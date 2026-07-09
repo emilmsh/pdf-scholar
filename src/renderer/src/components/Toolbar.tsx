@@ -7,6 +7,7 @@ import {
   IconFullscreen,
   IconMinus,
   IconPlus,
+  IconSearch,
   IconSidebar,
   IconTextSettings
 } from './icons'
@@ -26,6 +27,7 @@ interface Props {
   onZoomOut(): void
   onFitWidth(): void
   onSettingsChange(patch: Partial<Settings>): void
+  onToggleSearch(): void
   onToggleChrome(): void
   onToggleFullscreen(): void
 }
@@ -52,6 +54,7 @@ export default function Toolbar({
   onZoomOut,
   onFitWidth,
   onSettingsChange,
+  onToggleSearch,
   onToggleChrome,
   onToggleFullscreen
 }: Props): React.JSX.Element {
@@ -133,6 +136,10 @@ export default function Toolbar({
         </button>
 
         <div className="toolbar-sep" />
+
+        <button className="tb-btn" onClick={onToggleSearch} title="Søk i dokumentet (Ctrl+F)">
+          <IconSearch />
+        </button>
 
         <div className="theme-menu-anchor" ref={menuRef}>
           <button

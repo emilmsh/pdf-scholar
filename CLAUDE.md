@@ -23,6 +23,9 @@ A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in N
 - **Version pins**: electron-vite 5 requires vite ≤7 (vite 8 is out — do not upgrade blindly). pdf.js ships monthly majors — upgrade deliberately, `render`/TextLayer APIs churn.
 - pdf.js transfers the `data` buffer to its worker — always pass a copy (`payload.data.slice()`).
 - Drag-drop needs `webUtils.getPathForFile` in preload to recover the real path (`File.path` is gone in modern Electron).
+- **Full-page overlay hosts inside `.pdf-page` MUST be `pointer-events: none`** (only their interactive children `auto`) — otherwise they silently kill text selection. This bit us with the link layer.
+- **Zoom commits must anchor an exact page point** (pageIndex + in-page coords), not multiply scroll by the ratio — gaps/margins don't scale with zoom, and the transform must be removed in the same `useLayoutEffect` that sets the new scroll or pinch-release visibly jumps. Owner cares a lot about this being seamless.
+- Search maps text offsets → screen via the text-layer spans; spans correspond 1:1 to `getTextContent()` items with `str !== ''` (in order). If that invariant breaks (e.g. `includeMarkedContent` gets enabled), `resolveMatchRects` returns null.
 - The dev preview panel may attach multiple browser contexts to the same URL: console logs appear N times and `preview_click`/`preview_eval` can hit different contexts — do click + assert inside a single `preview_eval`.
 
 ## Conventions

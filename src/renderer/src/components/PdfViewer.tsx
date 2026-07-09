@@ -21,9 +21,12 @@ import {
 import type { PageAnnotation } from '../annotations'
 import PdfPage from './PdfPage'
 import Sidebar from './Sidebar'
+import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
+import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
+import type { PageText, SearchMatch, SearchOptions } from '../search'
 
 GlobalWorkerOptions.workerPort = new PdfWorker()
 
@@ -39,6 +42,7 @@ const RENDER_MARGIN = 800
 const GESTURE_SETTLE = 160
 
 const EMPTY_ANNOTS: PageAnnotation[] = []
+const EMPTY_RECTS: PageRect[] = []
 
 interface PageSize {
   w: number
@@ -93,6 +97,18 @@ export default function PdfViewer({
   const [backStack, setBackStack] = useState<{ page: number; offset: number }[]>([])
   const [pillEditing, setPillEditing] = useState(false)
   const [pillInput, setPillInput] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOptions, setSearchOptions] = useState<SearchOptions>({
+    matchCase: false,
+    wholeWords: false
+  })
+  const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
+  const [searchIndex, setSearchIndex] = useState(-1)
+  const [searchBusy, setSearchBusy] = useState(false)
+  const [searchHits, setSearchHits] = useState<{ pageNumber: number; rects: PageRect[] } | null>(
+    null
+  )
 
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
@@ -117,6 +133,10 @@ export default function PdfViewer({
     fy: number
     timer: number
   } | null>(null)
+  const pageTextsRef = useRef<PageText[] | null>(null)
+  const searchSeqRef = useRef(0)
+  const gotoSeqRef = useRef(0)
+  const searchJumpedRef = useRef(false)
 
   // ---------- Document loading ----------
 
@@ -180,6 +200,8 @@ export default function PdfViewer({
     }
     return { tops, lefts, total: y - PAGE_GAP + PAD_BOTTOM, contentWidth }
   }, [sizes, scale, containerWidth])
+  const layoutRef = useRef(layout)
+  layoutRef.current = layout
 
   const computeCurrent = useCallback((): { page: number; offset: number } | null => {
     const el = containerRef.current
@@ -697,6 +719,114 @@ export default function PdfViewer({
   const onInternalLink = useCallback((d: unknown) => linkActionsRef.current.internal(d), [])
   const onExternalLink = useCallback((u: string) => linkActionsRef.current.external(u), [])
 
+  // ---------- Search ----------
+
+  /** Poll until the page's text layer exists (it renders asynchronously) */
+  const waitForTextLayer = useCallback(
+    (pageNumber: number, timeoutMs = 4000): Promise<HTMLElement | null> =>
+      new Promise((resolve) => {
+        const t0 = Date.now()
+        const tick = (): void => {
+          const pageEl = containerRef.current?.querySelector<HTMLElement>(
+            `.pdf-page[data-page="${pageNumber}"]`
+          )
+          if (pageEl?.querySelector('.text-host .textLayer > span')) return resolve(pageEl)
+          if (Date.now() - t0 > timeoutMs) return resolve(pageEl ?? null)
+          window.setTimeout(tick, 120)
+        }
+        tick()
+      }),
+    []
+  )
+
+  const gotoMatch = useCallback(
+    async (matches: SearchMatch[], i: number, recordBack: boolean) => {
+      const el = containerRef.current
+      const lay = layoutRef.current
+      const texts = pageTextsRef.current
+      if (!el || !lay || !texts || matches.length === 0) return
+      const match = matches[i]
+      setSearchIndex(i)
+      if (recordBack) pushBack()
+      const seq = ++gotoSeqRef.current
+      // Bring the page into view so its text layer renders, then refine
+      el.scrollTop = Math.max(0, lay.tops[match.pageNumber - 1] - 8)
+      updateRange()
+      const pageEl = await waitForTextLayer(match.pageNumber)
+      if (seq !== gotoSeqRef.current || !pageEl) return
+      const rects = resolveMatchRects(pageEl, texts[match.pageNumber - 1], match, scaleRef.current)
+      if (!rects) {
+        setSearchHits(null)
+        return
+      }
+      setSearchHits({ pageNumber: match.pageNumber, rects })
+      const lay2 = layoutRef.current
+      if (lay2) {
+        el.scrollTop = Math.max(
+          0,
+          lay2.tops[match.pageNumber - 1] + rects[0].y * scaleRef.current - el.clientHeight * 0.35
+        )
+        updateRange()
+        schedulePositionSave()
+      }
+    },
+    [pushBack, updateRange, waitForTextLayer, schedulePositionSave]
+  )
+
+  // Debounced live search whenever the query/options change
+  useEffect(() => {
+    if (!searchOpen || !pdf) return
+    const seq = ++searchSeqRef.current
+    const query = searchQuery.trim()
+    if (!query) {
+      setSearchMatches([])
+      setSearchIndex(-1)
+      setSearchHits(null)
+      setSearchBusy(false)
+      return
+    }
+    setSearchBusy(true)
+    const timer = window.setTimeout(async () => {
+      try {
+        const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
+        if (seq !== searchSeqRef.current) return
+        const matches = findMatches(texts, query, searchOptions)
+        setSearchMatches(matches)
+        setSearchBusy(false)
+        if (matches.length > 0) {
+          const recordBack = !searchJumpedRef.current
+          searchJumpedRef.current = true
+          void gotoMatch(matches, 0, recordBack)
+        } else {
+          setSearchIndex(-1)
+          setSearchHits(null)
+        }
+      } catch {
+        if (seq === searchSeqRef.current) setSearchBusy(false)
+      }
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [searchOpen, searchQuery, searchOptions, pdf, gotoMatch])
+
+  const openSearch = useCallback(() => {
+    searchJumpedRef.current = false
+    setSearchOpen(true)
+  }, [])
+
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setSearchHits(null)
+  }, [])
+
+  const searchStep = useCallback(
+    (delta: number) => {
+      if (searchMatches.length === 0) return
+      const next = (searchIndex + delta + searchMatches.length) % searchMatches.length
+      void gotoMatch(searchMatches, next, false)
+    },
+    [searchMatches, searchIndex, gotoMatch]
+  )
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'F11') {
@@ -705,11 +835,18 @@ export default function PdfViewer({
       } else if (e.key === 'Escape') {
         if (noteDraft) setNoteDraft(null)
         else if (menu) setMenu(null)
+        else if (searchOpen) closeSearch()
         else if (fullscreen) toggleFullscreen()
         else if (chromeHidden) {
           setChromeHidden(false)
           setPeek(false)
         }
+      } else if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault()
+        openSearch()
+      } else if (e.key === 'F3') {
+        e.preventDefault()
+        searchStep(e.shiftKey ? -1 : 1)
       } else if (e.ctrlKey && (e.key === '+' || e.key === '=')) {
         e.preventDefault()
         zoomTo(scaleRef.current * 1.15)
@@ -723,7 +860,19 @@ export default function PdfViewer({
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [noteDraft, menu, fullscreen, chromeHidden, toggleFullscreen, zoomTo, fitWidth])
+  }, [
+    noteDraft,
+    menu,
+    searchOpen,
+    fullscreen,
+    chromeHidden,
+    toggleFullscreen,
+    closeSearch,
+    openSearch,
+    searchStep,
+    zoomTo,
+    fitWidth
+  ])
 
   // Focus the scroll container so PageUp/PageDown/arrows work immediately
   useEffect(() => {
@@ -776,6 +925,7 @@ export default function PdfViewer({
           onZoomOut={() => zoomTo(scaleRef.current / 1.15)}
           onFitWidth={fitWidth}
           onSettingsChange={onSettingsChange}
+          onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
           onToggleChrome={toggleChrome}
           onToggleFullscreen={toggleFullscreen}
         />
@@ -822,6 +972,9 @@ export default function PdfViewer({
                     scale={scale}
                     active={active}
                     annotations={sessionAnnots.get(pageNumber) ?? EMPTY_ANNOTS}
+                    searchRects={
+                      searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
+                    }
                     onInternalLink={onInternalLink}
                     onExternalLink={onExternalLink}
                   />
@@ -882,6 +1035,22 @@ export default function PdfViewer({
             {currentPage} av {sizes.length}
           </button>
         ))}
+
+      {searchOpen && (
+        <SearchBar
+          query={searchQuery}
+          options={searchOptions}
+          matches={searchMatches}
+          index={searchIndex}
+          busy={searchBusy}
+          onQueryChange={setSearchQuery}
+          onOptionsChange={setSearchOptions}
+          onNext={() => searchStep(1)}
+          onPrev={() => searchStep(-1)}
+          onPick={(i) => void gotoMatch(searchMatches, i, false)}
+          onClose={closeSearch}
+        />
+      )}
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
       {noteDraft && (

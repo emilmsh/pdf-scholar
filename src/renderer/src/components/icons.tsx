@@ -83,3 +83,10 @@ export const IconSidebar = (p: IconProps): React.JSX.Element => (
     <path d="M9.5 4v16" />
   </Svg>
 )
+
+export const IconSearch = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="M21 21l-4.8-4.8" />
+  </Svg>
+)

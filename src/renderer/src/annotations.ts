@@ -86,6 +86,36 @@ export function annotationCss(
 }
 
 /**
+ * Convert client rects (from a Range or Selection) into merged rects in page
+ * space, clipped to the given page element. Returns null when nothing lands
+ * on the page.
+ */
+export function clientRectsToPageRects(
+  rectList: Iterable<DOMRect>,
+  pageEl: HTMLElement,
+  scale: number
+): PageRect[] | null {
+  const pageRect = pageEl.getBoundingClientRect()
+  const rects: PageRect[] = []
+  for (const r of rectList) {
+    if (r.width < 1 || r.height < 2) continue
+    const left = Math.max(r.left, pageRect.left)
+    const right = Math.min(r.right, pageRect.right)
+    const top = Math.max(r.top, pageRect.top)
+    const bottom = Math.min(r.bottom, pageRect.bottom)
+    if (right - left < 1 || bottom - top < 2) continue
+    rects.push({
+      x: (left - pageRect.left) / scale,
+      y: (top - pageRect.top) / scale,
+      w: (right - left) / scale,
+      h: (bottom - top) / scale
+    })
+  }
+  if (rects.length === 0) return null
+  return mergeLineRects(rects)
+}
+
+/**
  * Convert the current DOM selection into merged rects in page space for the
  * given page element. Returns null when the selection does not intersect it.
  */
@@ -95,27 +125,11 @@ export function selectionRectsForPage(
   scale: number
 ): PageRect[] | null {
   if (selection.rangeCount === 0 || selection.isCollapsed) return null
-  const pageRect = pageEl.getBoundingClientRect()
-  const rects: PageRect[] = []
+  const all: DOMRect[] = []
   for (let i = 0; i < selection.rangeCount; i++) {
-    for (const r of selection.getRangeAt(i).getClientRects()) {
-      if (r.width < 1 || r.height < 2) continue
-      // Clip to this page
-      const left = Math.max(r.left, pageRect.left)
-      const right = Math.min(r.right, pageRect.right)
-      const top = Math.max(r.top, pageRect.top)
-      const bottom = Math.min(r.bottom, pageRect.bottom)
-      if (right - left < 1 || bottom - top < 2) continue
-      rects.push({
-        x: (left - pageRect.left) / scale,
-        y: (top - pageRect.top) / scale,
-        w: (right - left) / scale,
-        h: (bottom - top) / scale
-      })
-    }
+    all.push(...selection.getRangeAt(i).getClientRects())
   }
-  if (rects.length === 0) return null
-  return mergeLineRects(rects)
+  return clientRectsToPageRects(all, pageEl, scale)
 }
 
 /** Merge overlapping fragments on the same text line into single rects. */

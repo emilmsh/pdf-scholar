@@ -28,7 +28,8 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 - [x] Navigasjonshistorikk: «Tilbake til s. N»-pille etter alle hopp (lenker, TOC, miniatyrer, gå-til-side); full tilbake-stakk (levert 2026-07-09)
 - [x] Klikkbare hyperlenker i dokumentet: interne mål med presis Y-posisjon, eksterne åpnes i nettleser (levert 2026-07-09)
 - [x] Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett (levert 2026-07-09)
-- [ ] Søkelinje: skill store/små bokstaver, hele ord, marker alle, resultatliste, søkehistorikk
+- [x] Søkelinje (Ctrl+F): skill store/små bokstaver, hele ord (æøå-sikker), resultatliste med utdrag, treffmarkering på siden, F3/Shift+F3, søkehopp gir tilbake-pille (levert 2026-07-09)
+- [ ] Marker alle treff samtidig; søkehistorikk
 - [ ] Bokmerker-fane utvalg
 
 ## Fase 4 — Annoteringsfundament (Emils prioritet nr. 2)

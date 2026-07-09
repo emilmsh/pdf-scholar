@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from 'react'
 import { TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PageRect } from '../../../shared/types'
 import type { PageAnnotation } from '../annotations'
 import { annotationCss } from '../annotations'
 
@@ -16,6 +17,8 @@ interface Props {
   active: boolean
   /** Annotations created this session, drawn by the overlay (PDF page space) */
   annotations: PageAnnotation[]
+  /** Rects of the active search match on this page (page space) */
+  searchRects: PageRect[]
   /** Stable callbacks (identity must not change with viewer state) */
   onInternalLink(dest: unknown): void
   onExternalLink(url: string): void
@@ -35,6 +38,7 @@ function PdfPage({
   scale,
   active,
   annotations,
+  searchRects,
   onInternalLink,
   onExternalLink
 }: Props): React.JSX.Element {
@@ -154,6 +158,17 @@ function PdfPage({
         <div className="annot-overlay">
           {annotations.map((a) => (
             <AnnotationMarks key={a.id} annotation={a} scale={scale} pageHeight={cssHeight / scale} />
+          ))}
+        </div>
+      )}
+      {searchRects.length > 0 && (
+        <div className="annot-overlay">
+          {searchRects.map((r, i) => (
+            <div
+              key={i}
+              className="search-hit"
+              style={{ left: r.x * scale, top: r.y * scale, width: r.w * scale, height: r.h * scale }}
+            />
           ))}
         </div>
       )}
