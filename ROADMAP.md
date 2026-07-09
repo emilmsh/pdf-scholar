@@ -17,16 +17,19 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 - [ ] Jump List («Recent»-kategori) i oppgavelinjen
 
 ## Fase 2 — Leseopplevelse + temaer (Emils prioritet nr. 1)
-- Justerbar **kontrast** (og lysstyrke) per lesemodus; Auto-tema som følger Windows
-- «aA»-panel: rulleretning (vertikal kontinuerlig / horisontal én-side), to-siders oppslag, beskjær marger, hold skjermen våken
-- Distraksjonsfri: klikk midt på siden skjuler/viser alt; flytende sidetall-pille nede til høyre (klikk = gå til side)
-- Venstre sidepanel med Miniatyrer + Innholdsfortegnelse (TOC); klikk for å hoppe
+- [x] Justerbar **kontrast** og **lysstyrke** per lesemodus (glidere i «aA»-panelet, lagres per tema); Auto-tema som følger Windows (levert 2026-07-09)
+- [x] Hold skjermen våken (powerSaveBlocker) (levert 2026-07-09)
+- [x] Flytende sidetall-pille nede til høyre i distraksjonsfri modus (klikk = gå til side) (levert 2026-07-09)
+- [x] Venstre sidepanel med Miniatyrer + Innholdsfortegnelse (TOC); klikk for å hoppe (levert 2026-07-09)
+- [ ] «aA»-panel: rulleretning (vertikal kontinuerlig / horisontal én-side), to-siders oppslag, beskjær marger
+- Merk: «klikk midt på siden skjuler alt» er en iPad-gest; på desktop bruker vi knapp/F11 + pek-mot-toppen for å hente verktøylinjen (bevisst tilpasning)
 
 ## Fase 3 — Navigasjonsdybde + søk
-- Navigasjonshistorikk: «Tilbake til s. N»-pille etter alle hopp (lenker, TOC, søk, gå-til-side); full tilbake-stakk
-- Søkelinje: skill store/små bokstaver, hele ord, marker alle, resultatliste, søkehistorikk
-- Bokmerker-fane
-- ~~Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett~~ ✅ levert 2026-07-09 (høyreklikk eller meny som spretter opp ved markering) utvalg
+- [x] Navigasjonshistorikk: «Tilbake til s. N»-pille etter alle hopp (lenker, TOC, miniatyrer, gå-til-side); full tilbake-stakk (levert 2026-07-09)
+- [x] Klikkbare hyperlenker i dokumentet: interne mål med presis Y-posisjon, eksterne åpnes i nettleser (levert 2026-07-09)
+- [x] Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett (levert 2026-07-09)
+- [ ] Søkelinje: skill store/små bokstaver, hele ord, marker alle, resultatliste, søkehistorikk
+- [ ] Bokmerker-fane utvalg
 
 ## Fase 4 — Annoteringsfundament (Emils prioritet nr. 2)
 Grunnmuren ble levert 2026-07-09: mupdf `AnnotationEngine` i hovedprosessen bak typet IPC skriver Highlight (5 farger)/Underline/StrikeOut/notater som standard PDF-annotasjoner med appearance streams, inkrementell lagring og atomisk filbytte (rundtur verifisert med mupdf-gjenåpning); overlegg tegner dem umiddelbart. Gjenstår:
