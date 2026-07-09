@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ReadingPosition, RecentFile, Settings } from '../shared/types'
+export type { Settings }
 
 export interface WindowState {
   x?: number
@@ -21,18 +22,39 @@ export interface AppState {
 const DEFAULTS: AppState = {
   recents: [],
   positions: {},
-  settings: { theme: 'day' }
+  settings: {
+    theme: 'day',
+    themeAdjust: {
+      day: { contrast: 1, brightness: 1 },
+      sepia: { contrast: 1, brightness: 1 },
+      night: { contrast: 1, brightness: 1 }
+    },
+    keepAwake: false
+  }
 }
 
 let cached: AppState | null = null
 
 const stateFile = (): string => join(app.getPath('userData'), 'pdfx-state.json')
 
+export function mergeSettings(base: Settings, patch: Partial<Settings>): Settings {
+  return {
+    ...base,
+    ...patch,
+    themeAdjust: { ...base.themeAdjust, ...patch.themeAdjust }
+  }
+}
+
 export function getState(): AppState {
   if (cached) return cached
   let loaded: AppState
   try {
-    loaded = { ...DEFAULTS, ...JSON.parse(readFileSync(stateFile(), 'utf-8')) }
+    const parsed = JSON.parse(readFileSync(stateFile(), 'utf-8'))
+    loaded = {
+      ...DEFAULTS,
+      ...parsed,
+      settings: mergeSettings(DEFAULTS.settings, parsed.settings ?? {})
+    }
   } catch {
     loaded = structuredClone(DEFAULTS)
   }

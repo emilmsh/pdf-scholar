@@ -1,5 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import type { FilePayload, ReadingPosition, RecentFile, ThemeName } from '../../shared/types'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type {
+  FilePayload,
+  ReadingPosition,
+  RecentFile,
+  Settings,
+  ThemeName
+} from '../../shared/types'
 import { bridge } from './bridge'
 import PdfViewer from './components/PdfViewer'
 import Welcome from './components/Welcome'
@@ -9,16 +15,52 @@ interface OpenDocument {
   initialPosition: ReadingPosition | null
 }
 
+const FALLBACK_SETTINGS: Settings = {
+  theme: 'day',
+  themeAdjust: {
+    day: { contrast: 1, brightness: 1 },
+    sepia: { contrast: 1, brightness: 1 },
+    night: { contrast: 1, brightness: 1 }
+  },
+  keepAwake: false
+}
+
 export default function App(): React.JSX.Element {
   const [doc, setDoc] = useState<OpenDocument | null>(null)
   const [recents, setRecents] = useState<RecentFile[]>([])
-  const [theme, setThemeState] = useState<ThemeName>('day')
+  const [settings, setSettingsState] = useState<Settings>(FALLBACK_SETTINGS)
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  )
   const [error, setError] = useState<string | null>(null)
 
-  const applyTheme = useCallback((t: ThemeName, persist = true) => {
-    setThemeState(t)
-    document.documentElement.dataset.theme = t
-    if (persist) bridge.setTheme(t)
+  const resolvedTheme: ThemeName =
+    settings.theme === 'auto' ? (systemDark ? 'night' : 'day') : settings.theme
+
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
+    if (!mq) return
+    const onChange = (e: MediaQueryListEvent): void => setSystemDark(e.matches)
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  // Apply resolved theme + per-theme page adjustments as CSS variables
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.theme = resolvedTheme
+    const adjust = settings.themeAdjust[resolvedTheme]
+    root.style.setProperty('--page-contrast', String(adjust.contrast))
+    root.style.setProperty('--page-brightness', String(adjust.brightness))
+  }, [resolvedTheme, settings.themeAdjust])
+
+  const updateSettings = useCallback((patch: Partial<Settings>) => {
+    setSettingsState((prev) => ({
+      ...prev,
+      ...patch,
+      themeAdjust: { ...prev.themeAdjust, ...patch.themeAdjust }
+    }))
+    bridge.setSettings(patch)
   }, [])
 
   const refreshRecents = useCallback(() => {
@@ -54,13 +96,13 @@ export default function App(): React.JSX.Element {
   }, [openPayload])
 
   useEffect(() => {
-    bridge.getSettings().then((s) => applyTheme(s.theme, false))
+    bridge.getSettings().then(setSettingsState)
     refreshRecents()
     bridge.getPendingPath().then((path) => {
       if (path) openPath(path)
     })
     return bridge.onOpenPath((path) => openPath(path))
-  }, [applyTheme, refreshRecents, openPath])
+  }, [refreshRecents, openPath])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -71,7 +113,11 @@ export default function App(): React.JSX.Element {
       if (realPath) {
         await openPath(realPath)
       } else {
-        await openPayload({ path: file.name, name: file.name, data: new Uint8Array(await file.arrayBuffer()) })
+        await openPayload({
+          path: file.name,
+          name: file.name,
+          data: new Uint8Array(await file.arrayBuffer())
+        })
       }
     },
     [openPath, openPayload]
@@ -81,6 +127,21 @@ export default function App(): React.JSX.Element {
     setDoc(null)
     refreshRecents()
   }, [refreshRecents])
+
+  const viewer = useMemo(() => {
+    if (!doc) return null
+    return (
+      <PdfViewer
+        key={doc.payload.path}
+        payload={doc.payload}
+        initialPosition={doc.initialPosition}
+        settings={settings}
+        resolvedTheme={resolvedTheme}
+        onSettingsChange={updateSettings}
+        onClose={closeDocument}
+      />
+    )
+  }, [doc, settings, resolvedTheme, updateSettings, closeDocument])
 
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
@@ -92,18 +153,7 @@ export default function App(): React.JSX.Element {
           </button>
         </div>
       )}
-      {doc ? (
-        <PdfViewer
-          key={doc.payload.path}
-          payload={doc.payload}
-          initialPosition={doc.initialPosition}
-          theme={theme}
-          onThemeChange={applyTheme}
-          onClose={closeDocument}
-        />
-      ) : (
-        <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
-      )}
+      {viewer ?? <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />}
     </div>
   )
 }

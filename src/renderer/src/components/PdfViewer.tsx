@@ -7,6 +7,7 @@ import type {
   FilePayload,
   PageRect,
   ReadingPosition,
+  Settings,
   ThemeName
 } from '../../../shared/types'
 import { bridge } from '../bridge'
@@ -19,6 +20,7 @@ import {
 } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import PdfPage from './PdfPage'
+import Sidebar from './Sidebar'
 import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
@@ -53,8 +55,9 @@ interface NoteDraft {
 interface Props {
   payload: FilePayload
   initialPosition: ReadingPosition | null
-  theme: ThemeName
-  onThemeChange(theme: ThemeName): void
+  settings: Settings
+  resolvedTheme: ThemeName
+  onSettingsChange(patch: Partial<Settings>): void
   onClose(): void
 }
 
@@ -65,8 +68,9 @@ function clamp(v: number, min: number, max: number): number {
 export default function PdfViewer({
   payload,
   initialPosition,
-  theme,
-  onThemeChange,
+  settings,
+  resolvedTheme,
+  onSettingsChange,
   onClose
 }: Props): React.JSX.Element {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -85,6 +89,10 @@ export default function PdfViewer({
   const [sessionAnnots, setSessionAnnots] = useState<ReadonlyMap<number, PageAnnotation[]>>(
     new Map()
   )
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [backStack, setBackStack] = useState<{ page: number; offset: number }[]>([])
+  const [pillEditing, setPillEditing] = useState(false)
+  const [pillInput, setPillInput] = useState('')
 
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
@@ -581,6 +589,74 @@ export default function PdfViewer({
     [layout]
   )
 
+  // ---------- Navigation history ----------
+
+  const pushBack = useCallback(() => {
+    const current = computeCurrent()
+    if (current) setBackStack((s) => [...s.slice(-49), current])
+  }, [computeCurrent])
+
+  /** Jump with a breadcrumb so the reader can return (sidebar, links, go-to) */
+  const jumpToPage = useCallback(
+    (page: number) => {
+      pushBack()
+      goToPage(page)
+    },
+    [pushBack, goToPage]
+  )
+
+  const goBack = useCallback(() => {
+    const el = containerRef.current
+    if (!el || !layout) return
+    setBackStack((stack) => {
+      const target = stack[stack.length - 1]
+      if (target) {
+        const page = clamp(target.page, 1, layout.tops.length)
+        el.scrollTop = layout.tops[page - 1] + target.offset * sizes[page - 1].h * scale - 8
+      }
+      return stack.slice(0, -1)
+    })
+  }, [layout, sizes, scale])
+
+  const jumpToDest = useCallback(
+    async (dest: unknown) => {
+      const el = containerRef.current
+      if (!pdf || !el || !layout) return
+      try {
+        const explicit =
+          typeof dest === 'string' ? await pdf.getDestination(dest) : (dest as unknown[] | null)
+        if (!Array.isArray(explicit) || explicit.length === 0) return
+        const ref = explicit[0]
+        const pageIndex = typeof ref === 'number' ? ref : await pdf.getPageIndex(ref as never)
+        if (pageIndex < 0 || pageIndex >= sizes.length) return
+        pushBack()
+        // XYZ destinations carry a precise y in PDF user space (bottom-up)
+        const destName = (explicit[1] as { name?: string } | undefined)?.name
+        let top = layout.tops[pageIndex] - 8
+        if (destName === 'XYZ' && typeof explicit[3] === 'number') {
+          const pageH = sizes[pageIndex].h
+          top = layout.tops[pageIndex] + clamp(pageH - explicit[3], 0, pageH) * scale - 8
+        }
+        el.scrollTop = Math.max(0, top)
+      } catch (err) {
+        console.error('pdfx: klarte ikke å følge lenken', err)
+      }
+    },
+    [pdf, layout, sizes, scale, pushBack]
+  )
+
+  // Stable identities for PdfPage — new callbacks would re-render page canvases
+  const linkActionsRef = useRef({
+    internal: (_d: unknown): void => {},
+    external: (_u: string): void => {}
+  })
+  linkActionsRef.current = {
+    internal: (d: unknown) => void jumpToDest(d),
+    external: (u: string) => bridge.openExternal(u)
+  }
+  const onInternalLink = useCallback((d: unknown) => linkActionsRef.current.internal(d), [])
+  const onExternalLink = useCallback((u: string) => linkActionsRef.current.external(u), [])
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'F11') {
@@ -650,60 +726,122 @@ export default function PdfViewer({
           page={currentPage}
           pageCount={sizes.length}
           zoomPercent={scale > 0 ? Math.round(scale * 100) : 100}
-          theme={theme}
+          settings={settings}
+          resolvedTheme={resolvedTheme}
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
           onBack={onClose}
-          onGoToPage={goToPage}
+          onGoToPage={jumpToPage}
           onZoomIn={() => zoomTo(scaleRef.current * 1.15)}
           onZoomOut={() => zoomTo(scaleRef.current / 1.15)}
           onFitWidth={fitWidth}
-          onThemeChange={onThemeChange}
+          onSettingsChange={onSettingsChange}
           onToggleChrome={toggleChrome}
           onToggleFullscreen={toggleFullscreen}
         />
       </div>
       {chromeHidden && <div className="reveal-zone" onMouseEnter={() => setPeek(true)} />}
 
-      <div
-        className="pages"
-        ref={containerRef}
-        tabIndex={-1}
-        onScroll={onScroll}
-        onContextMenu={onContextMenu}
-        onMouseUp={onMouseUp}
-        onMouseDown={onMouseDown}
-      >
-        {layout && pdf ? (
-          <div
-            className="pages-inner"
-            ref={innerRef}
-            style={{ height: layout.total, width: layout.contentWidth }}
-          >
-            {sizes.map((size, i) => {
-              const pageNumber = i + 1
-              const active = pageNumber >= range[0] && pageNumber <= range[1]
-              return (
-                <PdfPage
-                  key={pageNumber}
-                  pdf={pdf}
-                  pageNumber={pageNumber}
-                  top={layout.tops[i]}
-                  left={layout.lefts[i]}
-                  cssWidth={size.w * scale}
-                  cssHeight={size.h * scale}
-                  scale={scale}
-                  active={active}
-                  annotations={sessionAnnots.get(pageNumber) ?? EMPTY_ANNOTS}
-                />
-              )
-            })}
-          </div>
-        ) : (
-          <div className="viewer-loading">
-            <div className="spinner" />
-            <span>Åpner {payload.name} …</span>
-          </div>
-        )}
+      <div className="viewer-body">
+        <Sidebar
+          open={sidebarOpen && !chromeHidden}
+          pdf={pdf}
+          sizes={sizes}
+          currentPage={currentPage}
+          onJumpToPage={jumpToPage}
+          onJumpToDest={(d) => void jumpToDest(d)}
+        />
+
+        <div
+          className="pages"
+          ref={containerRef}
+          tabIndex={-1}
+          onScroll={onScroll}
+          onContextMenu={onContextMenu}
+          onMouseUp={onMouseUp}
+          onMouseDown={onMouseDown}
+        >
+          {layout && pdf ? (
+            <div
+              className="pages-inner"
+              ref={innerRef}
+              style={{ height: layout.total, width: layout.contentWidth }}
+            >
+              {sizes.map((size, i) => {
+                const pageNumber = i + 1
+                const active = pageNumber >= range[0] && pageNumber <= range[1]
+                return (
+                  <PdfPage
+                    key={pageNumber}
+                    pdf={pdf}
+                    pageNumber={pageNumber}
+                    top={layout.tops[i]}
+                    left={layout.lefts[i]}
+                    cssWidth={size.w * scale}
+                    cssHeight={size.h * scale}
+                    scale={scale}
+                    active={active}
+                    annotations={sessionAnnots.get(pageNumber) ?? EMPTY_ANNOTS}
+                    onInternalLink={onInternalLink}
+                    onExternalLink={onExternalLink}
+                  />
+                )
+              })}
+            </div>
+          ) : (
+            <div className="viewer-loading">
+              <div className="spinner" />
+              <span>Åpner {payload.name} …</span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {backStack.length > 0 && layout && (
+        <button className="back-pill" onClick={goBack}>
+          ‹ Tilbake til s. {backStack[backStack.length - 1].page}
+        </button>
+      )}
+
+      {chromeHidden &&
+        layout &&
+        (pillEditing ? (
+          <form
+            className="page-pill editing"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const n = parseInt(pillInput, 10)
+              if (!Number.isNaN(n)) jumpToPage(n)
+              setPillEditing(false)
+            }}
+          >
+            <input
+              autoFocus
+              value={pillInput}
+              onChange={(e) => setPillInput(e.target.value.replace(/[^0-9]/g, ''))}
+              onBlur={() => setPillEditing(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.stopPropagation()
+                  setPillEditing(false)
+                }
+              }}
+              aria-label="Gå til side"
+            />
+            <span>av {sizes.length}</span>
+          </form>
+        ) : (
+          <button
+            className="page-pill"
+            title="Gå til side"
+            onClick={() => {
+              setPillInput(String(currentPage))
+              setPillEditing(true)
+            }}
+          >
+            {currentPage} av {sizes.length}
+          </button>
+        ))}
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
       {noteDraft && (

@@ -1,9 +1,15 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, powerSaveBlocker, shell } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
-import type { AnnotateRequest, FileError, FilePayload, ReadingPosition, ThemeName } from '../shared/types'
+import type {
+  AnnotateRequest,
+  FileError,
+  FilePayload,
+  ReadingPosition,
+  Settings
+} from '../shared/types'
 import { applyAnnotation } from './annotation-engine'
-import { addRecent, getState, saveState, setPosition } from './storage'
+import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
 
 let mainWindow: BrowserWindow | null = null
 // A .pdf path passed on the command line (double-click in Explorer / "Open with")
@@ -31,6 +37,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     registerIpc()
+    applyKeepAwake(getState().settings.keepAwake)
     createWindow()
 
     app.on('activate', () => {
@@ -127,9 +134,11 @@ function registerIpc(): void {
 
   ipcMain.on('position:set', (_e, path: string, pos: ReadingPosition) => setPosition(path, pos))
 
-  ipcMain.on('theme:set', (_e, theme: ThemeName) => {
-    getState().settings.theme = theme
+  ipcMain.on('settings:set', (_e, patch: Partial<Settings>) => {
+    const state = getState()
+    state.settings = mergeSettings(state.settings, patch)
     saveState()
+    applyKeepAwake(state.settings.keepAwake)
   })
 
   ipcMain.handle('annotate', (_e, req: AnnotateRequest) => applyAnnotation(req))
@@ -141,4 +150,14 @@ function registerIpc(): void {
   ipcMain.on('window:set-fullscreen', (_e, on: boolean) => {
     mainWindow?.setFullScreen(!!on)
   })
+}
+
+let keepAwakeId: number | null = null
+function applyKeepAwake(on: boolean): void {
+  if (on && keepAwakeId === null) {
+    keepAwakeId = powerSaveBlocker.start('prevent-display-sleep')
+  } else if (!on && keepAwakeId !== null) {
+    powerSaveBlocker.stop(keepAwakeId)
+    keepAwakeId = null
+  }
 }

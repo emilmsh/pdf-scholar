@@ -16,6 +16,9 @@ interface Props {
   active: boolean
   /** Annotations created this session, drawn by the overlay (PDF page space) */
   annotations: PageAnnotation[]
+  /** Stable callbacks (identity must not change with viewer state) */
+  onInternalLink(dest: unknown): void
+  onExternalLink(url: string): void
 }
 
 interface Cancellable {
@@ -31,19 +34,24 @@ function PdfPage({
   cssHeight,
   scale,
   active,
-  annotations
+  annotations,
+  onInternalLink,
+  onExternalLink
 }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
+  const linkRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const host = hostRef.current
     const textHost = textRef.current
-    if (!host || !textHost) return
+    const linkHost = linkRef.current
+    if (!host || !textHost || !linkHost) return
     if (!active) {
       // Free bitmap + text nodes when far outside the viewport
       host.replaceChildren()
       textHost.replaceChildren()
+      linkHost.replaceChildren()
       return
     }
 
@@ -86,6 +94,37 @@ function PdfPage({
       endOfContent.className = 'endOfContent'
       textDiv.append(endOfContent)
       textHost.replaceChildren(textDiv)
+
+      // Clickable link annotations (internal destinations + external URLs)
+      const annots = (await page.getAnnotations()) as {
+        subtype: string
+        rect: number[]
+        url?: string
+        dest?: unknown
+      }[]
+      if (cancelled) return
+      const links = annots.filter((a) => a.subtype === 'Link' && (a.url || a.dest))
+      const frag = document.createDocumentFragment()
+      for (const link of links) {
+        const [px1, py1] = viewport.convertToViewportPoint(link.rect[0], link.rect[1])
+        const [px2, py2] = viewport.convertToViewportPoint(link.rect[2], link.rect[3])
+        const anchor = document.createElement('a')
+        anchor.className = 'pdf-link'
+        anchor.href = '#'
+        anchor.style.left = `${Math.min(px1, px2)}px`
+        anchor.style.top = `${Math.min(py1, py2)}px`
+        anchor.style.width = `${Math.abs(px2 - px1)}px`
+        anchor.style.height = `${Math.abs(py2 - py1)}px`
+        if (link.url) anchor.title = link.url
+        anchor.addEventListener('click', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          if (link.url) onExternalLink(link.url)
+          else if (link.dest) onInternalLink(link.dest)
+        })
+        frag.append(anchor)
+      }
+      linkHost.replaceChildren(frag)
     })().catch((err: unknown) => {
       const name = err instanceof Error ? err.name : ''
       if (!cancelled && name !== 'RenderingCancelledException' && name !== 'AbortException') {
@@ -98,7 +137,7 @@ function PdfPage({
       renderTask?.cancel()
       textLayer?.cancel()
     }
-  }, [pdf, pageNumber, scale, active])
+  }, [pdf, pageNumber, scale, active, onInternalLink, onExternalLink])
 
   const style = {
     top,
@@ -119,6 +158,7 @@ function PdfPage({
         </div>
       )}
       <div className="text-host" ref={textRef} />
+      <div className="link-host" ref={linkRef} />
     </div>
   )
 }

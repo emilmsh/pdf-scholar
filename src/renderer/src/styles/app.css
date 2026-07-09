@@ -412,8 +412,64 @@ button {
   border-radius: 12px;
   box-shadow: var(--shadow-menu);
   padding: 12px;
-  min-width: 218px;
+  min-width: 264px;
   z-index: 40;
+}
+
+.theme-menu input[type='range'] {
+  width: 100%;
+  margin: 2px 0 10px;
+  accent-color: var(--accent);
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 4px;
+}
+
+.slider-label output {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.theme-menu-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.menu-reset {
+  font-size: 11.5px;
+  color: var(--accent);
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.menu-reset:hover {
+  background: var(--hover);
+}
+
+.theme-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 10px -4px;
+}
+
+.theme-menu-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.theme-menu-toggle input {
+  accent-color: var(--accent);
 }
 
 .theme-menu-label {
@@ -468,6 +524,209 @@ button {
   color: #ececf0;
 }
 
+.theme-option.theme-auto {
+  background: linear-gradient(105deg, #ffffff 49.5%, #1e1e22 50.5%);
+  color: #8a8a92;
+}
+
+/* Viewer body: sidebar + pages side by side */
+
+.viewer-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-chrome);
+  border-right: 1px solid transparent;
+  transition: width 0.18s ease;
+}
+
+.sidebar.open {
+  width: 178px;
+  border-right-color: var(--border);
+}
+
+.sidebar-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+}
+
+.sidebar-tabs button {
+  flex: 1;
+  padding: 5px 0;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sidebar-tabs button:hover {
+  background: var(--hover);
+}
+
+.sidebar-tabs button.active {
+  background: var(--active);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.thumb-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px;
+  border-radius: 9px;
+  border: 2px solid transparent;
+}
+
+.thumb:hover {
+  background: var(--hover);
+}
+
+.thumb.current {
+  border-color: var(--accent);
+}
+
+.thumb span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.thumb-canvas {
+  background: var(--page-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.thumb-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: var(--page-filter) contrast(var(--page-contrast, 1)) brightness(var(--page-brightness, 1));
+}
+
+.outline-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px 12px;
+}
+
+.sidebar-empty {
+  padding: 14px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.outline-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.outline-chevron {
+  width: 16px;
+  height: 22px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  border-radius: 5px;
+  transition: transform 0.12s;
+}
+
+.outline-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.outline-chevron:hover {
+  background: var(--hover);
+}
+
+.outline-chevron-spacer {
+  width: 16px;
+  flex-shrink: 0;
+}
+
+.outline-title {
+  flex: 1;
+  text-align: left;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-title:hover {
+  background: var(--hover);
+}
+
+/* ---------- Floating pills ---------- */
+
+.back-pill,
+.page-pill {
+  position: absolute;
+  bottom: 22px;
+  z-index: 45;
+  padding: 8px 15px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-menu);
+  font-size: 12.5px;
+  font-weight: 600;
+  animation: menu-in 0.15s ease;
+}
+
+.back-pill {
+  left: 22px;
+  color: var(--accent);
+}
+
+.back-pill:hover,
+.page-pill:hover {
+  filter: brightness(1.04);
+}
+
+.page-pill {
+  right: 22px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.page-pill.editing input {
+  width: 44px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-chrome);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  text-align: center;
+  outline: none;
+  padding: 1px 2px;
+}
+
 /* Pages */
 
 .pages {
@@ -500,7 +759,7 @@ button {
   width: 100%;
   height: 100%;
   border-radius: 2px;
-  filter: var(--page-filter);
+  filter: var(--page-filter) contrast(var(--page-contrast, 1)) brightness(var(--page-brightness, 1));
 }
 
 /* Session annotation overlay (between canvas and text layer) */
@@ -589,6 +848,25 @@ button {
 
 .textLayer ::selection {
   background: color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+/* Link annotations (clickable areas above the text layer) */
+
+.link-host {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+}
+
+.pdf-link {
+  position: absolute;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.pdf-link:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 /* Loading / errors / toast */

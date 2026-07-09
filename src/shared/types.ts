@@ -1,9 +1,19 @@
 // Types shared between the Electron main process, preload bridge and renderer.
 
 export type ThemeName = 'day' | 'sepia' | 'night'
+/** User's theme choice — 'auto' follows the OS light/dark setting */
+export type ThemePreference = ThemeName | 'auto'
+
+/** Per-theme page adjustments; 1 = neutral, sensible range 0.6–1.4 */
+export interface ThemeAdjust {
+  contrast: number
+  brightness: number
+}
 
 export interface Settings {
-  theme: ThemeName
+  theme: ThemePreference
+  themeAdjust: Record<ThemeName, ThemeAdjust>
+  keepAwake: boolean
 }
 
 export interface RecentFile {
@@ -64,7 +74,7 @@ export interface PdfxApi {
   getPosition(path: string): Promise<ReadingPosition | null>
   getPendingPath(): Promise<string | null>
   setPosition(path: string, pos: ReadingPosition): void
-  setTheme(theme: ThemeName): void
+  setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (mupdf, incremental save) */
   annotate(req: AnnotateRequest): Promise<AnnotateResult>
   /** Open an http(s) URL in the system browser */

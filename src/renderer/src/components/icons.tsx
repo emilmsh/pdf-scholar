@@ -76,3 +76,10 @@ export const IconFullscreen = (p: IconProps): React.JSX.Element => (
     <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
   </Svg>
 )
+
+export const IconSidebar = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M9.5 4v16" />
+  </Svg>
+)
