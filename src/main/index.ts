@@ -1,0 +1,133 @@
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { readFile } from 'node:fs/promises'
+import { basename, join, resolve } from 'node:path'
+import type { FileError, FilePayload, ReadingPosition, ThemeName } from '../shared/types'
+import { addRecent, getState, saveState, setPosition } from './storage'
+
+let mainWindow: BrowserWindow | null = null
+// A .pdf path passed on the command line (double-click in Explorer / "Open with")
+let pendingPath: string | null = pathFromArgv(process.argv)
+
+function pathFromArgv(argv: string[]): string | null {
+  const arg = argv.slice(1).find((a) => !a.startsWith('-') && a.toLowerCase().endsWith('.pdf'))
+  return arg ? resolve(arg) : null
+}
+
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    const path = pathFromArgv(argv)
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+      if (path) mainWindow.webContents.send('open-path', path)
+    } else if (path) {
+      pendingPath = path
+    }
+  })
+
+  app.whenReady().then(() => {
+    registerIpc()
+    createWindow()
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
+
+  app.on('window-all-closed', () => {
+    app.quit()
+  })
+}
+
+function createWindow(): void {
+  const state = getState()
+  mainWindow = new BrowserWindow({
+    width: state.window?.width ?? 1280,
+    height: state.window?.height ?? 860,
+    x: state.window?.x,
+    y: state.window?.y,
+    minWidth: 640,
+    minHeight: 480,
+    show: false,
+    autoHideMenuBar: true,
+    backgroundColor: '#1c1c1e',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js')
+    }
+  })
+
+  if (state.window?.maximized) mainWindow.maximize()
+
+  mainWindow.once('ready-to-show', () => mainWindow?.show())
+
+  mainWindow.on('close', () => {
+    if (!mainWindow) return
+    const bounds = mainWindow.getNormalBounds()
+    getState().window = { ...bounds, maximized: mainWindow.isMaximized() }
+    saveState()
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
+  // Open external links in the system browser, never inside the app
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+async function loadPdf(path: string): Promise<FilePayload | FileError> {
+  try {
+    const data = await readFile(path)
+    const name = basename(path)
+    addRecent(path, name)
+    app.addRecentDocument(path)
+    return { path, name, data: new Uint8Array(data) }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function registerIpc(): void {
+  ipcMain.handle('dialog:open', async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
+      properties: ['openFile']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return loadPdf(result.filePaths[0])
+  })
+
+  ipcMain.handle('file:read', (_e, path: string) => loadPdf(path))
+
+  ipcMain.handle('recents:get', () => getState().recents)
+
+  ipcMain.handle('settings:get', () => getState().settings)
+
+  ipcMain.handle('position:get', (_e, path: string) => getState().positions[path] ?? null)
+
+  ipcMain.handle('pending-path:get', () => {
+    const path = pendingPath
+    pendingPath = null
+    return path
+  })
+
+  ipcMain.on('position:set', (_e, path: string, pos: ReadingPosition) => setPosition(path, pos))
+
+  ipcMain.on('theme:set', (_e, theme: ThemeName) => {
+    getState().settings.theme = theme
+    saveState()
+  })
+}
