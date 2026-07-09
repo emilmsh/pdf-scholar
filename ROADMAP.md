@@ -26,6 +26,8 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 
 ## Fase 3 — Navigasjonsdybde + søk
 - [x] Navigasjonshistorikk: «Tilbake til s. N»-pille etter alle hopp (lenker, TOC, miniatyrer, gå-til-side); full tilbake-stakk (levert 2026-07-09)
+- [x] Frem-navigasjon: Alt+← / Alt+→, frem/tilbake-knapper i verktøylinjen og «Frem til s. N»-pille (levert 2026-07-09)
+- [x] Pinch-zoom snapper til tilpass-bredde/-høyde/-side når man slipper nær (levert 2026-07-09)
 - [x] Klikkbare hyperlenker i dokumentet: interne mål med presis Y-posisjon, eksterne åpnes i nettleser (levert 2026-07-09)
 - [x] Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett (levert 2026-07-09)
 - [x] Søkelinje (Ctrl+F): skill store/små bokstaver, hele ord (æøå-sikker), resultatliste med utdrag, treffmarkering på siden, F3/Shift+F3, søkehopp gir tilbake-pille (levert 2026-07-09)
@@ -39,6 +41,8 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] Squiggly (bølgestrek) i kontekstmenyen
 - [x] Merknader-fane i sidepanelet: alle annotasjoner gruppert per side med farge/tekst/forfatter; klikk hopper, hover-slett
 - [x] Sømløs dokument-gjenåpning etter redigering (én pdf.js-worker per dokument)
+- [x] Kommentar kan knyttes til ALLE annotasjonstyper via popoveren, ikke bare notater (levert 2026-07-09)
+- [x] Angre/gjør om for annotasjoner: Ctrl+Z / Ctrl+Shift+Z (også Ctrl+Y) som inverterbare motoroperasjoner — fungerer også på tvers av dokument-gjenåpninger (levert 2026-07-09, opprinnelig fase 5-punkt)
 - [ ] «Armert verktøy»-flyt (verktøyet forblir aktivt for gjentatt bruk)
 - [ ] Egendefinert fargevelger + opasitetskontroll (5-feltspalett finnes)
 - [ ] **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF/PDF Expert (iPad) og verifiser identisk visning — Emils manuelle test gjenstår
@@ -50,10 +54,14 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - Verktøysett-system i verktøylinjen
 
 ## Fase 6 — Annotasjonspanel + eksport (Emils prioritet nr. 3)
-- Annotasjoner-fane: liste gruppert per side med faktisk markert tekst + notatinnhold; klikk for å hoppe
-- Søk i annotasjoner + fargefilter; slett enkeltvis; tøm alle
-- **Eksporter annotasjonssammendrag** som HTML, tekst og Markdown
-- «Annoterte sider»: ny PDF med kun sider som har annotasjoner
+- [x] Merknader-fane: liste gruppert per side; klikk for å hoppe; slett enkeltvis (levert med fase 4)
+- [x] **Eksporter annotasjonssammendrag** som Markdown, HTML og ren tekst — inkluderer faktisk markert tekst (hentet via quad/tekst-geometri), kommentarer og forfatter, gruppert per side (levert 2026-07-09)
+- [ ] Markert tekst-utdrag også i selve listen (nå kun i eksport)
+- [ ] Søk i annotasjoner + fargefilter; tøm alle med bekreftelse
+- [ ] «Annoterte sider»: ny PDF med kun sider som har annotasjoner
+
+## Fase 6.5 — Faner (Emil ønsker dette tidlig, trukket frem fra fase 7)
+- Fanelinje for flere åpne dokumenter samtidig; Ctrl+Tab veksler; dra for å endre rekkefølge
 
 ## Fase 7 — Skall-paritet og polering
 - Fanelinje for flere dokumenter; delt visning
@@ -65,6 +73,9 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - Innholdssøk på tvers av filer i valgt mappe
 - Sky: primært via synkmapper (OneDrive/Dropbox) + filovervåking; API-integrasjon bare hvis nødvendig
 - **Beslutningsport for distribusjon**: mupdf AGPL-avklaring, kodesignering, auto-oppdatering
+
+## Tankeboks (ikke planlagt, ikke glemt)
+- **Nettleserutvidelse**: PDFX som PDF-visnings-erstatning i Edge/Chrome (MV3-extension). Fundamentet ligger til rette: renderer-en kjører allerede i ren nettleser via `bridge.ts`-fallbacks. Krever: mupdf WASM flyttet til renderer/worker, File System Access API for lagring, extension-innpakning. (Emils idé 2026-07-09.)
 
 ## Viktigste risikoer (med tiltak)
 1. **Koordinat-mapping** pdf.js-viewport ↔ PDF-sideflate (y-flipp, rotasjon, cropbox) — én delt, enhetstestet transformmodul; la mupdf beregne quads selv.

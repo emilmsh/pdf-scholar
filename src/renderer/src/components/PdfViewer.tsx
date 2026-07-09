@@ -30,6 +30,8 @@ import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
+import { collectExportRows, toHtml, toMarkdown, toPlainText } from '../annot-export'
+import type { ExportFormat } from './Sidebar'
 
 // One worker per open document (not a shared global port) so the document can
 // be re-opened after the annotation engine rewrites the file on disk.
@@ -77,6 +79,28 @@ const EMPTY_RECTS: PageRect[] = []
 interface PageSize {
   w: number
   h: number
+}
+
+interface AnnotPatch {
+  color?: [number, number, number]
+  contents?: string
+}
+
+/** Mutable identity for an annotation across undo/redo and document reloads */
+interface AnnotHandle {
+  pageNumber: number
+  localId: string
+  fileId: number | null
+}
+
+type UndoEntry =
+  | { kind: 'create'; handle: AnnotHandle; snapshot: PageAnnotation }
+  | { kind: 'delete'; handle: AnnotHandle; snapshot: PageAnnotation }
+  | { kind: 'change'; handle: AnnotHandle; before: AnnotPatch; after: AnnotPatch }
+
+interface NavPosition {
+  page: number
+  offset: number
 }
 
 interface NoteDraft {
@@ -130,7 +154,10 @@ export default function PdfViewer({
     localId: string
   } | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [backStack, setBackStack] = useState<{ page: number; offset: number }[]>([])
+  const [navStacks, setNavStacks] = useState<{ back: NavPosition[]; forward: NavPosition[] }>({
+    back: [],
+    forward: []
+  })
   const [pillEditing, setPillEditing] = useState(false)
   const [pillInput, setPillInput] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -399,6 +426,28 @@ export default function PdfViewer({
     zoomTo((containerWidth - SIDE_PAD) / sizes[0].w)
   }, [sizes, containerWidth, zoomTo])
 
+  /** Snap a pinch-commit scale to fit-width/fit-height/fit-page when close */
+  const snapScale = useCallback(
+    (raw: number): number => {
+      const el = containerRef.current
+      if (!el || sizes.length === 0 || el.clientWidth === 0) return raw
+      const { w, h } = sizes[0]
+      const fitW = (el.clientWidth - SIDE_PAD) / w
+      const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / h
+      for (const candidate of [fitW, fitH, Math.min(fitW, fitH)]) {
+        if (
+          candidate >= ZOOM_MIN &&
+          candidate <= ZOOM_MAX &&
+          Math.abs(raw - candidate) / candidate < 0.06
+        ) {
+          return candidate
+        }
+      }
+      return raw
+    },
+    [sizes]
+  )
+
   // Commit a pinch/ctrl-wheel gesture: swap the cheap CSS transform for a
   // crisp re-render at the accumulated scale. The transform is NOT removed
   // here — the commit effect does that once the new layout is in place, so
@@ -410,7 +459,7 @@ export default function PdfViewer({
     gestureRef.current = null
     window.clearTimeout(g.timer)
     const prev = scaleRef.current
-    const next = clamp(prev * g.factor, ZOOM_MIN, ZOOM_MAX)
+    const next = snapScale(clamp(prev * g.factor, ZOOM_MIN, ZOOM_MAX))
     const anchor = makeAnchor(g.fx, g.fy)
     if (next === prev || !anchor) {
       const inner = innerRef.current
@@ -425,7 +474,7 @@ export default function PdfViewer({
     pendingAnchorRef.current = anchor
     setScale(next)
     schedulePositionSave()
-  }, [makeAnchor, updateRange, schedulePositionSave])
+  }, [snapScale, makeAnchor, updateRange, schedulePositionSave])
   const commitGestureRef = useRef(commitGesture)
   commitGestureRef.current = commitGesture
 
@@ -495,6 +544,134 @@ export default function PdfViewer({
     []
   )
 
+  // Annotations are identified across undo/redo cycles by a mutable handle:
+  // re-creating an annotation gives it a NEW PDF object number, and a document
+  // reload regenerates local ids — the handle tracks both.
+  const matchesHandle = useCallback(
+    (r: PageAnnotation, handle: AnnotHandle): boolean =>
+      (handle.fileId !== null && r.fileId === handle.fileId) || r.id === handle.localId,
+    []
+  )
+
+  const findRecord = useCallback(
+    (handle: AnnotHandle): PageAnnotation | null =>
+      (annotsRef.current.get(handle.pageNumber) ?? []).find((r) => matchesHandle(r, handle)) ??
+      null,
+    [matchesHandle]
+  )
+
+  /** Add + persist an annotation (used by user actions, redo-create, undo-delete) */
+  const engineCreate = useCallback(
+    async (handle: AnnotHandle, snapshot: PageAnnotation) => {
+      const record: PageAnnotation = {
+        ...snapshot,
+        id: handle.localId,
+        fileId: null,
+        source: 'session'
+      }
+      mutatePage(handle.pageNumber, (list) => [...list, record])
+      const result = await bridge.annotate({
+        path: payload.path,
+        pageIndex: handle.pageNumber - 1,
+        type: snapshot.type,
+        quads: snapshot.quads,
+        color: snapshot.color,
+        opacity: snapshot.opacity,
+        contents: snapshot.contents,
+        author: snapshot.author
+      })
+      if ('error' in result) {
+        showToast(`Kunne ikke lagre annotasjonen: ${result.error}`)
+        mutatePage(handle.pageNumber, (list) => list.filter((r) => r.id !== handle.localId))
+      } else {
+        handle.fileId = result.id
+        mutatePage(handle.pageNumber, (list) =>
+          list.map((r) => (r.id === handle.localId ? { ...r, fileId: result.id } : r))
+        )
+      }
+    },
+    [payload.path, mutatePage, showToast]
+  )
+
+  const engineDelete = useCallback(
+    async (handle: AnnotHandle) => {
+      const wasFilePainted = findRecord(handle)?.source === 'file'
+      mutatePage(handle.pageNumber, (list) => list.filter((r) => !matchesHandle(r, handle)))
+      if (handle.fileId === null) return
+      const result = await bridge.deleteAnnotation({
+        path: payload.path,
+        pageIndex: handle.pageNumber - 1,
+        id: handle.fileId
+      })
+      if ('error' in result) showToast(`Kunne ikke slette annotasjonen: ${result.error}`)
+      else if (wasFilePainted) void reloadDocument()
+    },
+    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
+  )
+
+  const engineChange = useCallback(
+    async (handle: AnnotHandle, patch: AnnotPatch) => {
+      const wasFilePainted = findRecord(handle)?.source === 'file'
+      mutatePage(handle.pageNumber, (list) =>
+        list.map((r) => (matchesHandle(r, handle) ? { ...r, ...patch } : r))
+      )
+      if (handle.fileId === null) {
+        showToast('Annotasjonen lagres fortsatt — prøv igjen straks')
+        return
+      }
+      const result = await bridge.updateAnnotation({
+        path: payload.path,
+        pageIndex: handle.pageNumber - 1,
+        id: handle.fileId,
+        ...patch
+      })
+      if ('error' in result) showToast(`Kunne ikke endre annotasjonen: ${result.error}`)
+      // 'file' annots are painted by pdf.js from the file — refresh the canvas
+      else if (wasFilePainted && patch.color) void reloadDocument()
+    },
+    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
+  )
+
+  // ---------- Undo / redo ----------
+
+  const undoStackRef = useRef<UndoEntry[]>([])
+  const redoStackRef = useRef<UndoEntry[]>([])
+  const undoBusyRef = useRef(false)
+
+  const pushUndo = useCallback((entry: UndoEntry) => {
+    undoStackRef.current.push(entry)
+    if (undoStackRef.current.length > 100) undoStackRef.current.shift()
+    redoStackRef.current = []
+  }, [])
+
+  const performUndoRedo = useCallback(
+    async (direction: 'undo' | 'redo') => {
+      if (undoBusyRef.current) return
+      const source = direction === 'undo' ? undoStackRef : redoStackRef
+      const target = direction === 'undo' ? redoStackRef : undoStackRef
+      const entry = source.current.pop()
+      if (!entry) return
+      undoBusyRef.current = true
+      try {
+        if (entry.kind === 'create') {
+          if (direction === 'undo') await engineDelete(entry.handle)
+          else await engineCreate(entry.handle, entry.snapshot)
+        } else if (entry.kind === 'delete') {
+          if (direction === 'undo') await engineCreate(entry.handle, entry.snapshot)
+          else await engineDelete(entry.handle)
+        } else {
+          await engineChange(entry.handle, direction === 'undo' ? entry.before : entry.after)
+        }
+        target.current.push(entry)
+      } finally {
+        undoBusyRef.current = false
+      }
+    },
+    [engineCreate, engineDelete, engineChange]
+  )
+
+  // ---------- User-facing annotation actions ----------
+
   const persistAnnotation = useCallback(
     async (
       pageNumber: number,
@@ -504,8 +681,9 @@ export default function PdfViewer({
       opacity: number,
       contents?: string
     ) => {
-      const record: PageAnnotation = {
-        id: nextAnnotationId(),
+      const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
+      const snapshot: PageAnnotation = {
+        id: handle.localId,
         fileId: null,
         source: 'session',
         type,
@@ -515,68 +693,32 @@ export default function PdfViewer({
         contents,
         author: 'PDFX'
       }
-      mutatePage(pageNumber, (list) => [...list, record])
-      const result = await bridge.annotate({
-        path: payload.path,
-        pageIndex: pageNumber - 1,
-        type,
-        quads,
-        color,
-        opacity,
-        contents
-      })
-      if ('error' in result) {
-        showToast(`Kunne ikke lagre annotasjonen: ${result.error}`)
-        mutatePage(pageNumber, (list) => list.filter((r) => r.id !== record.id))
-      } else {
-        mutatePage(pageNumber, (list) =>
-          list.map((r) => (r.id === record.id ? { ...r, fileId: result.id } : r))
-        )
-      }
+      pushUndo({ kind: 'create', handle, snapshot })
+      await engineCreate(handle, snapshot)
     },
-    [payload.path, mutatePage, showToast]
+    [pushUndo, engineCreate]
   )
 
   const changeAnnotation = useCallback(
-    (pageNumber: number, record: PageAnnotation, patch: { color?: [number, number, number]; contents?: string }) => {
-      mutatePage(pageNumber, (list) =>
-        list.map((r) => (r.id === record.id ? { ...r, ...patch } : r))
-      )
-      if (record.fileId === null) {
-        showToast('Annotasjonen lagres fortsatt — prøv igjen straks')
-        return
-      }
-      void (async () => {
-        const result = await bridge.updateAnnotation({
-          path: payload.path,
-          pageIndex: pageNumber - 1,
-          id: record.fileId as number,
-          ...patch
-        })
-        if ('error' in result) showToast(`Kunne ikke endre annotasjonen: ${result.error}`)
-        // 'file' annots are painted by pdf.js from the file — refresh the canvas
-        else if (record.source === 'file' && patch.color) void reloadDocument()
-      })()
+    (pageNumber: number, record: PageAnnotation, patch: AnnotPatch) => {
+      const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId }
+      const before: AnnotPatch = {}
+      if (patch.color) before.color = record.color
+      if (patch.contents !== undefined) before.contents = record.contents ?? ''
+      pushUndo({ kind: 'change', handle, before, after: patch })
+      void engineChange(handle, patch)
     },
-    [payload.path, mutatePage, showToast, reloadDocument]
+    [pushUndo, engineChange]
   )
 
   const removeAnnotation = useCallback(
     (pageNumber: number, record: PageAnnotation) => {
-      mutatePage(pageNumber, (list) => list.filter((r) => r.id !== record.id))
+      const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId }
+      pushUndo({ kind: 'delete', handle, snapshot: { ...record } })
       setAnnotPopover(null)
-      if (record.fileId === null) return
-      void (async () => {
-        const result = await bridge.deleteAnnotation({
-          path: payload.path,
-          pageIndex: pageNumber - 1,
-          id: record.fileId as number
-        })
-        if ('error' in result) showToast(`Kunne ikke slette annotasjonen: ${result.error}`)
-        else if (record.source === 'file') void reloadDocument()
-      })()
+      void engineDelete(handle)
     },
-    [payload.path, mutatePage, showToast, reloadDocument]
+    [pushUndo, engineDelete]
   )
 
   /** Selection rects per page, for every rendered page the selection touches */
@@ -807,9 +949,22 @@ export default function PdfViewer({
 
   // ---------- Navigation history ----------
 
+  const scrollToNavPosition = useCallback(
+    (pos: NavPosition) => {
+      const el = containerRef.current
+      if (!el || !layout) return
+      const page = clamp(pos.page, 1, layout.tops.length)
+      el.scrollTop = layout.tops[page - 1] + pos.offset * sizes[page - 1].h * scale - 8
+    },
+    [layout, sizes, scale]
+  )
+
+  /** A NEW jump clears the forward stack (like browser history) */
   const pushBack = useCallback(() => {
     const current = computeCurrent()
-    if (current) setBackStack((s) => [...s.slice(-49), current])
+    if (current) {
+      setNavStacks(({ back }) => ({ back: [...back.slice(-49), current], forward: [] }))
+    }
   }, [computeCurrent])
 
   /** Jump with a breadcrumb so the reader can return (sidebar, links, go-to) */
@@ -822,17 +977,49 @@ export default function PdfViewer({
   )
 
   const goBack = useCallback(() => {
-    const el = containerRef.current
-    if (!el || !layout) return
-    setBackStack((stack) => {
-      const target = stack[stack.length - 1]
-      if (target) {
-        const page = clamp(target.page, 1, layout.tops.length)
-        el.scrollTop = layout.tops[page - 1] + target.offset * sizes[page - 1].h * scale - 8
+    const target = navStacks.back[navStacks.back.length - 1]
+    if (!target) return
+    const current = computeCurrent()
+    scrollToNavPosition(target)
+    setNavStacks(({ back, forward }) => ({
+      back: back.slice(0, -1),
+      forward: current ? [...forward, current] : forward
+    }))
+  }, [navStacks.back, computeCurrent, scrollToNavPosition])
+
+  const goForward = useCallback(() => {
+    const target = navStacks.forward[navStacks.forward.length - 1]
+    if (!target) return
+    const current = computeCurrent()
+    scrollToNavPosition(target)
+    setNavStacks(({ back, forward }) => ({
+      back: current ? [...back, current] : back,
+      forward: forward.slice(0, -1)
+    }))
+  }, [navStacks.forward, computeCurrent, scrollToNavPosition])
+
+  const exportAnnotations = useCallback(
+    async (format: ExportFormat) => {
+      if (!pdf) return
+      const rows = await collectExportRows(pdf, annotsRef.current)
+      if (rows.length === 0) {
+        showToast('Ingen merknader å eksportere')
+        return
       }
-      return stack.slice(0, -1)
-    })
-  }, [layout, sizes, scale])
+      const meta = { fileName: payload.name, exportedAt: new Date().toLocaleString('nb-NO') }
+      const base = payload.name.replace(/\.pdf$/i, '')
+      const [content, name] =
+        format === 'markdown'
+          ? [toMarkdown(rows, meta), `${base} - merknader.md`]
+          : format === 'html'
+            ? [toHtml(rows, meta), `${base} - merknader.html`]
+            : [toPlainText(rows, meta), `${base} - merknader.txt`]
+      const result = await bridge.saveTextFile(name, content)
+      if (result && 'error' in result) showToast(`Kunne ikke lagre: ${result.error}`)
+      else if (result) showToast(`Merknader eksportert: ${result.path}`)
+    },
+    [pdf, payload.name, showToast]
+  )
 
   const jumpToAnnot = useCallback(
     (pageNumber: number, record: PageAnnotation) => {
@@ -994,9 +1181,27 @@ export default function PdfViewer({
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
+      const tag = (e.target as HTMLElement | null)?.tagName
+      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA'
       if (e.key === 'F11') {
         e.preventDefault()
         toggleFullscreen()
+      } else if (!isTyping && e.ctrlKey && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault()
+        void performUndoRedo('undo')
+      } else if (
+        !isTyping &&
+        e.ctrlKey &&
+        ((e.shiftKey && (e.key === 'z' || e.key === 'Z')) || e.key === 'y' || e.key === 'Y')
+      ) {
+        e.preventDefault()
+        void performUndoRedo('redo')
+      } else if (!isTyping && e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        goBack()
+      } else if (!isTyping && e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault()
+        goForward()
       } else if (e.key === 'Escape') {
         if (noteDraft) setNoteDraft(null)
         else if (menu) setMenu(null)
@@ -1038,7 +1243,10 @@ export default function PdfViewer({
     openSearch,
     searchStep,
     zoomTo,
-    fitWidth
+    fitWidth,
+    performUndoRedo,
+    goBack,
+    goForward
   ])
 
   // Focus the scroll container so PageUp/PageDown/arrows work immediately
@@ -1085,6 +1293,10 @@ export default function PdfViewer({
           settings={settings}
           resolvedTheme={resolvedTheme}
           sidebarOpen={sidebarOpen}
+          canNavBack={navStacks.back.length > 0}
+          canNavForward={navStacks.forward.length > 0}
+          onNavBack={goBack}
+          onNavForward={goForward}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           onBack={onClose}
           onGoToPage={jumpToPage}
@@ -1110,6 +1322,7 @@ export default function PdfViewer({
           onJumpToDest={(d) => void jumpToDest(d)}
           onJumpToAnnot={jumpToAnnot}
           onDeleteAnnot={removeAnnotation}
+          onExport={(format) => void exportAnnotations(format)}
         />
 
         <div
@@ -1160,10 +1373,19 @@ export default function PdfViewer({
         </div>
       </div>
 
-      {backStack.length > 0 && layout && (
-        <button className="back-pill" onClick={goBack}>
-          ‹ Tilbake til s. {backStack[backStack.length - 1].page}
-        </button>
+      {(navStacks.back.length > 0 || navStacks.forward.length > 0) && layout && (
+        <div className="nav-pills">
+          {navStacks.back.length > 0 && (
+            <button className="back-pill" onClick={goBack} title="Alt+←">
+              ‹ Tilbake til s. {navStacks.back[navStacks.back.length - 1].page}
+            </button>
+          )}
+          {navStacks.forward.length > 0 && (
+            <button className="back-pill" onClick={goForward} title="Alt+→">
+              Frem til s. {navStacks.forward[navStacks.forward.length - 1].page} ›
+            </button>
+          )}
+        </div>
       )}
 
       {chromeHidden &&

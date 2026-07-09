@@ -682,11 +682,17 @@ button {
 
 /* ---------- Floating pills ---------- */
 
-.back-pill,
-.page-pill {
+.nav-pills {
   position: absolute;
+  left: 22px;
   bottom: 22px;
   z-index: 45;
+  display: flex;
+  gap: 8px;
+}
+
+.back-pill,
+.page-pill {
   padding: 8px 15px;
   border-radius: 999px;
   background: var(--bg-elevated);
@@ -697,8 +703,13 @@ button {
   animation: menu-in 0.15s ease;
 }
 
+.page-pill {
+  position: absolute;
+  bottom: 22px;
+  z-index: 45;
+}
+
 .back-pill {
-  left: 22px;
   color: var(--accent);
 }
 
@@ -1205,6 +1216,36 @@ button {
   flex: 1;
   overflow-y: auto;
   padding: 2px 6px 12px;
+}
+
+.annot-export-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.annot-export-row span {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-right: auto;
+}
+
+.annot-export-row button {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.annot-export-row button:hover {
+  background: var(--hover);
 }
 
 .annot-list-page {

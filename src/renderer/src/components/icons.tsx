@@ -90,3 +90,15 @@ export const IconSearch = (p: IconProps): React.JSX.Element => (
     <path d="M21 21l-4.8-4.8" />
   </Svg>
 )
+
+export const IconArrowLeft = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M19 12H5M11 6l-6 6 6 6" />
+  </Svg>
+)
+
+export const IconArrowRight = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M5 12h14M13 6l6 6-6 6" />
+  </Svg>
+)

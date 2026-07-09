@@ -41,6 +41,14 @@ export const UNDERLINE_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
 export const STRIKEOUT_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
 export const NOTE_COLOR: [number, number, number] = [1, 0.835, 0.29]
 
+export const ANNOT_TYPE_LABELS: Record<AnnotationType, string> = {
+  highlight: 'Markering',
+  underline: 'Understreking',
+  strikeout: 'Gjennomstreking',
+  squiggly: 'Bølgestrek',
+  note: 'Notat'
+}
+
 function rgbCss(rgb: [number, number, number], alpha: number): string {
   const [r, g, b] = rgb.map((v) => Math.round(v * 255))
   return `rgba(${r}, ${g}, ${b}, ${alpha})`

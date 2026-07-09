@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, powerSaveBlocker, shell } from 'electron'
-import { readFile } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { readFile, writeFile } from 'node:fs/promises'
+import { basename, extname, join, resolve } from 'node:path'
 import type {
   AnnotateRequest,
   DeleteAnnotationRequest,
@@ -151,6 +151,22 @@ function registerIpc(): void {
 
   ipcMain.on('shell:open-external', (_e, url: string) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+  })
+
+  ipcMain.handle('file:save-text', async (_e, defaultName: string, content: string) => {
+    if (!mainWindow) return null
+    const ext = extname(defaultName).replace('.', '') || 'txt'
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName,
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    try {
+      await writeFile(result.filePath, content, 'utf-8')
+      return { path: result.filePath }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
   })
 
   ipcMain.on('window:set-fullscreen', (_e, on: boolean) => {

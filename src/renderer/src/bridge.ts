@@ -102,6 +102,16 @@ const webApi: PdfxApi = {
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')
   },
+  saveTextFile: async (defaultName, content) => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = defaultName
+    a.click()
+    URL.revokeObjectURL(url)
+    return { path: defaultName }
+  },
   setFullscreen: (on) => {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})

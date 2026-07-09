@@ -1,16 +1,11 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { ANNOT_TYPE_LABELS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 
 const THUMB_WIDTH = 132
 
-const ANNOT_LABELS: Record<PageAnnotation['type'], string> = {
-  highlight: 'Markering',
-  underline: 'Understreking',
-  strikeout: 'Gjennomstreking',
-  squiggly: 'Bølgestrek',
-  note: 'Notat'
-}
+export type ExportFormat = 'markdown' | 'html' | 'text'
 
 export interface OutlineNode {
   title: string
@@ -34,6 +29,7 @@ interface Props {
   onJumpToDest(dest: unknown): void
   onJumpToAnnot(pageNumber: number, record: PageAnnotation): void
   onDeleteAnnot(pageNumber: number, record: PageAnnotation): void
+  onExport(format: ExportFormat): void
 }
 
 type Tab = 'thumbs' | 'outline' | 'annots'
@@ -47,7 +43,8 @@ function Sidebar({
   onJumpToPage,
   onJumpToDest,
   onJumpToAnnot,
-  onDeleteAnnot
+  onDeleteAnnot,
+  onExport
 }: Props): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('thumbs')
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
@@ -153,6 +150,7 @@ function Sidebar({
           annotations={annotations}
           onJump={onJumpToAnnot}
           onDelete={onDeleteAnnot}
+          onExport={onExport}
         />
       )}
     </div>
@@ -162,11 +160,13 @@ function Sidebar({
 function AnnotationList({
   annotations,
   onJump,
-  onDelete
+  onDelete,
+  onExport
 }: {
   annotations: ReadonlyMap<number, PageAnnotation[]>
   onJump(pageNumber: number, record: PageAnnotation): void
   onDelete(pageNumber: number, record: PageAnnotation): void
+  onExport(format: ExportFormat): void
 }): React.JSX.Element {
   const flat = useMemo(() => {
     const rows: { pageNumber: number; record: PageAnnotation }[] = []
@@ -187,6 +187,18 @@ function AnnotationList({
   let lastPage = 0
   return (
     <div className="annot-list">
+      <div className="annot-export-row">
+        <span>Eksporter</span>
+        <button onClick={() => onExport('markdown')} title="Eksporter sammendrag som Markdown">
+          MD
+        </button>
+        <button onClick={() => onExport('html')} title="Eksporter sammendrag som HTML">
+          HTML
+        </button>
+        <button onClick={() => onExport('text')} title="Eksporter sammendrag som ren tekst">
+          TXT
+        </button>
+      </div>
       {flat.map(({ pageNumber, record }) => {
         const header = pageNumber !== lastPage
         lastPage = pageNumber
@@ -202,7 +214,7 @@ function AnnotationList({
                   }}
                 />
                 <span className="annot-list-text">
-                  {record.contents || ANNOT_LABELS[record.type]}
+                  {record.contents || ANNOT_TYPE_LABELS[record.type]}
                   {record.author && <em> — {record.author}</em>}
                 </span>
               </button>

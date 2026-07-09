@@ -100,6 +100,8 @@ export interface PdfxApi {
   deleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult>
   /** Open an http(s) URL in the system browser */
   openExternal(url: string): void
+  /** Save text content via a save dialog; null = user cancelled */
+  saveTextFile(defaultName: string, content: string): Promise<{ path: string } | FileError | null>
   setFullscreen(on: boolean): void
   /** Resolve the real filesystem path of a File dropped onto the window (Electron only) */
   getPathForFile(file: File): string | null

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Settings, ThemeName, ThemePreference } from '../../../shared/types'
 import {
+  IconArrowLeft,
+  IconArrowRight,
   IconChevronLeft,
   IconExpand,
   IconFitWidth,
@@ -20,6 +22,10 @@ interface Props {
   settings: Settings
   resolvedTheme: ThemeName
   sidebarOpen: boolean
+  canNavBack: boolean
+  canNavForward: boolean
+  onNavBack(): void
+  onNavForward(): void
   onToggleSidebar(): void
   onBack(): void
   onGoToPage(page: number): void
@@ -47,6 +53,10 @@ export default function Toolbar({
   settings,
   resolvedTheme,
   sidebarOpen,
+  canNavBack,
+  canNavForward,
+  onNavBack,
+  onNavForward,
   onToggleSidebar,
   onBack,
   onGoToPage,
@@ -101,6 +111,17 @@ export default function Toolbar({
           title="Sidepanel (miniatyrer og innhold)"
         >
           <IconSidebar />
+        </button>
+        <button className="tb-btn" onClick={onNavBack} disabled={!canNavBack} title="Tilbake (Alt+←)">
+          <IconArrowLeft />
+        </button>
+        <button
+          className="tb-btn"
+          onClick={onNavForward}
+          disabled={!canNavForward}
+          title="Frem (Alt+→)"
+        >
+          <IconArrowRight />
         </button>
       </div>
 
