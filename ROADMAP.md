@@ -76,6 +76,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 
 ## Tankeboks (ikke planlagt, ikke glemt)
 - **Nettleserutvidelse**: PDFX som PDF-visnings-erstatning i Edge/Chrome (MV3-extension). Fundamentet ligger til rette: renderer-en kjører allerede i ren nettleser via `bridge.ts`-fallbacks. Krever: mupdf WASM flyttet til renderer/worker, File System Access API for lagring, extension-innpakning. (Emils idé 2026-07-09.)
+- **Legg moniteringsstrategi**: strategi for overvåking av appen (feil-/krasjrapportering, ytelsesmåling o.l. — omfang avklares med Emil når det tas opp). (Emils ønske 2026-07-09.)
 
 ## Viktigste risikoer (med tiltak)
 1. **Koordinat-mapping** pdf.js-viewport ↔ PDF-sideflate (y-flipp, rotasjon, cropbox) — én delt, enhetstestet transformmodul; la mupdf beregne quads selv.
