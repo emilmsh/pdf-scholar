@@ -99,7 +99,14 @@ export default function PdfViewer({
   const scaleRef = useRef(scale)
   scaleRef.current = scale
   const restoreRef = useRef<ReadingPosition | null>(initialPosition)
-  const pendingScrollRef = useRef<{ left: number; top: number } | null>(null)
+  /** Page-anchored focal point consumed by the post-zoom commit effect */
+  const pendingAnchorRef = useRef<{
+    pageIndex: number
+    pageX: number
+    pageY: number
+    fx: number
+    fy: number
+  } | null>(null)
   const saveTimerRef = useRef<number | null>(null)
   const toastTimerRef = useRef<number | null>(null)
   const gestureRef = useRef<{
@@ -229,16 +236,25 @@ export default function PdfViewer({
     updateRange()
   }, [layout, sizes, scale, updateRange])
 
-  // Apply scroll adjustment after a zoom change
+  // Commit a zoom: reposition the anchored page point under the focal spot
+  // and drop the gesture transform in the SAME pre-paint frame — this is what
+  // makes pinch-release seamless (gaps/margins don't scale with zoom, so a
+  // plain scroll*ratio would jump).
   useLayoutEffect(() => {
     const el = containerRef.current
-    if (el && pendingScrollRef.current) {
-      el.scrollTop = pendingScrollRef.current.top
-      el.scrollLeft = pendingScrollRef.current.left
-      pendingScrollRef.current = null
-      updateRange()
+    const anchor = pendingAnchorRef.current
+    if (!el || !layout || !anchor) return
+    pendingAnchorRef.current = null
+    el.scrollTop = Math.max(0, layout.tops[anchor.pageIndex] + anchor.pageY * scale - anchor.fy)
+    el.scrollLeft = Math.max(0, layout.lefts[anchor.pageIndex] + anchor.pageX * scale - anchor.fx)
+    const inner = innerRef.current
+    if (inner) {
+      inner.style.transform = ''
+      inner.style.willChange = ''
+      inner.style.transformOrigin = '0 0'
     }
-  }, [scale, updateRange])
+    updateRange()
+  }, [scale, layout, updateRange])
 
   const onScroll = useCallback(() => {
     updateRange()
@@ -248,6 +264,29 @@ export default function PdfViewer({
 
   // ---------- Zoom ----------
 
+  /** Capture the page point currently under (fx, fy) in the scroll viewport */
+  const makeAnchor = useCallback(
+    (fx: number, fy: number): typeof pendingAnchorRef.current => {
+      const el = containerRef.current
+      if (!el || !layout) return null
+      const prev = scaleRef.current
+      const contentY = el.scrollTop + fy
+      let pageIndex = 0
+      for (let i = 0; i < layout.tops.length; i++) {
+        if (layout.tops[i] <= contentY) pageIndex = i
+        else break
+      }
+      return {
+        pageIndex,
+        pageX: (el.scrollLeft + fx - layout.lefts[pageIndex]) / prev,
+        pageY: (contentY - layout.tops[pageIndex]) / prev,
+        fx,
+        fy
+      }
+    },
+    [layout]
+  )
+
   const zoomTo = useCallback(
     (next: number, focalClientY?: number) => {
       const el = containerRef.current
@@ -256,16 +295,12 @@ export default function PdfViewer({
       next = clamp(next, ZOOM_MIN, ZOOM_MAX)
       if (next === prev) return
       const rect = el.getBoundingClientRect()
-      const focal = focalClientY !== undefined ? focalClientY - rect.top : el.clientHeight / 2
-      const ratio = next / prev
-      pendingScrollRef.current = {
-        top: (el.scrollTop + focal) * ratio - focal,
-        left: el.scrollLeft * ratio
-      }
+      const fy = focalClientY !== undefined ? focalClientY - rect.top : el.clientHeight / 2
+      pendingAnchorRef.current = makeAnchor(el.clientWidth / 2, fy)
       setScale(next)
       schedulePositionSave()
     },
-    [schedulePositionSave]
+    [makeAnchor, schedulePositionSave]
   )
 
   const fitWidth = useCallback(() => {
@@ -274,31 +309,32 @@ export default function PdfViewer({
   }, [sizes, containerWidth, zoomTo])
 
   // Commit a pinch/ctrl-wheel gesture: swap the cheap CSS transform for a
-  // crisp re-render at the accumulated scale, keeping the focal point put.
+  // crisp re-render at the accumulated scale. The transform is NOT removed
+  // here — the commit effect does that once the new layout is in place, so
+  // there is no jump or flash on release.
   const commitGesture = useCallback(() => {
     const g = gestureRef.current
     const el = containerRef.current
-    const inner = innerRef.current
-    if (!g || !el || !inner) return
+    if (!g || !el) return
     gestureRef.current = null
     window.clearTimeout(g.timer)
-    inner.style.transform = ''
-    inner.style.willChange = ''
-    inner.style.transformOrigin = '0 0'
     const prev = scaleRef.current
     const next = clamp(prev * g.factor, ZOOM_MIN, ZOOM_MAX)
-    if (next === prev) {
+    const anchor = makeAnchor(g.fx, g.fy)
+    if (next === prev || !anchor) {
+      const inner = innerRef.current
+      if (inner) {
+        inner.style.transform = ''
+        inner.style.willChange = ''
+        inner.style.transformOrigin = '0 0'
+      }
       updateRange()
       return
     }
-    const ratio = next / prev
-    pendingScrollRef.current = {
-      top: g.originY * ratio - g.fy,
-      left: Math.max(0, g.originX * ratio - g.fx)
-    }
+    pendingAnchorRef.current = anchor
     setScale(next)
     schedulePositionSave()
-  }, [updateRange, schedulePositionSave])
+  }, [makeAnchor, updateRange, schedulePositionSave])
   const commitGestureRef = useRef(commitGesture)
   commitGestureRef.current = commitGesture
 
@@ -315,7 +351,11 @@ export default function PdfViewer({
       const rect = el.getBoundingClientRect()
       let g = gestureRef.current
       if (!g) {
-        const fx = e.clientX - rect.left
+        // Without a horizontal scrollbar pages stay centered after the commit,
+        // so scale around the viewport's center axis to match; with one, scale
+        // around the cursor.
+        const hasHScroll = el.scrollWidth > el.clientWidth + 1
+        const fx = hasHScroll ? e.clientX - rect.left : el.clientWidth / 2
         const fy = e.clientY - rect.top
         g = gestureRef.current = {
           factor: 1,

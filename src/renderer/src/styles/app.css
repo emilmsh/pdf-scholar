@@ -850,18 +850,22 @@ button {
   background: color-mix(in srgb, var(--accent) 34%, transparent);
 }
 
-/* Link annotations (clickable areas above the text layer) */
+/* Link annotations (clickable areas above the text layer).
+   The host MUST be pointer-events:none — otherwise it swallows mouse events
+   and text selection stops working; only the link rects themselves are live. */
 
 .link-host {
   position: absolute;
   inset: 0;
   z-index: 3;
+  pointer-events: none;
 }
 
 .pdf-link {
   position: absolute;
   border-radius: 3px;
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .pdf-link:hover {
