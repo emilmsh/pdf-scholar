@@ -33,11 +33,15 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 - [ ] Bokmerker-fane utvalg
 
 ## Fase 4 — Annoteringsfundament (Emils prioritet nr. 2)
-Grunnmuren ble levert 2026-07-09: mupdf `AnnotationEngine` i hovedprosessen bak typet IPC skriver Highlight (5 farger)/Underline/StrikeOut/notater som standard PDF-annotasjoner med appearance streams, inkrementell lagring og atomisk filbytte (rundtur verifisert med mupdf-gjenåpning); overlegg tegner dem umiddelbart. Gjenstår:
-- Eksisterende annotasjoner leses inn ved åpning og tegnes i overlegget (nå vises de via pdf.js-rendering)
-- Squiggly; «armert verktøy»-flyt (verktøy stays on for gjentatt bruk)
-- 5-felts fargepaletter per verktøy + egendefinert velger, opasitet; klikk på eksisterende annotasjon → egenskaper/slett (også annotasjoner fra andre apper)
-- **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF/PDF Expert (iPad) og verifiser identisk visning
+Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farger)/Underline/StrikeOut/Squiggly/notater som standard PDF-annotasjoner med appearance streams, inkrementell lagring og atomisk filbytte.
+- [x] Eksisterende annotasjoner leses inn ved åpning (enumerert via pdf.js) og er klikkbare
+- [x] Klikk/høyreklikk på annotasjon → egenskaper-popover: bytt farge, rediger notattekst, slett — også annotasjoner fra andre apper (motoren adresserer via PDF-objektnummer; rundtur verifisert)
+- [x] Squiggly (bølgestrek) i kontekstmenyen
+- [x] Merknader-fane i sidepanelet: alle annotasjoner gruppert per side med farge/tekst/forfatter; klikk hopper, hover-slett
+- [x] Sømløs dokument-gjenåpning etter redigering (én pdf.js-worker per dokument)
+- [ ] «Armert verktøy»-flyt (verktøyet forblir aktivt for gjentatt bruk)
+- [ ] Egendefinert fargevelger + opasitetskontroll (5-feltspalett finnes)
+- [ ] **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF/PDF Expert (iPad) og verifiser identisk visning — Emils manuelle test gjenstår
 
 ## Fase 5 — Fullt annoteringsverktøysett
 - Penn (fast bredde + trykkfølsom via Pointer Events), markeringstusj, viskelær, lasso-multivalg for blekk
