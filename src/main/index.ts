@@ -3,12 +3,14 @@ import { readFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
 import type {
   AnnotateRequest,
+  DeleteAnnotationRequest,
   FileError,
   FilePayload,
+  ModifyAnnotationRequest,
   ReadingPosition,
   Settings
 } from '../shared/types'
-import { applyAnnotation } from './annotation-engine'
+import { applyAnnotation, deleteAnnotation, updateAnnotation } from './annotation-engine'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
 
 let mainWindow: BrowserWindow | null = null
@@ -142,6 +144,10 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('annotate', (_e, req: AnnotateRequest) => applyAnnotation(req))
+
+  ipcMain.handle('annotation:update', (_e, req: ModifyAnnotationRequest) => updateAnnotation(req))
+
+  ipcMain.handle('annotation:delete', (_e, req: DeleteAnnotationRequest) => deleteAnnotation(req))
 
   ipcMain.on('shell:open-external', (_e, url: string) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)

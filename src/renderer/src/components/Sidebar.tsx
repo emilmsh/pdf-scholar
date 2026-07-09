@@ -1,7 +1,16 @@
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PageAnnotation } from '../annotations'
 
 const THUMB_WIDTH = 132
+
+const ANNOT_LABELS: Record<PageAnnotation['type'], string> = {
+  highlight: 'Markering',
+  underline: 'Understreking',
+  strikeout: 'Gjennomstreking',
+  squiggly: 'Bølgestrek',
+  note: 'Notat'
+}
 
 export interface OutlineNode {
   title: string
@@ -20,19 +29,25 @@ interface Props {
   pdf: PDFDocumentProxy | null
   sizes: PageSize[]
   currentPage: number
+  annotations: ReadonlyMap<number, PageAnnotation[]>
   onJumpToPage(page: number): void
   onJumpToDest(dest: unknown): void
+  onJumpToAnnot(pageNumber: number, record: PageAnnotation): void
+  onDeleteAnnot(pageNumber: number, record: PageAnnotation): void
 }
 
-type Tab = 'thumbs' | 'outline'
+type Tab = 'thumbs' | 'outline' | 'annots'
 
 function Sidebar({
   open,
   pdf,
   sizes,
   currentPage,
+  annotations,
   onJumpToPage,
-  onJumpToDest
+  onJumpToDest,
+  onJumpToAnnot,
+  onDeleteAnnot
 }: Props): React.JSX.Element {
   const [tab, setTab] = useState<Tab>('thumbs')
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
@@ -92,6 +107,9 @@ function Sidebar({
         <button className={tab === 'outline' ? 'active' : ''} onClick={() => setTab('outline')}>
           Innhold
         </button>
+        <button className={tab === 'annots' ? 'active' : ''} onClick={() => setTab('annots')}>
+          Merknader
+        </button>
       </div>
 
       {tab === 'thumbs' && (
@@ -129,6 +147,76 @@ function Sidebar({
           )}
         </div>
       )}
+
+      {tab === 'annots' && (
+        <AnnotationList
+          annotations={annotations}
+          onJump={onJumpToAnnot}
+          onDelete={onDeleteAnnot}
+        />
+      )}
+    </div>
+  )
+}
+
+function AnnotationList({
+  annotations,
+  onJump,
+  onDelete
+}: {
+  annotations: ReadonlyMap<number, PageAnnotation[]>
+  onJump(pageNumber: number, record: PageAnnotation): void
+  onDelete(pageNumber: number, record: PageAnnotation): void
+}): React.JSX.Element {
+  const flat = useMemo(() => {
+    const rows: { pageNumber: number; record: PageAnnotation }[] = []
+    for (const [pageNumber, list] of annotations) {
+      for (const record of list) rows.push({ pageNumber, record })
+    }
+    rows.sort(
+      (a, b) =>
+        a.pageNumber - b.pageNumber || (a.record.quads[0]?.y ?? 0) - (b.record.quads[0]?.y ?? 0)
+    )
+    return rows
+  }, [annotations])
+
+  if (flat.length === 0) {
+    return <p className="sidebar-empty">Ingen merknader i dokumentet ennå.</p>
+  }
+
+  let lastPage = 0
+  return (
+    <div className="annot-list">
+      {flat.map(({ pageNumber, record }) => {
+        const header = pageNumber !== lastPage
+        lastPage = pageNumber
+        return (
+          <div key={record.id}>
+            {header && <div className="annot-list-page">Side {pageNumber}</div>}
+            <div className="annot-list-row">
+              <button className="annot-list-main" onClick={() => onJump(pageNumber, record)}>
+                <span
+                  className="annot-list-dot"
+                  style={{
+                    background: `rgb(${record.color.map((v) => Math.round(v * 255)).join(',')})`
+                  }}
+                />
+                <span className="annot-list-text">
+                  {record.contents || ANNOT_LABELS[record.type]}
+                  {record.author && <em> — {record.author}</em>}
+                </span>
+              </button>
+              <button
+                className="annot-list-delete"
+                title="Slett merknad"
+                onClick={() => onDelete(pageNumber, record)}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

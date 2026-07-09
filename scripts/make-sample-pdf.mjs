@@ -153,6 +153,31 @@ for (const link of tocLinks) {
 }
 coverPage.createLink([MARGIN - 2, H - 94, MARGIN + 140, H - 74], 'https://pdfexpert.com/')
 
+// Pre-existing annotations "from another app" so select/edit/delete of
+// foreign annotations can be tested
+{
+  const page2 = pdf.loadPage(1)
+  const hits = page2.search('distraksjonsfri')
+  if (hits.length > 0) {
+    const hl = page2.createAnnotation('Highlight')
+    hl.setQuadPoints(hits[0])
+    hl.setColor([0.494, 0.827, 0.494])
+    hl.setOpacity(0.5)
+    hl.setAuthor('PDF Expert (test)')
+    hl.setCreationDate(new Date('2026-07-01T10:00:00Z'))
+    hl.update()
+  }
+  const page3 = pdf.loadPage(2)
+  const note = page3.createAnnotation('Text')
+  note.setRect([W - MARGIN - 20, 120, W - MARGIN, 140])
+  note.setColor([1, 0.835, 0.29])
+  note.setContents('Et eksisterende notat fra en annen app.')
+  note.setAuthor('PDF Expert (test)')
+  note.setIcon('Note')
+  note.setIsOpen(false)
+  note.update()
+}
+
 const buffer = pdf.saveToBuffer('garbage=2,compress=yes')
 mkdirSync(dirname(OUT), { recursive: true })
 writeFileSync(OUT, buffer.asUint8Array())

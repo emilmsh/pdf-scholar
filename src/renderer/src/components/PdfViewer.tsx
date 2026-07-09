@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
-import PdfWorker from 'pdfjs-dist/build/pdf.worker.mjs?worker'
+import { getDocument, PDFWorker } from 'pdfjs-dist'
+import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist'
+import PdfWorkerCtor from 'pdfjs-dist/build/pdf.worker.mjs?worker'
 import type {
   AnnotationType,
   FilePayload,
@@ -10,15 +10,18 @@ import type {
   Settings,
   ThemeName
 } from '../../../shared/types'
-import { bridge } from '../bridge'
+import { bridge, isElectron } from '../bridge'
 import {
   NOTE_COLOR,
   STRIKEOUT_COLOR,
   UNDERLINE_COLOR,
+  annotationAtPoint,
+  fromPdfJsAnnotation,
   nextAnnotationId,
   selectionRectsForPage
 } from '../annotations'
-import type { PageAnnotation } from '../annotations'
+import type { PageAnnotation, PdfJsAnnotationData } from '../annotations'
+import AnnotPopover from './AnnotPopover'
 import PdfPage from './PdfPage'
 import Sidebar from './Sidebar'
 import SearchBar from './SearchBar'
@@ -28,7 +31,34 @@ import type { MenuAction, MenuState } from './SelectionMenu'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 
-GlobalWorkerOptions.workerPort = new PdfWorker()
+// One worker per open document (not a shared global port) so the document can
+// be re-opened after the annotation engine rewrites the file on disk.
+interface DocResources {
+  task: PDFDocumentLoadingTask
+  port: Worker
+}
+
+function openDocument(data: Uint8Array): DocResources {
+  const port = new PdfWorkerCtor()
+  const task = getDocument({ data, worker: PDFWorker.create({ port }) })
+  return { task, port }
+}
+
+async function collectAnnotations(
+  doc: PDFDocumentProxy
+): Promise<Map<number, PageAnnotation[]>> {
+  const map = new Map<number, PageAnnotation[]>()
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i)
+    const pageHeight = page.getViewport({ scale: 1 }).height
+    const raw = (await page.getAnnotations()) as PdfJsAnnotationData[]
+    const records = raw
+      .map((r) => fromPdfJsAnnotation(r, pageHeight))
+      .filter((r): r is PageAnnotation => r !== null)
+    if (records.length > 0) map.set(i, records)
+  }
+  return map
+}
 
 const PAGE_GAP = 16
 const PAD_TOP = 28
@@ -90,9 +120,15 @@ export default function PdfViewer({
   const [toast, setToast] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null)
-  const [sessionAnnots, setSessionAnnots] = useState<ReadonlyMap<number, PageAnnotation[]>>(
-    new Map()
-  )
+  /** All annotations per page: 'file' records (painted by pdf.js) + 'session'
+   *  records created now (painted by our overlay) */
+  const [annots, setAnnots] = useState<ReadonlyMap<number, PageAnnotation[]>>(new Map())
+  const [annotPopover, setAnnotPopover] = useState<{
+    x: number
+    y: number
+    pageNumber: number
+    localId: string
+  } | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [backStack, setBackStack] = useState<{ page: number; offset: number }[]>([])
   const [pillEditing, setPillEditing] = useState(false)
@@ -137,15 +173,20 @@ export default function PdfViewer({
   const searchSeqRef = useRef(0)
   const gotoSeqRef = useRef(0)
   const searchJumpedRef = useRef(false)
+  const annotsRef = useRef(annots)
+  annotsRef.current = annots
 
   // ---------- Document loading ----------
+
+  const docResourcesRef = useRef<DocResources | null>(null)
 
   useEffect(() => {
     let destroyed = false
     // pdf.js transfers the underlying buffer to its worker, so hand it a copy
-    const loadingTask = getDocument({ data: payload.data.slice() })
+    const resources = openDocument(payload.data.slice())
+    docResourcesRef.current = resources
     ;(async () => {
-      const doc = await loadingTask.promise
+      const doc = await resources.task.promise
       if (destroyed) return
       setPdf(doc)
       const collected: PageSize[] = []
@@ -156,14 +197,41 @@ export default function PdfViewer({
         collected.push({ w: vp.width, h: vp.height })
       }
       setSizes(collected)
+      const fileAnnots = await collectAnnotations(doc)
+      if (!destroyed) setAnnots(fileAnnots)
     })().catch((err) => {
       if (!destroyed) setError(err instanceof Error ? err.message : String(err))
     })
     return () => {
       destroyed = true
-      loadingTask.destroy()
+      // Destroy whatever is CURRENT (a reload may have swapped resources)
+      docResourcesRef.current?.task.destroy()
+      docResourcesRef.current?.port.terminate()
+      docResourcesRef.current = null
     }
   }, [payload])
+
+  /** Re-open the file after the engine rewrote it, seamlessly swapping the
+   *  document (old canvases stay visible until re-rendered). */
+  const reloadDocument = useCallback(async () => {
+    if (!isElectron) return
+    const result = await bridge.readFile(payload.path)
+    if ('error' in result) return
+    const resources = openDocument(result.data.slice())
+    try {
+      const doc = await resources.task.promise
+      const fileAnnots = await collectAnnotations(doc)
+      const old = docResourcesRef.current
+      docResourcesRef.current = resources
+      setPdf(doc)
+      setAnnots(fileAnnots)
+      old?.task.destroy()
+      old?.port.terminate()
+    } catch {
+      resources.task.destroy()
+      resources.port.terminate()
+    }
+  }, [payload.path])
 
   // Track container width (for fit-width zoom and horizontal layout).
   // Fall back to the window width so layout never deadlocks if the element
@@ -282,6 +350,7 @@ export default function PdfViewer({
     updateRange()
     schedulePositionSave()
     setMenu((m) => (m ? null : m))
+    setAnnotPopover((p) => (p ? null : p))
   }, [updateRange, schedulePositionSave])
 
   // ---------- Zoom ----------
@@ -412,13 +481,19 @@ export default function PdfViewer({
     toastTimerRef.current = window.setTimeout(() => setToast(null), 2600)
   }, [])
 
-  const addSessionAnnotation = useCallback((pageNumber: number, record: PageAnnotation) => {
-    setSessionAnnots((prev) => {
-      const next = new Map(prev)
-      next.set(pageNumber, [...(prev.get(pageNumber) ?? []), record])
-      return next
-    })
-  }, [])
+  /** Immutably patch one page's annotation list */
+  const mutatePage = useCallback(
+    (pageNumber: number, fn: (list: PageAnnotation[]) => PageAnnotation[]) => {
+      setAnnots((prev) => {
+        const next = new Map(prev)
+        const list = fn(prev.get(pageNumber) ?? [])
+        if (list.length > 0) next.set(pageNumber, list)
+        else next.delete(pageNumber)
+        return next
+      })
+    },
+    []
+  )
 
   const persistAnnotation = useCallback(
     async (
@@ -429,14 +504,18 @@ export default function PdfViewer({
       opacity: number,
       contents?: string
     ) => {
-      addSessionAnnotation(pageNumber, {
+      const record: PageAnnotation = {
         id: nextAnnotationId(),
+        fileId: null,
+        source: 'session',
         type,
         quads,
         color,
         opacity,
-        contents
-      })
+        contents,
+        author: 'PDFX'
+      }
+      mutatePage(pageNumber, (list) => [...list, record])
       const result = await bridge.annotate({
         path: payload.path,
         pageIndex: pageNumber - 1,
@@ -446,9 +525,58 @@ export default function PdfViewer({
         opacity,
         contents
       })
-      if ('error' in result) showToast(`Kunne ikke lagre annotasjonen: ${result.error}`)
+      if ('error' in result) {
+        showToast(`Kunne ikke lagre annotasjonen: ${result.error}`)
+        mutatePage(pageNumber, (list) => list.filter((r) => r.id !== record.id))
+      } else {
+        mutatePage(pageNumber, (list) =>
+          list.map((r) => (r.id === record.id ? { ...r, fileId: result.id } : r))
+        )
+      }
     },
-    [payload.path, addSessionAnnotation, showToast]
+    [payload.path, mutatePage, showToast]
+  )
+
+  const changeAnnotation = useCallback(
+    (pageNumber: number, record: PageAnnotation, patch: { color?: [number, number, number]; contents?: string }) => {
+      mutatePage(pageNumber, (list) =>
+        list.map((r) => (r.id === record.id ? { ...r, ...patch } : r))
+      )
+      if (record.fileId === null) {
+        showToast('Annotasjonen lagres fortsatt — prøv igjen straks')
+        return
+      }
+      void (async () => {
+        const result = await bridge.updateAnnotation({
+          path: payload.path,
+          pageIndex: pageNumber - 1,
+          id: record.fileId as number,
+          ...patch
+        })
+        if ('error' in result) showToast(`Kunne ikke endre annotasjonen: ${result.error}`)
+        // 'file' annots are painted by pdf.js from the file — refresh the canvas
+        else if (record.source === 'file' && patch.color) void reloadDocument()
+      })()
+    },
+    [payload.path, mutatePage, showToast, reloadDocument]
+  )
+
+  const removeAnnotation = useCallback(
+    (pageNumber: number, record: PageAnnotation) => {
+      mutatePage(pageNumber, (list) => list.filter((r) => r.id !== record.id))
+      setAnnotPopover(null)
+      if (record.fileId === null) return
+      void (async () => {
+        const result = await bridge.deleteAnnotation({
+          path: payload.path,
+          pageIndex: pageNumber - 1,
+          id: record.fileId as number
+        })
+        if ('error' in result) showToast(`Kunne ikke slette annotasjonen: ${result.error}`)
+        else if (record.source === 'file') void reloadDocument()
+      })()
+    },
+    [payload.path, mutatePage, showToast, reloadDocument]
   )
 
   /** Selection rects per page, for every rendered page the selection touches */
@@ -465,7 +593,10 @@ export default function PdfViewer({
   }, [])
 
   const applyMarkup = useCallback(
-    (type: 'highlight' | 'underline' | 'strikeout', color: [number, number, number]) => {
+    (
+      type: 'highlight' | 'underline' | 'strikeout' | 'squiggly',
+      color: [number, number, number]
+    ) => {
       const perPage = collectSelectionRects()
       setMenu(null)
       if (perPage.length === 0) return
@@ -490,6 +621,9 @@ export default function PdfViewer({
           break
         case 'strikeout':
           applyMarkup('strikeout', STRIKEOUT_COLOR)
+          break
+        case 'squiggly':
+          applyMarkup('squiggly', UNDERLINE_COLOR)
           break
         case 'note': {
           if (!menu) break
@@ -577,15 +711,22 @@ export default function PdfViewer({
       })
     } else if (pageEl) {
       const rect = pageEl.getBoundingClientRect()
+      const pageNumber = Number(pageEl.dataset.page)
+      const px = (clientX - rect.left) / scaleRef.current
+      const py = (clientY - rect.top) / scaleRef.current
+      // An annotation under the cursor takes precedence over the point menu
+      const hit = annotationAtPoint(annotsRef.current.get(pageNumber) ?? [], px, py)
+      if (hit) {
+        setMenu(null)
+        setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
+        return
+      }
       setMenu({
         x: clientX,
         y: clientY,
-        pageNumber: Number(pageEl.dataset.page),
+        pageNumber,
         mode: 'point',
-        pagePoint: {
-          x: (clientX - rect.left) / scaleRef.current,
-          y: (clientY - rect.top) / scaleRef.current
-        }
+        pagePoint: { x: px, y: py }
       })
     } else {
       setMenu(null)
@@ -600,7 +741,8 @@ export default function PdfViewer({
     [openMenuAt]
   )
 
-  // PDF Expert-style: the menu pops up right after finishing a text selection
+  // PDF Expert-style: the menu pops up right after finishing a text selection;
+  // a plain click hit-tests annotations and opens the properties popover
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return
@@ -609,7 +751,18 @@ export default function PdfViewer({
         const sel = window.getSelection()
         if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
           openMenuAt(clientX, clientY, target)
+          return
         }
+        const pageEl = (target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+        if (!pageEl) return
+        const rect = pageEl.getBoundingClientRect()
+        const pageNumber = Number(pageEl.dataset.page)
+        const hit = annotationAtPoint(
+          annotsRef.current.get(pageNumber) ?? [],
+          (clientX - rect.left) / scaleRef.current,
+          (clientY - rect.top) / scaleRef.current
+        )
+        if (hit) setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
       }, 0)
     },
     [openMenuAt]
@@ -617,6 +770,7 @@ export default function PdfViewer({
 
   const onMouseDown = useCallback(() => {
     setMenu((m) => (m ? null : m))
+    setAnnotPopover((p) => (p ? null : p))
   }, [])
 
   // ---------- Chrome / fullscreen / keyboard ----------
@@ -679,6 +833,17 @@ export default function PdfViewer({
       return stack.slice(0, -1)
     })
   }, [layout, sizes, scale])
+
+  const jumpToAnnot = useCallback(
+    (pageNumber: number, record: PageAnnotation) => {
+      const el = containerRef.current
+      if (!el || !layout) return
+      pushBack()
+      const y = record.quads[0]?.y ?? 0
+      el.scrollTop = Math.max(0, layout.tops[pageNumber - 1] + y * scale - el.clientHeight * 0.3)
+    },
+    [layout, scale, pushBack]
+  )
 
   const jumpToDest = useCallback(
     async (dest: unknown) => {
@@ -835,6 +1000,7 @@ export default function PdfViewer({
       } else if (e.key === 'Escape') {
         if (noteDraft) setNoteDraft(null)
         else if (menu) setMenu(null)
+        else if (annotPopover) setAnnotPopover(null)
         else if (searchOpen) closeSearch()
         else if (fullscreen) toggleFullscreen()
         else if (chromeHidden) {
@@ -863,6 +1029,7 @@ export default function PdfViewer({
   }, [
     noteDraft,
     menu,
+    annotPopover,
     searchOpen,
     fullscreen,
     chromeHidden,
@@ -938,8 +1105,11 @@ export default function PdfViewer({
           pdf={pdf}
           sizes={sizes}
           currentPage={currentPage}
+          annotations={annots}
           onJumpToPage={jumpToPage}
           onJumpToDest={(d) => void jumpToDest(d)}
+          onJumpToAnnot={jumpToAnnot}
+          onDeleteAnnot={removeAnnotation}
         />
 
         <div
@@ -971,7 +1141,7 @@ export default function PdfViewer({
                     cssHeight={size.h * scale}
                     scale={scale}
                     active={active}
-                    annotations={sessionAnnots.get(pageNumber) ?? EMPTY_ANNOTS}
+                    annotations={annots.get(pageNumber) ?? EMPTY_ANNOTS}
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }
@@ -1053,6 +1223,25 @@ export default function PdfViewer({
       )}
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
+      {annotPopover &&
+        (() => {
+          const record = (annots.get(annotPopover.pageNumber) ?? []).find(
+            (r) => r.id === annotPopover.localId
+          )
+          if (!record) return null
+          return (
+            <AnnotPopover
+              x={annotPopover.x}
+              y={annotPopover.y}
+              annotation={record}
+              onColor={(color) => changeAnnotation(annotPopover.pageNumber, record, { color })}
+              onContents={(contents) =>
+                changeAnnotation(annotPopover.pageNumber, record, { contents })
+              }
+              onDelete={() => removeAnnotation(annotPopover.pageNumber, record)}
+            />
+          )
+        })()}
       {noteDraft && (
         <NotePopover
           x={noteDraft.x}

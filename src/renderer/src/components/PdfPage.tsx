@@ -154,11 +154,18 @@ function PdfPage({
   return (
     <div className="pdf-page" data-page={pageNumber} style={style}>
       <div className="canvas-host" ref={hostRef} />
-      {annotations.length > 0 && (
+      {annotations.some((a) => a.source === 'session') && (
         <div className="annot-overlay">
-          {annotations.map((a) => (
-            <AnnotationMarks key={a.id} annotation={a} scale={scale} pageHeight={cssHeight / scale} />
-          ))}
+          {annotations
+            .filter((a) => a.source === 'session')
+            .map((a) => (
+              <AnnotationMarks
+                key={a.id}
+                annotation={a}
+                scale={scale}
+                pageHeight={cssHeight / scale}
+              />
+            ))}
         </div>
       )}
       {searchRects.length > 0 && (

@@ -16,6 +16,7 @@ export type MenuAction =
   | { kind: 'highlight'; color: HighlightColor }
   | { kind: 'underline' }
   | { kind: 'strikeout' }
+  | { kind: 'squiggly' }
   | { kind: 'note' }
   | { kind: 'copy' }
   | { kind: 'search' }
@@ -67,6 +68,9 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'strikeout' })}>
             <span className="menu-glyph menu-glyph-strikeout">S</span> Gjennomstrek
+          </button>
+          <button className="menu-item" onClick={() => onAction({ kind: 'squiggly' })}>
+            <span className="menu-glyph menu-glyph-squiggly">S</span> Bølgestrek
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
             <span className="menu-glyph">✎</span> Notat

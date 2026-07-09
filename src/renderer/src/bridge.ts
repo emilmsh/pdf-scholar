@@ -89,7 +89,15 @@ const webApi: PdfxApi = {
   // flow (overlay, menus) can be exercised, but nothing is persisted.
   annotate: async (req) => {
     console.debug('pdfx (web): annotate mock', req)
-    return { ok: true }
+    return { ok: true, id: -Math.floor(Math.random() * 1e9) }
+  },
+  updateAnnotation: async (req) => {
+    console.debug('pdfx (web): updateAnnotation mock', req)
+    return { ok: true, id: req.id }
+  },
+  deleteAnnotation: async (req) => {
+    console.debug('pdfx (web): deleteAnnotation mock', req)
+    return { ok: true, id: req.id }
   },
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')

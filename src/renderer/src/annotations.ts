@@ -6,13 +6,21 @@ import type { CSSProperties } from 'react'
 import type { AnnotationType, PageRect } from '../../shared/types'
 
 export interface PageAnnotation {
+  /** Local key for React state */
   id: string
+  /** PDF object number — identifies the annotation in the file across
+   *  sessions; null for session annotations the engine has not confirmed */
+  fileId: number | null
+  /** 'file' annots are painted by pdf.js from the appearance stream (we only
+   *  hit-test them); 'session' annots are painted by our overlay */
+  source: 'session' | 'file'
   type: AnnotationType
   quads: PageRect[]
   /** rgb 0–1 */
   color: [number, number, number]
   opacity: number
   contents?: string
+  author?: string
 }
 
 export interface HighlightColor {
@@ -74,6 +82,14 @@ export function annotationCss(
         width: w,
         height: Math.max(1.5, scale * 1.2),
         background: rgbCss(a.color, 0.9)
+      }
+    case 'squiggly':
+      return {
+        left: x,
+        top: y + h - Math.max(2, 0.06 * h),
+        width: w,
+        height: Math.max(2, scale * 1.6),
+        background: `repeating-linear-gradient(90deg, ${rgbCss(a.color, 0.9)} 0 ${Math.max(3, 2 * scale)}px, transparent ${Math.max(3, 2 * scale)}px ${Math.max(6, 4 * scale)}px)`
       }
     case 'note':
       return {
@@ -156,4 +172,91 @@ function mergeLineRects(rects: PageRect[]): PageRect[] {
 let idCounter = 0
 export function nextAnnotationId(): string {
   return `session-${++idCounter}`
+}
+
+const SUBTYPE_MAP: Record<string, AnnotationType> = {
+  Highlight: 'highlight',
+  Underline: 'underline',
+  StrikeOut: 'strikeout',
+  Squiggly: 'squiggly',
+  Text: 'note'
+}
+
+/** Raw pdf.js annotation data (the fields we consume) */
+export interface PdfJsAnnotationData {
+  id: string
+  subtype: string
+  rect: number[]
+  quadPoints?: Float32Array | null
+  color?: Uint8ClampedArray | number[] | null
+  opacity?: number
+  contentsObj?: { str: string }
+  titleObj?: { str: string }
+}
+
+/**
+ * Convert a pdf.js annotation (PDF user space, y-up) into a PageAnnotation
+ * (page space, y-down). Returns null for unsupported subtypes.
+ */
+export function fromPdfJsAnnotation(
+  a: PdfJsAnnotationData,
+  pageHeight: number
+): PageAnnotation | null {
+  const type = SUBTYPE_MAP[a.subtype]
+  if (!type) return null
+  const fileId = parseInt(a.id, 10)
+  if (Number.isNaN(fileId)) return null
+
+  const toPageRect = (xs: number[], ys: number[]): PageRect => {
+    const xMin = Math.min(...xs)
+    const xMax = Math.max(...xs)
+    const yMin = Math.min(...ys)
+    const yMax = Math.max(...ys)
+    return { x: xMin, y: pageHeight - yMax, w: xMax - xMin, h: yMax - yMin }
+  }
+
+  const quads: PageRect[] = []
+  if (type !== 'note' && a.quadPoints && a.quadPoints.length >= 8) {
+    for (let i = 0; i + 7 < a.quadPoints.length; i += 8) {
+      const q = a.quadPoints
+      quads.push(
+        toPageRect([q[i], q[i + 2], q[i + 4], q[i + 6]], [q[i + 1], q[i + 3], q[i + 5], q[i + 7]])
+      )
+    }
+  } else {
+    quads.push(toPageRect([a.rect[0], a.rect[2]], [a.rect[1], a.rect[3]]))
+  }
+
+  const color: [number, number, number] = a.color
+    ? [a.color[0] / 255, a.color[1] / 255, a.color[2] / 255]
+    : [1, 0.835, 0.29]
+
+  return {
+    id: `file-${fileId}`,
+    fileId,
+    source: 'file',
+    type,
+    quads,
+    color,
+    opacity: a.opacity ?? 1,
+    contents: a.contentsObj?.str || undefined,
+    author: a.titleObj?.str || undefined
+  }
+}
+
+/** Topmost annotation whose quads contain the given page-space point */
+export function annotationAtPoint(
+  annots: PageAnnotation[],
+  x: number,
+  y: number
+): PageAnnotation | null {
+  const PAD = 2
+  for (let i = annots.length - 1; i >= 0; i--) {
+    for (const q of annots[i].quads) {
+      if (x >= q.x - PAD && x <= q.x + q.w + PAD && y >= q.y - PAD && y <= q.y + q.h + PAD) {
+        return annots[i]
+      }
+    }
+  }
+  return null
 }

@@ -1,5 +1,12 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { AnnotateRequest, PdfxApi, ReadingPosition, Settings } from '../shared/types'
+import type {
+  AnnotateRequest,
+  DeleteAnnotationRequest,
+  ModifyAnnotationRequest,
+  PdfxApi,
+  ReadingPosition,
+  Settings
+} from '../shared/types'
 
 const api: PdfxApi = {
   openFileDialog: () => ipcRenderer.invoke('dialog:open'),
@@ -11,6 +18,8 @@ const api: PdfxApi = {
   setPosition: (path: string, pos: ReadingPosition) => ipcRenderer.send('position:set', path, pos),
   setSettings: (patch: Partial<Settings>) => ipcRenderer.send('settings:set', patch),
   annotate: (req: AnnotateRequest) => ipcRenderer.invoke('annotate', req),
+  updateAnnotation: (req: ModifyAnnotationRequest) => ipcRenderer.invoke('annotation:update', req),
+  deleteAnnotation: (req: DeleteAnnotationRequest) => ipcRenderer.invoke('annotation:delete', req),
   openExternal: (url: string) => ipcRenderer.send('shell:open-external', url),
   setFullscreen: (on: boolean) => ipcRenderer.send('window:set-fullscreen', on),
   getPathForFile: (file: File) => {
