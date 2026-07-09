@@ -72,6 +72,24 @@ function textUnderQuads(items: PositionedItem[], quads: PageRect[]): string {
     .trim()
 }
 
+/** Marked-up text per annotation (localId → excerpt), for the sidebar list */
+export async function computeExcerpts(
+  pdf: PDFDocumentProxy,
+  annots: ReadonlyMap<number, PageAnnotation[]>
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  for (const [pageNumber, list] of annots) {
+    const markup = list.filter((r) => r.type !== 'note')
+    if (markup.length === 0) continue
+    const items = await getPositionedItems(pdf, pageNumber)
+    for (const record of markup) {
+      const text = textUnderQuads(items, record.quads)
+      if (text) map.set(record.id, text)
+    }
+  }
+  return map
+}
+
 export async function collectExportRows(
   pdf: PDFDocumentProxy,
   annots: ReadonlyMap<number, PageAnnotation[]>

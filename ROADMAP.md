@@ -28,6 +28,8 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 - [x] Navigasjonshistorikk: «Tilbake til s. N»-pille etter alle hopp (lenker, TOC, miniatyrer, gå-til-side); full tilbake-stakk (levert 2026-07-09)
 - [x] Frem-navigasjon: Alt+← / Alt+→, frem/tilbake-knapper i verktøylinjen og «Frem til s. N»-pille (levert 2026-07-09)
 - [x] Pinch-zoom snapper til tilpass-bredde/-høyde/-side når man slipper nær (levert 2026-07-09)
+- [x] Navigasjonspillene fader ut etter dødtid; våkner ved navigering eller hover i hjørnet (levert 2026-07-10)
+- [x] Dokumenter åpnes med hele første side synlig (fit-page, sentrert — ikke avkuttet vertikalt); lagret posisjon/zoom overstyrer (levert 2026-07-10)
 - [x] Klikkbare hyperlenker i dokumentet: interne mål med presis Y-posisjon, eksterne åpnes i nettleser (levert 2026-07-09)
 - [x] Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett (levert 2026-07-09)
 - [x] Søkelinje (Ctrl+F): skill store/små bokstaver, hele ord (æøå-sikker), resultatliste med utdrag, treffmarkering på siden, F3/Shift+F3, søkehopp gir tilbake-pille (levert 2026-07-09)
@@ -56,12 +58,14 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 ## Fase 6 — Annotasjonspanel + eksport (Emils prioritet nr. 3)
 - [x] Merknader-fane: liste gruppert per side; klikk for å hoppe; slett enkeltvis (levert med fase 4)
 - [x] **Eksporter annotasjonssammendrag** som Markdown, HTML og ren tekst — inkluderer faktisk markert tekst (hentet via quad/tekst-geometri), kommentarer og forfatter, gruppert per side (levert 2026-07-09)
-- [ ] Markert tekst-utdrag også i selve listen (nå kun i eksport)
-- [ ] Søk i annotasjoner + fargefilter; tøm alle med bekreftelse
+- [x] Markert tekst-utdrag i selve listen («utdrag» — kommentar som andrelinje) (levert 2026-07-10)
+- [x] Søk i merknader + fargefilter (5 palettfarger, kombinerbart med søk) (levert 2026-07-10)
+- [ ] Tøm alle med bekreftelse
 - [ ] «Annoterte sider»: ny PDF med kun sider som har annotasjoner
 
 ## Fase 6.5 — Faner (Emil ønsker dette tidlig, trukket frem fra fase 7)
-- Fanelinje for flere åpne dokumenter samtidig; Ctrl+Tab veksler; dra for å endre rekkefølge
+- [x] Fanelinje for flere åpne dokumenter: klikk/klikk-på-✕/midtklikk lukker, + åpner, Ctrl+Tab / Ctrl+Shift+Tab veksler, Ctrl+W lukker, Ctrl+O åpner; bakgrunnsfaner beholder full tilstand (scroll, zoom, angre-stakk) og leseposisjon lagres ved fanebytte (levert 2026-07-10)
+- [ ] Dra faner for å endre rekkefølge; «lukk andre faner»-meny
 
 ## Fase 7 — Skall-paritet og polering
 - Fanelinje for flere dokumenter; delt visning
@@ -76,7 +80,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 
 ## Tankeboks (ikke planlagt, ikke glemt)
 - **Nettleserutvidelse**: PDFX som PDF-visnings-erstatning i Edge/Chrome (MV3-extension). Fundamentet ligger til rette: renderer-en kjører allerede i ren nettleser via `bridge.ts`-fallbacks. Krever: mupdf WASM flyttet til renderer/worker, File System Access API for lagring, extension-innpakning. (Emils idé 2026-07-09.)
-- **Legg moniteringsstrategi**: strategi for overvåking av appen (feil-/krasjrapportering, ytelsesmåling o.l. — omfang avklares med Emil når det tas opp). (Emils ønske 2026-07-09.)
+- **Legg monetiseringsstrategi**: hvordan PDFX eventuelt kan tjene penger (lisens/kjøp/abonnement/gratis+pro — omfang avklares med Emil når det tas opp). NB: mupdf er AGPL — kommersiell distribusjon krever Artifex-lisens eller bytte av skrivemotor, se fase 8-porten. (Emils ønske 2026-07-09.)
 
 ## Viktigste risikoer (med tiltak)
 1. **Koordinat-mapping** pdf.js-viewport ↔ PDF-sideflate (y-flipp, rotasjon, cropbox) — én delt, enhetstestet transformmodul; la mupdf beregne quads selv.

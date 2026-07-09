@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   FilePayload,
   ReadingPosition,
@@ -8,9 +8,11 @@ import type {
 } from '../../shared/types'
 import { bridge } from './bridge'
 import PdfViewer from './components/PdfViewer'
+import TabBar from './components/TabBar'
 import Welcome from './components/Welcome'
 
-interface OpenDocument {
+interface OpenTab {
+  id: string
   payload: FilePayload
   initialPosition: ReadingPosition | null
 }
@@ -25,14 +27,20 @@ const FALLBACK_SETTINGS: Settings = {
   keepAwake: false
 }
 
+let tabCounter = 0
+
 export default function App(): React.JSX.Element {
-  const [doc, setDoc] = useState<OpenDocument | null>(null)
+  const [tabs, setTabs] = useState<OpenTab[]>([])
+  const [activeId, setActiveId] = useState<string | null>(null)
   const [recents, setRecents] = useState<RecentFile[]>([])
   const [settings, setSettingsState] = useState<Settings>(FALLBACK_SETTINGS)
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
   )
   const [error, setError] = useState<string | null>(null)
+
+  const tabsRef = useRef(tabs)
+  tabsRef.current = tabs
 
   const resolvedTheme: ThemeName =
     settings.theme === 'auto' ? (systemDark ? 'night' : 'day') : settings.theme
@@ -67,14 +75,50 @@ export default function App(): React.JSX.Element {
     bridge.getRecents().then(setRecents)
   }, [])
 
+  // ---------- Tabs ----------
+
   const openPayload = useCallback(async (payload: FilePayload) => {
+    const existing = tabsRef.current.find((t) => t.payload.path === payload.path)
+    if (existing) {
+      setActiveId(existing.id)
+      setError(null)
+      return
+    }
     const initialPosition = await bridge.getPosition(payload.path)
-    setDoc({ payload, initialPosition })
+    const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition }
+    setTabs((prev) => [...prev, tab])
+    setActiveId(tab.id)
     setError(null)
+  }, [])
+
+  const closeTab = useCallback((id: string) => {
+    setTabs((prev) => {
+      const index = prev.findIndex((t) => t.id === id)
+      const next = prev.filter((t) => t.id !== id)
+      setActiveId((current) => {
+        if (current !== id) return current
+        return next[Math.min(index, next.length - 1)]?.id ?? null
+      })
+      return next
+    })
+  }, [])
+
+  const cycleTab = useCallback((delta: number) => {
+    setActiveId((current) => {
+      const list = tabsRef.current
+      if (list.length < 2) return current
+      const index = list.findIndex((t) => t.id === current)
+      return list[(index + delta + list.length) % list.length].id
+    })
   }, [])
 
   const openPath = useCallback(
     async (path: string) => {
+      const existing = tabsRef.current.find((t) => t.payload.path === path)
+      if (existing) {
+        setActiveId(existing.id)
+        return
+      }
       const result = await bridge.readFile(path)
       if ('error' in result) {
         setError(`Kunne ikke åpne filen: ${result.error}`)
@@ -104,6 +148,32 @@ export default function App(): React.JSX.Element {
     return bridge.onOpenPath((path) => openPath(path))
   }, [refreshRecents, openPath])
 
+  // Refresh recents whenever the last tab closes (back at the welcome screen)
+  useEffect(() => {
+    if (tabs.length === 0) refreshRecents()
+  }, [tabs.length, refreshRecents])
+
+  // Tab shortcuts: Ctrl+Tab / Ctrl+Shift+Tab cycle, Ctrl+W close, Ctrl+O open
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.ctrlKey && e.key === 'Tab') {
+        e.preventDefault()
+        cycleTab(e.shiftKey ? -1 : 1)
+      } else if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) {
+        e.preventDefault()
+        setActiveId((current) => {
+          if (current) closeTab(current)
+          return current
+        })
+      } else if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault()
+        void openDialog()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [cycleTab, closeTab, openDialog])
+
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault()
@@ -123,26 +193,6 @@ export default function App(): React.JSX.Element {
     [openPath, openPayload]
   )
 
-  const closeDocument = useCallback(() => {
-    setDoc(null)
-    refreshRecents()
-  }, [refreshRecents])
-
-  const viewer = useMemo(() => {
-    if (!doc) return null
-    return (
-      <PdfViewer
-        key={doc.payload.path}
-        payload={doc.payload}
-        initialPosition={doc.initialPosition}
-        settings={settings}
-        resolvedTheme={resolvedTheme}
-        onSettingsChange={updateSettings}
-        onClose={closeDocument}
-      />
-    )
-  }, [doc, settings, resolvedTheme, updateSettings, closeDocument])
-
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
       {error && (
@@ -153,7 +203,36 @@ export default function App(): React.JSX.Element {
           </button>
         </div>
       )}
-      {viewer ?? <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />}
+
+      {tabs.length > 0 && (
+        <TabBar
+          tabs={tabs.map((t) => ({ id: t.id, name: t.payload.name, path: t.payload.path }))}
+          activeId={activeId}
+          onSelect={setActiveId}
+          onClose={closeTab}
+          onNewTab={() => void openDialog()}
+        />
+      )}
+
+      {tabs.length > 0 ? (
+        <div className="tab-views">
+          {tabs.map((tab) => (
+            <div key={tab.id} className={`tab-view${tab.id === activeId ? ' active' : ''}`}>
+              <PdfViewer
+                payload={tab.payload}
+                initialPosition={tab.initialPosition}
+                active={tab.id === activeId}
+                settings={settings}
+                resolvedTheme={resolvedTheme}
+                onSettingsChange={updateSettings}
+                onClose={() => closeTab(tab.id)}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+      )}
     </div>
   )
 }

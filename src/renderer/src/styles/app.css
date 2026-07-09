@@ -90,6 +90,103 @@ button {
   flex-direction: column;
 }
 
+/* ---------- Tab bar ---------- */
+
+.tab-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 6px 8px 0;
+  background: color-mix(in srgb, var(--bg-chrome) 88%, black);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 220px;
+  border-radius: 8px 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.tab:hover {
+  background: var(--hover);
+}
+
+.tab.active {
+  background: var(--bg-chrome);
+  color: var(--text);
+  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.tab-label {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 4px 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.tab-close {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0 6px 0 2px;
+  border-radius: 5px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: 0;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: var(--active);
+}
+
+.tab-new {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin: 0 2px 4px;
+  border-radius: 7px;
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.tab-new:hover {
+  background: var(--hover);
+}
+
+.tab-views {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.tab-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  visibility: hidden;
+}
+
+.tab-view.active {
+  visibility: visible;
+}
+
 /* ---------- Error banner ---------- */
 
 .error-banner {
@@ -689,6 +786,15 @@ button {
   z-index: 45;
   display: flex;
   gap: 8px;
+  /* extend the hover area a bit so faded pills can be woken by pointing at
+     their corner */
+  padding: 14px;
+  margin: -14px;
+  transition: opacity 0.4s ease;
+}
+
+.nav-pills.faded {
+  opacity: 0;
 }
 
 .back-pill,
@@ -1285,6 +1391,13 @@ button {
   border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
+.annot-list-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
 .annot-list-text {
   font-size: 12px;
   overflow: hidden;
@@ -1296,6 +1409,61 @@ button {
   color: var(--text-secondary);
   font-style: normal;
   font-size: 11px;
+}
+
+.annot-list-comment {
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annot-filter {
+  padding: 7px 6px 6px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.annot-filter input {
+  width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+}
+
+.annot-filter input:focus {
+  border-color: var(--accent);
+}
+
+.annot-filter-colors {
+  display: flex;
+  gap: 7px;
+  padding: 0 2px;
+}
+
+.annot-filter-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  transition: transform 0.08s;
+}
+
+.annot-filter-dot:hover {
+  transform: scale(1.15);
+}
+
+.annot-filter-dot.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .annot-list-delete {

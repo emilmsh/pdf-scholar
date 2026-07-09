@@ -30,7 +30,7 @@ import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
-import { collectExportRows, toHtml, toMarkdown, toPlainText } from '../annot-export'
+import { collectExportRows, computeExcerpts, toHtml, toMarkdown, toPlainText } from '../annot-export'
 import type { ExportFormat } from './Sidebar'
 
 // One worker per open document (not a shared global port) so the document can
@@ -113,6 +113,9 @@ interface NoteDraft {
 interface Props {
   payload: FilePayload
   initialPosition: ReadingPosition | null
+  /** False when this viewer sits in a background tab: window-level listeners
+   *  are disabled and the reading position is flushed */
+  active: boolean
   settings: Settings
   resolvedTheme: ThemeName
   onSettingsChange(patch: Partial<Settings>): void
@@ -126,6 +129,7 @@ function clamp(v: number, min: number, max: number): number {
 export default function PdfViewer({
   payload,
   initialPosition,
+  active,
   settings,
   resolvedTheme,
   onSettingsChange,
@@ -158,6 +162,8 @@ export default function PdfViewer({
     back: [],
     forward: []
   })
+  const [pillsFaded, setPillsFaded] = useState(false)
+  const pillsTimerRef = useRef<number | null>(null)
   const [pillEditing, setPillEditing] = useState(false)
   const [pillInput, setPillInput] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -202,6 +208,26 @@ export default function PdfViewer({
   const searchJumpedRef = useRef(false)
   const annotsRef = useRef(annots)
   annotsRef.current = annots
+  const [excerpts, setExcerpts] = useState<ReadonlyMap<string, string>>(new Map())
+
+  // Recover the marked-up text for the sidebar list (debounced; text geometry
+  // work happens off the interaction path)
+  useEffect(() => {
+    if (!pdf || annots.size === 0) return
+    let stale = false
+    const timer = window.setTimeout(async () => {
+      try {
+        const map = await computeExcerpts(pdf, annots)
+        if (!stale) setExcerpts(map)
+      } catch {
+        /* excerpts are cosmetic */
+      }
+    }, 300)
+    return () => {
+      stale = true
+      window.clearTimeout(timer)
+    }
+  }, [pdf, annots])
 
   // ---------- Document loading ----------
 
@@ -273,10 +299,14 @@ export default function PdfViewer({
     return () => observer.disconnect()
   }, [])
 
-  // Pick an initial fit-width zoom if none was restored
+  // Pick an initial zoom if none was restored: fit the WHOLE first page
+  // (fit-page), so a fresh document opens centered without vertical cropping
   useEffect(() => {
     if (scale > 0 || sizes.length === 0 || containerWidth === 0) return
-    setScale(clamp((containerWidth - SIDE_PAD) / sizes[0].w, ZOOM_MIN, ZOOM_MAX))
+    const height = containerRef.current?.clientHeight || window.innerHeight - 60
+    const fitW = (containerWidth - SIDE_PAD) / sizes[0].w
+    const fitH = (height - PAD_TOP - PAD_BOTTOM) / sizes[0].h
+    setScale(clamp(Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX))
   }, [sizes, scale, containerWidth])
 
   // ---------- Layout ----------
@@ -998,6 +1028,24 @@ export default function PdfViewer({
     }))
   }, [navStacks.forward, computeCurrent, scrollToNavPosition])
 
+  // The nav pills fade out after idle time; navigation or hovering their
+  // corner brings them back
+  const revealPills = useCallback(() => {
+    if (pillsTimerRef.current) window.clearTimeout(pillsTimerRef.current)
+    setPillsFaded(false)
+  }, [])
+
+  const schedulePillsFade = useCallback((delay = 2600) => {
+    if (pillsTimerRef.current) window.clearTimeout(pillsTimerRef.current)
+    pillsTimerRef.current = window.setTimeout(() => setPillsFaded(true), delay)
+  }, [])
+
+  useEffect(() => {
+    if (navStacks.back.length === 0 && navStacks.forward.length === 0) return
+    revealPills()
+    schedulePillsFade()
+  }, [navStacks, revealPills, schedulePillsFade])
+
   const exportAnnotations = useCallback(
     async (format: ExportFormat) => {
       if (!pdf) return
@@ -1180,6 +1228,7 @@ export default function PdfViewer({
   )
 
   useEffect(() => {
+    if (!active) return
     const onKeyDown = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement | null)?.tagName
       const isTyping = tag === 'INPUT' || tag === 'TEXTAREA'
@@ -1232,6 +1281,7 @@ export default function PdfViewer({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [
+    active,
     noteDraft,
     menu,
     annotPopover,
@@ -1251,14 +1301,31 @@ export default function PdfViewer({
 
   // Focus the scroll container so PageUp/PageDown/arrows work immediately
   useEffect(() => {
-    containerRef.current?.focus()
-  }, [pdf])
+    if (active) containerRef.current?.focus()
+  }, [pdf, active])
+
+  // Persist the reading position immediately when the tab goes to the
+  // background or the viewer unmounts (the debounced save may not have fired)
+  const flushPosition = useCallback(() => {
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
+    const current = computeCurrent()
+    if (current) bridge.setPosition(payload.path, { ...current, zoom: scaleRef.current })
+  }, [computeCurrent, payload.path])
+  const flushPositionRef = useRef(flushPosition)
+  flushPositionRef.current = flushPosition
+
+  useEffect(() => {
+    if (!active) flushPositionRef.current()
+  }, [active])
+
+  useEffect(() => () => flushPositionRef.current(), [])
 
   useEffect(
     () => () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
       if (gestureRef.current) window.clearTimeout(gestureRef.current.timer)
+      if (pillsTimerRef.current) window.clearTimeout(pillsTimerRef.current)
       if (fullscreen) bridge.setFullscreen(false)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1318,6 +1385,7 @@ export default function PdfViewer({
           sizes={sizes}
           currentPage={currentPage}
           annotations={annots}
+          excerpts={excerpts}
           onJumpToPage={jumpToPage}
           onJumpToDest={(d) => void jumpToDest(d)}
           onJumpToAnnot={jumpToAnnot}
@@ -1374,7 +1442,11 @@ export default function PdfViewer({
       </div>
 
       {(navStacks.back.length > 0 || navStacks.forward.length > 0) && layout && (
-        <div className="nav-pills">
+        <div
+          className={`nav-pills${pillsFaded ? ' faded' : ''}`}
+          onMouseEnter={revealPills}
+          onMouseLeave={() => schedulePillsFade(1400)}
+        >
           {navStacks.back.length > 0 && (
             <button className="back-pill" onClick={goBack} title="Alt+←">
               ‹ Tilbake til s. {navStacks.back[navStacks.back.length - 1].page}

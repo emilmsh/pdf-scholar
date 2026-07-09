@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { ANNOT_TYPE_LABELS } from '../annotations'
+import { ANNOT_TYPE_LABELS, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 
 const THUMB_WIDTH = 132
@@ -25,6 +25,8 @@ interface Props {
   sizes: PageSize[]
   currentPage: number
   annotations: ReadonlyMap<number, PageAnnotation[]>
+  /** localId → marked-up text (computed lazily by the viewer) */
+  excerpts: ReadonlyMap<string, string>
   onJumpToPage(page: number): void
   onJumpToDest(dest: unknown): void
   onJumpToAnnot(pageNumber: number, record: PageAnnotation): void
@@ -40,6 +42,7 @@ function Sidebar({
   sizes,
   currentPage,
   annotations,
+  excerpts,
   onJumpToPage,
   onJumpToDest,
   onJumpToAnnot,
@@ -148,6 +151,7 @@ function Sidebar({
       {tab === 'annots' && (
         <AnnotationList
           annotations={annotations}
+          excerpts={excerpts}
           onJump={onJumpToAnnot}
           onDelete={onDeleteAnnot}
           onExport={onExport}
@@ -157,17 +161,26 @@ function Sidebar({
   )
 }
 
+function colorDistance(a: [number, number, number], b: [number, number, number]): number {
+  return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
+}
+
 function AnnotationList({
   annotations,
+  excerpts,
   onJump,
   onDelete,
   onExport
 }: {
   annotations: ReadonlyMap<number, PageAnnotation[]>
+  excerpts: ReadonlyMap<string, string>
   onJump(pageNumber: number, record: PageAnnotation): void
   onDelete(pageNumber: number, record: PageAnnotation): void
   onExport(format: ExportFormat): void
 }): React.JSX.Element {
+  const [query, setQuery] = useState('')
+  const [colorFilter, setColorFilter] = useState<[number, number, number] | null>(null)
+
   const flat = useMemo(() => {
     const rows: { pageNumber: number; record: PageAnnotation }[] = []
     for (const [pageNumber, list] of annotations) {
@@ -179,6 +192,16 @@ function AnnotationList({
     )
     return rows
   }, [annotations])
+
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    return flat.filter(({ record }) => {
+      if (colorFilter && colorDistance(record.color, colorFilter) > 0.06) return false
+      if (!needle) return true
+      const haystack = `${record.contents ?? ''} ${excerpts.get(record.id) ?? ''}`.toLowerCase()
+      return haystack.includes(needle)
+    })
+  }, [flat, query, colorFilter, excerpts])
 
   if (flat.length === 0) {
     return <p className="sidebar-empty">Ingen merknader i dokumentet ennå.</p>
@@ -199,9 +222,45 @@ function AnnotationList({
           TXT
         </button>
       </div>
-      {flat.map(({ pageNumber, record }) => {
+
+      <div className="annot-filter">
+        <input
+          value={query}
+          placeholder="Søk i merknader …"
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Søk i merknader"
+        />
+        <div className="annot-filter-colors">
+          {HIGHLIGHT_COLORS.map((c) => (
+            <button
+              key={c.hex}
+              className={`annot-filter-dot${
+                colorFilter && colorDistance(c.rgb, colorFilter) < 0.001 ? ' active' : ''
+              }`}
+              style={{ background: c.hex }}
+              title={`Vis kun ${c.name.toLowerCase()}`}
+              onClick={() =>
+                setColorFilter((prev) =>
+                  prev && colorDistance(c.rgb, prev) < 0.001 ? null : c.rgb
+                )
+              }
+            />
+          ))}
+        </div>
+      </div>
+
+      {filtered.length === 0 && <p className="sidebar-empty">Ingen treff i merknadene.</p>}
+      {filtered.map(({ pageNumber, record }) => {
         const header = pageNumber !== lastPage
         lastPage = pageNumber
+        const excerpt = excerpts.get(record.id)
+        const primary =
+          record.type === 'note'
+            ? record.contents || ANNOT_TYPE_LABELS.note
+            : excerpt
+              ? `«${excerpt}»`
+              : ANNOT_TYPE_LABELS[record.type]
+        const comment = record.type !== 'note' ? record.contents : undefined
         return (
           <div key={record.id}>
             {header && <div className="annot-list-page">Side {pageNumber}</div>}
@@ -213,9 +272,12 @@ function AnnotationList({
                     background: `rgb(${record.color.map((v) => Math.round(v * 255)).join(',')})`
                   }}
                 />
-                <span className="annot-list-text">
-                  {record.contents || ANNOT_TYPE_LABELS[record.type]}
-                  {record.author && <em> — {record.author}</em>}
+                <span className="annot-list-body">
+                  <span className="annot-list-text">
+                    {primary}
+                    {record.author && <em> — {record.author}</em>}
+                  </span>
+                  {comment && <span className="annot-list-comment">{comment}</span>}
                 </span>
               </button>
               <button
