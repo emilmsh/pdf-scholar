@@ -11,6 +11,8 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 - [x] Åpning via kommandolinje/«Åpne med» (argv), single-instance med `second-instance`-ruting
 - [x] Vindusstørrelse/-posisjon huskes; dra-og-slipp av PDF
 - [x] Lesemodus: Dag/Sepia/Natt + distraksjonsfri modus (verktøylinjen skjules, vises ved å peke mot toppen, Esc avslutter)
+- [x] Myk zoom: pinch/Ctrl+hjul som CSS-transform under gesten, skarp gjentegning ved ro, fokuspunkt bevares; canvas-bytte uten hvit blink; horisontal panorering ved zoom (levert 2026-07-09)
+- [x] Fullskjerm via F11/knapp/Esc (levert 2026-07-09)
 - [ ] electron-builder NSIS-installer med `fileAssociations` for .pdf (per-bruker, uten admin)
 - [ ] Jump List («Recent»-kategori) i oppgavelinjen
 
@@ -24,13 +26,14 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 - Navigasjonshistorikk: «Tilbake til s. N»-pille etter alle hopp (lenker, TOC, søk, gå-til-side); full tilbake-stakk
 - Søkelinje: skill store/små bokstaver, hele ord, marker alle, resultatliste, søkehistorikk
 - Bokmerker-fane
-- Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett utvalg
+- ~~Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett~~ ✅ levert 2026-07-09 (høyreklikk eller meny som spretter opp ved markering) utvalg
 
 ## Fase 4 — Annoteringsfundament (Emils prioritet nr. 2)
-- mupdf `AnnotationEngine` i hovedprosessen bak typet IPC; eksisterende annotasjoner leses inn og tegnes i React-overlegget
-- Tekstmarkering fra utvalg: Highlight, Underline, Strikeout (+ Squiggly) via mupdf StructuredText-quads; «armert verktøy»-flyt
+Grunnmuren ble levert 2026-07-09: mupdf `AnnotationEngine` i hovedprosessen bak typet IPC skriver Highlight (5 farger)/Underline/StrikeOut/notater som standard PDF-annotasjoner med appearance streams, inkrementell lagring og atomisk filbytte (rundtur verifisert med mupdf-gjenåpning); overlegg tegner dem umiddelbart. Gjenstår:
+- Eksisterende annotasjoner leses inn ved åpning og tegnes i overlegget (nå vises de via pdf.js-rendering)
+- Squiggly; «armert verktøy»-flyt (verktøy stays on for gjentatt bruk)
 - 5-felts fargepaletter per verktøy + egendefinert velger, opasitet; klikk på eksisterende annotasjon → egenskaper/slett (også annotasjoner fra andre apper)
-- Debounced inkrementell autolagring med atomisk filbytte; **interop-port**: utdata må åpne korrekt i Acrobat/SumatraPDF/PDF Expert
+- **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF/PDF Expert (iPad) og verifiser identisk visning
 
 ## Fase 5 — Fullt annoteringsverktøysett
 - Penn (fast bredde + trykkfølsom via Pointer Events), markeringstusj, viskelær, lasso-multivalg for blekk
