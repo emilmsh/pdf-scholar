@@ -12,15 +12,19 @@ import type {
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
 import {
+  MARKER_DEFAULT,
+  MARKER_OPACITY,
   NOTE_COLOR,
+  PEN_DEFAULT,
   STRIKEOUT_COLOR,
   UNDERLINE_COLOR,
   annotationAtPoint,
   fromPdfJsAnnotation,
+  inkHitTest,
   nextAnnotationId,
   selectionRectsForPage
 } from '../annotations'
-import type { PageAnnotation, PdfJsAnnotationData } from '../annotations'
+import type { DrawTool, PageAnnotation, PdfJsAnnotationData } from '../annotations'
 import AnnotPopover from './AnnotPopover'
 import PdfPage from './PdfPage'
 import Sidebar from './Sidebar'
@@ -164,6 +168,22 @@ export default function PdfViewer({
   })
   const [pillsFaded, setPillsFaded] = useState(false)
   const pillsTimerRef = useRef<number | null>(null)
+  const [activeTool, setActiveTool] = useState<'pen' | 'marker' | 'eraser' | null>(null)
+  const [toolPrefs, setToolPrefs] = useState({ pen: PEN_DEFAULT, marker: MARKER_DEFAULT })
+
+  const drawTool = useMemo<DrawTool | null>(() => {
+    if (!activeTool) return null
+    if (activeTool === 'eraser') return { type: 'eraser', color: [0, 0, 0], width: 0, opacity: 0 }
+    const prefs = toolPrefs[activeTool]
+    return {
+      type: activeTool,
+      color: prefs.color,
+      width: prefs.width,
+      opacity: activeTool === 'marker' ? MARKER_OPACITY : 1
+    }
+  }, [activeTool, toolPrefs])
+  const drawToolRef = useRef(drawTool)
+  drawToolRef.current = drawTool
   const [pillEditing, setPillEditing] = useState(false)
   const [pillInput, setPillInput] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -608,7 +628,9 @@ export default function PdfViewer({
         color: snapshot.color,
         opacity: snapshot.opacity,
         contents: snapshot.contents,
-        author: snapshot.author
+        author: snapshot.author,
+        strokes: snapshot.strokes,
+        width: snapshot.width
       })
       if ('error' in result) {
         showToast(`Kunne ikke lagre annotasjonen: ${result.error}`)
@@ -709,7 +731,8 @@ export default function PdfViewer({
       quads: PageRect[],
       color: [number, number, number],
       opacity: number,
-      contents?: string
+      contents?: string,
+      extras?: { strokes?: [number, number][][]; width?: number }
     ) => {
       const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
       const snapshot: PageAnnotation = {
@@ -721,7 +744,9 @@ export default function PdfViewer({
         color,
         opacity,
         contents,
-        author: 'PDFX'
+        author: 'PDFX',
+        strokes: extras?.strokes,
+        width: extras?.width
       }
       pushUndo({ kind: 'create', handle, snapshot })
       await engineCreate(handle, snapshot)
@@ -749,6 +774,62 @@ export default function PdfViewer({
       void engineDelete(handle)
     },
     [pushUndo, engineDelete]
+  )
+
+  // ---------- Freehand drawing ----------
+
+  const completeStroke = useCallback(
+    (pageNumber: number, points: [number, number][]) => {
+      const tool = drawToolRef.current
+      if (!tool || tool.type === 'eraser') return
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const [x, y] of points) {
+        minX = Math.min(minX, x)
+        minY = Math.min(minY, y)
+        maxX = Math.max(maxX, x)
+        maxY = Math.max(maxY, y)
+      }
+      const pad = tool.width / 2 + 1
+      const quads = [
+        { x: minX - pad, y: minY - pad, w: maxX - minX + 2 * pad, h: maxY - minY + 2 * pad }
+      ]
+      void persistAnnotation(pageNumber, 'ink', quads, tool.color, tool.opacity, undefined, {
+        strokes: [points],
+        width: tool.width
+      })
+    },
+    [persistAnnotation]
+  )
+
+  const eraseAt = useCallback(
+    (pageNumber: number, x: number, y: number) => {
+      const list = annotsRef.current.get(pageNumber) ?? []
+      for (let i = list.length - 1; i >= 0; i--) {
+        const record = list[i]
+        if (record.type !== 'ink') continue
+        if (inkHitTest(record, x, y, 4)) {
+          removeAnnotation(pageNumber, record)
+          return
+        }
+      }
+    },
+    [removeAnnotation]
+  )
+
+  // Stable identities for PdfPage (fresh callbacks would re-render canvases)
+  const drawActionsRef = useRef({ stroke: completeStroke, erase: eraseAt })
+  drawActionsRef.current = { stroke: completeStroke, erase: eraseAt }
+  const onStrokeComplete = useCallback(
+    (pageNumber: number, points: [number, number][]) =>
+      drawActionsRef.current.stroke(pageNumber, points),
+    []
+  )
+  const onEraseAt = useCallback(
+    (pageNumber: number, x: number, y: number) => drawActionsRef.current.erase(pageNumber, x, y),
+    []
   )
 
   /** Selection rects per page, for every rendered page the selection touches */
@@ -908,6 +989,7 @@ export default function PdfViewer({
   const onContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
+      if (drawToolRef.current) return
       openMenuAt(e.clientX, e.clientY, e.target)
     },
     [openMenuAt]
@@ -917,7 +999,7 @@ export default function PdfViewer({
   // a plain click hit-tests annotations and opens the properties popover
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
-      if (e.button !== 0) return
+      if (e.button !== 0 || drawToolRef.current) return
       const { clientX, clientY, target } = e
       window.setTimeout(() => {
         const sel = window.getSelection()
@@ -1255,6 +1337,7 @@ export default function PdfViewer({
         if (noteDraft) setNoteDraft(null)
         else if (menu) setMenu(null)
         else if (annotPopover) setAnnotPopover(null)
+        else if (activeTool) setActiveTool(null)
         else if (searchOpen) closeSearch()
         else if (fullscreen) toggleFullscreen()
         else if (chromeHidden) {
@@ -1285,6 +1368,7 @@ export default function PdfViewer({
     noteDraft,
     menu,
     annotPopover,
+    activeTool,
     searchOpen,
     fullscreen,
     chromeHidden,
@@ -1364,6 +1448,12 @@ export default function PdfViewer({
           canNavForward={navStacks.forward.length > 0}
           onNavBack={goBack}
           onNavForward={goForward}
+          activeTool={activeTool}
+          toolPrefs={toolPrefs}
+          onToolSelect={setActiveTool}
+          onToolPrefChange={(tool, patch) =>
+            setToolPrefs((prev) => ({ ...prev, [tool]: { ...prev[tool], ...patch } }))
+          }
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           onBack={onClose}
           onGoToPage={jumpToPage}
@@ -1394,7 +1484,7 @@ export default function PdfViewer({
         />
 
         <div
-          className="pages"
+          className={`pages${drawTool ? ' drawing' : ''}`}
           ref={containerRef}
           tabIndex={-1}
           onScroll={onScroll}
@@ -1426,8 +1516,11 @@ export default function PdfViewer({
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }
+                    drawTool={drawTool}
                     onInternalLink={onInternalLink}
                     onExternalLink={onExternalLink}
+                    onStrokeComplete={onStrokeComplete}
+                    onErase={onEraseAt}
                   />
                 )
               })}

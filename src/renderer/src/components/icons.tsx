@@ -91,6 +91,27 @@ export const IconSearch = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconPen = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+  </Svg>
+)
+
+export const IconMarker = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M9 11l-6 6v4h4l6-6" />
+    <path d="M14 6l4 4 3-3a2.8 2.8 0 0 0-4-4l-3 3z" />
+    <path d="M9 11l4 4" />
+  </Svg>
+)
+
+export const IconEraser = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M20 20H8.5L3.5 15a2 2 0 0 1 0-2.8l8.7-8.7a2 2 0 0 1 2.8 0l5.5 5.5a2 2 0 0 1 0 2.8L14 18.3" />
+    <path d="M7 11l6 6" />
+  </Svg>
+)
+
 export const IconArrowLeft = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M19 12H5M11 6l-6 6 6 6" />

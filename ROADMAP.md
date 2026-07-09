@@ -50,10 +50,13 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [ ] **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF/PDF Expert (iPad) og verifiser identisk visning — Emils manuelle test gjenstår
 
 ## Fase 5 — Fullt annoteringsverktøysett
-- Penn (fast bredde + trykkfølsom via Pointer Events), markeringstusj, viskelær, lasso-multivalg for blekk
-- Popup-notater, fritekst, former (rektangel/ellipse/linje/pil)
-- Angre/gjør om som inverterbare motor-operasjoner; hurtigtaster
-- Verktøysett-system i verktøylinjen
+- [x] Penn og gjennomskinnelig markeringstusj: frihåndstegning med coalesced pointer events, farge- og breddevalg per verktøy, skrives som standard Ink-annotasjoner (rundtur verifisert); Esc avslutter verktøyet (levert 2026-07-10)
+- [x] Viskelær: sletter hele strøk med presis punkt-til-segment-trefftest; angrbart (levert 2026-07-10)
+- [x] ~~Angre/gjør om som inverterbare motor-operasjoner; hurtigtaster~~ (levert 2026-07-09)
+- [ ] Trykkfølsom penn (krever polygon-appearance i stedet for enkel Ink-bredde — utsatt bevisst for interop)
+- [ ] Lasso-multivalg for blekk
+- [ ] Fritekst på siden, former (rektangel/ellipse/linje/pil)
+- [ ] Verktøysett-system i verktøylinjen (tilpassbare grupper)
 
 ## Fase 6 — Annotasjonspanel + eksport (Emils prioritet nr. 3)
 - [x] Merknader-fane: liste gruppert per side; klikk for å hoppe; slett enkeltvis (levert med fase 4)

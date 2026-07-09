@@ -494,6 +494,68 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Drawing tools */
+
+.tool-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool-menu {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  min-width: 218px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  z-index: 40;
+  animation: menu-in 0.12s ease;
+}
+
+.tool-menu input[type='range'] {
+  width: 100%;
+  margin: 2px 0 2px;
+  accent-color: var(--accent);
+}
+
+.draw-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.draw-layer.erasing {
+  cursor: cell;
+}
+
+.draw-layer svg,
+.annot-ink-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* While a drawing tool is armed, text/links must not steal pointer events */
+
+.pages.drawing .textLayer,
+.pages.drawing .pdf-link {
+  pointer-events: none;
+}
+
+.pages.drawing .textLayer :is(span, br) {
+  cursor: crosshair;
+}
+
 /* Theme menu */
 
 .theme-menu-anchor {

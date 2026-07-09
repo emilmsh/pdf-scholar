@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Settings, ThemeName, ThemePreference } from '../../../shared/types'
+import { HIGHLIGHT_COLORS } from '../annotations'
 import {
   IconArrowLeft,
   IconArrowRight,
   IconChevronLeft,
+  IconEraser,
   IconExpand,
   IconFitWidth,
   IconFullscreen,
+  IconMarker,
   IconMinus,
+  IconPen,
   IconPlus,
   IconSearch,
   IconSidebar,
   IconTextSettings
 } from './icons'
+
+export type ToolName = 'pen' | 'marker' | 'eraser'
+
+export interface ToolPref {
+  color: [number, number, number]
+  width: number
+}
 
 interface Props {
   fileName: string
@@ -24,6 +35,10 @@ interface Props {
   sidebarOpen: boolean
   canNavBack: boolean
   canNavForward: boolean
+  activeTool: ToolName | null
+  toolPrefs: Record<'pen' | 'marker', ToolPref>
+  onToolSelect(tool: ToolName | null): void
+  onToolPrefChange(tool: 'pen' | 'marker', patch: Partial<ToolPref>): void
   onNavBack(): void
   onNavForward(): void
   onToggleSidebar(): void
@@ -55,6 +70,10 @@ export default function Toolbar({
   sidebarOpen,
   canNavBack,
   canNavForward,
+  activeTool,
+  toolPrefs,
+  onToolSelect,
+  onToolPrefChange,
   onNavBack,
   onNavForward,
   onToggleSidebar,
@@ -70,7 +89,37 @@ export default function Toolbar({
 }: Props): React.JSX.Element {
   const [pageInput, setPageInput] = useState(String(page))
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
+  const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const toolMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!toolMenu) return
+    const close = (e: MouseEvent): void => {
+      if (toolMenuRef.current && !toolMenuRef.current.contains(e.target as Node)) setToolMenu(null)
+    }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [toolMenu])
+
+  const selectTool = (tool: ToolName): void => {
+    if (activeTool === tool) {
+      if (tool === 'eraser') {
+        onToolSelect(null)
+      } else {
+        // Second click on the active tool opens its options; third closes tool
+        if (toolMenu === tool) {
+          setToolMenu(null)
+          onToolSelect(null)
+        } else {
+          setToolMenu(tool)
+        }
+      }
+    } else {
+      onToolSelect(tool)
+      setToolMenu(null)
+    }
+  }
 
   useEffect(() => {
     setPageInput(String(page))
@@ -123,6 +172,64 @@ export default function Toolbar({
         >
           <IconArrowRight />
         </button>
+
+        <div className="toolbar-sep" />
+
+        <div className="tool-group" ref={toolMenuRef}>
+          <button
+            className={`tb-btn${activeTool === 'pen' ? ' is-active' : ''}`}
+            onClick={() => selectTool('pen')}
+            title="Penn (klikk igjen for valg, Esc avslutter)"
+          >
+            <IconPen />
+          </button>
+          <button
+            className={`tb-btn${activeTool === 'marker' ? ' is-active' : ''}`}
+            onClick={() => selectTool('marker')}
+            title="Tusj (klikk igjen for valg, Esc avslutter)"
+          >
+            <IconMarker />
+          </button>
+          <button
+            className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
+            onClick={() => selectTool('eraser')}
+            title="Viskelær — sletter pennestrøk (Esc avslutter)"
+          >
+            <IconEraser />
+          </button>
+
+          {toolMenu && (
+            <div className="tool-menu">
+              <div className="theme-menu-label">
+                {toolMenu === 'pen' ? 'Penn' : 'Tusj'}
+              </div>
+              <div className="color-row">
+                {HIGHLIGHT_COLORS.map((c) => (
+                  <button
+                    key={c.hex}
+                    className="color-dot"
+                    style={{ background: c.hex }}
+                    title={c.name}
+                    onClick={() => onToolPrefChange(toolMenu, { color: c.rgb })}
+                  />
+                ))}
+              </div>
+              <div className="theme-menu-label slider-label">
+                Bredde
+                <output>{toolPrefs[toolMenu].width.toFixed(1)} pt</output>
+              </div>
+              <input
+                type="range"
+                min="1"
+                max="16"
+                step="0.5"
+                value={toolPrefs[toolMenu].width}
+                onChange={(e) => onToolPrefChange(toolMenu, { width: Number(e.target.value) })}
+                aria-label="Strekbredde"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="toolbar-title" title={fileName}>

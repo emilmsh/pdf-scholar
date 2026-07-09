@@ -21,6 +21,10 @@ export interface PageAnnotation {
   opacity: number
   contents?: string
   author?: string
+  /** ink only: strokes as [x, y] points in page space */
+  strokes?: [number, number][][]
+  /** ink only: stroke width in points */
+  width?: number
 }
 
 export interface HighlightColor {
@@ -46,12 +50,80 @@ export const ANNOT_TYPE_LABELS: Record<AnnotationType, string> = {
   underline: 'Understreking',
   strikeout: 'Gjennomstreking',
   squiggly: 'Bølgestrek',
-  note: 'Notat'
+  note: 'Notat',
+  ink: 'Penn'
 }
 
-function rgbCss(rgb: [number, number, number], alpha: number): string {
+export const PEN_DEFAULT: { color: [number, number, number]; width: number } = {
+  color: [0.16, 0.35, 0.75],
+  width: 2.2
+}
+export const MARKER_DEFAULT: { color: [number, number, number]; width: number } = {
+  color: [1, 0.835, 0.29],
+  width: 10
+}
+export const MARKER_OPACITY = 0.45
+
+export interface DrawTool {
+  type: 'pen' | 'marker' | 'eraser'
+  color: [number, number, number]
+  width: number
+  opacity: number
+}
+
+export function rgbCss(rgb: [number, number, number], alpha: number): string {
   const [r, g, b] = rgb.map((v) => Math.round(v * 255))
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+/** SVG path data for one freehand stroke (page-space points) */
+export function strokePathData(points: [number, number][]): string {
+  if (points.length === 0) return ''
+  let d = `M ${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`
+  for (let i = 1; i < points.length; i++) {
+    d += ` L ${points[i][0].toFixed(2)} ${points[i][1].toFixed(2)}`
+  }
+  return d
+}
+
+function pointToSegmentDistance(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number
+): number {
+  const dx = bx - ax
+  const dy = by - ay
+  const lenSq = dx * dx + dy * dy
+  const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq))
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+}
+
+/** True when a page-space point touches an ink annotation's strokes (or its
+ *  bounds for file inks whose strokes we don't hold) */
+export function inkHitTest(record: PageAnnotation, x: number, y: number, tolerance: number): boolean {
+  if (record.strokes && record.strokes.length > 0) {
+    const tol = Math.max(tolerance, (record.width ?? 2) / 2 + 2)
+    for (const stroke of record.strokes) {
+      if (stroke.length === 1) {
+        if (Math.hypot(x - stroke[0][0], y - stroke[0][1]) <= tol) return true
+        continue
+      }
+      for (let i = 1; i < stroke.length; i++) {
+        if (
+          pointToSegmentDistance(x, y, stroke[i - 1][0], stroke[i - 1][1], stroke[i][0], stroke[i][1]) <= tol
+        ) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+  return record.quads.some(
+    (q) => x >= q.x - 2 && x <= q.x + q.w + 2 && y >= q.y - 2 && y <= q.y + q.h + 2
+  )
 }
 
 /** Inline style for one quad of an annotation, in the page's CSS space. */
@@ -106,6 +178,9 @@ export function annotationCss(
         width: 18,
         height: 18
       }
+    case 'ink':
+      // Ink is rendered as SVG paths, not css boxes — see AnnotationMarks
+      return { left: x, top: y, width: w, height: h }
   }
 }
 
@@ -187,7 +262,8 @@ const SUBTYPE_MAP: Record<string, AnnotationType> = {
   Underline: 'underline',
   StrikeOut: 'strikeout',
   Squiggly: 'squiggly',
-  Text: 'note'
+  Text: 'note',
+  Ink: 'ink'
 }
 
 /** Raw pdf.js annotation data (the fields we consume) */

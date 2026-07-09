@@ -2,8 +2,8 @@ import { memo, useEffect, useRef } from 'react'
 import { TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect } from '../../../shared/types'
-import type { PageAnnotation } from '../annotations'
-import { annotationCss } from '../annotations'
+import type { DrawTool, PageAnnotation } from '../annotations'
+import { annotationCss, rgbCss, strokePathData } from '../annotations'
 
 interface Props {
   pdf: PDFDocumentProxy
@@ -19,9 +19,13 @@ interface Props {
   annotations: PageAnnotation[]
   /** Rects of the active search match on this page (page space) */
   searchRects: PageRect[]
+  /** Active freehand tool (pen/marker/eraser), or null when not drawing */
+  drawTool: DrawTool | null
   /** Stable callbacks (identity must not change with viewer state) */
   onInternalLink(dest: unknown): void
   onExternalLink(url: string): void
+  onStrokeComplete(pageNumber: number, points: [number, number][]): void
+  onErase(pageNumber: number, x: number, y: number): void
 }
 
 interface Cancellable {
@@ -39,12 +43,21 @@ function PdfPage({
   active,
   annotations,
   searchRects,
+  drawTool,
   onInternalLink,
-  onExternalLink
+  onExternalLink,
+  onStrokeComplete,
+  onErase
 }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
   const linkRef = useRef<HTMLDivElement>(null)
+  const drawSvgRef = useRef<SVGSVGElement>(null)
+  const strokeRef = useRef<{
+    pointerId: number
+    points: [number, number][]
+    path: SVGPathElement
+  } | null>(null)
 
   useEffect(() => {
     const host = hostRef.current
@@ -143,6 +156,74 @@ function PdfPage({
     }
   }, [pdf, pageNumber, scale, active, onInternalLink, onExternalLink])
 
+  // ---------- Freehand drawing (pen/marker/eraser) ----------
+
+  const pagePointOf = (clientX: number, clientY: number, el: HTMLElement): [number, number] => {
+    const rect = el.getBoundingClientRect()
+    return [(clientX - rect.left) / scale, (clientY - rect.top) / scale]
+  }
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (!drawTool || e.button !== 0) return
+    e.preventDefault()
+    const [x, y] = pagePointOf(e.clientX, e.clientY, e.currentTarget)
+    if (drawTool.type === 'eraser') {
+      onErase(pageNumber, x, y)
+      return
+    }
+    const svg = drawSvgRef.current
+    if (!svg) return
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId)
+    } catch {
+      /* synthetic or already-released pointers can't be captured — drawing still works */
+    }
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    path.setAttribute('fill', 'none')
+    path.setAttribute('stroke', rgbCss(drawTool.color, 1))
+    path.setAttribute('stroke-width', String(drawTool.width))
+    path.setAttribute('stroke-linecap', 'round')
+    path.setAttribute('stroke-linejoin', 'round')
+    path.setAttribute('opacity', String(drawTool.opacity))
+    path.setAttribute('d', strokePathData([[x, y]]))
+    svg.append(path)
+    strokeRef.current = { pointerId: e.pointerId, points: [[x, y]], path }
+  }
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (!drawTool) return
+    if (drawTool.type === 'eraser') {
+      if (e.buttons === 1) {
+        const [x, y] = pagePointOf(e.clientX, e.clientY, e.currentTarget)
+        onErase(pageNumber, x, y)
+      }
+      return
+    }
+    const stroke = strokeRef.current
+    if (!stroke || stroke.pointerId !== e.pointerId) return
+    const native = e.nativeEvent
+    const events =
+      'getCoalescedEvents' in native && native.getCoalescedEvents().length > 0
+        ? native.getCoalescedEvents()
+        : [native]
+    const el = e.currentTarget
+    for (const ev of events) {
+      const [x, y] = pagePointOf(ev.clientX, ev.clientY, el)
+      const last = stroke.points[stroke.points.length - 1]
+      if (Math.hypot(x - last[0], y - last[1]) < 0.4) continue
+      stroke.points.push([x, y])
+    }
+    stroke.path.setAttribute('d', strokePathData(stroke.points))
+  }
+
+  const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const stroke = strokeRef.current
+    if (!stroke || stroke.pointerId !== e.pointerId) return
+    strokeRef.current = null
+    stroke.path.remove()
+    if (stroke.points.length > 1) onStrokeComplete(pageNumber, stroke.points)
+  }
+
   const style = {
     top,
     left,
@@ -163,6 +244,7 @@ function PdfPage({
                 key={a.id}
                 annotation={a}
                 scale={scale}
+                pageWidth={cssWidth / scale}
                 pageHeight={cssHeight / scale}
               />
             ))}
@@ -181,6 +263,21 @@ function PdfPage({
       )}
       <div className="text-host" ref={textRef} />
       <div className="link-host" ref={linkRef} />
+      {drawTool && (
+        <div
+          className={`draw-layer${drawTool.type === 'eraser' ? ' erasing' : ''}`}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerEnd}
+          onPointerCancel={onPointerEnd}
+        >
+          <svg
+            ref={drawSvgRef}
+            viewBox={`0 0 ${cssWidth / scale} ${cssHeight / scale}`}
+            preserveAspectRatio="none"
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -188,12 +285,36 @@ function PdfPage({
 function AnnotationMarks({
   annotation,
   scale,
+  pageWidth,
   pageHeight
 }: {
   annotation: PageAnnotation
   scale: number
+  pageWidth: number
   pageHeight: number
 }): React.JSX.Element {
+  if (annotation.type === 'ink' && annotation.strokes) {
+    return (
+      <svg
+        className="annot-ink-svg"
+        viewBox={`0 0 ${pageWidth} ${pageHeight}`}
+        preserveAspectRatio="none"
+      >
+        {annotation.strokes.map((stroke, i) => (
+          <path
+            key={i}
+            d={strokePathData(stroke)}
+            fill="none"
+            stroke={rgbCss(annotation.color, 1)}
+            strokeWidth={annotation.width ?? 2}
+            opacity={annotation.opacity}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
+    )
+  }
   return (
     <>
       {annotation.quads.map((q, i) => {

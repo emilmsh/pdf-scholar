@@ -28,7 +28,8 @@ const TYPE_MAP = {
   underline: 'Underline',
   strikeout: 'StrikeOut',
   squiggly: 'Squiggly',
-  note: 'Text'
+  note: 'Text',
+  ink: 'Ink'
 } as const
 
 type Quad = [number, number, number, number, number, number, number, number]
@@ -90,6 +91,10 @@ export function applyAnnotation(req: AnnotateRequest): Promise<AnnotateResult> {
       annot.setRect([q.x, q.y, q.x + Math.max(q.w, 20), q.y + Math.max(q.h, 20)])
       annot.setIcon('Note')
       annot.setIsOpen(false)
+    } else if (req.type === 'ink') {
+      if (!req.strokes || req.strokes.length === 0) return { error: 'Streken er tom' }
+      annot.setInkList(req.strokes)
+      annot.setBorderWidth(req.width ?? 2)
     } else {
       annot.setQuadPoints(req.quads.map(rectToQuad))
     }
