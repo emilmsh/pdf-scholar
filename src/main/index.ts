@@ -1,7 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFile } from 'node:fs/promises'
 import { basename, join, resolve } from 'node:path'
-import type { FileError, FilePayload, ReadingPosition, ThemeName } from '../shared/types'
+import type { AnnotateRequest, FileError, FilePayload, ReadingPosition, ThemeName } from '../shared/types'
+import { applyAnnotation } from './annotation-engine'
 import { addRecent, getState, saveState, setPosition } from './storage'
 
 let mainWindow: BrowserWindow | null = null
@@ -129,5 +130,15 @@ function registerIpc(): void {
   ipcMain.on('theme:set', (_e, theme: ThemeName) => {
     getState().settings.theme = theme
     saveState()
+  })
+
+  ipcMain.handle('annotate', (_e, req: AnnotateRequest) => applyAnnotation(req))
+
+  ipcMain.on('shell:open-external', (_e, url: string) => {
+    if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+  })
+
+  ipcMain.on('window:set-fullscreen', (_e, on: boolean) => {
+    mainWindow?.setFullScreen(!!on)
   })
 }

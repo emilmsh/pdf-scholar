@@ -70,3 +70,9 @@ export const IconTextSettings = (p: IconProps): React.JSX.Element => (
     <path d="M4 18L10.5 5h1L18 18M6.5 13.5h9" />
   </Svg>
 )
+
+export const IconFullscreen = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+  </Svg>
+)

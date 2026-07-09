@@ -4,6 +4,7 @@ import {
   IconChevronLeft,
   IconExpand,
   IconFitWidth,
+  IconFullscreen,
   IconMinus,
   IconPlus,
   IconTextSettings
@@ -22,6 +23,7 @@ interface Props {
   onFitWidth(): void
   onThemeChange(theme: ThemeName): void
   onToggleChrome(): void
+  onToggleFullscreen(): void
 }
 
 const THEMES: { id: ThemeName; label: string }[] = [
@@ -42,7 +44,8 @@ export default function Toolbar({
   onZoomOut,
   onFitWidth,
   onThemeChange,
-  onToggleChrome
+  onToggleChrome,
+  onToggleFullscreen
 }: Props): React.JSX.Element {
   const [pageInput, setPageInput] = useState(String(page))
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
@@ -138,6 +141,9 @@ export default function Toolbar({
 
         <button className="tb-btn" onClick={onToggleChrome} title="Distraksjonsfri lesing (Esc avslutter)">
           <IconExpand />
+        </button>
+        <button className="tb-btn" onClick={onToggleFullscreen} title="Fullskjerm (F11)">
+          <IconFullscreen />
         </button>
       </div>
     </div>

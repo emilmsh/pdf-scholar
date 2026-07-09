@@ -1,9 +1,13 @@
-import { defineConfig } from 'electron-vite'
+import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
-  main: {},
-  preload: {},
+  main: {
+    plugins: [externalizeDepsPlugin()]
+  },
+  preload: {
+    plugins: [externalizeDepsPlugin()]
+  },
   renderer: {
     plugins: [react()]
   }

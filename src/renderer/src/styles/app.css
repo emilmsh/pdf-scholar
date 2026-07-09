@@ -484,14 +484,18 @@ button {
 
 .pdf-page {
   position: absolute;
-  left: 50%;
-  translate: -50% 0;
   background: var(--page-bg);
   box-shadow: var(--shadow-page);
   border-radius: 2px;
 }
 
-.pdf-page canvas {
+.canvas-host,
+.text-host {
+  position: absolute;
+  inset: 0;
+}
+
+.canvas-host canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -499,19 +503,56 @@ button {
   filter: var(--page-filter);
 }
 
-/* pdf.js text layer (selection) */
+/* Session annotation overlay (between canvas and text layer) */
+
+.annot-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.annot {
+  position: absolute;
+  border-radius: 1px;
+}
+
+.annot-note {
+  background: #ffd54a;
+  border: 1px solid rgba(120, 90, 0, 0.4);
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* pdf.js text layer (selection) — mirrors the rules pdf.js v6 requires:
+   span positions are percentages of the layer; the layer's own inline size is
+   round(var(--total-scale-factor) * pageDim px, var(--scale-round-*)); span
+   font-size/transform come from --font-height/--scale-x set by TextLayer. */
+
+.pdf-page {
+  --user-unit: 1;
+  --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+}
 
 .textLayer {
   position: absolute;
+  text-align: initial;
   inset: 0;
-  overflow: hidden;
+  overflow: clip;
   line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
   text-size-adjust: none;
   -webkit-text-size-adjust: none;
   forced-color-adjust: none;
   transform-origin: 0 0;
   caret-color: CanvasText;
   z-index: 2;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
 }
 
 .textLayer :is(span, br) {
@@ -520,6 +561,30 @@ button {
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+  display: contents;
+}
+
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
 }
 
 .textLayer ::selection {
@@ -567,6 +632,128 @@ button {
   font-size: 12px;
   max-width: 420px;
   text-align: center;
+}
+
+/* Selection / context menu */
+
+.selection-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 216px;
+  padding: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.12s ease;
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.color-row {
+  display: flex;
+  gap: 9px;
+  padding: 5px 8px 9px;
+}
+
+.color-dot {
+  width: 23px;
+  height: 23px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  transition: transform 0.08s;
+}
+
+.color-dot:hover {
+  transform: scale(1.18);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+}
+
+.menu-item:hover {
+  background: var(--hover);
+}
+
+.menu-glyph {
+  width: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.menu-glyph-underline {
+  text-decoration: underline;
+}
+
+.menu-glyph-strikeout {
+  text-decoration: line-through;
+}
+
+.menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 4px;
+}
+
+/* Note popover */
+
+.note-popover {
+  position: fixed;
+  z-index: 61;
+  width: 280px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.12s ease;
+}
+
+.note-popover textarea {
+  width: 100%;
+  height: 84px;
+  resize: none;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-chrome);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  outline: none;
+}
+
+.note-popover textarea:focus {
+  border-color: var(--accent);
+}
+
+.note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.note-actions button {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.note-actions .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .toast {

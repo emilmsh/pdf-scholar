@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
-import type { PdfxApi, ReadingPosition, ThemeName } from '../shared/types'
+import type { AnnotateRequest, PdfxApi, ReadingPosition, ThemeName } from '../shared/types'
 
 const api: PdfxApi = {
   openFileDialog: () => ipcRenderer.invoke('dialog:open'),
@@ -10,6 +10,9 @@ const api: PdfxApi = {
   getPendingPath: () => ipcRenderer.invoke('pending-path:get'),
   setPosition: (path: string, pos: ReadingPosition) => ipcRenderer.send('position:set', path, pos),
   setTheme: (theme: ThemeName) => ipcRenderer.send('theme:set', theme),
+  annotate: (req: AnnotateRequest) => ipcRenderer.invoke('annotate', req),
+  openExternal: (url: string) => ipcRenderer.send('shell:open-external', url),
+  setFullscreen: (on: boolean) => ipcRenderer.send('window:set-fullscreen', on),
   getPathForFile: (file: File) => {
     try {
       return webUtils.getPathForFile(file) || null

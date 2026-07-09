@@ -62,6 +62,19 @@ const webApi: PdfxApi = {
     state.settings.theme = theme
     saveWebState(state)
   },
+  // Browser preview cannot write to disk — accept the annotation so the UI
+  // flow (overlay, menus) can be exercised, but nothing is persisted.
+  annotate: async (req) => {
+    console.debug('pdfx (web): annotate mock', req)
+    return { ok: true }
+  },
+  openExternal: (url) => {
+    window.open(url, '_blank', 'noopener')
+  },
+  setFullscreen: (on) => {
+    if (on) document.documentElement.requestFullscreen?.().catch(() => {})
+    else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+  },
   getPathForFile: () => null,
   onOpenPath: () => () => {}
 }
