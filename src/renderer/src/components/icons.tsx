@@ -149,6 +149,33 @@ export const IconShapeArrow = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconSparkle = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M12 3.5c.7 3.6 2.4 5.3 6 6-3.6.7-5.3 2.4-6 6-.7-3.6-2.4-5.3-6-6 3.6-.7 5.3-2.4 6-6z" />
+    <path d="M18.5 14.5c.35 1.8 1.2 2.65 3 3-1.8.35-2.65 1.2-3 3-.35-1.8-1.2-2.65-3-3 1.8-.35 2.65-1.2 3-3z" />
+  </Svg>
+)
+
+export const IconGear = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09c0 .68.4 1.3 1.03 1.56a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9c.26.63.88 1.03 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03z" />
+  </Svg>
+)
+
+export const IconSend = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4.5 12L3 4.5 21 12 3 19.5 4.5 12z" />
+    <path d="M4.5 12H12" />
+  </Svg>
+)
+
+export const IconStop = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" />
+  </Svg>
+)
+
 export const IconArrowLeft = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M19 12H5M11 6l-6 6 6 6" />

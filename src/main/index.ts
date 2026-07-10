@@ -10,6 +10,7 @@ import type {
   ReadingPosition,
   Settings
 } from '../shared/types'
+import { registerAiIpc } from './ai'
 import { applyAnnotation, deleteAnnotation, updateAnnotation } from './annotation-engine'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
 
@@ -120,6 +121,7 @@ async function loadPdf(path: string): Promise<FilePayload | FileError> {
 }
 
 function registerIpc(): void {
+  registerAiIpc()
   ipcMain.handle('dialog:open', async () => {
     if (!mainWindow) return null
     const result = await dialog.showOpenDialog(mainWindow, {

@@ -101,6 +101,59 @@ export interface DeleteAnnotationRequest {
   id: number
 }
 
+// ---------- AI (BYO API key, multi-provider) ----------
+
+export type AiProviderId = 'anthropic' | 'openai' | 'azure' | 'mock'
+
+export interface AiConfig {
+  provider: AiProviderId
+  /** Model id/deployment per provider */
+  models: Record<AiProviderId, string>
+  azure: { endpoint: string; deployment: string }
+}
+
+/** Config as exposed to the renderer — keys never leave the main process */
+export interface AiConfigView extends AiConfig {
+  hasKey: Record<AiProviderId, boolean>
+  encryptionAvailable: boolean
+}
+
+export interface AiMessage {
+  role: 'user' | 'assistant'
+  text: string
+}
+
+export interface AiChatRequest {
+  requestId: number
+  system: string
+  messages: AiMessage[]
+  /** Page-joined document text; sent with citations enabled where supported */
+  document: { title: string; text: string } | null
+}
+
+/** Normalized citation. 'char' = offsets into the document text we sent
+ *  (Anthropic char_location); 'quote' = verbatim quote + page, resolved by
+ *  the renderer via text search (prompt-contract providers). */
+export type AiCitation =
+  | { kind: 'char'; start: number; end: number; citedText: string }
+  | { kind: 'quote'; pageNumber: number; quote: string }
+
+export interface AiContentPart {
+  text: string
+  citations: AiCitation[]
+}
+
+export interface AiUsage {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheWriteTokens: number
+}
+
+export type AiChatResult =
+  | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string }
+  | FileError
+
 export interface PdfxApi {
   openFileDialog(): Promise<FilePayload | FileError | null>
   readFile(path: string): Promise<FilePayload | FileError>
@@ -123,6 +176,14 @@ export interface PdfxApi {
   /** Resolve the real filesystem path of a File dropped onto the window (Electron only) */
   getPathForFile(file: File): string | null
   onOpenPath(cb: (path: string) => void): () => void
+  // ---------- AI ----------
+  aiGetConfig(): Promise<AiConfigView>
+  /** Patch config; `keys` entries are plaintext and encrypted at rest in main */
+  aiSetConfig(patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }): Promise<AiConfigView>
+  /** Streams deltas via onAiDelta; resolves with the final result */
+  aiChat(request: AiChatRequest): Promise<AiChatResult>
+  aiAbort(requestId: number): void
+  onAiDelta(cb: (requestId: number, text: string) => void): () => void
 }
 
 declare global {

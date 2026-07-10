@@ -1,5 +1,8 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
+  AiChatRequest,
+  AiConfig,
+  AiProviderId,
   AnnotateRequest,
   DeleteAnnotationRequest,
   ModifyAnnotationRequest,
@@ -36,6 +39,18 @@ const api: PdfxApi = {
     ipcRenderer.on('open-path', listener)
     return () => {
       ipcRenderer.removeListener('open-path', listener)
+    }
+  },
+  aiGetConfig: () => ipcRenderer.invoke('ai:get-config'),
+  aiSetConfig: (patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }) =>
+    ipcRenderer.invoke('ai:set-config', patch),
+  aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
+  aiAbort: (requestId: number) => ipcRenderer.send('ai:abort', requestId),
+  onAiDelta: (cb: (requestId: number, text: string) => void) => {
+    const listener = (_e: unknown, requestId: number, text: string): void => cb(requestId, text)
+    ipcRenderer.on('ai:delta', listener)
+    return () => {
+      ipcRenderer.removeListener('ai:delta', listener)
     }
   }
 }

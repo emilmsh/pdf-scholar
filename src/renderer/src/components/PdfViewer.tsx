@@ -34,6 +34,10 @@ import type {
   PdfJsAnnotationData,
   ShapeToolType
 } from '../annotations'
+import AiPanel, { AiQuickPopover } from './AiPanel'
+import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
+import { buildAiDocument } from '../ai'
+import type { ResolvedCitation } from '../ai'
 import AnnotPopover from './AnnotPopover'
 import PdfPage from './PdfPage'
 import Sidebar from './Sidebar'
@@ -224,6 +228,9 @@ export default function PdfViewer({
   const [searchHits, setSearchHits] = useState<{ pageNumber: number; rects: PageRect[] } | null>(
     null
   )
+  const [aiOpen, setAiOpen] = useState(false)
+  const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
+  const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
@@ -771,7 +778,7 @@ export default function PdfViewer({
         color,
         opacity,
         contents,
-        author: 'PDFX',
+        author: 'PDF Scholar',
         strokes: extras?.strokes,
         width: extras?.width,
         fontSize: extras?.fontSize
@@ -1029,9 +1036,36 @@ export default function PdfViewer({
           }
           setMenu(null)
           break
+        case 'ai': {
+          if (!selText || !menu || !pdf) {
+            setMenu(null)
+            break
+          }
+          const { x, y, pageNumber } = menu
+          const mode = action.mode
+          setMenu(null)
+          window.getSelection()?.removeAllRanges()
+          // Fetch the page text (context) before opening the popover
+          void (async () => {
+            let pageContext = ''
+            try {
+              const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
+              const pageText = texts[pageNumber - 1]?.text ?? ''
+              const at = pageText.indexOf(selText.slice(0, 80))
+              pageContext =
+                at === -1
+                  ? pageText.slice(0, 2000)
+                  : pageText.slice(Math.max(0, at - 1000), at + selText.length + 1000)
+            } catch {
+              /* context is best-effort */
+            }
+            setAiQuick({ x, y, mode, selection: selText, pageNumber, pageContext })
+          })()
+          break
+        }
       }
     },
-    [menu, applyMarkup, collectSelectionRects]
+    [menu, pdf, applyMarkup, collectSelectionRects]
   )
 
   const saveNote = useCallback(
@@ -1407,6 +1441,51 @@ export default function PdfViewer({
     [searchMatches, searchIndex, gotoMatch]
   )
 
+  // ---------- AI ----------
+
+  const ensureAiDocument = useCallback(async (): Promise<EnsuredDocument | null> => {
+    if (!pdf) return null
+    const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
+    return { pages, doc: buildAiDocument(pages) }
+  }, [pdf])
+
+  /** Citation chip clicked: jump to the cited passage and highlight it,
+   *  reusing the search-hit overlay and the text-layer rect machinery */
+  const jumpToAiCitation = useCallback(
+    async (resolved: ResolvedCitation) => {
+      const el = containerRef.current
+      const lay = layoutRef.current
+      const texts = pageTextsRef.current
+      if (!el || !lay || !texts) return
+      pushBack()
+      const seq = ++gotoSeqRef.current
+      el.scrollTop = Math.max(0, lay.tops[resolved.pageNumber - 1] - 8)
+      updateRange()
+      const pageEl = await waitForTextLayer(resolved.pageNumber)
+      if (seq !== gotoSeqRef.current || !pageEl) return
+      const rects = resolveMatchRects(
+        pageEl,
+        texts[resolved.pageNumber - 1],
+        { ...resolved, snippet: '', snippetOffset: 0 },
+        scaleRef.current
+      )
+      if (!rects || rects.length === 0) return
+      setSearchHits({ pageNumber: resolved.pageNumber, rects })
+      const lay2 = layoutRef.current
+      if (lay2) {
+        el.scrollTop = Math.max(
+          0,
+          lay2.tops[resolved.pageNumber - 1] + rects[0].y * scaleRef.current - el.clientHeight * 0.35
+        )
+        updateRange()
+        schedulePositionSave()
+      }
+    },
+    [pushBack, updateRange, waitForTextLayer, schedulePositionSave]
+  )
+
+  const consumeAiSeed = useCallback(() => setAiSeed(null), [])
+
   useEffect(() => {
     if (!active) return
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -1435,9 +1514,12 @@ export default function PdfViewer({
         if (freeTextDraft) setFreeTextDraft(null)
         else if (noteDraft) setNoteDraft(null)
         else if (menu) setMenu(null)
+        else if (aiQuick) setAiQuick(null)
         else if (annotPopover) setAnnotPopover(null)
         else if (activeTool) setActiveTool(null)
         else if (searchOpen) closeSearch()
+        else if (searchHits) setSearchHits(null)
+        else if (aiOpen) setAiOpen(false)
         else if (fullscreen) toggleFullscreen()
         else if (chromeHidden) {
           setChromeHidden(false)
@@ -1467,9 +1549,12 @@ export default function PdfViewer({
     freeTextDraft,
     noteDraft,
     menu,
+    aiQuick,
+    aiOpen,
     annotPopover,
     activeTool,
     searchOpen,
+    searchHits,
     fullscreen,
     chromeHidden,
     toggleFullscreen,
@@ -1562,6 +1647,8 @@ export default function PdfViewer({
           onFitWidth={fitWidth}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
+          aiOpen={aiOpen}
+          onToggleAi={() => setAiOpen((o) => !o)}
           onToggleChrome={toggleChrome}
           onToggleFullscreen={toggleFullscreen}
         />
@@ -1634,6 +1721,16 @@ export default function PdfViewer({
             </div>
           )}
         </div>
+
+        <AiPanel
+          open={aiOpen && !chromeHidden}
+          docTitle={payload.name}
+          seed={aiSeed}
+          onSeedConsumed={consumeAiSeed}
+          ensureDocument={ensureAiDocument}
+          onCitationClick={(resolved) => void jumpToAiCitation(resolved)}
+          onClose={() => setAiOpen(false)}
+        />
       </div>
 
       {(navStacks.back.length > 0 || navStacks.forward.length > 0) && layout && (
@@ -1712,6 +1809,17 @@ export default function PdfViewer({
       )}
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
+      {aiQuick && (
+        <AiQuickPopover
+          state={aiQuick}
+          onSendToChat={(seed) => {
+            setAiSeed(seed)
+            setAiQuick(null)
+            setAiOpen(true)
+          }}
+          onClose={() => setAiQuick(null)}
+        />
+      )}
       {annotPopover &&
         (() => {
           const record = (annots.get(annotPopover.pageNumber) ?? []).find(

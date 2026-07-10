@@ -22,6 +22,7 @@ export type MenuAction =
   | { kind: 'search' }
   | { kind: 'dictionary' }
   | { kind: 'translate' }
+  | { kind: 'ai'; mode: 'explain' | 'simplify' | 'define' }
 
 interface MenuProps {
   menu: MenuState
@@ -78,6 +79,16 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'copy' })}>
             Kopier
+          </button>
+          <div className="menu-sep" />
+          <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'explain' })}>
+            <span className="menu-glyph">✦</span> Forklar
+          </button>
+          <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}>
+            <span className="menu-glyph">✦</span> Forenkle
+          </button>
+          <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'define' })}>
+            <span className="menu-glyph">✦</span> Definer i kontekst
           </button>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'search' })}>

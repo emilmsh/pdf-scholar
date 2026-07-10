@@ -21,6 +21,7 @@ import {
   IconShapeSquare,
   IconShapes,
   IconSidebar,
+  IconSparkle,
   IconText,
   IconTextSettings
 } from './icons'
@@ -70,6 +71,8 @@ interface Props {
   onFitWidth(): void
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
+  aiOpen: boolean
+  onToggleAi(): void
   onToggleChrome(): void
   onToggleFullscreen(): void
 }
@@ -105,6 +108,8 @@ export default function Toolbar({
   onFitWidth,
   onSettingsChange,
   onToggleSearch,
+  aiOpen,
+  onToggleAi,
   onToggleChrome,
   onToggleFullscreen
 }: Props): React.JSX.Element {
@@ -321,6 +326,14 @@ export default function Toolbar({
 
         <button className="tb-btn" onClick={onToggleSearch} title="Søk i dokumentet (Ctrl+F)">
           <IconSearch />
+        </button>
+
+        <button
+          className={`tb-btn${aiOpen ? ' is-active' : ''}`}
+          onClick={onToggleAi}
+          title="Assistent — spør om dokumentet"
+        >
+          <IconSparkle />
         </button>
 
         <div className="theme-menu-anchor" ref={menuRef}>

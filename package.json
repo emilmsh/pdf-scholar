@@ -17,6 +17,7 @@
   "author": "Emil",
   "license": "UNLICENSED",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.111.0",
     "mupdf": "1.28.0"
   },
   "devDependencies": {

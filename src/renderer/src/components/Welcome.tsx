@@ -16,8 +16,8 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
   return (
     <div className="welcome">
       <div className="welcome-inner">
-        <div className="welcome-logo">PDFX</div>
-        <p className="welcome-tagline">Les, annotér og organiser PDF-er — vakkert og distraksjonsfritt.</p>
+        <div className="welcome-logo">PDF Scholar</div>
+        <p className="welcome-tagline">For deg som leser, forstår og arbeider med teksten.</p>
 
         <div className="welcome-actions">
           <button className="btn-primary" onClick={onOpenDialog}>

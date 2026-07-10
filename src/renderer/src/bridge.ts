@@ -1,7 +1,14 @@
 // Unified access to the platform layer. In Electron the preload script exposes
 // window.api; in a plain browser (dev preview) we fall back to web APIs so the
 // UI can be developed and screenshotted without Electron.
-import type { PdfxApi, ReadingPosition, Settings } from '../../shared/types'
+import type {
+  AiChatResult,
+  AiConfig,
+  AiContentPart,
+  PdfxApi,
+  ReadingPosition,
+  Settings
+} from '../../shared/types'
 
 export const isElectron = typeof window !== 'undefined' && !!window.api
 
@@ -117,7 +124,115 @@ const webApi: PdfxApi = {
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
   },
   getPathForFile: () => null,
-  onOpenPath: () => () => {}
+  onOpenPath: () => () => {},
+  // AI in the browser preview: only the offline mock provider is available,
+  // so the chat UI (streaming, citation chips, jump+highlight) can be tested.
+  aiGetConfig: async () => ({
+    ...loadWebAiConfig(),
+    hasKey: { anthropic: false, openai: false, azure: false, mock: true },
+    encryptionAvailable: false
+  }),
+  aiSetConfig: async (patch) => {
+    const current = loadWebAiConfig()
+    const next: AiConfig = {
+      provider: patch.provider ?? current.provider,
+      models: { ...current.models, ...patch.models },
+      azure: { ...current.azure, ...patch.azure }
+    }
+    localStorage.setItem('pdfx-web-ai', JSON.stringify(next))
+    return {
+      ...next,
+      hasKey: { anthropic: false, openai: false, azure: false, mock: true },
+      encryptionAvailable: false
+    }
+  },
+  aiChat: async (request): Promise<AiChatResult> => {
+    const config = loadWebAiConfig()
+    if (config.provider !== 'mock') {
+      return { error: 'Nettleser-forhåndsvisningen støtter kun mock-leverandøren. Bruk appen for ekte KI.' }
+    }
+    const doc = request.document
+    const answerA =
+      'Dette er et testsvar fra mock-leverandøren. Dokumentets innledning slår an tonen for resten av teksten'
+    const answerB =
+      ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
+    const full = answerA + answerB
+    // Few large chunks: background-tab timer clamping (≥1s) would make
+    // word-by-word streaming crawl in the automated preview
+    const step = Math.ceil(full.length / 5)
+    for (let i = 0; i < full.length; i += step) {
+      if (webAiAborted.has(request.requestId)) {
+        webAiAborted.delete(request.requestId)
+        return { error: 'Avbrutt' }
+      }
+      for (const cb of webAiDeltaListeners) cb(request.requestId, full.slice(i, i + step))
+      await new Promise((resolve) => setTimeout(resolve, 30))
+    }
+    const mid = doc ? Math.floor(doc.text.length * 0.4) : 0
+    const parts: AiContentPart[] = doc
+      ? [
+          {
+            text: answerA,
+            citations: [
+              { kind: 'char', start: 0, end: Math.min(90, doc.text.length), citedText: doc.text.slice(0, 90) }
+            ]
+          },
+          {
+            text: answerB,
+            citations: [
+              {
+                kind: 'char',
+                start: mid,
+                end: Math.min(mid + 120, doc.text.length),
+                citedText: doc.text.slice(mid, mid + 120)
+              }
+            ]
+          }
+        ]
+      : [{ text: full, citations: [] }]
+    return {
+      ok: true,
+      parts,
+      usage: {
+        inputTokens: doc ? Math.ceil(doc.text.length / 4) : 50,
+        outputTokens: Math.ceil(full.length / 4),
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0
+      },
+      model: 'mock-1'
+    }
+  },
+  aiAbort: (requestId) => {
+    webAiAborted.add(requestId)
+  },
+  onAiDelta: (cb) => {
+    webAiDeltaListeners.add(cb)
+    return () => {
+      webAiDeltaListeners.delete(cb)
+    }
+  }
+}
+
+const webAiDeltaListeners = new Set<(requestId: number, text: string) => void>()
+const webAiAborted = new Set<number>()
+
+function loadWebAiConfig(): AiConfig {
+  const fallback: AiConfig = {
+    provider: 'mock',
+    models: { anthropic: 'claude-opus-4-8', openai: 'gpt-5.1', azure: '', mock: 'mock-1' },
+    azure: { endpoint: '', deployment: '' }
+  }
+  try {
+    const parsed = JSON.parse(localStorage.getItem('pdfx-web-ai') ?? '{}')
+    return {
+      ...fallback,
+      ...parsed,
+      models: { ...fallback.models, ...parsed.models },
+      azure: { ...fallback.azure, ...parsed.azure }
+    }
+  } catch {
+    return fallback
+  }
 }
 
 export const bridge: PdfxApi = window.api ?? webApi

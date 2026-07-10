@@ -1,4 +1,4 @@
-// Annotation summary export (Phase 6). The marked-up text is recovered by
+﻿// Annotation summary export (Phase 6). The marked-up text is recovered by
 // intersecting each markup annotation's quads with the page's text items
 // (positions from getTextContent), slicing items proportionally by x-overlap.
 import type { PDFDocumentProxy } from 'pdfjs-dist'
@@ -72,7 +72,7 @@ function textUnderQuads(items: PositionedItem[], quads: PageRect[]): string {
     .trim()
 }
 
-/** Marked-up text per annotation (localId → excerpt), for the sidebar list */
+/** Marked-up text per annotation (localId â†’ excerpt), for the sidebar list */
 export async function computeExcerpts(
   pdf: PDFDocumentProxy,
   annots: ReadonlyMap<number, PageAnnotation[]>
@@ -133,14 +133,14 @@ function rowLine(row: ExportRow): { label: string; excerpt: string; comment: str
 }
 
 export function toMarkdown(rows: ExportRow[], meta: ExportMeta): string {
-  const lines: string[] = [`# Merknader — ${meta.fileName}`, '', `*Eksportert ${meta.exportedAt} fra PDFX*`]
+  const lines: string[] = [`# Merknader â€” ${meta.fileName}`, '', `*Eksportert ${meta.exportedAt} fra PDF Scholar*`]
   for (const [pageNumber, pageRows] of groupByPage(rows)) {
     lines.push('', `## Side ${pageNumber}`, '')
     for (const row of pageRows) {
       const { label, excerpt, comment, author } = rowLine(row)
       let line = `- **${label}**`
-      if (excerpt) line += `: «${excerpt}»`
-      if (comment) line += excerpt ? ` — ${comment}` : `: ${comment}`
+      if (excerpt) line += `: Â«${excerpt}Â»`
+      if (comment) line += excerpt ? ` â€” ${comment}` : `: ${comment}`
       if (author) line += ` *(${author})*`
       lines.push(line)
     }
@@ -149,14 +149,14 @@ export function toMarkdown(rows: ExportRow[], meta: ExportMeta): string {
 }
 
 export function toPlainText(rows: ExportRow[], meta: ExportMeta): string {
-  const lines: string[] = [`Merknader — ${meta.fileName}`, `Eksportert ${meta.exportedAt} fra PDFX`]
+  const lines: string[] = [`Merknader â€” ${meta.fileName}`, `Eksportert ${meta.exportedAt} fra PDF Scholar`]
   for (const [pageNumber, pageRows] of groupByPage(rows)) {
-    lines.push('', `Side ${pageNumber}`, '─'.repeat(30))
+    lines.push('', `Side ${pageNumber}`, 'â”€'.repeat(30))
     for (const row of pageRows) {
       const { label, excerpt, comment, author } = rowLine(row)
-      let line = `• ${label}`
-      if (excerpt) line += `: «${excerpt}»`
-      if (comment) line += excerpt ? ` — ${comment}` : `: ${comment}`
+      let line = `â€¢ ${label}`
+      if (excerpt) line += `: Â«${excerpt}Â»`
+      if (comment) line += excerpt ? ` â€” ${comment}` : `: ${comment}`
       if (author) line += ` (${author})`
       lines.push(line)
     }
@@ -177,24 +177,24 @@ export function toHtml(rows: ExportRow[], meta: ExportMeta): string {
       const [r, g, b] = row.record.color.map((v) => Math.round(v * 255))
       let li = `<li><span class="dot" style="background:rgb(${r},${g},${b})"></span><strong>${label}</strong>`
       if (excerpt) li += `: <q>${escapeHtml(excerpt)}</q>`
-      if (comment) li += ` — <em>${escapeHtml(comment)}</em>`
+      if (comment) li += ` â€” <em>${escapeHtml(comment)}</em>`
       if (author) li += ` <span class="author">(${escapeHtml(author)})</span>`
       body.push(li + '</li>')
     }
     body.push('</ul>')
   }
   return `<!doctype html>
-<html lang="no"><head><meta charset="utf-8"><title>Merknader — ${escapeHtml(meta.fileName)}</title>
+<html lang="no"><head><meta charset="utf-8"><title>Merknader â€” ${escapeHtml(meta.fileName)}</title>
 <style>
 body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1d1d1f; line-height: 1.55; }
 h1 { font-size: 24px; } h2 { font-size: 15px; margin-top: 28px; color: #6e6e73; text-transform: uppercase; letter-spacing: .05em; }
 ul { list-style: none; padding: 0; } li { padding: 7px 0; border-bottom: 1px solid #eee; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(0,0,0,.15); }
-.author { color: #6e6e73; font-size: 13px; } q { quotes: '«' '»'; }
+.author { color: #6e6e73; font-size: 13px; } q { quotes: 'Â«' 'Â»'; }
 .meta { color: #6e6e73; font-size: 13px; }
 </style></head><body>
-<h1>Merknader — ${escapeHtml(meta.fileName)}</h1>
-<p class="meta">Eksportert ${escapeHtml(meta.exportedAt)} fra PDFX</p>
+<h1>Merknader â€” ${escapeHtml(meta.fileName)}</h1>
+<p class="meta">Eksportert ${escapeHtml(meta.exportedAt)} fra PDF Scholar</p>
 ${body.join('\n')}
 </body></html>
 `

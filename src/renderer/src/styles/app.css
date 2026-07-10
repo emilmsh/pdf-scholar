@@ -1663,3 +1663,337 @@ button {
   background-clip: content-box;
   border: 3px solid transparent;
 }
+
+
+/* ============================================================
+   AI assistant — chat panel, citation chips, quick popover
+   ============================================================ */
+
+.ai-panel {
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  flex-shrink: 0;
+  background: var(--bg-chrome);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.ai-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.ai-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ai-model {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  padding-right: 2px;
+}
+
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-empty {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.55;
+  padding: 8px 2px;
+}
+
+.ai-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.ai-suggestions button {
+  text-align: left;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-elevated);
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.ai-suggestions button:hover {
+  border-color: var(--accent);
+}
+
+.ai-msg {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.ai-user {
+  align-self: flex-end;
+  max-width: 88%;
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-elevated));
+  border-radius: 12px 12px 3px 12px;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+}
+
+.ai-assistant {
+  align-self: stretch;
+  color: var(--text);
+}
+
+.ai-assistant p,
+.ai-quick-body p {
+  margin: 0 0 8px;
+}
+
+.ai-assistant p:last-child,
+.ai-quick-body p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-assistant ul,
+.ai-quick-body ul {
+  margin: 0 0 8px;
+  padding-left: 18px;
+}
+
+.ai-assistant h4 {
+  font-size: 13px;
+  margin: 4px 0 6px;
+}
+
+.ai-assistant code,
+.ai-quick-body code {
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  background: var(--hover);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
+.ai-part {
+  display: inline;
+}
+
+.ai-chips {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 3px;
+  vertical-align: baseline;
+}
+
+.ai-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 999px;
+  padding: 2.5px 7px;
+  white-space: nowrap;
+}
+
+.ai-chip:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.ai-meta {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin-top: 5px;
+}
+
+.ai-error {
+  font-size: 12.5px;
+  color: #d64545;
+  background: rgba(214, 69, 69, 0.08);
+  border: 1px solid rgba(214, 69, 69, 0.25);
+  border-radius: 9px;
+  padding: 8px 11px;
+}
+
+.ai-thinking {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  animation: ai-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.ai-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-composer textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  max-height: 120px;
+}
+
+.ai-composer textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ai-send {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.ai-send:disabled {
+  opacity: 0.4;
+}
+
+.ai-total {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 0 12px 8px;
+}
+
+/* Settings */
+
+.ai-settings {
+  padding: 16px 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ai-field input,
+.ai-field select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  padding: 7px 10px;
+}
+
+.ai-field input:focus,
+.ai-field select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ai-settings-note {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ai-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Quick popover (explain selection) */
+
+.ai-quick {
+  position: fixed;
+  z-index: 60;
+  width: 360px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.12s ease;
+  overflow: hidden;
+}
+
+.ai-quick-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ai-quick-head span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-quick-body {
+  padding: 11px 13px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.ai-quick-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 9px 13px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-quick-actions .ai-meta {
+  flex: 1;
+  margin-top: 0;
+}
