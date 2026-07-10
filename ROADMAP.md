@@ -77,6 +77,16 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - Stempler, signatur, verktøylinje-tilpasning
 - Designgjennomgang mot PDF Expert: avstander, ikoner, animasjoner, mørkt app-chrome
 
+## Fase 9 — KI-assistent («PDF Scholar»-retningen; plan i docs/AI-PLAN.md)
+Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 referanseoppslag); fleksibel multi-leverandør fra start; forklar-utvalg som popover med «Send til chat»; **PDF Scholar som arbeidsnavn** (appen er PDF-leser først, KI-appene i Scholar-rommet er KI først — forvekslingsrisikoen er mindre relevant).
+- [x] **Nivå 1 levert (2026-07-10):** chat-sidepanel med strømmende svar og klikkbare kildechips «s. N» (hopp + markering på setningsnivå via søkemaskineriet); Forklar/Forenkle/Definer i kontekstmenyen med popover + «Send til chat»; API-nøkkel kryptert med safeStorage (nøkkel forlater aldri main-prosessen); leverandører: Anthropic (innebygde Citations, prompt-caching), OpenAI + Azure (SSE + ordrett-sitat-kontrakt løst mot sideteksten), mock (offline test); kostnadsestimat per svar + løpende sum
+- [ ] Strukturert artikkelsammendrag (forskningsspørsmål/metode/data/funn/begrensninger med kildechips)
+- [ ] Spør annotasjonene («oppsummer det jeg har markert») — bygger på eksportuttrekket
+- [ ] Referanseoppslag (klikk på sitering → KI forklarer det refererte verket) — differensiatoren
+- [ ] Begrepshjelp (ordliste slik begrepene brukes i dokumentet)
+- [ ] PDF-base64-fallback for skannede dokumenter (page_location-siteringer)
+- [ ] Nivå 3 (parkert): kryssdokument, forhør-meg-quiz, metodekritikk-modus, forklar figur
+
 ## Fase 8 — Filhåndtering + sky (Emils prioritet nr. 4)
 - Hjemskjerm: Nylige (20) + Favoritter med egendefinert rekkefølge og fargeetiketter
 - Innholdssøk på tvers av filer i valgt mappe
@@ -94,4 +104,4 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 4. **Inkrementell lagring-kanttilfeller** — sjekk `canBeSavedIncrementally()`, fall tilbake til full lagring; alltid temp-fil + atomisk rename.
 5. **pdf.js API-endringer** (månedlige major-versjoner) — pin eksakt versjon, all pdf.js-bruk bak egen modul.
 6. **Windows-integrasjon**: `second-instance`-argv får Chromium-brytere injisert — defensiv parser; single-instance-lås feiler når første instans kjører forhøyet (kjent Electron-bug).
-7. **Omfang vs. én utvikler** — strengt «brukbar app per fase»; AI/OCR/reflow/skjemaer eksplisitt utenfor omfang.
+7. **Omfang vs. én utvikler** — strengt «brukbar app per fase»; OCR/reflow/skjemaer eksplisitt utenfor omfang (KI kom inn som egen fase 9 etter Emils beslutning 2026-07-10).

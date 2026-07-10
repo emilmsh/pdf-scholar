@@ -1,6 +1,8 @@
 # KI i PDF Scholar — forslag til diskusjon
 
-> Status: **UTKAST til diskusjon med Emil** — ingenting her er implementert eller besluttet.
+> Status: **BESLUTTET 2026-07-10** — Emils valg: prioritering 1→3→2→4→6 (så 5); multi-leverandør fra start;
+> forklar-utvalg som popover med «Send til chat»; **PDF Scholar som arbeidsnavn** (leser først, ikke KI først).
+> Nivå 1 (funksjon 1–3) levert samme dag — se ROADMAP fase 9 for status. Resten av dokumentet er planen som lå til grunn.
 > Posisjonering: appen er for «scholars» — folk som leser og arbeider dypt med forskningsartikler
 > og rapporter. KI-funksjonene skal styrke *lesing, forståelse og læring* — ikke kontor-automatisering.
 
