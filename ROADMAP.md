@@ -13,8 +13,8 @@ Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase 
 - [x] Lesemodus: Dag/Sepia/Natt + distraksjonsfri modus (verktøylinjen skjules, vises ved å peke mot toppen, Esc avslutter)
 - [x] Myk zoom: pinch/Ctrl+hjul som CSS-transform under gesten, skarp gjentegning ved ro, fokuspunkt bevares; canvas-bytte uten hvit blink; horisontal panorering ved zoom (levert 2026-07-09)
 - [x] Fullskjerm via F11/knapp/Esc (levert 2026-07-09)
-- [ ] electron-builder NSIS-installer med `fileAssociations` for .pdf (per-bruker, uten admin)
-- [ ] Jump List («Recent»-kategori) i oppgavelinjen
+- [x] electron-builder NSIS-installer med `fileAssociations` for .pdf (per-bruker, uten admin; «Åpne med»-oppføring, kaprer ikke standardapp) + app-ikon (levert 2026-07-10 — `npm run dist` → `release/PDFX-Setup-*.exe`)
+- [x] Jump List («Recent»-kategori) i oppgavelinjen + AppUserModelId (levert 2026-07-10)
 
 ## Fase 2 — Leseopplevelse + temaer (Emils prioritet nr. 1)
 - [x] Justerbar **kontrast** og **lysstyrke** per lesemodus (glidere i «aA»-panelet, lagres per tema); Auto-tema som følger Windows (levert 2026-07-09)
@@ -53,9 +53,11 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] Penn og gjennomskinnelig markeringstusj: frihåndstegning med coalesced pointer events, farge- og breddevalg per verktøy, skrives som standard Ink-annotasjoner (rundtur verifisert); Esc avslutter verktøyet (levert 2026-07-10)
 - [x] Viskelær: sletter hele strøk med presis punkt-til-segment-trefftest; angrbart (levert 2026-07-10)
 - [x] ~~Angre/gjør om som inverterbare motor-operasjoner; hurtigtaster~~ (levert 2026-07-09)
+- [x] Former: rektangel, ellipse, linje og pil — dra for å tegne med live forhåndsvisning; farge/bredde-valg; skrives som Square/Circle/Line-annotasjoner (pil = Line med ClosedArrow-ende; rundtur verifisert) (levert 2026-07-10)
+- [x] Fritekst på siden: klikk med tekstverktøyet → skriv → FreeText-annotasjon med riktig DA (tekstfarge, Helv 12) (levert 2026-07-10)
 - [ ] Trykkfølsom penn (krever polygon-appearance i stedet for enkel Ink-bredde — utsatt bevisst for interop)
 - [ ] Lasso-multivalg for blekk
-- [ ] Fritekst på siden, former (rektangel/ellipse/linje/pil)
+- [ ] Flytt/endre størrelse på former og fritekst med håndtak
 - [ ] Verktøysett-system i verktøylinjen (tilpassbare grupper)
 
 ## Fase 6 — Annotasjonspanel + eksport (Emils prioritet nr. 3)

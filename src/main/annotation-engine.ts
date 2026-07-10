@@ -29,7 +29,12 @@ const TYPE_MAP = {
   strikeout: 'StrikeOut',
   squiggly: 'Squiggly',
   note: 'Text',
-  ink: 'Ink'
+  ink: 'Ink',
+  square: 'Square',
+  circle: 'Circle',
+  line: 'Line',
+  arrow: 'Line',
+  freetext: 'FreeText'
 } as const
 
 type Quad = [number, number, number, number, number, number, number, number]
@@ -95,10 +100,26 @@ export function applyAnnotation(req: AnnotateRequest): Promise<AnnotateResult> {
       if (!req.strokes || req.strokes.length === 0) return { error: 'Streken er tom' }
       annot.setInkList(req.strokes)
       annot.setBorderWidth(req.width ?? 2)
+    } else if (req.type === 'square' || req.type === 'circle') {
+      const q = req.quads[0]
+      annot.setRect([q.x, q.y, q.x + q.w, q.y + q.h])
+      annot.setBorderWidth(req.width ?? 2)
+    } else if (req.type === 'line' || req.type === 'arrow') {
+      const [a, b] = req.strokes?.[0] ?? []
+      if (!a || !b) return { error: 'Linjen mangler endepunkter' }
+      // Line annots have no settable /Rect — mupdf derives bounds from /L
+      annot.setLine(a, b)
+      annot.setBorderWidth(req.width ?? 2)
+      if (req.type === 'arrow') annot.setLineEndingStyles('None', 'ClosedArrow')
+    } else if (req.type === 'freetext') {
+      const q = req.quads[0]
+      annot.setRect([q.x, q.y, q.x + q.w, q.y + q.h])
+      // Text color lives in the default appearance; /C would set a background
+      annot.setDefaultAppearance('Helv', req.fontSize ?? 12, req.color)
     } else {
       annot.setQuadPoints(req.quads.map(rectToQuad))
     }
-    annot.setColor(req.color)
+    if (req.type !== 'freetext') annot.setColor(req.color)
     if (req.opacity < 1) annot.setOpacity(req.opacity)
     if (req.contents) annot.setContents(req.contents)
     annot.setAuthor(req.author ?? 'PDFX')
@@ -113,7 +134,14 @@ export function updateAnnotation(req: ModifyAnnotationRequest): Promise<Annotate
     const page = pdf.loadPage(req.pageIndex) as PDFPage
     const annot = findAnnotation(page, req.id)
     if (!annot) return { error: 'Fant ikke annotasjonen i filen' }
-    if (req.color) annot.setColor(req.color)
+    if (req.color) {
+      if (annot.getType() === 'FreeText') {
+        const da = annot.getDefaultAppearance()
+        annot.setDefaultAppearance(da.font || 'Helv', da.size || 12, req.color)
+      } else {
+        annot.setColor(req.color)
+      }
+    }
     if (req.opacity !== undefined) annot.setOpacity(req.opacity)
     if (req.contents !== undefined) annot.setContents(req.contents)
     annot.setModificationDate(new Date())

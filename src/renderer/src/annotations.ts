@@ -21,10 +21,12 @@ export interface PageAnnotation {
   opacity: number
   contents?: string
   author?: string
-  /** ink only: strokes as [x, y] points in page space */
+  /** ink: strokes; line/arrow: [[start, end]] — page space */
   strokes?: [number, number][][]
-  /** ink only: stroke width in points */
+  /** ink/shapes: stroke width in points */
   width?: number
+  /** freetext only */
+  fontSize?: number
 }
 
 export interface HighlightColor {
@@ -51,8 +53,20 @@ export const ANNOT_TYPE_LABELS: Record<AnnotationType, string> = {
   strikeout: 'Gjennomstreking',
   squiggly: 'Bølgestrek',
   note: 'Notat',
-  ink: 'Penn'
+  ink: 'Penn',
+  square: 'Rektangel',
+  circle: 'Ellipse',
+  line: 'Linje',
+  arrow: 'Pil',
+  freetext: 'Tekst'
 }
+
+export const SHAPE_DEFAULT: { color: [number, number, number]; width: number } = {
+  color: [0.886, 0.29, 0.29],
+  width: 2
+}
+export const FREETEXT_COLOR: [number, number, number] = [0.11, 0.11, 0.13]
+export const FREETEXT_SIZE = 12
 
 export const PEN_DEFAULT: { color: [number, number, number]; width: number } = {
   color: [0.16, 0.35, 0.75],
@@ -64,12 +78,25 @@ export const MARKER_DEFAULT: { color: [number, number, number]; width: number } 
 }
 export const MARKER_OPACITY = 0.45
 
+export type DrawToolType =
+  | 'pen'
+  | 'marker'
+  | 'eraser'
+  | 'square'
+  | 'circle'
+  | 'line'
+  | 'arrow'
+  | 'text'
+
 export interface DrawTool {
-  type: 'pen' | 'marker' | 'eraser'
+  type: DrawToolType
   color: [number, number, number]
   width: number
   opacity: number
 }
+
+export const SHAPE_TOOL_TYPES = ['square', 'circle', 'line', 'arrow'] as const
+export type ShapeToolType = (typeof SHAPE_TOOL_TYPES)[number]
 
 export function rgbCss(rgb: [number, number, number], alpha: number): string {
   const [r, g, b] = rgb.map((v) => Math.round(v * 255))
@@ -178,10 +205,35 @@ export function annotationCss(
         width: 18,
         height: 18
       }
+    case 'freetext':
+      return {
+        left: x,
+        top: y,
+        width: w,
+        height: h,
+        color: rgbCss(a.color, 1)
+      }
     case 'ink':
-      // Ink is rendered as SVG paths, not css boxes — see AnnotationMarks
+    case 'square':
+    case 'circle':
+    case 'line':
+    case 'arrow':
+      // Rendered as SVG in AnnotationMarks, not css boxes
       return { left: x, top: y, width: w, height: h }
   }
+}
+
+/** SVG polygon points for an arrowhead at `to`, pointing from `from` */
+export function arrowHeadPoints(
+  from: [number, number],
+  to: [number, number],
+  size: number
+): string {
+  const angle = Math.atan2(to[1] - from[1], to[0] - from[0])
+  const spread = 0.46
+  const p1 = [to[0] - size * Math.cos(angle - spread), to[1] - size * Math.sin(angle - spread)]
+  const p2 = [to[0] - size * Math.cos(angle + spread), to[1] - size * Math.sin(angle + spread)]
+  return `${to[0]},${to[1]} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}`
 }
 
 /**
@@ -263,7 +315,11 @@ const SUBTYPE_MAP: Record<string, AnnotationType> = {
   StrikeOut: 'strikeout',
   Squiggly: 'squiggly',
   Text: 'note',
-  Ink: 'ink'
+  Ink: 'ink',
+  Square: 'square',
+  Circle: 'circle',
+  Line: 'line',
+  FreeText: 'freetext'
 }
 
 /** Raw pdf.js annotation data (the fields we consume) */

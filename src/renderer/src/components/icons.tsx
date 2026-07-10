@@ -112,6 +112,43 @@ export const IconEraser = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconShapes = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="3" y="3" width="11" height="11" rx="1.5" />
+    <circle cx="15.5" cy="15.5" r="5.5" />
+  </Svg>
+)
+
+export const IconText = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4 6V4h16v2M12 4v16M9 20h6" />
+  </Svg>
+)
+
+export const IconShapeSquare = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="4" y="5" width="16" height="14" rx="1.5" />
+  </Svg>
+)
+
+export const IconShapeCircle = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <ellipse cx="12" cy="12" rx="8.5" ry="7" />
+  </Svg>
+)
+
+export const IconShapeLine = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M5 19L19 5" />
+  </Svg>
+)
+
+export const IconShapeArrow = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M5 19L19 5M19 5h-7M19 5v7" />
+  </Svg>
+)
+
 export const IconArrowLeft = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M19 12H5M11 6l-6 6 6 6" />

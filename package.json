@@ -11,15 +11,13 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
-    "sample": "node scripts/make-sample-pdf.mjs"
+    "sample": "node scripts/make-sample-pdf.mjs",
+    "dist": "npm run build && electron-builder --win"
   },
   "author": "Emil",
   "license": "UNLICENSED",
   "dependencies": {
-    "mupdf": "1.28.0",
-    "pdfjs-dist": "^6.1.200",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "mupdf": "1.28.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
@@ -27,8 +25,12 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^43.1.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.1.200",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "^7.0.2",
     "vite": "^7.3.6"
   }

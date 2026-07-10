@@ -40,7 +40,18 @@ export interface FileError {
   error: string
 }
 
-export type AnnotationType = 'highlight' | 'underline' | 'strikeout' | 'squiggly' | 'note' | 'ink'
+export type AnnotationType =
+  | 'highlight'
+  | 'underline'
+  | 'strikeout'
+  | 'squiggly'
+  | 'note'
+  | 'ink'
+  | 'square'
+  | 'circle'
+  | 'line'
+  | 'arrow'
+  | 'freetext'
 
 /** Rect in PDF points, origin at the page's top-left, y growing downward
  *  (MuPDF page space — same direction as pdf.js viewport space). */
@@ -62,10 +73,12 @@ export interface AnnotateRequest {
   opacity: number
   contents?: string
   author?: string
-  /** ink only: freehand strokes as [x, y] points in page space */
+  /** ink: freehand strokes; line/arrow: [[start, end]] — in page space */
   strokes?: [number, number][][]
-  /** ink only: stroke width in PDF points */
+  /** ink/shapes: stroke width in PDF points */
   width?: number
+  /** freetext only */
+  fontSize?: number
 }
 
 /** On success carries the PDF object number of the (new) annotation */

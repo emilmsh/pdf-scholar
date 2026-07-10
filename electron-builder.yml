@@ -1,0 +1,28 @@
+# Installer configuration. Per-user NSIS install (no admin) with a .pdf
+# "Open with" association — we do NOT hijack the default PDF handler; the
+# user opts in via Windows' "Open with" / default apps UI.
+appId: no.emil.pdfx
+productName: PDFX
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - '!**/*.map'
+asarUnpack:
+  # mupdf loads its .wasm from disk at runtime
+  - node_modules/mupdf/**
+win:
+  target:
+    - nsis
+  icon: build/icon.png
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+  artifactName: PDFX-Setup-${version}.${ext}
+fileAssociations:
+  - ext: pdf
+    name: PDF-dokument
+    description: PDF-dokument
+    role: Viewer

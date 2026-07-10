@@ -2,8 +2,11 @@ import { memo, useEffect, useRef } from 'react'
 import { TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect } from '../../../shared/types'
-import type { DrawTool, PageAnnotation } from '../annotations'
-import { annotationCss, rgbCss, strokePathData } from '../annotations'
+import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
+import { annotationCss, arrowHeadPoints, rgbCss, strokePathData } from '../annotations'
+
+const SHAPE_TYPES = new Set(['square', 'circle', 'line', 'arrow'])
+const SVG_NS = 'http://www.w3.org/2000/svg'
 
 interface Props {
   pdf: PDFDocumentProxy
@@ -26,6 +29,13 @@ interface Props {
   onExternalLink(url: string): void
   onStrokeComplete(pageNumber: number, points: [number, number][]): void
   onErase(pageNumber: number, x: number, y: number): void
+  onShapeComplete(
+    pageNumber: number,
+    type: ShapeToolType,
+    a: [number, number],
+    b: [number, number]
+  ): void
+  onPlaceText(pageNumber: number, x: number, y: number, clientX: number, clientY: number): void
 }
 
 interface Cancellable {
@@ -47,7 +57,9 @@ function PdfPage({
   onInternalLink,
   onExternalLink,
   onStrokeComplete,
-  onErase
+  onErase,
+  onShapeComplete,
+  onPlaceText
 }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
@@ -57,6 +69,13 @@ function PdfPage({
     pointerId: number
     points: [number, number][]
     path: SVGPathElement
+  } | null>(null)
+  const shapeRef = useRef<{
+    pointerId: number
+    type: ShapeToolType
+    start: [number, number]
+    end: [number, number]
+    group: SVGGElement
   } | null>(null)
 
   useEffect(() => {
@@ -163,12 +182,67 @@ function PdfPage({
     return [(clientX - rect.left) / scale, (clientY - rect.top) / scale]
   }
 
+  const renderShapePreview = (
+    group: SVGGElement,
+    type: ShapeToolType,
+    a: [number, number],
+    b: [number, number],
+    color: string,
+    width: number
+  ): void => {
+    group.replaceChildren()
+    const x = Math.min(a[0], b[0])
+    const y = Math.min(a[1], b[1])
+    const w = Math.abs(b[0] - a[0])
+    const h = Math.abs(b[1] - a[1])
+    if (type === 'square') {
+      const el = document.createElementNS(SVG_NS, 'rect')
+      el.setAttribute('x', String(x))
+      el.setAttribute('y', String(y))
+      el.setAttribute('width', String(w))
+      el.setAttribute('height', String(h))
+      group.append(el)
+    } else if (type === 'circle') {
+      const el = document.createElementNS(SVG_NS, 'ellipse')
+      el.setAttribute('cx', String(x + w / 2))
+      el.setAttribute('cy', String(y + h / 2))
+      el.setAttribute('rx', String(w / 2))
+      el.setAttribute('ry', String(h / 2))
+      group.append(el)
+    } else {
+      const el = document.createElementNS(SVG_NS, 'line')
+      el.setAttribute('x1', String(a[0]))
+      el.setAttribute('y1', String(a[1]))
+      el.setAttribute('x2', String(b[0]))
+      el.setAttribute('y2', String(b[1]))
+      group.append(el)
+      if (type === 'arrow') {
+        const head = document.createElementNS(SVG_NS, 'polygon')
+        head.setAttribute('points', arrowHeadPoints(a, b, Math.max(6, width * 3.2)))
+        head.setAttribute('fill', color)
+        head.setAttribute('stroke', 'none')
+        group.append(head)
+      }
+    }
+    for (const child of group.children) {
+      if (child.tagName !== 'polygon') {
+        child.setAttribute('fill', 'none')
+        child.setAttribute('stroke', color)
+        child.setAttribute('stroke-width', String(width))
+      }
+    }
+  }
+
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (!drawTool || e.button !== 0) return
     e.preventDefault()
     const [x, y] = pagePointOf(e.clientX, e.clientY, e.currentTarget)
     if (drawTool.type === 'eraser') {
       onErase(pageNumber, x, y)
+      return
+    }
+    if (drawTool.type === 'text') {
+      onPlaceText(pageNumber, x, y, e.clientX, e.clientY)
       return
     }
     const svg = drawSvgRef.current
@@ -178,7 +252,20 @@ function PdfPage({
     } catch {
       /* synthetic or already-released pointers can't be captured — drawing still works */
     }
-    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    if (SHAPE_TYPES.has(drawTool.type)) {
+      const group = document.createElementNS(SVG_NS, 'g')
+      group.setAttribute('opacity', String(drawTool.opacity))
+      svg.append(group)
+      shapeRef.current = {
+        pointerId: e.pointerId,
+        type: drawTool.type as ShapeToolType,
+        start: [x, y],
+        end: [x, y],
+        group
+      }
+      return
+    }
+    const path = document.createElementNS(SVG_NS, 'path')
     path.setAttribute('fill', 'none')
     path.setAttribute('stroke', rgbCss(drawTool.color, 1))
     path.setAttribute('stroke-width', String(drawTool.width))
@@ -199,6 +286,19 @@ function PdfPage({
       }
       return
     }
+    const shape = shapeRef.current
+    if (shape && shape.pointerId === e.pointerId) {
+      shape.end = pagePointOf(e.clientX, e.clientY, e.currentTarget)
+      renderShapePreview(
+        shape.group,
+        shape.type,
+        shape.start,
+        shape.end,
+        rgbCss(drawTool.color, 1),
+        drawTool.width
+      )
+      return
+    }
     const stroke = strokeRef.current
     if (!stroke || stroke.pointerId !== e.pointerId) return
     const native = e.nativeEvent
@@ -217,6 +317,15 @@ function PdfPage({
   }
 
   const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const shape = shapeRef.current
+    if (shape && shape.pointerId === e.pointerId) {
+      shapeRef.current = null
+      shape.group.remove()
+      const dx = Math.abs(shape.end[0] - shape.start[0])
+      const dy = Math.abs(shape.end[1] - shape.start[1])
+      if (dx > 2 || dy > 2) onShapeComplete(pageNumber, shape.type, shape.start, shape.end)
+      return
+    }
     const stroke = strokeRef.current
     if (!stroke || stroke.pointerId !== e.pointerId) return
     strokeRef.current = null
@@ -265,7 +374,7 @@ function PdfPage({
       <div className="link-host" ref={linkRef} />
       {drawTool && (
         <div
-          className={`draw-layer${drawTool.type === 'eraser' ? ' erasing' : ''}`}
+          className={`draw-layer${drawTool.type === 'eraser' ? ' erasing' : ''}${drawTool.type === 'text' ? ' text-mode' : ''}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerEnd}
@@ -313,6 +422,54 @@ function AnnotationMarks({
           />
         ))}
       </svg>
+    )
+  }
+  if (SHAPE_TYPES.has(annotation.type)) {
+    const q = annotation.quads[0]
+    const color = rgbCss(annotation.color, 1)
+    const width = annotation.width ?? 2
+    const [a, b] = annotation.strokes?.[0] ?? []
+    return (
+      <svg
+        className="annot-ink-svg"
+        viewBox={`0 0 ${pageWidth} ${pageHeight}`}
+        preserveAspectRatio="none"
+        opacity={annotation.opacity}
+      >
+        {annotation.type === 'square' && (
+          <rect x={q.x} y={q.y} width={q.w} height={q.h} fill="none" stroke={color} strokeWidth={width} />
+        )}
+        {annotation.type === 'circle' && (
+          <ellipse
+            cx={q.x + q.w / 2}
+            cy={q.y + q.h / 2}
+            rx={q.w / 2}
+            ry={q.h / 2}
+            fill="none"
+            stroke={color}
+            strokeWidth={width}
+          />
+        )}
+        {(annotation.type === 'line' || annotation.type === 'arrow') && a && b && (
+          <>
+            <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={color} strokeWidth={width} />
+            {annotation.type === 'arrow' && (
+              <polygon points={arrowHeadPoints(a, b, Math.max(6, width * 3.2))} fill={color} />
+            )}
+          </>
+        )}
+      </svg>
+    )
+  }
+  if (annotation.type === 'freetext') {
+    const css = annotationCss(annotation, annotation.quads[0], scale, pageHeight)
+    return (
+      <div
+        className="annot annot-freetext"
+        style={{ ...css, fontSize: (annotation.fontSize ?? 12) * scale }}
+      >
+        {annotation.contents}
+      </div>
     )
   }
   return (

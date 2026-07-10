@@ -38,6 +38,16 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    app.setAppUserModelId('no.emil.pdfx')
+    // Show the "Recent" category (fed by app.addRecentDocument) in the
+    // taskbar Jump List
+    if (process.platform === 'win32') {
+      try {
+        app.setJumpList([{ type: 'recent' }])
+      } catch {
+        /* Jump List is cosmetic — never block startup on it */
+      }
+    }
     registerIpc()
     applyKeepAwake(getState().settings.keepAwake)
     createWindow()

@@ -523,12 +523,36 @@ button {
   accent-color: var(--accent);
 }
 
+.shape-row {
+  display: flex;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.shape-pick.is-active {
+  background: var(--active);
+  color: var(--accent);
+}
+
+.annot-freetext {
+  position: absolute;
+  font-family: Helvetica, Arial, sans-serif;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .draw-layer {
   position: absolute;
   inset: 0;
   z-index: 5;
   cursor: crosshair;
   touch-action: none;
+}
+
+.draw-layer.text-mode {
+  cursor: text;
 }
 
 .draw-layer.erasing {

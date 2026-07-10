@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Settings, ThemeName, ThemePreference } from '../../../shared/types'
-import { HIGHLIGHT_COLORS } from '../annotations'
+import { HIGHLIGHT_COLORS, SHAPE_TOOL_TYPES } from '../annotations'
+import type { DrawToolType, ShapeToolType } from '../annotations'
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -14,15 +15,35 @@ import {
   IconPen,
   IconPlus,
   IconSearch,
+  IconShapeArrow,
+  IconShapeCircle,
+  IconShapeLine,
+  IconShapeSquare,
+  IconShapes,
   IconSidebar,
+  IconText,
   IconTextSettings
 } from './icons'
 
-export type ToolName = 'pen' | 'marker' | 'eraser'
+export type ToolName = DrawToolType
 
 export interface ToolPref {
   color: [number, number, number]
   width: number
+}
+
+const SHAPE_ICONS: Record<ShapeToolType, (p: { size?: number }) => React.JSX.Element> = {
+  square: IconShapeSquare,
+  circle: IconShapeCircle,
+  line: IconShapeLine,
+  arrow: IconShapeArrow
+}
+
+const SHAPE_LABELS: Record<ShapeToolType, string> = {
+  square: 'Rektangel',
+  circle: 'Ellipse',
+  line: 'Linje',
+  arrow: 'Pil'
 }
 
 interface Props {
@@ -36,9 +57,9 @@ interface Props {
   canNavBack: boolean
   canNavForward: boolean
   activeTool: ToolName | null
-  toolPrefs: Record<'pen' | 'marker', ToolPref>
+  toolPrefs: Record<'pen' | 'marker' | 'shape', ToolPref>
   onToolSelect(tool: ToolName | null): void
-  onToolPrefChange(tool: 'pen' | 'marker', patch: Partial<ToolPref>): void
+  onToolPrefChange(tool: 'pen' | 'marker' | 'shape', patch: Partial<ToolPref>): void
   onNavBack(): void
   onNavForward(): void
   onToggleSidebar(): void
@@ -89,7 +110,7 @@ export default function Toolbar({
 }: Props): React.JSX.Element {
   const [pageInput, setPageInput] = useState(String(page))
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
-  const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | null>(null)
+  const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
 
@@ -102,7 +123,7 @@ export default function Toolbar({
     return () => window.removeEventListener('mousedown', close)
   }, [toolMenu])
 
-  const selectTool = (tool: ToolName): void => {
+  const selectTool = (tool: 'pen' | 'marker' | 'eraser'): void => {
     if (activeTool === tool) {
       if (tool === 'eraser') {
         onToolSelect(null)
@@ -120,6 +141,8 @@ export default function Toolbar({
       setToolMenu(null)
     }
   }
+
+  const shapeActive = (SHAPE_TOOL_TYPES as readonly string[]).includes(activeTool ?? '')
 
   useEffect(() => {
     setPageInput(String(page))
@@ -197,12 +220,43 @@ export default function Toolbar({
           >
             <IconEraser />
           </button>
+          <button
+            className={`tb-btn${shapeActive ? ' is-active' : ''}`}
+            onClick={() => setToolMenu((m) => (m === 'shape' ? null : 'shape'))}
+            title="Former: rektangel, ellipse, linje, pil"
+          >
+            <IconShapes />
+          </button>
+          <button
+            className={`tb-btn${activeTool === 'text' ? ' is-active' : ''}`}
+            onClick={() => onToolSelect(activeTool === 'text' ? null : 'text')}
+            title="Tekst på siden — klikk der teksten skal stå (Esc avslutter)"
+          >
+            <IconText />
+          </button>
 
           {toolMenu && (
             <div className="tool-menu">
               <div className="theme-menu-label">
-                {toolMenu === 'pen' ? 'Penn' : 'Tusj'}
+                {toolMenu === 'pen' ? 'Penn' : toolMenu === 'marker' ? 'Tusj' : 'Former'}
               </div>
+              {toolMenu === 'shape' && (
+                <div className="shape-row">
+                  {SHAPE_TOOL_TYPES.map((shape) => {
+                    const Icon = SHAPE_ICONS[shape]
+                    return (
+                      <button
+                        key={shape}
+                        className={`tb-btn shape-pick${activeTool === shape ? ' is-active' : ''}`}
+                        title={SHAPE_LABELS[shape]}
+                        onClick={() => onToolSelect(activeTool === shape ? null : shape)}
+                      >
+                        <Icon />
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               <div className="color-row">
                 {HIGHLIGHT_COLORS.map((c) => (
                   <button

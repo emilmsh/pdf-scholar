@@ -12,10 +12,13 @@ import type {
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
 import {
+  FREETEXT_COLOR,
+  FREETEXT_SIZE,
   MARKER_DEFAULT,
   MARKER_OPACITY,
   NOTE_COLOR,
   PEN_DEFAULT,
+  SHAPE_DEFAULT,
   STRIKEOUT_COLOR,
   UNDERLINE_COLOR,
   annotationAtPoint,
@@ -24,7 +27,13 @@ import {
   nextAnnotationId,
   selectionRectsForPage
 } from '../annotations'
-import type { DrawTool, PageAnnotation, PdfJsAnnotationData } from '../annotations'
+import type {
+  DrawTool,
+  DrawToolType,
+  PageAnnotation,
+  PdfJsAnnotationData,
+  ShapeToolType
+} from '../annotations'
 import AnnotPopover from './AnnotPopover'
 import PdfPage from './PdfPage'
 import Sidebar from './Sidebar'
@@ -168,19 +177,36 @@ export default function PdfViewer({
   })
   const [pillsFaded, setPillsFaded] = useState(false)
   const pillsTimerRef = useRef<number | null>(null)
-  const [activeTool, setActiveTool] = useState<'pen' | 'marker' | 'eraser' | null>(null)
-  const [toolPrefs, setToolPrefs] = useState({ pen: PEN_DEFAULT, marker: MARKER_DEFAULT })
+  const [activeTool, setActiveTool] = useState<DrawToolType | null>(null)
+  const [toolPrefs, setToolPrefs] = useState({
+    pen: PEN_DEFAULT,
+    marker: MARKER_DEFAULT,
+    shape: SHAPE_DEFAULT
+  })
+  const [freeTextDraft, setFreeTextDraft] = useState<{
+    pageNumber: number
+    x: number
+    y: number
+    clientX: number
+    clientY: number
+  } | null>(null)
 
   const drawTool = useMemo<DrawTool | null>(() => {
     if (!activeTool) return null
     if (activeTool === 'eraser') return { type: 'eraser', color: [0, 0, 0], width: 0, opacity: 0 }
-    const prefs = toolPrefs[activeTool]
-    return {
-      type: activeTool,
-      color: prefs.color,
-      width: prefs.width,
-      opacity: activeTool === 'marker' ? MARKER_OPACITY : 1
+    if (activeTool === 'text') {
+      return { type: 'text', color: FREETEXT_COLOR, width: 0, opacity: 1 }
     }
+    if (activeTool === 'pen' || activeTool === 'marker') {
+      const prefs = toolPrefs[activeTool]
+      return {
+        type: activeTool,
+        color: prefs.color,
+        width: prefs.width,
+        opacity: activeTool === 'marker' ? MARKER_OPACITY : 1
+      }
+    }
+    return { type: activeTool, color: toolPrefs.shape.color, width: toolPrefs.shape.width, opacity: 1 }
   }, [activeTool, toolPrefs])
   const drawToolRef = useRef(drawTool)
   drawToolRef.current = drawTool
@@ -630,7 +656,8 @@ export default function PdfViewer({
         contents: snapshot.contents,
         author: snapshot.author,
         strokes: snapshot.strokes,
-        width: snapshot.width
+        width: snapshot.width,
+        fontSize: snapshot.fontSize
       })
       if ('error' in result) {
         showToast(`Kunne ikke lagre annotasjonen: ${result.error}`)
@@ -732,7 +759,7 @@ export default function PdfViewer({
       color: [number, number, number],
       opacity: number,
       contents?: string,
-      extras?: { strokes?: [number, number][][]; width?: number }
+      extras?: { strokes?: [number, number][][]; width?: number; fontSize?: number }
     ) => {
       const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
       const snapshot: PageAnnotation = {
@@ -746,7 +773,8 @@ export default function PdfViewer({
         contents,
         author: 'PDFX',
         strokes: extras?.strokes,
-        width: extras?.width
+        width: extras?.width,
+        fontSize: extras?.fontSize
       }
       pushUndo({ kind: 'create', handle, snapshot })
       await engineCreate(handle, snapshot)
@@ -819,9 +847,69 @@ export default function PdfViewer({
     [removeAnnotation]
   )
 
+  const completeShape = useCallback(
+    (pageNumber: number, type: ShapeToolType, a: [number, number], b: [number, number]) => {
+      const tool = drawToolRef.current
+      if (!tool) return
+      const isLine = type === 'line' || type === 'arrow'
+      const pad = isLine ? Math.max(6, tool.width * 3.2) : 0
+      const quads = [
+        {
+          x: Math.min(a[0], b[0]) - pad,
+          y: Math.min(a[1], b[1]) - pad,
+          w: Math.abs(b[0] - a[0]) + 2 * pad,
+          h: Math.abs(b[1] - a[1]) + 2 * pad
+        }
+      ]
+      void persistAnnotation(pageNumber, type, quads, tool.color, 1, undefined, {
+        width: tool.width,
+        strokes: isLine ? [[a, b]] : undefined
+      })
+    },
+    [persistAnnotation]
+  )
+
+  const placeFreeText = useCallback(
+    (pageNumber: number, x: number, y: number, clientX: number, clientY: number) => {
+      setFreeTextDraft({ pageNumber, x, y, clientX, clientY })
+    },
+    []
+  )
+
+  const saveFreeText = useCallback(
+    (text: string) => {
+      if (!freeTextDraft) return
+      const lines = text.split('\n')
+      const longest = Math.max(...lines.map((l) => l.length))
+      const w = Math.min(260, Math.max(80, longest * FREETEXT_SIZE * 0.52 + 8))
+      const h = lines.length * FREETEXT_SIZE * 1.35 + 8
+      void persistAnnotation(
+        freeTextDraft.pageNumber,
+        'freetext',
+        [{ x: freeTextDraft.x, y: freeTextDraft.y, w, h }],
+        FREETEXT_COLOR,
+        1,
+        text,
+        { fontSize: FREETEXT_SIZE }
+      )
+      setFreeTextDraft(null)
+    },
+    [freeTextDraft, persistAnnotation]
+  )
+
   // Stable identities for PdfPage (fresh callbacks would re-render canvases)
-  const drawActionsRef = useRef({ stroke: completeStroke, erase: eraseAt })
-  drawActionsRef.current = { stroke: completeStroke, erase: eraseAt }
+  const drawActionsRef = useRef({
+    stroke: completeStroke,
+    erase: eraseAt,
+    shape: completeShape,
+    text: placeFreeText
+  })
+  drawActionsRef.current = {
+    stroke: completeStroke,
+    erase: eraseAt,
+    shape: completeShape,
+    text: placeFreeText
+  }
   const onStrokeComplete = useCallback(
     (pageNumber: number, points: [number, number][]) =>
       drawActionsRef.current.stroke(pageNumber, points),
@@ -829,6 +917,16 @@ export default function PdfViewer({
   )
   const onEraseAt = useCallback(
     (pageNumber: number, x: number, y: number) => drawActionsRef.current.erase(pageNumber, x, y),
+    []
+  )
+  const onShapeComplete = useCallback(
+    (pageNumber: number, type: ShapeToolType, a: [number, number], b: [number, number]) =>
+      drawActionsRef.current.shape(pageNumber, type, a, b),
+    []
+  )
+  const onPlaceText = useCallback(
+    (pageNumber: number, x: number, y: number, clientX: number, clientY: number) =>
+      drawActionsRef.current.text(pageNumber, x, y, clientX, clientY),
     []
   )
 
@@ -1334,7 +1432,8 @@ export default function PdfViewer({
         e.preventDefault()
         goForward()
       } else if (e.key === 'Escape') {
-        if (noteDraft) setNoteDraft(null)
+        if (freeTextDraft) setFreeTextDraft(null)
+        else if (noteDraft) setNoteDraft(null)
         else if (menu) setMenu(null)
         else if (annotPopover) setAnnotPopover(null)
         else if (activeTool) setActiveTool(null)
@@ -1365,6 +1464,7 @@ export default function PdfViewer({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [
     active,
+    freeTextDraft,
     noteDraft,
     menu,
     annotPopover,
@@ -1521,6 +1621,8 @@ export default function PdfViewer({
                     onExternalLink={onExternalLink}
                     onStrokeComplete={onStrokeComplete}
                     onErase={onEraseAt}
+                    onShapeComplete={onShapeComplete}
+                    onPlaceText={onPlaceText}
                   />
                 )
               })}
@@ -1635,6 +1737,14 @@ export default function PdfViewer({
           y={noteDraft.y}
           onSave={saveNote}
           onCancel={() => setNoteDraft(null)}
+        />
+      )}
+      {freeTextDraft && (
+        <NotePopover
+          x={freeTextDraft.clientX}
+          y={freeTextDraft.clientY}
+          onSave={saveFreeText}
+          onCancel={() => setFreeTextDraft(null)}
         />
       )}
       {toast && <div className="toast">{toast}</div>}
