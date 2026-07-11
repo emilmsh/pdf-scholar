@@ -33,6 +33,8 @@ interface Props {
   onJumpToAnnot(pageNumber: number, record: PageAnnotation): void
   onDeleteAnnot(pageNumber: number, record: PageAnnotation): void
   onExport(format: ExportFormat): void
+  /** Open the AI panel with the "summarize my annotations" question */
+  onAskAi(): void
 }
 
 type Tab = 'thumbs' | 'outline' | 'annots'
@@ -48,7 +50,8 @@ function Sidebar({
   onJumpToDest,
   onJumpToAnnot,
   onDeleteAnnot,
-  onExport
+  onExport,
+  onAskAi
 }: Props): React.JSX.Element {
   useLang()
   const [tab, setTab] = useState<Tab>('thumbs')
@@ -157,6 +160,7 @@ function Sidebar({
           onJump={onJumpToAnnot}
           onDelete={onDeleteAnnot}
           onExport={onExport}
+          onAskAi={onAskAi}
         />
       )}
     </div>
@@ -172,13 +176,15 @@ function AnnotationList({
   excerpts,
   onJump,
   onDelete,
-  onExport
+  onExport,
+  onAskAi
 }: {
   annotations: ReadonlyMap<number, PageAnnotation[]>
   excerpts: ReadonlyMap<string, string>
   onJump(pageNumber: number, record: PageAnnotation): void
   onDelete(pageNumber: number, record: PageAnnotation): void
   onExport(format: ExportFormat): void
+  onAskAi(): void
 }): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [colorFilter, setColorFilter] = useState<[number, number, number] | null>(null)
@@ -222,6 +228,9 @@ function AnnotationList({
         </button>
         <button onClick={() => onExport('text')} title={t('side.exportTxtTip')}>
           TXT
+        </button>
+        <button className="annot-ask-ai" onClick={onAskAi} title={t('ai.annotsTip')}>
+          ✦
         </button>
       </div>
 

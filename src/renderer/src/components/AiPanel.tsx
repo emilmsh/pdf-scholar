@@ -11,6 +11,7 @@ import type {
 } from '../../../shared/types'
 import { bridge } from '../bridge'
 import {
+  annotationsQuestion,
   chatSystem,
   citationPage,
   estimateCost,
@@ -260,6 +261,11 @@ interface PanelProps {
   seed: AiSeed | null
   onSeedConsumed(): void
   ensureDocument(): Promise<EnsuredDocument | null>
+  /** Whether the document currently has any annotations (gates the suggestion) */
+  hasAnnotations: boolean
+  /** Bumped by the viewer (sidebar ✦) to fire the annotations question */
+  annotsAskId: number
+  getAnnotationsText(): Promise<string | null>
   onCitationClick(resolved: ResolvedCitation): void
   onClose(): void
 }
@@ -272,6 +278,9 @@ export default function AiPanel({
   seed,
   onSeedConsumed,
   ensureDocument,
+  hasAnnotations,
+  annotsAskId,
+  getAnnotationsText,
   onCitationClick,
   onClose
 }: PanelProps): React.JSX.Element | null {
@@ -375,6 +384,19 @@ export default function AiPanel({
     if (currentIdRef.current !== null) bridge.aiAbort(currentIdRef.current)
   }, [])
 
+  const sendAnnots = useCallback(async () => {
+    const block = await getAnnotationsText()
+    if (block) void send(annotationsQuestion(block), t('ai.annotsBtn'))
+  }, [getAnnotationsText, send])
+
+  // Sidebar ✦ bumps annotsAskId to fire the annotations question from outside
+  const lastAnnotsAskRef = useRef(annotsAskId)
+  useEffect(() => {
+    if (!open || annotsAskId === lastAnnotsAskRef.current) return
+    lastAnnotsAskRef.current = annotsAskId
+    void sendAnnots()
+  }, [open, annotsAskId, sendAnnots])
+
   const handleCitation = useCallback(
     (citation: AiCitation) => {
       const ensured = docRef.current
@@ -456,6 +478,11 @@ export default function AiPanel({
                     <IconSummary size={15} />
                     {t('ai.summaryBtn')}
                   </button>
+                  {hasAnnotations && (
+                    <button title={t('ai.annotsTip')} onClick={() => void sendAnnots()}>
+                      {t('ai.annotsBtn')}
+                    </button>
+                  )}
                   {suggestions().map((s) => (
                     <button key={s} onClick={() => void send(s)}>
                       {s}

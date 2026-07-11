@@ -2077,3 +2077,17 @@ button {
   color: var(--accent);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
 }
+
+/* Ask-AI button in the annotation list header */
+
+.annot-ask-ai {
+  margin-left: auto;
+  color: var(--accent);
+  font-size: 13px;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.annot-ask-ai:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}

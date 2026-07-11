@@ -153,6 +153,15 @@ export function explainUserMessage(selection: string, pageNumber: number, pageCo
     : `Selected text (from page ${pageNumber}):\n"${selection}"\n\nContext from the page:\n${pageContext}`
 }
 
+/** Question scaffold for "ask my annotations": the block lists the user's
+ *  own highlights/notes; keeping it inside the user message means follow-up
+ *  questions retain it via the chat history. */
+export function annotationsQuestion(block: string): string {
+  return getLanguage() === 'nb'
+    ? `Nedenfor er merknadene mine i dokumentet (markeringer, understrekinger og notater, med sidetall). Oppsummer hva jeg har vært opptatt av, grupper gjerne etter tema, og pek på punkter det ser ut som jeg bør følge opp. Bruk dokumentet for kontekst der det trengs.\n\n${block}`
+    : `Below are my annotations in the document (highlights, underlines and notes, with page numbers). Summarize what I have been focusing on, group by theme where natural, and point out items I appear to need to follow up on. Use the document for context where needed.\n\n${block}`
+}
+
 /** The structured-article-summary request (sent through the normal chat
  *  pipeline so streaming and citation chips come for free) */
 export function summaryPrompt(): string {

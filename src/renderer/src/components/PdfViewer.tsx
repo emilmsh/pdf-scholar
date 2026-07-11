@@ -21,6 +21,7 @@ import {
   SHAPE_DEFAULT,
   STRIKEOUT_COLOR,
   UNDERLINE_COLOR,
+  annotTypeLabel,
   annotationAtPoint,
   fromPdfJsAnnotation,
   inkHitTest,
@@ -233,6 +234,8 @@ export default function PdfViewer({
   const [aiOpen, setAiOpen] = useState(false)
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
+  /** Bumped to make the AI panel fire the "ask my annotations" question */
+  const [annotsAskId, setAnnotsAskId] = useState(0)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
@@ -1518,6 +1521,32 @@ export default function PdfViewer({
 
   const consumeAiSeed = useCallback(() => setAiSeed(null), [])
 
+  /** The user's annotations as a compact text block for the AI (same data as
+   *  the export: page, type, marked-up excerpt, comment) */
+  const getAnnotationsText = useCallback(async (): Promise<string | null> => {
+    if (!pdf) return null
+    const rows = await collectExportRows(pdf, annotsRef.current)
+    if (rows.length === 0) return null
+    return rows
+      .map(({ pageNumber, record, excerpt }) => {
+        let line = `[${t('app.pageAbbrev')} ${pageNumber}] ${annotTypeLabel(record.type)}`
+        if (excerpt) line += `: «${excerpt}»`
+        if (record.contents) line += ` — ${record.contents}`
+        return line
+      })
+      .join('\n')
+  }, [pdf])
+
+  const hasAnnotations = useMemo(
+    () => [...annots.values()].some((list) => list.length > 0),
+    [annots]
+  )
+
+  const askAnnotations = useCallback(() => {
+    setAiOpen(true)
+    setAnnotsAskId((n) => n + 1)
+  }, [])
+
   useEffect(() => {
     if (!active) return
     const onKeyDown = (e: KeyboardEvent): void => {
@@ -1701,6 +1730,7 @@ export default function PdfViewer({
           onJumpToAnnot={jumpToAnnot}
           onDeleteAnnot={removeAnnotation}
           onExport={(format) => void exportAnnotations(format)}
+          onAskAi={askAnnotations}
         />
 
         <div
@@ -1761,6 +1791,9 @@ export default function PdfViewer({
           seed={aiSeed}
           onSeedConsumed={consumeAiSeed}
           ensureDocument={ensureAiDocument}
+          hasAnnotations={hasAnnotations}
+          annotsAskId={annotsAskId}
+          getAnnotationsText={getAnnotationsText}
           onCitationClick={(resolved) => void jumpToAiCitation(resolved)}
           onClose={() => setAiOpen(false)}
         />
