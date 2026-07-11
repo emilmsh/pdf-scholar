@@ -2091,3 +2091,23 @@ button {
 .annot-ask-ai:hover {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
+
+/* Distraction-free: the tab bar collapses with the toolbar.
+   min-height: 0 is required — as a column-flex child its implicit
+   min-height: auto would otherwise beat max-height: 0. */
+
+.tab-bar {
+  max-height: 44px;
+  min-height: 0;
+  transition: max-height 0.22s ease, opacity 0.22s ease, padding 0.22s ease;
+}
+
+.tab-bar.tucked {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-bottom-width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}

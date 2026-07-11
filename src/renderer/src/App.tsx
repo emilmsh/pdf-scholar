@@ -40,6 +40,8 @@ export default function App(): React.JSX.Element {
     () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
   )
   const [error, setError] = useState<string | null>(null)
+  /** Active tab is in distraction-free mode → tuck the tab bar too */
+  const [immersive, setImmersive] = useState(false)
 
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
@@ -215,6 +217,7 @@ export default function App(): React.JSX.Element {
         <TabBar
           tabs={tabs.map((t) => ({ id: t.id, name: t.payload.name, path: t.payload.path }))}
           activeId={activeId}
+          hidden={immersive}
           onSelect={setActiveId}
           onClose={closeTab}
           onNewTab={() => void openDialog()}
@@ -232,6 +235,7 @@ export default function App(): React.JSX.Element {
                 settings={settings}
                 resolvedTheme={resolvedTheme}
                 onSettingsChange={updateSettings}
+                onImmersiveChange={setImmersive}
                 onClose={() => closeTab(tab.id)}
               />
             </div>

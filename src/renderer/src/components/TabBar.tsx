@@ -9,6 +9,8 @@ export interface TabInfo {
 interface Props {
   tabs: TabInfo[]
   activeId: string | null
+  /** Distraction-free mode: collapse the bar (top-edge hover brings it back) */
+  hidden: boolean
   onSelect(id: string): void
   onClose(id: string): void
   onNewTab(): void
@@ -17,13 +19,14 @@ interface Props {
 export default function TabBar({
   tabs,
   activeId,
+  hidden,
   onSelect,
   onClose,
   onNewTab
 }: Props): React.JSX.Element {
   useLang()
   return (
-    <div className="tab-bar">
+    <div className={`tab-bar${hidden ? ' tucked' : ''}`}>
       {tabs.map((tab) => (
         <div
           key={tab.id}

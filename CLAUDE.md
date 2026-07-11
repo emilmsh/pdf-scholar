@@ -19,7 +19,8 @@ A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in N
 
 ## Gotchas (hard-won)
 - **pdfjs-dist v6 API**: `page.render({ canvas, viewport })` — pass the canvas, not `canvasContext`. Worker must be loaded via Vite's `?worker` import assigned to `GlobalWorkerOptions.workerPort` (a bare `?url` workerSrc hangs in dev).
-- **pdf.js renders via requestAnimationFrame** → in a *hidden* tab (automated preview) rendering stalls and scroll events don't fire. `main.tsx` has a dev-only rAF→setTimeout shim; when driving the preview programmatically, dispatch `new Event('scroll')` manually after setting `scrollTop`. These are preview-environment artifacts, not app bugs.
+- **pdf.js renders via requestAnimationFrame** → in a *hidden* tab (automated preview) rendering stalls and scroll events don't fire. `main.tsx` has a dev-only rAF→setTimeout shim; when driving the preview programmatically, dispatch `new Event('scroll')` manually after setting `scrollTop`. **CSS transitions also freeze at their start value in hidden tabs** — getComputedStyle will forever report pre-transition values even though the rule matches; to verify layout logic, inject `* { transition: none !important }` first. These are preview-environment artifacts, not app bugs.
+- **Column-flex children have `min-height: auto`**, which beats `max-height: 0` — collapsing a bar (e.g. `.tab-bar`) needs an explicit `min-height: 0`.
 - **Version pins**: electron-vite 5 requires vite ≤7 (vite 8 is out — do not upgrade blindly). pdf.js ships monthly majors — upgrade deliberately, `render`/TextLayer APIs churn.
 - pdf.js transfers the `data` buffer to its worker — always pass a copy (`payload.data.slice()`).
 - Drag-drop needs `webUtils.getPathForFile` in preload to recover the real path (`File.path` is gone in modern Electron).

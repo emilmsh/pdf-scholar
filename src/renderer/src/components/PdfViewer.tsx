@@ -138,6 +138,9 @@ interface Props {
   settings: Settings
   resolvedTheme: ThemeName
   onSettingsChange(patch: Partial<Settings>): void
+  /** Distraction-free state of the ACTIVE viewer — the app shell hides the
+   *  tab bar along with the toolbar (and reveals both on top-edge hover) */
+  onImmersiveChange(immersive: boolean): void
   onClose(): void
 }
 
@@ -152,6 +155,7 @@ export default function PdfViewer({
   settings,
   resolvedTheme,
   onSettingsChange,
+  onImmersiveChange,
   onClose
 }: Props): React.JSX.Element {
   useLang()
@@ -1188,6 +1192,12 @@ export default function PdfViewer({
   }, [])
 
   // ---------- Chrome / fullscreen / keyboard ----------
+
+  // Only the active tab's distraction-free state drives the app shell (the
+  // tab bar tucks away with the toolbar and returns on top-edge hover)
+  useEffect(() => {
+    if (active) onImmersiveChange(chromeHidden && !peek)
+  }, [active, chromeHidden, peek, onImmersiveChange])
 
   const toggleChrome = useCallback(() => {
     setChromeHidden((hidden) => {
