@@ -1997,3 +1997,44 @@ button {
   flex: 1;
   margin-top: 0;
 }
+
+/* Labeled color rows in the selection menu */
+
+.menu-color-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+}
+
+.menu-row-label {
+  width: 76px;
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
+.menu-color-group .color-row {
+  padding: 3px 0;
+  gap: 7px;
+}
+
+.color-bar {
+  width: 22px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  transition: transform 0.08s;
+}
+
+.color-bar span {
+  width: 18px;
+  height: 5px;
+  border-radius: 3px;
+}
+
+.color-bar:hover {
+  transform: scale(1.15);
+  background: var(--hover);
+}

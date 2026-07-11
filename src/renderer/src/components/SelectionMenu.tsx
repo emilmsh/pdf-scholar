@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { HIGHLIGHT_COLORS } from '../annotations'
+import { HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
 import type { HighlightColor } from '../annotations'
 
 export interface MenuState {
@@ -14,7 +14,7 @@ export interface MenuState {
 
 export type MenuAction =
   | { kind: 'highlight'; color: HighlightColor }
-  | { kind: 'underline' }
+  | { kind: 'underline'; color: HighlightColor }
   | { kind: 'strikeout' }
   | { kind: 'squiggly' }
   | { kind: 'note' }
@@ -53,20 +53,36 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
     >
       {isSelection && (
         <>
-          <div className="color-row">
-            {HIGHLIGHT_COLORS.map((c) => (
-              <button
-                key={c.hex}
-                className="color-dot"
-                style={{ background: c.hex }}
-                title={`Marker (${c.name.toLowerCase()})`}
-                onClick={() => onAction({ kind: 'highlight', color: c })}
-              />
-            ))}
+          <div className="menu-color-group">
+            <span className="menu-row-label">Marker</span>
+            <div className="color-row">
+              {HIGHLIGHT_COLORS.map((c) => (
+                <button
+                  key={c.hex}
+                  className="color-dot"
+                  style={{ background: c.hex }}
+                  title={`Marker (${c.name.toLowerCase()})`}
+                  onClick={() => onAction({ kind: 'highlight', color: c })}
+                />
+              ))}
+            </div>
           </div>
-          <button className="menu-item" onClick={() => onAction({ kind: 'underline' })}>
-            <span className="menu-glyph menu-glyph-underline">U</span> Understrek
-          </button>
+          <div className="menu-color-group">
+            <span className="menu-row-label">Understrek</span>
+            <div className="color-row">
+              {UNDERLINE_COLORS.map((c) => (
+                <button
+                  key={c.hex}
+                  className="color-bar"
+                  title={`Understrek (${c.name.toLowerCase()})`}
+                  onClick={() => onAction({ kind: 'underline', color: c })}
+                >
+                  <span style={{ background: c.hex }} />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'strikeout' })}>
             <span className="menu-glyph menu-glyph-strikeout">S</span> Gjennomstrek
           </button>

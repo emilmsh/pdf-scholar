@@ -73,6 +73,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [ ] Dra faner for å endre rekkefølge; «lukk andre faner»-meny
 
 ## Fase 7 — Skall-paritet og polering
+- **Språkvalg i appen (Emils ønske 2026-07-11): minst norsk bokmål og engelsk** — alle UI-strenger ut i en ordbok med `t()`-oppslag, språkvalg i innstillinger (auto = OS-språk), gjelder også KI-systemprompter
 - Fanelinje for flere dokumenter; delt visning
 - Stempler, signatur, verktøylinje-tilpasning
 - Designgjennomgang mot PDF Expert: avstander, ikoner, animasjoner, mørkt app-chrome

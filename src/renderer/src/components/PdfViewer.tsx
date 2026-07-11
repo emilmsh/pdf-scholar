@@ -256,6 +256,9 @@ export default function PdfViewer({
     timer: number
   } | null>(null)
   const pageTextsRef = useRef<PageText[] | null>(null)
+  const searchOpenRef = useRef(searchOpen)
+  searchOpenRef.current = searchOpen
+  const aiHitTimerRef = useRef<number | null>(null)
   const searchSeqRef = useRef(0)
   const gotoSeqRef = useRef(0)
   const searchJumpedRef = useRef(false)
@@ -509,7 +512,9 @@ export default function PdfViewer({
     zoomTo((containerWidth - SIDE_PAD) / sizes[0].w)
   }, [sizes, containerWidth, zoomTo])
 
-  /** Snap a pinch-commit scale to fit-width/fit-height/fit-page when close */
+  /** Snap a pinch-commit scale to fit-width/fit-height/fit-page when close.
+   *  Tight threshold: the snap adjusts the committed scale away from what the
+   *  gesture showed on screen, so anything above ~2.5% reads as a jump. */
   const snapScale = useCallback(
     (raw: number): number => {
       const el = containerRef.current
@@ -521,7 +526,7 @@ export default function PdfViewer({
         if (
           candidate >= ZOOM_MIN &&
           candidate <= ZOOM_MAX &&
-          Math.abs(raw - candidate) / candidate < 0.06
+          Math.abs(raw - candidate) / candidate < 0.025
         ) {
           return candidate
         }
@@ -534,15 +539,17 @@ export default function PdfViewer({
   // Commit a pinch/ctrl-wheel gesture: swap the cheap CSS transform for a
   // crisp re-render at the accumulated scale. The transform is NOT removed
   // here — the commit effect does that once the new layout is in place, so
-  // there is no jump or flash on release.
-  const commitGesture = useCallback(() => {
+  // there is no jump or flash on release. Mid-gesture commits skip the
+  // fit-snap: snapping while the fingers are still moving fights the user.
+  const commitGesture = useCallback((snap = true) => {
     const g = gestureRef.current
     const el = containerRef.current
     if (!g || !el) return
     gestureRef.current = null
     window.clearTimeout(g.timer)
     const prev = scaleRef.current
-    const next = snapScale(clamp(prev * g.factor, ZOOM_MIN, ZOOM_MAX))
+    const raw = clamp(prev * g.factor, ZOOM_MIN, ZOOM_MAX)
+    const next = snap ? snapScale(raw) : raw
     const anchor = makeAnchor(g.fx, g.fy)
     if (next === prev || !anchor) {
       const inner = innerRef.current
@@ -593,13 +600,26 @@ export default function PdfViewer({
         setMenu((m) => (m ? null : m))
       }
       // Trackpad pinches arrive as many small deltas — scale the factor by
-      // delta magnitude so the gesture tracks finger distance smoothly.
-      const step = Math.exp(-e.deltaY * 0.0022)
+      // delta magnitude so the gesture tracks finger distance. Mouse wheels
+      // send big notches (±100+); give those a fixed, calmer step.
+      const step =
+        Math.abs(e.deltaY) >= 90
+          ? e.deltaY < 0
+            ? 1.18
+            : 1 / 1.18
+          : Math.exp(-e.deltaY * 0.0038)
       const target = clamp(scaleRef.current * g.factor * step, ZOOM_MIN, ZOOM_MAX)
       g.factor = target / scaleRef.current
       inner.style.transform = `scale(${g.factor})`
       window.clearTimeout(g.timer)
-      g.timer = window.setTimeout(() => commitGestureRef.current(), GESTURE_SETTLE)
+      // Long pinches blur (CSS-scaled canvas): re-render mid-gesture once the
+      // factor drifts far enough; the anchored commit makes this seamless and
+      // the next wheel event just starts a fresh gesture segment.
+      if (g.factor > 1.3 || g.factor < 1 / 1.3) {
+        commitGestureRef.current(false)
+      } else {
+        g.timer = window.setTimeout(() => commitGestureRef.current(), GESTURE_SETTLE)
+      }
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -975,7 +995,7 @@ export default function PdfViewer({
           applyMarkup('highlight', action.color.rgb)
           break
         case 'underline':
-          applyMarkup('underline', UNDERLINE_COLOR)
+          applyMarkup('underline', action.color?.rgb ?? UNDERLINE_COLOR)
           break
         case 'strikeout':
           applyMarkup('strikeout', STRIKEOUT_COLOR)
@@ -1157,6 +1177,9 @@ export default function PdfViewer({
   const onMouseDown = useCallback(() => {
     setMenu((m) => (m ? null : m))
     setAnnotPopover((p) => (p ? null : p))
+    // A lingering citation highlight releases on the next interaction with
+    // the document (while searching, the search UI owns the highlight)
+    if (!searchOpenRef.current) setSearchHits((h) => (h ? null : h))
   }, [])
 
   // ---------- Chrome / fullscreen / keyboard ----------
@@ -1471,6 +1494,12 @@ export default function PdfViewer({
       )
       if (!rects || rects.length === 0) return
       setSearchHits({ pageNumber: resolved.pageNumber, rects })
+      // The citation highlight releases by itself after a moment (or on the
+      // next click in the document) — it's a pointer, not a selection
+      if (aiHitTimerRef.current) window.clearTimeout(aiHitTimerRef.current)
+      aiHitTimerRef.current = window.setTimeout(() => {
+        if (!searchOpenRef.current) setSearchHits(null)
+      }, 4000)
       const lay2 = layoutRef.current
       if (lay2) {
         el.scrollTop = Math.max(
@@ -1595,6 +1624,7 @@ export default function PdfViewer({
       if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
       if (gestureRef.current) window.clearTimeout(gestureRef.current.timer)
       if (pillsTimerRef.current) window.clearTimeout(pillsTimerRef.current)
+      if (aiHitTimerRef.current) window.clearTimeout(aiHitTimerRef.current)
       if (fullscreen) bridge.setFullscreen(false)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps

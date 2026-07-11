@@ -43,6 +43,15 @@ export const HIGHLIGHT_COLORS: HighlightColor[] = [
   { name: 'Lilla', hex: '#c39dff', rgb: [0.765, 0.616, 1] }
 ]
 
+/** Saturated palette for line markup (underline) — pastels vanish as thin lines */
+export const UNDERLINE_COLORS: HighlightColor[] = [
+  { name: 'Rød', hex: '#e2494a', rgb: [0.886, 0.286, 0.29] },
+  { name: 'Oransje', hex: '#f5920b', rgb: [0.96, 0.573, 0.043] },
+  { name: 'Grønn', hex: '#2f9e58', rgb: [0.184, 0.62, 0.345] },
+  { name: 'Blå', hex: '#327cf6', rgb: [0.196, 0.486, 0.965] },
+  { name: 'Lilla', hex: '#8f52d6', rgb: [0.561, 0.322, 0.839] }
+]
+
 export const UNDERLINE_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
 export const STRIKEOUT_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
 export const NOTE_COLOR: [number, number, number] = [1, 0.835, 0.29]

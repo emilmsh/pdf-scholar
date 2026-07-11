@@ -12,6 +12,8 @@ files:
 asarUnpack:
   # mupdf loads its .wasm from disk at runtime
   - node_modules/mupdf/**
+  # loaded via dynamic import() — keep it on real disk like mupdf
+  - node_modules/@anthropic-ai/sdk/**
 win:
   target:
     - nsis
