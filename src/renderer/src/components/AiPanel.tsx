@@ -11,13 +11,15 @@ import type {
 } from '../../../shared/types'
 import { bridge } from '../bridge'
 import {
-  CHAT_SYSTEM,
+  chatSystem,
   citationPage,
   estimateCost,
   explainSystem,
+  explainUserMessage,
   formatCost,
   resolveCitation
 } from '../ai'
+import { t, useLang } from '../i18n'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
 import { IconGear, IconSend, IconSparkle, IconStop } from './icons'
@@ -99,10 +101,10 @@ function AssistantBody({ parts, doc, onCitation }: AssistantBodyProps): React.JS
                   <button
                     key={j}
                     className="ai-chip"
-                    title="Hopp til kilden i dokumentet"
+                    title={t('ai.chipTip')}
                     onClick={() => onCitation(c)}
                   >
-                    {page !== null ? `s. ${page}` : 'kilde'}
+                    {page !== null ? `${t('app.pageAbbrev')} ${page}` : t('ai.sourceChip')}
                   </button>
                 )
               })}
@@ -116,11 +118,11 @@ function AssistantBody({ parts, doc, onCitation }: AssistantBodyProps): React.JS
 
 // ---------- Settings ----------
 
-const PROVIDER_LABELS: { id: AiProviderId; label: string }[] = [
+const providerLabels = (): { id: AiProviderId; label: string }[] => [
   { id: 'anthropic', label: 'Claude (Anthropic)' },
   { id: 'openai', label: 'OpenAI' },
   { id: 'azure', label: 'Azure OpenAI' },
-  { id: 'mock', label: 'Test uten nøkkel (mock)' }
+  { id: 'mock', label: t('ai.providerMock') }
 ]
 
 const MODEL_SUGGESTIONS: Record<AiProviderId, string[]> = {
@@ -137,6 +139,7 @@ interface SettingsProps {
 }
 
 function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Element {
+  useLang()
   const [provider, setProvider] = useState<AiProviderId>(config.provider)
   const [model, setModel] = useState(config.models[config.provider] ?? '')
   const [key, setKey] = useState('')
@@ -166,9 +169,9 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
   return (
     <div className="ai-settings">
       <label className="ai-field">
-        <span>Leverandør</span>
+        <span>{t('ai.provider')}</span>
         <select value={provider} onChange={(e) => pickProvider(e.target.value as AiProviderId)}>
-          {PROVIDER_LABELS.map((p) => (
+          {providerLabels().map((p) => (
             <option key={p.id} value={p.id}>
               {p.label}
             </option>
@@ -177,11 +180,11 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
       </label>
       {provider !== 'mock' && (
         <label className="ai-field">
-          <span>API-nøkkel</span>
+          <span>{t('ai.apiKey')}</span>
           <input
             type="password"
             value={key}
-            placeholder={config.hasKey[provider] ? '•••••••• (lagret)' : 'Lim inn nøkkelen din'}
+            placeholder={config.hasKey[provider] ? t('ai.keySaved') : t('ai.keyNew')}
             onChange={(e) => setKey(e.target.value)}
             spellCheck={false}
           />
@@ -189,7 +192,7 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
       )}
       {provider !== 'azure' && provider !== 'mock' && (
         <label className="ai-field">
-          <span>Modell</span>
+          <span>{t('ai.model')}</span>
           <input
             list={`ai-models-${provider}`}
             value={model}
@@ -206,7 +209,7 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
       {provider === 'azure' && (
         <>
           <label className="ai-field">
-            <span>Endepunkt</span>
+            <span>{t('ai.endpoint')}</span>
             <input
               value={endpoint}
               placeholder="https://…openai.azure.com"
@@ -215,7 +218,7 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
             />
           </label>
           <label className="ai-field">
-            <span>Deployment</span>
+            <span>{t('ai.deployment')}</span>
             <input
               value={deployment}
               onChange={(e) => setDeployment(e.target.value)}
@@ -225,18 +228,17 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
         </>
       )}
       <p className="ai-settings-note">
-        Nøkkelen lagres kryptert på denne maskinen og brukes kun direkte mot leverandørens API.
-        Dokumentteksten sendes til leverandøren først når du stiller et spørsmål.
+        {t('ai.settingsNote')}
         {!config.encryptionAvailable && provider !== 'mock' && (
-          <strong> Merk: systemkryptering er utilgjengelig her; nøkkelen lagres uten kryptering.</strong>
+          <strong>{t('ai.encryptionWarn')}</strong>
         )}
       </p>
       <div className="ai-settings-actions">
         <button className="btn-secondary" onClick={onClose}>
-          Avbryt
+          {t('app.cancel')}
         </button>
         <button className="btn-primary" disabled={saving} onClick={() => void save()}>
-          Lagre
+          {t('app.save')}
         </button>
       </div>
     </div>
@@ -261,11 +263,7 @@ interface PanelProps {
   onClose(): void
 }
 
-const SUGGESTIONS = [
-  'Oppsummer dokumentet kort',
-  'Hva er forskningsspørsmålet og hovedfunnene?',
-  'Forklar metoden enkelt'
-]
+const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
 
 export default function AiPanel({
   open,
@@ -276,6 +274,7 @@ export default function AiPanel({
   onCitationClick,
   onClose
 }: PanelProps): React.JSX.Element | null {
+  useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [messages, setMessages] = useState<PanelMessage[]>([])
@@ -352,7 +351,7 @@ export default function AiPanel({
       currentIdRef.current = requestId
       const result = await bridge.aiChat({
         requestId,
-        system: CHAT_SYSTEM,
+        system: chatSystem(),
         messages: history,
         document: ensured ? { title: docTitle, text: ensured.doc.text } : null
       })
@@ -402,25 +401,24 @@ export default function AiPanel({
 
   if (!open) return null
 
-  const providerLabel =
-    PROVIDER_LABELS.find((p) => p.id === config?.provider)?.label ?? ''
+  const providerLabel = providerLabels().find((p) => p.id === config?.provider)?.label ?? ''
 
   return (
     <aside className="ai-panel">
       <header className="ai-header">
         <IconSparkle size={16} />
-        <span className="ai-title">Assistent</span>
+        <span className="ai-title">{t('ai.assistant')}</span>
         <span className="ai-model" title={providerLabel}>
           {config ? (config.provider === 'azure' ? config.azure.deployment : config.models[config.provider]) : ''}
         </span>
         <button
           className={`tb-btn${showSettings ? ' is-active' : ''}`}
-          title="KI-innstillinger"
+          title={t('ai.settingsTip')}
           onClick={() => setShowSettings((s) => !s)}
         >
           <IconGear size={15} />
         </button>
-        <button className="tb-btn" title="Lukk (Esc)" onClick={onClose}>
+        <button className="tb-btn" title={t('ai.closeTip')} onClick={onClose}>
           ✕
         </button>
       </header>
@@ -439,9 +437,9 @@ export default function AiPanel({
           <div className="ai-messages" ref={scrollRef}>
             {messages.length === 0 && !busy && (
               <div className="ai-empty">
-                <p>Still spørsmål om dokumentet. Svarene får kildehenvisninger du kan klikke på for å hoppe til riktig sted.</p>
+                <p>{t('ai.emptyIntro')}</p>
                 <div className="ai-suggestions">
-                  {SUGGESTIONS.map((s) => (
+                  {suggestions().map((s) => (
                     <button key={s} onClick={() => void send(s)}>
                       {s}
                     </button>
@@ -478,7 +476,7 @@ export default function AiPanel({
                 {streamText ? (
                   renderMarkdownLite(streamText)
                 ) : (
-                  <div className="ai-thinking">Leser dokumentet …</div>
+                  <div className="ai-thinking">{t('ai.readingDoc')}</div>
                 )}
               </div>
             )}
@@ -489,7 +487,7 @@ export default function AiPanel({
               ref={inputRef}
               value={input}
               rows={2}
-              placeholder="Spør om dokumentet …"
+              placeholder={t('ai.composerPlaceholder')}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -500,13 +498,13 @@ export default function AiPanel({
               }}
             />
             {busy ? (
-              <button className="ai-send" title="Stopp" onClick={stop}>
+              <button className="ai-send" title={t('ai.stopTip')} onClick={stop}>
                 <IconStop size={16} />
               </button>
             ) : (
               <button
                 className="ai-send"
-                title="Send (Enter)"
+                title={t('ai.sendTip')}
                 disabled={!input.trim()}
                 onClick={() => void send(input)}
               >
@@ -515,7 +513,7 @@ export default function AiPanel({
             )}
           </footer>
           {totalCost !== null && (
-            <div className="ai-total">Samtalen har kostet ≈ {formatCost(totalCost)}</div>
+            <div className="ai-total">{t('ai.totalCost', { cost: formatCost(totalCost) })}</div>
           )}
         </>
       )}
@@ -534,11 +532,8 @@ export interface AiQuickState {
   pageContext: string
 }
 
-const QUICK_TITLES: Record<AiQuickState['mode'], string> = {
-  explain: 'Forklar',
-  simplify: 'Forenkle',
-  define: 'Definer'
-}
+const quickTitle = (mode: AiQuickState['mode']): string =>
+  mode === 'explain' ? t('ai.quickExplain') : mode === 'simplify' ? t('ai.quickSimplify') : t('ai.quickDefine')
 
 interface QuickProps {
   state: AiQuickState
@@ -547,6 +542,7 @@ interface QuickProps {
 }
 
 export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): React.JSX.Element {
+  useLang()
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
@@ -566,10 +562,7 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
         requestId,
         system: explainSystem(state.mode),
         messages: [
-          {
-            role: 'user',
-            text: `Utvalgt tekst (fra side ${state.pageNumber}):\n«${state.selection}»\n\nKontekst fra siden:\n${state.pageContext}`
-          }
+          { role: 'user', text: explainUserMessage(state.selection, state.pageNumber, state.pageContext) }
         ],
         document: null
       })
@@ -601,7 +594,7 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
       <div className="ai-quick-head">
         <IconSparkle size={14} />
         <span>
-          {QUICK_TITLES[state.mode]}: «{state.selection.length > 42 ? `${state.selection.slice(0, 42)}…` : state.selection}»
+          {quickTitle(state.mode)}: «{state.selection.length > 42 ? `${state.selection.slice(0, 42)}…` : state.selection}»
         </span>
       </div>
       <div className="ai-quick-body">
@@ -610,7 +603,7 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
         ) : text ? (
           renderMarkdownLite(text)
         ) : (
-          <div className="ai-thinking">Tenker …</div>
+          <div className="ai-thinking">{t('ai.thinking')}</div>
         )}
       </div>
       <div className="ai-quick-actions">
@@ -620,15 +613,19 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
           disabled={!done || !!error}
           onClick={() =>
             onSendToChat({
-              question: `${QUICK_TITLES[state.mode]}: «${state.selection}» (s. ${state.pageNumber})`,
+              question: t('ai.quickQuestion', {
+                title: quickTitle(state.mode),
+                selection: state.selection,
+                page: state.pageNumber
+              }),
               answer: finalRef.current
             })
           }
         >
-          Send til chat
+          {t('ai.sendToChat')}
         </button>
         <button className="btn-primary" onClick={onClose}>
-          Lukk
+          {t('app.close')}
         </button>
       </div>
     </div>

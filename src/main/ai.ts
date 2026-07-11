@@ -22,12 +22,14 @@ const PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'mock']
 
 // Prompt contract for providers without native citations (mirrors the
 // oe-intervju QUOTE_GROUNDING_RULES pattern): verbatim quotes we can locate.
+// Instructions address the model and stay English for both UI languages; the
+// [KILDE ...] marker syntax is fixed (parsed by regex in parseQuoteContract).
 const QUOTE_CONTRACT = `
 
-SITERINGSREGLER (viktig):
-- Når du bygger på dokumentet, siter kilden inline på formen [KILDE s.N: "ordrett utdrag"].
-- Utdraget MÅ være en eksakt, ordrett delstreng fra dokumentteksten (10–200 tegn), og N er sidetallet der utdraget står (sidene er merket «[Side N]» i dokumentet).
-- Ikke finn på sitater. Kan du ikke støtte en påstand med et ordrett utdrag, si det eksplisitt.`
+CITATION RULES (important):
+- When you draw on the document, cite the source inline in the form [KILDE s.N: "verbatim excerpt"].
+- The excerpt MUST be an exact, verbatim substring of the document text (10–200 characters), and N is the page number where it appears (pages are marked "[Side N]" or "[Page N]" in the document).
+- Never invent quotes. If you cannot support a claim with a verbatim excerpt, say so explicitly.`
 
 // ---------- Key encryption ----------
 

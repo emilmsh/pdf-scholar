@@ -45,6 +45,7 @@ import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
+import { locale, t, useLang } from '../i18n'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toHtml, toMarkdown, toPlainText } from '../annot-export'
@@ -152,6 +153,7 @@ export default function PdfViewer({
   onSettingsChange,
   onClose
 }: Props): React.JSX.Element {
+  useLang()
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
   const [scale, setScale] = useState(initialPosition?.zoom ?? 0)
@@ -687,7 +689,7 @@ export default function PdfViewer({
         fontSize: snapshot.fontSize
       })
       if ('error' in result) {
-        showToast(`Kunne ikke lagre annotasjonen: ${result.error}`)
+        showToast(t('viewer.annotSaveFailed', { error: result.error }))
         mutatePage(handle.pageNumber, (list) => list.filter((r) => r.id !== handle.localId))
       } else {
         handle.fileId = result.id
@@ -709,7 +711,7 @@ export default function PdfViewer({
         pageIndex: handle.pageNumber - 1,
         id: handle.fileId
       })
-      if ('error' in result) showToast(`Kunne ikke slette annotasjonen: ${result.error}`)
+      if ('error' in result) showToast(t('viewer.annotDeleteFailed', { error: result.error }))
       else if (wasFilePainted) void reloadDocument()
     },
     [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
@@ -722,7 +724,7 @@ export default function PdfViewer({
         list.map((r) => (matchesHandle(r, handle) ? { ...r, ...patch } : r))
       )
       if (handle.fileId === null) {
-        showToast('Annotasjonen lagres fortsatt — prøv igjen straks')
+        showToast(t('viewer.annotStillSaving'))
         return
       }
       const result = await bridge.updateAnnotation({
@@ -731,7 +733,7 @@ export default function PdfViewer({
         id: handle.fileId,
         ...patch
       })
-      if ('error' in result) showToast(`Kunne ikke endre annotasjonen: ${result.error}`)
+      if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: result.error }))
       // 'file' annots are painted by pdf.js from the file — refresh the canvas
       else if (wasFilePainted && patch.color) void reloadDocument()
     },
@@ -1188,7 +1190,7 @@ export default function PdfViewer({
     setChromeHidden((hidden) => {
       const next = !hidden
       setPeek(false)
-      if (next) showToast('Distraksjonsfri lesing — trykk Esc for å vise verktøylinjen')
+      if (next) showToast(t('viewer.distractionToast'))
       return next
     })
   }, [showToast])
@@ -1199,7 +1201,7 @@ export default function PdfViewer({
       bridge.setFullscreen(next)
       setChromeHidden(next)
       setPeek(false)
-      if (next) showToast('Fullskjerm — trykk Esc eller F11 for å avslutte')
+      if (next) showToast(t('viewer.fullscreenToast'))
       return next
     })
   }, [showToast])
@@ -1288,20 +1290,21 @@ export default function PdfViewer({
       if (!pdf) return
       const rows = await collectExportRows(pdf, annotsRef.current)
       if (rows.length === 0) {
-        showToast('Ingen merknader å eksportere')
+        showToast(t('viewer.nothingToExport'))
         return
       }
-      const meta = { fileName: payload.name, exportedAt: new Date().toLocaleString('nb-NO') }
+      const meta = { fileName: payload.name, exportedAt: new Date().toLocaleString(locale()) }
       const base = payload.name.replace(/\.pdf$/i, '')
+      const suffix = t('export.suffix')
       const [content, name] =
         format === 'markdown'
-          ? [toMarkdown(rows, meta), `${base} - merknader.md`]
+          ? [toMarkdown(rows, meta), `${base} - ${suffix}.md`]
           : format === 'html'
-            ? [toHtml(rows, meta), `${base} - merknader.html`]
-            : [toPlainText(rows, meta), `${base} - merknader.txt`]
+            ? [toHtml(rows, meta), `${base} - ${suffix}.html`]
+            : [toPlainText(rows, meta), `${base} - ${suffix}.txt`]
       const result = await bridge.saveTextFile(name, content)
-      if (result && 'error' in result) showToast(`Kunne ikke lagre: ${result.error}`)
-      else if (result) showToast(`Merknader eksportert: ${result.path}`)
+      if (result && 'error' in result) showToast(t('viewer.saveFailed', { error: result.error }))
+      else if (result) showToast(t('viewer.exported', { path: result.path }))
     },
     [pdf, payload.name, showToast]
   )
@@ -1636,10 +1639,10 @@ export default function PdfViewer({
   if (error) {
     return (
       <div className="viewer-error">
-        <p>Kunne ikke vise dokumentet.</p>
+        <p>{t('viewer.errorTitle')}</p>
         <p className="viewer-error-detail">{error}</p>
         <button className="btn-primary" onClick={onClose}>
-          Tilbake
+          {t('app.back')}
         </button>
       </div>
     )
@@ -1747,7 +1750,7 @@ export default function PdfViewer({
           ) : (
             <div className="viewer-loading">
               <div className="spinner" />
-              <span>Åpner {payload.name} …</span>
+              <span>{t('viewer.opening', { name: payload.name })}</span>
             </div>
           )}
         </div>
@@ -1771,12 +1774,12 @@ export default function PdfViewer({
         >
           {navStacks.back.length > 0 && (
             <button className="back-pill" onClick={goBack} title="Alt+←">
-              ‹ Tilbake til s. {navStacks.back[navStacks.back.length - 1].page}
+              {t('viewer.backToPage', { page: navStacks.back[navStacks.back.length - 1].page })}
             </button>
           )}
           {navStacks.forward.length > 0 && (
             <button className="back-pill" onClick={goForward} title="Alt+→">
-              Frem til s. {navStacks.forward[navStacks.forward.length - 1].page} ›
+              {t('viewer.forwardToPage', { page: navStacks.forward[navStacks.forward.length - 1].page })}
             </button>
           )}
         </div>
@@ -1805,20 +1808,20 @@ export default function PdfViewer({
                   setPillEditing(false)
                 }
               }}
-              aria-label="Gå til side"
+              aria-label={t('tb.goToPage')}
             />
-            <span>av {sizes.length}</span>
+            <span>{t('viewer.ofPages', { count: sizes.length })}</span>
           </form>
         ) : (
           <button
             className="page-pill"
-            title="Gå til side"
+            title={t('tb.goToPage')}
             onClick={() => {
               setPillInput(String(currentPage))
               setPillEditing(true)
             }}
           >
-            {currentPage} av {sizes.length}
+            {currentPage} {t('viewer.ofPages', { count: sizes.length })}
           </button>
         ))}
 

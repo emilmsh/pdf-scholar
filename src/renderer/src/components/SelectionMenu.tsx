@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
+import { colorLabel, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
 import type { HighlightColor } from '../annotations'
+import { t, useLang } from '../i18n'
 
 export interface MenuState {
   /** viewport (client) coordinates */
@@ -37,6 +38,7 @@ function clampToViewport(x: number, y: number, w: number, h: number): { left: nu
 }
 
 export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element {
+  useLang()
   const isSelection = menu.mode === 'selection'
   const { left, top } = clampToViewport(menu.x, menu.y, 240, isSelection ? 260 : 60)
 
@@ -54,27 +56,27 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
       {isSelection && (
         <>
           <div className="menu-color-group">
-            <span className="menu-row-label">Marker</span>
+            <span className="menu-row-label">{t('menu.marker')}</span>
             <div className="color-row">
               {HIGHLIGHT_COLORS.map((c) => (
                 <button
                   key={c.hex}
                   className="color-dot"
                   style={{ background: c.hex }}
-                  title={`Marker (${c.name.toLowerCase()})`}
+                  title={t('menu.markerTip', { color: colorLabel(c).toLowerCase() })}
                   onClick={() => onAction({ kind: 'highlight', color: c })}
                 />
               ))}
             </div>
           </div>
           <div className="menu-color-group">
-            <span className="menu-row-label">Understrek</span>
+            <span className="menu-row-label">{t('menu.underline')}</span>
             <div className="color-row">
               {UNDERLINE_COLORS.map((c) => (
                 <button
                   key={c.hex}
                   className="color-bar"
-                  title={`Understrek (${c.name.toLowerCase()})`}
+                  title={t('menu.underlineTip', { color: colorLabel(c).toLowerCase() })}
                   onClick={() => onAction({ kind: 'underline', color: c })}
                 >
                   <span style={{ background: c.hex }} />
@@ -84,43 +86,43 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           </div>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'strikeout' })}>
-            <span className="menu-glyph menu-glyph-strikeout">S</span> Gjennomstrek
+            <span className="menu-glyph menu-glyph-strikeout">S</span> {t('menu.strikeout')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'squiggly' })}>
-            <span className="menu-glyph menu-glyph-squiggly">S</span> Bølgestrek
+            <span className="menu-glyph menu-glyph-squiggly">S</span> {t('menu.squiggly')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
-            <span className="menu-glyph">✎</span> Notat
+            <span className="menu-glyph">✎</span> {t('menu.note')}
           </button>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'copy' })}>
-            Kopier
+            {t('menu.copy')}
           </button>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'explain' })}>
-            <span className="menu-glyph">✦</span> Forklar
+            <span className="menu-glyph">✦</span> {t('menu.aiExplain')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}>
-            <span className="menu-glyph">✦</span> Forenkle
+            <span className="menu-glyph">✦</span> {t('menu.aiSimplify')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'define' })}>
-            <span className="menu-glyph">✦</span> Definer i kontekst
+            <span className="menu-glyph">✦</span> {t('menu.aiDefine')}
           </button>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'search' })}>
-            Søk på nettet
+            {t('menu.webSearch')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'dictionary' })}>
-            Slå opp i ordbok
+            {t('menu.dictionary')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'translate' })}>
-            Oversett
+            {t('menu.translate')}
           </button>
         </>
       )}
       {!isSelection && (
         <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
-          <span className="menu-glyph">✎</span> Nytt notat her
+          <span className="menu-glyph">✎</span> {t('menu.newNoteHere')}
         </button>
       )}
     </div>
@@ -135,6 +137,7 @@ interface NoteProps {
 }
 
 export function NotePopover({ x, y, onSave, onCancel }: NoteProps): React.JSX.Element {
+  useLang()
   const [text, setText] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
   const { left, top } = clampToViewport(x, y, 280, 160)
@@ -148,7 +151,7 @@ export function NotePopover({ x, y, onSave, onCancel }: NoteProps): React.JSX.El
       <textarea
         ref={ref}
         value={text}
-        placeholder="Skriv et notat …"
+        placeholder={t('menu.notePlaceholder')}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && text.trim()) onSave(text.trim())
@@ -158,10 +161,10 @@ export function NotePopover({ x, y, onSave, onCancel }: NoteProps): React.JSX.El
       />
       <div className="note-actions">
         <button className="btn-secondary" onClick={onCancel}>
-          Avbryt
+          {t('app.cancel')}
         </button>
         <button className="btn-primary" disabled={!text.trim()} onClick={() => onSave(text.trim())}>
-          Lagre
+          {t('app.save')}
         </button>
       </div>
     </div>

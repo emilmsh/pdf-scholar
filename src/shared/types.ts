@@ -10,10 +10,14 @@ export interface ThemeAdjust {
   brightness: number
 }
 
+/** UI language — 'auto' follows the OS/browser language */
+export type LanguagePreference = 'nb' | 'en' | 'auto'
+
 export interface Settings {
   theme: ThemePreference
   themeAdjust: Record<ThemeName, ThemeAdjust>
   keepAwake: boolean
+  language: LanguagePreference
 }
 
 export interface RecentFile {

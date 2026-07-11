@@ -2038,3 +2038,31 @@ button {
   transform: scale(1.15);
   background: var(--hover);
 }
+
+/* Language picker in the view menu */
+
+.lang-options {
+  display: flex;
+  gap: 6px;
+  padding: 2px 10px 8px;
+}
+
+.lang-option {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-elevated);
+}
+
+.lang-option:hover {
+  border-color: var(--accent);
+}
+
+.lang-option.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  font-weight: 600;
+}

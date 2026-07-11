@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { ANNOT_TYPE_LABELS, HIGHLIGHT_COLORS } from '../annotations'
+import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
+import { t, useLang } from '../i18n'
 
 interface Props {
   x: number
@@ -19,6 +20,7 @@ export default function AnnotPopover({
   onContents,
   onDelete
 }: Props): React.JSX.Element {
+  useLang()
   const [text, setText] = useState(annotation.contents ?? '')
   const left = Math.max(8, Math.min(x, window.innerWidth - 264))
   const top = Math.max(8, Math.min(y + 10, window.innerHeight - 240))
@@ -31,7 +33,7 @@ export default function AnnotPopover({
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="annot-popover-head">
-        <span>{ANNOT_TYPE_LABELS[annotation.type]}</span>
+        <span>{annotTypeLabel(annotation.type)}</span>
         {annotation.author && <span className="annot-popover-author">{annotation.author}</span>}
       </div>
 
@@ -41,7 +43,7 @@ export default function AnnotPopover({
             key={c.hex}
             className="color-dot"
             style={{ background: c.hex }}
-            title={c.name}
+            title={colorLabel(c)}
             onClick={() => onColor(c.rgb)}
           />
         ))}
@@ -50,7 +52,7 @@ export default function AnnotPopover({
       <textarea
         className="annot-popover-text"
         value={text}
-        placeholder={annotation.type === 'note' ? 'Notattekst …' : 'Legg til kommentar …'}
+        placeholder={annotation.type === 'note' ? t('popover.notePlaceholder') : t('popover.commentPlaceholder')}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => {
           if (text.trim() !== (annotation.contents ?? '')) onContents(text.trim())
@@ -60,7 +62,7 @@ export default function AnnotPopover({
 
       <div className="annot-popover-actions">
         <button className="annot-delete" onClick={onDelete}>
-          Slett
+          {t('app.delete')}
         </button>
       </div>
     </div>

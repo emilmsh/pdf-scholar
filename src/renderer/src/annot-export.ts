@@ -1,9 +1,10 @@
-﻿// Annotation summary export (Phase 6). The marked-up text is recovered by
+// Annotation summary export (Phase 6). The marked-up text is recovered by
 // intersecting each markup annotation's quads with the page's text items
 // (positions from getTextContent), slicing items proportionally by x-overlap.
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect } from '../../shared/types'
-import { ANNOT_TYPE_LABELS } from './annotations'
+import { annotTypeLabel } from './annotations'
+import { getLanguage, t } from './i18n'
 import type { PageAnnotation } from './annotations'
 
 export interface ExportRow {
@@ -72,7 +73,7 @@ function textUnderQuads(items: PositionedItem[], quads: PageRect[]): string {
     .trim()
 }
 
-/** Marked-up text per annotation (localId â†’ excerpt), for the sidebar list */
+/** Marked-up text per annotation (localId → excerpt), for the sidebar list */
 export async function computeExcerpts(
   pdf: PDFDocumentProxy,
   annots: ReadonlyMap<number, PageAnnotation[]>
@@ -125,7 +126,7 @@ function groupByPage(rows: ExportRow[]): Map<number, ExportRow[]> {
 
 function rowLine(row: ExportRow): { label: string; excerpt: string; comment: string; author: string } {
   return {
-    label: ANNOT_TYPE_LABELS[row.record.type],
+    label: annotTypeLabel(row.record.type),
     excerpt: row.excerpt,
     comment: row.record.contents ?? '',
     author: row.record.author ?? ''
@@ -133,14 +134,18 @@ function rowLine(row: ExportRow): { label: string; excerpt: string; comment: str
 }
 
 export function toMarkdown(rows: ExportRow[], meta: ExportMeta): string {
-  const lines: string[] = [`# Merknader â€” ${meta.fileName}`, '', `*Eksportert ${meta.exportedAt} fra PDF Scholar*`]
+  const lines: string[] = [
+    `# ${t('export.title', { name: meta.fileName })}`,
+    '',
+    `*${t('export.byline', { date: meta.exportedAt })}*`
+  ]
   for (const [pageNumber, pageRows] of groupByPage(rows)) {
-    lines.push('', `## Side ${pageNumber}`, '')
+    lines.push('', `## ${t('export.page', { page: pageNumber })}`, '')
     for (const row of pageRows) {
       const { label, excerpt, comment, author } = rowLine(row)
       let line = `- **${label}**`
-      if (excerpt) line += `: Â«${excerpt}Â»`
-      if (comment) line += excerpt ? ` â€” ${comment}` : `: ${comment}`
+      if (excerpt) line += `: «${excerpt}»`
+      if (comment) line += excerpt ? ` — ${comment}` : `: ${comment}`
       if (author) line += ` *(${author})*`
       lines.push(line)
     }
@@ -149,14 +154,17 @@ export function toMarkdown(rows: ExportRow[], meta: ExportMeta): string {
 }
 
 export function toPlainText(rows: ExportRow[], meta: ExportMeta): string {
-  const lines: string[] = [`Merknader â€” ${meta.fileName}`, `Eksportert ${meta.exportedAt} fra PDF Scholar`]
+  const lines: string[] = [
+    t('export.title', { name: meta.fileName }),
+    t('export.byline', { date: meta.exportedAt })
+  ]
   for (const [pageNumber, pageRows] of groupByPage(rows)) {
-    lines.push('', `Side ${pageNumber}`, 'â”€'.repeat(30))
+    lines.push('', t('export.page', { page: pageNumber }), '─'.repeat(30))
     for (const row of pageRows) {
       const { label, excerpt, comment, author } = rowLine(row)
-      let line = `â€¢ ${label}`
-      if (excerpt) line += `: Â«${excerpt}Â»`
-      if (comment) line += excerpt ? ` â€” ${comment}` : `: ${comment}`
+      let line = `• ${label}`
+      if (excerpt) line += `: «${excerpt}»`
+      if (comment) line += excerpt ? ` — ${comment}` : `: ${comment}`
       if (author) line += ` (${author})`
       lines.push(line)
     }
@@ -171,30 +179,30 @@ function escapeHtml(s: string): string {
 export function toHtml(rows: ExportRow[], meta: ExportMeta): string {
   const body: string[] = []
   for (const [pageNumber, pageRows] of groupByPage(rows)) {
-    body.push(`<h2>Side ${pageNumber}</h2><ul>`)
+    body.push(`<h2>${t('export.page', { page: pageNumber })}</h2><ul>`)
     for (const row of pageRows) {
       const { label, excerpt, comment, author } = rowLine(row)
       const [r, g, b] = row.record.color.map((v) => Math.round(v * 255))
       let li = `<li><span class="dot" style="background:rgb(${r},${g},${b})"></span><strong>${label}</strong>`
       if (excerpt) li += `: <q>${escapeHtml(excerpt)}</q>`
-      if (comment) li += ` â€” <em>${escapeHtml(comment)}</em>`
+      if (comment) li += ` — <em>${escapeHtml(comment)}</em>`
       if (author) li += ` <span class="author">(${escapeHtml(author)})</span>`
       body.push(li + '</li>')
     }
     body.push('</ul>')
   }
   return `<!doctype html>
-<html lang="no"><head><meta charset="utf-8"><title>Merknader â€” ${escapeHtml(meta.fileName)}</title>
+<html lang="${getLanguage() === 'nb' ? 'no' : 'en'}"><head><meta charset="utf-8"><title>${escapeHtml(t('export.title', { name: meta.fileName }))}</title>
 <style>
 body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 20px; color: #1d1d1f; line-height: 1.55; }
 h1 { font-size: 24px; } h2 { font-size: 15px; margin-top: 28px; color: #6e6e73; text-transform: uppercase; letter-spacing: .05em; }
 ul { list-style: none; padding: 0; } li { padding: 7px 0; border-bottom: 1px solid #eee; }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; border: 1px solid rgba(0,0,0,.15); }
-.author { color: #6e6e73; font-size: 13px; } q { quotes: 'Â«' 'Â»'; }
+.author { color: #6e6e73; font-size: 13px; } q { quotes: '«' '»'; }
 .meta { color: #6e6e73; font-size: 13px; }
 </style></head><body>
-<h1>Merknader â€” ${escapeHtml(meta.fileName)}</h1>
-<p class="meta">Eksportert ${escapeHtml(meta.exportedAt)} fra PDF Scholar</p>
+<h1>${escapeHtml(t('export.title', { name: meta.fileName }))}</h1>
+<p class="meta">${escapeHtml(t('export.byline', { date: meta.exportedAt }))}</p>
 ${body.join('\n')}
 </body></html>
 `

@@ -47,7 +47,8 @@ const DEFAULTS: AppState = {
       sepia: { contrast: 1, brightness: 1 },
       night: { contrast: 1, brightness: 1 }
     },
-    keepAwake: false
+    keepAwake: false,
+    language: 'auto'
   },
   ai: DEFAULT_AI
 }

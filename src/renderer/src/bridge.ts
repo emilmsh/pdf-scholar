@@ -9,6 +9,7 @@ import type {
   ReadingPosition,
   Settings
 } from '../../shared/types'
+import { t } from './i18n'
 
 export const isElectron = typeof window !== 'undefined' && !!window.api
 
@@ -26,7 +27,8 @@ const DEFAULT_SETTINGS: Settings = {
     sepia: { contrast: 1, brightness: 1 },
     night: { contrast: 1, brightness: 1 }
   },
-  keepAwake: false
+  keepAwake: false,
+  language: 'auto'
 }
 
 function loadWebState(): WebState {
@@ -149,7 +151,7 @@ const webApi: PdfxApi = {
   aiChat: async (request): Promise<AiChatResult> => {
     const config = loadWebAiConfig()
     if (config.provider !== 'mock') {
-      return { error: 'Nettleser-forhåndsvisningen støtter kun mock-leverandøren. Bruk appen for ekte KI.' }
+      return { error: t('ai.mockOnlyWeb') }
     }
     const doc = request.document
     const answerA =
@@ -163,7 +165,7 @@ const webApi: PdfxApi = {
     for (let i = 0; i < full.length; i += step) {
       if (webAiAborted.has(request.requestId)) {
         webAiAborted.delete(request.requestId)
-        return { error: 'Avbrutt' }
+        return { error: t('ai.aborted') }
       }
       for (const cb of webAiDeltaListeners) cb(request.requestId, full.slice(i, i + step))
       await new Promise((resolve) => setTimeout(resolve, 30))

@@ -7,6 +7,7 @@ import type {
   ThemeName
 } from '../../shared/types'
 import { bridge } from './bridge'
+import { setLanguage } from './i18n'
 import PdfViewer from './components/PdfViewer'
 import TabBar from './components/TabBar'
 import Welcome from './components/Welcome'
@@ -24,7 +25,8 @@ const FALLBACK_SETTINGS: Settings = {
     sepia: { contrast: 1, brightness: 1 },
     night: { contrast: 1, brightness: 1 }
   },
-  keepAwake: false
+  keepAwake: false,
+  language: 'auto'
 }
 
 let tabCounter = 0
@@ -61,6 +63,11 @@ export default function App(): React.JSX.Element {
     root.style.setProperty('--page-contrast', String(adjust.contrast))
     root.style.setProperty('--page-brightness', String(adjust.brightness))
   }, [resolvedTheme, settings.themeAdjust])
+
+  // Keep the i18n store in sync with the language setting
+  useEffect(() => {
+    setLanguage(settings.language)
+  }, [settings.language])
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
     setSettingsState((prev) => ({

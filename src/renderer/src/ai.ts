@@ -1,6 +1,7 @@
 // Renderer-side AI helpers: document text assembly for the API, mapping
 // citations back to page positions, and cost estimation.
 import type { AiCitation, AiUsage } from '../../shared/types'
+import { getLanguage } from './i18n'
 import type { PageText } from './search'
 
 export interface AiDocument {
@@ -11,12 +12,15 @@ export interface AiDocument {
 }
 
 /** Page markers let prompt-contract providers (OpenAI/Azure) name page
- *  numbers; Anthropic citations use raw char offsets which we map ourselves. */
+ *  numbers; Anthropic citations use raw char offsets which we map ourselves.
+ *  Offsets are derived from the marker as written, so the localized label is
+ *  safe — the built document is cached together with its pageStarts. */
 export function buildAiDocument(pages: PageText[]): AiDocument {
+  const label = getLanguage() === 'nb' ? 'Side' : 'Page'
   let text = ''
   const pageStarts: number[] = []
   for (let i = 0; i < pages.length; i++) {
-    text += `[Side ${i + 1}]\n`
+    text += `[${label} ${i + 1}]\n`
     pageStarts.push(text.length)
     text += pages[i].text
     if (i < pages.length - 1) text += '\n\n'
@@ -104,21 +108,47 @@ export function formatCost(dollars: number): string {
   return `$${dollars.toFixed(2)}`
 }
 
-// ---------- Prompts ----------
+// ---------- Prompts (follow the app language) ----------
 
-export const CHAT_SYSTEM = `Du er forskningsassistenten i PDF-leseren PDF Scholar. Brukeren leser et dokument (typisk en forskningsartikkel eller rapport) og stiller spørsmål om det.
+export function chatSystem(): string {
+  if (getLanguage() === 'nb') {
+    return `Du er forskningsassistenten i PDF-leseren PDF Scholar. Brukeren leser et dokument (typisk en forskningsartikkel eller rapport) og stiller spørsmål om det.
 
 - Svar på samme språk som brukeren skriver (norsk bokmål som standard).
 - Vær presis, akademisk nøktern og konsis. Ingen utfyllende småprat.
 - Bygg svarene på dokumentet og siter kildene dine, slik at brukeren kan hoppe til stedet i PDF-en.
 - Skiller tydelig mellom hva dokumentet sier og hva som er din egen vurdering eller bakgrunnskunnskap.`
+  }
+  return `You are the research assistant in the PDF reader PDF Scholar. The user is reading a document (typically a research article or report) and asks questions about it.
+
+- Answer in the same language the user writes in (English by default).
+- Be precise, academically sober and concise. No filler chatter.
+- Ground your answers in the document and cite your sources, so the user can jump to the place in the PDF.
+- Distinguish clearly between what the document says and what is your own judgement or background knowledge.`
+}
 
 export function explainSystem(mode: 'explain' | 'simplify' | 'define'): string {
+  if (getLanguage() === 'nb') {
+    const task =
+      mode === 'explain'
+        ? 'Forklar den utvalgte teksten: hva den betyr og hvilken rolle den spiller i sammenhengen.'
+        : mode === 'simplify'
+          ? 'Skriv den utvalgte teksten om i enklere språk, uten å miste presisjon.'
+          : 'Definer begrepet/uttrykket slik det brukes i akkurat denne sammenhengen.'
+    return `Du hjelper en leser i PDF-leseren PDF Scholar. ${task} Svar kort (2–6 setninger), på norsk bokmål, uten innledning eller oppsummering. Bruk konteksten fra siden når det trengs.`
+  }
   const task =
     mode === 'explain'
-      ? 'Forklar den utvalgte teksten: hva den betyr og hvilken rolle den spiller i sammenhengen.'
+      ? 'Explain the selected text: what it means and what role it plays in context.'
       : mode === 'simplify'
-        ? 'Skriv den utvalgte teksten om i enklere språk, uten å miste presisjon.'
-        : 'Definer begrepet/uttrykket slik det brukes i akkurat denne sammenhengen.'
-  return `Du hjelper en leser i PDF-leseren PDF Scholar. ${task} Svar kort (2–6 setninger), på norsk bokmål, uten innledning eller oppsummering. Bruk konteksten fra siden når det trengs.`
+        ? 'Rewrite the selected text in simpler language without losing precision.'
+        : 'Define the term/expression as it is used in this specific context.'
+  return `You are helping a reader in the PDF reader PDF Scholar. ${task} Answer briefly (2–6 sentences), in English, with no preamble or summary. Use the page context when needed.`
+}
+
+/** User-message scaffold for the explain-selection popover */
+export function explainUserMessage(selection: string, pageNumber: number, pageContext: string): string {
+  return getLanguage() === 'nb'
+    ? `Utvalgt tekst (fra side ${pageNumber}):\n«${selection}»\n\nKontekst fra siden:\n${pageContext}`
+    : `Selected text (from page ${pageNumber}):\n"${selection}"\n\nContext from the page:\n${pageContext}`
 }

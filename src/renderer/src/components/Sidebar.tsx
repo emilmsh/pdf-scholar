@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { ANNOT_TYPE_LABELS, HIGHLIGHT_COLORS } from '../annotations'
+import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
+import { t, useLang } from '../i18n'
 
 const THUMB_WIDTH = 132
 
@@ -49,6 +50,7 @@ function Sidebar({
   onDeleteAnnot,
   onExport
 }: Props): React.JSX.Element {
+  useLang()
   const [tab, setTab] = useState<Tab>('thumbs')
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
   const [visibleThumbs, setVisibleThumbs] = useState<ReadonlySet<number>>(new Set())
@@ -102,13 +104,13 @@ function Sidebar({
     <div className={`sidebar${open ? ' open' : ''}`}>
       <div className="sidebar-tabs">
         <button className={tab === 'thumbs' ? 'active' : ''} onClick={() => setTab('thumbs')}>
-          Sider
+          {t('side.pages')}
         </button>
         <button className={tab === 'outline' ? 'active' : ''} onClick={() => setTab('outline')}>
-          Innhold
+          {t('side.contents')}
         </button>
         <button className={tab === 'annots' ? 'active' : ''} onClick={() => setTab('annots')}>
-          Merknader
+          {t('side.annots')}
         </button>
       </div>
 
@@ -140,8 +142,8 @@ function Sidebar({
 
       {tab === 'outline' && (
         <div className="outline-list">
-          {outline === null && <p className="sidebar-empty">Laster …</p>}
-          {outline?.length === 0 && <p className="sidebar-empty">Dokumentet har ingen innholdsfortegnelse.</p>}
+          {outline === null && <p className="sidebar-empty">{t('side.loading')}</p>}
+          {outline?.length === 0 && <p className="sidebar-empty">{t('side.noOutline')}</p>}
           {outline && outline.length > 0 && (
             <OutlineLevel nodes={outline} depth={0} onJump={onJumpToDest} />
           )}
@@ -204,21 +206,21 @@ function AnnotationList({
   }, [flat, query, colorFilter, excerpts])
 
   if (flat.length === 0) {
-    return <p className="sidebar-empty">Ingen merknader i dokumentet ennå.</p>
+    return <p className="sidebar-empty">{t('side.noAnnots')}</p>
   }
 
   let lastPage = 0
   return (
     <div className="annot-list">
       <div className="annot-export-row">
-        <span>Eksporter</span>
-        <button onClick={() => onExport('markdown')} title="Eksporter sammendrag som Markdown">
+        <span>{t('side.export')}</span>
+        <button onClick={() => onExport('markdown')} title={t('side.exportMdTip')}>
           MD
         </button>
-        <button onClick={() => onExport('html')} title="Eksporter sammendrag som HTML">
+        <button onClick={() => onExport('html')} title={t('side.exportHtmlTip')}>
           HTML
         </button>
-        <button onClick={() => onExport('text')} title="Eksporter sammendrag som ren tekst">
+        <button onClick={() => onExport('text')} title={t('side.exportTxtTip')}>
           TXT
         </button>
       </div>
@@ -226,9 +228,9 @@ function AnnotationList({
       <div className="annot-filter">
         <input
           value={query}
-          placeholder="Søk i merknader …"
+          placeholder={t('side.searchAnnots')}
           onChange={(e) => setQuery(e.target.value)}
-          aria-label="Søk i merknader"
+          aria-label={t('side.searchAnnots')}
         />
         <div className="annot-filter-colors">
           {HIGHLIGHT_COLORS.map((c) => (
@@ -238,7 +240,7 @@ function AnnotationList({
                 colorFilter && colorDistance(c.rgb, colorFilter) < 0.001 ? ' active' : ''
               }`}
               style={{ background: c.hex }}
-              title={`Vis kun ${c.name.toLowerCase()}`}
+              title={t('side.showOnly', { color: colorLabel(c).toLowerCase() })}
               onClick={() =>
                 setColorFilter((prev) =>
                   prev && colorDistance(c.rgb, prev) < 0.001 ? null : c.rgb
@@ -249,21 +251,21 @@ function AnnotationList({
         </div>
       </div>
 
-      {filtered.length === 0 && <p className="sidebar-empty">Ingen treff i merknadene.</p>}
+      {filtered.length === 0 && <p className="sidebar-empty">{t('side.noMatches')}</p>}
       {filtered.map(({ pageNumber, record }) => {
         const header = pageNumber !== lastPage
         lastPage = pageNumber
         const excerpt = excerpts.get(record.id)
         const primary =
           record.type === 'note'
-            ? record.contents || ANNOT_TYPE_LABELS.note
+            ? record.contents || annotTypeLabel('note')
             : excerpt
               ? `«${excerpt}»`
-              : ANNOT_TYPE_LABELS[record.type]
+              : annotTypeLabel(record.type)
         const comment = record.type !== 'note' ? record.contents : undefined
         return (
           <div key={record.id}>
-            {header && <div className="annot-list-page">Side {pageNumber}</div>}
+            {header && <div className="annot-list-page">{t('side.page', { page: pageNumber })}</div>}
             <div className="annot-list-row">
               <button className="annot-list-main" onClick={() => onJump(pageNumber, record)}>
                 <span
@@ -282,7 +284,7 @@ function AnnotationList({
               </button>
               <button
                 className="annot-list-delete"
-                title="Slett merknad"
+                title={t('side.deleteAnnot')}
                 onClick={() => onDelete(pageNumber, record)}
               >
                 ✕
@@ -331,7 +333,7 @@ function OutlineRow({
           <button
             className={`outline-chevron${expanded ? ' expanded' : ''}`}
             onClick={() => setExpanded((e) => !e)}
-            aria-label={expanded ? 'Lukk' : 'Åpne'}
+            aria-label={expanded ? t('side.collapse') : t('side.expand')}
           >
             ›
           </button>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
+import { t, useLang } from '../i18n'
 
 interface Props {
   query: string
@@ -28,6 +29,7 @@ export default function SearchBar({
   onPick,
   onClose
 }: Props): React.JSX.Element {
+  useLang()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -44,12 +46,12 @@ export default function SearchBar({
 
   const count = matches.length
   const status = busy
-    ? 'Søker …'
+    ? t('search.searching')
     : query.trim() === ''
       ? ''
       : count === 0
-        ? 'Ingen treff'
-        : `${index + 1} av ${count}`
+        ? t('search.noMatches')
+        : t('search.count', { index: index + 1, count })
 
   return (
     <div className="search-bar" onMouseDown={(e) => e.stopPropagation()}>
@@ -57,7 +59,7 @@ export default function SearchBar({
         <input
           ref={inputRef}
           value={query}
-          placeholder="Søk i dokumentet …"
+          placeholder={t('search.placeholder')}
           onChange={(e) => onQueryChange(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation()
@@ -65,30 +67,30 @@ export default function SearchBar({
             else if (e.key === 'Enter') onNext()
             else if (e.key === 'Escape') onClose()
           }}
-          aria-label="Søk i dokumentet"
+          aria-label={t('search.placeholder')}
         />
         <span className="search-status">{status}</span>
-        <button className="tb-btn" onClick={onPrev} disabled={count === 0} title="Forrige (Shift+Enter)">
+        <button className="tb-btn" onClick={onPrev} disabled={count === 0} title={t('search.prevTip')}>
           ↑
         </button>
-        <button className="tb-btn" onClick={onNext} disabled={count === 0} title="Neste (Enter)">
+        <button className="tb-btn" onClick={onNext} disabled={count === 0} title={t('search.nextTip')}>
           ↓
         </button>
         <button
           className={`tb-btn search-opt${options.matchCase ? ' is-active' : ''}`}
           onClick={() => onOptionsChange({ ...options, matchCase: !options.matchCase })}
-          title="Skill mellom store og små bokstaver"
+          title={t('search.matchCaseTip')}
         >
           Aa
         </button>
         <button
           className={`tb-btn search-opt${options.wholeWords ? ' is-active' : ''}`}
           onClick={() => onOptionsChange({ ...options, wholeWords: !options.wholeWords })}
-          title="Bare hele ord"
+          title={t('search.wholeWordsTip')}
         >
           |ab|
         </button>
-        <button className="tb-btn" onClick={onClose} title="Lukk (Esc)">
+        <button className="tb-btn" onClick={onClose} title={t('search.closeTip')}>
           ✕
         </button>
       </div>
@@ -101,7 +103,7 @@ export default function SearchBar({
               className={`search-result${i === index ? ' active' : ''}`}
               onClick={() => onPick(i)}
             >
-              <span className="search-result-page">s. {m.pageNumber}</span>
+              <span className="search-result-page">{t('app.pageAbbrev')} {m.pageNumber}</span>
               <span className="search-result-snippet">
                 {m.snippet.slice(0, m.snippetOffset)}
                 <mark>{m.snippet.slice(m.snippetOffset, m.snippetOffset + (m.end - m.start))}</mark>

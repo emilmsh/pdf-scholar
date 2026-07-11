@@ -1,3 +1,5 @@
+import { t, useLang } from '../i18n'
+
 export interface TabInfo {
   id: string
   name: string
@@ -19,6 +21,7 @@ export default function TabBar({
   onClose,
   onNewTab
 }: Props): React.JSX.Element {
+  useLang()
   return (
     <div className="tab-bar">
       {tabs.map((tab) => (
@@ -33,12 +36,12 @@ export default function TabBar({
           <button className="tab-label" onClick={() => onSelect(tab.id)}>
             {tab.name}
           </button>
-          <button className="tab-close" aria-label="Lukk fane" onClick={() => onClose(tab.id)}>
+          <button className="tab-close" aria-label={t('tabs.close')} onClick={() => onClose(tab.id)}>
             ✕
           </button>
         </div>
       ))}
-      <button className="tab-new" onClick={onNewTab} title="Åpne PDF (Ctrl+O)">
+      <button className="tab-new" onClick={onNewTab} title={t('tabs.new')}>
         +
       </button>
     </div>

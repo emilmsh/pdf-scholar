@@ -4,6 +4,7 @@
 // these rects as-is (verified in scripts/spike-mupdf-annot.mjs).
 import type { CSSProperties } from 'react'
 import type { AnnotationType, PageRect } from '../../shared/types'
+import { t } from './i18n'
 
 export interface PageAnnotation {
   /** Local key for React state */
@@ -29,45 +30,43 @@ export interface PageAnnotation {
   fontSize?: number
 }
 
+export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange'
+
 export interface HighlightColor {
-  name: string
+  key: ColorKey
   hex: string
   rgb: [number, number, number]
 }
 
+/** Localized display name for a palette color */
+export function colorLabel(c: HighlightColor): string {
+  return t(`color.${c.key}`)
+}
+
 export const HIGHLIGHT_COLORS: HighlightColor[] = [
-  { name: 'Gul', hex: '#ffd54a', rgb: [1, 0.835, 0.29] },
-  { name: 'Grønn', hex: '#7ed37e', rgb: [0.494, 0.827, 0.494] },
-  { name: 'Blå', hex: '#6fb6ff', rgb: [0.435, 0.714, 1] },
-  { name: 'Rosa', hex: '#ff8db0', rgb: [1, 0.553, 0.69] },
-  { name: 'Lilla', hex: '#c39dff', rgb: [0.765, 0.616, 1] }
+  { key: 'yellow', hex: '#ffd54a', rgb: [1, 0.835, 0.29] },
+  { key: 'green', hex: '#7ed37e', rgb: [0.494, 0.827, 0.494] },
+  { key: 'blue', hex: '#6fb6ff', rgb: [0.435, 0.714, 1] },
+  { key: 'pink', hex: '#ff8db0', rgb: [1, 0.553, 0.69] },
+  { key: 'purple', hex: '#c39dff', rgb: [0.765, 0.616, 1] }
 ]
 
 /** Saturated palette for line markup (underline) — pastels vanish as thin lines */
 export const UNDERLINE_COLORS: HighlightColor[] = [
-  { name: 'Rød', hex: '#e2494a', rgb: [0.886, 0.286, 0.29] },
-  { name: 'Oransje', hex: '#f5920b', rgb: [0.96, 0.573, 0.043] },
-  { name: 'Grønn', hex: '#2f9e58', rgb: [0.184, 0.62, 0.345] },
-  { name: 'Blå', hex: '#327cf6', rgb: [0.196, 0.486, 0.965] },
-  { name: 'Lilla', hex: '#8f52d6', rgb: [0.561, 0.322, 0.839] }
+  { key: 'red', hex: '#e2494a', rgb: [0.886, 0.286, 0.29] },
+  { key: 'orange', hex: '#f5920b', rgb: [0.96, 0.573, 0.043] },
+  { key: 'green', hex: '#2f9e58', rgb: [0.184, 0.62, 0.345] },
+  { key: 'blue', hex: '#327cf6', rgb: [0.196, 0.486, 0.965] },
+  { key: 'purple', hex: '#8f52d6', rgb: [0.561, 0.322, 0.839] }
 ]
 
 export const UNDERLINE_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
 export const STRIKEOUT_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
 export const NOTE_COLOR: [number, number, number] = [1, 0.835, 0.29]
 
-export const ANNOT_TYPE_LABELS: Record<AnnotationType, string> = {
-  highlight: 'Markering',
-  underline: 'Understreking',
-  strikeout: 'Gjennomstreking',
-  squiggly: 'Bølgestrek',
-  note: 'Notat',
-  ink: 'Penn',
-  square: 'Rektangel',
-  circle: 'Ellipse',
-  line: 'Linje',
-  arrow: 'Pil',
-  freetext: 'Tekst'
+/** Localized display name for an annotation type */
+export function annotTypeLabel(type: AnnotationType): string {
+  return t(`annot.${type}`)
 }
 
 export const SHAPE_DEFAULT: { color: [number, number, number]; width: number } = {

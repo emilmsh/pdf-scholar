@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Settings, ThemeName, ThemePreference } from '../../../shared/types'
-import { HIGHLIGHT_COLORS, SHAPE_TOOL_TYPES } from '../annotations'
+import type { LanguagePreference, Settings, ThemeName, ThemePreference } from '../../../shared/types'
+import { colorLabel, HIGHLIGHT_COLORS, SHAPE_TOOL_TYPES } from '../annotations'
 import type { DrawToolType, ShapeToolType } from '../annotations'
+import { t, useLang } from '../i18n'
+import type { MsgKey } from '../i18n'
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -40,11 +42,11 @@ const SHAPE_ICONS: Record<ShapeToolType, (p: { size?: number }) => React.JSX.Ele
   arrow: IconShapeArrow
 }
 
-const SHAPE_LABELS: Record<ShapeToolType, string> = {
-  square: 'Rektangel',
-  circle: 'Ellipse',
-  line: 'Linje',
-  arrow: 'Pil'
+const SHAPE_LABEL_KEYS: Record<ShapeToolType, MsgKey> = {
+  square: 'shape.square',
+  circle: 'shape.circle',
+  line: 'shape.line',
+  arrow: 'shape.arrow'
 }
 
 interface Props {
@@ -77,10 +79,17 @@ interface Props {
   onToggleFullscreen(): void
 }
 
-const THEMES: { id: ThemePreference; label: string }[] = [
-  { id: 'day', label: 'Dag' },
-  { id: 'sepia', label: 'Sepia' },
-  { id: 'night', label: 'Natt' },
+const THEMES: { id: ThemePreference; labelKey: MsgKey }[] = [
+  { id: 'day', labelKey: 'tb.themeDay' },
+  { id: 'sepia', labelKey: 'tb.themeSepia' },
+  { id: 'night', labelKey: 'tb.themeNight' },
+  { id: 'auto', labelKey: 'tb.themeAuto' }
+]
+
+const LANGUAGES: { id: LanguagePreference; label: string }[] = [
+  // Language names stay in their own language — standard for language pickers
+  { id: 'nb', label: 'Norsk' },
+  { id: 'en', label: 'English' },
   { id: 'auto', label: 'Auto' }
 ]
 
@@ -113,6 +122,7 @@ export default function Toolbar({
   onToggleChrome,
   onToggleFullscreen
 }: Props): React.JSX.Element {
+  useLang()
   const [pageInput, setPageInput] = useState(String(page))
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | null>(null)
@@ -178,25 +188,25 @@ export default function Toolbar({
   return (
     <div className="toolbar">
       <div className="toolbar-group">
-        <button className="tb-btn tb-back" onClick={onBack} title="Tilbake til biblioteket">
+        <button className="tb-btn tb-back" onClick={onBack} title={t('tb.libraryTip')}>
           <IconChevronLeft />
-          <span>Bibliotek</span>
+          <span>{t('tb.library')}</span>
         </button>
         <button
           className={`tb-btn${sidebarOpen ? ' is-active' : ''}`}
           onClick={onToggleSidebar}
-          title="Sidepanel (miniatyrer og innhold)"
+          title={t('tb.sidebarTip')}
         >
           <IconSidebar />
         </button>
-        <button className="tb-btn" onClick={onNavBack} disabled={!canNavBack} title="Tilbake (Alt+←)">
+        <button className="tb-btn" onClick={onNavBack} disabled={!canNavBack} title={t('tb.navBackTip')}>
           <IconArrowLeft />
         </button>
         <button
           className="tb-btn"
           onClick={onNavForward}
           disabled={!canNavForward}
-          title="Frem (Alt+→)"
+          title={t('tb.navForwardTip')}
         >
           <IconArrowRight />
         </button>
@@ -207,35 +217,35 @@ export default function Toolbar({
           <button
             className={`tb-btn${activeTool === 'pen' ? ' is-active' : ''}`}
             onClick={() => selectTool('pen')}
-            title="Penn (klikk igjen for valg, Esc avslutter)"
+            title={t('tb.penTip')}
           >
             <IconPen />
           </button>
           <button
             className={`tb-btn${activeTool === 'marker' ? ' is-active' : ''}`}
             onClick={() => selectTool('marker')}
-            title="Tusj (klikk igjen for valg, Esc avslutter)"
+            title={t('tb.markerTip')}
           >
             <IconMarker />
           </button>
           <button
             className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
             onClick={() => selectTool('eraser')}
-            title="Viskelær — sletter pennestrøk (Esc avslutter)"
+            title={t('tb.eraserTip')}
           >
             <IconEraser />
           </button>
           <button
             className={`tb-btn${shapeActive ? ' is-active' : ''}`}
             onClick={() => setToolMenu((m) => (m === 'shape' ? null : 'shape'))}
-            title="Former: rektangel, ellipse, linje, pil"
+            title={t('tb.shapesTip')}
           >
             <IconShapes />
           </button>
           <button
             className={`tb-btn${activeTool === 'text' ? ' is-active' : ''}`}
             onClick={() => onToolSelect(activeTool === 'text' ? null : 'text')}
-            title="Tekst på siden — klikk der teksten skal stå (Esc avslutter)"
+            title={t('tb.textTip')}
           >
             <IconText />
           </button>
@@ -243,7 +253,7 @@ export default function Toolbar({
           {toolMenu && (
             <div className="tool-menu">
               <div className="theme-menu-label">
-                {toolMenu === 'pen' ? 'Penn' : toolMenu === 'marker' ? 'Tusj' : 'Former'}
+                {toolMenu === 'pen' ? t('tb.pen') : toolMenu === 'marker' ? t('tb.marker') : t('tb.shapes')}
               </div>
               {toolMenu === 'shape' && (
                 <div className="shape-row">
@@ -253,7 +263,7 @@ export default function Toolbar({
                       <button
                         key={shape}
                         className={`tb-btn shape-pick${activeTool === shape ? ' is-active' : ''}`}
-                        title={SHAPE_LABELS[shape]}
+                        title={t(SHAPE_LABEL_KEYS[shape])}
                         onClick={() => onToolSelect(activeTool === shape ? null : shape)}
                       >
                         <Icon />
@@ -268,13 +278,13 @@ export default function Toolbar({
                     key={c.hex}
                     className="color-dot"
                     style={{ background: c.hex }}
-                    title={c.name}
+                    title={colorLabel(c)}
                     onClick={() => onToolPrefChange(toolMenu, { color: c.rgb })}
                   />
                 ))}
               </div>
               <div className="theme-menu-label slider-label">
-                Bredde
+                {t('tb.width')}
                 <output>{toolPrefs[toolMenu].width.toFixed(1)} pt</output>
               </div>
               <input
@@ -284,7 +294,7 @@ export default function Toolbar({
                 step="0.5"
                 value={toolPrefs[toolMenu].width}
                 onChange={(e) => onToolPrefChange(toolMenu, { width: Number(e.target.value) })}
-                aria-label="Strekbredde"
+                aria-label={t('tb.strokeWidth')}
               />
             </div>
           )}
@@ -304,34 +314,34 @@ export default function Toolbar({
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
             }}
-            aria-label="Gå til side"
+            aria-label={t('tb.goToPage')}
           />
           <span>/ {pageCount || '–'}</span>
         </div>
 
         <div className="toolbar-sep" />
 
-        <button className="tb-btn" onClick={onZoomOut} title="Zoom ut (Ctrl+-)">
+        <button className="tb-btn" onClick={onZoomOut} title={t('tb.zoomOutTip')}>
           <IconMinus />
         </button>
         <span className="zoom-label">{zoomPercent}%</span>
-        <button className="tb-btn" onClick={onZoomIn} title="Zoom inn (Ctrl++)">
+        <button className="tb-btn" onClick={onZoomIn} title={t('tb.zoomInTip')}>
           <IconPlus />
         </button>
-        <button className="tb-btn" onClick={onFitWidth} title="Tilpass bredde (Ctrl+0)">
+        <button className="tb-btn" onClick={onFitWidth} title={t('tb.fitWidthTip')}>
           <IconFitWidth />
         </button>
 
         <div className="toolbar-sep" />
 
-        <button className="tb-btn" onClick={onToggleSearch} title="Søk i dokumentet (Ctrl+F)">
+        <button className="tb-btn" onClick={onToggleSearch} title={t('tb.searchTip')}>
           <IconSearch />
         </button>
 
         <button
           className={`tb-btn${aiOpen ? ' is-active' : ''}`}
           onClick={onToggleAi}
-          title="Assistent — spør om dokumentet"
+          title={t('tb.aiTip')}
         >
           <IconSparkle />
         </button>
@@ -340,28 +350,28 @@ export default function Toolbar({
           <button
             className={`tb-btn${viewMenuOpen ? ' is-active' : ''}`}
             onClick={() => setViewMenuOpen((o) => !o)}
-            title="Visningsinnstillinger"
+            title={t('tb.viewTip')}
           >
             <IconTextSettings />
           </button>
           {viewMenuOpen && (
             <div className="theme-menu">
-              <div className="theme-menu-label">Lesemodus</div>
+              <div className="theme-menu-label">{t('tb.readingMode')}</div>
               <div className="theme-options">
-                {THEMES.map((t) => (
+                {THEMES.map((theme) => (
                   <button
-                    key={t.id}
-                    className={`theme-option theme-${t.id}${settings.theme === t.id ? ' selected' : ''}`}
-                    onClick={() => onSettingsChange({ theme: t.id })}
+                    key={theme.id}
+                    className={`theme-option theme-${theme.id}${settings.theme === theme.id ? ' selected' : ''}`}
+                    onClick={() => onSettingsChange({ theme: theme.id })}
                   >
                     Aa
-                    <span>{t.label}</span>
+                    <span>{t(theme.labelKey)}</span>
                   </button>
                 ))}
               </div>
 
               <div className="theme-menu-label slider-label">
-                Kontrast
+                {t('tb.contrast')}
                 <output>{Math.round(adjust.contrast * 100)}%</output>
               </div>
               <input
@@ -371,11 +381,11 @@ export default function Toolbar({
                 step="0.02"
                 value={adjust.contrast}
                 onChange={(e) => setAdjust('contrast', Number(e.target.value))}
-                aria-label="Kontrast"
+                aria-label={t('tb.contrast')}
               />
 
               <div className="theme-menu-label slider-label">
-                Lysstyrke
+                {t('tb.brightness')}
                 <output>{Math.round(adjust.brightness * 100)}%</output>
               </div>
               <input
@@ -385,7 +395,7 @@ export default function Toolbar({
                 step="0.02"
                 value={adjust.brightness}
                 onChange={(e) => setAdjust('brightness', Number(e.target.value))}
-                aria-label="Lysstyrke"
+                aria-label={t('tb.brightness')}
               />
 
               <div className="theme-menu-row">
@@ -400,8 +410,23 @@ export default function Toolbar({
                     })
                   }
                 >
-                  Nullstill
+                  {t('tb.reset')}
                 </button>
+              </div>
+
+              <div className="theme-menu-sep" />
+
+              <div className="theme-menu-label">{t('tb.language')}</div>
+              <div className="lang-options">
+                {LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.id}
+                    className={`lang-option${settings.language === lang.id ? ' selected' : ''}`}
+                    onClick={() => onSettingsChange({ language: lang.id })}
+                  >
+                    {lang.id === 'auto' ? t('tb.langAuto') : lang.label}
+                  </button>
+                ))}
               </div>
 
               <div className="theme-menu-sep" />
@@ -412,16 +437,16 @@ export default function Toolbar({
                   checked={settings.keepAwake}
                   onChange={(e) => onSettingsChange({ keepAwake: e.target.checked })}
                 />
-                Hold skjermen våken
+                {t('tb.keepAwake')}
               </label>
             </div>
           )}
         </div>
 
-        <button className="tb-btn" onClick={onToggleChrome} title="Distraksjonsfri lesing (Esc avslutter)">
+        <button className="tb-btn" onClick={onToggleChrome} title={t('tb.distractionTip')}>
           <IconExpand />
         </button>
-        <button className="tb-btn" onClick={onToggleFullscreen} title="Fullskjerm (F11)">
+        <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
           <IconFullscreen />
         </button>
       </div>
