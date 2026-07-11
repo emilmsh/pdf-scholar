@@ -81,7 +81,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 ## Fase 9 — KI-assistent («PDF Scholar»-retningen; plan i docs/AI-PLAN.md)
 Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 referanseoppslag); fleksibel multi-leverandør fra start; forklar-utvalg som popover med «Send til chat»; **PDF Scholar som arbeidsnavn** (appen er PDF-leser først, KI-appene i Scholar-rommet er KI først — forvekslingsrisikoen er mindre relevant).
 - [x] **Nivå 1 levert (2026-07-10):** chat-sidepanel med strømmende svar og klikkbare kildechips «s. N» (hopp + markering på setningsnivå via søkemaskineriet); Forklar/Forenkle/Definer i kontekstmenyen med popover + «Send til chat»; API-nøkkel kryptert med safeStorage (nøkkel forlater aldri main-prosessen); leverandører: Anthropic (innebygde Citations, prompt-caching), OpenAI + Azure (SSE + ordrett-sitat-kontrakt løst mot sideteksten), mock (offline test); kostnadsestimat per svar + løpende sum
-- [ ] Strukturert artikkelsammendrag (forskningsspørsmål/metode/data/funn/begrensninger med kildechips)
+- [x] Strukturert artikkelsammendrag (levert 2026-07-11): knapp i panelets tomtilstand + toppfelt → forskningsspørsmål/metode/data/funn/bidrag/begrensninger med kildechips; går gjennom vanlig chat-løype (strømming + siteringer gratis); kompakt brukerboble skjuler instruks-stillaset; tilpasser seksjonene for ikke-empiriske dokumenter
 - [ ] Spør annotasjonene («oppsummer det jeg har markert») — bygger på eksportuttrekket
 - [ ] Referanseoppslag (klikk på sitering → KI forklarer det refererte verket) — differensiatoren
 - [ ] Begrepshjelp (ordliste slik begrepene brukes i dokumentet)

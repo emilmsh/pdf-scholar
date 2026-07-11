@@ -2066,3 +2066,14 @@ button {
   background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
   font-weight: 600;
 }
+
+/* Structured summary button (AI panel empty state) */
+
+.ai-summary-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
+}

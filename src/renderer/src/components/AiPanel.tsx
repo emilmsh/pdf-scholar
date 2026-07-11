@@ -17,12 +17,13 @@ import {
   explainSystem,
   explainUserMessage,
   formatCost,
-  resolveCitation
+  resolveCitation,
+  summaryPrompt
 } from '../ai'
 import { t, useLang } from '../i18n'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
-import { IconGear, IconSend, IconSparkle, IconStop } from './icons'
+import { IconGear, IconSend, IconSparkle, IconStop, IconSummary } from './icons'
 
 let requestCounter = 1
 const nextRequestId = (): number => requestCounter++
@@ -78,7 +79,7 @@ function renderMarkdownLite(text: string): React.ReactNode {
 // ---------- Message rendering ----------
 
 type PanelMessage =
-  | { role: 'user'; text: string }
+  | { role: 'user'; text: string; /** compact bubble label when text is a long scaffold */ display?: string }
   | { role: 'assistant'; parts: AiContentPart[]; usage?: AiUsage; model?: string; error?: string }
 
 interface AssistantBodyProps {
@@ -330,13 +331,13 @@ export default function AiPanel({
   }, [open, showSettings])
 
   const send = useCallback(
-    async (question: string) => {
+    async (question: string, display?: string) => {
       const trimmed = question.trim()
       if (!trimmed || busy) return
       setInput('')
       setBusy(true)
       setStreamText('')
-      setMessages((m) => [...m, { role: 'user', text: trimmed }])
+      setMessages((m) => [...m, { role: 'user', text: trimmed, display }])
       const history = [
         ...messagesRef.current.map((m) =>
           m.role === 'user'
@@ -412,6 +413,14 @@ export default function AiPanel({
           {config ? (config.provider === 'azure' ? config.azure.deployment : config.models[config.provider]) : ''}
         </span>
         <button
+          className="tb-btn"
+          title={t('ai.summaryTip')}
+          disabled={busy || showSettings}
+          onClick={() => void send(summaryPrompt(), t('ai.summaryBtn'))}
+        >
+          <IconSummary size={15} />
+        </button>
+        <button
           className={`tb-btn${showSettings ? ' is-active' : ''}`}
           title={t('ai.settingsTip')}
           onClick={() => setShowSettings((s) => !s)}
@@ -439,6 +448,14 @@ export default function AiPanel({
               <div className="ai-empty">
                 <p>{t('ai.emptyIntro')}</p>
                 <div className="ai-suggestions">
+                  <button
+                    className="ai-summary-btn"
+                    title={t('ai.summaryTip')}
+                    onClick={() => void send(summaryPrompt(), t('ai.summaryBtn'))}
+                  >
+                    <IconSummary size={15} />
+                    {t('ai.summaryBtn')}
+                  </button>
                   {suggestions().map((s) => (
                     <button key={s} onClick={() => void send(s)}>
                       {s}
@@ -450,7 +467,7 @@ export default function AiPanel({
             {messages.map((m, i) =>
               m.role === 'user' ? (
                 <div className="ai-msg ai-user" key={i}>
-                  {m.text}
+                  {m.display ?? m.text}
                 </div>
               ) : (
                 <div className="ai-msg ai-assistant" key={i}>

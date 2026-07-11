@@ -152,3 +152,30 @@ export function explainUserMessage(selection: string, pageNumber: number, pageCo
     ? `Utvalgt tekst (fra side ${pageNumber}):\n«${selection}»\n\nKontekst fra siden:\n${pageContext}`
     : `Selected text (from page ${pageNumber}):\n"${selection}"\n\nContext from the page:\n${pageContext}`
 }
+
+/** The structured-article-summary request (sent through the normal chat
+ *  pipeline so streaming and citation chips come for free) */
+export function summaryPrompt(): string {
+  if (getLanguage() === 'nb') {
+    return `Lag et strukturert sammendrag av dokumentet med disse delene som overskrifter (#### Overskrift):
+
+#### Forskningsspørsmål
+#### Metode og identifikasjonsstrategi
+#### Data
+#### Hovedfunn
+#### Bidrag
+#### Begrensninger
+
+Hold hver del til 1–4 setninger og siter kilden for hvert vesentlige punkt. Hvis dokumentet ikke er en empirisk forskningsartikkel, tilpass delene til dokumenttypen (f.eks. Problemstilling/Tilnærming/Konklusjoner for en rapport) og si kort fra om det.`
+  }
+  return `Write a structured summary of the document using these sections as headings (#### Heading):
+
+#### Research question
+#### Method and identification strategy
+#### Data
+#### Main findings
+#### Contribution
+#### Limitations
+
+Keep each section to 1–4 sentences and cite the source for every substantive point. If the document is not an empirical research article, adapt the sections to the document type (e.g. Problem/Approach/Conclusions for a report) and briefly say so.`
+}

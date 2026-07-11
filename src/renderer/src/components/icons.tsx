@@ -149,6 +149,15 @@ export const IconShapeArrow = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconSummary = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="4.5" y="3.5" width="15" height="17" rx="2" />
+    <path d="M8 8h8" />
+    <path d="M8 12h8" />
+    <path d="M8 16h5" />
+  </Svg>
+)
+
 export const IconSparkle = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M12 3.5c.7 3.6 2.4 5.3 6 6-3.6.7-5.3 2.4-6 6-.7-3.6-2.4-5.3-6-6 3.6-.7 5.3-2.4 6-6z" />
