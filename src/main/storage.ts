@@ -28,12 +28,13 @@ export interface AppState {
 const DEFAULT_AI: StoredAiConfig = {
   provider: 'anthropic',
   models: {
-    anthropic: 'claude-opus-4-8',
-    openai: 'gpt-5.1',
+    anthropic: 'claude-sonnet-5',
+    openai: 'gpt-5.6-terra',
     azure: '',
     mock: 'mock-1'
   },
   azure: { endpoint: '', deployment: '' },
+  thinking: 'medium',
   keys: { anthropic: '', openai: '', azure: '', mock: '' }
 }
 
@@ -62,6 +63,7 @@ export function mergeAiConfig(
     provider: patch.provider ?? base.provider,
     models: { ...base.models, ...patch.models },
     azure: { ...base.azure, ...patch.azure },
+    thinking: patch.thinking ?? base.thinking,
     keys: { ...base.keys, ...patch.keys }
   }
 }

@@ -144,7 +144,8 @@ const webApi: PdfxApi = {
     const next: AiConfig = {
       provider: patch.provider ?? current.provider,
       models: { ...current.models, ...patch.models },
-      azure: { ...current.azure, ...patch.azure }
+      azure: { ...current.azure, ...patch.azure },
+      thinking: patch.thinking ?? current.thinking
     }
     localStorage.setItem('pdfx-web-ai', JSON.stringify(next))
     return {
@@ -226,8 +227,9 @@ const webAiAborted = new Set<number>()
 function loadWebAiConfig(): AiConfig {
   const fallback: AiConfig = {
     provider: 'mock',
-    models: { anthropic: 'claude-opus-4-8', openai: 'gpt-5.1', azure: '', mock: 'mock-1' },
-    azure: { endpoint: '', deployment: '' }
+    models: { anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-terra', azure: '', mock: 'mock-1' },
+    azure: { endpoint: '', deployment: '' },
+    thinking: 'medium'
   }
   try {
     const parsed = JSON.parse(localStorage.getItem('pdfx-web-ai') ?? '{}')

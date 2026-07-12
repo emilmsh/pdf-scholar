@@ -14,11 +14,54 @@ import type {
   AiConfigView,
   AiContentPart,
   AiProviderId,
-  AiUsage
+  AiUsage,
+  ThinkingLevel
 } from '../shared/types'
 import { getState, mergeAiConfig, saveState } from './storage'
 
 const PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'mock']
+
+// ---------- Reasoning-effort mapping (verified 2026-07, see docs/agent-notes/modeller-api.md) ----------
+
+type Effort = 'low' | 'medium' | 'high'
+const EFFORT: Record<Exclude<ThinkingLevel, 'off'>, Effort> = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high'
+}
+
+/** Anthropic thinking params for a model + level. Rules that bite:
+ *  budget_tokens is rejected (400) on Fable/Opus 4.8/Sonnet 5 — use adaptive
+ *  thinking + output_config.effort; Haiku rejects effort entirely; Sonnet 5
+ *  thinks by default so "off" must be explicit. */
+function anthropicThinking(
+  model: string,
+  level: ThinkingLevel
+): {
+  thinking?: { type: 'adaptive' } | { type: 'disabled' }
+  outputConfig?: { effort: Effort }
+  maxTokens: number
+} {
+  const isHaiku = /haiku/i.test(model)
+  const isFable = /fable|mythos/i.test(model)
+  // Haiku: no effort support; keep it simple (no thinking)
+  if (isHaiku) return { maxTokens: 4096 }
+  if (level === 'off') {
+    // Fable always thinks; Sonnet 5 thinks by default → disable explicitly
+    if (isFable) return { outputConfig: { effort: 'low' }, maxTokens: 12000 }
+    if (/sonnet-5/i.test(model)) return { thinking: { type: 'disabled' }, maxTokens: 4096 }
+    return { maxTokens: 4096 } // Opus: omitting thinking = off
+  }
+  const effort = EFFORT[level]
+  // Fable: thinking always on, don't send the thinking field
+  if (isFable) return { outputConfig: { effort }, maxTokens: 16000 }
+  return { thinking: { type: 'adaptive' }, outputConfig: { effort }, maxTokens: 12000 }
+}
+
+/** OpenAI reasoning_effort value (none maps 'off') */
+function openAiEffort(level: ThinkingLevel): string {
+  return level === 'off' ? 'none' : level
+}
 
 // Prompt contract for providers without native citations (mirrors the
 // oe-intervju QUOTE_GROUNDING_RULES pattern): verbatim quotes we can locate.
@@ -61,6 +104,7 @@ function configView(): AiConfigView {
     provider: ai.provider,
     models: { ...ai.models },
     azure: { ...ai.azure },
+    thinking: ai.thinking,
     hasKey,
     encryptionAvailable: safeStorage.isEncryptionAvailable()
   }
@@ -80,6 +124,7 @@ type Emit = (text: string) => void
 async function chatAnthropic(
   apiKey: string,
   model: string,
+  thinking: ThinkingLevel,
   req: AiChatRequest,
   emit: Emit,
   signal: AbortSignal
@@ -114,19 +159,42 @@ async function chatAnthropic(
     return { role: m.role, content: m.text }
   })
 
-  const stream = client.messages.stream(
-    { model, max_tokens: 4096, system: req.system, messages },
-    { signal }
-  )
-  stream.on('text', (delta) => emit(delta))
+  const tuning = anthropicThinking(model, thinking)
+  const isFable = /fable|mythos/i.test(model)
+  const params: Record<string, unknown> = {
+    model,
+    max_tokens: tuning.maxTokens,
+    system: req.system,
+    messages
+  }
+  if (tuning.thinking) params.thinking = tuning.thinking
+  if (tuning.outputConfig) params.output_config = tuning.outputConfig
+  // Fable: safety-classifier refusals are opt-in recoverable via server-side
+  // fallback to Opus 4.8 (see docs/agent-notes/modeller-api.md)
+  if (isFable) {
+    params.betas = ['server-side-fallback-2026-06-01']
+    params.fallbacks = [{ model: 'claude-opus-4-8' }]
+  }
+  const api = isFable ? client.beta.messages : client.messages
+  type AnthropicStream = ReturnType<typeof client.messages.stream>
+  const streamFn = api.stream as unknown as (p: unknown, o: unknown) => AnthropicStream
+  const stream = streamFn(params, { signal })
+  stream.on('text', (delta: string) => emit(delta))
   const final = await stream.finalMessage()
 
+  interface CharLoc {
+    type: string
+    start_char_index: number
+    end_char_index: number
+    cited_text: string
+  }
   const parts: AiContentPart[] = []
   for (const block of final.content) {
     if (block.type !== 'text') continue
+    const citations = (block.citations ?? []) as CharLoc[]
     parts.push({
       text: block.text,
-      citations: (block.citations ?? [])
+      citations: citations
         .filter((c) => c.type === 'char_location')
         .map((c) => ({
           kind: 'char' as const,
@@ -172,6 +240,7 @@ async function chatOpenAiCompatible(
   url: string,
   headers: Record<string, string>,
   model: string | null,
+  thinking: ThinkingLevel,
   req: AiChatRequest,
   emit: Emit,
   signal: AbortSignal,
@@ -191,6 +260,8 @@ async function chatOpenAiCompatible(
 
   const body: Record<string, unknown> = { messages, stream: true }
   if (model) body.model = model
+  // gpt-5.6 reasoning control (harmless on models that ignore it)
+  if (/gpt-5|o[0-9]/i.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking)
   if (includeUsageOption) body.stream_options = { include_usage: true }
 
   const response = await fetch(url, {
@@ -330,12 +401,13 @@ export function registerAiIpc(): void {
       }
       switch (ai.provider) {
         case 'anthropic':
-          return await chatAnthropic(key, ai.models.anthropic, req, emit, controller.signal)
+          return await chatAnthropic(key, ai.models.anthropic, ai.thinking, req, emit, controller.signal)
         case 'openai':
           return await chatOpenAiCompatible(
             'https://api.openai.com/v1/chat/completions',
             { authorization: `Bearer ${key}` },
             ai.models.openai,
+            ai.thinking,
             req,
             emit,
             controller.signal,
@@ -350,6 +422,7 @@ export function registerAiIpc(): void {
             `${endpoint}/openai/deployments/${ai.azure.deployment}/chat/completions?api-version=2024-12-01-preview`,
             { 'api-key': key },
             null,
+            ai.thinking,
             req,
             emit,
             controller.signal,

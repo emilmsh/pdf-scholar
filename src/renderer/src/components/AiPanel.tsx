@@ -7,7 +7,8 @@ import type {
   AiConfigView,
   AiContentPart,
   AiProviderId,
-  AiUsage
+  AiUsage,
+  ThinkingLevel
 } from '../../../shared/types'
 import { bridge } from '../bridge'
 import {
@@ -22,6 +23,7 @@ import {
   summaryPrompt
 } from '../ai'
 import { t, useLang } from '../i18n'
+import type { MsgKey } from '../i18n'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
 import { IconGear, IconSend, IconSparkle, IconStop, IconSummary } from './icons'
@@ -127,12 +129,29 @@ const providerLabels = (): { id: AiProviderId; label: string }[] => [
   { id: 'mock', label: t('ai.providerMock') }
 ]
 
-const MODEL_SUGGESTIONS: Record<AiProviderId, string[]> = {
-  anthropic: ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-haiku-4-5'],
-  openai: ['gpt-5.1', 'gpt-5-mini'],
+// Curated, verified model lists (see docs/agent-notes/modeller-api.md)
+const MODELS: Record<AiProviderId, { id: string; label: string }[]> = {
+  anthropic: [
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — anbefalt' },
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 — mest kapabel' },
+    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — rask/billig' },
+    { id: 'claude-fable-5', label: 'Claude Fable 5 — tyngst/dyrest' }
+  ],
+  openai: [
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — anbefalt' },
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol — flaggskip' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — rask' }
+  ],
   azure: [],
-  mock: ['mock-1']
+  mock: [{ id: 'mock-1', label: 'mock-1' }]
 }
+
+const THINKING_LEVELS: { id: ThinkingLevel; key: MsgKey }[] = [
+  { id: 'off', key: 'ai.thinkOff' },
+  { id: 'low', key: 'ai.thinkLow' },
+  { id: 'medium', key: 'ai.thinkMedium' },
+  { id: 'high', key: 'ai.thinkHigh' }
+]
 
 interface SettingsProps {
   config: AiConfigView
@@ -144,6 +163,7 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
   useLang()
   const [provider, setProvider] = useState<AiProviderId>(config.provider)
   const [model, setModel] = useState(config.models[config.provider] ?? '')
+  const [thinking, setThinking] = useState<ThinkingLevel>(config.thinking ?? 'medium')
   const [key, setKey] = useState('')
   const [endpoint, setEndpoint] = useState(config.azure.endpoint)
   const [deployment, setDeployment] = useState(config.azure.deployment)
@@ -151,16 +171,20 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
 
   const pickProvider = (p: AiProviderId): void => {
     setProvider(p)
-    setModel(config.models[p] ?? '')
+    setModel(config.models[p] || MODELS[p][0]?.id || '')
     setKey('')
   }
+
+  // Haiku ignores reasoning effort — hide the control for it
+  const thinkingApplies = !/haiku/i.test(model) && provider !== 'mock'
 
   const save = async (): Promise<void> => {
     setSaving(true)
     const patch: Parameters<typeof bridge.aiSetConfig>[0] = {
       provider,
       models: { ...config.models, [provider]: model.trim() },
-      azure: { endpoint: endpoint.trim(), deployment: deployment.trim() }
+      azure: { endpoint: endpoint.trim(), deployment: deployment.trim() },
+      thinking
     }
     if (key.trim()) patch.keys = { [provider]: key.trim() }
     const next = await bridge.aiSetConfig(patch)
@@ -195,17 +219,28 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
       {provider !== 'azure' && provider !== 'mock' && (
         <label className="ai-field">
           <span>{t('ai.model')}</span>
-          <input
-            list={`ai-models-${provider}`}
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            spellCheck={false}
-          />
-          <datalist id={`ai-models-${provider}`}>
-            {MODEL_SUGGESTIONS[provider].map((m) => (
-              <option key={m} value={m} />
+          <select value={model} onChange={(e) => setModel(e.target.value)}>
+            {MODELS[provider].map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
             ))}
-          </datalist>
+            {!MODELS[provider].some((m) => m.id === model) && model && (
+              <option value={model}>{model}</option>
+            )}
+          </select>
+        </label>
+      )}
+      {thinkingApplies && (
+        <label className="ai-field">
+          <span>{t('ai.reasoning')}</span>
+          <select value={thinking} onChange={(e) => setThinking(e.target.value as ThinkingLevel)}>
+            {THINKING_LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {t(l.key)}
+              </option>
+            ))}
+          </select>
         </label>
       )}
       {provider === 'azure' && (

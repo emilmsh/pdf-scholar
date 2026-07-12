@@ -210,6 +210,11 @@ const nb = {
   'ai.keySaved': '•••••••• (lagret)',
   'ai.keyNew': 'Lim inn nøkkelen din',
   'ai.model': 'Modell',
+  'ai.reasoning': 'Tenkeinnsats',
+  'ai.thinkOff': 'Av',
+  'ai.thinkLow': 'Lav',
+  'ai.thinkMedium': 'Middels',
+  'ai.thinkHigh': 'Høy',
   'ai.endpoint': 'Endepunkt',
   'ai.deployment': 'Deployment',
   'ai.settingsNote':
@@ -418,6 +423,11 @@ const en: Dict = {
   'ai.keySaved': '•••••••• (saved)',
   'ai.keyNew': 'Paste your key',
   'ai.model': 'Model',
+  'ai.reasoning': 'Reasoning effort',
+  'ai.thinkOff': 'Off',
+  'ai.thinkLow': 'Low',
+  'ai.thinkMedium': 'Medium',
+  'ai.thinkHigh': 'High',
   'ai.endpoint': 'Endpoint',
   'ai.deployment': 'Deployment',
   'ai.settingsNote':

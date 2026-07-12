@@ -111,11 +111,16 @@ export interface DeleteAnnotationRequest {
 
 export type AiProviderId = 'anthropic' | 'openai' | 'azure' | 'mock'
 
+/** How hard the model should reason; mapped per provider/model in main */
+export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
+
 export interface AiConfig {
   provider: AiProviderId
   /** Model id/deployment per provider */
   models: Record<AiProviderId, string>
   azure: { endpoint: string; deployment: string }
+  /** Reasoning effort (default 'medium') */
+  thinking: ThinkingLevel
 }
 
 /** Config as exposed to the renderer — keys never leave the main process */
