@@ -346,7 +346,8 @@ function OutlineRow({
   depth: number
   onJump(dest: unknown): void
 }): React.JSX.Element {
-  const [expanded, setExpanded] = useState(depth === 0)
+  // Collapsed by default: subheadings appear when the parent is clicked
+  const [expanded, setExpanded] = useState(false)
   const hasChildren = node.items.length > 0
   return (
     <div>
@@ -362,7 +363,15 @@ function OutlineRow({
         ) : (
           <span className="outline-chevron-spacer" />
         )}
-        <button className="outline-title" title={node.title} onClick={() => onJump(node.dest)}>
+        <button
+          className="outline-title"
+          title={node.title}
+          onClick={() => {
+            // Clicking a parent heading reveals its subheadings (and navigates)
+            if (hasChildren) setExpanded(true)
+            onJump(node.dest)
+          }}
+        >
           {node.title}
         </button>
       </div>
