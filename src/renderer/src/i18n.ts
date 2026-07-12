@@ -68,6 +68,8 @@ const nb = {
   'tb.brightness': 'Lysstyrke',
   'tb.reset': 'Nullstill',
   'tb.keepAwake': 'Hold skjermen våken',
+  'tb.showTabBar': 'Vis fanelinje',
+  'tb.docMenuTip': 'Åpne dokumenter',
   'tb.language': 'Språk',
   'tb.langAuto': 'Auto',
   'tb.distractionTip': 'Distraksjonsfri lesing (Esc avslutter)',
@@ -177,6 +179,9 @@ const nb = {
   'viewer.saveFailed': 'Kunne ikke lagre: {error}',
   'viewer.exported': 'Merknader eksportert: {path}',
   'viewer.printFailed': 'Kunne ikke skrive ut: {error}',
+  'viewer.saved': 'Endringene er lagret i PDF-en',
+  'viewer.recovered': 'Ulagrede endringer fra forrige økt ble gjenopprettet',
+  'tb.saveTip': 'Lagre endringer i PDF-en (Ctrl+S)',
 
   // Read aloud
   'ra.playPause': 'Spill av / pause',
@@ -295,6 +300,8 @@ const en: Dict = {
   'tb.brightness': 'Brightness',
   'tb.reset': 'Reset',
   'tb.keepAwake': 'Keep the screen awake',
+  'tb.showTabBar': 'Show tab bar',
+  'tb.docMenuTip': 'Open documents',
   'tb.language': 'Language',
   'tb.langAuto': 'Auto',
   'tb.distractionTip': 'Distraction-free reading (Esc to exit)',
@@ -396,6 +403,9 @@ const en: Dict = {
   'viewer.saveFailed': 'Could not save: {error}',
   'viewer.exported': 'Annotations exported: {path}',
   'viewer.printFailed': 'Could not print: {error}',
+  'viewer.saved': 'Changes saved to the PDF',
+  'viewer.recovered': 'Unsaved changes from the previous session were recovered',
+  'tb.saveTip': 'Save changes to the PDF (Ctrl+S)',
 
   'ra.playPause': 'Play / pause',
   'ra.stop': 'Stop reading aloud',

@@ -5,6 +5,8 @@ export interface TabInfo {
   id: string
   name: string
   path: string
+  /** Unsaved annotation changes (save model) */
+  dirty?: boolean
 }
 
 interface Props {
@@ -59,6 +61,7 @@ export default function TabBar({
           }}
         >
           <button className="tab-label" onClick={() => onSelect(tab.id)}>
+            {tab.dirty && <span className="tab-dirty-dot">•</span>}
             {tab.name}
           </button>
           <button className="tab-close" aria-label={t('tabs.close')} onClick={() => onClose(tab.id)}>

@@ -26,7 +26,8 @@ const FALLBACK_SETTINGS: Settings = {
     night: { contrast: 1, brightness: 1 }
   },
   keepAwake: false,
-  language: 'auto'
+  language: 'auto',
+  showTabBar: false
 }
 
 let tabCounter = 0
@@ -42,6 +43,20 @@ export default function App(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   /** Active tab is in distraction-free mode → tuck the tab bar too */
   const [immersive, setImmersive] = useState(false)
+  /** Tab ids with unsaved annotation changes (save model) */
+  const [dirtyTabs, setDirtyTabs] = useState<ReadonlySet<string>>(new Set())
+  const dirtyTabsRef = useRef(dirtyTabs)
+  dirtyTabsRef.current = dirtyTabs
+
+  const setTabDirty = useCallback((id: string, dirty: boolean) => {
+    setDirtyTabs((prev) => {
+      if (prev.has(id) === dirty) return prev
+      const next = new Set(prev)
+      if (dirty) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }, [])
 
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
@@ -95,14 +110,17 @@ export default function App(): React.JSX.Element {
     }
     const initialPosition = await bridge.getPosition(payload.path)
     const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition }
+    bridge.docOpened(payload.path)
     setTabs((prev) => [...prev, tab])
     setActiveId(tab.id)
     setError(null)
   }, [])
 
-  const closeTab = useCallback((id: string) => {
+  const reallyCloseTab = useCallback((id: string) => {
     setTabs((prev) => {
       const index = prev.findIndex((t) => t.id === id)
+      const closing = prev[index]
+      if (closing) bridge.docClosed(closing.payload.path)
       const next = prev.filter((t) => t.id !== id)
       setActiveId((current) => {
         if (current !== id) return current
@@ -110,7 +128,30 @@ export default function App(): React.JSX.Element {
       })
       return next
     })
+    setDirtyTabs((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
   }, [])
+
+  /** Close with the unsaved-changes prompt when the tab is dirty */
+  const closeTab = useCallback(
+    (id: string) => {
+      const tab = tabsRef.current.find((t) => t.id === id)
+      if (!tab) return
+      if (!dirtyTabsRef.current.has(id)) {
+        reallyCloseTab(id)
+        return
+      }
+      void bridge.docConfirmClose(tab.payload.path).then((verdict) => {
+        if (verdict === 'cancel') return
+        reallyCloseTab(id)
+      })
+    },
+    [reallyCloseTab]
+  )
 
   const cycleTab = useCallback((delta: number) => {
     setActiveId((current) => {
@@ -216,9 +257,14 @@ export default function App(): React.JSX.Element {
         </div>
       )}
 
-      {tabs.length > 0 && (
+      {tabs.length > 0 && settings.showTabBar && (
         <TabBar
-          tabs={tabs.map((t) => ({ id: t.id, name: t.payload.name, path: t.payload.path }))}
+          tabs={tabs.map((t) => ({
+            id: t.id,
+            name: t.payload.name,
+            path: t.payload.path,
+            dirty: dirtyTabs.has(t.id)
+          }))}
           activeId={activeId}
           hidden={immersive}
           onSelect={setActiveId}
@@ -241,6 +287,18 @@ export default function App(): React.JSX.Element {
                 resolvedTheme={resolvedTheme}
                 onSettingsChange={updateSettings}
                 onImmersiveChange={setImmersive}
+                onDirtyChange={(dirty) => setTabDirty(tab.id, dirty)}
+                docs={tabs.map((d) => ({
+                  id: d.id,
+                  name: d.payload.name,
+                  path: d.payload.path,
+                  dirty: dirtyTabs.has(d.id),
+                  active: d.id === activeId
+                }))}
+                onSelectDoc={setActiveId}
+                onCloseDoc={closeTab}
+                onOpenDialog={() => void openDialog()}
+                onNewWindow={(path) => bridge.newWindow(path)}
                 onClose={() => closeTab(tab.id)}
               />
             </div>

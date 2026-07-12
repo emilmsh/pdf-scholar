@@ -304,6 +304,16 @@ export function clientRectsToPageRects(
     })
   }
   if (rects.length === 0) return null
+  // Text-layer spans in tables/figures (LaTeX column rules, stretched
+  // glyphs) can be many times taller than a text line; selecting across
+  // them turns the markup into giant vertical bars. Drop rects far taller
+  // than the median line height — headings (~2× body) still survive.
+  if (rects.length >= 3) {
+    const heights = rects.map((r) => r.h).sort((a, b) => a - b)
+    const median = heights[Math.floor(heights.length / 2)]
+    const filtered = rects.filter((r) => r.h <= median * 2.5)
+    if (filtered.length > 0) return mergeLineRects(filtered)
+  }
   return mergeLineRects(rects)
 }
 

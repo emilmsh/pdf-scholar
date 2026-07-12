@@ -19,6 +19,7 @@ import {
   IconPen,
   IconPlus,
   IconPrint,
+  IconSave,
   IconSearch,
   IconSpeaker,
   IconShapeArrow,
@@ -53,8 +54,23 @@ const SHAPE_LABEL_KEYS: Record<ShapeToolType, MsgKey> = {
   arrow: 'shape.arrow'
 }
 
+interface DocInfo {
+  id: string
+  name: string
+  path: string
+  dirty: boolean
+  active: boolean
+}
+
 interface Props {
   fileName: string
+  filePath: string
+  /** Open documents in this window — shown in the title dropdown */
+  docs: DocInfo[]
+  onSelectDoc(id: string): void
+  onCloseDoc(id: string): void
+  onOpenDialog(): void
+  onNewWindow(path?: string): void
   page: number
   pageCount: number
   zoomPercent: number
@@ -81,6 +97,9 @@ interface Props {
   fitTarget: 'width' | 'page'
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
+  /** Unsaved annotation changes exist (enables the save button) */
+  dirty: boolean
+  onSave(): void
   onPrint(): void
   readAloudOpen: boolean
   onToggleReadAloud(): void
@@ -106,6 +125,12 @@ const LANGUAGES: { id: LanguagePreference; label: string }[] = [
 
 export default function Toolbar({
   fileName,
+  filePath,
+  docs,
+  onSelectDoc,
+  onCloseDoc,
+  onOpenDialog,
+  onNewWindow,
   page,
   pageCount,
   zoomPercent,
@@ -131,6 +156,8 @@ export default function Toolbar({
   fitTarget,
   onSettingsChange,
   onToggleSearch,
+  dirty,
+  onSave,
   onPrint,
   readAloudOpen,
   onToggleReadAloud,
@@ -144,6 +171,17 @@ export default function Toolbar({
   const [zoomEditing, setZoomEditing] = useState(false)
   const [zoomInput, setZoomInput] = useState('')
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
+  const [docMenuOpen, setDocMenuOpen] = useState(false)
+  const docMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!docMenuOpen) return
+    const close = (e: MouseEvent): void => {
+      if (docMenuRef.current && !docMenuRef.current.contains(e.target as Node)) setDocMenuOpen(false)
+    }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [docMenuOpen])
   const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
@@ -327,8 +365,68 @@ export default function Toolbar({
         </div>
       </div>
 
-      <div className="toolbar-title" title={fileName}>
-        {fileName}
+      <div className="toolbar-title-anchor" ref={docMenuRef}>
+        <button
+          className={`toolbar-title${docMenuOpen ? ' is-active' : ''}`}
+          title={t('tb.docMenuTip')}
+          onClick={() => setDocMenuOpen((o) => !o)}
+        >
+          <span className="toolbar-title-text">{fileName}</span>
+          <IconChevronDown size={11} />
+        </button>
+        {docMenuOpen && (
+          <div className="doc-menu">
+            {docs.map((doc) => (
+              <div key={doc.id} className={`doc-menu-row${doc.active ? ' active' : ''}`}>
+                <button
+                  className="doc-menu-name"
+                  onClick={() => {
+                    onSelectDoc(doc.id)
+                    setDocMenuOpen(false)
+                  }}
+                >
+                  {doc.dirty && <span className="tab-dirty-dot">•</span>}
+                  {doc.name}
+                </button>
+                <button
+                  className="doc-menu-close"
+                  aria-label={t('tabs.close')}
+                  onClick={() => onCloseDoc(doc.id)}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <div className="menu-sep" />
+            <button
+              className="menu-item"
+              onClick={() => {
+                onOpenDialog()
+                setDocMenuOpen(false)
+              }}
+            >
+              {t('tabs.new')}
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => {
+                onNewWindow(filePath)
+                setDocMenuOpen(false)
+              }}
+            >
+              {t('tabs.openInNewWindow')}
+            </button>
+            <button
+              className="menu-item"
+              onClick={() => {
+                onNewWindow()
+                setDocMenuOpen(false)
+              }}
+            >
+              {t('tabs.newWindow')}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="toolbar-group">
@@ -403,6 +501,15 @@ export default function Toolbar({
           title={t('tb.readAloudTip')}
         >
           <IconSpeaker />
+        </button>
+
+        <button
+          className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
+          onClick={onSave}
+          disabled={!dirty}
+          title={t('tb.saveTip')}
+        >
+          <IconSave />
         </button>
 
         <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
@@ -501,6 +608,15 @@ export default function Toolbar({
               </div>
 
               <div className="theme-menu-sep" />
+
+              <label className="theme-menu-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.showTabBar}
+                  onChange={(e) => onSettingsChange({ showTabBar: e.target.checked })}
+                />
+                {t('tb.showTabBar')}
+              </label>
 
               <label className="theme-menu-toggle">
                 <input

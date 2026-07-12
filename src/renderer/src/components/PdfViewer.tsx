@@ -144,7 +144,23 @@ interface Props {
   /** Distraction-free state of the ACTIVE viewer — the app shell hides the
    *  tab bar along with the toolbar (and reveals both on top-edge hover) */
   onImmersiveChange(immersive: boolean): void
+  /** Unsaved-changes state (save model) — App needs it for close prompts */
+  onDirtyChange(dirty: boolean): void
+  /** Open documents in this window, for the toolbar document picker */
+  docs: DocInfo[]
+  onSelectDoc(id: string): void
+  onCloseDoc(id: string): void
+  onOpenDialog(): void
+  onNewWindow(path?: string): void
   onClose(): void
+}
+
+export interface DocInfo {
+  id: string
+  name: string
+  path: string
+  dirty: boolean
+  active: boolean
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -159,6 +175,12 @@ export default function PdfViewer({
   resolvedTheme,
   onSettingsChange,
   onImmersiveChange,
+  onDirtyChange,
+  docs,
+  onSelectDoc,
+  onCloseDoc,
+  onOpenDialog,
+  onNewWindow,
   onClose
 }: Props): React.JSX.Element {
   useLang()
@@ -671,6 +693,43 @@ export default function PdfViewer({
     toastTimerRef.current = window.setTimeout(() => setToast(null), 2600)
   }, [])
 
+  // ---------- Save model (dirty = unsaved draft exists) ----------
+
+  const [dirty, setDirty] = useState(false)
+  const markDirtyRef = useRef<() => void>(() => {})
+  markDirtyRef.current = () => {
+    setDirty((d) => {
+      if (!d) onDirtyChange(true)
+      return true
+    })
+  }
+
+  // A leftover draft from a previous session is loaded silently — surface it
+  useEffect(() => {
+    let stale = false
+    void bridge.docIsDirty(payload.path).then((isDirty) => {
+      if (stale || !isDirty) return
+      setDirty(true)
+      onDirtyChange(true)
+      showToast(t('viewer.recovered'))
+    })
+    return () => {
+      stale = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payload.path])
+
+  const saveDocument = useCallback(async () => {
+    const result = await bridge.docSave(payload.path)
+    if (result && 'error' in result) {
+      showToast(t('viewer.saveFailed', { error: result.error }))
+      return
+    }
+    setDirty(false)
+    onDirtyChange(false)
+    showToast(t('viewer.saved'))
+  }, [payload.path, showToast, onDirtyChange])
+
   /** Immutably patch one page's annotation list */
   const mutatePage = useCallback(
     (pageNumber: number, fn: (list: PageAnnotation[]) => PageAnnotation[]) => {
@@ -729,6 +788,7 @@ export default function PdfViewer({
         mutatePage(handle.pageNumber, (list) => list.filter((r) => r.id !== handle.localId))
       } else {
         handle.fileId = result.id
+        markDirtyRef.current()
         mutatePage(handle.pageNumber, (list) =>
           list.map((r) => (r.id === handle.localId ? { ...r, fileId: result.id } : r))
         )
@@ -748,7 +808,10 @@ export default function PdfViewer({
         id: handle.fileId
       })
       if ('error' in result) showToast(t('viewer.annotDeleteFailed', { error: result.error }))
-      else if (wasFilePainted) void reloadDocument()
+      else {
+        markDirtyRef.current()
+        if (wasFilePainted) void reloadDocument()
+      }
     },
     [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
   )
@@ -772,8 +835,11 @@ export default function PdfViewer({
         rect: patch.quads?.[0]
       })
       if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: result.error }))
-      // 'file' annots are painted by pdf.js from the file — refresh the canvas
-      else if (wasFilePainted && (patch.color || patch.quads)) void reloadDocument()
+      else {
+        markDirtyRef.current()
+        // 'file' annots are painted by pdf.js from the file — refresh the canvas
+        if (wasFilePainted && (patch.color || patch.quads)) void reloadDocument()
+      }
     },
     [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
   )
@@ -1713,6 +1779,39 @@ export default function PdfViewer({
     setReadVoice((match ?? voices.find((v) => v.default) ?? voices[0]).voiceURI)
   }, [voices, readVoice])
 
+  /** The user picked a voice by hand — stop auto-selecting per document */
+  const voiceManualRef = useRef(false)
+
+  /** Crude but effective: is the document Norwegian or English? */
+  const detectDocLanguage = useCallback((texts: PageText[]): 'nb' | 'en' => {
+    const sample = texts
+      .slice(0, 3)
+      .map((p) => p.text)
+      .join(' ')
+      .toLowerCase()
+      .slice(0, 4000)
+    const nbHits =
+      ((sample.match(/\b(og|ikke|det|som|på|til|med|har|å|skal|kan|fra|ved|også|eller|være)\b/g) ??
+        []).length +
+        (sample.match(/[æøå]/g) ?? []).length * 2)
+    const enHits = (sample.match(/\b(the|of|and|that|with|this|from|which|are|have|been|their)\b/g) ??
+      []).length
+    return nbHits > enHits ? 'nb' : 'en'
+  }, [])
+
+  /** Best available voice for a language ("Natural" Windows voices first) */
+  const pickVoiceFor = useCallback(
+    (lang: 'nb' | 'en'): SpeechSynthesisVoice | null => {
+      const prefixes = lang === 'nb' ? ['nb', 'no'] : ['en']
+      const candidates = voices.filter((v) =>
+        prefixes.some((p) => v.lang.toLowerCase().startsWith(p))
+      )
+      if (candidates.length === 0) return null
+      return candidates.find((v) => /natural/i.test(v.name)) ?? candidates[0]
+    },
+    [voices]
+  )
+
   /** Follow the spoken sentence: highlight it and keep it comfortably in view */
   const highlightSentence = useCallback(
     async (s: ReadSentence) => {
@@ -1814,10 +1913,19 @@ export default function PdfViewer({
     const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
     const sentences = buildSentences(texts, currentPage)
     if (sentences.length === 0) return
+    // Read English papers with an English voice even when the UI is Norwegian
+    // (and vice versa) — unless the user picked a voice themselves
+    if (!voiceManualRef.current) {
+      const voice = pickVoiceFor(detectDocLanguage(texts))
+      if (voice) {
+        setReadVoice(voice.voiceURI)
+        readPrefsRef.current.voiceURI = voice.voiceURI
+      }
+    }
     readSessionRef.current = { sentences, index: 0, stopped: false }
     setReadAloud('playing')
     speakFrom(0)
-  }, [pdf, currentPage, buildSentences, speakFrom])
+  }, [pdf, currentPage, buildSentences, speakFrom, detectDocLanguage, pickVoiceFor])
 
   const toggleReadPause = useCallback(() => {
     const synth = window.speechSynthesis
@@ -1942,6 +2050,9 @@ export default function PdfViewer({
       } else if (!isTyping && e.altKey && e.key === 'ArrowRight') {
         e.preventDefault()
         goForward()
+      } else if (e.ctrlKey && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        if (dirty) void saveDocument()
       } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && annotPopover) {
         e.preventDefault()
         const record = (annotsRef.current.get(annotPopover.pageNumber) ?? []).find(
@@ -1994,6 +2105,8 @@ export default function PdfViewer({
     activeTool,
     readAloud,
     stopReadAloud,
+    dirty,
+    saveDocument,
     searchOpen,
     searchHits,
     fullscreen,
@@ -2067,6 +2180,12 @@ export default function PdfViewer({
       >
         <Toolbar
           fileName={payload.name}
+          filePath={payload.path}
+          docs={docs}
+          onSelectDoc={onSelectDoc}
+          onCloseDoc={onCloseDoc}
+          onOpenDialog={onOpenDialog}
+          onNewWindow={onNewWindow}
           page={currentPage}
           pageCount={sizes.length}
           zoomPercent={scale > 0 ? Math.round(scale * 100) : 100}
@@ -2094,6 +2213,8 @@ export default function PdfViewer({
           fitTarget={fitTarget}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
+          dirty={dirty}
+          onSave={() => void saveDocument()}
           onPrint={() => {
             void bridge.printFile(payload.path).then((result) => {
               if (result && 'error' in result) showToast(t('viewer.printFailed', { error: result.error }))
@@ -2374,7 +2495,10 @@ export default function PdfViewer({
             className="readaloud-voice"
             value={readVoice}
             title={t('ra.voice')}
-            onChange={(e) => setReadVoice(e.target.value)}
+            onChange={(e) => {
+              voiceManualRef.current = true
+              setReadVoice(e.target.value)
+            }}
           >
             {voices.map((v) => (
               <option key={v.voiceURI} value={v.voiceURI}>

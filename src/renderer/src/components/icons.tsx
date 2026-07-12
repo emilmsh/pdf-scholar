@@ -227,6 +227,14 @@ export const IconGear = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconSave = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M5 3.5h11l4.5 4.5v11a1.5 1.5 0 0 1 -1.5 1.5h-14a1.5 1.5 0 0 1 -1.5 -1.5v-14A1.5 1.5 0 0 1 5 3.5z" />
+    <path d="M7.5 3.5v5h8v-5" />
+    <rect x="7" y="13" width="10" height="7.5" rx="1" />
+  </Svg>
+)
+
 export const IconPrint = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M7 8V3.5h10V8" />

@@ -49,7 +49,8 @@ const DEFAULTS: AppState = {
       night: { contrast: 1, brightness: 1 }
     },
     keepAwake: false,
-    language: 'auto'
+    language: 'auto',
+    showTabBar: false
   },
   ai: DEFAULT_AI
 }

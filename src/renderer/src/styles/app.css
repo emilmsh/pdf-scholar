@@ -21,21 +21,23 @@
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0, 0, 0, 0.25);
 }
 
+/* «Pergament» — warmer, golden-ochre parchment character (ink text,
+   ink-and-gold accent); reads as ancient-scroll without losing contrast */
 :root[data-theme='sepia'] {
-  --bg-chrome: #f2e9d9;
-  --bg-canvas: #e7dcc4;
-  --bg-elevated: #faf4e6;
-  --border: rgba(92, 70, 40, 0.16);
-  --text: #43382a;
-  --text-secondary: #8a7a63;
-  --accent: #a26b2b;
-  --accent-text: #ffffff;
-  --hover: rgba(92, 70, 40, 0.08);
-  --active: rgba(92, 70, 40, 0.14);
-  --page-bg: #f6efe0;
-  --page-filter: sepia(0.4) brightness(0.99) contrast(0.94);
-  --shadow-page: 0 1px 2px rgba(80, 60, 30, 0.16), 0 4px 14px rgba(80, 60, 30, 0.12);
-  --shadow-menu: 0 8px 30px rgba(80, 60, 30, 0.2), 0 0 1px rgba(80, 60, 30, 0.3);
+  --bg-chrome: #efe3cc;
+  --bg-canvas: #e3d5b8;
+  --bg-elevated: #f9f1dd;
+  --border: rgba(88, 62, 30, 0.18);
+  --text: #3f3323;
+  --text-secondary: #85714f;
+  --accent: #96601f;
+  --accent-text: #fffaf0;
+  --hover: rgba(88, 62, 30, 0.08);
+  --active: rgba(88, 62, 30, 0.15);
+  --page-bg: #f5ecd6;
+  --page-filter: sepia(0.5) brightness(0.985) contrast(0.93) saturate(1.05);
+  --shadow-page: 0 1px 2px rgba(74, 52, 20, 0.18), 0 4px 16px rgba(74, 52, 20, 0.14);
+  --shadow-menu: 0 8px 30px rgba(74, 52, 20, 0.22), 0 0 1px rgba(74, 52, 20, 0.32);
 }
 
 :root[data-theme='night'] {
@@ -2475,5 +2477,152 @@ button {
 }
 
 .tab-menu .menu-item:hover {
+  background: var(--hover);
+}
+
+/* Scholarly details, scoped to the Pergament (sepia) theme only */
+
+:root[data-theme='sepia'] .ai-header {
+  border-bottom: 3px double var(--border);
+}
+
+:root[data-theme='sepia'] .welcome-logo {
+  font-family: 'Palatino Linotype', Cambria, Georgia, serif;
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, var(--accent), #6e4a1a);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+:root[data-theme='sepia'] .welcome-tagline::after {
+  content: '';
+  display: block;
+  width: 72px;
+  margin: 18px auto 0;
+  border-top: 3px double var(--border);
+}
+
+/* Save model: dirty indicators */
+
+.tb-save:disabled {
+  opacity: 0.35;
+}
+
+.tb-save.has-changes {
+  color: var(--accent);
+}
+
+.tab-dirty-dot {
+  color: var(--accent);
+  margin-right: 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Document picker: the toolbar title is a dropdown over open documents */
+
+.toolbar-title-anchor {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.toolbar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.toolbar-title:hover,
+.toolbar-title.is-active {
+  background: var(--hover);
+}
+
+.toolbar-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-title svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.doc-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  min-width: 260px;
+  max-width: 380px;
+  padding: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.1s ease;
+}
+
+.doc-menu-row {
+  display: flex;
+  align-items: center;
+  border-radius: 7px;
+}
+
+.doc-menu-row:hover {
+  background: var(--hover);
+}
+
+.doc-menu-row.active .doc-menu-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.doc-menu-name {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 4px 7px 10px;
+  text-align: left;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-menu-close {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-right: 4px;
+  border-radius: 5px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.doc-menu-close:hover {
+  background: var(--active);
+}
+
+.doc-menu .menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 12.5px;
+}
+
+.doc-menu .menu-item:hover {
   background: var(--hover);
 }

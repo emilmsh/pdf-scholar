@@ -28,7 +28,8 @@ const DEFAULT_SETTINGS: Settings = {
     night: { contrast: 1, brightness: 1 }
   },
   keepAwake: false,
-  language: 'auto'
+  language: 'auto',
+  showTabBar: false
 }
 
 function loadWebState(): WebState {
@@ -115,6 +116,13 @@ const webApi: PdfxApi = {
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')
   },
+  // Save model: the browser preview has no real files — everything is a
+  // harmless no-op so the save UI can still be exercised
+  docOpened: () => {},
+  docClosed: () => {},
+  docIsDirty: async () => false,
+  docSave: async () => ({ ok: true }),
+  docConfirmClose: async () => 'discard',
   // Browser preview: a new browser tab stands in for a new app window
   newWindow: (path) => {
     window.open(path ? `${location.origin}/#open=${encodeURIComponent(path)}` : location.href, '_blank')

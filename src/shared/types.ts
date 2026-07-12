@@ -18,6 +18,8 @@ export interface Settings {
   themeAdjust: Record<ThemeName, ThemeAdjust>
   keepAwake: boolean
   language: LanguagePreference
+  /** Show the classic tab bar; default is the document picker in the toolbar */
+  showTabBar: boolean
 }
 
 export interface RecentFile {
@@ -183,6 +185,16 @@ export interface PdfxApi {
   openExternal(url: string): void
   /** Open a new app window, optionally loading a document (side-by-side use) */
   newWindow(path?: string): void
+  // ---------- Save model (annotation edits go to a draft, not the file) ----------
+  /** Tell main a document is open in this window (unsaved-changes guard) */
+  docOpened(path: string): void
+  docClosed(path: string): void
+  /** True when the document has unsaved annotation changes (a draft exists) */
+  docIsDirty(path: string): Promise<boolean>
+  /** Write the draft back over the original file */
+  docSave(path: string): Promise<{ ok: true } | FileError>
+  /** Native save/discard/cancel prompt; performs the chosen action */
+  docConfirmClose(path: string): Promise<'save' | 'discard' | 'cancel'>
   /** Open the system print dialog for the PDF file */
   printFile(path: string): Promise<{ ok: true } | FileError>
   /** Save text content via a save dialog; null = user cancelled */

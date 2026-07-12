@@ -14,6 +14,7 @@ import type {
 } from '../shared/types'
 import { registerAiIpc } from './ai'
 import { applyAnnotation, deleteAnnotation, updateAnnotation } from './annotation-engine'
+import { discardDraft, ensureDraft, hasDraft, readPathFor, saveDraft } from './drafts'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
@@ -40,6 +41,35 @@ migrateUserData()
 let firstPending: string | null = pathFromArgv(process.argv)
 /** webContents.id → a .pdf path the renderer should open once it asks */
 const pendingPaths = new Map<number, string>()
+/** webContents.id → original paths of documents open in that window (for
+ *  the unsaved-changes guard on window close) */
+const openDocs = new Map<number, Set<string>>()
+/** Windows allowed to close without re-running the unsaved-changes guard */
+const forceClose = new Set<number>()
+
+/** Native-dialog strings following the app language setting */
+function dialogStrings(): {
+  buttons: string[]
+  message(name: string): string
+  messageMany(count: number): string
+  detail: string
+} {
+  const pref = getState().settings.language
+  const nb = pref === 'nb' || (pref === 'auto' && app.getLocale().toLowerCase().startsWith('n'))
+  return nb
+    ? {
+        buttons: ['Lagre', 'Ikke lagre', 'Avbryt'],
+        message: (name) => `Vil du lagre endringene i «${name}»?`,
+        messageMany: (count) => `Vil du lagre endringene i ${count} dokumenter?`,
+        detail: 'Endringene går tapt hvis du ikke lagrer dem.'
+      }
+    : {
+        buttons: ['Save', "Don't save", 'Cancel'],
+        message: (name) => `Do you want to save the changes to “${name}”?`,
+        messageMany: (count) => `Do you want to save the changes to ${count} documents?`,
+        detail: 'Your changes will be lost if you don’t save them.'
+      }
+}
 
 function pathFromArgv(argv: string[]): string | null {
   const arg = argv.slice(1).find((a) => !a.startsWith('-') && a.toLowerCase().endsWith('.pdf'))
@@ -125,19 +155,52 @@ function createWindow(openPath?: string | null): BrowserWindow {
 
   // Only the first window restores the maximized state
   if (state.window?.maximized && offset === 0) win.maximize()
-  if (openPath) pendingPaths.set(win.webContents.id, openPath)
+  // Capture the id now: win.webContents throws "Object has been destroyed"
+  // when read inside the 'closed' handler
+  const wcId = win.webContents.id
+  if (openPath) pendingPaths.set(wcId, openPath)
 
   win.once('ready-to-show', () => win.show())
 
-  // Persist this window's bounds as the default for the next launch
-  win.on('close', () => {
+  // Persist this window's bounds as the default for the next launch, and
+  // guard against closing with unsaved annotation changes
+  win.on('close', (event) => {
+    if (win.isDestroyed()) return
     const bounds = win.getNormalBounds()
     getState().window = { ...bounds, maximized: win.isMaximized() }
     saveState()
+
+    if (forceClose.has(wcId)) return
+    const dirty = [...(openDocs.get(wcId) ?? [])].filter(hasDraft)
+    if (dirty.length === 0) return
+    event.preventDefault()
+    const s = dialogStrings()
+    void dialog
+      .showMessageBox(win, {
+        type: 'question',
+        buttons: s.buttons,
+        defaultId: 0,
+        cancelId: 2,
+        noLink: true,
+        message:
+          dirty.length === 1 ? s.message(basename(dirty[0])) : s.messageMany(dirty.length),
+        detail: s.detail
+      })
+      .then(({ response }) => {
+        if (response === 2) return // Avbryt
+        for (const path of dirty) {
+          if (response === 0) saveDraft(path)
+          else discardDraft(path)
+        }
+        forceClose.add(wcId)
+        if (!win.isDestroyed()) win.close()
+      })
   })
 
   win.on('closed', () => {
-    pendingPaths.delete(win.webContents.id)
+    pendingPaths.delete(wcId)
+    openDocs.delete(wcId)
+    forceClose.delete(wcId)
   })
 
   // Open external links in the system browser, never inside the app
@@ -156,7 +219,9 @@ function createWindow(openPath?: string | null): BrowserWindow {
 
 async function loadPdf(path: string): Promise<FilePayload | FileError> {
   try {
-    const data = await readFile(path)
+    // A leftover draft means unsaved changes from a previous session —
+    // load those bytes so the work is silently recovered
+    const data = await readFile(readPathFor(path))
     const name = basename(path)
     addRecent(path, name)
     app.addRecentDocument(path)
@@ -209,11 +274,66 @@ function registerIpc(): void {
     applyKeepAwake(state.settings.keepAwake)
   })
 
-  ipcMain.handle('annotate', (_e, req: AnnotateRequest) => applyAnnotation(req))
+  // Annotation writes go to the draft copy, never the original (save model)
+  ipcMain.handle('annotate', (_e, req: AnnotateRequest) =>
+    applyAnnotation({ ...req, path: ensureDraft(req.path) })
+  )
 
-  ipcMain.handle('annotation:update', (_e, req: ModifyAnnotationRequest) => updateAnnotation(req))
+  ipcMain.handle('annotation:update', (_e, req: ModifyAnnotationRequest) =>
+    updateAnnotation({ ...req, path: ensureDraft(req.path) })
+  )
 
-  ipcMain.handle('annotation:delete', (_e, req: DeleteAnnotationRequest) => deleteAnnotation(req))
+  ipcMain.handle('annotation:delete', (_e, req: DeleteAnnotationRequest) =>
+    deleteAnnotation({ ...req, path: ensureDraft(req.path) })
+  )
+
+  // ---------- Document lifecycle (save model) ----------
+
+  ipcMain.on('doc:opened', (e, path: string) => {
+    const set = openDocs.get(e.sender.id) ?? new Set<string>()
+    set.add(path)
+    openDocs.set(e.sender.id, set)
+  })
+
+  ipcMain.on('doc:closed', (e, path: string) => {
+    openDocs.get(e.sender.id)?.delete(path)
+  })
+
+  ipcMain.handle('doc:is-dirty', (_e, path: string) => hasDraft(path))
+
+  ipcMain.handle('doc:save', (_e, path: string) => {
+    try {
+      saveDraft(path)
+      return { ok: true }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Shows the native save/discard/cancel prompt for one document and
+  // performs the chosen action; the renderer only needs the verdict
+  ipcMain.handle('doc:confirm-close', async (e, path: string) => {
+    if (!hasDraft(path)) return 'discard'
+    const parent = windowFor(e)
+    if (!parent) return 'discard'
+    const s = dialogStrings()
+    const { response } = await dialog.showMessageBox(parent, {
+      type: 'question',
+      buttons: s.buttons,
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+      message: s.message(basename(path)),
+      detail: s.detail
+    })
+    if (response === 2) return 'cancel'
+    if (response === 0) {
+      saveDraft(path)
+      return 'save'
+    }
+    discardDraft(path)
+    return 'discard'
+  })
 
   ipcMain.on('shell:open-external', (_e, url: string) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
@@ -248,7 +368,8 @@ function registerIpc(): void {
         show: false,
         webPreferences: { plugins: true }
       })
-      await printWin.loadURL(pathToFileURL(path).href)
+      // Print what the user sees: the draft when there are unsaved changes
+      await printWin.loadURL(pathToFileURL(readPathFor(path)).href)
       // Give the PDF plugin a moment to finish rendering before printing
       await new Promise((resolve) => setTimeout(resolve, 700))
       return await new Promise((resolve) => {
