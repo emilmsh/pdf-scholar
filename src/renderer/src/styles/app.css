@@ -2005,6 +2005,8 @@ button {
   align-items: center;
   gap: 10px;
   padding: 4px 10px;
+  /* the row defines the menu's width — never let swatches overflow */
+  width: max-content;
 }
 
 .menu-row-label {
@@ -2112,39 +2114,66 @@ button {
   pointer-events: none;
 }
 
-/* The selection menu must never leave the viewport (it has grown tall) */
+/* The selection menu must never leave the viewport (it has grown tall);
+   never show a horizontal bar — the vertical scrollbar may steal a few px */
 
 .selection-menu {
+  /* max-content: shrink-to-fit against the anchor position must never
+     squeeze the rows (that caused clipped color rows) */
+  width: max-content;
+  max-width: calc(100vw - 16px);
   max-height: calc(100vh - 16px);
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
 }
 
-/* Color-wheel pick at the end of each markup color row */
+/* Section header grouping the AI actions */
 
-.color-wheel {
+.menu-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.menu-icon {
+  width: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+}
+
+/* Custom-color pick at the end of each markup color row: a calm "+"
+   swatch that opens the native color picker */
+
+.color-plus {
   position: relative;
   width: 23px;
   height: 23px;
   border-radius: 50%;
   cursor: pointer;
-  background: conic-gradient(#e5484d, #f5a524, #ffd54a, #30a46c, #327cf6, #8e4ec6, #e5484d);
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  transition: transform 0.08s;
+  display: grid;
+  place-items: center;
+  border: 1px dashed color-mix(in srgb, var(--text-secondary) 55%, transparent);
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  transition: transform 0.08s, border-color 0.08s, color 0.08s;
 }
 
-.color-wheel::after {
-  content: '';
-  position: absolute;
-  inset: 6px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
+.color-plus:hover {
+  transform: scale(1.12);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.color-wheel:hover {
-  transform: scale(1.15);
-}
-
-.color-wheel input {
+.color-plus input {
   position: absolute;
   inset: 0;
   opacity: 0;

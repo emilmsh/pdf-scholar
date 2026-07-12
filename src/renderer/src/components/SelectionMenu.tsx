@@ -10,6 +10,7 @@ import {
 import type { HighlightColor } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
+import { IconBook, IconCopy, IconGlobe, IconNote, IconSparkle, IconTranslate } from './icons'
 
 /** Palette dots/bars + last-used custom colors + a native color-wheel pick */
 export function MarkupColorRow({
@@ -47,7 +48,8 @@ export function MarkupColorRow({
           </button>
         )
       )}
-      <label className="color-wheel" title={t('menu.customColor')}>
+      <label className="color-plus" title={t('menu.customColor')}>
+        +
         <input
           type="color"
           onChange={(e) => {
@@ -178,37 +180,40 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           </div>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
-            <span className="menu-glyph">✎</span> {t('menu.note')}
+            <span className="menu-icon"><IconNote size={15} /></span> {t('menu.note')}
           </button>
-          <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'copy' })}>
-            {t('menu.copy')}
+            <span className="menu-icon"><IconCopy size={15} /></span> {t('menu.copy')}
           </button>
           <div className="menu-sep" />
+          <div className="menu-section-label">
+            <IconSparkle size={11} />
+            {t('menu.aiSection')}
+          </div>
           <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'explain' })}>
-            <span className="menu-glyph">✦</span> {t('menu.aiExplain')}
+            {t('menu.aiExplain')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}>
-            <span className="menu-glyph">✦</span> {t('menu.aiSimplify')}
+            {t('menu.aiSimplify')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'define' })}>
-            <span className="menu-glyph">✦</span> {t('menu.aiDefine')}
+            {t('menu.aiDefine')}
           </button>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'search' })}>
-            {t('menu.webSearch')}
+            <span className="menu-icon"><IconGlobe size={15} /></span> {t('menu.webSearch')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'dictionary' })}>
-            {t('menu.dictionary')}
+            <span className="menu-icon"><IconBook size={15} /></span> {t('menu.dictionary')}
           </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'translate' })}>
-            {t('menu.translate')}
+            <span className="menu-icon"><IconTranslate size={15} /></span> {t('menu.translate')}
           </button>
         </>
       )}
       {!isSelection && (
         <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
-          <span className="menu-glyph">✎</span> {t('menu.newNoteHere')}
+          <span className="menu-icon"><IconNote size={15} /></span> {t('menu.newNoteHere')}
         </button>
       )}
     </div>

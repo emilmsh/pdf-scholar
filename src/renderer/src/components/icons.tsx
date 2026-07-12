@@ -149,6 +149,47 @@ export const IconShapeArrow = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconNote = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4.5 6a2 2 0 0 1 2 -2h11a2 2 0 0 1 2 2v8.5L14 20H6.5a2 2 0 0 1 -2 -2z" />
+    <path d="M14 20v-3.5a2 2 0 0 1 2 -2h3.5" />
+  </Svg>
+)
+
+export const IconCopy = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="9" y="9" width="11" height="11" rx="2" />
+    <path d="M5 15H4.5a2 2 0 0 1 -2 -2v-8.5a2 2 0 0 1 2 -2H13a2 2 0 0 1 2 2V5" />
+  </Svg>
+)
+
+export const IconGlobe = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <ellipse cx="12" cy="12" rx="4" ry="9" />
+    <path d="M3.5 9h17" />
+    <path d="M3.5 15h17" />
+  </Svg>
+)
+
+export const IconBook = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M12 6.5c-1.8 -1.6 -4.2 -2 -7.5 -2v13c3.3 0 5.7 .4 7.5 2c1.8 -1.6 4.2 -2 7.5 -2v-13c-3.3 0 -5.7 .4 -7.5 2z" />
+    <path d="M12 6.5v13" />
+  </Svg>
+)
+
+export const IconTranslate = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M3.5 6h9" />
+    <path d="M8 3.5V6" />
+    <path d="M11 6c-.8 3.4 -3.2 6.4 -6.5 8" />
+    <path d="M5.5 9.5c1.2 2.6 3.4 4.4 6 5" />
+    <path d="M12.5 20.5L16.75 11l4.25 9.5" />
+    <path d="M13.9 17.5h5.7" />
+  </Svg>
+)
+
 export const IconSummary = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="4.5" y="3.5" width="15" height="17" rx="2" />
