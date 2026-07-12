@@ -7,6 +7,7 @@ import type { MsgKey } from '../i18n'
 import {
   IconArrowLeft,
   IconArrowRight,
+  IconChevronDown,
   IconChevronLeft,
   IconEraser,
   IconExpand,
@@ -17,7 +18,9 @@ import {
   IconMinus,
   IconPen,
   IconPlus,
+  IconPrint,
   IconSearch,
+  IconSpeaker,
   IconShapeArrow,
   IconShapeCircle,
   IconShapeLine,
@@ -77,6 +80,9 @@ interface Props {
   fitTarget: 'width' | 'page'
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
+  onPrint(): void
+  readAloudOpen: boolean
+  onToggleReadAloud(): void
   aiOpen: boolean
   onToggleAi(): void
   onToggleChrome(): void
@@ -123,6 +129,9 @@ export default function Toolbar({
   fitTarget,
   onSettingsChange,
   onToggleSearch,
+  onPrint,
+  readAloudOpen,
+  onToggleReadAloud,
   aiOpen,
   onToggleAi,
   onToggleChrome,
@@ -220,20 +229,27 @@ export default function Toolbar({
         <div className="toolbar-sep" />
 
         <div className="tool-group" ref={toolMenuRef}>
-          <button
-            className={`tb-btn${activeTool === 'pen' ? ' is-active' : ''}`}
-            onClick={() => selectTool('pen')}
-            title={t('tb.penTip')}
-          >
-            <IconPen />
-          </button>
-          <button
-            className={`tb-btn${activeTool === 'marker' ? ' is-active' : ''}`}
-            onClick={() => selectTool('marker')}
-            title={t('tb.markerTip')}
-          >
-            <IconMarker />
-          </button>
+          {(['pen', 'marker'] as const).map((tool) => (
+            <span className="tb-split" key={tool}>
+              <button
+                className={`tb-btn${activeTool === tool ? ' is-active' : ''}`}
+                onClick={() => selectTool(tool)}
+                title={tool === 'pen' ? t('tb.penTip') : t('tb.markerTip')}
+              >
+                {tool === 'pen' ? <IconPen /> : <IconMarker />}
+              </button>
+              <button
+                className={`tb-chevron${toolMenu === tool ? ' is-active' : ''}`}
+                title={t('tb.toolOptionsTip')}
+                onClick={() => {
+                  if (activeTool !== tool) onToolSelect(tool)
+                  setToolMenu((m) => (m === tool ? null : tool))
+                }}
+              >
+                <IconChevronDown size={11} />
+              </button>
+            </span>
+          ))}
           <button
             className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
             onClick={() => selectTool('eraser')}
@@ -346,6 +362,18 @@ export default function Toolbar({
 
         <button className="tb-btn" onClick={onToggleSearch} title={t('tb.searchTip')}>
           <IconSearch />
+        </button>
+
+        <button
+          className={`tb-btn${readAloudOpen ? ' is-active' : ''}`}
+          onClick={onToggleReadAloud}
+          title={t('tb.readAloudTip')}
+        >
+          <IconSpeaker />
+        </button>
+
+        <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
+          <IconPrint />
         </button>
 
         <button

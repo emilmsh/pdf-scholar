@@ -176,6 +176,8 @@ export interface PdfxApi {
   deleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult>
   /** Open an http(s) URL in the system browser */
   openExternal(url: string): void
+  /** Open the system print dialog for the PDF file */
+  printFile(path: string): Promise<{ ok: true } | FileError>
   /** Save text content via a save dialog; null = user cancelled */
   saveTextFile(defaultName: string, content: string): Promise<{ path: string } | FileError | null>
   setFullscreen(on: boolean): void

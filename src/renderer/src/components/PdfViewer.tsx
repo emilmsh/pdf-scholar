@@ -40,13 +40,14 @@ import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
 import { buildAiDocument } from '../ai'
 import type { ResolvedCitation } from '../ai'
 import AnnotPopover from './AnnotPopover'
+import { IconPause, IconPlay, IconStop } from './icons'
 import PdfPage from './PdfPage'
 import Sidebar from './Sidebar'
 import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
-import { locale, t, useLang } from '../i18n'
+import { getLanguage, locale, t, useLang } from '../i18n'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toHtml, toMarkdown, toPlainText } from '../annot-export'
@@ -190,6 +191,9 @@ export default function PdfViewer({
   })
   const [pillsFaded, setPillsFaded] = useState(false)
   const pillsTimerRef = useRef<number | null>(null)
+  /** Distraction-free: scrollbar + page pill fade after idle, wake on activity */
+  const [hudFaded, setHudFaded] = useState(false)
+  const hudTimerRef = useRef<number | null>(null)
   const [activeTool, setActiveTool] = useState<DrawToolType | null>(null)
   const [toolPrefs, setToolPrefs] = useState({
     pen: PEN_DEFAULT,
@@ -470,12 +474,18 @@ export default function PdfViewer({
     updateRange()
   }, [scale, layout, updateRange])
 
+  const chromeHiddenRef = useRef(chromeHidden)
+  chromeHiddenRef.current = chromeHidden
+
   const onScroll = useCallback(() => {
     updateRange()
     schedulePositionSave()
     setMenu((m) => (m ? null : m))
     setAnnotPopover((p) => (p ? null : p))
+    if (chromeHiddenRef.current) wakeHudRef.current()
   }, [updateRange, schedulePositionSave])
+
+  const wakeHudRef = useRef<() => void>(() => {})
 
   // ---------- Zoom ----------
 
@@ -1248,6 +1258,7 @@ export default function PdfViewer({
     const now = performance.now()
     if (now - hoverThrottleRef.current < 80) return
     hoverThrottleRef.current = now
+    if (chromeHiddenRef.current) wakeHudRef.current()
     if (drawToolRef.current || noteDragRef.current) {
       setHoverTip((tip) => (tip ? null : tip))
       return
@@ -1351,11 +1362,30 @@ export default function PdfViewer({
 
   // ---------- Chrome / fullscreen / keyboard ----------
 
-  // Only the active tab's distraction-free state drives the app shell (the
-  // tab bar tucks away with the toolbar and returns on top-edge hover)
+  /** Any activity wakes the reading HUD; it fades again after idle */
+  const wakeHud = useCallback(() => {
+    setHudFaded((f) => (f ? false : f))
+    if (hudTimerRef.current) window.clearTimeout(hudTimerRef.current)
+    hudTimerRef.current = window.setTimeout(() => setHudFaded(true), 2600)
+  }, [])
+  wakeHudRef.current = wakeHud
+
   useEffect(() => {
-    if (active) onImmersiveChange(chromeHidden && !peek)
-  }, [active, chromeHidden, peek, onImmersiveChange])
+    if (chromeHidden) wakeHud()
+    else {
+      if (hudTimerRef.current) window.clearTimeout(hudTimerRef.current)
+      setHudFaded(false)
+    }
+  }, [chromeHidden, wakeHud])
+
+  // Only the active tab's distraction-free state drives the app shell.
+  // Deliberately NOT tied to peek: the tab bar collapsing/expanding shifts
+  // the layout under the cursor, which made the top-edge hover oscillate
+  // (toolbar appears → content shifts → cursor leaves → toolbar hides → …).
+  // The peeked toolbar overlays absolutely and causes no such shift.
+  useEffect(() => {
+    if (active) onImmersiveChange(chromeHidden)
+  }, [active, chromeHidden, onImmersiveChange])
 
   const toggleChrome = useCallback(() => {
     setChromeHidden((hidden) => {
@@ -1638,6 +1668,172 @@ export default function PdfViewer({
     [searchMatches, searchIndex, gotoMatch]
   )
 
+  // ---------- Read aloud ----------
+
+  interface ReadSentence {
+    pageNumber: number
+    start: number
+    end: number
+    text: string
+  }
+
+  const [readAloud, setReadAloud] = useState<'closed' | 'playing' | 'paused'>('closed')
+  const [readRate, setReadRate] = useState(1)
+  const [readVoice, setReadVoice] = useState<string>('')
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const readSessionRef = useRef<{
+    sentences: ReadSentence[]
+    index: number
+    stopped: boolean
+  } | null>(null)
+  const readPrefsRef = useRef({ rate: 1, voiceURI: '' })
+  readPrefsRef.current = { rate: readRate, voiceURI: readVoice }
+
+  useEffect(() => {
+    const synth = window.speechSynthesis
+    if (!synth) return
+    const load = (): void => setVoices(synth.getVoices())
+    load()
+    synth.addEventListener('voiceschanged', load)
+    return () => synth.removeEventListener('voiceschanged', load)
+  }, [])
+
+  // Default voice: match the app language when such a voice exists
+  useEffect(() => {
+    if (readVoice || voices.length === 0) return
+    const wanted = getLanguage() === 'nb' ? ['nb', 'no'] : ['en']
+    const match = voices.find((v) => wanted.some((p) => v.lang.toLowerCase().startsWith(p)))
+    setReadVoice((match ?? voices.find((v) => v.default) ?? voices[0]).voiceURI)
+  }, [voices, readVoice])
+
+  /** Follow the spoken sentence: highlight it and keep it comfortably in view */
+  const highlightSentence = useCallback(
+    async (s: ReadSentence) => {
+      const el = containerRef.current
+      const lay = layoutRef.current
+      const texts = pageTextsRef.current
+      if (!el || !lay || !texts) return
+      const pageTop = lay.tops[s.pageNumber - 1]
+      if (Math.abs(el.scrollTop - pageTop) > el.clientHeight * 2) {
+        el.scrollTop = Math.max(0, pageTop - 8)
+        updateRange()
+      }
+      const pageEl = await waitForTextLayer(s.pageNumber)
+      if (!pageEl || readSessionRef.current?.stopped !== false) return
+      const rects = resolveMatchRects(
+        pageEl,
+        texts[s.pageNumber - 1],
+        { pageNumber: s.pageNumber, start: s.start, end: s.end, snippet: '', snippetOffset: 0 },
+        scaleRef.current
+      )
+      if (!rects || rects.length === 0) return
+      setSearchHits({ pageNumber: s.pageNumber, rects })
+      const lay2 = layoutRef.current
+      if (!lay2) return
+      const y = lay2.tops[s.pageNumber - 1] + rects[0].y * scaleRef.current
+      const viewTop = el.scrollTop
+      if (y < viewTop + 70 || y > viewTop + el.clientHeight - 150) {
+        el.scrollTo({ top: Math.max(0, y - el.clientHeight * 0.3), behavior: 'smooth' })
+      }
+    },
+    [updateRange, waitForTextLayer]
+  )
+
+  const speakFrom = useCallback(
+    (index: number) => {
+      const session = readSessionRef.current
+      const synth = window.speechSynthesis
+      if (!session || session.stopped || !synth) return
+      if (index >= session.sentences.length) {
+        session.stopped = true
+        readSessionRef.current = null
+        setReadAloud('closed')
+        setSearchHits(null)
+        return
+      }
+      session.index = index
+      const s = session.sentences[index]
+      const utterance = new SpeechSynthesisUtterance(s.text)
+      utterance.rate = readPrefsRef.current.rate
+      const voice = synth.getVoices().find((v) => v.voiceURI === readPrefsRef.current.voiceURI)
+      if (voice) utterance.voice = voice
+      utterance.onstart = () => void highlightSentence(s)
+      utterance.onend = () => {
+        if (readSessionRef.current === session && !session.stopped) speakFrom(index + 1)
+      }
+      utterance.onerror = () => {
+        if (readSessionRef.current === session && !session.stopped) speakFrom(index + 1)
+      }
+      synth.speak(utterance)
+    },
+    [highlightSentence]
+  )
+
+  /** Split page texts into sentences with char offsets (from a given page) */
+  const buildSentences = useCallback((texts: PageText[], fromPage: number): ReadSentence[] => {
+    const out: ReadSentence[] = []
+    for (let p = fromPage - 1; p < texts.length; p++) {
+      const text = texts[p].text
+      const regex = /[^.!?\n]+[.!?]*[\s]*/g
+      let match: RegExpExecArray | null
+      while ((match = regex.exec(text)) !== null) {
+        const raw = match[0]
+        const trimmed = raw.trim()
+        if (trimmed.length < 2) continue
+        const leading = raw.indexOf(trimmed[0])
+        out.push({
+          pageNumber: p + 1,
+          start: match.index + leading,
+          end: match.index + leading + trimmed.length,
+          text: trimmed
+        })
+      }
+    }
+    return out
+  }, [])
+
+  const stopReadAloud = useCallback(() => {
+    const session = readSessionRef.current
+    if (session) session.stopped = true
+    readSessionRef.current = null
+    window.speechSynthesis?.cancel()
+    setReadAloud('closed')
+    setSearchHits(null)
+  }, [])
+
+  const startReadAloud = useCallback(async () => {
+    if (!pdf || !window.speechSynthesis) return
+    window.speechSynthesis.cancel()
+    const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
+    const sentences = buildSentences(texts, currentPage)
+    if (sentences.length === 0) return
+    readSessionRef.current = { sentences, index: 0, stopped: false }
+    setReadAloud('playing')
+    speakFrom(0)
+  }, [pdf, currentPage, buildSentences, speakFrom])
+
+  const toggleReadPause = useCallback(() => {
+    const synth = window.speechSynthesis
+    if (!synth) return
+    setReadAloud((state) => {
+      if (state === 'playing') {
+        synth.pause()
+        return 'paused'
+      }
+      if (state === 'paused') {
+        synth.resume()
+        return 'playing'
+      }
+      return state
+    })
+  }, [])
+
+  // Never keep speaking from a background tab / after close
+  useEffect(() => {
+    if (!active && readSessionRef.current) stopReadAloud()
+  }, [active, stopReadAloud])
+  useEffect(() => () => window.speechSynthesis?.cancel(), [])
+
   // ---------- AI ----------
 
   const ensureAiDocument = useCallback(async (): Promise<EnsuredDocument | null> => {
@@ -1752,6 +1948,7 @@ export default function PdfViewer({
         else if (aiQuick) setAiQuick(null)
         else if (annotPopover) setAnnotPopover(null)
         else if (activeTool) setActiveTool(null)
+        else if (readAloud !== 'closed') stopReadAloud()
         else if (searchOpen) closeSearch()
         else if (searchHits) setSearchHits(null)
         else if (aiOpen) setAiOpen(false)
@@ -1788,6 +1985,8 @@ export default function PdfViewer({
     aiOpen,
     annotPopover,
     activeTool,
+    readAloud,
+    stopReadAloud,
     searchOpen,
     searchHits,
     fullscreen,
@@ -1832,6 +2031,7 @@ export default function PdfViewer({
       if (gestureRef.current) window.clearTimeout(gestureRef.current.timer)
       if (pillsTimerRef.current) window.clearTimeout(pillsTimerRef.current)
       if (aiHitTimerRef.current) window.clearTimeout(aiHitTimerRef.current)
+      if (hudTimerRef.current) window.clearTimeout(hudTimerRef.current)
       if (fullscreen) bridge.setFullscreen(false)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1853,7 +2053,7 @@ export default function PdfViewer({
   }
 
   return (
-    <div className={`viewer${chromeHidden ? ' chrome-hidden' : ''}`}>
+    <div className={`viewer${chromeHidden ? ' chrome-hidden' : ''}${chromeHidden && hudFaded ? ' hud-faded' : ''}`}>
       <div
         className={`toolbar-wrap${chromeHidden && !peek ? ' tucked' : ''}`}
         onMouseLeave={() => chromeHidden && setPeek(false)}
@@ -1886,6 +2086,16 @@ export default function PdfViewer({
           fitTarget={fitTarget}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
+          onPrint={() => {
+            void bridge.printFile(payload.path).then((result) => {
+              if (result && 'error' in result) showToast(t('viewer.printFailed', { error: result.error }))
+            })
+          }}
+          readAloudOpen={readAloud !== 'closed'}
+          onToggleReadAloud={() => {
+            if (readAloud === 'closed') void startReadAloud()
+            else stopReadAloud()
+          }}
           aiOpen={aiOpen}
           onToggleAi={() => setAiOpen((o) => !o)}
           onToggleChrome={toggleChrome}
@@ -2131,6 +2341,40 @@ export default function PdfViewer({
           onSave={saveNote}
           onCancel={() => setNoteDraft(null)}
         />
+      )}
+      {readAloud !== 'closed' && (
+        <div className="readaloud-bar">
+          <button className="tb-btn" onClick={toggleReadPause} title={t('ra.playPause')}>
+            {readAloud === 'playing' ? <IconPause size={16} /> : <IconPlay size={16} />}
+          </button>
+          <button className="tb-btn" onClick={stopReadAloud} title={t('ra.stop')}>
+            <IconStop size={16} />
+          </button>
+          <select
+            className="readaloud-rate"
+            value={readRate}
+            title={t('ra.rate')}
+            onChange={(e) => setReadRate(Number(e.target.value))}
+          >
+            {[0.75, 1, 1.25, 1.5, 2].map((r) => (
+              <option key={r} value={r}>
+                {r}×
+              </option>
+            ))}
+          </select>
+          <select
+            className="readaloud-voice"
+            value={readVoice}
+            title={t('ra.voice')}
+            onChange={(e) => setReadVoice(e.target.value)}
+          >
+            {voices.map((v) => (
+              <option key={v.voiceURI} value={v.voiceURI}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </div>
       )}
       {hoverTip && !menu && !annotPopover && !noteDraft && (
         <div

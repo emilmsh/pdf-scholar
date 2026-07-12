@@ -111,6 +111,11 @@ const webApi: PdfxApi = {
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')
   },
+  // Browser preview: open the PDF in a new tab — its viewer has print
+  printFile: async (path) => {
+    window.open(path, '_blank', 'noopener')
+    return { ok: true }
+  },
   saveTextFile: async (defaultName, content) => {
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)

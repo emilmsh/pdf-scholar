@@ -27,6 +27,12 @@ export const IconChevronLeft = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconChevronDown = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M6 9l6 6 6-6" />
+  </Svg>
+)
+
 export const IconPlus = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M12 5v14M5 12h14" />
@@ -218,6 +224,35 @@ export const IconGear = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <circle cx="12" cy="12" r="3" />
     <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09c0 .68.4 1.3 1.03 1.56a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9c.26.63.88 1.03 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.56 1.03z" />
+  </Svg>
+)
+
+export const IconPrint = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M7 8V3.5h10V8" />
+    <rect x="3.5" y="8" width="17" height="8.5" rx="2" />
+    <rect x="7" y="13.5" width="10" height="7" />
+  </Svg>
+)
+
+export const IconSpeaker = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M3.5 9v6h4l5 4.5v-15L7.5 9z" />
+    <path d="M16 9.5a4 4 0 0 1 0 5" />
+    <path d="M18.5 7a7.5 7.5 0 0 1 0 10" />
+  </Svg>
+)
+
+export const IconPlay = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M7.5 4.5l12 7.5-12 7.5z" />
+  </Svg>
+)
+
+export const IconPause = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M8 5v14" />
+    <path d="M16 5v14" />
   </Svg>
 )
 

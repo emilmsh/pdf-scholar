@@ -2245,3 +2245,90 @@ button {
   overflow: hidden;
   white-space: pre-wrap;
 }
+
+/* Reading HUD fades in distraction-free mode after idle */
+
+.pages::-webkit-scrollbar {
+  width: 12px;
+}
+
+.pages::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-secondary) 42%, transparent);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 8px;
+  transition: background 0.3s;
+}
+
+.pages::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.viewer.hud-faded .pages::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.page-pill {
+  transition: opacity 0.35s ease;
+}
+
+.viewer.hud-faded .page-pill {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Split tool button (main action + options chevron) */
+
+.tb-split {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tb-chevron {
+  width: 13px;
+  height: 30px;
+  margin-left: -3px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  border-radius: 5px;
+}
+
+.tb-chevron:hover,
+.tb-chevron.is-active {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* Read-aloud control bar */
+
+.readaloud-bar {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.12s ease;
+}
+
+.readaloud-bar select {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.readaloud-voice {
+  max-width: 190px;
+}

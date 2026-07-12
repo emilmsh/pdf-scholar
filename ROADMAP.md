@@ -74,6 +74,10 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 
 ## Fase 7 — Skall-paritet og polering
 - [x] **Språkvalg i appen: norsk bokmål og engelsk** (Emils ønske 2026-07-11, levert samme dag) — alle UI-strenger i `src/renderer/src/i18n.ts` med `t()`-oppslag, velger i aA-menyen (Norsk/English/Auto der auto følger OS-språket), gjelder også KI-systemprompter, eksportdokumenter og datoformat. Nye strenger SKAL inn i begge ordbøkene.
+- [x] Høytlesing (Emils valg fra Edge-vurderingen, levert 2026-07-12): setningsvis TTS via SpeechSynthesis med markering som følger og auto-scroll, spill/pause/stopp, hastighet og stemmevalg
+- [x] Skriv ut (levert 2026-07-12): skjult vindu med Chromiums PDF-viser + systemets utskriftsdialog
+- [ ] **Roter sider** (Emils bestilling 2026-07-12) — visningsrotasjon 90°-steg; krever koordinatmapping i alle overlegg + inverse på tegneverktøy
+- [ ] **Tosiders visning** (Emils bestilling 2026-07-12) — motstående sider (forside alene), layoutmotoren må lære rader
 - Fanelinje for flere dokumenter; delt visning
 - Stempler, signatur, verktøylinje-tilpasning
 - Designgjennomgang mot PDF Expert: avstander, ikoner, animasjoner, mørkt app-chrome

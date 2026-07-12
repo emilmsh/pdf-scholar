@@ -44,6 +44,9 @@ const nb = {
   'tb.shapes': 'Former',
   'tb.width': 'Bredde',
   'tb.strokeWidth': 'Strekbredde',
+  'tb.toolOptionsTip': 'Farge og bredde',
+  'tb.printTip': 'Skriv ut',
+  'tb.readAloudTip': 'Høytlesing',
   'tb.goToPage': 'Gå til side',
   'tb.zoomOutTip': 'Zoom ut (Ctrl+-)',
   'tb.zoomInTip': 'Zoom inn (Ctrl++)',
@@ -166,6 +169,13 @@ const nb = {
   'viewer.nothingToExport': 'Ingen merknader å eksportere',
   'viewer.saveFailed': 'Kunne ikke lagre: {error}',
   'viewer.exported': 'Merknader eksportert: {path}',
+  'viewer.printFailed': 'Kunne ikke skrive ut: {error}',
+
+  // Read aloud
+  'ra.playPause': 'Spill av / pause',
+  'ra.stop': 'Stopp høytlesing',
+  'ra.rate': 'Hastighet',
+  'ra.voice': 'Stemme',
 
   // Export documents
   'export.title': 'Merknader — {name}',
@@ -249,6 +259,9 @@ const en: Dict = {
   'tb.shapes': 'Shapes',
   'tb.width': 'Width',
   'tb.strokeWidth': 'Stroke width',
+  'tb.toolOptionsTip': 'Color and width',
+  'tb.printTip': 'Print',
+  'tb.readAloudTip': 'Read aloud',
   'tb.goToPage': 'Go to page',
   'tb.zoomOutTip': 'Zoom out (Ctrl+-)',
   'tb.zoomInTip': 'Zoom in (Ctrl++)',
@@ -363,6 +376,12 @@ const en: Dict = {
   'viewer.nothingToExport': 'No annotations to export',
   'viewer.saveFailed': 'Could not save: {error}',
   'viewer.exported': 'Annotations exported: {path}',
+  'viewer.printFailed': 'Could not print: {error}',
+
+  'ra.playPause': 'Play / pause',
+  'ra.stop': 'Stop reading aloud',
+  'ra.rate': 'Speed',
+  'ra.voice': 'Voice',
 
   'export.title': 'Annotations — {name}',
   'export.byline': 'Exported {date} from PDF Scholar',

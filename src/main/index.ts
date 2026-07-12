@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, powerSaveBlocker, shell } from 'electron'
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, extname, join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import type {
   AnnotateRequest,
   DeleteAnnotationRequest,
@@ -183,6 +184,28 @@ function registerIpc(): void {
 
   ipcMain.on('window:set-fullscreen', (_e, on: boolean) => {
     mainWindow?.setFullScreen(!!on)
+  })
+
+  // Print via a hidden window hosting Chromium's built-in PDF viewer: it
+  // renders the file (with saved annotations) and drives the print dialog.
+  ipcMain.handle('file:print', async (_e, path: string) => {
+    try {
+      const printWin = new BrowserWindow({
+        show: false,
+        webPreferences: { plugins: true }
+      })
+      await printWin.loadURL(pathToFileURL(path).href)
+      // Give the PDF plugin a moment to finish rendering before printing
+      await new Promise((resolve) => setTimeout(resolve, 700))
+      return await new Promise((resolve) => {
+        printWin.webContents.print({}, (success, failureReason) => {
+          printWin.destroy()
+          resolve(success || failureReason === 'cancelled' ? { ok: true } : { error: failureReason })
+        })
+      })
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
   })
 }
 
