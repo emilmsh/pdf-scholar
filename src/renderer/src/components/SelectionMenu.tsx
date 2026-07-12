@@ -251,13 +251,25 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             <IconSparkle size={11} />
             {t('menu.aiSection')}
           </div>
-          <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'explain' })}>
+          <button
+            className="menu-item"
+            title={t('menu.aiExplainTip')}
+            onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
+          >
             {t('menu.aiExplain')}
           </button>
-          <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}>
+          <button
+            className="menu-item"
+            title={t('menu.aiSimplifyTip')}
+            onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
+          >
             {t('menu.aiSimplify')}
           </button>
-          <button className="menu-item" onClick={() => onAction({ kind: 'ai', mode: 'define' })}>
+          <button
+            className="menu-item"
+            title={t('menu.aiDefineTip')}
+            onClick={() => onAction({ kind: 'ai', mode: 'define' })}
+          >
             {t('menu.aiDefine')}
           </button>
           <div className="menu-sep" />
