@@ -35,27 +35,44 @@ function migrateUserData(): void {
 }
 migrateUserData()
 
-let mainWindow: BrowserWindow | null = null
 // A .pdf path passed on the command line (double-click in Explorer / "Open with")
-let pendingPath: string | null = pathFromArgv(process.argv)
+// for the very first window; per-window paths live in pendingPaths below.
+let firstPending: string | null = pathFromArgv(process.argv)
+/** webContents.id → a .pdf path the renderer should open once it asks */
+const pendingPaths = new Map<number, string>()
 
 function pathFromArgv(argv: string[]): string | null {
   const arg = argv.slice(1).find((a) => !a.startsWith('-') && a.toLowerCase().endsWith('.pdf'))
   return arg ? resolve(arg) : null
 }
 
+/** The window an IPC event came from, or the currently focused one */
+function windowFor(e?: { sender: Electron.WebContents }): BrowserWindow | null {
+  if (e) {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (w) return w
+  }
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+}
+
 const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
+  // A second launch (e.g. "Open with" from Explorer) opens its own window so
+  // documents can sit side by side; a bare launch just focuses an existing one.
   app.on('second-instance', (_event, argv) => {
     const path = pathFromArgv(argv)
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
-      if (path) mainWindow.webContents.send('open-path', path)
-    } else if (path) {
-      pendingPath = path
+    if (path) {
+      createWindow(path)
+    } else {
+      const w = windowFor()
+      if (w) {
+        if (w.isMinimized()) w.restore()
+        w.focus()
+      } else {
+        createWindow()
+      }
     }
   })
 
@@ -72,7 +89,8 @@ if (!gotLock) {
     }
     registerIpc()
     applyKeepAwake(getState().settings.keepAwake)
-    createWindow()
+    createWindow(firstPending)
+    firstPending = null
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -84,13 +102,17 @@ if (!gotLock) {
   })
 }
 
-function createWindow(): void {
+function createWindow(openPath?: string | null): BrowserWindow {
   const state = getState()
-  mainWindow = new BrowserWindow({
+  // Cascade extra windows so they don't land exactly on top of each other
+  const offset = BrowserWindow.getAllWindows().length * 34
+  const baseX = state.window?.x
+  const baseY = state.window?.y
+  const win = new BrowserWindow({
     width: state.window?.width ?? 1280,
     height: state.window?.height ?? 860,
-    x: state.window?.x,
-    y: state.window?.y,
+    x: baseX === undefined ? undefined : baseX + offset,
+    y: baseY === undefined ? undefined : baseY + offset,
     minWidth: 640,
     minHeight: 480,
     show: false,
@@ -101,32 +123,35 @@ function createWindow(): void {
     }
   })
 
-  if (state.window?.maximized) mainWindow.maximize()
+  // Only the first window restores the maximized state
+  if (state.window?.maximized && offset === 0) win.maximize()
+  if (openPath) pendingPaths.set(win.webContents.id, openPath)
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show())
+  win.once('ready-to-show', () => win.show())
 
-  mainWindow.on('close', () => {
-    if (!mainWindow) return
-    const bounds = mainWindow.getNormalBounds()
-    getState().window = { ...bounds, maximized: mainWindow.isMaximized() }
+  // Persist this window's bounds as the default for the next launch
+  win.on('close', () => {
+    const bounds = win.getNormalBounds()
+    getState().window = { ...bounds, maximized: win.isMaximized() }
     saveState()
   })
 
-  mainWindow.on('closed', () => {
-    mainWindow = null
+  win.on('closed', () => {
+    pendingPaths.delete(win.webContents.id)
   })
 
   // Open external links in the system browser, never inside the app
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http:') || url.startsWith('https:')) shell.openExternal(url)
     return { action: 'deny' }
   })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  return win
 }
 
 async function loadPdf(path: string): Promise<FilePayload | FileError> {
@@ -143,14 +168,21 @@ async function loadPdf(path: string): Promise<FilePayload | FileError> {
 
 function registerIpc(): void {
   registerAiIpc()
-  ipcMain.handle('dialog:open', async () => {
-    if (!mainWindow) return null
-    const result = await dialog.showOpenDialog(mainWindow, {
+  ipcMain.handle('dialog:open', async (e) => {
+    const parent = windowFor(e)
+    if (!parent) return null
+    const result = await dialog.showOpenDialog(parent, {
       filters: [{ name: 'PDF', extensions: ['pdf'] }],
       properties: ['openFile']
     })
     if (result.canceled || result.filePaths.length === 0) return null
     return loadPdf(result.filePaths[0])
+  })
+
+  // Open a new top-level window, optionally loading a document — lets the user
+  // place documents side by side or view two spots in one file at once
+  ipcMain.on('window:new', (_e, path?: string) => {
+    createWindow(typeof path === 'string' && path ? path : null)
   })
 
   ipcMain.handle('file:read', (_e, path: string) => loadPdf(path))
@@ -161,9 +193,10 @@ function registerIpc(): void {
 
   ipcMain.handle('position:get', (_e, path: string) => getState().positions[path] ?? null)
 
-  ipcMain.handle('pending-path:get', () => {
-    const path = pendingPath
-    pendingPath = null
+  ipcMain.handle('pending-path:get', (e) => {
+    const id = e.sender.id
+    const path = pendingPaths.get(id) ?? null
+    pendingPaths.delete(id)
     return path
   })
 
@@ -186,10 +219,11 @@ function registerIpc(): void {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
   })
 
-  ipcMain.handle('file:save-text', async (_e, defaultName: string, content: string) => {
-    if (!mainWindow) return null
+  ipcMain.handle('file:save-text', async (e, defaultName: string, content: string) => {
+    const parent = windowFor(e)
+    if (!parent) return null
     const ext = extname(defaultName).replace('.', '') || 'txt'
-    const result = await dialog.showSaveDialog(mainWindow, {
+    const result = await dialog.showSaveDialog(parent, {
       defaultPath: defaultName,
       filters: [{ name: ext.toUpperCase(), extensions: [ext] }]
     })
@@ -202,8 +236,8 @@ function registerIpc(): void {
     }
   })
 
-  ipcMain.on('window:set-fullscreen', (_e, on: boolean) => {
-    mainWindow?.setFullScreen(!!on)
+  ipcMain.on('window:set-fullscreen', (e, on: boolean) => {
+    windowFor(e)?.setFullScreen(!!on)
   })
 
   // Print via a hidden window hosting Chromium's built-in PDF viewer: it

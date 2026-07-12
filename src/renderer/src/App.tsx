@@ -174,6 +174,9 @@ export default function App(): React.JSX.Element {
           if (current) closeTab(current)
           return current
         })
+      } else if (e.ctrlKey && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault()
+        bridge.newWindow()
       } else if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) {
         e.preventDefault()
         void openDialog()
@@ -221,6 +224,8 @@ export default function App(): React.JSX.Element {
           onSelect={setActiveId}
           onClose={closeTab}
           onNewTab={() => void openDialog()}
+          onNewWindow={() => bridge.newWindow()}
+          onOpenInNewWindow={(path) => bridge.newWindow(path)}
         />
       )}
 

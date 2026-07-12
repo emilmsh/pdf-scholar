@@ -2436,3 +2436,44 @@ button {
 .color-picker-apply:disabled {
   opacity: 0.4;
 }
+
+/* Tab bar: new-window button + tab context menu */
+
+.tab-new-window {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin: 0 2px 4px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.tab-new-window:hover {
+  background: var(--hover);
+}
+
+.tab-menu {
+  position: fixed;
+  z-index: 70;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.1s ease;
+}
+
+.tab-menu .menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 12.5px;
+}
+
+.tab-menu .menu-item:hover {
+  background: var(--hover);
+}

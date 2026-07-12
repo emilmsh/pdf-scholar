@@ -24,6 +24,7 @@ const api: PdfxApi = {
   updateAnnotation: (req: ModifyAnnotationRequest) => ipcRenderer.invoke('annotation:update', req),
   deleteAnnotation: (req: DeleteAnnotationRequest) => ipcRenderer.invoke('annotation:delete', req),
   openExternal: (url: string) => ipcRenderer.send('shell:open-external', url),
+  newWindow: (path?: string) => ipcRenderer.send('window:new', path),
   printFile: (path: string) => ipcRenderer.invoke('file:print', path),
   saveTextFile: (defaultName: string, content: string) =>
     ipcRenderer.invoke('file:save-text', defaultName, content),

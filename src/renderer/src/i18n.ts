@@ -26,7 +26,10 @@ const nb = {
 
   // Tabs
   'tabs.close': 'Lukk fane',
+  'tabs.closeTab': 'Lukk fane',
   'tabs.new': 'Åpne PDF (Ctrl+O)',
+  'tabs.newWindow': 'Nytt vindu (Ctrl+Shift+N)',
+  'tabs.openInNewWindow': 'Åpne i nytt vindu',
 
   // Toolbar
   'tb.library': 'Bibliotek',
@@ -251,7 +254,10 @@ const en: Dict = {
   'welcome.recents': 'Recently read',
 
   'tabs.close': 'Close tab',
+  'tabs.closeTab': 'Close tab',
   'tabs.new': 'Open PDF (Ctrl+O)',
+  'tabs.newWindow': 'New window (Ctrl+Shift+N)',
+  'tabs.openInNewWindow': 'Open in new window',
 
   'tb.library': 'Library',
   'tb.libraryTip': 'Back to the library',

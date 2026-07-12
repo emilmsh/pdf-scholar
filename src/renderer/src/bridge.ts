@@ -79,7 +79,11 @@ const webApi: PdfxApi = {
   getRecents: async () => [],
   getSettings: async () => loadWebState().settings,
   getPosition: async (path) => loadWebState().positions[path] ?? null,
-  getPendingPath: async () => null,
+  getPendingPath: async () => {
+    // A new browser tab opened via newWindow() carries #open=<path>
+    const m = /#open=([^&]+)/.exec(location.hash)
+    return m ? decodeURIComponent(m[1]) : null
+  },
   setPosition: (path, pos) => {
     const state = loadWebState()
     state.positions[path] = pos
@@ -110,6 +114,10 @@ const webApi: PdfxApi = {
   },
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')
+  },
+  // Browser preview: a new browser tab stands in for a new app window
+  newWindow: (path) => {
+    window.open(path ? `${location.origin}/#open=${encodeURIComponent(path)}` : location.href, '_blank')
   },
   // Browser preview: open the PDF in a new tab — its viewer has print
   printFile: async (path) => {
