@@ -942,6 +942,13 @@ export default function PdfViewer({
 
   const placeFreeText = useCallback(
     (pageNumber: number, x: number, y: number, clientX: number, clientY: number) => {
+      // Pointerdown fires before the editor's blur: clicking outside an open
+      // draft must commit it in place, never re-anchor it under the cursor.
+      const editor = document.querySelector<HTMLTextAreaElement>('.freetext-editor')
+      if (editor) {
+        editor.blur()
+        return
+      }
       setFreeTextDraft({ pageNumber, x, y, clientX, clientY })
     },
     []
@@ -2081,6 +2088,7 @@ export default function PdfViewer({
           onGoToPage={jumpToPage}
           onZoomIn={() => zoomTo(scaleRef.current * 1.15)}
           onZoomOut={() => zoomTo(scaleRef.current / 1.15)}
+          onZoomTo={(percent) => zoomTo(percent / 100)}
           onFitWidth={fitWidth}
           onFitPage={fitPage}
           fitTarget={fitTarget}

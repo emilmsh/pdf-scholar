@@ -74,6 +74,7 @@ interface Props {
   onGoToPage(page: number): void
   onZoomIn(): void
   onZoomOut(): void
+  onZoomTo(percent: number): void
   onFitWidth(): void
   onFitPage(): void
   /** What the fit toggle offers next (Edge-style width↔page toggle) */
@@ -124,6 +125,7 @@ export default function Toolbar({
   onGoToPage,
   onZoomIn,
   onZoomOut,
+  onZoomTo,
   onFitWidth,
   onFitPage,
   fitTarget,
@@ -139,6 +141,8 @@ export default function Toolbar({
 }: Props): React.JSX.Element {
   useLang()
   const [pageInput, setPageInput] = useState(String(page))
+  const [zoomEditing, setZoomEditing] = useState(false)
+  const [zoomInput, setZoomInput] = useState('')
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -346,7 +350,36 @@ export default function Toolbar({
         <button className="tb-btn" onClick={onZoomOut} title={t('tb.zoomOutTip')}>
           <IconMinus />
         </button>
-        <span className="zoom-label">{zoomPercent}%</span>
+        {zoomEditing ? (
+          <input
+            className="zoom-input"
+            autoFocus
+            value={zoomInput}
+            onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
+            onBlur={() => setZoomEditing(false)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') {
+                const n = parseInt(zoomInput, 10)
+                if (!Number.isNaN(n)) onZoomTo(n)
+                setZoomEditing(false)
+              }
+              if (e.key === 'Escape') setZoomEditing(false)
+            }}
+            aria-label="Zoom %"
+          />
+        ) : (
+          <button
+            className="zoom-label"
+            title={t('tb.zoomExactTip')}
+            onClick={() => {
+              setZoomInput(String(zoomPercent))
+              setZoomEditing(true)
+            }}
+          >
+            {zoomPercent}%
+          </button>
+        )}
         <button className="tb-btn" onClick={onZoomIn} title={t('tb.zoomInTip')}>
           <IconPlus />
         </button>

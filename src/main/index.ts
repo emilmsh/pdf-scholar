@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, powerSaveBlocker, shell } from 'electron'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
-import { basename, extname, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type {
   AnnotateRequest,
@@ -14,6 +15,25 @@ import type {
 import { registerAiIpc } from './ai'
 import { applyAnnotation, deleteAnnotation, updateAnnotation } from './annotation-engine'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
+
+// One-time migration: renaming the app PDFX → PDF Scholar moved userData;
+// carry the state file over so recents, positions and encrypted AI keys
+// survive (DPAPI keys stay decryptable — same Windows user).
+function migrateUserData(): void {
+  try {
+    const dir = app.getPath('userData')
+    const target = join(dir, 'pdfx-state.json')
+    if (existsSync(target)) return
+    const legacy = join(dirname(dir), 'PDFX', 'pdfx-state.json')
+    if (existsSync(legacy)) {
+      mkdirSync(dir, { recursive: true })
+      copyFileSync(legacy, target)
+    }
+  } catch {
+    /* a fresh start is an acceptable fallback */
+  }
+}
+migrateUserData()
 
 let mainWindow: BrowserWindow | null = null
 // A .pdf path passed on the command line (double-click in Explorer / "Open with")

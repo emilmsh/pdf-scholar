@@ -2332,3 +2332,107 @@ button {
 .readaloud-voice {
   max-width: 190px;
 }
+
+/* Zoom: click the percentage to type an exact value */
+
+.zoom-label {
+  min-width: 46px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text);
+  border-radius: 6px;
+  padding: 3px 4px;
+}
+
+.zoom-label:hover {
+  background: var(--hover);
+}
+
+.zoom-input {
+  width: 52px;
+  text-align: center;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 4px;
+  outline: none;
+}
+
+/* Pen and marker get tool-shaped cursors (hotspot at the tip) */
+
+.draw-layer.pen-mode {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><g transform="translate(1 1)"><path d="M3 21l3.5-1 13-13-2.5-2.5-13 13z" fill="white" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 4.5l2.5 2.5 2-2a1.8 1.8 0 0 0 0-2.5A1.8 1.8 0 0 0 18 4z" fill="%23327cf6" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 21l1-3.5 2.5 2.5z" fill="black"/></g></svg>') 3 22, crosshair;
+}
+
+.draw-layer.marker-mode {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><g transform="translate(1 1)"><rect x="12" y="1.5" width="9" height="7" rx="1.4" transform="rotate(45 16 5)" fill="%23ffd54a" stroke="black" stroke-width="1.4"/><path d="M5.5 16.5l4 4-2.5 2.5-4-1 -0.5-3z" fill="white" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M9.5 20.5l6.5-6.5-4-4-6.5 6.5z" fill="%23ffe89a" stroke="black" stroke-width="1.4" stroke-linejoin="round"/></g></svg>') 4 22, crosshair;
+}
+
+/* Custom colour picker popover (hex + wheel) behind the "+" swatch */
+
+.color-plus-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.color-picker-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: var(--shadow-menu);
+}
+
+.color-picker-wheel {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+}
+
+.color-picker-hex {
+  width: 84px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-canvas);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-family: Consolas, monospace;
+  padding: 4px 7px;
+  outline: none;
+}
+
+.color-picker-hex:focus {
+  border-color: var(--accent);
+}
+
+.color-picker-apply {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 13px;
+}
+
+.color-picker-apply:disabled {
+  opacity: 0.4;
+}

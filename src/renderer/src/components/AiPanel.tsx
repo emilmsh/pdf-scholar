@@ -402,7 +402,15 @@ export default function AiPanel({
       const ensured = docRef.current
       if (!ensured) return
       const resolved = resolveCitation(citation, ensured.pages, ensured.doc)
-      if (resolved) onCitationClick(resolved)
+      if (resolved) {
+        onCitationClick(resolved)
+        return
+      }
+      // Never a dead button: an unlocatable quote still jumps to its page
+      const page = citationPage(citation, ensured.doc)
+      if (page && page >= 1 && page <= ensured.pages.length) {
+        onCitationClick({ pageNumber: page, start: 0, end: 0 })
+      }
     },
     [onCitationClick]
   )

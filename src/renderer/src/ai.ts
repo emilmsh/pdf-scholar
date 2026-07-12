@@ -45,10 +45,21 @@ export function resolveCitation(
   if (citation.kind === 'quote') {
     const pageIndex = citation.pageNumber - 1
     if (pageIndex < 0 || pageIndex >= pages.length) return null
-    const haystack = pages[pageIndex].text.toLowerCase()
-    const at = haystack.indexOf(citation.quote.toLowerCase())
+    const pageText = pages[pageIndex].text
+    // Fast path: exact, case-insensitive
+    const exact = pageText.toLowerCase().indexOf(citation.quote.toLowerCase())
+    if (exact !== -1) {
+      return { pageNumber: citation.pageNumber, start: exact, end: exact + citation.quote.length }
+    }
+    // Robust path: models normalize "verbatim" quotes (curly quotes, collapsed
+    // line breaks) while the PDF text has raw whitespace and soft hyphens —
+    // match on a normalized copy and map offsets back to the original.
+    const { norm, map } = normalizeWithMap(pageText)
+    const needle = foldChars(citation.quote).replace(/\s+/g, ' ').trim().toLowerCase()
+    if (needle.length < 3) return null
+    const at = norm.indexOf(needle)
     if (at === -1) return null
-    return { pageNumber: citation.pageNumber, start: at, end: at + citation.quote.length }
+    return { pageNumber: citation.pageNumber, start: map[at], end: map[at + needle.length - 1] + 1 }
   }
   // char kind: find the page whose range contains the citation start.
   // Offsets inside the leading "[Side 1]" marker clamp to the first page.
@@ -64,6 +75,40 @@ export function resolveCitation(
   const end = Math.min(citation.end - doc.pageStarts[pageIndex], pageLen)
   if (start >= pageLen || end <= 0 || end <= start) return null
   return { pageNumber: pageIndex + 1, start: Math.max(0, start), end }
+}
+
+/** 1:1 char folds so normalized offsets map back to the original text */
+function foldChars(s: string): string {
+  return s
+    .replace(/[‘’‚]/g, "'")
+    .replace(/[“”„«»]/g, '"')
+    .replace(/[‐‑–—]/g, '-')
+    .replace(/ /g, ' ')
+}
+
+/** Lowercased, soft-hyphen-stripped, whitespace-collapsed copy of `text`,
+ *  plus map[i] = offset in the original text of normalized char i. */
+function normalizeWithMap(text: string): { norm: string; map: number[] } {
+  const folded = foldChars(text).toLowerCase()
+  let norm = ''
+  const map: number[] = []
+  let pendingSpace = false
+  for (let i = 0; i < folded.length; i++) {
+    const ch = folded[i]
+    if (ch === '­') continue // soft hyphen
+    if (/\s/.test(ch)) {
+      pendingSpace = norm.length > 0
+      continue
+    }
+    if (pendingSpace) {
+      norm += ' '
+      map.push(i)
+      pendingSpace = false
+    }
+    norm += ch
+    map.push(i)
+  }
+  return { norm, map }
 }
 
 /** Page number a citation points at (for chip labels), best effort */

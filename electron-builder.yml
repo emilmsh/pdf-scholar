@@ -1,8 +1,9 @@
 # Installer configuration. Per-user NSIS install (no admin) with a .pdf
 # "Open with" association — we do NOT hijack the default PDF handler; the
 # user opts in via Windows' "Open with" / default apps UI.
+# appId stays no.emil.pdfx so NSIS recognizes existing installs and upgrades
 appId: no.emil.pdfx
-productName: PDFX
+productName: PDF Scholar
 directories:
   output: release
   buildResources: build
@@ -22,7 +23,7 @@ nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
-  artifactName: PDFX-Setup-${version}.${ext}
+  artifactName: PDF-Scholar-Setup-${version}.${ext}
 fileAssociations:
   - ext: pdf
     name: PDF-dokument

@@ -99,6 +99,7 @@ Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 refera
 - **Beslutningsport for distribusjon**: mupdf AGPL-avklaring, kodesignering, auto-oppdatering
 
 ## Tankeboks (ikke planlagt, ikke glemt)
+- **Zotero-integrasjon** (Emils notat 2026-07-12): vurdere kobling mot referanseverktøy — import av PDF-er fra Zotero-bibliotek, eksport av annoteringer/notater tilbake, evt. Better BibTeX-nøkler i referanseoppslaget.
 - **Nettleserutvidelse**: PDFX som PDF-visnings-erstatning i Edge/Chrome (MV3-extension). Fundamentet ligger til rette: renderer-en kjører allerede i ren nettleser via `bridge.ts`-fallbacks. Krever: mupdf WASM flyttet til renderer/worker, File System Access API for lagring, extension-innpakning. (Emils idé 2026-07-09.)
 - **Legg monetiseringsstrategi**: hvordan PDFX eventuelt kan tjene penger (lisens/kjøp/abonnement/gratis+pro — omfang avklares med Emil når det tas opp). NB: mupdf er AGPL — kommersiell distribusjon krever Artifex-lisens eller bytte av skrivemotor, se fase 8-porten. (Emils ønske 2026-07-09.)
 

@@ -151,7 +151,8 @@ async function chatAnthropic(
 
 /** Split text on [KILDE s.N: "quote"] markers into parts with quote citations */
 function parseQuoteContract(text: string): AiContentPart[] {
-  const regex = /\s*\[KILDE s\.?\s*(\d+):\s*[«"]([^"»]{5,300})[»"]\]/g
+  // Tolerant: curly quotes, «Kilde» casing, flexible spacing around the colon
+  const regex = /\s*\[KILDE\s+s\.?\s*(\d+)\s*:\s*[«"“]([^"«»“”\]]{5,300})["»”]\]/gi
   const parts: AiContentPart[] = []
   let last = 0
   let match: RegExpExecArray | null

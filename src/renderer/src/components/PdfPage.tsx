@@ -414,7 +414,7 @@ function PdfPage({
       <div className="link-host" ref={linkRef} />
       {drawTool && (
         <div
-          className={`draw-layer${drawTool.type === 'eraser' ? ' erasing' : ''}${drawTool.type === 'text' ? ' text-mode' : ''}`}
+          className={`draw-layer${drawTool.type === 'eraser' ? ' erasing' : ''}${drawTool.type === 'text' ? ' text-mode' : ''}${drawTool.type === 'pen' ? ' pen-mode' : ''}${drawTool.type === 'marker' ? ' marker-mode' : ''}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerEnd}

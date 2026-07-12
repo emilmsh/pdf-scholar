@@ -12,7 +12,74 @@ import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import { IconBook, IconCopy, IconGlobe, IconNote, IconSparkle, IconTranslate } from './icons'
 
-/** Palette dots/bars + last-used custom colors + a native color-wheel pick */
+const HEX_RE = /^#?[0-9a-fA-F]{6}$/
+
+/** Small popover behind the "+" swatch: a colour wheel and a hex field so
+ *  users can pick visually or paste an exact #rrggbb. */
+function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const [hex, setHex] = useState('#')
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [open])
+
+  const commit = (value: string): void => {
+    if (!HEX_RE.test(value)) return
+    onPick(value.startsWith('#') ? value.toLowerCase() : `#${value.toLowerCase()}`)
+    setOpen(false)
+  }
+
+  return (
+    <div className="color-plus-wrap" ref={ref}>
+      <button className="color-plus" title={t('menu.customColor')} onClick={() => setOpen((o) => !o)}>
+        +
+      </button>
+      {open && (
+        <div className="color-picker-pop" onMouseDown={(e) => e.stopPropagation()}>
+          <input
+            type="color"
+            className="color-picker-wheel"
+            value={HEX_RE.test(hex) ? hex : '#ffd54a'}
+            onChange={(e) => {
+              setHex(e.target.value)
+              onPick(e.target.value.toLowerCase())
+            }}
+          />
+          <input
+            type="text"
+            className="color-picker-hex"
+            value={hex}
+            placeholder="#rrggbb"
+            spellCheck={false}
+            autoFocus
+            onChange={(e) => setHex(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') commit(hex)
+              if (e.key === 'Escape') setOpen(false)
+            }}
+          />
+          <button
+            className="color-picker-apply"
+            disabled={!HEX_RE.test(hex)}
+            onClick={() => commit(hex)}
+          >
+            ✓
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Palette dots/bars + last-used custom colors + a custom hex/wheel picker */
 export function MarkupColorRow({
   palette,
   swatch,
@@ -26,6 +93,11 @@ export function MarkupColorRow({
 }): React.JSX.Element {
   const [customs, setCustoms] = useState<HighlightColor[]>(loadCustomColors)
   const colors = [...palette, ...customs.filter((c) => !palette.some((p) => p.hex === c.hex))]
+  const pickCustom = (hex: string): void => {
+    addCustomColor(hex)
+    setCustoms(loadCustomColors())
+    onPick({ key: 'custom', hex, rgb: hexToRgb(hex) })
+  }
   return (
     <div className="color-row">
       {colors.map((c) =>
@@ -48,18 +120,7 @@ export function MarkupColorRow({
           </button>
         )
       )}
-      <label className="color-plus" title={t('menu.customColor')}>
-        +
-        <input
-          type="color"
-          onChange={(e) => {
-            const hex = e.target.value
-            addCustomColor(hex)
-            setCustoms(loadCustomColors())
-            onPick({ key: 'custom', hex, rgb: hexToRgb(hex) })
-          }}
-        />
-      </label>
+      <CustomColorPicker onPick={pickCustom} />
     </div>
   )
 }
