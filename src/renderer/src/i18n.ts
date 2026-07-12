@@ -99,7 +99,10 @@ const nb = {
   'menu.underline': 'Understrek',
   'menu.underlineTip': 'Understrek ({color})',
   'menu.strikeout': 'Gjennomstrek',
+  'menu.strikeoutTip': 'Gjennomstrek ({color})',
   'menu.squiggly': 'Bølgestrek',
+  'menu.squigglyTip': 'Bølgestrek ({color})',
+  'menu.customColor': 'Velg farge …',
   'menu.note': 'Notat',
   'menu.copy': 'Kopier',
   'menu.aiExplain': 'Forklar',
@@ -114,6 +117,7 @@ const nb = {
   // Annotation popover
   'popover.notePlaceholder': 'Notattekst …',
   'popover.commentPlaceholder': 'Legg til kommentar …',
+  'popover.colorTip': '{color}',
 
   // Sidebar
   'side.pages': 'Sider',
@@ -294,7 +298,10 @@ const en: Dict = {
   'menu.underline': 'Underline',
   'menu.underlineTip': 'Underline ({color})',
   'menu.strikeout': 'Strike through',
+  'menu.strikeoutTip': 'Strike through ({color})',
   'menu.squiggly': 'Squiggly underline',
+  'menu.squigglyTip': 'Squiggly underline ({color})',
+  'menu.customColor': 'Pick a color …',
   'menu.note': 'Note',
   'menu.copy': 'Copy',
   'menu.aiExplain': 'Explain',
@@ -308,6 +315,7 @@ const en: Dict = {
 
   'popover.notePlaceholder': 'Note text …',
   'popover.commentPlaceholder': 'Add a comment …',
+  'popover.colorTip': '{color}',
 
   'side.pages': 'Pages',
   'side.contents': 'Contents',

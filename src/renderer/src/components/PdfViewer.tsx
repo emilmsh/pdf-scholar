@@ -103,6 +103,8 @@ interface PageSize {
 interface AnnotPatch {
   color?: [number, number, number]
   contents?: string
+  /** Note drag: replacement quads (engine gets quads[0] as the new rect) */
+  quads?: PageRect[]
 }
 
 /** Mutable identity for an annotation across undo/redo and document reloads */
@@ -738,11 +740,13 @@ export default function PdfViewer({
         path: payload.path,
         pageIndex: handle.pageNumber - 1,
         id: handle.fileId,
-        ...patch
+        color: patch.color,
+        contents: patch.contents,
+        rect: patch.quads?.[0]
       })
       if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: result.error }))
       // 'file' annots are painted by pdf.js from the file — refresh the canvas
-      else if (wasFilePainted && patch.color) void reloadDocument()
+      else if (wasFilePainted && (patch.color || patch.quads)) void reloadDocument()
     },
     [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
   )
@@ -824,6 +828,7 @@ export default function PdfViewer({
       const before: AnnotPatch = {}
       if (patch.color) before.color = record.color
       if (patch.contents !== undefined) before.contents = record.contents ?? ''
+      if (patch.quads) before.quads = record.quads
       pushUndo({ kind: 'change', handle, before, after: patch })
       void engineChange(handle, patch)
     },
@@ -1007,10 +1012,10 @@ export default function PdfViewer({
           applyMarkup('underline', action.color?.rgb ?? UNDERLINE_COLOR)
           break
         case 'strikeout':
-          applyMarkup('strikeout', STRIKEOUT_COLOR)
+          applyMarkup('strikeout', action.color?.rgb ?? STRIKEOUT_COLOR)
           break
         case 'squiggly':
-          applyMarkup('squiggly', UNDERLINE_COLOR)
+          applyMarkup('squiggly', action.color?.rgb ?? UNDERLINE_COLOR)
           break
         case 'note': {
           if (!menu) break
@@ -1161,6 +1166,8 @@ export default function PdfViewer({
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0 || drawToolRef.current) return
+      // A completed note drag must not open the properties popover
+      if (performance.now() - dragEndAtRef.current < 400) return
       const { clientX, clientY, target } = e
       window.setTimeout(() => {
         const sel = window.getSelection()
@@ -1183,13 +1190,109 @@ export default function PdfViewer({
     [openMenuAt]
   )
 
-  const onMouseDown = useCallback(() => {
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
     setMenu((m) => (m ? null : m))
     setAnnotPopover((p) => (p ? null : p))
     // A lingering citation highlight releases on the next interaction with
     // the document (while searching, the search UI owns the highlight)
     if (!searchOpenRef.current) setSearchHits((h) => (h ? null : h))
+    // Mousedown on a note bubble arms a drag (movement threshold decides
+    // between drag and the plain click that opens the popover)
+    if (e.button !== 0 || drawToolRef.current) return
+    const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+    if (!pageEl) return
+    const rect = pageEl.getBoundingClientRect()
+    const pageNumber = Number(pageEl.dataset.page)
+    const hit = annotationAtPoint(
+      annotsRef.current.get(pageNumber) ?? [],
+      (e.clientX - rect.left) / scaleRef.current,
+      (e.clientY - rect.top) / scaleRef.current
+    )
+    if (hit?.type === 'note' && hit.quads[0]) {
+      noteDragRef.current = {
+        pageNumber,
+        record: hit,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        moved: false
+      }
+    }
   }, [])
+
+  // ---------- Note dragging ----------
+
+  const noteDragRef = useRef<{
+    pageNumber: number
+    record: PageAnnotation
+    startClientX: number
+    startClientY: number
+    moved: boolean
+  } | null>(null)
+  const dragEndAtRef = useRef(0)
+  const [noteGhost, setNoteGhost] = useState<{
+    pageNumber: number
+    x: number
+    y: number
+    w: number
+    h: number
+    color: [number, number, number]
+  } | null>(null)
+
+  /** Where the dragged note lands for a given cursor position (page space, clamped) */
+  const dragTarget = useCallback(
+    (drag: NonNullable<typeof noteDragRef.current>, clientX: number, clientY: number) => {
+      const q = drag.record.quads[0]
+      const size = sizes[drag.pageNumber - 1]
+      const scale = scaleRef.current
+      const x = q.x + (clientX - drag.startClientX) / scale
+      const y = q.y + (clientY - drag.startClientY) / scale
+      return {
+        x: clamp(x, 0, Math.max(0, (size?.w ?? q.x + q.w) - q.w)),
+        y: clamp(y, 0, Math.max(0, (size?.h ?? q.y + q.h) - q.h))
+      }
+    },
+    [sizes]
+  )
+
+  useEffect(() => {
+    if (!active) return
+    const onMove = (e: MouseEvent): void => {
+      const drag = noteDragRef.current
+      if (!drag) return
+      if (
+        !drag.moved &&
+        Math.hypot(e.clientX - drag.startClientX, e.clientY - drag.startClientY) < 3
+      ) {
+        return
+      }
+      drag.moved = true
+      const { x, y } = dragTarget(drag, e.clientX, e.clientY)
+      const q = drag.record.quads[0]
+      setNoteGhost({ pageNumber: drag.pageNumber, x, y, w: q.w, h: q.h, color: drag.record.color })
+    }
+    const onUp = (e: MouseEvent): void => {
+      const drag = noteDragRef.current
+      noteDragRef.current = null
+      if (!drag) return
+      setNoteGhost(null)
+      if (!drag.moved) return
+      dragEndAtRef.current = performance.now()
+      const { x, y } = dragTarget(drag, e.clientX, e.clientY)
+      const q = drag.record.quads[0]
+      const dx = x - q.x
+      const dy = y - q.y
+      if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return
+      changeAnnotation(drag.pageNumber, drag.record, {
+        quads: drag.record.quads.map((quad) => ({ ...quad, x: quad.x + dx, y: quad.y + dy }))
+      })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+  }, [active, dragTarget, changeAnnotation])
 
   // ---------- Chrome / fullscreen / keyboard ----------
 
@@ -1786,6 +1889,18 @@ export default function PdfViewer({
                   />
                 )
               })}
+              {noteGhost && (
+                <div
+                  className="note-drag-ghost"
+                  style={{
+                    left: layout.lefts[noteGhost.pageNumber - 1] + noteGhost.x * scale,
+                    top: layout.tops[noteGhost.pageNumber - 1] + noteGhost.y * scale,
+                    width: noteGhost.w * scale,
+                    height: noteGhost.h * scale,
+                    background: `rgb(${noteGhost.color.map((v) => Math.round(v * 255)).join(',')})`
+                  }}
+                />
+              )}
             </div>
           ) : (
             <div className="viewer-loading">

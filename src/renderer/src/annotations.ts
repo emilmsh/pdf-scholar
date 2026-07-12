@@ -30,7 +30,7 @@ export interface PageAnnotation {
   fontSize?: number
 }
 
-export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange'
+export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange' | 'custom'
 
 export interface HighlightColor {
   key: ColorKey
@@ -38,9 +38,42 @@ export interface HighlightColor {
   rgb: [number, number, number]
 }
 
-/** Localized display name for a palette color */
+/** Localized display name for a palette color; custom picks show their hex */
 export function colorLabel(c: HighlightColor): string {
-  return t(`color.${c.key}`)
+  return c.key === 'custom' ? c.hex.toUpperCase() : t(`color.${c.key}`)
+}
+
+export function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace('#', ''), 16)
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
+}
+
+// ---------- Last-used custom colors (color-wheel picks) ----------
+
+const CUSTOM_COLORS_KEY = 'pdfx-custom-colors'
+const CUSTOM_COLORS_MAX = 3
+
+export function loadCustomColors(): HighlightColor[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CUSTOM_COLORS_KEY) ?? '[]')
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((h): h is string => typeof h === 'string' && /^#[0-9a-fA-F]{6}$/.test(h))
+      .slice(0, CUSTOM_COLORS_MAX)
+      .map((hex) => ({ key: 'custom' as const, hex, rgb: hexToRgb(hex) }))
+  } catch {
+    return []
+  }
+}
+
+/** Remember a color-wheel pick (most recent first, deduped, capped) */
+export function addCustomColor(hex: string): void {
+  const list = [hex, ...loadCustomColors().map((c) => c.hex).filter((h) => h !== hex)]
+  try {
+    localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(list.slice(0, CUSTOM_COLORS_MAX)))
+  } catch {
+    /* remembering colors is cosmetic */
+  }
 }
 
 export const HIGHLIGHT_COLORS: HighlightColor[] = [

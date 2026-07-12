@@ -97,6 +97,8 @@ export interface ModifyAnnotationRequest {
   color?: [number, number, number]
   opacity?: number
   contents?: string
+  /** Move/resize (note drag) — page space, top-left origin */
+  rect?: PageRect
 }
 
 export interface DeleteAnnotationRequest {

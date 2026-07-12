@@ -144,6 +144,11 @@ export function updateAnnotation(req: ModifyAnnotationRequest): Promise<Annotate
     }
     if (req.opacity !== undefined) annot.setOpacity(req.opacity)
     if (req.contents !== undefined) annot.setContents(req.contents)
+    // Note drag: our page space matches MuPDF's (top-left, y down). Line
+    // annots have no settable /Rect — but only notes are moved this way.
+    if (req.rect && annot.getType() !== 'Line') {
+      annot.setRect([req.rect.x, req.rect.y, req.rect.x + req.rect.w, req.rect.y + req.rect.h])
+    }
     annot.setModificationDate(new Date())
     annot.update()
     return { ok: true, id: req.id }
