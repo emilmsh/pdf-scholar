@@ -54,7 +54,14 @@ function Sidebar({
   onAskAi
 }: Props): React.JSX.Element {
   useLang()
-  const [tab, setTab] = useState<Tab>('thumbs')
+  // Contents is the scholar's default view; fall back to thumbnails when the
+  // document has no outline (unless the user already picked a tab)
+  const [tab, setTab] = useState<Tab>('outline')
+  const userPickedRef = useRef(false)
+  const pickTab = (next: Tab): void => {
+    userPickedRef.current = true
+    setTab(next)
+  }
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
   const [visibleThumbs, setVisibleThumbs] = useState<ReadonlySet<number>>(new Set())
   const listRef = useRef<HTMLDivElement>(null)
@@ -65,9 +72,15 @@ function Sidebar({
     pdf
       .getOutline()
       .then((items) => {
-        if (!cancelled) setOutline((items as OutlineNode[] | null) ?? [])
+        if (cancelled) return
+        const nodes = (items as OutlineNode[] | null) ?? []
+        setOutline(nodes)
+        if (nodes.length === 0 && !userPickedRef.current) setTab('thumbs')
       })
-      .catch(() => setOutline([]))
+      .catch(() => {
+        setOutline([])
+        if (!userPickedRef.current) setTab('thumbs')
+      })
     return () => {
       cancelled = true
     }
@@ -106,13 +119,13 @@ function Sidebar({
   return (
     <div className={`sidebar${open ? ' open' : ''}`}>
       <div className="sidebar-tabs">
-        <button className={tab === 'thumbs' ? 'active' : ''} onClick={() => setTab('thumbs')}>
-          {t('side.pages')}
-        </button>
-        <button className={tab === 'outline' ? 'active' : ''} onClick={() => setTab('outline')}>
+        <button className={tab === 'outline' ? 'active' : ''} onClick={() => pickTab('outline')}>
           {t('side.contents')}
         </button>
-        <button className={tab === 'annots' ? 'active' : ''} onClick={() => setTab('annots')}>
+        <button className={tab === 'thumbs' ? 'active' : ''} onClick={() => pickTab('thumbs')}>
+          {t('side.pages')}
+        </button>
+        <button className={tab === 'annots' ? 'active' : ''} onClick={() => pickTab('annots')}>
           {t('side.annots')}
         </button>
       </div>

@@ -45,6 +45,14 @@ export const IconFitWidth = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconFitPage = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="6.5" y="3.5" width="11" height="17" rx="1.5" />
+    <path d="M2.5 8.5v-5h5" />
+    <path d="M21.5 15.5v5h-5" />
+  </Svg>
+)
+
 export const IconExpand = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />

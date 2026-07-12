@@ -2190,3 +2190,58 @@ button {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
   pointer-events: none;
 }
+
+/* Eraser tool: a real eraser cursor instead of the generic cell cursor */
+
+.draw-layer.erasing {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M7 20L3 16a2 2 0 0 1 0-2.8l8.2-8.2a2 2 0 0 1 2.8 0L20 11a2 2 0 0 1 0 2.8L14 20z" fill="white" stroke="black" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.6 8.6l6.8 6.8" stroke="black" stroke-width="1.6"/><path d="M7 20h13" stroke="black" stroke-width="1.6" stroke-linecap="round"/></svg>') 4 20, cell;
+}
+
+/* Hover tooltip showing an annotation's comment */
+
+.annot-hover-tip {
+  position: fixed;
+  z-index: 55;
+  max-width: 264px;
+  padding: 7px 11px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: var(--shadow-menu);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  pointer-events: none;
+  animation: menu-in 0.1s ease;
+}
+
+/* Modern comment marker (SVG speech bubble) */
+
+.annot-note-mark {
+  position: absolute;
+  overflow: visible;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+/* Free text typed directly on the page, WYSIWYG */
+
+.freetext-editor {
+  position: absolute;
+  z-index: 26;
+  min-width: 80px;
+  min-height: 1.4em;
+  max-width: 340px;
+  field-sizing: content;
+  resize: none;
+  padding: 2px 4px;
+  font-family: Helvetica, Arial, sans-serif;
+  line-height: 1.35;
+  color: #1c1c21;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1.5px dashed var(--accent);
+  border-radius: 3px;
+  outline: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+}

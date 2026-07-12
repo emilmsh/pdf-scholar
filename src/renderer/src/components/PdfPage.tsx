@@ -69,7 +69,30 @@ function PdfPage({
     pointerId: number
     points: [number, number][]
     path: SVGPathElement
+    /** Snapped to a straight line (hold still while drawing, or Shift) */
+    straight: boolean
+    holdTimer: number
   } | null>(null)
+
+  /** Redraw the active stroke as a straight start→current line */
+  const snapStrokeStraight = (stroke: NonNullable<typeof strokeRef.current>): void => {
+    stroke.straight = true
+    const first = stroke.points[0]
+    const last = stroke.points[stroke.points.length - 1]
+    stroke.path.setAttribute('d', strokePathData([first, last]))
+  }
+
+  /** Holding the pen still mid-stroke straightens it (Apple Pencil-style) */
+  const armStrokeHold = (stroke: NonNullable<typeof strokeRef.current>): void => {
+    window.clearTimeout(stroke.holdTimer)
+    stroke.holdTimer = window.setTimeout(() => {
+      const active = strokeRef.current
+      if (active !== stroke || active.straight) return
+      const first = active.points[0]
+      const last = active.points[active.points.length - 1]
+      if (Math.hypot(last[0] - first[0], last[1] - first[1]) > 12) snapStrokeStraight(active)
+    }, 600)
+  }
   const shapeRef = useRef<{
     pointerId: number
     type: ShapeToolType
@@ -274,7 +297,8 @@ function PdfPage({
     path.setAttribute('opacity', String(drawTool.opacity))
     path.setAttribute('d', strokePathData([[x, y]]))
     svg.append(path)
-    strokeRef.current = { pointerId: e.pointerId, points: [[x, y]], path }
+    strokeRef.current = { pointerId: e.pointerId, points: [[x, y]], path, straight: false, holdTimer: 0 }
+    armStrokeHold(strokeRef.current)
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
@@ -307,12 +331,22 @@ function PdfPage({
         ? native.getCoalescedEvents()
         : [native]
     const el = e.currentTarget
+    let moved = false
     for (const ev of events) {
       const [x, y] = pagePointOf(ev.clientX, ev.clientY, el)
       const last = stroke.points[stroke.points.length - 1]
       if (Math.hypot(x - last[0], y - last[1]) < 0.4) continue
       stroke.points.push([x, y])
+      moved = true
     }
+    if (e.shiftKey && !stroke.straight) snapStrokeStraight(stroke)
+    if (stroke.straight) {
+      const first = stroke.points[0]
+      const last = stroke.points[stroke.points.length - 1]
+      stroke.path.setAttribute('d', strokePathData([first, last]))
+      return
+    }
+    if (moved) armStrokeHold(stroke)
     stroke.path.setAttribute('d', strokePathData(stroke.points))
   }
 
@@ -329,8 +363,14 @@ function PdfPage({
     const stroke = strokeRef.current
     if (!stroke || stroke.pointerId !== e.pointerId) return
     strokeRef.current = null
+    window.clearTimeout(stroke.holdTimer)
     stroke.path.remove()
-    if (stroke.points.length > 1) onStrokeComplete(pageNumber, stroke.points)
+    if (stroke.points.length > 1) {
+      const points = stroke.straight
+        ? [stroke.points[0], stroke.points[stroke.points.length - 1]]
+        : stroke.points
+      onStrokeComplete(pageNumber, points)
+    }
   }
 
   const style = {
@@ -470,6 +510,31 @@ function AnnotationMarks({
       >
         {annotation.contents}
       </div>
+    )
+  }
+  if (annotation.type === 'note') {
+    // Modern comment marker (speech bubble) instead of a plain colored box
+    const q = annotation.quads[0]
+    return (
+      <svg
+        className="annot annot-note-mark"
+        style={{ left: q.x * scale, top: q.y * scale }}
+        width={q.w * scale}
+        height={q.h * scale}
+        viewBox="0 0 24 24"
+      >
+        <path
+          d="M3.5 6a2.5 2.5 0 0 1 2.5 -2.5h12a2.5 2.5 0 0 1 2.5 2.5v8a2.5 2.5 0 0 1 -2.5 2.5H11l-4.5 4v-4H6a2.5 2.5 0 0 1 -2.5 -2.5z"
+          fill={rgbCss(annotation.color, 1)}
+          stroke="rgba(0,0,0,0.35)"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+        <g stroke="rgba(0,0,0,0.45)" strokeWidth="1.6" strokeLinecap="round">
+          <path d="M7.5 8.5h9" />
+          <path d="M7.5 12h6" />
+        </g>
+      </svg>
     )
   }
   return (

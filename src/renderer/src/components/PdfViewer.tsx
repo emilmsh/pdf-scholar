@@ -523,6 +523,23 @@ export default function PdfViewer({
     zoomTo((containerWidth - SIDE_PAD) / sizes[0].w)
   }, [sizes, containerWidth, zoomTo])
 
+  /** Whole page visible (Edge-style toggle companion to fit-width) */
+  const fitPage = useCallback(() => {
+    const el = containerRef.current
+    if (!el || sizes.length === 0 || el.clientWidth === 0) return
+    const fitW = (el.clientWidth - SIDE_PAD) / sizes[0].w
+    const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / sizes[0].h
+    zoomTo(Math.min(fitW, fitH))
+  }, [sizes, zoomTo])
+
+  /** Which fit the toggle button should offer next: 'page' when we are at
+   *  (or near) fit-width, otherwise 'width' */
+  const fitTarget: 'width' | 'page' = useMemo(() => {
+    if (sizes.length === 0 || containerWidth === 0) return 'page'
+    const fitW = (containerWidth - SIDE_PAD) / sizes[0].w
+    return Math.abs(scale - fitW) / fitW < 0.02 ? 'page' : 'width'
+  }, [scale, sizes, containerWidth])
+
   /** Snap a pinch-commit scale to fit-width/fit-height/fit-page when close.
    *  Tight threshold: the snap adjusts the committed scale away from what the
    *  gesture showed on screen, so anything above ~2.5% reads as a jump. */
@@ -876,6 +893,7 @@ export default function PdfViewer({
   const eraseAt = useCallback(
     (pageNumber: number, x: number, y: number) => {
       const list = annotsRef.current.get(pageNumber) ?? []
+      // Ink strokes first (path-precise hit), then any other annotation type
       for (let i = list.length - 1; i >= 0; i--) {
         const record = list[i]
         if (record.type !== 'ink') continue
@@ -884,6 +902,8 @@ export default function PdfViewer({
           return
         }
       }
+      const hit = annotationAtPoint(list, x, y)
+      if (hit) removeAnnotation(pageNumber, hit)
     },
     [removeAnnotation]
   )
@@ -1216,6 +1236,41 @@ export default function PdfViewer({
         startClientY: e.clientY,
         moved: false
       }
+    }
+  }, [])
+
+  // ---------- Hover comment tooltip ----------
+
+  const [hoverTip, setHoverTip] = useState<{ x: number; y: number; text: string } | null>(null)
+  const hoverThrottleRef = useRef(0)
+
+  const onPagesMouseMove = useCallback((e: React.MouseEvent) => {
+    const now = performance.now()
+    if (now - hoverThrottleRef.current < 80) return
+    hoverThrottleRef.current = now
+    if (drawToolRef.current || noteDragRef.current) {
+      setHoverTip((tip) => (tip ? null : tip))
+      return
+    }
+    const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+    if (!pageEl) {
+      setHoverTip((tip) => (tip ? null : tip))
+      return
+    }
+    const rect = pageEl.getBoundingClientRect()
+    const pageNumber = Number(pageEl.dataset.page)
+    const hit = annotationAtPoint(
+      annotsRef.current.get(pageNumber) ?? [],
+      (e.clientX - rect.left) / scaleRef.current,
+      (e.clientY - rect.top) / scaleRef.current
+    )
+    const text = hit?.type !== 'freetext' ? hit?.contents?.trim() : undefined
+    if (text) {
+      setHoverTip((tip) =>
+        tip && tip.text === text ? tip : { x: e.clientX, y: e.clientY, text }
+      )
+    } else {
+      setHoverTip((tip) => (tip ? null : tip))
     }
   }, [])
 
@@ -1684,6 +1739,12 @@ export default function PdfViewer({
       } else if (!isTyping && e.altKey && e.key === 'ArrowRight') {
         e.preventDefault()
         goForward()
+      } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && annotPopover) {
+        e.preventDefault()
+        const record = (annotsRef.current.get(annotPopover.pageNumber) ?? []).find(
+          (r) => r.id === annotPopover.localId
+        )
+        if (record) removeAnnotation(annotPopover.pageNumber, record)
       } else if (e.key === 'Escape') {
         if (freeTextDraft) setFreeTextDraft(null)
         else if (noteDraft) setNoteDraft(null)
@@ -1738,6 +1799,7 @@ export default function PdfViewer({
     zoomTo,
     fitWidth,
     performUndoRedo,
+    removeAnnotation,
     goBack,
     goForward
   ])
@@ -1820,6 +1882,8 @@ export default function PdfViewer({
           onZoomIn={() => zoomTo(scaleRef.current * 1.15)}
           onZoomOut={() => zoomTo(scaleRef.current / 1.15)}
           onFitWidth={fitWidth}
+          onFitPage={fitPage}
+          fitTarget={fitTarget}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
           aiOpen={aiOpen}
@@ -1854,6 +1918,8 @@ export default function PdfViewer({
           onContextMenu={onContextMenu}
           onMouseUp={onMouseUp}
           onMouseDown={onMouseDown}
+          onMouseMove={onPagesMouseMove}
+          onMouseLeave={() => setHoverTip(null)}
         >
           {layout && pdf ? (
             <div
@@ -1889,6 +1955,34 @@ export default function PdfViewer({
                   />
                 )
               })}
+              {freeTextDraft && (
+                <textarea
+                  className="freetext-editor"
+                  autoFocus
+                  rows={1}
+                  spellCheck={false}
+                  style={{
+                    left: layout.lefts[freeTextDraft.pageNumber - 1] + freeTextDraft.x * scale,
+                    top: layout.tops[freeTextDraft.pageNumber - 1] + freeTextDraft.y * scale,
+                    fontSize: FREETEXT_SIZE * scale
+                  }}
+                  onKeyDown={(e) => {
+                    e.stopPropagation()
+                    if (e.key === 'Escape') setFreeTextDraft(null)
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      const value = (e.target as HTMLTextAreaElement).value.trim()
+                      if (value) saveFreeText(value)
+                      else setFreeTextDraft(null)
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim()
+                    if (value) saveFreeText(value)
+                    else setFreeTextDraft(null)
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+              )}
               {noteGhost && (
                 <div
                   className="note-drag-ghost"
@@ -2038,13 +2132,16 @@ export default function PdfViewer({
           onCancel={() => setNoteDraft(null)}
         />
       )}
-      {freeTextDraft && (
-        <NotePopover
-          x={freeTextDraft.clientX}
-          y={freeTextDraft.clientY}
-          onSave={saveFreeText}
-          onCancel={() => setFreeTextDraft(null)}
-        />
+      {hoverTip && !menu && !annotPopover && !noteDraft && (
+        <div
+          className="annot-hover-tip"
+          style={{
+            left: Math.min(hoverTip.x + 12, window.innerWidth - 280),
+            top: Math.min(hoverTip.y + 14, window.innerHeight - 120)
+          }}
+        >
+          {hoverTip.text}
+        </div>
       )}
       {toast && <div className="toast">{toast}</div>}
     </div>

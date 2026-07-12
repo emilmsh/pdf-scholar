@@ -10,6 +10,7 @@ import {
   IconChevronLeft,
   IconEraser,
   IconExpand,
+  IconFitPage,
   IconFitWidth,
   IconFullscreen,
   IconMarker,
@@ -71,6 +72,9 @@ interface Props {
   onZoomIn(): void
   onZoomOut(): void
   onFitWidth(): void
+  onFitPage(): void
+  /** What the fit toggle offers next (Edge-style width↔page toggle) */
+  fitTarget: 'width' | 'page'
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
   aiOpen: boolean
@@ -115,6 +119,8 @@ export default function Toolbar({
   onZoomIn,
   onZoomOut,
   onFitWidth,
+  onFitPage,
+  fitTarget,
   onSettingsChange,
   onToggleSearch,
   aiOpen,
@@ -328,8 +334,12 @@ export default function Toolbar({
         <button className="tb-btn" onClick={onZoomIn} title={t('tb.zoomInTip')}>
           <IconPlus />
         </button>
-        <button className="tb-btn" onClick={onFitWidth} title={t('tb.fitWidthTip')}>
-          <IconFitWidth />
+        <button
+          className="tb-btn"
+          onClick={fitTarget === 'page' ? onFitPage : onFitWidth}
+          title={fitTarget === 'page' ? t('tb.fitPageTip') : t('tb.fitWidthTip')}
+        >
+          {fitTarget === 'page' ? <IconFitPage /> : <IconFitWidth />}
         </button>
 
         <div className="toolbar-sep" />
