@@ -99,7 +99,10 @@ function decryptKey(stored: string): string {
 function configView(): AiConfigView {
   const ai = getState().ai
   const hasKey = {} as Record<AiProviderId, boolean>
-  for (const p of PROVIDERS) hasKey[p] = p === 'mock' ? true : ai.keys[p] !== ''
+  // "Has a key" means the stored blob actually decrypts — a blob that fails
+  // DPAPI decryption must show as not-set so the user re-enters it, instead
+  // of the settings claiming a key exists while every request fails.
+  for (const p of PROVIDERS) hasKey[p] = p === 'mock' ? true : decryptKey(ai.keys[p]) !== ''
   return {
     provider: ai.provider,
     models: { ...ai.models },
@@ -372,13 +375,16 @@ export function registerAiIpc(): void {
       if (patch.keys) {
         for (const p of PROVIDERS) {
           const value = patch.keys[p]
-          if (value !== undefined) encryptedKeys[p] = encryptKey(value)
+          // Empty/blank means "no change" — there is no remove-key UI, and
+          // treating '' as a wipe is how stored keys get lost by accident
+          if (value !== undefined && value.trim() !== '') encryptedKeys[p] = encryptKey(value.trim())
         }
       }
       state.ai = mergeAiConfig(state.ai, {
         provider: patch.provider,
         models: patch.models,
         azure: patch.azure,
+        thinking: patch.thinking,
         keys: encryptedKeys
       })
       saveState()
@@ -397,7 +403,12 @@ export function registerAiIpc(): void {
       const ai = getState().ai
       const key = decryptKey(ai.keys[ai.provider])
       if (ai.provider !== 'mock' && !key) {
-        return { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
+        // Distinguish "never entered" from "stored but undecryptable"
+        // (DPAPI ties encryption to the Windows user — credential changes
+        // or a copied profile can invalidate the blob)
+        return ai.keys[ai.provider] !== ''
+          ? { error: 'API-nøkkelen kunne ikke dekrypteres (Windows-kontoen kan ha endret seg). Legg den inn på nytt i KI-innstillingene.' }
+          : { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
       }
       switch (ai.provider) {
         case 'anthropic':

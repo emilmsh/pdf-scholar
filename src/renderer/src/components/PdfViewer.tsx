@@ -665,9 +665,9 @@ export default function PdfViewer({
       const step =
         Math.abs(e.deltaY) >= 90
           ? e.deltaY < 0
-            ? 1.18
-            : 1 / 1.18
-          : Math.exp(-e.deltaY * 0.0038)
+            ? 1.22
+            : 1 / 1.22
+          : Math.exp(-e.deltaY * 0.006)
       const target = clamp(scaleRef.current * g.factor * step, ZOOM_MIN, ZOOM_MAX)
       g.factor = target / scaleRef.current
       inner.style.transform = `scale(${g.factor})`
@@ -692,6 +692,12 @@ export default function PdfViewer({
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
     toastTimerRef.current = window.setTimeout(() => setToast(null), 2600)
   }, [])
+
+  // Hide all annotations (clean reading view) — hit-testing pauses too so
+  // invisible annotations can't swallow clicks or show tooltips
+  const [annotsHidden, setAnnotsHidden] = useState(false)
+  const annotsHiddenRef = useRef(annotsHidden)
+  annotsHiddenRef.current = annotsHidden
 
   // ---------- Save model (dirty = unsaved draft exists) ----------
 
@@ -1237,7 +1243,9 @@ export default function PdfViewer({
       const px = (clientX - rect.left) / scaleRef.current
       const py = (clientY - rect.top) / scaleRef.current
       // An annotation under the cursor takes precedence over the point menu
-      const hit = annotationAtPoint(annotsRef.current.get(pageNumber) ?? [], px, py)
+      const hit = annotsHiddenRef.current
+        ? null
+        : annotationAtPoint(annotsRef.current.get(pageNumber) ?? [], px, py)
       if (hit) {
         setMenu(null)
         setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
@@ -1282,6 +1290,7 @@ export default function PdfViewer({
         if (!pageEl) return
         const rect = pageEl.getBoundingClientRect()
         const pageNumber = Number(pageEl.dataset.page)
+        if (annotsHiddenRef.current) return
         const hit = annotationAtPoint(
           annotsRef.current.get(pageNumber) ?? [],
           (clientX - rect.left) / scaleRef.current,
@@ -1301,7 +1310,7 @@ export default function PdfViewer({
     if (!searchOpenRef.current) setSearchHits((h) => (h ? null : h))
     // Mousedown on a note bubble arms a drag (movement threshold decides
     // between drag and the plain click that opens the popover)
-    if (e.button !== 0 || drawToolRef.current) return
+    if (e.button !== 0 || drawToolRef.current || annotsHiddenRef.current) return
     const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
     if (!pageEl) return
     const rect = pageEl.getBoundingClientRect()
@@ -1332,7 +1341,7 @@ export default function PdfViewer({
     if (now - hoverThrottleRef.current < 80) return
     hoverThrottleRef.current = now
     if (chromeHiddenRef.current) wakeHudRef.current()
-    if (drawToolRef.current || noteDragRef.current) {
+    if (drawToolRef.current || noteDragRef.current || annotsHiddenRef.current) {
       setHoverTip((tip) => (tip ? null : tip))
       return
     }
@@ -2215,6 +2224,8 @@ export default function PdfViewer({
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
           dirty={dirty}
           onSave={() => void saveDocument()}
+          annotsHidden={annotsHidden}
+          onToggleAnnots={() => setAnnotsHidden((h) => !h)}
           onPrint={() => {
             void bridge.printFile(payload.path).then((result) => {
               if (result && 'error' in result) showToast(t('viewer.printFailed', { error: result.error }))
@@ -2281,6 +2292,7 @@ export default function PdfViewer({
                     scale={scale}
                     active={active}
                     annotations={annots.get(pageNumber) ?? EMPTY_ANNOTS}
+                    hideAnnots={annotsHidden}
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }

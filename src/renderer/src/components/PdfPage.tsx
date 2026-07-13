@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from 'react'
-import { TextLayer } from 'pdfjs-dist'
+import { AnnotationMode, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
@@ -20,6 +20,9 @@ interface Props {
   active: boolean
   /** Annotations created this session, drawn by the overlay (PDF page space) */
   annotations: PageAnnotation[]
+  /** Hide all annotations: skips the overlay and re-renders the canvas
+   *  without the file's annotation appearances */
+  hideAnnots: boolean
   /** Rects of the active search match on this page (page space) */
   searchRects: PageRect[]
   /** Active freehand tool (pen/marker/eraser), or null when not drawing */
@@ -52,6 +55,7 @@ function PdfPage({
   scale,
   active,
   annotations,
+  hideAnnots,
   searchRects,
   drawTool,
   onInternalLink,
@@ -132,7 +136,8 @@ function PdfPage({
       const task = page.render({
         canvas,
         viewport,
-        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined
+        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+        annotationMode: hideAnnots ? AnnotationMode.DISABLE : AnnotationMode.ENABLE
       })
       renderTask = task
       await task.promise
@@ -196,7 +201,7 @@ function PdfPage({
       renderTask?.cancel()
       textLayer?.cancel()
     }
-  }, [pdf, pageNumber, scale, active, onInternalLink, onExternalLink])
+  }, [pdf, pageNumber, scale, active, hideAnnots, onInternalLink, onExternalLink])
 
   // ---------- Freehand drawing (pen/marker/eraser) ----------
 
@@ -384,7 +389,7 @@ function PdfPage({
   return (
     <div className="pdf-page" data-page={pageNumber} style={style}>
       <div className="canvas-host" ref={hostRef} />
-      {annotations.some((a) => a.source === 'session') && (
+      {!hideAnnots && annotations.some((a) => a.source === 'session') && (
         <div className="annot-overlay">
           {annotations
             .filter((a) => a.source === 'session')

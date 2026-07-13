@@ -113,9 +113,10 @@ export const IconPen = (p: IconProps): React.JSX.Element => (
 
 export const IconMarker = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
-    <path d="M9 11l-6 6v4h4l6-6" />
-    <path d="M14 6l4 4 3-3a2.8 2.8 0 0 0-4-4l-3 3z" />
-    <path d="M9 11l4 4" />
+    {/* Chisel-tip highlighter over the line it just drew */}
+    <path d="M14.5 4l5.5 5.5-8.5 8.5H7v-4.5z" />
+    <path d="M12 6.5L17.5 12" />
+    <path d="M4 21h16" />
   </Svg>
 )
 
@@ -274,6 +275,22 @@ export const IconSend = (p: IconProps): React.JSX.Element => (
 export const IconStop = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" />
+  </Svg>
+)
+
+export const IconEye = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="3" />
+  </Svg>
+)
+
+export const IconEyeOff = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4 4l16 16" />
+    <path d="M10.3 5.8A10 10 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-2.8 3.6" />
+    <path d="M6.4 6.4A15.5 15.5 0 0 0 2.5 12s3.5 6.5 9.5 6.5a9.6 9.6 0 0 0 4.1-.9" />
+    <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
   </Svg>
 )
 

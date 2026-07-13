@@ -11,6 +11,8 @@ import {
   IconChevronLeft,
   IconEraser,
   IconExpand,
+  IconEye,
+  IconEyeOff,
   IconFitPage,
   IconFitWidth,
   IconFullscreen,
@@ -100,6 +102,9 @@ interface Props {
   /** Unsaved annotation changes exist (enables the save button) */
   dirty: boolean
   onSave(): void
+  /** All annotations temporarily hidden (clean reading view) */
+  annotsHidden: boolean
+  onToggleAnnots(): void
   onPrint(): void
   readAloudOpen: boolean
   onToggleReadAloud(): void
@@ -158,6 +163,8 @@ export default function Toolbar({
   onToggleSearch,
   dirty,
   onSave,
+  annotsHidden,
+  onToggleAnnots,
   onPrint,
   readAloudOpen,
   onToggleReadAloud,
@@ -174,13 +181,16 @@ export default function Toolbar({
   const [docMenuOpen, setDocMenuOpen] = useState(false)
   const docMenuRef = useRef<HTMLDivElement>(null)
 
+  // Outside-click closers listen for pointerdown in the capture phase:
+  // pointerdown always fires (page overlays may suppress the compat
+  // mousedown via preventDefault) and capture beats stopPropagation.
   useEffect(() => {
     if (!docMenuOpen) return
-    const close = (e: MouseEvent): void => {
+    const close = (e: Event): void => {
       if (docMenuRef.current && !docMenuRef.current.contains(e.target as Node)) setDocMenuOpen(false)
     }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
   }, [docMenuOpen])
   const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -188,11 +198,11 @@ export default function Toolbar({
 
   useEffect(() => {
     if (!toolMenu) return
-    const close = (e: MouseEvent): void => {
+    const close = (e: Event): void => {
       if (toolMenuRef.current && !toolMenuRef.current.contains(e.target as Node)) setToolMenu(null)
     }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
   }, [toolMenu])
 
   const selectTool = (tool: 'pen' | 'marker' | 'eraser'): void => {
@@ -222,11 +232,11 @@ export default function Toolbar({
 
   useEffect(() => {
     if (!viewMenuOpen) return
-    const close = (e: MouseEvent): void => {
+    const close = (e: Event): void => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setViewMenuOpen(false)
     }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
   }, [viewMenuOpen])
 
   const commitPage = (): void => {
@@ -312,6 +322,13 @@ export default function Toolbar({
             title={t('tb.textTip')}
           >
             <IconText />
+          </button>
+          <button
+            className={`tb-btn${annotsHidden ? ' is-active' : ''}`}
+            onClick={onToggleAnnots}
+            title={annotsHidden ? t('tb.showAnnotsTip') : t('tb.hideAnnotsTip')}
+          >
+            {annotsHidden ? <IconEyeOff /> : <IconEye />}
           </button>
 
           {toolMenu && (
@@ -434,6 +451,7 @@ export default function Toolbar({
           <input
             value={pageInput}
             onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
+            onFocus={(e) => e.currentTarget.select()}
             onBlur={commitPage}
             onKeyDown={(e) => {
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
@@ -454,6 +472,7 @@ export default function Toolbar({
             autoFocus
             value={zoomInput}
             onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
+            onFocus={(e) => e.currentTarget.select()}
             onBlur={() => setZoomEditing(false)}
             onKeyDown={(e) => {
               e.stopPropagation()

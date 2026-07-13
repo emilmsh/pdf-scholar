@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { AiConfig, AiProviderId, ReadingPosition, RecentFile, Settings } from '../shared/types'
 export type { Settings }
@@ -92,7 +92,18 @@ export function getState(): AppState {
       settings: mergeSettings(DEFAULTS.settings, parsed.settings ?? {}),
       ai: mergeAiConfig(DEFAULT_AI, parsed.ai ?? {})
     }
-  } catch {
+  } catch (err) {
+    // A file that exists but won't parse holds data (encrypted API keys!)
+    // that the next saveState would otherwise overwrite with defaults —
+    // keep a copy so nothing is lost permanently.
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.error('pdfx: state file unreadable, backing it up', err)
+      try {
+        copyFileSync(stateFile(), stateFile() + '.corrupt')
+      } catch {
+        /* backup is best-effort */
+      }
+    }
     loaded = structuredClone(DEFAULTS)
   }
   cached = loaded
@@ -102,7 +113,12 @@ export function getState(): AppState {
 export function saveState(): void {
   try {
     mkdirSync(dirname(stateFile()), { recursive: true })
-    writeFileSync(stateFile(), JSON.stringify(getState(), null, 2))
+    // Atomic write: a crash mid-write must never truncate the state file —
+    // it holds the encrypted API keys, and a half-written JSON would be
+    // replaced by defaults on the next launch.
+    const tmp = stateFile() + '.tmp'
+    writeFileSync(tmp, JSON.stringify(getState(), null, 2))
+    renameSync(tmp, stateFile())
   } catch (err) {
     console.error('pdfx: failed to save state', err)
   }
