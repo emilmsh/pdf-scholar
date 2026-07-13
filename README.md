@@ -13,8 +13,12 @@ in the document, and nothing gets between you and the page.
 
 **Reading**
 - Buttery smooth scrolling, pinch zoom that never jumps on release, fit width/page toggle
-- Day / Parchment / Night themes with per-theme contrast and brightness sliders
-- Distraction-free mode: all chrome fades away; hover the top edge to peek
+- Day / Sepia / Night / Night+ themes — a warm ivory reading mode and two dark modes
+  (soft and high-contrast)
+- Distraction-free mode: all chrome fades away; hover the top edge for the toolbar,
+  the left edge for the table of contents, the right edge for the assistant
+- Single-key shortcuts while reading: D (distraction-free), T (contents), A (assistant),
+  H (hide annotations), R (read aloud), F (fit width/page)
 - Table of contents, thumbnails, back/forward navigation after following internal links
 - Remembers your reading position and recent files; opens straight from Explorer
 - **Read aloud**: sentence-by-sentence speech with the highlight following along,
@@ -47,10 +51,10 @@ in the document, and nothing gets between you and the page.
 
 **Scholarly by design**
 
-![Parchment theme](docs/screenshots/parchment.png)
+![Sepia theme](docs/screenshots/parchment.png)
 
-Norwegian and English UI. The Parchment theme brings a warm, golden-ochre reading mood —
-think researching old manuscripts, subtly.
+Norwegian and English UI. The Sepia theme brings a warm ivory reading mood with a
+terracotta accent — calm on the eyes for long sessions.
 
 ## Development
 

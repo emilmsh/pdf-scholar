@@ -58,16 +58,28 @@ app.whenReady().then(async () => {
   )
   await capture(win, 'assistant.png')
 
-  // Parchment theme
+  // Sepia theme — set it through the real settings path so nothing
+  // re-applies the stored theme before the capture
   await run(
     win,
     `const wait=(ms)=>new Promise(r=>setTimeout(r,ms));
      document.querySelector('.ai-header button[title*="Lukk"], .ai-header button:last-child')?.click();
      await wait(200);
-     document.documentElement.dataset.theme='sepia';
+     document.querySelector('button[title="Visningsinnstillinger"]')?.click();
+     await wait(200);
+     document.querySelector('.theme-option.theme-sepia')?.click();
+     await wait(200);
+     document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+     await wait(100);
      document.querySelector('button[title*="Sidepanel"]')?.click();
      await wait(1200);`
   )
+  const diag = await win.webContents.executeJavaScript(
+    `document.documentElement.dataset.theme + ' | accent=' +
+     getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() + ' | option=' +
+     !!document.querySelector('.theme-option.theme-sepia')`
+  )
+  console.log('theme diag:', diag)
   await capture(win, 'parchment.png')
 
   app.quit()

@@ -193,6 +193,10 @@ export default function PdfViewer({
   const [error, setError] = useState<string | null>(null)
   const [chromeHidden, setChromeHidden] = useState(false)
   const [peek, setPeek] = useState(false)
+  /** Edge-hover panel in distraction-free: contents (left) or AI (right) */
+  const [sidePeek, setSidePeek] = useState<'toc' | 'ai' | null>(null)
+  const sidePeekRef = useRef(sidePeek)
+  sidePeekRef.current = sidePeek
   const [fullscreen, setFullscreen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -1341,6 +1345,8 @@ export default function PdfViewer({
     if (now - hoverThrottleRef.current < 80) return
     hoverThrottleRef.current = now
     if (chromeHiddenRef.current) wakeHudRef.current()
+    // Moving back over the pages retracts an edge-hover panel
+    if (sidePeekRef.current) setSidePeek(null)
     if (drawToolRef.current || noteDragRef.current || annotsHiddenRef.current) {
       setHoverTip((tip) => (tip ? null : tip))
       return
@@ -1473,17 +1479,18 @@ export default function PdfViewer({
     setChromeHidden((hidden) => {
       const next = !hidden
       setPeek(false)
+      setSidePeek(null)
       if (next) showToast(t('viewer.distractionToast'))
       return next
     })
   }, [showToast])
 
+  // Fullscreen is just fullscreen — distraction-free is its own mode and the
+  // user combines them as they like
   const toggleFullscreen = useCallback(() => {
     setFullscreen((f) => {
       const next = !f
       bridge.setFullscreen(next)
-      setChromeHidden(next)
-      setPeek(false)
       if (next) showToast(t('viewer.fullscreenToast'))
       return next
     })
@@ -2083,6 +2090,7 @@ export default function PdfViewer({
         else if (chromeHidden) {
           setChromeHidden(false)
           setPeek(false)
+          setSidePeek(null)
         }
       } else if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault()
@@ -2099,12 +2107,40 @@ export default function PdfViewer({
       } else if (e.ctrlKey && e.key === '0') {
         e.preventDefault()
         fitWidth()
+      } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // Single-key reading shortcuts (never fire while typing)
+        const k = e.key.toLowerCase()
+        if (k === 'd') {
+          e.preventDefault()
+          toggleChrome()
+        } else if (k === 't') {
+          e.preventDefault()
+          setSidebarOpen((o) => !o)
+        } else if (k === 'a') {
+          e.preventDefault()
+          setAiOpen((o) => !o)
+        } else if (k === 'h') {
+          e.preventDefault()
+          setAnnotsHidden((h) => !h)
+        } else if (k === 'r') {
+          e.preventDefault()
+          if (readAloud === 'closed') void startReadAloud()
+          else stopReadAloud()
+        } else if (k === 'f') {
+          e.preventDefault()
+          if (fitTarget === 'page') fitPage()
+          else fitWidth()
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [
     active,
+    toggleChrome,
+    startReadAloud,
+    fitTarget,
+    fitPage,
     freeTextDraft,
     noteDraft,
     menu,
@@ -2243,10 +2279,16 @@ export default function PdfViewer({
         />
       </div>
       {chromeHidden && <div className="reveal-zone" onMouseEnter={() => setPeek(true)} />}
+      {chromeHidden && (
+        <div className="reveal-zone-left" onMouseEnter={() => setSidePeek('toc')} />
+      )}
+      {chromeHidden && (
+        <div className="reveal-zone-right" onMouseEnter={() => setSidePeek('ai')} />
+      )}
 
       <div className="viewer-body">
         <Sidebar
-          open={sidebarOpen && !chromeHidden}
+          open={chromeHidden ? sidePeek === 'toc' : sidebarOpen}
           pdf={pdf}
           sizes={sizes}
           currentPage={currentPage}
@@ -2356,7 +2398,7 @@ export default function PdfViewer({
         </div>
 
         <AiPanel
-          open={aiOpen && !chromeHidden}
+          open={chromeHidden ? sidePeek === 'ai' : aiOpen}
           docTitle={payload.name}
           seed={aiSeed}
           onSeedConsumed={consumeAiSeed}

@@ -118,6 +118,7 @@ const THEMES: { id: ThemePreference; labelKey: MsgKey }[] = [
   { id: 'day', labelKey: 'tb.themeDay' },
   { id: 'sepia', labelKey: 'tb.themeSepia' },
   { id: 'night', labelKey: 'tb.themeNight' },
+  { id: 'nightHc', labelKey: 'tb.themeNightHc' },
   { id: 'auto', labelKey: 'tb.themeAuto' }
 ]
 
@@ -243,13 +244,6 @@ export default function Toolbar({
     const n = parseInt(pageInput, 10)
     if (!Number.isNaN(n)) onGoToPage(n)
     else setPageInput(String(page))
-  }
-
-  const adjust = settings.themeAdjust[resolvedTheme]
-  const setAdjust = (key: 'contrast' | 'brightness', value: number): void => {
-    onSettingsChange({
-      themeAdjust: { ...settings.themeAdjust, [resolvedTheme]: { ...adjust, [key]: value } }
-    })
   }
 
   return (
@@ -565,50 +559,6 @@ export default function Toolbar({
                     <span>{t(theme.labelKey)}</span>
                   </button>
                 ))}
-              </div>
-
-              <div className="theme-menu-label slider-label">
-                {t('tb.contrast')}
-                <output>{Math.round(adjust.contrast * 100)}%</output>
-              </div>
-              <input
-                type="range"
-                min="0.6"
-                max="1.4"
-                step="0.02"
-                value={adjust.contrast}
-                onChange={(e) => setAdjust('contrast', Number(e.target.value))}
-                aria-label={t('tb.contrast')}
-              />
-
-              <div className="theme-menu-label slider-label">
-                {t('tb.brightness')}
-                <output>{Math.round(adjust.brightness * 100)}%</output>
-              </div>
-              <input
-                type="range"
-                min="0.6"
-                max="1.4"
-                step="0.02"
-                value={adjust.brightness}
-                onChange={(e) => setAdjust('brightness', Number(e.target.value))}
-                aria-label={t('tb.brightness')}
-              />
-
-              <div className="theme-menu-row">
-                <button
-                  className="menu-reset"
-                  onClick={() =>
-                    onSettingsChange({
-                      themeAdjust: {
-                        ...settings.themeAdjust,
-                        [resolvedTheme]: { contrast: 1, brightness: 1 }
-                      }
-                    })
-                  }
-                >
-                  {t('tb.reset')}
-                </button>
               </div>
 
               <div className="theme-menu-sep" />

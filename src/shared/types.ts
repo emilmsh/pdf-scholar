@@ -1,21 +1,15 @@
 // Types shared between the Electron main process, preload bridge and renderer.
 
-export type ThemeName = 'day' | 'sepia' | 'night'
+/** 'night' is the softer dark mode; 'nightHc' is the high-contrast one */
+export type ThemeName = 'day' | 'sepia' | 'night' | 'nightHc'
 /** User's theme choice — 'auto' follows the OS light/dark setting */
 export type ThemePreference = ThemeName | 'auto'
-
-/** Per-theme page adjustments; 1 = neutral, sensible range 0.6–1.4 */
-export interface ThemeAdjust {
-  contrast: number
-  brightness: number
-}
 
 /** UI language — 'auto' follows the OS/browser language */
 export type LanguagePreference = 'nb' | 'en' | 'auto'
 
 export interface Settings {
   theme: ThemePreference
-  themeAdjust: Record<ThemeName, ThemeAdjust>
   keepAwake: boolean
   language: LanguagePreference
   /** Show the classic tab bar; default is the document picker in the toolbar */

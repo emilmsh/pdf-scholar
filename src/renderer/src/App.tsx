@@ -20,11 +20,6 @@ interface OpenTab {
 
 const FALLBACK_SETTINGS: Settings = {
   theme: 'day',
-  themeAdjust: {
-    day: { contrast: 1, brightness: 1 },
-    sepia: { contrast: 1, brightness: 1 },
-    night: { contrast: 1, brightness: 1 }
-  },
   keepAwake: false,
   language: 'auto',
   showTabBar: false
@@ -72,14 +67,10 @@ export default function App(): React.JSX.Element {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  // Apply resolved theme + per-theme page adjustments as CSS variables
+  // Apply the resolved theme (all page recoloring lives in the theme's CSS)
   useEffect(() => {
-    const root = document.documentElement
-    root.dataset.theme = resolvedTheme
-    const adjust = settings.themeAdjust[resolvedTheme]
-    root.style.setProperty('--page-contrast', String(adjust.contrast))
-    root.style.setProperty('--page-brightness', String(adjust.brightness))
-  }, [resolvedTheme, settings.themeAdjust])
+    document.documentElement.dataset.theme = resolvedTheme
+  }, [resolvedTheme])
 
   // Keep the i18n store in sync with the language setting
   useEffect(() => {
@@ -87,11 +78,7 @@ export default function App(): React.JSX.Element {
   }, [settings.language])
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
-    setSettingsState((prev) => ({
-      ...prev,
-      ...patch,
-      themeAdjust: { ...prev.themeAdjust, ...patch.themeAdjust }
-    }))
+    setSettingsState((prev) => ({ ...prev, ...patch }))
     bridge.setSettings(patch)
   }, [])
 

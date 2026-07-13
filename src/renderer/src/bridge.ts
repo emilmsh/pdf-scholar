@@ -22,11 +22,6 @@ const LS_KEY = 'pdfx-web-state'
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'day',
-  themeAdjust: {
-    day: { contrast: 1, brightness: 1 },
-    sepia: { contrast: 1, brightness: 1 },
-    night: { contrast: 1, brightness: 1 }
-  },
   keepAwake: false,
   language: 'auto',
   showTabBar: false
@@ -39,11 +34,7 @@ function loadWebState(): WebState {
     return {
       ...fallback,
       ...parsed,
-      settings: {
-        ...DEFAULT_SETTINGS,
-        ...parsed.settings,
-        themeAdjust: { ...DEFAULT_SETTINGS.themeAdjust, ...parsed.settings?.themeAdjust }
-      }
+      settings: { ...DEFAULT_SETTINGS, ...parsed.settings }
     }
   } catch {
     return fallback
@@ -92,11 +83,7 @@ const webApi: PdfxApi = {
   },
   setSettings: (patch) => {
     const state = loadWebState()
-    state.settings = {
-      ...state.settings,
-      ...patch,
-      themeAdjust: { ...state.settings.themeAdjust, ...patch.themeAdjust }
-    }
+    state.settings = { ...state.settings, ...patch }
     saveWebState(state)
   },
   // Browser preview cannot write to disk — accept the annotation so the UI

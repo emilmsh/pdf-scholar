@@ -43,11 +43,6 @@ const DEFAULTS: AppState = {
   positions: {},
   settings: {
     theme: 'day',
-    themeAdjust: {
-      day: { contrast: 1, brightness: 1 },
-      sepia: { contrast: 1, brightness: 1 },
-      night: { contrast: 1, brightness: 1 }
-    },
     keepAwake: false,
     language: 'auto',
     showTabBar: false
@@ -74,11 +69,7 @@ let cached: AppState | null = null
 const stateFile = (): string => join(app.getPath('userData'), 'pdfx-state.json')
 
 export function mergeSettings(base: Settings, patch: Partial<Settings>): Settings {
-  return {
-    ...base,
-    ...patch,
-    themeAdjust: { ...base.themeAdjust, ...patch.themeAdjust }
-  }
+  return { ...base, ...patch }
 }
 
 export function getState(): AppState {
