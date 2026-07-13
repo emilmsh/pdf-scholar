@@ -96,6 +96,24 @@ const GESTURE_SETTLE = 160
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
 
+/** Drag-resizable panel widths: defaults, clamps and persistence */
+const PANEL_DEFAULTS = { sidebar: 212, ai: 340 }
+const PANEL_MIN = { sidebar: 160, ai: 264 }
+const PANEL_MAX = { sidebar: 460, ai: 600 }
+const PANEL_LS_KEY = 'pdfx-panel-widths'
+
+function loadPanelWidths(): { sidebar: number; ai: number } {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PANEL_LS_KEY) ?? '{}')
+    return {
+      sidebar: clamp(Number(parsed.sidebar) || PANEL_DEFAULTS.sidebar, PANEL_MIN.sidebar, PANEL_MAX.sidebar),
+      ai: clamp(Number(parsed.ai) || PANEL_DEFAULTS.ai, PANEL_MIN.ai, PANEL_MAX.ai)
+    }
+  } catch {
+    return { ...PANEL_DEFAULTS }
+  }
+}
+
 interface PageSize {
   w: number
   h: number
@@ -211,6 +229,11 @@ export default function PdfViewer({
     localId: string
   } | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  /** Drag-resizable panel widths (px), persisted per user */
+  const [panelW, setPanelW] = useState(loadPanelWidths)
+  const panelWRef = useRef(panelW)
+  panelWRef.current = panelW
+  const [resizingPanel, setResizingPanel] = useState<'sidebar' | 'ai' | null>(null)
   const [navStacks, setNavStacks] = useState<{ back: NavPosition[]; forward: NavPosition[] }>({
     back: [],
     forward: []
@@ -702,6 +725,42 @@ export default function PdfViewer({
   const [annotsHidden, setAnnotsHidden] = useState(false)
   const annotsHiddenRef = useRef(annotsHidden)
   annotsHiddenRef.current = annotsHidden
+
+  // ---------- Panel resizing (sidebar / AI panel dividers) ----------
+
+  const persistPanelWidths = (): void => {
+    try {
+      localStorage.setItem(PANEL_LS_KEY, JSON.stringify(panelWRef.current))
+    } catch {
+      /* width preference is best-effort */
+    }
+  }
+
+  const beginPanelResize = useCallback((panel: 'sidebar' | 'ai', e: React.PointerEvent) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = panelWRef.current[panel]
+    setResizingPanel(panel)
+    const onMove = (ev: PointerEvent): void => {
+      // The sidebar grows rightwards, the AI panel leftwards
+      const raw = panel === 'sidebar' ? startW + (ev.clientX - startX) : startW - (ev.clientX - startX)
+      const w = clamp(Math.round(raw), PANEL_MIN[panel], PANEL_MAX[panel])
+      setPanelW((p) => (p[panel] === w ? p : { ...p, [panel]: w }))
+    }
+    const onUp = (): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setResizingPanel(null)
+      persistPanelWidths()
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }, [])
+
+  const resetPanelWidth = useCallback((panel: 'sidebar' | 'ai') => {
+    setPanelW((p) => ({ ...p, [panel]: PANEL_DEFAULTS[panel] }))
+    window.setTimeout(persistPanelWidths, 0)
+  }, [])
 
   // ---------- Save model (dirty = unsaved draft exists) ----------
 
@@ -2286,7 +2345,10 @@ export default function PdfViewer({
         <div className="reveal-zone-right" onMouseEnter={() => setSidePeek('ai')} />
       )}
 
-      <div className="viewer-body">
+      <div
+        className={`viewer-body${resizingPanel ? ' panel-resizing' : ''}`}
+        style={{ '--sidebar-w': `${panelW.sidebar}px`, '--ai-w': `${panelW.ai}px` } as React.CSSProperties}
+      >
         <Sidebar
           open={chromeHidden ? sidePeek === 'toc' : sidebarOpen}
           pdf={pdf}
@@ -2301,6 +2363,14 @@ export default function PdfViewer({
           onExport={(format) => void exportAnnotations(format)}
           onAskAi={askAnnotations}
         />
+        {sidebarOpen && !chromeHidden && (
+          <div
+            className={`panel-resizer${resizingPanel === 'sidebar' ? ' active' : ''}`}
+            title={t('viewer.resizerTip')}
+            onPointerDown={(e) => beginPanelResize('sidebar', e)}
+            onDoubleClick={() => resetPanelWidth('sidebar')}
+          />
+        )}
 
         <div
           className={`pages${drawTool ? ' drawing' : ''}`}
@@ -2397,6 +2467,14 @@ export default function PdfViewer({
           )}
         </div>
 
+        {aiOpen && !chromeHidden && (
+          <div
+            className={`panel-resizer${resizingPanel === 'ai' ? ' active' : ''}`}
+            title={t('viewer.resizerTip')}
+            onPointerDown={(e) => beginPanelResize('ai', e)}
+            onDoubleClick={() => resetPanelWidth('ai')}
+          />
+        )}
         <AiPanel
           open={chromeHidden ? sidePeek === 'ai' : aiOpen}
           docTitle={payload.name}

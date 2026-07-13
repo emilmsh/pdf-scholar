@@ -9,6 +9,15 @@ in the document, and nothing gets between you and the page.
 
 ![Reading view](docs/screenshots/reading.png)
 
+## Download
+
+[![Latest release](https://img.shields.io/github/v/release/emilmsh/pdf-scholar?label=Windows%20installer&color=c96442)](https://github.com/emilmsh/pdf-scholar/releases/latest)
+
+**[⬇ Get PDF Scholar for Windows](https://github.com/emilmsh/pdf-scholar/releases/latest)** —
+download `PDF-Scholar-Setup-*.exe` from the latest release and run it. It installs in seconds
+and opens PDFs straight from Explorer. Everything works out of the box; add your own
+Anthropic/OpenAI API key in the assistant settings if you want the AI features.
+
 ## Highlights
 
 **Reading**
@@ -73,5 +82,10 @@ the annotation engine, the AI providers and the draft-based save model. See `CLA
 
 ## Status
 
-Personal project under active development. Not distributed; mupdf is AGPL-licensed, which is
-revisited before any distribution.
+Personal project under active development. Installers are attached to
+[GitHub releases](https://github.com/emilmsh/pdf-scholar/releases).
+
+Note on licensing: the annotation engine uses [mupdf](https://mupdf.com/), which is
+AGPL-3.0-licensed. Distributing builds publicly therefore requires this project to be
+available under AGPL-compatible terms — settle the project license before making the
+repository public.

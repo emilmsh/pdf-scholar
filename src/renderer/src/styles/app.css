@@ -809,8 +809,44 @@ button {
 }
 
 .sidebar.open {
-  width: 212px;
+  width: var(--sidebar-w, 212px);
   border-right-color: var(--border);
+}
+
+/* Drag handle between a panel and the pages (double-click resets) */
+.panel-resizer {
+  flex: 0 0 7px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 5;
+}
+
+.panel-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 3px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.panel-resizer:hover::after,
+.panel-resizer.active::after {
+  background: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* While dragging: no text selection, no width transition fighting the hand */
+.viewer-body.panel-resizing {
+  user-select: none;
+  cursor: col-resize;
+}
+
+.viewer-body.panel-resizing .sidebar {
+  transition: none;
 }
 
 .sidebar-tabs {
@@ -1748,7 +1784,7 @@ button {
 .ai-panel {
   display: flex;
   flex-direction: column;
-  width: 340px;
+  width: var(--ai-w, 340px);
   flex-shrink: 0;
   background: var(--bg-chrome);
   border-left: 1px solid var(--border);

@@ -175,6 +175,7 @@ const nb = {
   'viewer.annotChangeFailed': 'Kunne ikke endre annotasjonen: {error}',
   'viewer.distractionToast':
     'Distraksjonsfri lesing — Esc avslutter, hover kantene for verktøylinje, innhold og assistent',
+  'viewer.resizerTip': 'Dra for å endre bredde — dobbeltklikk nullstiller',
   'viewer.fullscreenToast': 'Fullskjerm — trykk Esc eller F11 for å avslutte',
   'viewer.nothingToExport': 'Ingen merknader å eksportere',
   'viewer.saveFailed': 'Kunne ikke lagre: {error}',
@@ -400,6 +401,7 @@ const en: Dict = {
   'viewer.annotChangeFailed': 'Could not change the annotation: {error}',
   'viewer.distractionToast':
     'Distraction-free reading — Esc exits, hover the edges for toolbar, contents and assistant',
+  'viewer.resizerTip': 'Drag to resize — double-click to reset',
   'viewer.fullscreenToast': 'Full screen — press Esc or F11 to exit',
   'viewer.nothingToExport': 'No annotations to export',
   'viewer.saveFailed': 'Could not save: {error}',
