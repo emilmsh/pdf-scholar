@@ -1217,6 +1217,12 @@ button {
   user-select: none;
 }
 
+/* While selecting, endOfContent covers the page so drags that start or
+   end between lines anchor sanely (pdf.js viewer does the same) */
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
 .textLayer ::selection {
   background: color-mix(in srgb, var(--accent) 34%, transparent);
 }
@@ -2778,11 +2784,16 @@ button {
   font-size: 12.5px;
   font-weight: 600;
   color: var(--text);
+  /* Reads as a dropdown control at rest — new users should see that
+     the file name is clickable without having to hover it */
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
 }
 
 .toolbar-title:hover,
 .toolbar-title.is-active {
   background: var(--hover);
+  border-color: color-mix(in srgb, var(--text-secondary) 35%, transparent);
 }
 
 .toolbar-title-text {

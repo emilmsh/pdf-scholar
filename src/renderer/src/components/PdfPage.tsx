@@ -163,6 +163,16 @@ function PdfPage({
       const endOfContent = document.createElement('div')
       endOfContent.className = 'endOfContent'
       textDiv.append(endOfContent)
+      // pdf.js's selection trick: while the mouse is down, .endOfContent
+      // expands to cover the page (CSS .selecting) so a drag that starts
+      // in the empty space between lines anchors there instead of
+      // selecting the entire page
+      textDiv.addEventListener('mousedown', () => {
+        textDiv.classList.add('selecting')
+        window.addEventListener('mouseup', () => textDiv.classList.remove('selecting'), {
+          once: true
+        })
+      })
       textHost.replaceChildren(textDiv)
 
       // Clickable link annotations (internal destinations + external URLs)
