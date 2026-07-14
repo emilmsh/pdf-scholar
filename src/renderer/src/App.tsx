@@ -35,8 +35,8 @@ export default function App(): React.JSX.Element {
     () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
   )
   const [error, setError] = useState<string | null>(null)
-  /** Active tab is in distraction-free mode → tuck the tab bar too */
-  const [immersive, setImmersive] = useState(false)
+  /** Active tab is in presentation mode → tuck the tab bar too */
+  const [presenting, setPresenting] = useState(false)
   /** Tab ids with unsaved annotation changes (save model) */
   const [dirtyTabs, setDirtyTabs] = useState<ReadonlySet<string>>(new Set())
   const dirtyTabsRef = useRef(dirtyTabs)
@@ -264,13 +264,14 @@ export default function App(): React.JSX.Element {
           dirty: dirtyTabs.has(t.id)
         }))}
         activeId={activeId}
-        hidden={immersive || fullscreen}
+        hidden={presenting || fullscreen}
         onSelect={setActiveId}
         onClose={closeTab}
         onNewTab={() => void openDialog()}
         onNewWindow={() => bridge.newWindow()}
         onOpenInNewWindow={(path) => bridge.newWindow(path)}
         onShowInFolder={(path) => bridge.showInFolder(path)}
+        onLibrary={() => activeId && closeTab(activeId)}
       />
 
       {tabs.length > 0 ? (
@@ -284,7 +285,7 @@ export default function App(): React.JSX.Element {
                 settings={settings}
                 resolvedTheme={resolvedTheme}
                 onSettingsChange={updateSettings}
-                onImmersiveChange={setImmersive}
+                onPresentationChange={setPresenting}
                 onDirtyChange={(dirty) => setTabDirty(tab.id, dirty)}
                 onClose={() => closeTab(tab.id)}
               />

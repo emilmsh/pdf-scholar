@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { t, useLang } from '../i18n'
+import { IconChevronLeft } from './icons'
 
 export interface TabInfo {
   id: string
@@ -12,7 +13,7 @@ export interface TabInfo {
 interface Props {
   tabs: TabInfo[]
   activeId: string | null
-  /** Fullscreen or distraction-free: collapse the strip */
+  /** Fullscreen or presentation: collapse the strip */
   hidden: boolean
   onSelect(id: string): void
   onClose(id: string): void
@@ -20,6 +21,8 @@ interface Props {
   onNewWindow(): void
   onOpenInNewWindow(path: string): void
   onShowInFolder(path: string): void
+  /** Back to the library (closes the active document) */
+  onLibrary(): void
 }
 
 /** Tiny scroll glyph shown at the left of the titlebar (matches the app icon) */
@@ -40,7 +43,8 @@ export default function TabBar({
   onNewTab,
   onNewWindow,
   onOpenInNewWindow,
-  onShowInFolder
+  onShowInFolder,
+  onLibrary
 }: Props): React.JSX.Element {
   useLang()
   const [menu, setMenu] = useState<{ x: number; y: number; tab: TabInfo } | null>(null)
@@ -63,10 +67,19 @@ export default function TabBar({
   return (
     <div className={`tab-bar${hidden ? ' tucked' : ''}`}>
       <div className="tab-bar-inner">
-      <span className="tab-app-glyph" aria-hidden="true">
-        <AppGlyph />
-      </span>
-      {tabs.length === 0 && <span className="tab-app-name">PDF Scholar</span>}
+      {tabs.length > 0 ? (
+        <button className="tab-library" onClick={onLibrary} title={t('tb.libraryTip')}>
+          <IconChevronLeft size={15} />
+          <span>{t('tb.library')}</span>
+        </button>
+      ) : (
+        <>
+          <span className="tab-app-glyph" aria-hidden="true">
+            <AppGlyph />
+          </span>
+          <span className="tab-app-name">PDF Scholar</span>
+        </>
+      )}
       {tabs.map((tab) => (
         <div
           key={tab.id}

@@ -165,6 +165,28 @@ button {
   padding: 0 6px 0 2px;
 }
 
+/* Library button at the far left of the titlebar tab strip (moved out of the
+   toolbar so the side panels can own the toolbar's edges) */
+.tab-library {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  padding: 0 9px 0 5px;
+  margin-right: 4px;
+  border-radius: 7px;
+  color: var(--accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+}
+
+.tab-library:hover {
+  background: var(--hover);
+}
+
 .tab-app-name {
   align-self: center;
   font-size: 12px;
@@ -451,7 +473,10 @@ button {
   transition: transform 0.22s ease, opacity 0.22s ease;
 }
 
-.viewer.chrome-hidden .toolbar-wrap {
+/* Unpinned toolbar overlays the pages from the top edge. It sits BELOW the
+   titlebar tab strip (which stays put), so it never lands under the native
+   window controls — the reason the old distraction mode trapped the user. */
+.viewer.toolbar-unpinned .toolbar-wrap {
   position: absolute;
   top: 0;
   left: 0;
@@ -464,6 +489,7 @@ button {
   pointer-events: none;
 }
 
+/* Top hot-zone reveals the unpinned toolbar on hover */
 .reveal-zone {
   position: absolute;
   top: 0;
@@ -473,49 +499,83 @@ button {
   z-index: 29;
 }
 
-/* Distraction-free edge hovers: contents on the left, assistant on the
-   right. Kept below the top zone's corners. */
-.reveal-zone-left,
-.reveal-zone-right {
+/* ---- Edge rails: thin always-present grabbers at the extreme sides. Click
+   toggles the panel pinned; hover peeks it (retracts on page hover). ---- */
+.edge-rail {
   position: absolute;
-  top: 56px;
-  bottom: 56px;
-  width: 12px;
-  z-index: 28;
+  top: 46px;
+  bottom: 0;
+  width: 15px;
+  z-index: 33;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
-.reveal-zone-left {
+.edge-rail-left {
   left: 0;
+  justify-content: flex-start;
 }
 
-.reveal-zone-right {
+.edge-rail-right {
   right: 0;
+  justify-content: flex-end;
 }
 
-/* The peeked panels overlay the pages absolutely — they must never shift
-   the layout under the cursor (that causes hover oscillation) */
-.chrome-hidden .viewer-body {
-  position: relative;
+.edge-rail-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 48px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-menu);
+  opacity: 0;
+  transform: translateX(-7px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
-.chrome-hidden .sidebar {
+.edge-rail-left .edge-rail-handle {
+  border-left: none;
+  border-radius: 0 9px 9px 0;
+}
+
+.edge-rail-right .edge-rail-handle {
+  border-right: none;
+  border-radius: 9px 0 0 9px;
+  transform: translateX(7px);
+}
+
+.edge-rail:hover .edge-rail-handle,
+.edge-rail.active .edge-rail-handle {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.edge-rail.active .edge-rail-handle {
+  color: var(--accent);
+}
+
+/* A peeked panel overlays the pages (no layout shift). A pinned panel stays
+   in normal flow and re-fits the page instead (handled in the viewer). */
+.viewer-body.toc-peek .sidebar {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  z-index: 30;
-}
-
-.chrome-hidden .sidebar.open {
+  z-index: 32;
   box-shadow: var(--shadow-menu);
 }
 
-.chrome-hidden .ai-panel {
+.viewer-body.ai-peek .ai-panel {
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
-  z-index: 30;
+  z-index: 32;
   box-shadow: var(--shadow-menu);
 }
 
@@ -843,12 +903,43 @@ button {
   flex-direction: column;
   background: var(--bg-chrome);
   border-right: 1px solid transparent;
-  transition: width 0.18s ease;
+}
+
+/* A peeked (overlay) sidebar slides in; a pinned one appears instantly so the
+   page re-fits in a single step rather than janking across the transition. */
+.viewer-body.toc-peek .sidebar {
+  transition: transform 0.16s ease;
 }
 
 .sidebar.open {
   width: var(--sidebar-w, 212px);
   border-right-color: var(--border);
+}
+
+.viewer-body.toc-peek .sidebar.open {
+  animation: peek-in-left 0.16s ease;
+}
+
+.viewer-body.ai-peek .ai-panel {
+  animation: peek-in-right 0.16s ease;
+}
+
+@keyframes peek-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes peek-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 /* Drag handle between a panel and the pages (double-click resets) */
@@ -2922,5 +3013,97 @@ button {
   margin-right: 4px;
   font-size: 14px;
   line-height: 1;
+}
+
+/* ============================================================
+   Presentation mode — Acrobat-style fullscreen slideshow
+   ============================================================ */
+
+.presentation {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0b0b0d;
+  cursor: default;
+  animation: fade-in 0.18s ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.presentation-canvas {
+  /* Match the reading view's page recolouring (night inverts, sepia warms) */
+  filter: var(--page-filter, none);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+}
+
+.presentation-bar {
+  position: fixed;
+  bottom: 26px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  color: #f5f5f7;
+  cursor: default;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.presentation.controls-hidden .presentation-bar {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
+  pointer-events: none;
+}
+
+.presentation-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #f5f5f7;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.presentation-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.presentation-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.presentation-counter {
+  min-width: 62px;
+  text-align: center;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: #d4d4d8;
+}
+
+.presentation-exit {
+  margin-left: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0 999px 999px 0;
 }
 
