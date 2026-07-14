@@ -154,6 +154,12 @@ function PdfPage({
       textLayer = tl
       await tl.render()
       if (cancelled) return
+      // Whitespace-only items (LaTeX PDFs often park them in the margins,
+      // one per line) must not paint their own selection box — they stay
+      // in the DOM so copied text keeps its spaces, but render no highlight.
+      for (const span of textDiv.querySelectorAll('span')) {
+        if (!(span.textContent ?? '').trim()) span.classList.add('ws-only')
+      }
       const endOfContent = document.createElement('div')
       endOfContent.className = 'endOfContent'
       textDiv.append(endOfContent)
