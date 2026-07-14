@@ -1,13 +1,12 @@
 // AI assistant: right-hand chat panel with grounded citation chips, provider
 // settings, and the quick "explain selection" popover. Keys and API calls
 // live in the main process; this component only sees the PdfxApi surface.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   AiCitation,
   AiConfigView,
   AiContentPart,
   AiProviderId,
-  AiUsage,
   ThinkingLevel
 } from '../../../shared/types'
 import { bridge } from '../bridge'
@@ -22,11 +21,22 @@ import {
   resolveCitation,
   summaryPrompt
 } from '../ai'
-import { t, useLang } from '../i18n'
+import { t, useLang, locale } from '../i18n'
 import type { MsgKey } from '../i18n'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
-import { IconGear, IconSend, IconSparkle, IconStop, IconSummary } from './icons'
+import type { ChatMessage, StoredConversation } from '../chat-store'
+import { deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
+import {
+  IconChevronDown,
+  IconGear,
+  IconHistory,
+  IconPlus,
+  IconSend,
+  IconSparkle,
+  IconStop,
+  IconSummary
+} from './icons'
 
 let requestCounter = 1
 const nextRequestId = (): number => requestCounter++
@@ -268,9 +278,7 @@ function renderMarkdown(text: string, ctx?: ChipContext): React.ReactNode {
 
 // ---------- Message rendering ----------
 
-type PanelMessage =
-  | { role: 'user'; text: string; /** compact bubble label when text is a long scaffold */ display?: string }
-  | { role: 'assistant'; parts: AiContentPart[]; usage?: AiUsage; model?: string; error?: string }
+type PanelMessage = ChatMessage
 
 interface AssistantBodyProps {
   parts: AiContentPart[]
@@ -468,6 +476,7 @@ export interface AiSeed {
 interface PanelProps {
   open: boolean
   docTitle: string
+  docPath: string
   /** Exchange handed over from the explain-selection popover */
   seed: AiSeed | null
   onSeedConsumed(): void
@@ -483,9 +492,16 @@ interface PanelProps {
 
 const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
 
+const chatTitle = (msgs: PanelMessage[]): string => {
+  const first = msgs.find((m) => m.role === 'user') as Extract<PanelMessage, { role: 'user' }> | undefined
+  const s = (first?.display ?? first?.text ?? '').replace(/\s+/g, ' ').trim()
+  return s ? (s.length > 60 ? `${s.slice(0, 57)}…` : s) : t('ai.untitledChat')
+}
+
 export default function AiPanel({
   open,
   docTitle,
+  docPath,
   seed,
   onSeedConsumed,
   ensureDocument,
@@ -498,14 +514,25 @@ export default function AiPanel({
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [messages, setMessages] = useState<PanelMessage[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [conversations, setConversations] = useState<StoredConversation[]>(() => loadConversations(docPath))
+  const [activeChatId, setActiveChatId] = useState<string | null>(() => conversations[0]?.id ?? null)
+  const [messages, setMessages] = useState<PanelMessage[]>(() => conversations[0]?.messages ?? [])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [streamText, setStreamText] = useState('')
+  const [pinned, setPinned] = useState(true)
+  const [, setDocReady] = useState(false) // bump-only: re-renders chips once docRef resolves
   const docRef = useRef<EnsuredDocument | null>(null)
   const currentIdRef = useRef<number | null>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+  const pinnedRef = useRef(true)
+  const jumpingRef = useRef(false)
+  const conversationsRef = useRef(conversations)
+  conversationsRef.current = conversations
+  const activeChatIdRef = useRef(activeChatId)
+  activeChatIdRef.current = activeChatId
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -541,10 +568,33 @@ export default function AiPanel({
     onSeedConsumed()
   }, [open, seed, onSeedConsumed])
 
-  useEffect(() => {
+  const handleScroll = useCallback((): void => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+    if (jumpingRef.current) {
+      if (atBottom) jumpingRef.current = false // smooth jump finished
+      return // ignore intermediate positions during the animation
+    }
+    pinnedRef.current = atBottom
+    setPinned(atBottom)
+  }, [])
+
+  // Instant autoscroll while pinned (streaming); useLayoutEffect so the user
+  // never sees the pre-scroll frame.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (el && pinnedRef.current) el.scrollTop = el.scrollHeight
   }, [messages, streamText, busy])
+
+  const jumpToBottom = useCallback((): void => {
+    const el = scrollRef.current
+    if (!el) return
+    jumpingRef.current = true
+    pinnedRef.current = true
+    setPinned(true)
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [])
 
   useEffect(() => {
     if (open && !showSettings) inputRef.current?.focus()
@@ -554,6 +604,8 @@ export default function AiPanel({
     async (question: string, display?: string) => {
       const trimmed = question.trim()
       if (!trimmed || busy) return
+      pinnedRef.current = true
+      setPinned(true)
       setInput('')
       setBusy(true)
       setStreamText('')
@@ -568,6 +620,7 @@ export default function AiPanel({
       ]
       const ensured = docRef.current ?? (await ensureDocument())
       docRef.current = ensured
+      if (ensured) setDocReady(true)
       const requestId = nextRequestId()
       currentIdRef.current = requestId
       const result = await bridge.aiChat({
@@ -608,9 +661,78 @@ export default function AiPanel({
     void sendAnnots()
   }, [open, annotsAskId, sendAnnots])
 
+  // Write-through: persist only settled states (never mid-stream). An aborted
+  // send still settles (error message appended, busy=false) and is persisted.
+  useEffect(() => {
+    if (busy || messages.length === 0) return
+    const id = activeChatIdRef.current ?? newConversationId()
+    const existing = conversationsRef.current.find((c) => c.id === id)
+    const chat: StoredConversation = {
+      id,
+      title: existing?.title ?? chatTitle(messages),
+      createdAt: existing?.createdAt ?? Date.now(),
+      updatedAt: Date.now(),
+      messages
+    }
+    const next = [chat, ...conversationsRef.current.filter((c) => c.id !== id)]
+    saveConversations(docPath, next)
+    setConversations(next.slice(0, 10)) // mirror the store cap
+    if (activeChatIdRef.current !== id) setActiveChatId(id)
+  }, [messages, busy, docPath])
+
+  const startNewChat = useCallback((): void => {
+    if (busy) return
+    setActiveChatId(null)
+    setMessages([])
+    setShowHistory(false)
+    pinnedRef.current = true
+    setPinned(true)
+    inputRef.current?.focus()
+  }, [busy])
+
+  const openConversation = useCallback(
+    (id: string): void => {
+      if (busy) return
+      const chat = conversationsRef.current.find((c) => c.id === id)
+      if (!chat) return
+      pinnedRef.current = true
+      setPinned(true)
+      setActiveChatId(id)
+      setMessages(chat.messages)
+      setShowHistory(false)
+    },
+    [busy]
+  )
+
+  const removeConversation = useCallback(
+    (id: string): void => {
+      const next = deleteConversation(docPath, id)
+      setConversations(next)
+      if (activeChatIdRef.current === id) {
+        setActiveChatId(null)
+        setMessages([]) // stay in the history view
+      }
+    },
+    [docPath]
+  )
+
+  const toggleHistory = useCallback((): void => {
+    if (busy) return
+    setShowHistory((s) => {
+      if (!s) setConversations(loadConversations(docPath)) // fresh across windows
+      return !s
+    })
+    setShowSettings(false)
+  }, [busy, docPath])
+
   const handleCitation = useCallback(
-    (citation: AiCitation) => {
-      const ensured = docRef.current
+    async (citation: AiCitation): Promise<void> => {
+      let ensured = docRef.current
+      if (!ensured) {
+        ensured = await ensureDocument()
+        docRef.current = ensured
+        if (ensured) setDocReady(true) // re-render: chip labels resolve to page numbers
+      }
       if (!ensured) return
       const resolved = resolveCitation(citation, ensured.pages, ensured.doc)
       if (resolved) {
@@ -623,7 +745,7 @@ export default function AiPanel({
         onCitationClick({ pageNumber: page, start: 0, end: 0 })
       }
     },
-    [onCitationClick]
+    [onCitationClick, ensureDocument]
   )
 
   const totalCost = useMemo(() => {
@@ -654,9 +776,28 @@ export default function AiPanel({
           {config ? (config.provider === 'azure' ? config.azure.deployment : config.models[config.provider]) : ''}
         </span>
         <button
+          className="tb-btn"
+          title={t('ai.newChatTip')}
+          disabled={busy}
+          onClick={startNewChat}
+        >
+          <IconPlus size={15} />
+        </button>
+        <button
+          className={`tb-btn${showHistory ? ' is-active' : ''}`}
+          title={t('ai.historyTip')}
+          disabled={busy}
+          onClick={toggleHistory}
+        >
+          <IconHistory size={15} />
+        </button>
+        <button
           className={`tb-btn${showSettings ? ' is-active' : ''}`}
           title={t('ai.settingsTip')}
-          onClick={() => setShowSettings((s) => !s)}
+          onClick={() => {
+            setShowSettings((s) => !s)
+            setShowHistory(false)
+          }}
         >
           <IconGear size={15} />
         </button>
@@ -674,9 +815,41 @@ export default function AiPanel({
           }}
           onClose={() => setShowSettings(false)}
         />
+      ) : showHistory ? (
+        <div className="ai-history">
+          <div className="ai-history-heading">{t('ai.historyTitle')}</div>
+          {conversations.length === 0 ? (
+            <p className="ai-history-empty">{t('ai.historyEmpty')}</p>
+          ) : (
+            conversations.map((c) => (
+              <div
+                key={c.id}
+                className={`ai-history-item${c.id === activeChatId ? ' is-active' : ''}`}
+                onClick={() => openConversation(c.id)}
+              >
+                <span className="ai-history-title">{c.title}</span>
+                <span className="ai-history-meta">
+                  {new Date(c.updatedAt).toLocaleDateString(locale())} ·{' '}
+                  {t('ai.historyMessages', { count: String(c.messages.length) })}
+                </span>
+                <button
+                  className="ai-history-delete"
+                  title={t('ai.historyDeleteTip')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeConversation(c.id)
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       ) : (
         <>
-          <div className="ai-messages" ref={scrollRef}>
+          <div className="ai-messages-wrap">
+          <div className="ai-messages" ref={scrollRef} onScroll={handleScroll}>
             {messages.length === 0 && !busy && (
               <div className="ai-empty">
                 <p>{t('ai.emptyIntro')}</p>
@@ -735,6 +908,12 @@ export default function AiPanel({
                 )}
               </div>
             )}
+          </div>
+          {!pinned && (
+            <button className="ai-jump-bottom" title={t('ai.jumpNewestTip')} onClick={jumpToBottom}>
+              <IconChevronDown size={14} />
+            </button>
+          )}
           </div>
 
           <footer className="ai-composer">

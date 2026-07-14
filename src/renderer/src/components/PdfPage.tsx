@@ -415,7 +415,7 @@ function PdfPage({
     <div className="pdf-page" data-page={pageNumber} style={style}>
       <div className="canvas-host" ref={hostRef} />
       {!hideAnnots && annotations.some((a) => a.source === 'session') && (
-        <div className="annot-overlay">
+        <div className="annot-overlay annot-marks">
           {annotations
             .filter((a) => a.source === 'session')
             .map((a) => (

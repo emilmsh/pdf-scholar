@@ -2522,6 +2522,7 @@ export default function PdfViewer({
         <AiPanel
           open={chromeHidden ? sidePeek === 'ai' : aiOpen}
           docTitle={payload.name}
+          docPath={payload.path}
           seed={aiSeed}
           onSeedConsumed={consumeAiSeed}
           ensureDocument={ensureAiDocument}

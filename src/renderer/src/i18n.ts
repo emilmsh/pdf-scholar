@@ -71,8 +71,12 @@ const nb = {
   'tb.keepAwake': 'Hold skjermen våken',
   'tb.language': 'Språk',
   'tb.langAuto': 'Auto',
-  'tb.distractionTip': 'Distraksjonsfri lesing (D, Esc avslutter)',
+  'tb.pinTip': 'Fest verktøylinjen — nå skjules den, hover toppen for å vise den',
+  'tb.unpinTip': 'Løsne verktøylinjen — la den skjule seg for renere lesing',
+  'tb.presentTip': 'Presentasjonsmodus (P) — én side om gangen, helskjerm',
   'tb.fullscreenTip': 'Fullskjerm (F11)',
+  'tb.tocRailTip': 'Innhold — klikk for å feste, hover for et raskt blikk',
+  'tb.aiRailTip': 'Assistent — klikk for å feste, hover for et raskt blikk',
 
   // Shapes
   'shape.square': 'Rektangel',
@@ -172,10 +176,11 @@ const nb = {
   'viewer.annotDeleteFailed': 'Kunne ikke slette annotasjonen: {error}',
   'viewer.annotStillSaving': 'Annotasjonen lagres fortsatt — prøv igjen straks',
   'viewer.annotChangeFailed': 'Kunne ikke endre annotasjonen: {error}',
-  'viewer.distractionToast':
-    'Distraksjonsfri lesing — Esc avslutter, hover kantene for verktøylinje, innhold og assistent',
+  'viewer.toolbarUnpinnedToast':
+    'Verktøylinjen er løsnet — den skjuler seg selv; hover toppkanten for å vise den',
   'viewer.resizerTip': 'Dra for å endre bredde — dobbeltklikk nullstiller',
   'viewer.fullscreenToast': 'Fullskjerm — trykk Esc eller F11 for å avslutte',
+  'viewer.presentToast': 'Presentasjonsmodus — piltaster eller klikk blar, Esc avslutter',
   'viewer.nothingToExport': 'Ingen merknader å eksportere',
   'viewer.saveFailed': 'Kunne ikke lagre: {error}',
   'viewer.exported': 'Merknader eksportert: {path}',
@@ -239,7 +244,15 @@ const nb = {
   'ai.quickDefine': 'Definer',
   'ai.quickQuestion': '{title}: «{selection}» (s. {page})',
   'ai.mockOnlyWeb': 'Nettleser-forhåndsvisningen støtter kun mock-leverandøren. Bruk appen for ekte KI.',
-  'ai.aborted': 'Avbrutt'
+  'ai.aborted': 'Avbrutt',
+  'ai.newChatTip': 'Ny samtale',
+  'ai.historyTip': 'Samtalehistorikk for dette dokumentet',
+  'ai.historyTitle': 'Tidligere samtaler',
+  'ai.historyEmpty': 'Ingen tidligere samtaler for dette dokumentet.',
+  'ai.historyDeleteTip': 'Slett samtalen',
+  'ai.historyMessages': '{count} meldinger',
+  'ai.jumpNewestTip': 'Hopp til nyeste melding',
+  'ai.untitledChat': 'Uten tittel'
 }
 
 export type MsgKey = keyof typeof nb
@@ -304,8 +317,12 @@ const en: Dict = {
   'tb.keepAwake': 'Keep the screen awake',
   'tb.language': 'Language',
   'tb.langAuto': 'Auto',
-  'tb.distractionTip': 'Distraction-free reading (D, Esc to exit)',
+  'tb.pinTip': 'Pin the toolbar — it now hides itself; hover the top to reveal it',
+  'tb.unpinTip': 'Unpin the toolbar — let it hide itself for cleaner reading',
+  'tb.presentTip': 'Presentation mode (P) — one page at a time, full screen',
   'tb.fullscreenTip': 'Full screen (F11)',
+  'tb.tocRailTip': 'Contents — click to pin, hover for a quick look',
+  'tb.aiRailTip': 'Assistant — click to pin, hover for a quick look',
 
   'shape.square': 'Rectangle',
   'shape.circle': 'Ellipse',
@@ -461,7 +478,15 @@ const en: Dict = {
   'ai.quickDefine': 'Define',
   'ai.quickQuestion': '{title}: «{selection}» (p. {page})',
   'ai.mockOnlyWeb': 'The browser preview only supports the mock provider. Use the app for real AI.',
-  'ai.aborted': 'Stopped'
+  'ai.aborted': 'Stopped',
+  'ai.newChatTip': 'New conversation',
+  'ai.historyTip': 'Conversation history for this document',
+  'ai.historyTitle': 'Previous conversations',
+  'ai.historyEmpty': 'No previous conversations for this document.',
+  'ai.historyDeleteTip': 'Delete conversation',
+  'ai.historyMessages': '{count} messages',
+  'ai.jumpNewestTip': 'Jump to newest message',
+  'ai.untitledChat': 'Untitled'
 }
 
 const DICTIONARIES: Record<Lang, Dict> = { nb, en }

@@ -14,7 +14,7 @@ A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in N
 - **pdf.js (pdfjs-dist v6) renders; it never writes.** Planned: **mupdf WASM writes annotations** (standard annots + appearance streams, incremental save) behind an `AnnotationEngine` interface in the main process; annotations are drawn by our own React overlay, NOT pdf.js's editor layer. See ROADMAP.md for rationale.
 - Renderer works in a plain browser: `bridge.ts` falls back to fetch/localStorage/file-input when `window.api` is missing. Keep new platform calls going through `PdfxApi` so this stays true.
 - App state (recents, per-file reading positions, theme, window bounds) is a hand-rolled JSON store in `userData/pdfx-state.json` (`src/main/storage.ts`).
-- Themes = CSS variables on `<html data-theme="day|sepia|night">` in `src/renderer/src/styles/app.css`; page recoloring is a CSS `filter` on the page canvas (`--page-filter`).
+- Themes = CSS variables on `<html data-theme="day|sepia|night">` in `src/renderer/src/styles/app.css`; page recoloring is a CSS `filter` on the page canvas (`--page-filter`, also applied to the annotation-marks overlay and live draw layer) plus `mix-blend-mode: var(--page-blend)` — sepia multiplies the canvas against the cream `--page-bg` so white paper takes the exact cream tone without washing out figure colours.
 - Viewer (`PdfViewer.tsx`): pages absolutely positioned from a computed layout (tops array); visibility range computed mathematically on scroll (no IntersectionObserver); only pages within 800px of the viewport mount a canvas + text layer.
 
 ## Gotchas (hard-won)
