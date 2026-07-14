@@ -23,8 +23,7 @@ const LS_KEY = 'pdfx-web-state'
 const DEFAULT_SETTINGS: Settings = {
   theme: 'day',
   keepAwake: false,
-  language: 'auto',
-  showTabBar: false
+  language: 'auto'
 }
 
 function loadWebState(): WebState {
@@ -133,6 +132,12 @@ const webApi: PdfxApi = {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
   },
+  onFullScreen: (cb) => {
+    const listener = (): void => cb(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', listener)
+    return () => document.removeEventListener('fullscreenchange', listener)
+  },
+  setTitleBarColors: () => {},
   getPathForFile: () => null,
   onOpenPath: () => () => {},
   // AI in the browser preview: only the offline mock provider is available,

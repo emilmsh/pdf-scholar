@@ -581,15 +581,6 @@ export default function Toolbar({
               <label className="theme-menu-toggle">
                 <input
                   type="checkbox"
-                  checked={settings.showTabBar}
-                  onChange={(e) => onSettingsChange({ showTabBar: e.target.checked })}
-                />
-                {t('tb.showTabBar')}
-              </label>
-
-              <label className="theme-menu-toggle">
-                <input
-                  type="checkbox"
                   checked={settings.keepAwake}
                   onChange={(e) => onSettingsChange({ keepAwake: e.target.checked })}
                 />

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, powerSaveBlocker, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerSaveBlocker, shell } from 'electron'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -77,6 +77,22 @@ function pathFromArgv(argv: string[]): string | null {
 }
 
 /** The window an IPC event came from, or the currently focused one */
+/** Native window-controls overlay colors per theme — MUST mirror the
+ *  --bg-titlebar / --text values in app.css. The renderer re-syncs on
+ *  theme change; this map only styles the very first frame. */
+const TITLEBAR_COLORS: Record<string, { color: string; symbolColor: string }> = {
+  day: { color: '#e4e4e9', symbolColor: '#1d1d1f' },
+  sepia: { color: '#e6e3d7', symbolColor: '#3d3929' },
+  night: { color: '#1c1c1b', symbolColor: '#eeece2' },
+  nightHc: { color: '#111113', symbolColor: '#f5f5f7' }
+}
+
+function initialTitleBarColors(): { color: string; symbolColor: string } {
+  const pref = getState().settings.theme
+  const theme = pref === 'auto' ? (nativeTheme.shouldUseDarkColors ? 'night' : 'day') : pref
+  return TITLEBAR_COLORS[theme] ?? TITLEBAR_COLORS.day
+}
+
 function windowFor(e?: { sender: Electron.WebContents }): BrowserWindow | null {
   if (e) {
     const w = BrowserWindow.fromWebContents(e.sender)
@@ -148,6 +164,10 @@ function createWindow(openPath?: string | null): BrowserWindow {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#1c1c1e',
+    // Edge-style: frameless with native window controls overlaying our
+    // own titlebar strip (which hosts the document tabs)
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { ...initialTitleBarColors(), height: 36 },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js')
     }
@@ -204,6 +224,14 @@ function createWindow(openPath?: string | null): BrowserWindow {
     pendingPaths.delete(wcId)
     openDocs.delete(wcId)
     forceClose.delete(wcId)
+  })
+
+  // The renderer hides its titlebar strip while in OS fullscreen
+  win.on('enter-full-screen', () => {
+    if (!win.isDestroyed()) win.webContents.send('window:fullscreen', true)
+  })
+  win.on('leave-full-screen', () => {
+    if (!win.isDestroyed()) win.webContents.send('window:fullscreen', false)
   })
 
   // Open external links in the system browser, never inside the app
@@ -361,6 +389,17 @@ function registerIpc(): void {
 
   ipcMain.on('window:set-fullscreen', (e, on: boolean) => {
     windowFor(e)?.setFullScreen(!!on)
+  })
+
+  // Theme change: recolor the native window-controls overlay to match
+  ipcMain.on('window:titlebar-colors', (e, color: string, symbolColor: string) => {
+    const win = windowFor(e)
+    if (!win || win.isDestroyed()) return
+    try {
+      win.setTitleBarOverlay({ color, symbolColor, height: 36 })
+    } catch {
+      /* not supported on this platform */
+    }
   })
 
   // Print via a hidden window hosting Chromium's built-in PDF viewer: it

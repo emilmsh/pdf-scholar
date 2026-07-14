@@ -12,8 +12,6 @@ export interface Settings {
   theme: ThemePreference
   keepAwake: boolean
   language: LanguagePreference
-  /** Show the classic tab bar; default is the document picker in the toolbar */
-  showTabBar: boolean
 }
 
 export interface RecentFile {
@@ -194,6 +192,10 @@ export interface PdfxApi {
   /** Save text content via a save dialog; null = user cancelled */
   saveTextFile(defaultName: string, content: string): Promise<{ path: string } | FileError | null>
   setFullscreen(on: boolean): void
+  /** Notifies when the window enters/leaves OS fullscreen */
+  onFullScreen(cb: (fullscreen: boolean) => void): () => void
+  /** Sync the native window-controls overlay with the current theme */
+  setTitleBarColors(color: string, symbolColor: string): void
   /** Resolve the real filesystem path of a File dropped onto the window (Electron only) */
   getPathForFile(file: File): string | null
   onOpenPath(cb: (path: string) => void): () => void

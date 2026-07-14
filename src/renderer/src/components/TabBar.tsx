@@ -12,7 +12,7 @@ export interface TabInfo {
 interface Props {
   tabs: TabInfo[]
   activeId: string | null
-  /** Distraction-free mode: collapse the bar (top-edge hover brings it back) */
+  /** Fullscreen or distraction-free: collapse the strip */
   hidden: boolean
   onSelect(id: string): void
   onClose(id: string): void
@@ -20,6 +20,15 @@ interface Props {
   onNewWindow(): void
   onOpenInNewWindow(path: string): void
 }
+
+/** Tiny scroll glyph shown at the left of the titlebar (matches the app icon) */
+const AppGlyph = (): React.JSX.Element => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+    <path d="M7 4.5h11a2 2 0 0 1 2 2c0 1.1-.9 2-2 2h-1" />
+    <path d="M7 4.5a2.5 2.5 0 0 0-2.5 2.5v10" />
+    <path d="M17 8.5v9a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2c0-1.1.9-2 2-2H15" />
+  </svg>
+)
 
 export default function TabBar({
   tabs,
@@ -45,8 +54,17 @@ export default function TabBar({
     }
   }, [menu])
 
+  // The strip lives inside the frameless window's titlebar: the row is a
+  // window-drag region, every interactive child opts out (CSS app-region),
+  // and the content is inset to the OS-reported titlebar area so it never
+  // slides under the native window controls.
   return (
     <div className={`tab-bar${hidden ? ' tucked' : ''}`}>
+      <div className="tab-bar-inner">
+      <span className="tab-app-glyph" aria-hidden="true">
+        <AppGlyph />
+      </span>
+      {tabs.length === 0 && <span className="tab-app-name">PDF Scholar</span>}
       {tabs.map((tab) => (
         <div
           key={tab.id}
@@ -75,6 +93,7 @@ export default function TabBar({
       <button className="tab-new-window" onClick={onNewWindow} title={t('tabs.newWindow')}>
         ⧉
       </button>
+      </div>
 
       {menu && (
         <div

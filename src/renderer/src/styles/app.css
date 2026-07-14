@@ -17,6 +17,7 @@
   --active: rgba(0, 0, 0, 0.09);
   --page-bg: #ffffff;
   --page-filter: none;
+  --bg-titlebar: #e4e4e9;
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.12), 0 4px 14px rgba(0, 0, 0, 0.1);
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0, 0, 0, 0.25);
 }
@@ -36,6 +37,7 @@
   --active: rgba(61, 57, 41, 0.11);
   --page-bg: #faf9f5;
   --page-filter: sepia(0.14) brightness(0.99);
+  --bg-titlebar: #e6e3d7;
   --shadow-page: 0 1px 2px rgba(61, 57, 41, 0.14), 0 4px 16px rgba(61, 57, 41, 0.11);
   --shadow-menu: 0 8px 30px rgba(61, 57, 41, 0.18), 0 0 1px rgba(61, 57, 41, 0.3);
 }
@@ -57,6 +59,7 @@
   --active: rgba(255, 255, 255, 0.12);
   --page-bg: #21211f;
   --page-filter: invert(0.89) hue-rotate(180deg);
+  --bg-titlebar: #1c1c1b;
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.45);
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.2);
 }
@@ -76,6 +79,7 @@
   --active: rgba(255, 255, 255, 0.14);
   --page-bg: #0a0a0b;
   --page-filter: invert(1) hue-rotate(180deg);
+  --bg-titlebar: #111113;
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.7), 0 4px 16px rgba(0, 0, 0, 0.6);
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.25);
 }
@@ -117,16 +121,51 @@ button {
 
 /* ---------- Tab bar ---------- */
 
+/* ---------- Titlebar tab strip (Edge-style, frameless window) ----------
+   The window is created with titleBarStyle:'hidden' + titleBarOverlay, so
+   this strip IS the titlebar: the row is a window-drag region, interactive
+   children opt out, and the content insets to env(titlebar-area-*) so it
+   never slides under the native min/max/close buttons.
+   --bg-titlebar MUST stay in sync with TITLEBAR_COLORS (main) and the
+   overlay map in App.tsx. */
+
 .tab-bar {
+  position: relative;
+  height: 36px;
+  flex-shrink: 0;
+  background: var(--bg-titlebar);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.tab-bar-inner {
+  position: absolute;
+  left: env(titlebar-area-x, 0px);
+  top: env(titlebar-area-y, 0px);
+  width: env(titlebar-area-width, 100%);
+  height: 100%;
   display: flex;
   align-items: flex-end;
   gap: 3px;
-  padding: 6px 8px 0;
-  background: color-mix(in srgb, var(--bg-chrome) 88%, black);
-  border-bottom: 1px solid var(--border);
+  padding: 5px 8px 0;
   overflow-x: auto;
   scrollbar-width: none;
-  flex-shrink: 0;
+}
+
+.tab-app-glyph {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  color: var(--text-secondary);
+  padding: 0 6px 0 2px;
+}
+
+.tab-app-name {
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .tab {
@@ -136,6 +175,7 @@ button {
   max-width: 220px;
   border-radius: 8px 8px 0 0;
   color: var(--text-secondary);
+  -webkit-app-region: no-drag;
 }
 
 .tab:hover {
@@ -188,6 +228,7 @@ button {
   border-radius: 7px;
   font-size: 16px;
   color: var(--text-secondary);
+  -webkit-app-region: no-drag;
 }
 
 .tab-new:hover {
@@ -2300,15 +2341,13 @@ button {
    min-height: auto would otherwise beat max-height: 0. */
 
 .tab-bar {
-  max-height: 44px;
+  max-height: 36px;
   min-height: 0;
-  transition: max-height 0.22s ease, opacity 0.22s ease, padding 0.22s ease;
+  transition: max-height 0.22s ease, opacity 0.22s ease;
 }
 
 .tab-bar.tucked {
   max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
   opacity: 0;
   border-bottom-width: 0;
   overflow: hidden;
@@ -2648,6 +2687,7 @@ button {
   border-radius: 7px;
   font-size: 13px;
   color: var(--text-secondary);
+  -webkit-app-region: no-drag;
 }
 
 .tab-new-window:hover {

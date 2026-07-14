@@ -34,6 +34,15 @@ const api: PdfxApi = {
   saveTextFile: (defaultName: string, content: string) =>
     ipcRenderer.invoke('file:save-text', defaultName, content),
   setFullscreen: (on: boolean) => ipcRenderer.send('window:set-fullscreen', on),
+  onFullScreen: (cb: (fullscreen: boolean) => void) => {
+    const listener = (_e: unknown, fullscreen: boolean): void => cb(fullscreen)
+    ipcRenderer.on('window:fullscreen', listener)
+    return () => {
+      ipcRenderer.removeListener('window:fullscreen', listener)
+    }
+  },
+  setTitleBarColors: (color: string, symbolColor: string) =>
+    ipcRenderer.send('window:titlebar-colors', color, symbolColor),
   getPathForFile: (file: File) => {
     try {
       return webUtils.getPathForFile(file) || null

@@ -44,8 +44,7 @@ const DEFAULTS: AppState = {
   settings: {
     theme: 'day',
     keepAwake: false,
-    language: 'auto',
-    showTabBar: false
+    language: 'auto'
   },
   ai: DEFAULT_AI
 }

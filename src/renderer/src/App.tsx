@@ -21,8 +21,7 @@ interface OpenTab {
 const FALLBACK_SETTINGS: Settings = {
   theme: 'day',
   keepAwake: false,
-  language: 'auto',
-  showTabBar: false
+  language: 'auto'
 }
 
 let tabCounter = 0
@@ -68,9 +67,22 @@ export default function App(): React.JSX.Element {
   }, [])
 
   // Apply the resolved theme (all page recoloring lives in the theme's CSS)
+  // and recolor the native window-controls overlay to match. The colors
+  // MUST mirror --bg-titlebar / --text in app.css.
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
+    const overlay: Record<ThemeName, [string, string]> = {
+      day: ['#e4e4e9', '#1d1d1f'],
+      sepia: ['#e6e3d7', '#3d3929'],
+      night: ['#1c1c1b', '#eeece2'],
+      nightHc: ['#111113', '#f5f5f7']
+    }
+    bridge.setTitleBarColors(...overlay[resolvedTheme])
   }, [resolvedTheme])
+
+  // OS fullscreen hides the titlebar strip (the native controls hide too)
+  const [fullscreen, setFullscreen] = useState(false)
+  useEffect(() => bridge.onFullScreen(setFullscreen), [])
 
   // Keep the i18n store in sync with the language setting
   useEffect(() => {
@@ -244,23 +256,21 @@ export default function App(): React.JSX.Element {
         </div>
       )}
 
-      {tabs.length > 0 && settings.showTabBar && (
-        <TabBar
-          tabs={tabs.map((t) => ({
-            id: t.id,
-            name: t.payload.name,
-            path: t.payload.path,
-            dirty: dirtyTabs.has(t.id)
-          }))}
-          activeId={activeId}
-          hidden={immersive}
-          onSelect={setActiveId}
-          onClose={closeTab}
-          onNewTab={() => void openDialog()}
-          onNewWindow={() => bridge.newWindow()}
-          onOpenInNewWindow={(path) => bridge.newWindow(path)}
-        />
-      )}
+      <TabBar
+        tabs={tabs.map((t) => ({
+          id: t.id,
+          name: t.payload.name,
+          path: t.payload.path,
+          dirty: dirtyTabs.has(t.id)
+        }))}
+        activeId={activeId}
+        hidden={immersive || fullscreen}
+        onSelect={setActiveId}
+        onClose={closeTab}
+        onNewTab={() => void openDialog()}
+        onNewWindow={() => bridge.newWindow()}
+        onOpenInNewWindow={(path) => bridge.newWindow(path)}
+      />
 
       {tabs.length > 0 ? (
         <div className="tab-views">
