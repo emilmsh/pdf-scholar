@@ -160,7 +160,10 @@ function createWindow(openPath?: string | null): BrowserWindow {
   const wcId = win.webContents.id
   if (openPath) pendingPaths.set(wcId, openPath)
 
-  win.once('ready-to-show', () => win.show())
+  // Guard: the window can be closed before ready-to-show ever fires
+  win.once('ready-to-show', () => {
+    if (!win.isDestroyed()) win.show()
+  })
 
   // Persist this window's bounds as the default for the next launch, and
   // guard against closing with unsaved annotation changes
@@ -374,7 +377,8 @@ function registerIpc(): void {
       await new Promise((resolve) => setTimeout(resolve, 700))
       return await new Promise((resolve) => {
         printWin.webContents.print({}, (success, failureReason) => {
-          printWin.destroy()
+          // The hidden window may already be gone if the app is quitting
+          if (!printWin.isDestroyed()) printWin.destroy()
           resolve(success || failureReason === 'cancelled' ? { ok: true } : { error: failureReason })
         })
       })
