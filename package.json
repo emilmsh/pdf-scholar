@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "A faithful PDF Expert-style PDF reader and annotator for Windows",
   "main": "out/main/index.js",
   "private": true,
@@ -14,8 +14,8 @@
     "sample": "node scripts/make-sample-pdf.mjs",
     "dist": "npm run build && electron-builder --win"
   },
-  "author": "Emil",
-  "license": "UNLICENSED",
+  "author": "Emil Mathias Strøm Halseth",
+  "license": "AGPL-3.0-or-later",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
     "mupdf": "1.28.0"

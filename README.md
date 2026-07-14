@@ -85,7 +85,14 @@ the annotation engine, the AI providers and the draft-based save model. See `CLA
 Personal project under active development. Installers are attached to
 [GitHub releases](https://github.com/emilmsh/pdf-scholar/releases).
 
-Note on licensing: the annotation engine uses [mupdf](https://mupdf.com/), which is
-AGPL-3.0-licensed. Distributing builds publicly therefore requires this project to be
-available under AGPL-compatible terms — settle the project license before making the
-repository public.
+## License
+
+PDF Scholar is free software, licensed under the
+**[GNU AGPL-3.0-or-later](LICENSE)** — the same license as
+[mupdf](https://mupdf.com/) (© Artifex Software), which powers the annotation engine.
+Other major components: [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0),
+[Electron](https://www.electronjs.org/) (MIT), [React](https://react.dev/) (MIT) and the
+[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (MIT).
+
+PDF Scholar is an independent project. It is not affiliated with or endorsed by Readdle
+(makers of PDF Expert), whose product inspired the design.
