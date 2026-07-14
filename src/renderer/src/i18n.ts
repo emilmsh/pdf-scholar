@@ -30,6 +30,7 @@ const nb = {
   'tabs.new': 'Åpne PDF (Ctrl+O)',
   'tabs.newWindow': 'Nytt vindu (Ctrl+Shift+N)',
   'tabs.openInNewWindow': 'Åpne i nytt vindu',
+  'tabs.showInFolder': 'Vis i Filutforsker',
 
   // Toolbar
   'tb.library': 'Bibliotek',
@@ -68,7 +69,6 @@ const nb = {
   'tb.themeNightHc': 'Natt+',
   'tb.themeAuto': 'Auto',
   'tb.keepAwake': 'Hold skjermen våken',
-  'tb.docMenuTip': 'Åpne dokumenter',
   'tb.language': 'Språk',
   'tb.langAuto': 'Auto',
   'tb.distractionTip': 'Distraksjonsfri lesing (D, Esc avslutter)',
@@ -264,6 +264,7 @@ const en: Dict = {
   'tabs.new': 'Open PDF (Ctrl+O)',
   'tabs.newWindow': 'New window (Ctrl+Shift+N)',
   'tabs.openInNewWindow': 'Open in new window',
+  'tabs.showInFolder': 'Show in File Explorer',
 
   'tb.library': 'Library',
   'tb.libraryTip': 'Back to the library',
@@ -301,7 +302,6 @@ const en: Dict = {
   'tb.themeNightHc': 'Night+',
   'tb.themeAuto': 'Auto',
   'tb.keepAwake': 'Keep the screen awake',
-  'tb.docMenuTip': 'Open documents',
   'tb.language': 'Language',
   'tb.langAuto': 'Auto',
   'tb.distractionTip': 'Distraction-free reading (D, Esc to exit)',

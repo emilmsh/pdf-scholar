@@ -6,7 +6,7 @@
 :root,
 :root[data-theme='day'] {
   --bg-chrome: #f7f7f9;
-  --bg-canvas: #e9e9ee;
+  --bg-canvas: #eeeef2;
   --bg-elevated: #ffffff;
   --border: rgba(0, 0, 0, 0.08);
   --text: #1d1d1f;
@@ -17,7 +17,7 @@
   --active: rgba(0, 0, 0, 0.09);
   --page-bg: #ffffff;
   --page-filter: none;
-  --bg-titlebar: #e4e4e9;
+  --bg-titlebar: #ededf0;
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.12), 0 4px 14px rgba(0, 0, 0, 0.1);
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.16), 0 0 1px rgba(0, 0, 0, 0.25);
 }
@@ -26,7 +26,7 @@
    terracotta accent, and only a gentle warm tint on the page itself */
 :root[data-theme='sepia'] {
   --bg-chrome: #f0eee6;
-  --bg-canvas: #e6e3d7;
+  --bg-canvas: #eae8dd;
   --bg-elevated: #faf9f5;
   --border: rgba(61, 57, 41, 0.14);
   --text: #3d3929;
@@ -37,7 +37,7 @@
   --active: rgba(61, 57, 41, 0.11);
   --page-bg: #faf9f5;
   --page-filter: sepia(0.14) brightness(0.99);
-  --bg-titlebar: #e6e3d7;
+  --bg-titlebar: #e9e6db;
   --shadow-page: 0 1px 2px rgba(61, 57, 41, 0.14), 0 4px 16px rgba(61, 57, 41, 0.11);
   --shadow-menu: 0 8px 30px rgba(61, 57, 41, 0.18), 0 0 1px rgba(61, 57, 41, 0.3);
 }
@@ -48,7 +48,7 @@
    glyphs look fuzzy before */
 :root[data-theme='night'] {
   --bg-chrome: #262624;
-  --bg-canvas: #171716;
+  --bg-canvas: #1c1c1b;
   --bg-elevated: #30302e;
   --border: rgba(255, 255, 255, 0.1);
   --text: #eeece2;
@@ -59,7 +59,7 @@
   --active: rgba(255, 255, 255, 0.12);
   --page-bg: #21211f;
   --page-filter: invert(0.89) hue-rotate(180deg);
-  --bg-titlebar: #1c1c1b;
+  --bg-titlebar: #21211f;
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.45);
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.2);
 }
@@ -185,7 +185,6 @@ button {
 .tab.active {
   background: var(--bg-chrome);
   color: var(--text);
-  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.06);
 }
 
 .tab-label {
@@ -531,15 +530,8 @@ button {
   gap: 2px;
 }
 
-.toolbar-title {
+.toolbar-spacer {
   flex: 1;
-  text-align: center;
-  font-weight: 600;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 12px;
 }
 
 .toolbar-sep {
@@ -1229,6 +1221,14 @@ button {
 
 /* Invisible whitespace items never paint a selection box of their own */
 .textLayer .ws-only::selection {
+  background: transparent;
+}
+
+/* pdf.js appends one <br> per text line (copy keeps line breaks); they
+   stack in normal flow along the page's left edge and each painted a
+   little selection dash in the margin — the pdf.js viewer mutes them
+   with exactly this rule */
+.textLayer br::selection {
   background: transparent;
 }
 
@@ -2764,115 +2764,3 @@ button {
   line-height: 1;
 }
 
-/* Document picker: the toolbar title is a dropdown over open documents */
-
-.toolbar-title-anchor {
-  position: relative;
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  justify-content: center;
-}
-
-.toolbar-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  padding: 4px 10px;
-  border-radius: 7px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text);
-  /* Reads as a dropdown control at rest — new users should see that
-     the file name is clickable without having to hover it */
-  border: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
-}
-
-.toolbar-title:hover,
-.toolbar-title.is-active {
-  background: var(--hover);
-  border-color: color-mix(in srgb, var(--text-secondary) 35%, transparent);
-}
-
-.toolbar-title-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.toolbar-title svg {
-  flex-shrink: 0;
-  color: var(--text-secondary);
-}
-
-.doc-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 60;
-  min-width: 260px;
-  max-width: 380px;
-  padding: 6px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow-menu);
-  animation: menu-in 0.1s ease;
-}
-
-.doc-menu-row {
-  display: flex;
-  align-items: center;
-  border-radius: 7px;
-}
-
-.doc-menu-row:hover {
-  background: var(--hover);
-}
-
-.doc-menu-row.active .doc-menu-name {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.doc-menu-name {
-  flex: 1;
-  min-width: 0;
-  padding: 7px 4px 7px 10px;
-  text-align: left;
-  font-size: 12.5px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.doc-menu-close {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  margin-right: 4px;
-  border-radius: 5px;
-  font-size: 10px;
-  color: var(--text-secondary);
-}
-
-.doc-menu-close:hover {
-  background: var(--active);
-}
-
-.doc-menu .menu-item {
-  display: block;
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 7px;
-  text-align: left;
-  font-size: 12.5px;
-}
-
-.doc-menu .menu-item:hover {
-  background: var(--hover);
-}

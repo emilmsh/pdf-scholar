@@ -56,23 +56,7 @@ const SHAPE_LABEL_KEYS: Record<ShapeToolType, MsgKey> = {
   arrow: 'shape.arrow'
 }
 
-interface DocInfo {
-  id: string
-  name: string
-  path: string
-  dirty: boolean
-  active: boolean
-}
-
 interface Props {
-  fileName: string
-  filePath: string
-  /** Open documents in this window — shown in the title dropdown */
-  docs: DocInfo[]
-  onSelectDoc(id: string): void
-  onCloseDoc(id: string): void
-  onOpenDialog(): void
-  onNewWindow(path?: string): void
   page: number
   pageCount: number
   zoomPercent: number
@@ -130,13 +114,6 @@ const LANGUAGES: { id: LanguagePreference; label: string }[] = [
 ]
 
 export default function Toolbar({
-  fileName,
-  filePath,
-  docs,
-  onSelectDoc,
-  onCloseDoc,
-  onOpenDialog,
-  onNewWindow,
   page,
   pageCount,
   zoomPercent,
@@ -179,20 +156,9 @@ export default function Toolbar({
   const [zoomEditing, setZoomEditing] = useState(false)
   const [zoomInput, setZoomInput] = useState('')
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
-  const [docMenuOpen, setDocMenuOpen] = useState(false)
-  const docMenuRef = useRef<HTMLDivElement>(null)
-
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
-  useEffect(() => {
-    if (!docMenuOpen) return
-    const close = (e: Event): void => {
-      if (docMenuRef.current && !docMenuRef.current.contains(e.target as Node)) setDocMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [docMenuOpen])
   const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
@@ -376,69 +342,8 @@ export default function Toolbar({
         </div>
       </div>
 
-      <div className="toolbar-title-anchor" ref={docMenuRef}>
-        <button
-          className={`toolbar-title${docMenuOpen ? ' is-active' : ''}`}
-          title={t('tb.docMenuTip')}
-          onClick={() => setDocMenuOpen((o) => !o)}
-        >
-          <span className="toolbar-title-text">{fileName}</span>
-          <IconChevronDown size={11} />
-        </button>
-        {docMenuOpen && (
-          <div className="doc-menu">
-            {docs.map((doc) => (
-              <div key={doc.id} className={`doc-menu-row${doc.active ? ' active' : ''}`}>
-                <button
-                  className="doc-menu-name"
-                  onClick={() => {
-                    onSelectDoc(doc.id)
-                    setDocMenuOpen(false)
-                  }}
-                >
-                  {doc.dirty && <span className="tab-dirty-dot">•</span>}
-                  {doc.name}
-                </button>
-                <button
-                  className="doc-menu-close"
-                  aria-label={t('tabs.close')}
-                  onClick={() => onCloseDoc(doc.id)}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            <div className="menu-sep" />
-            <button
-              className="menu-item"
-              onClick={() => {
-                onOpenDialog()
-                setDocMenuOpen(false)
-              }}
-            >
-              {t('tabs.new')}
-            </button>
-            <button
-              className="menu-item"
-              onClick={() => {
-                onNewWindow(filePath)
-                setDocMenuOpen(false)
-              }}
-            >
-              {t('tabs.openInNewWindow')}
-            </button>
-            <button
-              className="menu-item"
-              onClick={() => {
-                onNewWindow()
-                setDocMenuOpen(false)
-              }}
-            >
-              {t('tabs.newWindow')}
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Tabs in the titlebar carry the file name now — the centre is air */}
+      <div className="toolbar-spacer" />
 
       <div className="toolbar-group">
         <div className="page-indicator">

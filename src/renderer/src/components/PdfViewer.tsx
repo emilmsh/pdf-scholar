@@ -164,21 +164,7 @@ interface Props {
   onImmersiveChange(immersive: boolean): void
   /** Unsaved-changes state (save model) — App needs it for close prompts */
   onDirtyChange(dirty: boolean): void
-  /** Open documents in this window, for the toolbar document picker */
-  docs: DocInfo[]
-  onSelectDoc(id: string): void
-  onCloseDoc(id: string): void
-  onOpenDialog(): void
-  onNewWindow(path?: string): void
   onClose(): void
-}
-
-export interface DocInfo {
-  id: string
-  name: string
-  path: string
-  dirty: boolean
-  active: boolean
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -194,11 +180,6 @@ export default function PdfViewer({
   onSettingsChange,
   onImmersiveChange,
   onDirtyChange,
-  docs,
-  onSelectDoc,
-  onCloseDoc,
-  onOpenDialog,
-  onNewWindow,
   onClose
 }: Props): React.JSX.Element {
   useLang()
@@ -2283,13 +2264,6 @@ export default function PdfViewer({
         onMouseLeave={() => chromeHidden && setPeek(false)}
       >
         <Toolbar
-          fileName={payload.name}
-          filePath={payload.path}
-          docs={docs}
-          onSelectDoc={onSelectDoc}
-          onCloseDoc={onCloseDoc}
-          onOpenDialog={onOpenDialog}
-          onNewWindow={onNewWindow}
           page={currentPage}
           pageCount={sizes.length}
           zoomPercent={scale > 0 ? Math.round(scale * 100) : 100}

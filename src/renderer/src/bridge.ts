@@ -128,6 +128,7 @@ const webApi: PdfxApi = {
     URL.revokeObjectURL(url)
     return { path: defaultName }
   },
+  showInFolder: () => {},
   setFullscreen: (on) => {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})

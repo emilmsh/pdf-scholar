@@ -19,6 +19,7 @@ interface Props {
   onNewTab(): void
   onNewWindow(): void
   onOpenInNewWindow(path: string): void
+  onShowInFolder(path: string): void
 }
 
 /** Tiny scroll glyph shown at the left of the titlebar (matches the app icon) */
@@ -38,7 +39,8 @@ export default function TabBar({
   onClose,
   onNewTab,
   onNewWindow,
-  onOpenInNewWindow
+  onOpenInNewWindow,
+  onShowInFolder
 }: Props): React.JSX.Element {
   useLang()
   const [menu, setMenu] = useState<{ x: number; y: number; tab: TabInfo } | null>(null)
@@ -109,6 +111,15 @@ export default function TabBar({
             }}
           >
             {t('tabs.openInNewWindow')}
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
+              onShowInFolder(menu.tab.path)
+              setMenu(null)
+            }}
+          >
+            {t('tabs.showInFolder')}
           </button>
           <button
             className="menu-item"

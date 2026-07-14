@@ -81,9 +81,9 @@ function pathFromArgv(argv: string[]): string | null {
  *  --bg-titlebar / --text values in app.css. The renderer re-syncs on
  *  theme change; this map only styles the very first frame. */
 const TITLEBAR_COLORS: Record<string, { color: string; symbolColor: string }> = {
-  day: { color: '#e4e4e9', symbolColor: '#1d1d1f' },
-  sepia: { color: '#e6e3d7', symbolColor: '#3d3929' },
-  night: { color: '#1c1c1b', symbolColor: '#eeece2' },
+  day: { color: '#ededf0', symbolColor: '#1d1d1f' },
+  sepia: { color: '#e9e6db', symbolColor: '#3d3929' },
+  night: { color: '#21211f', symbolColor: '#eeece2' },
   nightHc: { color: '#111113', symbolColor: '#f5f5f7' }
 }
 
@@ -105,21 +105,19 @@ const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  // A second launch (e.g. "Open with" from Explorer) opens its own window so
-  // documents can sit side by side; a bare launch just focuses an existing one.
+  // A second launch (e.g. "Open with" from Explorer) opens the document as a
+  // new TAB in the existing window — a new window is an explicit choice via
+  // the tab strip's ⧉ button or the tab context menu, never the default.
   app.on('second-instance', (_event, argv) => {
     const path = pathFromArgv(argv)
-    if (path) {
-      createWindow(path)
-    } else {
-      const w = windowFor()
-      if (w) {
-        if (w.isMinimized()) w.restore()
-        w.focus()
-      } else {
-        createWindow()
-      }
+    const w = windowFor()
+    if (!w) {
+      createWindow(path ?? undefined)
+      return
     }
+    if (w.isMinimized()) w.restore()
+    w.focus()
+    if (path) w.webContents.send('open-path', path)
   })
 
   app.whenReady().then(() => {
@@ -368,6 +366,10 @@ function registerIpc(): void {
 
   ipcMain.on('shell:open-external', (_e, url: string) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
+  })
+
+  ipcMain.on('shell:show-in-folder', (_e, path: string) => {
+    if (typeof path === 'string' && existsSync(path)) shell.showItemInFolder(path)
   })
 
   ipcMain.handle('file:save-text', async (e, defaultName: string, content: string) => {

@@ -157,8 +157,11 @@ function PdfPage({
       // Whitespace-only items (LaTeX PDFs often park them in the margins,
       // one per line) must not paint their own selection box — they stay
       // in the DOM so copied text keeps its spaces, but render no highlight.
+      // trim() misses zero-width/invisible characters (U+200B, soft
+      // hyphens, BOM…) that HTML-to-PDF generators love to emit
       for (const span of textDiv.querySelectorAll('span')) {
-        if (!(span.textContent ?? '').trim()) span.classList.add('ws-only')
+        const visible = (span.textContent ?? '').replace(/[\s\u00AD\u200B-\u200F\u2060\uFEFF]/gu, '')
+        if (!visible) span.classList.add('ws-only')
       }
       const endOfContent = document.createElement('div')
       endOfContent.className = 'endOfContent'

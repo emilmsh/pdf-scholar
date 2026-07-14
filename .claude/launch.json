@@ -6,6 +6,19 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev:web"],
       "port": 5199
+    },
+    {
+      "name": "scratchpad-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "-y",
+        "http-server",
+        "C:/Emil/temp/claude/C--Users-EmilMathiasStr-mHals-Documents-GitHub-pdfexpert-clone/7300f2be-c5ef-4452-8706-44ae67979e02/scratchpad",
+        "-p",
+        "5310",
+        "-c-1"
+      ],
+      "port": 5310
     }
   ]
 }

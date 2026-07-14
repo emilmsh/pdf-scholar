@@ -191,6 +191,8 @@ export interface PdfxApi {
   printFile(path: string): Promise<{ ok: true } | FileError>
   /** Save text content via a save dialog; null = user cancelled */
   saveTextFile(defaultName: string, content: string): Promise<{ path: string } | FileError | null>
+  /** Reveal the file in Windows File Explorer */
+  showInFolder(path: string): void
   setFullscreen(on: boolean): void
   /** Notifies when the window enters/leaves OS fullscreen */
   onFullScreen(cb: (fullscreen: boolean) => void): () => void

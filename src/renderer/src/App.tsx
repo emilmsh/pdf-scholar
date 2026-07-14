@@ -72,9 +72,9 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
     const overlay: Record<ThemeName, [string, string]> = {
-      day: ['#e4e4e9', '#1d1d1f'],
-      sepia: ['#e6e3d7', '#3d3929'],
-      night: ['#1c1c1b', '#eeece2'],
+      day: ['#ededf0', '#1d1d1f'],
+      sepia: ['#e9e6db', '#3d3929'],
+      night: ['#21211f', '#eeece2'],
       nightHc: ['#111113', '#f5f5f7']
     }
     bridge.setTitleBarColors(...overlay[resolvedTheme])
@@ -270,6 +270,7 @@ export default function App(): React.JSX.Element {
         onNewTab={() => void openDialog()}
         onNewWindow={() => bridge.newWindow()}
         onOpenInNewWindow={(path) => bridge.newWindow(path)}
+        onShowInFolder={(path) => bridge.showInFolder(path)}
       />
 
       {tabs.length > 0 ? (
@@ -285,17 +286,6 @@ export default function App(): React.JSX.Element {
                 onSettingsChange={updateSettings}
                 onImmersiveChange={setImmersive}
                 onDirtyChange={(dirty) => setTabDirty(tab.id, dirty)}
-                docs={tabs.map((d) => ({
-                  id: d.id,
-                  name: d.payload.name,
-                  path: d.payload.path,
-                  dirty: dirtyTabs.has(d.id),
-                  active: d.id === activeId
-                }))}
-                onSelectDoc={setActiveId}
-                onCloseDoc={closeTab}
-                onOpenDialog={() => void openDialog()}
-                onNewWindow={(path) => bridge.newWindow(path)}
                 onClose={() => closeTab(tab.id)}
               />
             </div>
