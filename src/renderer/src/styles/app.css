@@ -2437,6 +2437,48 @@ button {
   pointer-events: none;
 }
 
+/* Selection frame around the selected annotation (host overlay is pointer-events: none) */
+.annot-selection {
+  position: absolute;
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.annot-selection i {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+}
+.annot-selection i.tl {
+  left: -4px;
+  top: -4px;
+}
+.annot-selection i.tr {
+  right: -4px;
+  top: -4px;
+}
+.annot-selection i.bl {
+  left: -4px;
+  bottom: -4px;
+}
+.annot-selection i.br {
+  right: -4px;
+  bottom: -4px;
+}
+
+/* Floating ghost while dragging a non-note annotation (notes keep .note-drag-ghost) */
+.annot-drag-ghost {
+  position: absolute;
+  z-index: 25;
+  border: 1.5px dashed var(--accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  pointer-events: none;
+}
+
 /* Eraser tool: a real eraser cursor instead of the generic cell cursor */
 
 .draw-layer.erasing {

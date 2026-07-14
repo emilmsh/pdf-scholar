@@ -451,3 +451,70 @@ export function annotationAtPoint(
   }
   return null
 }
+
+/** Annotation types that support drag-to-move (translate) */
+export const MOVABLE_TYPES = new Set<AnnotationType>([
+  'note',
+  'freetext',
+  'square',
+  'circle',
+  'line',
+  'arrow',
+  'ink'
+])
+
+export function isMovableAnnotation(a: PageAnnotation): boolean {
+  return MOVABLE_TYPES.has(a.type) && a.quads.length > 0
+}
+
+function hitsQuads(a: PageAnnotation, x: number, y: number): boolean {
+  const PAD = 2
+  return a.quads.some(
+    (q) => x >= q.x - PAD && x <= q.x + q.w + PAD && y >= q.y - PAD && y <= q.y + q.h + PAD
+  )
+}
+
+/**
+ * Topmost annotation whose GEOMETRY (not bbox) contains the given page-space
+ * point. Square/circle only respond near their outline so clicks inside a
+ * hollow shape still select text; tolerance grows with stroke width.
+ */
+export function annotationHitTest(
+  annots: PageAnnotation[],
+  x: number,
+  y: number
+): PageAnnotation | null {
+  for (let i = annots.length - 1; i >= 0; i--) {
+    const a = annots[i]
+    const tol = Math.max(3, (a.width ?? 2) / 2 + 3)
+    if (a.type === 'square') {
+      const q = a.quads[0]
+      const inOuter = x >= q.x - tol && x <= q.x + q.w + tol && y >= q.y - tol && y <= q.y + q.h + tol
+      const inInner = x >= q.x + tol && x <= q.x + q.w - tol && y >= q.y + tol && y <= q.y + q.h - tol
+      if (inOuter && !inInner) return a
+    } else if (a.type === 'circle') {
+      const q = a.quads[0]
+      const rx = q.w / 2
+      const ry = q.h / 2
+      if (rx >= 1 && ry >= 1) {
+        const nx = (x - (q.x + rx)) / rx
+        const ny = (y - (q.y + ry)) / ry
+        // distance from the ellipse boundary, approximated via the normalized
+        // radial offset scaled by the smaller semi-axis
+        if (Math.abs(Math.hypot(nx, ny) - 1) * Math.min(rx, ry) <= tol) return a
+      }
+    } else if (a.type === 'line' || a.type === 'arrow') {
+      const [p, q2] = a.strokes?.[0] ?? []
+      if (p && q2) {
+        if (pointToSegmentDistance(x, y, p[0], p[1], q2[0], q2[1]) <= tol) return a
+      } else if (hitsQuads(a, x, y)) {
+        return a // file-loaded lines carry no endpoints in the record — bbox fallback
+      }
+    } else if (a.type === 'ink') {
+      if (inkHitTest(a, x, y, 4)) return a
+    } else if (hitsQuads(a, x, y)) {
+      return a // markup, note, freetext: padded bbox (same PAD=2 as annotationAtPoint)
+    }
+  }
+  return null
+}

@@ -149,6 +149,25 @@ export function updateAnnotation(req: ModifyAnnotationRequest): Promise<Annotate
     if (req.rect && annot.getType() !== 'Line') {
       annot.setRect([req.rect.x, req.rect.y, req.rect.x + req.rect.w, req.rect.y + req.rect.h])
     }
+    // Move: translate whatever geometry this annot actually has. getRect/setRect
+    // THROW on Line annots in mupdf 1.28 ("Line annotations have no Rect
+    // property") — branch on type BEFORE touching the rect. Verified in
+    // scripts/spike-annot-move.mjs (endpoint order + /LE arrowheads survive).
+    if (req.translate) {
+      const { dx, dy } = req.translate
+      const type = annot.getType()
+      if (type === 'Line') {
+        const [a, b] = annot.getLine()
+        annot.setLine([a[0] + dx, a[1] + dy], [b[0] + dx, b[1] + dy])
+      } else if (type === 'Ink') {
+        annot.setInkList(
+          annot.getInkList().map((s) => s.map(([x, y]) => [x + dx, y + dy] as [number, number]))
+        )
+      } else {
+        const r = annot.getRect()
+        annot.setRect([r[0] + dx, r[1] + dy, r[2] + dx, r[3] + dy])
+      }
+    }
     annot.setModificationDate(new Date())
     annot.update()
     return { ok: true, id: req.id }

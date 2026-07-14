@@ -23,8 +23,10 @@ import {
   UNDERLINE_COLOR,
   annotTypeLabel,
   annotationAtPoint,
+  annotationHitTest,
   fromPdfJsAnnotation,
   inkHitTest,
+  isMovableAnnotation,
   nextAnnotationId,
   selectionRectsForPage
 } from '../annotations'
@@ -124,6 +126,11 @@ interface AnnotPatch {
   contents?: string
   /** Note drag: replacement quads (engine gets quads[0] as the new rect) */
   quads?: PageRect[]
+  /** Drag-move of an ink/line/arrow: replacement strokes */
+  strokes?: [number, number][][]
+  /** Drag-move: relative shift in page space — the engine reads its own
+   *  current geometry and writes it back shifted (see ModifyAnnotationRequest) */
+  translate?: { dx: number; dy: number }
 }
 
 /** Mutable identity for an annotation across undo/redo and document reloads */
@@ -209,6 +216,11 @@ export default function PdfViewer({
     pageNumber: number
     localId: string
   } | null>(null)
+  /** Selected annotation (accent frame). Outlives the popover — scrolling
+   *  closes the popover but keeps the frame, per ux-planer.md §1. */
+  const [selected, setSelected] = useState<{ pageNumber: number; localId: string } | null>(null)
+  const selectedRef = useRef(selected)
+  selectedRef.current = selected
   const [sidebarOpen, setSidebarOpen] = useState(false)
   /** Drag-resizable panel widths (px), persisted per user */
   const [panelW, setPanelW] = useState(loadPanelWidths)
@@ -882,13 +894,16 @@ export default function PdfViewer({
         id: handle.fileId,
         color: patch.color,
         contents: patch.contents,
-        rect: patch.quads?.[0]
+        rect: patch.translate ? undefined : patch.quads?.[0],
+        translate: patch.translate
       })
       if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: result.error }))
       else {
         markDirtyRef.current()
         // 'file' annots are painted by pdf.js from the file — refresh the canvas
-        if (wasFilePainted && (patch.color || patch.quads)) void reloadDocument()
+        if (wasFilePainted && (patch.color || patch.quads || patch.strokes || patch.translate)) {
+          void reloadDocument()
+        }
       }
     },
     [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
@@ -972,6 +987,8 @@ export default function PdfViewer({
       if (patch.color) before.color = record.color
       if (patch.contents !== undefined) before.contents = record.contents ?? ''
       if (patch.quads) before.quads = record.quads
+      if (patch.strokes) before.strokes = record.strokes
+      if (patch.translate) before.translate = { dx: -patch.translate.dx, dy: -patch.translate.dy }
       pushUndo({ kind: 'change', handle, before, after: patch })
       void engineChange(handle, patch)
     },
@@ -983,6 +1000,7 @@ export default function PdfViewer({
       const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId }
       pushUndo({ kind: 'delete', handle, snapshot: { ...record } })
       setAnnotPopover(null)
+      setSelected((s) => (s && s.localId === record.id ? null : s))
       void engineDelete(handle)
     },
     [pushUndo, engineDelete]
@@ -1289,9 +1307,10 @@ export default function PdfViewer({
       // An annotation under the cursor takes precedence over the point menu
       const hit = annotsHiddenRef.current
         ? null
-        : annotationAtPoint(annotsRef.current.get(pageNumber) ?? [], px, py)
+        : annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
       if (hit) {
         setMenu(null)
+        setSelected({ pageNumber, localId: hit.id })
         setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
         return
       }
@@ -1331,16 +1350,24 @@ export default function PdfViewer({
           return
         }
         const pageEl = (target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
-        if (!pageEl) return
+        if (!pageEl) {
+          setSelected(null)
+          return
+        }
         const rect = pageEl.getBoundingClientRect()
         const pageNumber = Number(pageEl.dataset.page)
         if (annotsHiddenRef.current) return
-        const hit = annotationAtPoint(
+        const hit = annotationHitTest(
           annotsRef.current.get(pageNumber) ?? [],
           (clientX - rect.left) / scaleRef.current,
           (clientY - rect.top) / scaleRef.current
         )
-        if (hit) setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
+        if (hit) {
+          setSelected({ pageNumber, localId: hit.id })
+          setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
+        } else {
+          setSelected(null)
+        }
       }, 0)
     },
     [openMenuAt]
@@ -1359,19 +1386,20 @@ export default function PdfViewer({
     if (!pageEl) return
     const rect = pageEl.getBoundingClientRect()
     const pageNumber = Number(pageEl.dataset.page)
-    const hit = annotationAtPoint(
+    const hit = annotationHitTest(
       annotsRef.current.get(pageNumber) ?? [],
       (e.clientX - rect.left) / scaleRef.current,
       (e.clientY - rect.top) / scaleRef.current
     )
-    if (hit?.type === 'note' && hit.quads[0]) {
-      noteDragRef.current = {
+    if (hit && isMovableAnnotation(hit) && hit.quads[0]) {
+      annotDragRef.current = {
         pageNumber,
         record: hit,
         startClientX: e.clientX,
         startClientY: e.clientY,
         moved: false
       }
+      e.preventDefault()
     }
   }, [])
 
@@ -1387,7 +1415,7 @@ export default function PdfViewer({
     if (chromeHiddenRef.current) wakeHudRef.current()
     // Moving back over the pages retracts an edge-hover panel
     if (sidePeekRef.current) setSidePeek(null)
-    if (drawToolRef.current || noteDragRef.current || annotsHiddenRef.current) {
+    if (drawToolRef.current || annotDragRef.current || annotsHiddenRef.current) {
       setHoverTip((tip) => (tip ? null : tip))
       return
     }
@@ -1398,7 +1426,7 @@ export default function PdfViewer({
     }
     const rect = pageEl.getBoundingClientRect()
     const pageNumber = Number(pageEl.dataset.page)
-    const hit = annotationAtPoint(
+    const hit = annotationHitTest(
       annotsRef.current.get(pageNumber) ?? [],
       (e.clientX - rect.left) / scaleRef.current,
       (e.clientY - rect.top) / scaleRef.current
@@ -1413,9 +1441,9 @@ export default function PdfViewer({
     }
   }, [])
 
-  // ---------- Note dragging ----------
+  // ---------- Annotation dragging (note bubbles + geometric shapes) ----------
 
-  const noteDragRef = useRef<{
+  const annotDragRef = useRef<{
     pageNumber: number
     record: PageAnnotation
     startClientX: number
@@ -1423,18 +1451,19 @@ export default function PdfViewer({
     moved: boolean
   } | null>(null)
   const dragEndAtRef = useRef(0)
-  const [noteGhost, setNoteGhost] = useState<{
+  const [dragGhost, setDragGhost] = useState<{
     pageNumber: number
     x: number
     y: number
     w: number
     h: number
     color: [number, number, number]
+    kind: 'bubble' | 'outline'
   } | null>(null)
 
-  /** Where the dragged note lands for a given cursor position (page space, clamped) */
+  /** Where the dragged annotation lands for a given cursor position (page space, clamped) */
   const dragTarget = useCallback(
-    (drag: NonNullable<typeof noteDragRef.current>, clientX: number, clientY: number) => {
+    (drag: NonNullable<typeof annotDragRef.current>, clientX: number, clientY: number) => {
       const q = drag.record.quads[0]
       const size = sizes[drag.pageNumber - 1]
       const scale = scaleRef.current
@@ -1451,7 +1480,7 @@ export default function PdfViewer({
   useEffect(() => {
     if (!active) return
     const onMove = (e: MouseEvent): void => {
-      const drag = noteDragRef.current
+      const drag = annotDragRef.current
       if (!drag) return
       if (
         !drag.moved &&
@@ -1462,13 +1491,21 @@ export default function PdfViewer({
       drag.moved = true
       const { x, y } = dragTarget(drag, e.clientX, e.clientY)
       const q = drag.record.quads[0]
-      setNoteGhost({ pageNumber: drag.pageNumber, x, y, w: q.w, h: q.h, color: drag.record.color })
+      setDragGhost({
+        pageNumber: drag.pageNumber,
+        x,
+        y,
+        w: q.w,
+        h: q.h,
+        color: drag.record.color,
+        kind: drag.record.type === 'note' ? 'bubble' : 'outline'
+      })
     }
     const onUp = (e: MouseEvent): void => {
-      const drag = noteDragRef.current
-      noteDragRef.current = null
+      const drag = annotDragRef.current
+      annotDragRef.current = null
       if (!drag) return
-      setNoteGhost(null)
+      setDragGhost(null)
       if (!drag.moved) return
       dragEndAtRef.current = performance.now()
       const { x, y } = dragTarget(drag, e.clientX, e.clientY)
@@ -1476,9 +1513,17 @@ export default function PdfViewer({
       const dx = x - q.x
       const dy = y - q.y
       if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return
-      changeAnnotation(drag.pageNumber, drag.record, {
-        quads: drag.record.quads.map((quad) => ({ ...quad, x: quad.x + dx, y: quad.y + dy }))
-      })
+      const patch: AnnotPatch = {
+        quads: drag.record.quads.map((quad) => ({ ...quad, x: quad.x + dx, y: quad.y + dy })),
+        translate: { dx, dy }
+      }
+      if (drag.record.strokes) {
+        patch.strokes = drag.record.strokes.map((s) =>
+          s.map(([px, py]) => [px + dx, py + dy] as [number, number])
+        )
+      }
+      setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id })
+      changeAnnotation(drag.pageNumber, drag.record, patch)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
@@ -2109,18 +2154,20 @@ export default function PdfViewer({
       } else if (e.ctrlKey && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault()
         if (dirty) void saveDocument()
-      } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && annotPopover) {
+      } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && (selected ?? annotPopover)) {
         e.preventDefault()
-        const record = (annotsRef.current.get(annotPopover.pageNumber) ?? []).find(
-          (r) => r.id === annotPopover.localId
+        const target = selected ?? annotPopover!
+        const record = (annotsRef.current.get(target.pageNumber) ?? []).find(
+          (r) => r.id === target.localId
         )
-        if (record) removeAnnotation(annotPopover.pageNumber, record)
+        if (record) removeAnnotation(target.pageNumber, record)
       } else if (e.key === 'Escape') {
         if (freeTextDraft) setFreeTextDraft(null)
         else if (noteDraft) setNoteDraft(null)
         else if (menu) setMenu(null)
         else if (aiQuick) setAiQuick(null)
         else if (annotPopover) setAnnotPopover(null)
+        else if (selected) setSelected(null)
         else if (activeTool) setActiveTool(null)
         else if (readAloud !== 'closed') stopReadAloud()
         else if (searchOpen) closeSearch()
@@ -2187,6 +2234,7 @@ export default function PdfViewer({
     aiQuick,
     aiOpen,
     annotPopover,
+    selected,
     activeTool,
     readAloud,
     stopReadAloud,
@@ -2207,6 +2255,16 @@ export default function PdfViewer({
     goBack,
     goForward
   ])
+
+  // Hiding annotations (H) or activating a draw tool pauses hit-testing —
+  // clear the selection frame so it never floats over a mode where it can't
+  // be interacted with.
+  useEffect(() => {
+    if (annotsHidden || activeTool) {
+      setSelected(null)
+      setAnnotPopover(null)
+    }
+  }, [annotsHidden, activeTool])
 
   // Focus the scroll container so PageUp/PageDown/arrows work immediately
   useEffect(() => {
@@ -2379,6 +2437,7 @@ export default function PdfViewer({
                     active={active}
                     annotations={annots.get(pageNumber) ?? EMPTY_ANNOTS}
                     hideAnnots={annotsHidden}
+                    selectedId={selected?.pageNumber === pageNumber ? selected.localId : null}
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }
@@ -2420,15 +2479,26 @@ export default function PdfViewer({
                   onMouseDown={(e) => e.stopPropagation()}
                 />
               )}
-              {noteGhost && (
+              {dragGhost && dragGhost.kind === 'bubble' && (
                 <div
                   className="note-drag-ghost"
                   style={{
-                    left: layout.lefts[noteGhost.pageNumber - 1] + noteGhost.x * scale,
-                    top: layout.tops[noteGhost.pageNumber - 1] + noteGhost.y * scale,
-                    width: noteGhost.w * scale,
-                    height: noteGhost.h * scale,
-                    background: `rgb(${noteGhost.color.map((v) => Math.round(v * 255)).join(',')})`
+                    left: layout.lefts[dragGhost.pageNumber - 1] + dragGhost.x * scale,
+                    top: layout.tops[dragGhost.pageNumber - 1] + dragGhost.y * scale,
+                    width: dragGhost.w * scale,
+                    height: dragGhost.h * scale,
+                    background: `rgb(${dragGhost.color.map((v) => Math.round(v * 255)).join(',')})`
+                  }}
+                />
+              )}
+              {dragGhost && dragGhost.kind === 'outline' && (
+                <div
+                  className="annot-drag-ghost"
+                  style={{
+                    left: layout.lefts[dragGhost.pageNumber - 1] + dragGhost.x * scale,
+                    top: layout.tops[dragGhost.pageNumber - 1] + dragGhost.y * scale,
+                    width: dragGhost.w * scale,
+                    height: dragGhost.h * scale
                   }}
                 />
               )}

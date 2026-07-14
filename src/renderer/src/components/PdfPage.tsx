@@ -23,6 +23,9 @@ interface Props {
   /** Hide all annotations: skips the overlay and re-renders the canvas
    *  without the file's annotation appearances */
   hideAnnots: boolean
+  /** Local id of the selected annotation on THIS page, or null — passed per
+   *  page (not the whole `selected` object) so unrelated pages don't re-render */
+  selectedId: string | null
   /** Rects of the active search match on this page (page space) */
   searchRects: PageRect[]
   /** Active freehand tool (pen/marker/eraser), or null when not drawing */
@@ -56,6 +59,7 @@ function PdfPage({
   active,
   annotations,
   hideAnnots,
+  selectedId,
   searchRects,
   drawTool,
   onInternalLink,
@@ -405,6 +409,8 @@ function PdfPage({
     '--scale-factor': String(scale)
   } as React.CSSProperties
 
+  const selectedAnnot = selectedId ? annotations.find((a) => a.id === selectedId) ?? null : null
+
   return (
     <div className="pdf-page" data-page={pageNumber} style={style}>
       <div className="canvas-host" ref={hostRef} />
@@ -434,6 +440,11 @@ function PdfPage({
           ))}
         </div>
       )}
+      {!hideAnnots && selectedAnnot && (
+        <div className="annot-overlay">
+          <SelectionFrame record={selectedAnnot} scale={scale} />
+        </div>
+      )}
       <div className="text-host" ref={textRef} />
       <div className="link-host" ref={linkRef} />
       {drawTool && (
@@ -451,6 +462,45 @@ function PdfPage({
           />
         </div>
       )}
+    </div>
+  )
+}
+
+/** Accent selection frame over the union bbox of all quads. PAD is in page-space
+ *  points so the frame hugs the annotation at any zoom. Lives inside a
+ *  pointer-events:none .annot-overlay host — never make this interactive. */
+function SelectionFrame({
+  record,
+  scale
+}: {
+  record: PageAnnotation
+  scale: number
+}): React.JSX.Element {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const q of record.quads) {
+    minX = Math.min(minX, q.x)
+    minY = Math.min(minY, q.y)
+    maxX = Math.max(maxX, q.x + q.w)
+    maxY = Math.max(maxY, q.y + q.h)
+  }
+  const PAD = 4
+  return (
+    <div
+      className="annot-selection"
+      style={{
+        left: (minX - PAD) * scale,
+        top: (minY - PAD) * scale,
+        width: (maxX - minX + 2 * PAD) * scale,
+        height: (maxY - minY + 2 * PAD) * scale
+      }}
+    >
+      <i className="tl" />
+      <i className="tr" />
+      <i className="bl" />
+      <i className="br" />
     </div>
   )
 }

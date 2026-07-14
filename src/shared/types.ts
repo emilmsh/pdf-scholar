@@ -93,6 +93,11 @@ export interface ModifyAnnotationRequest {
   contents?: string
   /** Move/resize (note drag) — page space, top-left origin */
   rect?: PageRect
+  /** Move: translate all geometry by (dx, dy) in page space (top-left origin,
+   *  y down). The engine reads the annotation's own geometry and writes it
+   *  back shifted — Line via setLine (getRect/setRect throw on Line in mupdf
+   *  1.28), Ink via setInkList, everything else via setRect. */
+  translate?: { dx: number; dy: number }
 }
 
 export interface DeleteAnnotationRequest {
