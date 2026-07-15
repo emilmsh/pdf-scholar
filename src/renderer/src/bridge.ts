@@ -10,6 +10,7 @@ import type {
   Settings
 } from '../../shared/types'
 import { t } from './i18n'
+import { createExtensionApi, isExtensionContext } from './extension-api'
 
 export const isElectron = typeof window !== 'undefined' && !!window.api
 
@@ -46,7 +47,7 @@ function saveWebState(state: WebState): void {
   localStorage.setItem(LS_KEY, JSON.stringify(state))
 }
 
-const webApi: PdfxApi = {
+export const webApi: PdfxApi = {
   openFileDialog: () =>
     new Promise((resolve) => {
       const input = document.createElement('input')
@@ -270,4 +271,10 @@ function loadWebAiConfig(): AiConfig {
   }
 }
 
-export const bridge: PdfxApi = window.api ?? webApi
+// Platform selection: Electron (window.api) → WebExtension → plain-web fallback.
+// The extension bridge is an overlay on the web fallback (see extension-api.ts).
+export const bridge: PdfxApi = window.api
+  ? window.api
+  : isExtensionContext()
+    ? createExtensionApi(webApi)
+    : webApi
