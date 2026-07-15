@@ -3,6 +3,7 @@ import { getDocument, PDFWorker } from 'pdfjs-dist'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist'
 import PdfWorkerCtor from 'pdfjs-dist/build/pdf.worker.mjs?worker'
 import type {
+  AiCitation,
   AnnotationType,
   FilePayload,
   PageRect,
@@ -39,11 +40,21 @@ import type {
 } from '../annotations'
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
-import { buildAiDocument } from '../ai'
+import {
+  buildAiDocument,
+  chatSystem,
+  citationPage,
+  estimateCost,
+  formatCost,
+  nextAiRequestId,
+  resolveCitation,
+  semanticSearchPrompt
+} from '../ai'
 import type { ResolvedCitation } from '../ai'
 import AnnotPopover from './AnnotPopover'
-import { IconPause, IconPlay, IconStop } from './icons'
+import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
 import PdfPage from './PdfPage'
+import PresentationMode from './PresentationMode'
 import Sidebar from './Sidebar'
 import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
@@ -103,6 +114,25 @@ const PANEL_DEFAULTS = { sidebar: 212, ai: 340 }
 const PANEL_MIN = { sidebar: 160, ai: 264 }
 const PANEL_MAX = { sidebar: 460, ai: 600 }
 const PANEL_LS_KEY = 'pdfx-panel-widths'
+
+const TOOLBAR_PIN_LS_KEY = 'pdfx-toolbar-pinned'
+
+/** Toolbar starts pinned unless the user unpinned it in a previous session */
+function loadToolbarPinned(): boolean {
+  try {
+    return localStorage.getItem(TOOLBAR_PIN_LS_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+
+function saveToolbarPinned(pinned: boolean): void {
+  try {
+    localStorage.setItem(TOOLBAR_PIN_LS_KEY, pinned ? '1' : '0')
+  } catch {
+    /* pin preference is best-effort */
+  }
+}
 
 function loadPanelWidths(): { sidebar: number; ai: number } {
   try {
@@ -166,9 +196,9 @@ interface Props {
   settings: Settings
   resolvedTheme: ThemeName
   onSettingsChange(patch: Partial<Settings>): void
-  /** Distraction-free state of the ACTIVE viewer — the app shell hides the
-   *  tab bar along with the toolbar (and reveals both on top-edge hover) */
-  onImmersiveChange(immersive: boolean): void
+  /** Presentation-mode state of the ACTIVE viewer — the app shell tucks the
+   *  tab bar so the slideshow overlay owns the whole window */
+  onPresentationChange(presenting: boolean): void
   /** Unsaved-changes state (save model) — App needs it for close prompts */
   onDirtyChange(dirty: boolean): void
   onClose(): void
@@ -185,7 +215,7 @@ export default function PdfViewer({
   settings,
   resolvedTheme,
   onSettingsChange,
-  onImmersiveChange,
+  onPresentationChange,
   onDirtyChange,
   onClose
 }: Props): React.JSX.Element {
@@ -197,12 +227,30 @@ export default function PdfViewer({
   const [range, setRange] = useState<[number, number]>([1, 1])
   const [currentPage, setCurrentPage] = useState(initialPosition?.page ?? 1)
   const [error, setError] = useState<string | null>(null)
-  const [chromeHidden, setChromeHidden] = useState(false)
-  const [peek, setPeek] = useState(false)
-  /** Edge-hover panel in distraction-free: contents (left) or AI (right) */
-  const [sidePeek, setSidePeek] = useState<'toc' | 'ai' | null>(null)
-  const sidePeekRef = useRef(sidePeek)
-  sidePeekRef.current = sidePeek
+  /** Edge-style toolbar auto-hide. Pinned (default) = always visible; unpinned
+   *  = tucks away and reveals on top-edge hover. Persisted across sessions. */
+  const [toolbarPinned, setToolbarPinned] = useState(loadToolbarPinned)
+  const [toolbarPeek, setToolbarPeek] = useState(false)
+  /** Acrobat-style one-page-at-a-time slideshow (own fullscreen overlay) */
+  const [presentation, setPresentation] = useState(false)
+  const presentationRef = useRef(presentation)
+  presentationRef.current = presentation
+  /** Transient edge-hover reveal of the side panels (quick look; retracts when
+   *  the pointer moves back over the pages) */
+  const [tocPeek, setTocPeek] = useState(false)
+  const [aiPeek, setAiPeek] = useState(false)
+  const tocPeekRef = useRef(tocPeek)
+  tocPeekRef.current = tocPeek
+  const aiPeekRef = useRef(aiPeek)
+  aiPeekRef.current = aiPeek
+  /** Which fit the zoom is locked to: a fit mode re-fits when the available
+   *  width changes (panel open/close, window resize) so the page never gets
+   *  shoved off-centre; 'custom' preserves the exact scale */
+  const [fitMode, setFitMode] = useState<'width' | 'page' | 'custom'>(
+    initialPosition?.zoom ? 'custom' : 'page'
+  )
+  const fitModeRef = useRef(fitMode)
+  fitModeRef.current = fitMode
   const [fullscreen, setFullscreen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
@@ -221,7 +269,9 @@ export default function PdfViewer({
   const [selected, setSelected] = useState<{ pageNumber: number; localId: string } | null>(null)
   const selectedRef = useRef(selected)
   selectedRef.current = selected
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  /** Side panels pinned open (persistent toggle from the toolbar or the edge
+   *  rail); a panel is visible when pinned OR peeked */
+  const [tocPinned, setTocPinned] = useState(false)
   /** Drag-resizable panel widths (px), persisted per user */
   const [panelW, setPanelW] = useState(loadPanelWidths)
   const panelWRef = useRef(panelW)
@@ -283,7 +333,17 @@ export default function PdfViewer({
   const [searchHits, setSearchHits] = useState<{ pageNumber: number; rects: PageRect[] } | null>(
     null
   )
-  const [aiOpen, setAiOpen] = useState(false)
+  // Semantic (AI) search mode alongside exact text search
+  const [searchMode, setSearchMode] = useState<'text' | 'ai'>('text')
+  const [semantic, setSemantic] = useState<{
+    status: 'idle' | 'running' | 'done' | 'noKey' | 'error'
+    hits: { label: string; citation: AiCitation; pageNumber: number | null }[]
+    index: number
+    note: string | null
+    cost: string | null
+  }>({ status: 'idle', hits: [], index: -1, note: null, cost: null })
+  const semanticReqRef = useRef<number | null>(null)
+  const [aiPinned, setAiPinned] = useState(false)
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
   /** Bumped to make the AI panel fire the "ask my annotations" question */
@@ -412,6 +472,24 @@ export default function PdfViewer({
     return () => observer.disconnect()
   }, [])
 
+  // When a side panel is pinned open or closed the pages column changes width.
+  // If the page overflows horizontally (custom zoom), keep the same page point
+  // under the viewport centre so the document doesn't get shoved sideways and
+  // the reader never has to pan back. Runs synchronously after the panel is
+  // laid out (fit modes fit fully and re-fit via `refit` instead).
+  const pagesWidthRef = useRef(0)
+  useLayoutEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const newW = el.clientWidth
+    const oldW = pagesWidthRef.current
+    pagesWidthRef.current = newW
+    if (oldW && newW && oldW !== newW && el.scrollWidth > newW + 1) {
+      const center = el.scrollLeft + oldW / 2
+      el.scrollLeft = Math.max(0, center - newW / 2)
+    }
+  }, [tocPinned, aiPinned])
+
   // Pick an initial zoom if none was restored: fit the WHOLE first page
   // (fit-page), so a fresh document opens centered without vertical cropping
   useEffect(() => {
@@ -516,15 +594,18 @@ export default function PdfViewer({
     updateRange()
   }, [scale, layout, updateRange])
 
-  const chromeHiddenRef = useRef(chromeHidden)
-  chromeHiddenRef.current = chromeHidden
+  // "Immersive" reading = the toolbar auto-hides (unpinned). Drives the HUD
+  // fade (scrollbar + page pill) and the floating page pill.
+  const immersive = !toolbarPinned
+  const immersiveRef = useRef(immersive)
+  immersiveRef.current = immersive
 
   const onScroll = useCallback(() => {
     updateRange()
     schedulePositionSave()
     setMenu((m) => (m ? null : m))
     setAnnotPopover((p) => (p ? null : p))
-    if (chromeHiddenRef.current) wakeHudRef.current()
+    if (immersiveRef.current) wakeHudRef.current()
   }, [updateRange, schedulePositionSave])
 
   const wakeHudRef = useRef<() => void>(() => {})
@@ -570,8 +651,19 @@ export default function PdfViewer({
     [makeAnchor, schedulePositionSave]
   )
 
+  /** A hand-set zoom (buttons, keyboard, exact %) leaves the fit modes so the
+   *  scale is preserved verbatim when panels open or the window resizes */
+  const manualZoom = useCallback(
+    (next: number, focalClientY?: number) => {
+      setFitMode('custom')
+      zoomTo(next, focalClientY)
+    },
+    [zoomTo]
+  )
+
   const fitWidth = useCallback(() => {
     if (sizes.length === 0 || containerWidth === 0) return
+    setFitMode('width')
     zoomTo((containerWidth - SIDE_PAD) / sizes[0].w)
   }, [sizes, containerWidth, zoomTo])
 
@@ -579,10 +671,38 @@ export default function PdfViewer({
   const fitPage = useCallback(() => {
     const el = containerRef.current
     if (!el || sizes.length === 0 || el.clientWidth === 0) return
+    setFitMode('page')
     const fitW = (el.clientWidth - SIDE_PAD) / sizes[0].w
     const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / sizes[0].h
     zoomTo(Math.min(fitW, fitH))
   }, [sizes, zoomTo])
+
+  // Re-fit when the usable width changes (a side panel pinned open/closed, or
+  // the window resized). In a fit mode the page rescales to the new width and
+  // stays centred — no manual pan back. 'custom' zoom is left untouched (the
+  // width-measure keeps its centre point instead).
+  const refit = useCallback(() => {
+    const el = containerRef.current
+    const mode = fitModeRef.current
+    if (!el || mode === 'custom' || sizes.length === 0) return
+    const cw = el.clientWidth
+    const ch = el.clientHeight
+    if (cw === 0) return
+    const fitW = (cw - SIDE_PAD) / sizes[0].w
+    const fitH = (ch - PAD_TOP - PAD_BOTTOM) / sizes[0].h
+    const next = clamp(mode === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
+    const prev = scaleRef.current
+    if (prev <= 0 || Math.abs(next - prev) / prev < 0.002) return
+    pendingAnchorRef.current = makeAnchor(cw / 2, ch / 2)
+    setScale(next)
+    schedulePositionSave()
+  }, [sizes, makeAnchor, schedulePositionSave])
+  const refitRef = useRef(refit)
+  refitRef.current = refit
+
+  useEffect(() => {
+    refitRef.current()
+  }, [containerWidth])
 
   /** Which fit the toggle button should offer next: 'page' when we are at
    *  (or near) fit-width, otherwise 'width' */
@@ -642,6 +762,7 @@ export default function PdfViewer({
       return
     }
     pendingAnchorRef.current = anchor
+    setFitMode('custom')
     setScale(next)
     schedulePositionSave()
   }, [snapScale, makeAnchor, updateRange, schedulePositionSave])
@@ -1268,9 +1389,42 @@ export default function PdfViewer({
           })()
           break
         }
+        case 'reference': {
+          if (!selText || !menu || !pdf) {
+            setMenu(null)
+            break
+          }
+          const { x, y, pageNumber } = menu
+          setMenu(null)
+          window.getSelection()?.removeAllRanges()
+          // Attach the whole document so the model can find the bibliography
+          // entry itself; also grab local context around the citation.
+          void (async () => {
+            let pageContext = ''
+            let document: { title: string; text: string; pageStarts: number[] } | null = null
+            try {
+              // Build the document inline (buildAiDocument is a module fn) —
+              // ensureAiDocument is declared later in the component, so
+              // depending on it here would hit the const TDZ.
+              const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
+              const doc = buildAiDocument(pages)
+              document = { title: payload.name, text: doc.text, pageStarts: doc.pageStarts }
+              const pageText = pages[pageNumber - 1]?.text ?? ''
+              const at = pageText.indexOf(selText.slice(0, 80))
+              pageContext =
+                at === -1
+                  ? pageText.slice(0, 1500)
+                  : pageText.slice(Math.max(0, at - 800), at + selText.length + 800)
+            } catch {
+              /* context is best-effort */
+            }
+            setAiQuick({ x, y, mode: 'reference', selection: selText, pageNumber, pageContext, document })
+          })()
+          break
+        }
       }
     },
-    [menu, pdf, applyMarkup, collectSelectionRects]
+    [menu, pdf, payload.name, applyMarkup, collectSelectionRects]
   )
 
   const saveNote = useCallback(
@@ -1412,9 +1566,10 @@ export default function PdfViewer({
     const now = performance.now()
     if (now - hoverThrottleRef.current < 80) return
     hoverThrottleRef.current = now
-    if (chromeHiddenRef.current) wakeHudRef.current()
-    // Moving back over the pages retracts an edge-hover panel
-    if (sidePeekRef.current) setSidePeek(null)
+    if (immersiveRef.current) wakeHudRef.current()
+    // Moving back over the pages retracts any peeked edge panel
+    if (tocPeekRef.current) setTocPeek(false)
+    if (aiPeekRef.current) setAiPeek(false)
     if (drawToolRef.current || annotDragRef.current || annotsHiddenRef.current) {
       setHoverTip((tip) => (tip ? null : tip))
       return
@@ -1544,34 +1699,35 @@ export default function PdfViewer({
   wakeHudRef.current = wakeHud
 
   useEffect(() => {
-    if (chromeHidden) wakeHud()
+    if (immersive) wakeHud()
     else {
       if (hudTimerRef.current) window.clearTimeout(hudTimerRef.current)
       setHudFaded(false)
     }
-  }, [chromeHidden, wakeHud])
+  }, [immersive, wakeHud])
 
-  // Only the active tab's distraction-free state drives the app shell.
-  // Deliberately NOT tied to peek: the tab bar collapsing/expanding shifts
-  // the layout under the cursor, which made the top-edge hover oscillate
-  // (toolbar appears → content shifts → cursor leaves → toolbar hides → …).
-  // The peeked toolbar overlays absolutely and causes no such shift.
+  // Only the active tab's presentation state drives the app shell (it tucks
+  // the tab bar so the slideshow overlay owns the whole window).
   useEffect(() => {
-    if (active) onImmersiveChange(chromeHidden)
-  }, [active, chromeHidden, onImmersiveChange])
+    if (active) onPresentationChange(presentation)
+  }, [active, presentation, onPresentationChange])
 
-  const toggleChrome = useCallback(() => {
-    setChromeHidden((hidden) => {
-      const next = !hidden
-      setPeek(false)
-      setSidePeek(null)
-      if (next) showToast(t('viewer.distractionToast'))
+  // Pin / unpin the toolbar (Edge-style). Unpinned, it hides itself and
+  // reveals on top-edge hover; the choice is remembered across sessions.
+  const togglePin = useCallback(() => {
+    setToolbarPinned((pinned) => {
+      const next = !pinned
+      saveToolbarPinned(next)
+      if (!next) {
+        setToolbarPeek(false)
+        showToast(t('viewer.toolbarUnpinnedToast'))
+      }
       return next
     })
   }, [showToast])
 
-  // Fullscreen is just fullscreen — distraction-free is its own mode and the
-  // user combines them as they like
+  // Fullscreen is just OS fullscreen — the pin state and presentation mode are
+  // independent, and the user combines them as they like
   const toggleFullscreen = useCallback(() => {
     setFullscreen((f) => {
       const next = !f
@@ -1580,6 +1736,28 @@ export default function PdfViewer({
       return next
     })
   }, [showToast])
+
+  // Presentation mode: a self-contained fullscreen slideshow overlay. Entering
+  // takes the window into OS fullscreen (if it wasn't already) so nothing but
+  // the current page shows; exiting restores the previous fullscreen state.
+  const presFullscreenRef = useRef(false)
+  const enterPresentation = useCallback(() => {
+    presFullscreenRef.current = !fullscreen
+    if (!fullscreen) bridge.setFullscreen(true)
+    setPresentation(true)
+    setToolbarPeek(false)
+    setTocPeek(false)
+    setAiPeek(false)
+    showToast(t('viewer.presentToast'))
+  }, [fullscreen, showToast])
+
+  const exitPresentation = useCallback(() => {
+    setPresentation(false)
+    if (presFullscreenRef.current) {
+      presFullscreenRef.current = false
+      bridge.setFullscreen(false)
+    }
+  }, [])
 
   const goToPage = useCallback(
     (page: number) => {
@@ -1788,9 +1966,10 @@ export default function PdfViewer({
     [pushBack, updateRange, waitForTextLayer, schedulePositionSave]
   )
 
-  // Debounced live search whenever the query/options change
+  // Debounced live search whenever the query/options change (exact-text mode
+  // only — AI mode searches on Enter, never live)
   useEffect(() => {
-    if (!searchOpen || !pdf) return
+    if (!searchOpen || !pdf || searchMode === 'ai') return
     const seq = ++searchSeqRef.current
     const query = searchQuery.trim()
     if (!query) {
@@ -1831,7 +2010,78 @@ export default function PdfViewer({
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
     setSearchHits(null)
+    if (semanticReqRef.current !== null) {
+      bridge.aiAbort(semanticReqRef.current)
+      semanticReqRef.current = null
+    }
+    setSemantic({ status: 'idle', hits: [], index: -1, note: null, cost: null })
   }, [])
+
+  // ---------- Semantic (AI) search ----------
+
+  const runSemanticSearch = useCallback(async () => {
+    if (!pdf) return
+    const query = searchQuery.trim()
+    if (!query) return
+    const config = await bridge.aiGetConfig()
+    if (!config.hasKey[config.provider]) {
+      setSemantic({ status: 'noKey', hits: [], index: -1, note: null, cost: null })
+      return
+    }
+    setSemantic({ status: 'running', hits: [], index: -1, note: null, cost: null })
+    const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
+    const doc = buildAiDocument(pages)
+    const requestId = nextAiRequestId()
+    semanticReqRef.current = requestId
+    // System + document block are byte-identical to the chat panel so the
+    // Anthropic prompt cache is shared; the search instruction is in the user
+    // message only.
+    const result = await bridge.aiChat({
+      requestId,
+      system: chatSystem(),
+      messages: [{ role: 'user', text: semanticSearchPrompt(query) }],
+      document: { title: payload.name, text: doc.text }
+    })
+    if (semanticReqRef.current !== requestId) return // superseded/aborted
+    semanticReqRef.current = null
+    if ('error' in result) {
+      setSemantic({ status: 'error', hits: [], index: -1, note: result.error, cost: null })
+      return
+    }
+    const hits: { label: string; citation: AiCitation; pageNumber: number | null }[] = []
+    for (const part of result.parts) {
+      const label = part.text.replace(/^\s*\d+[.)]\s*/, '').trim()
+      for (const c of part.citations) {
+        const fallback = c.kind === 'char' ? c.citedText : c.quote
+        hits.push({ label: label || fallback.slice(0, 80), citation: c, pageNumber: citationPage(c, doc) })
+      }
+    }
+    const cost = estimateCost(result.model, result.usage)
+    setSemantic({
+      status: 'done',
+      hits,
+      index: -1,
+      note: hits.length === 0 ? result.parts.map((p) => p.text).join(' ').trim() : null,
+      cost: cost !== null ? formatCost(cost) : null
+    })
+  }, [pdf, searchQuery, payload.name])
+
+  const pickSemanticHit = useCallback(
+    (i: number) => {
+      const hit = semantic.hits[i]
+      if (!hit) return
+      setSemantic((s) => ({ ...s, index: i }))
+      const pages = pageTextsRef.current
+      if (!pages) return
+      const doc = buildAiDocument(pages)
+      const resolved = resolveCitation(hit.citation, pages, doc)
+      if (resolved) void jumpToAiCitation(resolved)
+      else if (hit.pageNumber && hit.pageNumber >= 1 && hit.pageNumber <= pages.length) {
+        void jumpToAiCitation({ pageNumber: hit.pageNumber, start: 0, end: 0 })
+      }
+    },
+    [semantic.hits]
+  )
 
   const searchStep = useCallback(
     (delta: number) => {
@@ -2123,7 +2373,7 @@ export default function PdfViewer({
   )
 
   const askAnnotations = useCallback(() => {
-    setAiOpen(true)
+    setAiPinned(true)
     setAnnotsAskId((n) => n + 1)
   }, [])
 
@@ -2132,6 +2382,8 @@ export default function PdfViewer({
     const onKeyDown = (e: KeyboardEvent): void => {
       const tag = (e.target as HTMLElement | null)?.tagName
       const isTyping = tag === 'INPUT' || tag === 'TEXTAREA'
+      // The presentation overlay owns the keyboard while it is open
+      if (presentationRef.current) return
       if (e.key === 'F11') {
         e.preventDefault()
         toggleFullscreen()
@@ -2172,13 +2424,8 @@ export default function PdfViewer({
         else if (readAloud !== 'closed') stopReadAloud()
         else if (searchOpen) closeSearch()
         else if (searchHits) setSearchHits(null)
-        else if (aiOpen) setAiOpen(false)
+        else if (aiPinned) setAiPinned(false)
         else if (fullscreen) toggleFullscreen()
-        else if (chromeHidden) {
-          setChromeHidden(false)
-          setPeek(false)
-          setSidePeek(null)
-        }
       } else if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault()
         openSearch()
@@ -2187,25 +2434,25 @@ export default function PdfViewer({
         searchStep(e.shiftKey ? -1 : 1)
       } else if (e.ctrlKey && (e.key === '+' || e.key === '=')) {
         e.preventDefault()
-        zoomTo(scaleRef.current * 1.15)
+        manualZoom(scaleRef.current * 1.15)
       } else if (e.ctrlKey && e.key === '-') {
         e.preventDefault()
-        zoomTo(scaleRef.current / 1.15)
+        manualZoom(scaleRef.current / 1.15)
       } else if (e.ctrlKey && e.key === '0') {
         e.preventDefault()
         fitWidth()
       } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
         // Single-key reading shortcuts (never fire while typing)
         const k = e.key.toLowerCase()
-        if (k === 'd') {
+        if (k === 'p') {
           e.preventDefault()
-          toggleChrome()
+          enterPresentation()
         } else if (k === 't') {
           e.preventDefault()
-          setSidebarOpen((o) => !o)
+          setTocPinned((o) => !o)
         } else if (k === 'a') {
           e.preventDefault()
-          setAiOpen((o) => !o)
+          setAiPinned((o) => !o)
         } else if (k === 'h') {
           e.preventDefault()
           setAnnotsHidden((h) => !h)
@@ -2224,7 +2471,7 @@ export default function PdfViewer({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [
     active,
-    toggleChrome,
+    enterPresentation,
     startReadAloud,
     fitTarget,
     fitPage,
@@ -2232,7 +2479,7 @@ export default function PdfViewer({
     noteDraft,
     menu,
     aiQuick,
-    aiOpen,
+    aiPinned,
     annotPopover,
     selected,
     activeTool,
@@ -2243,12 +2490,11 @@ export default function PdfViewer({
     searchOpen,
     searchHits,
     fullscreen,
-    chromeHidden,
     toggleFullscreen,
     closeSearch,
     openSearch,
     searchStep,
-    zoomTo,
+    manualZoom,
     fitWidth,
     performUndoRedo,
     removeAnnotation,
@@ -2315,11 +2561,17 @@ export default function PdfViewer({
     )
   }
 
+  const toolbarVisible = toolbarPinned || toolbarPeek
+  const tocVisible = tocPinned || tocPeek
+  const aiVisible = aiPinned || aiPeek
+
   return (
-    <div className={`viewer${chromeHidden ? ' chrome-hidden' : ''}${chromeHidden && hudFaded ? ' hud-faded' : ''}`}>
+    <div
+      className={`viewer${immersive ? ' toolbar-unpinned' : ''}${immersive && hudFaded ? ' hud-faded' : ''}`}
+    >
       <div
-        className={`toolbar-wrap${chromeHidden && !peek ? ' tucked' : ''}`}
-        onMouseLeave={() => chromeHidden && setPeek(false)}
+        className={`toolbar-wrap${toolbarVisible ? '' : ' tucked'}`}
+        onMouseLeave={() => !toolbarPinned && setToolbarPeek(false)}
       >
         <Toolbar
           page={currentPage}
@@ -2327,7 +2579,7 @@ export default function PdfViewer({
           zoomPercent={scale > 0 ? Math.round(scale * 100) : 100}
           settings={settings}
           resolvedTheme={resolvedTheme}
-          sidebarOpen={sidebarOpen}
+          sidebarOpen={tocPinned}
           canNavBack={navStacks.back.length > 0}
           canNavForward={navStacks.forward.length > 0}
           onNavBack={goBack}
@@ -2338,12 +2590,11 @@ export default function PdfViewer({
           onToolPrefChange={(tool, patch) =>
             setToolPrefs((prev) => ({ ...prev, [tool]: { ...prev[tool], ...patch } }))
           }
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
-          onBack={onClose}
+          onToggleSidebar={() => setTocPinned((o) => !o)}
           onGoToPage={jumpToPage}
-          onZoomIn={() => zoomTo(scaleRef.current * 1.15)}
-          onZoomOut={() => zoomTo(scaleRef.current / 1.15)}
-          onZoomTo={(percent) => zoomTo(percent / 100)}
+          onZoomIn={() => manualZoom(scaleRef.current * 1.15)}
+          onZoomOut={() => manualZoom(scaleRef.current / 1.15)}
+          onZoomTo={(percent) => manualZoom(percent / 100)}
           onFitWidth={fitWidth}
           onFitPage={fitPage}
           fitTarget={fitTarget}
@@ -2363,26 +2614,53 @@ export default function PdfViewer({
             if (readAloud === 'closed') void startReadAloud()
             else stopReadAloud()
           }}
-          aiOpen={aiOpen}
-          onToggleAi={() => setAiOpen((o) => !o)}
-          onToggleChrome={toggleChrome}
+          aiOpen={aiPinned}
+          onToggleAi={() => setAiPinned((o) => !o)}
+          toolbarPinned={toolbarPinned}
+          onTogglePin={togglePin}
+          onPresent={enterPresentation}
           onToggleFullscreen={toggleFullscreen}
         />
       </div>
-      {chromeHidden && <div className="reveal-zone" onMouseEnter={() => setPeek(true)} />}
-      {chromeHidden && (
-        <div className="reveal-zone-left" onMouseEnter={() => setSidePeek('toc')} />
-      )}
-      {chromeHidden && (
-        <div className="reveal-zone-right" onMouseEnter={() => setSidePeek('ai')} />
-      )}
+      {immersive && <div className="reveal-zone" onMouseEnter={() => setToolbarPeek(true)} />}
+
+      {/* Edge rails — click toggles a panel pinned, hover gives a quick peek
+          that retracts when the pointer moves back over the pages */}
+      <div
+        className={`edge-rail edge-rail-left${tocVisible ? ' active' : ''}`}
+        title={t('tb.tocRailTip')}
+        onMouseEnter={() => !tocPinned && setTocPeek(true)}
+        onClick={() => {
+          setTocPeek(false)
+          setTocPinned((o) => !o)
+        }}
+      >
+        <span className="edge-rail-handle">
+          <IconPanelLeft size={15} />
+        </span>
+      </div>
+      <div
+        className={`edge-rail edge-rail-right${aiVisible ? ' active' : ''}`}
+        title={t('tb.aiRailTip')}
+        onMouseEnter={() => !aiPinned && setAiPeek(true)}
+        onClick={() => {
+          setAiPeek(false)
+          setAiPinned((o) => !o)
+        }}
+      >
+        <span className="edge-rail-handle">
+          <IconPanelRight size={15} />
+        </span>
+      </div>
 
       <div
-        className={`viewer-body${resizingPanel ? ' panel-resizing' : ''}`}
+        className={`viewer-body${resizingPanel ? ' panel-resizing' : ''}${
+          tocPeek && !tocPinned ? ' toc-peek' : ''
+        }${aiPeek && !aiPinned ? ' ai-peek' : ''}`}
         style={{ '--sidebar-w': `${panelW.sidebar}px`, '--ai-w': `${panelW.ai}px` } as React.CSSProperties}
       >
         <Sidebar
-          open={chromeHidden ? sidePeek === 'toc' : sidebarOpen}
+          open={tocVisible}
           pdf={pdf}
           sizes={sizes}
           currentPage={currentPage}
@@ -2395,7 +2673,7 @@ export default function PdfViewer({
           onExport={(format) => void exportAnnotations(format)}
           onAskAi={askAnnotations}
         />
-        {sidebarOpen && !chromeHidden && (
+        {tocPinned && (
           <div
             className={`panel-resizer${resizingPanel === 'sidebar' ? ' active' : ''}`}
             title={t('viewer.resizerTip')}
@@ -2511,7 +2789,7 @@ export default function PdfViewer({
           )}
         </div>
 
-        {aiOpen && !chromeHidden && (
+        {aiPinned && (
           <div
             className={`panel-resizer${resizingPanel === 'ai' ? ' active' : ''}`}
             title={t('viewer.resizerTip')}
@@ -2520,7 +2798,7 @@ export default function PdfViewer({
           />
         )}
         <AiPanel
-          open={chromeHidden ? sidePeek === 'ai' : aiOpen}
+          open={aiVisible}
           docTitle={payload.name}
           docPath={payload.path}
           seed={aiSeed}
@@ -2530,7 +2808,10 @@ export default function PdfViewer({
           annotsAskId={annotsAskId}
           getAnnotationsText={getAnnotationsText}
           onCitationClick={(resolved) => void jumpToAiCitation(resolved)}
-          onClose={() => setAiOpen(false)}
+          onClose={() => {
+            setAiPeek(false)
+            setAiPinned(false)
+          }}
         />
       </div>
 
@@ -2553,7 +2834,7 @@ export default function PdfViewer({
         </div>
       )}
 
-      {chromeHidden &&
+      {!toolbarVisible &&
         layout &&
         (pillEditing ? (
           <form
@@ -2600,6 +2881,19 @@ export default function PdfViewer({
           matches={searchMatches}
           index={searchIndex}
           busy={searchBusy}
+          mode={searchMode}
+          onModeChange={setSearchMode}
+          aiStatus={semantic.status}
+          aiHits={semantic.hits.map((h) => ({ label: h.label, pageNumber: h.pageNumber }))}
+          aiIndex={semantic.index}
+          aiNote={semantic.note}
+          aiCost={semantic.cost}
+          onAiSearch={() => void runSemanticSearch()}
+          onAiPick={pickSemanticHit}
+          onOpenAiSettings={() => {
+            closeSearch()
+            setAiPinned(true)
+          }}
           onQueryChange={setSearchQuery}
           onOptionsChange={setSearchOptions}
           onNext={() => searchStep(1)}
@@ -2616,7 +2910,18 @@ export default function PdfViewer({
           onSendToChat={(seed) => {
             setAiSeed(seed)
             setAiQuick(null)
-            setAiOpen(true)
+            setAiPinned(true)
+          }}
+          onCitation={(c) => {
+            const pages = pageTextsRef.current
+            if (!pages) return
+            const doc = buildAiDocument(pages)
+            const resolved = resolveCitation(c, pages, doc)
+            if (resolved) void jumpToAiCitation(resolved)
+            else {
+              const p = citationPage(c, doc)
+              if (p && p >= 1 && p <= pages.length) void jumpToAiCitation({ pageNumber: p, start: 0, end: 0 })
+            }
           }}
           onClose={() => setAiQuick(null)}
         />
@@ -2697,6 +3002,19 @@ export default function PdfViewer({
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
+      {presentation && pdf && sizes.length > 0 && (
+        <PresentationMode
+          pdf={pdf}
+          sizes={sizes}
+          initialPage={currentPage}
+          resolvedTheme={resolvedTheme}
+          onPageChange={(page) => {
+            setCurrentPage(page)
+            goToPage(page)
+          }}
+          onExit={exitPresentation}
+        />
+      )}
     </div>
   )
 }

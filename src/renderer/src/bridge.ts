@@ -22,6 +22,8 @@ const LS_KEY = 'pdfx-web-state'
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'day',
+  autoLight: 'day',
+  autoDark: 'night',
   keepAwake: false,
   language: 'auto'
 }

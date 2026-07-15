@@ -8,9 +8,7 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconChevronDown,
-  IconChevronLeft,
   IconEraser,
-  IconExpand,
   IconEye,
   IconEyeOff,
   IconFitPage,
@@ -19,7 +17,10 @@ import {
   IconMarker,
   IconMinus,
   IconPen,
+  IconPin,
+  IconPinOff,
   IconPlus,
+  IconPresent,
   IconPrint,
   IconSave,
   IconSearch,
@@ -72,7 +73,6 @@ interface Props {
   onNavBack(): void
   onNavForward(): void
   onToggleSidebar(): void
-  onBack(): void
   onGoToPage(page: number): void
   onZoomIn(): void
   onZoomOut(): void
@@ -94,7 +94,10 @@ interface Props {
   onToggleReadAloud(): void
   aiOpen: boolean
   onToggleAi(): void
-  onToggleChrome(): void
+  /** Toolbar auto-hide: pinned = always shown, unpinned = reveals on hover */
+  toolbarPinned: boolean
+  onTogglePin(): void
+  onPresent(): void
   onToggleFullscreen(): void
 }
 
@@ -129,7 +132,6 @@ export default function Toolbar({
   onNavBack,
   onNavForward,
   onToggleSidebar,
-  onBack,
   onGoToPage,
   onZoomIn,
   onZoomOut,
@@ -148,7 +150,9 @@ export default function Toolbar({
   onToggleReadAloud,
   aiOpen,
   onToggleAi,
-  onToggleChrome,
+  toolbarPinned,
+  onTogglePin,
+  onPresent,
   onToggleFullscreen
 }: Props): React.JSX.Element {
   useLang()
@@ -215,10 +219,6 @@ export default function Toolbar({
   return (
     <div className="toolbar">
       <div className="toolbar-group">
-        <button className="tb-btn tb-back" onClick={onBack} title={t('tb.libraryTip')}>
-          <IconChevronLeft />
-          <span>{t('tb.library')}</span>
-        </button>
         <button
           className={`tb-btn${sidebarOpen ? ' is-active' : ''}`}
           onClick={onToggleSidebar}
@@ -466,6 +466,40 @@ export default function Toolbar({
                 ))}
               </div>
 
+              {settings.theme === 'auto' && (
+                <div className="theme-auto-prefs">
+                  <div className="theme-auto-row">
+                    <span className="theme-auto-label">{t('tb.autoLight')}</span>
+                    <div className="theme-auto-choices">
+                      {(['day', 'sepia'] as const).map((id) => (
+                        <button
+                          key={id}
+                          className={`theme-chip theme-${id}${settings.autoLight === id ? ' selected' : ''}`}
+                          onClick={() => onSettingsChange({ autoLight: id })}
+                        >
+                          {t(id === 'day' ? 'tb.themeDay' : 'tb.themeSepia')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="theme-auto-row">
+                    <span className="theme-auto-label">{t('tb.autoDark')}</span>
+                    <div className="theme-auto-choices">
+                      {(['night', 'nightHc'] as const).map((id) => (
+                        <button
+                          key={id}
+                          className={`theme-chip theme-${id}${settings.autoDark === id ? ' selected' : ''}`}
+                          onClick={() => onSettingsChange({ autoDark: id })}
+                        >
+                          {t(id === 'night' ? 'tb.themeNight' : 'tb.themeNightHc')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="theme-auto-hint">{t('tb.autoHint')}</div>
+                </div>
+              )}
+
               <div className="theme-menu-sep" />
 
               <div className="theme-menu-label">{t('tb.language')}</div>
@@ -495,8 +529,15 @@ export default function Toolbar({
           )}
         </div>
 
-        <button className="tb-btn" onClick={onToggleChrome} title={t('tb.distractionTip')}>
-          <IconExpand />
+        <button
+          className={`tb-btn${toolbarPinned ? '' : ' is-active'}`}
+          onClick={onTogglePin}
+          title={toolbarPinned ? t('tb.unpinTip') : t('tb.pinTip')}
+        >
+          {toolbarPinned ? <IconPin /> : <IconPinOff />}
+        </button>
+        <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
+          <IconPresent />
         </button>
         <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
           <IconFullscreen />

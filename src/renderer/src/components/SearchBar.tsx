@@ -2,12 +2,29 @@ import { useEffect, useRef } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
 import { t, useLang } from '../i18n'
 
+export interface SemanticHitView {
+  label: string
+  pageNumber: number | null
+}
+
 interface Props {
   query: string
   options: SearchOptions
   matches: SearchMatch[]
   index: number
   busy: boolean
+  /** Search mode: exact text or AI-semantic */
+  mode: 'text' | 'ai'
+  onModeChange(mode: 'text' | 'ai'): void
+  /** AI-mode state (only meaningful when mode === 'ai') */
+  aiStatus: 'idle' | 'running' | 'done' | 'noKey' | 'error'
+  aiHits: SemanticHitView[]
+  aiIndex: number
+  aiNote: string | null
+  aiCost: string | null
+  onAiSearch(): void
+  onAiPick(index: number): void
+  onOpenAiSettings(): void
   onQueryChange(query: string): void
   onOptionsChange(options: SearchOptions): void
   onNext(): void
@@ -22,6 +39,16 @@ export default function SearchBar({
   matches,
   index,
   busy,
+  mode,
+  onModeChange,
+  aiStatus,
+  aiHits,
+  aiIndex,
+  aiNote,
+  aiCost,
+  onAiSearch,
+  onAiPick,
+  onOpenAiSettings,
   onQueryChange,
   onOptionsChange,
   onNext,
@@ -32,6 +59,7 @@ export default function SearchBar({
   useLang()
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const isAi = mode === 'ai'
 
   useEffect(() => {
     inputRef.current?.focus()
@@ -42,60 +70,100 @@ export default function SearchBar({
     listRef.current
       ?.querySelector('.search-result.active')
       ?.scrollIntoView({ block: 'nearest' })
-  }, [index])
+  }, [index, aiIndex])
 
   const count = matches.length
-  const status = busy
+  const textStatus = busy
     ? t('search.searching')
     : query.trim() === ''
       ? ''
       : count === 0
         ? t('search.noMatches')
         : t('search.count', { index: index + 1, count })
+  const aiStatusText =
+    aiStatus === 'running'
+      ? t('search.aiSearching')
+      : aiStatus === 'done'
+        ? aiHits.length > 0
+          ? t('search.aiHits', { count: aiHits.length }) + (aiCost ? ` · ${t('search.aiCost', { cost: aiCost })}` : '')
+          : t('search.aiNoHits')
+        : aiStatus === 'error'
+          ? t('search.searchError')
+          : ''
 
   return (
     <div className="search-bar" onMouseDown={(e) => e.stopPropagation()}>
       <div className="search-row">
+        <div className="search-mode" role="tablist">
+          <button
+            className={`search-mode-btn${!isAi ? ' is-active' : ''}`}
+            onClick={() => onModeChange('text')}
+            title={t('search.modeTextTip')}
+          >
+            {t('search.modeText')}
+          </button>
+          <button
+            className={`search-mode-btn${isAi ? ' is-active' : ''}`}
+            onClick={() => onModeChange('ai')}
+            title={t('search.modeAiTip')}
+          >
+            ✦ {t('search.modeAi')}
+          </button>
+        </div>
         <input
           ref={inputRef}
           value={query}
-          placeholder={t('search.placeholder')}
+          placeholder={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
           onChange={(e) => onQueryChange(e.target.value)}
           onKeyDown={(e) => {
             e.stopPropagation()
-            if (e.key === 'Enter' && e.shiftKey) onPrev()
-            else if (e.key === 'Enter') onNext()
-            else if (e.key === 'Escape') onClose()
+            if (isAi) {
+              if (e.key === 'Enter') onAiSearch()
+              else if (e.key === 'Escape') onClose()
+            } else {
+              if (e.key === 'Enter' && e.shiftKey) onPrev()
+              else if (e.key === 'Enter') onNext()
+              else if (e.key === 'Escape') onClose()
+            }
           }}
-          aria-label={t('search.placeholder')}
+          aria-label={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
         />
-        <span className="search-status">{status}</span>
-        <button className="tb-btn" onClick={onPrev} disabled={count === 0} title={t('search.prevTip')}>
-          ↑
-        </button>
-        <button className="tb-btn" onClick={onNext} disabled={count === 0} title={t('search.nextTip')}>
-          ↓
-        </button>
-        <button
-          className={`tb-btn search-opt${options.matchCase ? ' is-active' : ''}`}
-          onClick={() => onOptionsChange({ ...options, matchCase: !options.matchCase })}
-          title={t('search.matchCaseTip')}
-        >
-          Aa
-        </button>
-        <button
-          className={`tb-btn search-opt${options.wholeWords ? ' is-active' : ''}`}
-          onClick={() => onOptionsChange({ ...options, wholeWords: !options.wholeWords })}
-          title={t('search.wholeWordsTip')}
-        >
-          |ab|
-        </button>
+        <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
+        {!isAi && (
+          <>
+            <button className="tb-btn" onClick={onPrev} disabled={count === 0} title={t('search.prevTip')}>
+              ↑
+            </button>
+            <button className="tb-btn" onClick={onNext} disabled={count === 0} title={t('search.nextTip')}>
+              ↓
+            </button>
+            <button
+              className={`tb-btn search-opt${options.matchCase ? ' is-active' : ''}`}
+              onClick={() => onOptionsChange({ ...options, matchCase: !options.matchCase })}
+              title={t('search.matchCaseTip')}
+            >
+              Aa
+            </button>
+            <button
+              className={`tb-btn search-opt${options.wholeWords ? ' is-active' : ''}`}
+              onClick={() => onOptionsChange({ ...options, wholeWords: !options.wholeWords })}
+              title={t('search.wholeWordsTip')}
+            >
+              |ab|
+            </button>
+          </>
+        )}
+        {isAi && aiStatus !== 'running' && (
+          <button className="tb-btn" onClick={onAiSearch} disabled={query.trim() === ''} title={t('search.modeAiTip')}>
+            ✦
+          </button>
+        )}
         <button className="tb-btn" onClick={onClose} title={t('search.closeTip')}>
           ✕
         </button>
       </div>
 
-      {count > 0 && (
+      {!isAi && count > 0 && (
         <div className="search-results" ref={listRef}>
           {matches.map((m, i) => (
             <button
@@ -109,6 +177,35 @@ export default function SearchBar({
                 <mark>{m.snippet.slice(m.snippetOffset, m.snippetOffset + (m.end - m.start))}</mark>
                 {m.snippet.slice(m.snippetOffset + (m.end - m.start))}
               </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isAi && aiStatus === 'noKey' && (
+        <div className="search-ai-note">
+          {t('search.aiNoKey')}{' '}
+          <button className="search-ai-link" onClick={onOpenAiSettings}>
+            {t('search.aiOpenSettings')}
+          </button>
+        </div>
+      )}
+      {isAi && aiStatus === 'error' && aiNote && <div className="search-ai-note">{aiNote}</div>}
+      {isAi && aiStatus === 'done' && aiHits.length === 0 && aiNote && (
+        <div className="search-ai-note">{aiNote}</div>
+      )}
+      {isAi && aiHits.length > 0 && (
+        <div className="search-results" ref={listRef}>
+          {aiHits.map((h, i) => (
+            <button
+              key={i}
+              className={`search-result${i === aiIndex ? ' active' : ''}`}
+              onClick={() => onAiPick(i)}
+            >
+              {h.pageNumber !== null && (
+                <span className="search-result-page">{t('app.pageAbbrev')} {h.pageNumber}</span>
+              )}
+              <span className="search-result-snippet">{h.label}</span>
             </button>
           ))}
         </div>

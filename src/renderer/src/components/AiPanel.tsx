@@ -18,6 +18,9 @@ import {
   explainSystem,
   explainUserMessage,
   formatCost,
+  nextAiRequestId,
+  referenceSystem,
+  referenceUserMessage,
   resolveCitation,
   summaryPrompt
 } from '../ai'
@@ -38,8 +41,7 @@ import {
   IconSummary
 } from './icons'
 
-let requestCounter = 1
-const nextRequestId = (): number => requestCounter++
+const nextRequestId = nextAiRequestId
 
 export interface EnsuredDocument {
   pages: PageText[]
@@ -466,6 +468,76 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
   )
 }
 
+// ---------- Model quick-menu (click the header chip) ----------
+
+interface ModelMenuProps {
+  config: AiConfigView
+  onSaved(next: AiConfigView): void
+  onClose(): void
+  onOpenSettings(): void
+}
+
+/** Small popover under the header model chip: switch model + reasoning effort
+ *  for the current provider without opening full settings. */
+function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuProps): React.JSX.Element {
+  useLang()
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const close = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [onClose])
+
+  const provider = config.provider
+  const model = config.models[provider] ?? ''
+  const models = MODELS[provider] ?? []
+  // Haiku ignores reasoning effort; mock has none — mirror AiSettings
+  const thinkingApplies = !/haiku/i.test(model) && provider !== 'mock'
+
+  const patch = (p: Parameters<typeof bridge.aiSetConfig>[0]): void => {
+    void bridge.aiSetConfig(p).then(onSaved)
+  }
+
+  return (
+    <div className="ai-model-menu" ref={ref}>
+      <label className="ai-field">
+        <span>{t('ai.model')}</span>
+        <select
+          value={model}
+          onChange={(e) => patch({ models: { ...config.models, [provider]: e.target.value } })}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+          {!models.some((m) => m.id === model) && model && <option value={model}>{model}</option>}
+        </select>
+      </label>
+      {thinkingApplies && (
+        <label className="ai-field">
+          <span>{t('ai.reasoning')}</span>
+          <select
+            value={config.thinking}
+            onChange={(e) => patch({ thinking: e.target.value as ThinkingLevel })}
+          >
+            {THINKING_LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {t(l.key)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <button className="ai-model-more" onClick={onOpenSettings}>
+        {t('ai.settingsTip')}
+      </button>
+    </div>
+  )
+}
+
 // ---------- Chat panel ----------
 
 export interface AiSeed {
@@ -514,6 +586,7 @@ export default function AiPanel({
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showModelMenu, setShowModelMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [conversations, setConversations] = useState<StoredConversation[]>(() => loadConversations(docPath))
   const [activeChatId, setActiveChatId] = useState<string | null>(() => conversations[0]?.id ?? null)
@@ -772,9 +845,44 @@ export default function AiPanel({
       <header className="ai-header">
         <IconSparkle size={16} />
         <span className="ai-title">{t('ai.assistant')}</span>
-        <span className="ai-model" title={providerLabel}>
-          {config ? (config.provider === 'azure' ? config.azure.deployment : config.models[config.provider]) : ''}
-        </span>
+        <div className="ai-model-anchor">
+          <button
+            className="ai-model"
+            title={config ? `${providerLabel} — ${t('ai.modelMenuTip')}` : providerLabel}
+            disabled={!config}
+            onClick={() => {
+              if (!config) return
+              // Azure has no curated model list — send them to full settings
+              if (config.provider === 'azure') {
+                setShowSettings(true)
+                setShowHistory(false)
+                return
+              }
+              setShowModelMenu((s) => !s)
+            }}
+          >
+            <span className="ai-model-name">
+              {config
+                ? config.provider === 'azure'
+                  ? config.azure.deployment
+                  : config.models[config.provider]
+                : ''}
+            </span>
+            {config && config.provider !== 'azure' && <IconChevronDown size={11} />}
+          </button>
+          {showModelMenu && config && (
+            <ModelQuickMenu
+              config={config}
+              onSaved={setConfig}
+              onClose={() => setShowModelMenu(false)}
+              onOpenSettings={() => {
+                setShowModelMenu(false)
+                setShowSettings(true)
+                setShowHistory(false)
+              }}
+            />
+          )}
+        </div>
         <button
           className="tb-btn"
           title={t('ai.newChatTip')}
@@ -960,29 +1068,42 @@ export default function AiPanel({
 export interface AiQuickState {
   x: number
   y: number
-  mode: 'explain' | 'simplify' | 'define'
+  mode: 'explain' | 'simplify' | 'define' | 'reference'
   selection: string
   pageNumber: number
   pageContext: string
+  /** Reference lookup needs the whole document attached so the model can find
+   *  the bibliography entry itself; explain/simplify/define do not.
+   *  pageStarts lets the citation chips resolve char offsets to page numbers. */
+  document?: { title: string; text: string; pageStarts: number[] } | null
 }
 
 const quickTitle = (mode: AiQuickState['mode']): string =>
-  mode === 'explain' ? t('ai.quickExplain') : mode === 'simplify' ? t('ai.quickSimplify') : t('ai.quickDefine')
+  mode === 'explain'
+    ? t('ai.quickExplain')
+    : mode === 'simplify'
+      ? t('ai.quickSimplify')
+      : mode === 'reference'
+        ? t('ai.quickReference')
+        : t('ai.quickDefine')
 
 interface QuickProps {
   state: AiQuickState
   onSendToChat(seed: AiSeed): void
+  onCitation?(citation: AiCitation): void
   onClose(): void
 }
 
-export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): React.JSX.Element {
+export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: QuickProps): React.JSX.Element {
   useLang()
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [meta, setMeta] = useState<string | null>(null)
+  const [parts, setParts] = useState<AiContentPart[] | null>(null)
   const requestIdRef = useRef<number | null>(null)
   const finalRef = useRef('')
+  const isReference = state.mode === 'reference'
 
   useEffect(() => {
     let stale = false
@@ -994,11 +1115,20 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
     void (async () => {
       const result = await bridge.aiChat({
         requestId,
-        system: explainSystem(state.mode),
+        system: isReference ? referenceSystem() : explainSystem(state.mode as 'explain' | 'simplify' | 'define'),
         messages: [
-          { role: 'user', text: explainUserMessage(state.selection, state.pageNumber, state.pageContext) }
+          {
+            role: 'user',
+            text: isReference
+              ? referenceUserMessage(state.selection, state.pageNumber, state.pageContext)
+              : explainUserMessage(state.selection, state.pageNumber, state.pageContext)
+          }
         ],
-        document: null
+        // Reference lookup attaches the whole document so the model can find
+        // the bibliography entry; the others stay page-local.
+        document: isReference && state.document
+          ? { title: state.document.title, text: state.document.text }
+          : null
       })
       if (stale) return
       setDone(true)
@@ -1008,6 +1138,7 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
         const full = result.parts.map((p) => p.text).join('')
         finalRef.current = full
         setText(full)
+        setParts(result.parts)
         const cost = estimateCost(result.model, result.usage)
         if (cost !== null) setMeta(`≈ ${formatCost(cost)}`)
       }
@@ -1034,6 +1165,12 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
       <div className="ai-quick-body">
         {error ? (
           <div className="ai-error">{error}</div>
+        ) : parts && isReference ? (
+          <AssistantBody
+            parts={parts}
+            doc={state.document ? { text: state.document.text, pageStarts: state.document.pageStarts } : null}
+            onCitation={(c) => onCitation?.(c)}
+          />
         ) : text ? (
           renderMarkdown(text)
         ) : (
