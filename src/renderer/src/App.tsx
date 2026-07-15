@@ -158,6 +158,26 @@ export default function App(): React.JSX.Element {
     [reallyCloseTab]
   )
 
+  // Move a tab to another window (drag) or tear it off into a new one. The
+  // source tab closes WITHOUT the discard prompt so its unsaved draft (kept on
+  // disk, keyed by path in main) travels with the document — the target window
+  // opens the same path and picks the draft back up.
+  const moveTabOut = useCallback(
+    async (id: string, path: string) => {
+      const verdict = await bridge.tabDropAtCursor(path)
+      if (verdict === 'window' || verdict === 'new') reallyCloseTab(id)
+    },
+    [reallyCloseTab]
+  )
+
+  const moveToNewWindow = useCallback(
+    (id: string, path: string) => {
+      bridge.newWindow(path)
+      reallyCloseTab(id)
+    },
+    [reallyCloseTab]
+  )
+
   const cycleTab = useCallback((delta: number) => {
     setActiveId((current) => {
       const list = tabsRef.current
@@ -277,6 +297,8 @@ export default function App(): React.JSX.Element {
         onNewWindow={() => bridge.newWindow()}
         onOpenInNewWindow={(path) => bridge.newWindow(path)}
         onShowInFolder={(path) => bridge.showInFolder(path)}
+        onTabDragOut={(id, path) => void moveTabOut(id, path)}
+        onMoveToNewWindow={moveToNewWindow}
         onLibrary={() => activeId && closeTab(activeId)}
       />
 

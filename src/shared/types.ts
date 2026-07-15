@@ -50,6 +50,9 @@ export interface FileError {
   error: string
 }
 
+/** Outcome of dropping a dragged tab (see PdfxApi.tabDropAtCursor) */
+export type TabDropResult = 'window' | 'new' | 'same'
+
 export type AnnotationType =
   | 'highlight'
   | 'underline'
@@ -216,6 +219,11 @@ export interface PdfxApi {
   openExternal(url: string): void
   /** Open a new app window, optionally loading a document (side-by-side use) */
   newWindow(path?: string): void
+  /** A tab was dragged out and released. Main hit-tests the cursor against
+   *  every window: 'window' = handed to another window (merge), 'new' = torn
+   *  off into a fresh window, 'same' = dropped back on the source (no-op).
+   *  The source closes its tab for 'window'/'new'. */
+  tabDropAtCursor(path: string): Promise<TabDropResult>
   // ---------- Save model (annotation edits go to a draft, not the file) ----------
   /** Tell main a document is open in this window (unsaved-changes guard) */
   docOpened(path: string): void

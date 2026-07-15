@@ -21,6 +21,10 @@ interface Props {
   onNewWindow(): void
   onOpenInNewWindow(path: string): void
   onShowInFolder(path: string): void
+  /** A tab was dragged out and released — main decides where it lands */
+  onTabDragOut(id: string, path: string): void
+  /** Context-menu fallback: tear the tab off into a new window */
+  onMoveToNewWindow(id: string, path: string): void
   /** Back to the library (closes the active document) */
   onLibrary(): void
 }
@@ -44,10 +48,13 @@ export default function TabBar({
   onNewWindow,
   onOpenInNewWindow,
   onShowInFolder,
+  onTabDragOut,
+  onMoveToNewWindow,
   onLibrary
 }: Props): React.JSX.Element {
   useLang()
   const [menu, setMenu] = useState<{ x: number; y: number; tab: TabInfo } | null>(null)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!menu) return
@@ -83,8 +90,21 @@ export default function TabBar({
       {tabs.map((tab) => (
         <div
           key={tab.id}
-          className={`tab${tab.id === activeId ? ' active' : ''}`}
+          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}`}
           title={tab.path}
+          draggable
+          onDragStart={(e) => {
+            // HTML5 drag can't cross OS windows; we only need dragend to fire so
+            // main can hit-test the cursor. Setting data keeps some platforms
+            // from cancelling the drag.
+            e.dataTransfer.effectAllowed = 'move'
+            e.dataTransfer.setData('text/plain', tab.path)
+            setDraggingId(tab.id)
+          }}
+          onDragEnd={() => {
+            setDraggingId(null)
+            onTabDragOut(tab.id, tab.path)
+          }}
           onAuxClick={(e) => {
             if (e.button === 1) onClose(tab.id)
           }}
@@ -116,6 +136,15 @@ export default function TabBar({
           style={{ left: Math.min(menu.x, window.innerWidth - 220), top: menu.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >
+          <button
+            className="menu-item"
+            onClick={() => {
+              onMoveToNewWindow(menu.tab.id, menu.tab.path)
+              setMenu(null)
+            }}
+          >
+            {t('tabs.moveToNewWindow')}
+          </button>
           <button
             className="menu-item"
             onClick={() => {
