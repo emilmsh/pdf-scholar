@@ -115,6 +115,9 @@ const webApi: PdfxApi = {
   newWindow: (path) => {
     window.open(path ? `${location.origin}/#open=${encodeURIComponent(path)}` : location.href, '_blank')
   },
+  // No cross-window cursor hit-testing in a plain browser — dropping a tab is
+  // a no-op so dev:web keeps working
+  tabDropAtCursor: async () => 'same',
   // Browser preview: open the PDF in a new tab — its viewer has print
   printFile: async (path) => {
     window.open(path, '_blank', 'noopener')

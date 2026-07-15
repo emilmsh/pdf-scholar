@@ -214,6 +214,11 @@ button {
   color: var(--text);
 }
 
+/* While being torn off / dragged to another window */
+.tab.dragging {
+  opacity: 0.5;
+}
+
 .tab-label {
   flex: 1;
   min-width: 0;

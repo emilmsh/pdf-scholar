@@ -30,6 +30,7 @@ const nb = {
   'tabs.new': 'Åpne PDF (Ctrl+O)',
   'tabs.newWindow': 'Nytt vindu (Ctrl+Shift+N)',
   'tabs.openInNewWindow': 'Åpne i nytt vindu',
+  'tabs.moveToNewWindow': 'Flytt til nytt vindu',
   'tabs.showInFolder': 'Vis i Filutforsker',
 
   // Toolbar
@@ -306,6 +307,7 @@ const en: Dict = {
   'tabs.new': 'Open PDF (Ctrl+O)',
   'tabs.newWindow': 'New window (Ctrl+Shift+N)',
   'tabs.openInNewWindow': 'Open in new window',
+  'tabs.moveToNewWindow': 'Move to new window',
   'tabs.showInFolder': 'Show in File Explorer',
 
   'tb.library': 'Library',

@@ -1,4 +1,13 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, powerSaveBlocker, shell } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  nativeTheme,
+  powerSaveBlocker,
+  screen,
+  shell
+} from 'electron'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
@@ -277,6 +286,35 @@ function registerIpc(): void {
   // place documents side by side or view two spots in one file at once
   ipcMain.on('window:new', (_e, path?: string) => {
     createWindow(typeof path === 'string' && path ? path : null)
+  })
+
+  // A tab was dragged out and released. HTML5 drag events don't cross OS
+  // window boundaries, so main hit-tests the OS cursor against every window's
+  // bounds and decides where the document goes. The document's draft (unsaved
+  // annotations) is keyed by path in main, so it travels automatically: the
+  // target opens the same path and picks up the same draft — the renderer just
+  // closes the source tab WITHOUT the discard prompt.
+  ipcMain.handle('tab:drop-at-cursor', (e, path: string) => {
+    const source = BrowserWindow.fromWebContents(e.sender)
+    const pt = screen.getCursorScreenPoint()
+    const inBounds = (win: BrowserWindow): boolean => {
+      const b = win.getBounds()
+      return pt.x >= b.x && pt.x <= b.x + b.width && pt.y >= b.y && pt.y <= b.y + b.height
+    }
+    // Another (non-minimized) window under the cursor → merge into it
+    const target = BrowserWindow.getAllWindows().find(
+      (w) => w !== source && !w.isDestroyed() && !w.isMinimized() && inBounds(w)
+    )
+    if (target) {
+      if (!target.webContents.isDestroyed()) target.webContents.send('open-path', path)
+      target.focus()
+      return 'window'
+    }
+    // Dropped back on the source window → treat as a no-op reorder
+    if (source && !source.isDestroyed() && inBounds(source)) return 'same'
+    // Dropped on empty desktop → tear off into a fresh window
+    createWindow(path)
+    return 'new'
   })
 
   ipcMain.handle('file:read', (_e, path: string) => loadPdf(path))
