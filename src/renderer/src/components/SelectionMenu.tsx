@@ -150,7 +150,9 @@ interface SelectionStats {
 
 function countSelection(text: string): SelectionStats {
   const trimmed = text.trim()
-  const words = trimmed ? trimmed.split(/\s+/).length : 0
+  // A "word" must carry a letter or number — a lone dash or bullet doesn't
+  // count (matches how Word Counter Plus tallies).
+  const words = trimmed ? trimmed.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length : 0
   const characters = text.length
   const charactersNoSpaces = text.replace(/\s/g, '').length
   const sentenceMarks = (trimmed.match(/[.!?…]+(?=\s|$)/g) ?? []).length
