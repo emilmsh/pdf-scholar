@@ -10,6 +10,10 @@ export type LanguagePreference = 'nb' | 'en' | 'auto'
 
 export interface Settings {
   theme: ThemePreference
+  /** Which light theme 'auto' resolves to when the OS is in light mode */
+  autoLight: 'day' | 'sepia'
+  /** Which dark theme 'auto' resolves to when the OS is in dark mode */
+  autoDark: 'night' | 'nightHc'
   keepAwake: boolean
   language: LanguagePreference
 }

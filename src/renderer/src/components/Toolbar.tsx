@@ -466,6 +466,40 @@ export default function Toolbar({
                 ))}
               </div>
 
+              {settings.theme === 'auto' && (
+                <div className="theme-auto-prefs">
+                  <div className="theme-auto-row">
+                    <span className="theme-auto-label">{t('tb.autoLight')}</span>
+                    <div className="theme-auto-choices">
+                      {(['day', 'sepia'] as const).map((id) => (
+                        <button
+                          key={id}
+                          className={`theme-chip theme-${id}${settings.autoLight === id ? ' selected' : ''}`}
+                          onClick={() => onSettingsChange({ autoLight: id })}
+                        >
+                          {t(id === 'day' ? 'tb.themeDay' : 'tb.themeSepia')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="theme-auto-row">
+                    <span className="theme-auto-label">{t('tb.autoDark')}</span>
+                    <div className="theme-auto-choices">
+                      {(['night', 'nightHc'] as const).map((id) => (
+                        <button
+                          key={id}
+                          className={`theme-chip theme-${id}${settings.autoDark === id ? ' selected' : ''}`}
+                          onClick={() => onSettingsChange({ autoDark: id })}
+                        >
+                          {t(id === 'night' ? 'tb.themeNight' : 'tb.themeNightHc')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="theme-auto-hint">{t('tb.autoHint')}</div>
+                </div>
+              )}
+
               <div className="theme-menu-sep" />
 
               <div className="theme-menu-label">{t('tb.language')}</div>

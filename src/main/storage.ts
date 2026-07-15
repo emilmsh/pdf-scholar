@@ -43,6 +43,8 @@ const DEFAULTS: AppState = {
   positions: {},
   settings: {
     theme: 'day',
+    autoLight: 'day',
+    autoDark: 'night',
     keepAwake: false,
     language: 'auto'
   },

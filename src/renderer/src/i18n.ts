@@ -71,6 +71,9 @@ const nb = {
   'tb.keepAwake': 'Hold skjermen våken',
   'tb.language': 'Språk',
   'tb.langAuto': 'Auto',
+  'tb.autoLight': 'Lys',
+  'tb.autoDark': 'Mørk',
+  'tb.autoHint': 'Auto følger systemets lys/mørk-innstilling.',
   'tb.pinTip': 'Fest verktøylinjen — nå skjules den, hover toppen for å vise den',
   'tb.unpinTip': 'Løsne verktøylinjen — la den skjule seg for renere lesing',
   'tb.presentTip': 'Presentasjonsmodus (P) — én side om gangen, helskjerm',
@@ -130,6 +133,13 @@ const nb = {
   'menu.translate': 'Oversett',
   'menu.newNoteHere': 'Nytt notat her',
   'menu.notePlaceholder': 'Skriv et notat …',
+  'menu.count': 'Ordtelling',
+  'menu.words': 'Ord',
+  'menu.characters': 'Tegn',
+  'menu.charactersNoSpaces': 'Tegn (uten mellomrom)',
+  'menu.sentences': 'Setninger',
+  'menu.readingTime': 'Lesetid',
+  'menu.readingUnderMin': '< 1 min',
 
   // Annotation popover
   'popover.notePlaceholder': 'Notattekst …',
@@ -207,6 +217,7 @@ const nb = {
   // AI panel
   'ai.assistant': 'Assistent',
   'ai.settingsTip': 'KI-innstillinger',
+  'ai.modelMenuTip': 'Bytt modell og tenkeinnsats',
   'ai.closeTip': 'Lukk (Esc)',
   'ai.emptyIntro':
     'Still spørsmål om dokumentet. Svarene får kildehenvisninger du kan klikke på for å hoppe til riktig sted.',
@@ -320,6 +331,9 @@ const en: Dict = {
   'tb.keepAwake': 'Keep the screen awake',
   'tb.language': 'Language',
   'tb.langAuto': 'Auto',
+  'tb.autoLight': 'Light',
+  'tb.autoDark': 'Dark',
+  'tb.autoHint': 'Auto follows the system light/dark setting.',
   'tb.pinTip': 'Pin the toolbar — it now hides itself; hover the top to reveal it',
   'tb.unpinTip': 'Unpin the toolbar — let it hide itself for cleaner reading',
   'tb.presentTip': 'Presentation mode (P) — one page at a time, full screen',
@@ -375,6 +389,13 @@ const en: Dict = {
   'menu.translate': 'Translate',
   'menu.newNoteHere': 'New note here',
   'menu.notePlaceholder': 'Write a note …',
+  'menu.count': 'Word count',
+  'menu.words': 'Words',
+  'menu.characters': 'Characters',
+  'menu.charactersNoSpaces': 'Characters (no spaces)',
+  'menu.sentences': 'Sentences',
+  'menu.readingTime': 'Reading time',
+  'menu.readingUnderMin': '< 1 min',
 
   'popover.notePlaceholder': 'Note text …',
   'popover.commentPlaceholder': 'Add a comment …',
@@ -445,6 +466,7 @@ const en: Dict = {
 
   'ai.assistant': 'Assistant',
   'ai.settingsTip': 'AI settings',
+  'ai.modelMenuTip': 'Change model and reasoning effort',
   'ai.closeTip': 'Close (Esc)',
   'ai.emptyIntro':
     'Ask questions about the document. Answers come with source references you can click to jump to the right place.',
