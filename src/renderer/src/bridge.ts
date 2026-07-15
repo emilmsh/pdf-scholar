@@ -229,7 +229,19 @@ const webApi: PdfxApi = {
     return () => {
       webAiDeltaListeners.delete(cb)
     }
-  }
+  },
+  // No WebContentsView in a plain browser — a web search just opens a
+  // DuckDuckGo tab (the pre-panel behaviour), and the rest are no-ops.
+  webSearchOpen: (query) => {
+    const q = (query ?? '').trim()
+    window.open(q ? `https://duckduckgo.com/?q=${encodeURIComponent(q)}` : 'https://duckduckgo.com/', '_blank', 'noopener')
+  },
+  webSearchClose: () => {},
+  webSearchSetBounds: () => {},
+  webSearchBack: () => {},
+  webSearchForward: () => {},
+  webSearchReload: () => {},
+  onWebSearchState: () => () => {}
 }
 
 const webAiDeltaListeners = new Set<(requestId: number, text: string) => void>()

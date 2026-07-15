@@ -281,7 +281,15 @@ const nb = {
   'ai.historyDeleteTip': 'Slett samtalen',
   'ai.historyMessages': '{count} meldinger',
   'ai.jumpNewestTip': 'Hopp til nyeste melding',
-  'ai.untitledChat': 'Uten tittel'
+  'ai.untitledChat': 'Uten tittel',
+
+  // Web search panel
+  'web.title': 'Nettsøk',
+  'web.back': 'Tilbake',
+  'web.forward': 'Frem',
+  'web.reload': 'Last inn på nytt',
+  'web.openExternal': 'Åpne i nettleseren',
+  'web.close': 'Lukk (Esc)'
 }
 
 export type MsgKey = keyof typeof nb
@@ -545,7 +553,15 @@ const en: Dict = {
   'ai.historyDeleteTip': 'Delete conversation',
   'ai.historyMessages': '{count} messages',
   'ai.jumpNewestTip': 'Jump to newest message',
-  'ai.untitledChat': 'Untitled'
+  'ai.untitledChat': 'Untitled',
+
+  // Web search panel
+  'web.title': 'Web search',
+  'web.back': 'Back',
+  'web.forward': 'Forward',
+  'web.reload': 'Reload',
+  'web.openExternal': 'Open in browser',
+  'web.close': 'Close (Esc)'
 }
 
 const DICTIONARIES: Record<Lang, Dict> = { nb, en }

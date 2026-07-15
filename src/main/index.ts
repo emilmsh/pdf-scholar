@@ -13,6 +13,7 @@ import type {
   Settings
 } from '../shared/types'
 import { registerAiIpc } from './ai'
+import { registerWebSearchIpc } from './web-search'
 import { applyAnnotation, deleteAnnotation, updateAnnotation } from './annotation-engine'
 import { discardDraft, ensureDraft, hasDraft, readPathFor, saveDraft } from './drafts'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
@@ -262,6 +263,7 @@ async function loadPdf(path: string): Promise<FilePayload | FileError> {
 
 function registerIpc(): void {
   registerAiIpc()
+  registerWebSearchIpc()
   ipcMain.handle('dialog:open', async (e) => {
     const parent = windowFor(e)
     if (!parent) return null
