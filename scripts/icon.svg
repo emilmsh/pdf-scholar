@@ -1,74 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#4f8ceb"/>
-      <stop offset="1" stop-color="#2c60c6"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#0e3a3f"/>
+      <stop offset="1" stop-color="#18696a"/>
     </linearGradient>
-    <linearGradient id="parch" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#faf3e0"/>
-      <stop offset="1" stop-color="#e9dcba"/>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#faf4e8"/>
+      <stop offset="1" stop-color="#ece0c8"/>
     </linearGradient>
     <linearGradient id="roll" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#fdf8ea"/>
-      <stop offset="0.5" stop-color="#f1e5c4"/>
-      <stop offset="1" stop-color="#c9b586"/>
+      <stop offset="0" stop-color="#f2e6cd"/>
+      <stop offset="1" stop-color="#d6c096"/>
     </linearGradient>
-    <linearGradient id="vane" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#fefdf9"/>
-      <stop offset="1" stop-color="#ddd8ca"/>
-    </linearGradient>
-    <linearGradient id="horn" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ecd39a"/>
-      <stop offset="1" stop-color="#c9a35e"/>
-    </linearGradient>
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.25"/>
+    <filter id="softShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.30"/>
     </filter>
   </defs>
-  <rect width="512" height="512" rx="104" fill="url(#bg)"/>
-  <!-- parchment: rolled top edge, gently waved bottom -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- scroll: rolled top & bottom, reading highlight over one line -->
   <g filter="url(#softShadow)">
-    <path d="M156 126 h200 v276 q -50 14 -100 0 q -50 -14 -100 0 z" fill="url(#parch)"/>
-    <path d="M156 126 h200 v14 h-200 z" fill="#8f7a4e" opacity="0.22"/>
-    <g fill="#b8a273">
-      <rect x="180" y="186" width="126" height="13" rx="6.5"/>
-      <rect x="180" y="218" width="152" height="13" rx="6.5"/>
-      <rect x="180" y="282" width="152" height="13" rx="6.5"/>
-      <rect x="180" y="314" width="106" height="13" rx="6.5"/>
+    <rect x="154" y="134" width="204" height="244" rx="11" fill="url(#paper)"/>
+    <g fill="#a99c82" opacity="0.85">
+      <rect x="184" y="181" width="140" height="13" rx="6.5"/>
+      <rect x="184" y="300" width="142" height="13" rx="6.5"/>
+      <rect x="184" y="332" width="100" height="13" rx="6.5"/>
     </g>
-    <rect x="173" y="243" width="146" height="27" rx="9" fill="#ffd54a"/>
-    <rect x="180" y="250" width="132" height="13" rx="6.5" fill="#8a7430" opacity="0.55"/>
-    <rect x="138" y="88" width="236" height="40" rx="20" fill="url(#roll)"/>
-    <circle cx="158" cy="108" r="11" fill="#e3d3a6"/><circle cx="158" cy="108" r="4.5" fill="#a98f5c"/>
-    <circle cx="354" cy="108" r="11" fill="#e3d3a6"/><circle cx="354" cy="108" r="4.5" fill="#a98f5c"/>
-  </g>
-  <!-- goose quill: white vane w/ barb lines, brown rachis, cut horn nib -->
-  <g filter="url(#softShadow)" transform="translate(258,360) rotate(38)">
-    <path d="M 30,-252
-             C 62,-212 70,-150 52,-96
-             L 42,-104
-             C 46,-84 44,-66 30,-54
-             C 20,-44 6,-38 -3,-42
-             C -14,-47 -22,-60 -26,-78
-             L -18,-74
-             C -28,-96 -32,-128 -28,-160
-             C -24,-196 0,-232 30,-252 Z"
-          fill="url(#vane)"/>
-    <path d="M -3,-42 C -14,-47 -22,-60 -26,-78 L -18,-74 C -28,-96 -32,-128 -28,-160 C -26,-178 -20,-198 -10,-216 C -18,-186 -20,-150 -14,-118 C -10,-90 -2,-64 8,-50 C 4,-44 0,-41 -3,-42 Z"
-          fill="#b9b19c" opacity="0.5"/>
-    <path d="M 30,-252 C 48,-230 58,-204 60,-176 C 46,-186 32,-204 24,-226 C 26,-236 28,-246 30,-252 Z"
-          fill="#93876f" opacity="0.8"/>
-    <g stroke="#b9b19c" stroke-width="2" opacity="0.55" fill="none">
-      <path d="M 8,-64 C 20,-72 32,-84 42,-98"/>
-      <path d="M 6,-98 C 20,-108 34,-122 44,-138"/>
-      <path d="M 2,-136 C 16,-146 30,-160 40,-176"/>
-      <path d="M 0,-174 C 12,-184 24,-198 34,-212"/>
-    </g>
-    <path d="M 30,-252 C 12,-196 2,-130 -2,-64 C -3,-56 -4,-50 -5,-44"
-          stroke="#9c6b3f" stroke-width="5.5" fill="none" stroke-linecap="round"/>
-    <path d="M -8,-46 C -10,-18 -7,6 0,32 C 7,6 10,-18 8,-46 C 3,-50 -3,-50 -8,-46 Z"
-          fill="url(#horn)" stroke="#8a6a34" stroke-width="1.5"/>
-    <path d="M 0,32 L 0,2" stroke="#8a6a34" stroke-width="2"/>
-    <path d="M 0,32 C -3,20 -4,8 -4,-4 L -1,-2 L 0,10 Z" fill="#ffffff" opacity="0.35"/>
+    <rect x="178" y="217" width="156" height="28" rx="8" fill="#f4c56a" opacity="0.55"/>
+    <rect x="184" y="224" width="140" height="13" rx="6.5" fill="#a99c82" opacity="0.9"/>
+    <rect x="131" y="107" width="250" height="54" rx="27" fill="url(#roll)"/>
+    <ellipse cx="148" cy="134" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
+    <ellipse cx="364" cy="134" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
+    <rect x="131" y="351" width="250" height="54" rx="27" fill="url(#roll)"/>
+    <ellipse cx="148" cy="378" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
+    <ellipse cx="364" cy="378" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
   </g>
 </svg>

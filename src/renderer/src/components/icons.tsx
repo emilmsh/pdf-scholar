@@ -394,3 +394,54 @@ export const IconSpread = (p: IconProps): React.JSX.Element => (
     <rect x="13" y="4" width="8" height="16" rx="1" />
   </Svg>
 )
+
+// The full-colour app mark: the scroll from scripts/icon.svg. This is a fixed
+// brand icon (same in every theme), not a line icon — it does not use currentColor.
+export const AppMark = ({
+  size,
+  className
+}: {
+  size?: number
+  className?: string
+}): React.JSX.Element => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 512 512"
+    className={className}
+    role="img"
+    aria-label="PDF Scholar"
+  >
+    <defs>
+      <linearGradient id="am-bg" x1="0" y1="0" x2="0.35" y2="1">
+        <stop offset="0" stopColor="#0e3a3f" />
+        <stop offset="1" stopColor="#18696a" />
+      </linearGradient>
+      <linearGradient id="am-paper" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#faf4e8" />
+        <stop offset="1" stopColor="#ece0c8" />
+      </linearGradient>
+      <linearGradient id="am-roll" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stopColor="#f2e6cd" />
+        <stop offset="1" stopColor="#d6c096" />
+      </linearGradient>
+    </defs>
+    <rect width="512" height="512" rx="112" fill="url(#am-bg)" />
+    <g>
+      <rect x="154" y="134" width="204" height="244" rx="11" fill="url(#am-paper)" />
+      <g fill="#a99c82" opacity="0.85">
+        <rect x="184" y="181" width="140" height="13" rx="6.5" />
+        <rect x="184" y="300" width="142" height="13" rx="6.5" />
+        <rect x="184" y="332" width="100" height="13" rx="6.5" />
+      </g>
+      <rect x="178" y="217" width="156" height="28" rx="8" fill="#f4c56a" opacity="0.55" />
+      <rect x="184" y="224" width="140" height="13" rx="6.5" fill="#a99c82" opacity="0.9" />
+      <rect x="131" y="107" width="250" height="54" rx="27" fill="url(#am-roll)" />
+      <ellipse cx="148" cy="134" rx="8" ry="18" fill="#b89f6f" opacity="0.55" />
+      <ellipse cx="364" cy="134" rx="8" ry="18" fill="#b89f6f" opacity="0.55" />
+      <rect x="131" y="351" width="250" height="54" rx="27" fill="url(#am-roll)" />
+      <ellipse cx="148" cy="378" rx="8" ry="18" fill="#b89f6f" opacity="0.55" />
+      <ellipse cx="364" cy="378" rx="8" ry="18" fill="#b89f6f" opacity="0.55" />
+    </g>
+  </svg>
+)

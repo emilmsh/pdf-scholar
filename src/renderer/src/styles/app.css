@@ -320,6 +320,21 @@ button {
   display: flex;
   justify-content: center;
   background: var(--bg-chrome);
+  /* Library palette lifted from the app icon (deep teal + warm amber). */
+  --wc-teal: #147a76;
+  --wc-amber: #d99f34;
+  --wc-logo-from: #1a8a83;
+  --wc-logo-to: #0e4a4d;
+  --wc-btn-from: #1a807b;
+  --wc-btn-to: #0e565a;
+}
+
+/* Icon reads too dark on the night grounds — brighten the tokens that sit on the page. */
+:root[data-theme='night'] .welcome,
+:root[data-theme='nightHc'] .welcome {
+  --wc-teal: #3fb0a6;
+  --wc-logo-from: #55c6bb;
+  --wc-logo-to: #2f938c;
 }
 
 .welcome-inner {
@@ -331,20 +346,36 @@ button {
   text-align: center;
 }
 
+.welcome-lockup {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.welcome-mark {
+  width: 60px;
+  height: 60px;
+  border-radius: 15px;
+  flex: none;
+  box-shadow: 0 6px 18px rgba(14, 58, 63, 0.3);
+}
+
 .welcome-logo {
   font-size: 44px;
   font-weight: 700;
-  letter-spacing: 2px;
-  background: linear-gradient(135deg, var(--accent), #7a4af7);
+  letter-spacing: 1px;
+  background: linear-gradient(135deg, var(--wc-logo-from), var(--wc-logo-to));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .welcome-tagline {
-  margin-top: 10px;
+  margin-top: 16px;
   color: var(--text-secondary);
   font-size: 15px;
+  line-height: 1.55;
+  max-width: 46ch;
 }
 
 .welcome-actions {
@@ -369,6 +400,13 @@ button {
 
 .btn-primary:hover {
   filter: brightness(1.08);
+}
+
+/* On the library page the primary action carries the icon's teal, not the theme accent. */
+.welcome .btn-primary {
+  background: linear-gradient(135deg, var(--wc-btn-from), var(--wc-btn-to));
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(14, 58, 63, 0.28);
 }
 
 .btn-secondary {
@@ -436,7 +474,7 @@ button {
 
 .recent-row svg {
   grid-area: icon;
-  color: var(--accent);
+  color: var(--wc-teal);
 }
 
 .recent-name {
@@ -1006,7 +1044,7 @@ button {
 }
 
 .sidebar.open {
-  width: var(--sidebar-w, 212px);
+  width: var(--sidebar-w, 248px);
   border-right-color: var(--border);
 }
 
@@ -3241,7 +3279,7 @@ button {
 :root[data-theme='sepia'] .welcome-logo {
   font-family: 'Palatino Linotype', Cambria, Georgia, serif;
   letter-spacing: 1px;
-  background: linear-gradient(135deg, var(--accent), #8a4630);
+  background: linear-gradient(135deg, var(--wc-logo-from), var(--wc-logo-to));
   -webkit-background-clip: text;
   background-clip: text;
 }

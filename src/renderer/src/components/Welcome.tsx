@@ -1,7 +1,6 @@
 import type { RecentFile } from '../../../shared/types'
-import { isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
-import { IconDocument, IconFolderOpen } from './icons'
+import { AppMark, IconDocument, IconFolderOpen } from './icons'
 
 interface Props {
   recents: RecentFile[]
@@ -18,7 +17,10 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
   return (
     <div className="welcome">
       <div className="welcome-inner">
-        <div className="welcome-logo">PDF Scholar</div>
+        <div className="welcome-lockup">
+          <AppMark className="welcome-mark" />
+          <div className="welcome-logo">PDF Scholar</div>
+        </div>
         <p className="welcome-tagline">{t('welcome.tagline')}</p>
 
         <div className="welcome-actions">
@@ -26,11 +28,6 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
             <IconFolderOpen />
             {t('welcome.openPdf')}
           </button>
-          {!isElectron && (
-            <button className="btn-secondary" onClick={() => onOpenRecent('/sample.pdf')}>
-              {t('welcome.openSample')}
-            </button>
-          )}
         </div>
         <p className="welcome-hint">{t('welcome.dragHint')}</p>
 

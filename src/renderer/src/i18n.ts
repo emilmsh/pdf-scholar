@@ -18,9 +18,8 @@ const nb = {
   'app.pageAbbrev': 's.',
 
   // Welcome
-  'welcome.tagline': 'For deg som leser, forstår og arbeider med teksten.',
+  'welcome.tagline': 'Laget for forskning.',
   'welcome.openPdf': 'Åpne PDF …',
-  'welcome.openSample': 'Åpne eksempeldokument',
   'welcome.dragHint': '… eller dra og slipp en PDF hvor som helst i vinduet',
   'welcome.recents': 'Nylig lest',
 
@@ -309,9 +308,8 @@ const en: Dict = {
   'app.back': 'Back',
   'app.pageAbbrev': 'p.',
 
-  'welcome.tagline': 'For those who read, understand and work with the text.',
+  'welcome.tagline': 'Made for research.',
   'welcome.openPdf': 'Open PDF …',
-  'welcome.openSample': 'Open sample document',
   'welcome.dragHint': '… or drag and drop a PDF anywhere in the window',
   'welcome.recents': 'Recently read',
 
