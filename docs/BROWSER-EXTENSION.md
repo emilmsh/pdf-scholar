@@ -96,7 +96,7 @@ Then in `edge://extensions` (or `chrome://extensions`):
 | Reading position / recents / settings | JSON store | `chrome.storage.local` | Parity, different backend |
 | Annotation UI (draw, notes, shapes) | ✅ | ✅ | Overlay is renderer-side |
 | **Persist annotations to disk** | ✅ | ⏳ | See roadmap — the one real gap |
-| AI chat / grounded citations | ✅ live | ⏳ mock | See roadmap |
+| AI chat / grounded citations | ✅ live | ✅ live¹ | ¹ real Anthropic/OpenAI/Azure, BYO key in `chrome.storage.local` (not encrypted — see roadmap); shares the provider core `src/shared/ai-chat.ts` |
 | New window / side-by-side | native window | `chrome.tabs.create` | Adapted |
 | Print | ✅ | ✅ | Browser print |
 
@@ -121,11 +121,20 @@ the constraint is persisting them to the original path.
   privileged layer the Electron main process already is — the `annotate`/
   `docSave` logic can largely be reused behind a native-messaging shim.
 
-### 2. Live AI
-Keys must not sit in extension storage in plaintext, and provider APIs need CORS.
-Route AI through the **same native messaging host** (which owns the encrypted
-keys and makes the calls), mirroring how keys never leave the Electron main
-process today. Until then the extension uses the offline mock provider.
+### 2. Live AI — DONE (first step), one gap left
+Real Anthropic/OpenAI/Azure chat now runs directly from the viewer page
+(`src/renderer/src/extension-ai.ts`), sharing the provider core with the
+Electron app (`src/shared/ai-chat.ts` → `runProviderChat`). The CORS problem is
+moot inside an extension: the manifest `host_permissions` let the page fetch the
+provider origins directly, and the Anthropic SDK runs with
+`dangerouslyAllowBrowser`.
+
+The remaining gap is **key-at-rest safety**: keys sit in `chrome.storage.local`,
+which is isolated per-extension but not encrypted (the UI surfaces this via
+`encryptionAvailable:false`). The Electron app encrypts keys with the OS
+keychain. Full parity routes AI through the **same native messaging host** as
+the annotation write-back above, which would own the encrypted keys and make the
+calls — mirroring how keys never leave the Electron main process today.
 
 ## Known limitations / watch-list
 

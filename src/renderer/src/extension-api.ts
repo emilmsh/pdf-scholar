@@ -6,19 +6,17 @@
 // tab instead of an in-app tab (Edge/Chrome-style integration).
 //
 // It is built as an OVERLAY on top of the web fallback (`base`): everything the
-// web fallback already does correctly in a plain page (fullscreen, the AI mock,
-// text-file export) is inherited; only the genuinely platform-specific pieces
-// are overridden here — reading the document handed to us by the browser, tab
-// creation, and persistence via chrome.storage. Passing `base` in (rather than
-// importing it) keeps bridge.ts the single owner of platform selection and
-// avoids an import cycle.
+// web fallback already does correctly in a plain page (fullscreen, text-file
+// export) is inherited; only the genuinely platform-specific pieces are
+// overridden here — reading the document handed to us by the browser, tab
+// creation, persistence via chrome.storage, and real AI (extension-ai.ts).
+// Passing `base` in (rather than importing it) keeps bridge.ts the single owner
+// of platform selection and avoids an import cycle.
 //
 // Deliberately staged for later (documented in docs/BROWSER-EXTENSION.md):
 //   - annotate/updateAnnotation/deleteAnnotation still use the mock — real
 //     write-back needs the mupdf-WASM engine + a save target (File System
 //     Access handle or a native-messaging host). The seams are marked TODO.
-//   - AI uses the web mock; live providers need a native host (key safety +
-//     CORS) or a CORS-enabled proxy.
 
 import type {
   FilePayload,
