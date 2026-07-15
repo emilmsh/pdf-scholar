@@ -332,6 +332,14 @@ const MODELS: Record<AiProviderId, { id: string; label: string }[]> = {
   mock: [{ id: 'mock-1', label: 'mock-1' }]
 }
 
+// Where each provider lets you set a spending cap — linked from the key field
+// so the reminder to cap a key is one click from acting on it.
+const SPEND_CAP_URLS: Partial<Record<AiProviderId, string>> = {
+  anthropic: 'https://console.anthropic.com/settings/limits',
+  openai: 'https://platform.openai.com/settings/organization/limits',
+  azure: 'https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview'
+}
+
 const THINKING_LEVELS: { id: ThinkingLevel; key: MsgKey }[] = [
   { id: 'off', key: 'ai.thinkOff' },
   { id: 'low', key: 'ai.thinkLow' },
@@ -391,16 +399,35 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
         </select>
       </label>
       {provider !== 'mock' && (
-        <label className="ai-field">
-          <span>{t('ai.apiKey')}</span>
-          <input
-            type="password"
-            value={key}
-            placeholder={config.hasKey[provider] ? t('ai.keySaved') : t('ai.keyNew')}
-            onChange={(e) => setKey(e.target.value)}
-            spellCheck={false}
-          />
-        </label>
+        <div className="ai-field-group">
+          <label className="ai-field">
+            <span>{t('ai.apiKey')}</span>
+            <input
+              type="password"
+              value={key}
+              placeholder={config.hasKey[provider] ? t('ai.keySaved') : t('ai.keyNew')}
+              onChange={(e) => setKey(e.target.value)}
+              spellCheck={false}
+            />
+          </label>
+          <p className="ai-field-hint">
+            {t('ai.keyCapHint')}
+            {SPEND_CAP_URLS[provider] && (
+              <>
+                {' '}
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    bridge.openExternal(SPEND_CAP_URLS[provider]!)
+                  }}
+                >
+                  {t('ai.keyCapLink')}
+                </a>
+              </>
+            )}
+          </p>
+        </div>
       )}
       {provider !== 'azure' && provider !== 'mock' && (
         <label className="ai-field">

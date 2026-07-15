@@ -2555,6 +2555,23 @@ button {
   border-color: var(--accent);
 }
 
+.ai-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-field-hint {
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.ai-field-hint a {
+  color: var(--accent);
+  cursor: pointer;
+}
+
 .ai-settings-note {
   font-size: 11.5px;
   line-height: 1.5;
