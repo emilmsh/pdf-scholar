@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import type { LanguagePreference, Settings, ThemeName, ThemePreference } from '../../../shared/types'
+import type {
+  LanguagePreference,
+  Settings,
+  ThemeName,
+  ThemePreference,
+  ViewRotation
+} from '../../../shared/types'
 import { colorLabel, HIGHLIGHT_COLORS, SHAPE_TOOL_TYPES } from '../annotations'
 import type { DrawToolType, ShapeToolType } from '../annotations'
 import { t, useLang } from '../i18n'
@@ -22,9 +28,12 @@ import {
   IconPlus,
   IconPresent,
   IconPrint,
+  IconRotateCcw,
+  IconRotateCw,
   IconSave,
   IconSearch,
   IconSpeaker,
+  IconSpread,
   IconShapeArrow,
   IconShapeCircle,
   IconShapeLine,
@@ -69,6 +78,11 @@ interface Props {
   activeTool: ToolName | null
   toolPrefs: Record<'pen' | 'marker' | 'shape', ToolPref>
   onToolSelect(tool: ToolName | null): void
+  /** View rotation + two-page spread (view menu controls) */
+  rotation: ViewRotation
+  spread: boolean
+  onRotate(dir: 1 | -1): void
+  onToggleSpread(): void
   onToolPrefChange(tool: 'pen' | 'marker' | 'shape', patch: Partial<ToolPref>): void
   onNavBack(): void
   onNavForward(): void
@@ -128,6 +142,10 @@ export default function Toolbar({
   activeTool,
   toolPrefs,
   onToolSelect,
+  rotation,
+  spread,
+  onRotate,
+  onToggleSpread,
   onToolPrefChange,
   onNavBack,
   onNavForward,
@@ -513,6 +531,26 @@ export default function Toolbar({
                     {lang.id === 'auto' ? t('tb.langAuto') : lang.label}
                   </button>
                 ))}
+              </div>
+
+              <div className="theme-menu-sep" />
+
+              <div className="theme-menu-label">{t('tb.layout')}</div>
+              <div className="view-layout-row">
+                <button className="view-layout-btn" onClick={() => onRotate(-1)} title={t('tb.rotateCcw')}>
+                  <IconRotateCcw size={16} />
+                </button>
+                <button className="view-layout-btn" onClick={() => onRotate(1)} title={t('tb.rotateCw')}>
+                  <IconRotateCw size={16} />
+                </button>
+                <span className="view-rotation-label">{rotation}°</span>
+                <button
+                  className={`view-layout-btn spread-btn${spread ? ' selected' : ''}`}
+                  onClick={onToggleSpread}
+                  title={t('tb.spread')}
+                >
+                  <IconSpread size={16} />
+                </button>
               </div>
 
               <div className="theme-menu-sep" />

@@ -9,7 +9,8 @@ import type {
   PageRect,
   ReadingPosition,
   Settings,
-  ThemeName
+  ThemeName,
+  ViewRotation
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
 import {
@@ -38,6 +39,14 @@ import type {
   PdfJsAnnotationData,
   ShapeToolType
 } from '../annotations'
+import {
+  buildRows,
+  pageRectToView,
+  viewDeltaToPage,
+  viewPointToPage,
+  viewRectToPage,
+  viewSize
+} from '../rotation'
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
 import {
@@ -96,6 +105,8 @@ async function collectAnnotations(
 }
 
 const PAGE_GAP = 16
+/** Horizontal gap between the two pages of a spread */
+const SPREAD_GAP = 24
 const PAD_TOP = 28
 const PAD_BOTTOM = 28
 const SIDE_PAD = 64
@@ -222,7 +233,17 @@ export default function PdfViewer({
   useLang()
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
   const [sizes, setSizes] = useState<PageSize[]>([])
+  const sizesRef = useRef(sizes)
+  sizesRef.current = sizes
   const [scale, setScale] = useState(initialPosition?.zoom ?? 0)
+  /** User view rotation (clockwise) and two-page spread — display settings,
+   *  persisted with the reading position, never written into the file */
+  const [rotation, setRotation] = useState<ViewRotation>(initialPosition?.rotation ?? 0)
+  const rotationRef = useRef(rotation)
+  rotationRef.current = rotation
+  const [spread, setSpread] = useState(initialPosition?.spread ?? false)
+  const spreadRef = useRef(spread)
+  spreadRef.current = spread
   const [containerWidth, setContainerWidth] = useState(0)
   const [range, setRange] = useState<[number, number]>([1, 1])
   const [currentPage, setCurrentPage] = useState(initialPosition?.page ?? 1)
@@ -490,32 +511,43 @@ export default function PdfViewer({
     }
   }, [tocPinned, aiPinned])
 
+  // View-space reference dimensions (page units) that fit-width/fit-page zoom
+  // against: the first page under the current rotation, widened to a pair when
+  // spread is on.
+  const fitDenom = useCallback((): { w: number; h: number } => {
+    if (sizes.length === 0) return { w: 1, h: 1 }
+    const v0 = viewSize(sizes[0].w, sizes[0].h, rotation)
+    if (spread && sizes.length > 1) {
+      const v1 = viewSize(sizes[1].w, sizes[1].h, rotation)
+      return { w: v0.w + v1.w + SPREAD_GAP, h: Math.max(v0.h, v1.h) }
+    }
+    return { w: v0.w, h: v0.h }
+  }, [sizes, rotation, spread])
+
   // Pick an initial zoom if none was restored: fit the WHOLE first page
   // (fit-page), so a fresh document opens centered without vertical cropping
   useEffect(() => {
     if (scale > 0 || sizes.length === 0 || containerWidth === 0) return
     const height = containerRef.current?.clientHeight || window.innerHeight - 60
-    const fitW = (containerWidth - SIDE_PAD) / sizes[0].w
-    const fitH = (height - PAD_TOP - PAD_BOTTOM) / sizes[0].h
+    const denom = fitDenom()
+    const fitW = (containerWidth - SIDE_PAD) / denom.w
+    const fitH = (height - PAD_TOP - PAD_BOTTOM) / denom.h
     setScale(clamp(Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX))
-  }, [sizes, scale, containerWidth])
+  }, [sizes, scale, containerWidth, fitDenom])
 
   // ---------- Layout ----------
 
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
-    const maxW = Math.max(...sizes.map((s) => s.w))
-    const contentWidth = Math.max(containerWidth, maxW * scale + SIDE_PAD)
-    const tops: number[] = []
-    const lefts: number[] = []
-    let y = PAD_TOP
-    for (const s of sizes) {
-      tops.push(y)
-      lefts.push((contentWidth - s.w * scale) / 2)
-      y += s.h * scale + PAGE_GAP
-    }
-    return { tops, lefts, total: y - PAGE_GAP + PAD_BOTTOM, contentWidth }
-  }, [sizes, scale, containerWidth])
+    return buildRows(sizes, scale, rotation, spread, {
+      containerWidth,
+      pageGap: PAGE_GAP,
+      padTop: PAD_TOP,
+      padBottom: PAD_BOTTOM,
+      sidePad: SIDE_PAD,
+      spreadGap: SPREAD_GAP
+    })
+  }, [sizes, scale, containerWidth, rotation, spread])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -523,15 +555,16 @@ export default function PdfViewer({
     const el = containerRef.current
     if (!el || !layout) return null
     const anchor = el.scrollTop + el.clientHeight * 0.35
-    let page = 1
-    for (let i = 0; i < layout.tops.length; i++) {
-      if (layout.tops[i] <= anchor) page = i + 1
+    // Walk rows (a spread row holds two pages); report the LEFT page of the row
+    let row = layout.rows[0]
+    for (const r of layout.rows) {
+      if (r.top <= anchor) row = r
       else break
     }
-    const pageHeight = sizes[page - 1].h * scale
-    const offset = clamp((el.scrollTop - layout.tops[page - 1]) / pageHeight, 0, 1)
-    return { page, offset }
-  }, [layout, sizes, scale])
+    const pageIndex = row.pages[0].index
+    const offset = clamp((el.scrollTop - layout.tops[pageIndex]) / layout.heights[pageIndex], 0, 1)
+    return { page: pageIndex + 1, offset }
+  }, [layout])
 
   const updateRange = useCallback(() => {
     const el = containerRef.current
@@ -542,21 +575,26 @@ export default function PdfViewer({
     let to = 1
     for (let i = 0; i < layout.tops.length; i++) {
       const pageTop = layout.tops[i]
-      const pageBottom = pageTop + sizes[i].h * scale
+      const pageBottom = pageTop + layout.heights[i]
       if (pageBottom < top) from = i + 2
       if (pageTop <= bottom) to = i + 1
     }
     setRange((prev) => (prev[0] === from && prev[1] === to ? prev : [from, Math.max(from, to)]))
     const current = computeCurrent()
     if (current) setCurrentPage(current.page)
-  }, [layout, sizes, scale, computeCurrent])
+  }, [layout, computeCurrent])
 
   const schedulePositionSave = useCallback(() => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
     saveTimerRef.current = window.setTimeout(() => {
       const current = computeCurrent()
       if (current) {
-        bridge.setPosition(payload.path, { ...current, zoom: scaleRef.current })
+        bridge.setPosition(payload.path, {
+          ...current,
+          zoom: scaleRef.current,
+          rotation: rotationRef.current,
+          spread: spreadRef.current
+        })
       }
     }, 600)
   }, [computeCurrent, payload.path])
@@ -569,7 +607,7 @@ export default function PdfViewer({
       const pos = restoreRef.current
       restoreRef.current = null
       const page = clamp(pos.page, 1, layout.tops.length)
-      el.scrollTop = layout.tops[page - 1] + pos.offset * sizes[page - 1].h * scale - 8
+      el.scrollTop = layout.tops[page - 1] + pos.offset * layout.heights[page - 1] - 8
     }
     updateRange()
   }, [layout, sizes, scale, updateRange])
@@ -592,7 +630,10 @@ export default function PdfViewer({
       inner.style.transformOrigin = '0 0'
     }
     updateRange()
-  }, [scale, layout, updateRange])
+    // `rotation` is in the deps deliberately: a rotate that changes the layout
+    // must never leave a pending anchor (set under the old rotation) to be
+    // consumed here with stale coords (rotateView also clears it).
+  }, [scale, layout, rotation, updateRange])
 
   // "Immersive" reading = the toolbar auto-hides (unpinned). Drives the HUD
   // fade (scrollbar + page pill) and the floating page pill.
@@ -664,18 +705,19 @@ export default function PdfViewer({
   const fitWidth = useCallback(() => {
     if (sizes.length === 0 || containerWidth === 0) return
     setFitMode('width')
-    zoomTo((containerWidth - SIDE_PAD) / sizes[0].w)
-  }, [sizes, containerWidth, zoomTo])
+    zoomTo((containerWidth - SIDE_PAD) / fitDenom().w)
+  }, [sizes, containerWidth, zoomTo, fitDenom])
 
   /** Whole page visible (Edge-style toggle companion to fit-width) */
   const fitPage = useCallback(() => {
     const el = containerRef.current
     if (!el || sizes.length === 0 || el.clientWidth === 0) return
     setFitMode('page')
-    const fitW = (el.clientWidth - SIDE_PAD) / sizes[0].w
-    const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / sizes[0].h
+    const denom = fitDenom()
+    const fitW = (el.clientWidth - SIDE_PAD) / denom.w
+    const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
     zoomTo(Math.min(fitW, fitH))
-  }, [sizes, zoomTo])
+  }, [sizes, zoomTo, fitDenom])
 
   // Re-fit when the usable width changes (a side panel pinned open/closed, or
   // the window resized). In a fit mode the page rescales to the new width and
@@ -688,15 +730,16 @@ export default function PdfViewer({
     const cw = el.clientWidth
     const ch = el.clientHeight
     if (cw === 0) return
-    const fitW = (cw - SIDE_PAD) / sizes[0].w
-    const fitH = (ch - PAD_TOP - PAD_BOTTOM) / sizes[0].h
+    const denom = fitDenom()
+    const fitW = (cw - SIDE_PAD) / denom.w
+    const fitH = (ch - PAD_TOP - PAD_BOTTOM) / denom.h
     const next = clamp(mode === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
     const prev = scaleRef.current
     if (prev <= 0 || Math.abs(next - prev) / prev < 0.002) return
     pendingAnchorRef.current = makeAnchor(cw / 2, ch / 2)
     setScale(next)
     schedulePositionSave()
-  }, [sizes, makeAnchor, schedulePositionSave])
+  }, [sizes, makeAnchor, schedulePositionSave, fitDenom])
   const refitRef = useRef(refit)
   refitRef.current = refit
 
@@ -833,6 +876,86 @@ export default function PdfViewer({
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
     toastTimerRef.current = window.setTimeout(() => setToast(null), 2600)
   }, [])
+
+  // ---------- Rotation + spread (view actions) ----------
+
+  /** The fit-mode scale for a hypothetical rotation/spread, or null when the
+   *  zoom is 'custom' (left untouched). Reads live refs so it can be computed
+   *  with the NEXT rotation/spread before the state has committed. */
+  const computeFitScale = useCallback((rot: ViewRotation, spr: boolean): number | null => {
+    const el = containerRef.current
+    const s = sizesRef.current
+    if (!el || fitModeRef.current === 'custom' || s.length === 0 || el.clientWidth === 0) return null
+    const v0 = viewSize(s[0].w, s[0].h, rot)
+    let dw = v0.w
+    let dh = v0.h
+    if (spr && s.length > 1) {
+      const v1 = viewSize(s[1].w, s[1].h, rot)
+      dw = v0.w + v1.w + SPREAD_GAP
+      dh = Math.max(v0.h, v1.h)
+    }
+    const fitW = (el.clientWidth - SIDE_PAD) / dw
+    const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / dh
+    return clamp(fitModeRef.current === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
+  }, [])
+
+  /** Re-anchor the reading position across a rotation/spread relayout: capture
+   *  the current page + fractional offset into restoreRef so the same spot is
+   *  scrolled back after the layout rebuilds (batched with the state change so
+   *  it happens in one relayout — pinch anchor stays cleared, no jump). */
+  const reanchorFor = useCallback(
+    (rot: ViewRotation, spr: boolean): void => {
+      const cur = computeCurrent()
+      pendingAnchorRef.current = null
+      const nextScale = computeFitScale(rot, spr)
+      if (nextScale !== null) setScale(nextScale)
+      if (cur) {
+        restoreRef.current = {
+          page: cur.page,
+          offset: cur.offset,
+          zoom: nextScale ?? scaleRef.current,
+          rotation: rot,
+          spread: spr
+        }
+      }
+    },
+    [computeCurrent, computeFitScale]
+  )
+
+  const rotateView = useCallback(
+    (dir: 1 | -1) => {
+      const next = ((((rotationRef.current + dir * 90) % 360) + 360) % 360) as ViewRotation
+      // Draw tools assume an un-rotated page — deactivate on rotate
+      setActiveTool((tool) => {
+        if (tool) showToast(t('viewer.rotatedToolsOff'))
+        return null
+      })
+      setFreeTextDraft(null)
+      reanchorFor(next, spreadRef.current)
+      setRotation(next)
+      schedulePositionSave()
+    },
+    [reanchorFor, showToast, schedulePositionSave]
+  )
+
+  const toggleSpread = useCallback(() => {
+    const next = !spreadRef.current
+    reanchorFor(rotationRef.current, next)
+    setSpread(next)
+    schedulePositionSave()
+  }, [reanchorFor, schedulePositionSave])
+
+  /** Tool selection guarded by rotation — draw tools are off while rotated */
+  const selectTool = useCallback(
+    (tool: DrawToolType | null) => {
+      if (tool && rotationRef.current !== 0) {
+        showToast(t('viewer.rotatedToolsOff'))
+        return
+      }
+      setActiveTool(tool)
+    },
+    [showToast]
+  )
 
   // Hide all annotations (clean reading view) — hit-testing pauses too so
   // invisible annotations can't swallow clicks or show tooltips
@@ -1270,8 +1393,19 @@ export default function PdfViewer({
     const out: { pageNumber: number; rects: PageRect[] }[] = []
     if (!el || !sel || sel.isCollapsed) return out
     for (const pageEl of el.querySelectorAll<HTMLElement>('.pdf-page')) {
-      const rects = selectionRectsForPage(sel, pageEl, scaleRef.current)
-      if (rects) out.push({ pageNumber: Number(pageEl.dataset.page), rects })
+      // selectionRectsForPage divides client offsets by scale → VIEW-space
+      // rects (the on-screen rotated frame). Convert to PAGE space before they
+      // become annotation quads written to the file.
+      const viewRects = selectionRectsForPage(sel, pageEl, scaleRef.current)
+      if (!viewRects) continue
+      const pageNumber = Number(pageEl.dataset.page)
+      const size = sizesRef.current[pageNumber - 1]
+      const rot = rotationRef.current
+      const rects =
+        size && rot !== 0
+          ? viewRects.map((r) => viewRectToPage(r, size.w, size.h, rot))
+          : viewRects
+      out.push({ pageNumber, rects })
     }
     return out
   }, [])
@@ -1437,6 +1571,24 @@ export default function PdfViewer({
     [noteDraft, persistAnnotation]
   )
 
+  // Convert client (screen) coordinates to PAGE space (what annotations store
+  // and hit-tests expect), routing through the rotation transform. The one
+  // boundary all pointer→page conversions go through — a raw
+  // (clientX-rect.left)/scale would be VIEW space and corrupt coords when
+  // rotated. Identity at rotation 0.
+  const pagePointFromClient = useCallback(
+    (clientX: number, clientY: number, pageEl: HTMLElement): [number, number] => {
+      const rect = pageEl.getBoundingClientRect()
+      const vx = (clientX - rect.left) / scaleRef.current
+      const vy = (clientY - rect.top) / scaleRef.current
+      const pageNumber = Number(pageEl.dataset.page)
+      const size = sizesRef.current[pageNumber - 1]
+      if (!size) return [vx, vy]
+      return viewPointToPage(vx, vy, size.w, size.h, rotationRef.current)
+    },
+    []
+  )
+
   const openMenuAt = useCallback((clientX: number, clientY: number, target: EventTarget | null) => {
     const pageEl = (target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
     const sel = window.getSelection()
@@ -1454,10 +1606,8 @@ export default function PdfViewer({
         mode: 'selection'
       })
     } else if (pageEl) {
-      const rect = pageEl.getBoundingClientRect()
       const pageNumber = Number(pageEl.dataset.page)
-      const px = (clientX - rect.left) / scaleRef.current
-      const py = (clientY - rect.top) / scaleRef.current
+      const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
       // An annotation under the cursor takes precedence over the point menu
       const hit = annotsHiddenRef.current
         ? null
@@ -1478,7 +1628,7 @@ export default function PdfViewer({
     } else {
       setMenu(null)
     }
-  }, [])
+  }, [pagePointFromClient])
 
   const onContextMenu = useCallback(
     (e: React.MouseEvent) => {
@@ -1508,14 +1658,10 @@ export default function PdfViewer({
           setSelected(null)
           return
         }
-        const rect = pageEl.getBoundingClientRect()
         const pageNumber = Number(pageEl.dataset.page)
         if (annotsHiddenRef.current) return
-        const hit = annotationHitTest(
-          annotsRef.current.get(pageNumber) ?? [],
-          (clientX - rect.left) / scaleRef.current,
-          (clientY - rect.top) / scaleRef.current
-        )
+        const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
+        const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
         if (hit) {
           setSelected({ pageNumber, localId: hit.id })
           setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
@@ -1524,7 +1670,7 @@ export default function PdfViewer({
         }
       }, 0)
     },
-    [openMenuAt]
+    [openMenuAt, pagePointFromClient]
   )
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1538,13 +1684,9 @@ export default function PdfViewer({
     if (e.button !== 0 || drawToolRef.current || annotsHiddenRef.current) return
     const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
     if (!pageEl) return
-    const rect = pageEl.getBoundingClientRect()
     const pageNumber = Number(pageEl.dataset.page)
-    const hit = annotationHitTest(
-      annotsRef.current.get(pageNumber) ?? [],
-      (e.clientX - rect.left) / scaleRef.current,
-      (e.clientY - rect.top) / scaleRef.current
-    )
+    const [hx, hy] = pagePointFromClient(e.clientX, e.clientY, pageEl)
+    const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], hx, hy)
     if (hit && isMovableAnnotation(hit) && hit.quads[0]) {
       annotDragRef.current = {
         pageNumber,
@@ -1555,7 +1697,7 @@ export default function PdfViewer({
       }
       e.preventDefault()
     }
-  }, [])
+  }, [pagePointFromClient])
 
   // ---------- Hover comment tooltip ----------
 
@@ -1579,13 +1721,9 @@ export default function PdfViewer({
       setHoverTip((tip) => (tip ? null : tip))
       return
     }
-    const rect = pageEl.getBoundingClientRect()
     const pageNumber = Number(pageEl.dataset.page)
-    const hit = annotationHitTest(
-      annotsRef.current.get(pageNumber) ?? [],
-      (e.clientX - rect.left) / scaleRef.current,
-      (e.clientY - rect.top) / scaleRef.current
-    )
+    const [hx, hy] = pagePointFromClient(e.clientX, e.clientY, pageEl)
+    const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], hx, hy)
     const text = hit?.type !== 'freetext' ? hit?.contents?.trim() : undefined
     if (text) {
       setHoverTip((tip) =>
@@ -1594,7 +1732,7 @@ export default function PdfViewer({
     } else {
       setHoverTip((tip) => (tip ? null : tip))
     }
-  }, [])
+  }, [pagePointFromClient])
 
   // ---------- Annotation dragging (note bubbles + geometric shapes) ----------
 
@@ -1622,8 +1760,15 @@ export default function PdfViewer({
       const q = drag.record.quads[0]
       const size = sizes[drag.pageNumber - 1]
       const scale = scaleRef.current
-      const x = q.x + (clientX - drag.startClientX) / scale
-      const y = q.y + (clientY - drag.startClientY) / scale
+      // The cursor delta is a VIEW-space vector; rotate it into page space so
+      // the annotation follows the pointer under any rotation.
+      const view = viewDeltaToPage(
+        (clientX - drag.startClientX) / scale,
+        (clientY - drag.startClientY) / scale,
+        rotationRef.current
+      )
+      const x = q.x + view.dx
+      const y = q.y + view.dy
       return {
         x: clamp(x, 0, Math.max(0, (size?.w ?? q.x + q.w) - q.w)),
         y: clamp(y, 0, Math.max(0, (size?.h ?? q.y + q.h) - q.h))
@@ -1867,10 +2012,14 @@ export default function PdfViewer({
       const el = containerRef.current
       if (!el || !layout) return
       pushBack()
-      const y = record.quads[0]?.y ?? 0
-      el.scrollTop = Math.max(0, layout.tops[pageNumber - 1] + y * scale - el.clientHeight * 0.3)
+      const q = record.quads[0]
+      const size = sizes[pageNumber - 1]
+      // Scroll to the annotation's VIEW-space top so it lands correctly under
+      // rotation (identity at rotation 0)
+      const vy = q && size ? pageRectToView(q, size.w, size.h, rotation).y : (q?.y ?? 0)
+      el.scrollTop = Math.max(0, layout.tops[pageNumber - 1] + vy * scale - el.clientHeight * 0.3)
     },
-    [layout, scale, pushBack]
+    [layout, scale, sizes, rotation, pushBack]
   )
 
   const jumpToDest = useCallback(
@@ -1889,15 +2038,18 @@ export default function PdfViewer({
         const destName = (explicit[1] as { name?: string } | undefined)?.name
         let top = layout.tops[pageIndex] - 8
         if (destName === 'XYZ' && typeof explicit[3] === 'number') {
-          const pageH = sizes[pageIndex].h
-          top = layout.tops[pageIndex] + clamp(pageH - explicit[3], 0, pageH) * scale - 8
+          const size = sizes[pageIndex]
+          const pageY = clamp(size.h - explicit[3], 0, size.h)
+          // Map the page-space y to view space so the link lands under rotation
+          const vy = pageRectToView({ x: 0, y: pageY, w: 0, h: 0 }, size.w, size.h, rotation).y
+          top = layout.tops[pageIndex] + vy * scale - 8
         }
         el.scrollTop = Math.max(0, top)
       } catch (err) {
         console.error('pdfx: klarte ikke å følge lenken', err)
       }
     },
-    [pdf, layout, sizes, scale, pushBack]
+    [pdf, layout, sizes, scale, rotation, pushBack]
   )
 
   // Stable identities for PdfPage — new callbacks would re-render page canvases
@@ -2444,7 +2596,18 @@ export default function PdfViewer({
       } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
         // Single-key reading shortcuts (never fire while typing)
         const k = e.key.toLowerCase()
-        if (k === 'p') {
+        // Rotation MUST be checked before the k==='r' read-aloud branch below
+        // (Shift+R rotates; bracket keys rotate too)
+        if (e.shiftKey && k === 'r') {
+          e.preventDefault()
+          rotateView(1)
+        } else if (k === ']') {
+          e.preventDefault()
+          rotateView(1)
+        } else if (k === '[') {
+          e.preventDefault()
+          rotateView(-1)
+        } else if (k === 'p') {
           e.preventDefault()
           enterPresentation()
         } else if (k === 't') {
@@ -2499,7 +2662,8 @@ export default function PdfViewer({
     performUndoRedo,
     removeAnnotation,
     goBack,
-    goForward
+    goForward,
+    rotateView
   ])
 
   // Hiding annotations (H) or activating a draw tool pauses hit-testing —
@@ -2522,7 +2686,13 @@ export default function PdfViewer({
   const flushPosition = useCallback(() => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
     const current = computeCurrent()
-    if (current) bridge.setPosition(payload.path, { ...current, zoom: scaleRef.current })
+    if (current)
+      bridge.setPosition(payload.path, {
+        ...current,
+        zoom: scaleRef.current,
+        rotation: rotationRef.current,
+        spread: spreadRef.current
+      })
   }, [computeCurrent, payload.path])
   const flushPositionRef = useRef(flushPosition)
   flushPositionRef.current = flushPosition
@@ -2586,7 +2756,11 @@ export default function PdfViewer({
           onNavForward={goForward}
           activeTool={activeTool}
           toolPrefs={toolPrefs}
-          onToolSelect={setActiveTool}
+          onToolSelect={selectTool}
+          rotation={rotation}
+          spread={spread}
+          onRotate={rotateView}
+          onToggleSpread={toggleSpread}
           onToolPrefChange={(tool, patch) =>
             setToolPrefs((prev) => ({ ...prev, [tool]: { ...prev[tool], ...patch } }))
           }
@@ -2709,9 +2883,12 @@ export default function PdfViewer({
                     pageNumber={pageNumber}
                     top={layout.tops[i]}
                     left={layout.lefts[i]}
-                    cssWidth={size.w * scale}
-                    cssHeight={size.h * scale}
+                    cssWidth={layout.widths[i]}
+                    cssHeight={layout.heights[i]}
                     scale={scale}
+                    rotation={rotation}
+                    pageW={size.w}
+                    pageH={size.h}
                     active={active}
                     annotations={annots.get(pageNumber) ?? EMPTY_ANNOTS}
                     hideAnnots={annotsHidden}
@@ -2757,29 +2934,35 @@ export default function PdfViewer({
                   onMouseDown={(e) => e.stopPropagation()}
                 />
               )}
-              {dragGhost && dragGhost.kind === 'bubble' && (
-                <div
-                  className="note-drag-ghost"
-                  style={{
-                    left: layout.lefts[dragGhost.pageNumber - 1] + dragGhost.x * scale,
-                    top: layout.tops[dragGhost.pageNumber - 1] + dragGhost.y * scale,
-                    width: dragGhost.w * scale,
-                    height: dragGhost.h * scale,
-                    background: `rgb(${dragGhost.color.map((v) => Math.round(v * 255)).join(',')})`
-                  }}
-                />
-              )}
-              {dragGhost && dragGhost.kind === 'outline' && (
-                <div
-                  className="annot-drag-ghost"
-                  style={{
-                    left: layout.lefts[dragGhost.pageNumber - 1] + dragGhost.x * scale,
-                    top: layout.tops[dragGhost.pageNumber - 1] + dragGhost.y * scale,
-                    width: dragGhost.w * scale,
-                    height: dragGhost.h * scale
-                  }}
-                />
-              )}
+              {dragGhost &&
+                (() => {
+                  // The ghost is stored in page space; rotate it to view space
+                  // so it tracks the pointer under rotation.
+                  const size = sizes[dragGhost.pageNumber - 1]
+                  const gv = size
+                    ? pageRectToView(
+                        { x: dragGhost.x, y: dragGhost.y, w: dragGhost.w, h: dragGhost.h },
+                        size.w,
+                        size.h,
+                        rotation
+                      )
+                    : { x: dragGhost.x, y: dragGhost.y, w: dragGhost.w, h: dragGhost.h }
+                  const style = {
+                    left: layout.lefts[dragGhost.pageNumber - 1] + gv.x * scale,
+                    top: layout.tops[dragGhost.pageNumber - 1] + gv.y * scale,
+                    width: gv.w * scale,
+                    height: gv.h * scale,
+                    ...(dragGhost.kind === 'bubble'
+                      ? { background: `rgb(${dragGhost.color.map((v) => Math.round(v * 255)).join(',')})` }
+                      : {})
+                  }
+                  return (
+                    <div
+                      className={dragGhost.kind === 'bubble' ? 'note-drag-ghost' : 'annot-drag-ghost'}
+                      style={style}
+                    />
+                  )
+                })()}
             </div>
           ) : (
             <div className="viewer-loading">

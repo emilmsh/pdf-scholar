@@ -3,7 +3,8 @@
 // growing downward — which is also MuPDF's convention, so the engine uses
 // these rects as-is (verified in scripts/spike-mupdf-annot.mjs).
 import type { CSSProperties } from 'react'
-import type { AnnotationType, PageRect } from '../../shared/types'
+import type { AnnotationType, PageRect, ViewRotation } from '../../shared/types'
+import { pagePointToView, pageRectToView } from './rotation'
 import { t } from './i18n'
 
 export interface PageAnnotation {
@@ -194,73 +195,67 @@ export function inkHitTest(record: PageAnnotation, x: number, y: number, toleran
   )
 }
 
-/** Inline style for one quad of an annotation, in the page's CSS space. */
+/**
+ * Inline style for one quad of an annotation, positioned in VIEW space (after
+ * the user's rotation). The painted region is computed as a PAGE-space rect per
+ * type — with thicknesses/offsets in page units so the ×scale result is
+ * numerically identical to the un-rotated code at rotation 0 (verified by
+ * diffing a highlighted page) — then rotated via pageRectToView and scaled.
+ */
 export function annotationCss(
   a: PageAnnotation,
   q: PageRect,
   scale: number,
-  _pageHeight: number
+  pageSize: { w: number; h: number },
+  rotation: ViewRotation
 ): CSSProperties {
-  const x = q.x * scale
-  const y = q.y * scale
-  const w = q.w * scale
-  const h = q.h * scale
+  const { w: pw, h: ph } = pageSize
+  const toCss = (pr: PageRect): CSSProperties => {
+    const vr = pageRectToView(pr, pw, ph, rotation)
+    return { left: vr.x * scale, top: vr.y * scale, width: vr.w * scale, height: vr.h * scale }
+  }
   switch (a.type) {
     case 'highlight':
+      return { ...toCss(q), background: rgbCss(a.color, 0.42), mixBlendMode: 'multiply' }
+    case 'underline': {
+      const thick = Math.max(1.5 / scale, 1.2)
+      const off = Math.max(1.5 / scale, 0.045 * q.h)
       return {
-        left: x,
-        top: y,
-        width: w,
-        height: h,
-        background: rgbCss(a.color, 0.42),
-        mixBlendMode: 'multiply'
-      }
-    case 'underline':
-      return {
-        left: x,
-        top: y + h - Math.max(1.5, 0.045 * h),
-        width: w,
-        height: Math.max(1.5, scale * 1.2),
+        ...toCss({ x: q.x, y: q.y + q.h - off, w: q.w, h: thick }),
         background: rgbCss(a.color, 0.9)
       }
-    case 'strikeout':
+    }
+    case 'strikeout': {
+      const thick = Math.max(1.5 / scale, 1.2)
       return {
-        left: x,
-        top: y + h * 0.52,
-        width: w,
-        height: Math.max(1.5, scale * 1.2),
+        ...toCss({ x: q.x, y: q.y + q.h * 0.52, w: q.w, h: thick }),
         background: rgbCss(a.color, 0.9)
       }
-    case 'squiggly':
+    }
+    case 'squiggly': {
+      const thick = Math.max(2 / scale, 1.6)
+      const off = Math.max(2 / scale, 0.06 * q.h)
+      const period = Math.max(3, 2 * scale)
+      // The stripe direction follows the rotated baseline
       return {
-        left: x,
-        top: y + h - Math.max(2, 0.06 * h),
-        width: w,
-        height: Math.max(2, scale * 1.6),
-        background: `repeating-linear-gradient(90deg, ${rgbCss(a.color, 0.9)} 0 ${Math.max(3, 2 * scale)}px, transparent ${Math.max(3, 2 * scale)}px ${Math.max(6, 4 * scale)}px)`
+        ...toCss({ x: q.x, y: q.y + q.h - off, w: q.w, h: thick }),
+        background: `repeating-linear-gradient(${(90 + rotation) % 360}deg, ${rgbCss(a.color, 0.9)} 0 ${period}px, transparent ${period}px ${Math.max(6, 4 * scale)}px)`
       }
-    case 'note':
-      return {
-        left: x,
-        top: y,
-        width: 18,
-        height: 18
-      }
+    }
+    case 'note': {
+      // Fixed-size, upright marker — only its anchor point rotates
+      const [vx, vy] = pagePointToView(q.x, q.y, pw, ph, rotation)
+      return { left: vx * scale, top: vy * scale, width: 18, height: 18 }
+    }
     case 'freetext':
-      return {
-        left: x,
-        top: y,
-        width: w,
-        height: h,
-        color: rgbCss(a.color, 1)
-      }
+      return { ...toCss(q), color: rgbCss(a.color, 1) }
     case 'ink':
     case 'square':
     case 'circle':
     case 'line':
     case 'arrow':
       // Rendered as SVG in AnnotationMarks, not css boxes
-      return { left: x, top: y, width: w, height: h }
+      return toCss(q)
   }
 }
 
