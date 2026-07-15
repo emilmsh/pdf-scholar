@@ -11,6 +11,24 @@ export interface AiDocument {
   pageStarts: number[]
 }
 
+// Shared request-id counter for ALL renderer callers of ai:chat (chat panel,
+// quick popover, semantic search). The main process keys in-flight requests
+// by id, so every caller must draw from one sequence to avoid collisions.
+let aiRequestCounter = 1
+export const nextAiRequestId = (): number => aiRequestCounter++
+
+/** A semantic-search result: a passage the model says discusses the query.
+ *  start===end===0 means only a page-level jump is possible. */
+export interface SemanticHit {
+  pageNumber: number
+  start: number
+  end: number
+  /** The model's short description of what the passage says */
+  label: string
+  /** Verbatim excerpt used to locate + highlight the passage */
+  quote: string
+}
+
 /** Page markers let prompt-contract providers (OpenAI/Azure) name page
  *  numbers; Anthropic citations use raw char offsets which we map ourselves.
  *  Offsets are derived from the marker as written, so the localized label is
@@ -240,6 +258,22 @@ Answer in three short parts, in English:
    - If you do not know the work, say so plainly ("I don't know this work") and stick to what the reference list and context say. Never guess at findings, journal or content.
 
 Keep the whole answer under about 120 words.`
+}
+
+/** Semantic search: keep the system prompt = chatSystem() so the Anthropic
+ *  document block (with ephemeral cache_control) is byte-identical to the chat
+ *  panel and the cache is shared. The search-specific instruction lives ONLY
+ *  in the user message. QUOTE_CONTRACT (added by main for OpenAI/Azure) and
+ *  Anthropic native citations both come back as AiCitation. */
+export function semanticSearchPrompt(query: string): string {
+  if (getLanguage() === 'nb') {
+    return `Finn de 3–8 stedene i dokumentet som best omtaler dette temaet: «${query}»
+
+Svar KUN med en nummerert liste, uten innledning eller avslutning. Hvert punkt: én kort beskrivelse (maks 15 ord) av hva stedet sier, med et kort ordrett sitat (10–30 ord) fra passasjen som kilde. Ranger etter relevans. Hvis dokumentet ikke omtaler temaet, si det i én setning uten liste.`
+  }
+  return `Find the 3–8 passages in the document that best discuss this topic: "${query}"
+
+Answer ONLY with a numbered list, no preamble or closing. Each item: one short description (max 15 words) of what the passage says, citing a short verbatim quote (10–30 words) from the passage as the source. Rank by relevance. If the document does not discuss the topic, say so in one sentence with no list.`
 }
 
 /** User-message scaffold for reference lookup */

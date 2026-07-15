@@ -18,6 +18,7 @@ import {
   explainSystem,
   explainUserMessage,
   formatCost,
+  nextAiRequestId,
   referenceSystem,
   referenceUserMessage,
   resolveCitation,
@@ -40,8 +41,7 @@ import {
   IconSummary
 } from './icons'
 
-let requestCounter = 1
-const nextRequestId = (): number => requestCounter++
+const nextRequestId = nextAiRequestId
 
 export interface EnsuredDocument {
   pages: PageText[]

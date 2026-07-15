@@ -3,6 +3,7 @@ import { getDocument, PDFWorker } from 'pdfjs-dist'
 import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist'
 import PdfWorkerCtor from 'pdfjs-dist/build/pdf.worker.mjs?worker'
 import type {
+  AiCitation,
   AnnotationType,
   FilePayload,
   PageRect,
@@ -39,7 +40,16 @@ import type {
 } from '../annotations'
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
-import { buildAiDocument, citationPage, resolveCitation } from '../ai'
+import {
+  buildAiDocument,
+  chatSystem,
+  citationPage,
+  estimateCost,
+  formatCost,
+  nextAiRequestId,
+  resolveCitation,
+  semanticSearchPrompt
+} from '../ai'
 import type { ResolvedCitation } from '../ai'
 import AnnotPopover from './AnnotPopover'
 import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
@@ -323,6 +333,16 @@ export default function PdfViewer({
   const [searchHits, setSearchHits] = useState<{ pageNumber: number; rects: PageRect[] } | null>(
     null
   )
+  // Semantic (AI) search mode alongside exact text search
+  const [searchMode, setSearchMode] = useState<'text' | 'ai'>('text')
+  const [semantic, setSemantic] = useState<{
+    status: 'idle' | 'running' | 'done' | 'noKey' | 'error'
+    hits: { label: string; citation: AiCitation; pageNumber: number | null }[]
+    index: number
+    note: string | null
+    cost: string | null
+  }>({ status: 'idle', hits: [], index: -1, note: null, cost: null })
+  const semanticReqRef = useRef<number | null>(null)
   const [aiPinned, setAiPinned] = useState(false)
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
@@ -1946,9 +1966,10 @@ export default function PdfViewer({
     [pushBack, updateRange, waitForTextLayer, schedulePositionSave]
   )
 
-  // Debounced live search whenever the query/options change
+  // Debounced live search whenever the query/options change (exact-text mode
+  // only — AI mode searches on Enter, never live)
   useEffect(() => {
-    if (!searchOpen || !pdf) return
+    if (!searchOpen || !pdf || searchMode === 'ai') return
     const seq = ++searchSeqRef.current
     const query = searchQuery.trim()
     if (!query) {
@@ -1989,7 +2010,78 @@ export default function PdfViewer({
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
     setSearchHits(null)
+    if (semanticReqRef.current !== null) {
+      bridge.aiAbort(semanticReqRef.current)
+      semanticReqRef.current = null
+    }
+    setSemantic({ status: 'idle', hits: [], index: -1, note: null, cost: null })
   }, [])
+
+  // ---------- Semantic (AI) search ----------
+
+  const runSemanticSearch = useCallback(async () => {
+    if (!pdf) return
+    const query = searchQuery.trim()
+    if (!query) return
+    const config = await bridge.aiGetConfig()
+    if (!config.hasKey[config.provider]) {
+      setSemantic({ status: 'noKey', hits: [], index: -1, note: null, cost: null })
+      return
+    }
+    setSemantic({ status: 'running', hits: [], index: -1, note: null, cost: null })
+    const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
+    const doc = buildAiDocument(pages)
+    const requestId = nextAiRequestId()
+    semanticReqRef.current = requestId
+    // System + document block are byte-identical to the chat panel so the
+    // Anthropic prompt cache is shared; the search instruction is in the user
+    // message only.
+    const result = await bridge.aiChat({
+      requestId,
+      system: chatSystem(),
+      messages: [{ role: 'user', text: semanticSearchPrompt(query) }],
+      document: { title: payload.name, text: doc.text }
+    })
+    if (semanticReqRef.current !== requestId) return // superseded/aborted
+    semanticReqRef.current = null
+    if ('error' in result) {
+      setSemantic({ status: 'error', hits: [], index: -1, note: result.error, cost: null })
+      return
+    }
+    const hits: { label: string; citation: AiCitation; pageNumber: number | null }[] = []
+    for (const part of result.parts) {
+      const label = part.text.replace(/^\s*\d+[.)]\s*/, '').trim()
+      for (const c of part.citations) {
+        const fallback = c.kind === 'char' ? c.citedText : c.quote
+        hits.push({ label: label || fallback.slice(0, 80), citation: c, pageNumber: citationPage(c, doc) })
+      }
+    }
+    const cost = estimateCost(result.model, result.usage)
+    setSemantic({
+      status: 'done',
+      hits,
+      index: -1,
+      note: hits.length === 0 ? result.parts.map((p) => p.text).join(' ').trim() : null,
+      cost: cost !== null ? formatCost(cost) : null
+    })
+  }, [pdf, searchQuery, payload.name])
+
+  const pickSemanticHit = useCallback(
+    (i: number) => {
+      const hit = semantic.hits[i]
+      if (!hit) return
+      setSemantic((s) => ({ ...s, index: i }))
+      const pages = pageTextsRef.current
+      if (!pages) return
+      const doc = buildAiDocument(pages)
+      const resolved = resolveCitation(hit.citation, pages, doc)
+      if (resolved) void jumpToAiCitation(resolved)
+      else if (hit.pageNumber && hit.pageNumber >= 1 && hit.pageNumber <= pages.length) {
+        void jumpToAiCitation({ pageNumber: hit.pageNumber, start: 0, end: 0 })
+      }
+    },
+    [semantic.hits]
+  )
 
   const searchStep = useCallback(
     (delta: number) => {
@@ -2789,6 +2881,19 @@ export default function PdfViewer({
           matches={searchMatches}
           index={searchIndex}
           busy={searchBusy}
+          mode={searchMode}
+          onModeChange={setSearchMode}
+          aiStatus={semantic.status}
+          aiHits={semantic.hits.map((h) => ({ label: h.label, pageNumber: h.pageNumber }))}
+          aiIndex={semantic.index}
+          aiNote={semantic.note}
+          aiCost={semantic.cost}
+          onAiSearch={() => void runSemanticSearch()}
+          onAiPick={pickSemanticHit}
+          onOpenAiSettings={() => {
+            closeSearch()
+            setAiPinned(true)
+          }}
           onQueryChange={setSearchQuery}
           onOptionsChange={setSearchOptions}
           onNext={() => searchStep(1)}
