@@ -20,6 +20,8 @@ interface OpenTab {
 
 const FALLBACK_SETTINGS: Settings = {
   theme: 'day',
+  autoLight: 'day',
+  autoDark: 'night',
   keepAwake: false,
   language: 'auto'
 }
@@ -56,7 +58,11 @@ export default function App(): React.JSX.Element {
   tabsRef.current = tabs
 
   const resolvedTheme: ThemeName =
-    settings.theme === 'auto' ? (systemDark ? 'night' : 'day') : settings.theme
+    settings.theme === 'auto'
+      ? systemDark
+        ? settings.autoDark
+        : settings.autoLight
+      : settings.theme
 
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-color-scheme: dark)')

@@ -466,6 +466,76 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
   )
 }
 
+// ---------- Model quick-menu (click the header chip) ----------
+
+interface ModelMenuProps {
+  config: AiConfigView
+  onSaved(next: AiConfigView): void
+  onClose(): void
+  onOpenSettings(): void
+}
+
+/** Small popover under the header model chip: switch model + reasoning effort
+ *  for the current provider without opening full settings. */
+function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuProps): React.JSX.Element {
+  useLang()
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const close = (e: MouseEvent): void => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    window.addEventListener('mousedown', close)
+    return () => window.removeEventListener('mousedown', close)
+  }, [onClose])
+
+  const provider = config.provider
+  const model = config.models[provider] ?? ''
+  const models = MODELS[provider] ?? []
+  // Haiku ignores reasoning effort; mock has none — mirror AiSettings
+  const thinkingApplies = !/haiku/i.test(model) && provider !== 'mock'
+
+  const patch = (p: Parameters<typeof bridge.aiSetConfig>[0]): void => {
+    void bridge.aiSetConfig(p).then(onSaved)
+  }
+
+  return (
+    <div className="ai-model-menu" ref={ref}>
+      <label className="ai-field">
+        <span>{t('ai.model')}</span>
+        <select
+          value={model}
+          onChange={(e) => patch({ models: { ...config.models, [provider]: e.target.value } })}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+          {!models.some((m) => m.id === model) && model && <option value={model}>{model}</option>}
+        </select>
+      </label>
+      {thinkingApplies && (
+        <label className="ai-field">
+          <span>{t('ai.reasoning')}</span>
+          <select
+            value={config.thinking}
+            onChange={(e) => patch({ thinking: e.target.value as ThinkingLevel })}
+          >
+            {THINKING_LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {t(l.key)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <button className="ai-model-more" onClick={onOpenSettings}>
+        {t('ai.settingsTip')}
+      </button>
+    </div>
+  )
+}
+
 // ---------- Chat panel ----------
 
 export interface AiSeed {
@@ -514,6 +584,7 @@ export default function AiPanel({
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [showModelMenu, setShowModelMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [conversations, setConversations] = useState<StoredConversation[]>(() => loadConversations(docPath))
   const [activeChatId, setActiveChatId] = useState<string | null>(() => conversations[0]?.id ?? null)
@@ -772,9 +843,44 @@ export default function AiPanel({
       <header className="ai-header">
         <IconSparkle size={16} />
         <span className="ai-title">{t('ai.assistant')}</span>
-        <span className="ai-model" title={providerLabel}>
-          {config ? (config.provider === 'azure' ? config.azure.deployment : config.models[config.provider]) : ''}
-        </span>
+        <div className="ai-model-anchor">
+          <button
+            className="ai-model"
+            title={config ? `${providerLabel} — ${t('ai.modelMenuTip')}` : providerLabel}
+            disabled={!config}
+            onClick={() => {
+              if (!config) return
+              // Azure has no curated model list — send them to full settings
+              if (config.provider === 'azure') {
+                setShowSettings(true)
+                setShowHistory(false)
+                return
+              }
+              setShowModelMenu((s) => !s)
+            }}
+          >
+            <span className="ai-model-name">
+              {config
+                ? config.provider === 'azure'
+                  ? config.azure.deployment
+                  : config.models[config.provider]
+                : ''}
+            </span>
+            {config && config.provider !== 'azure' && <IconChevronDown size={11} />}
+          </button>
+          {showModelMenu && config && (
+            <ModelQuickMenu
+              config={config}
+              onSaved={setConfig}
+              onClose={() => setShowModelMenu(false)}
+              onOpenSettings={() => {
+                setShowModelMenu(false)
+                setShowSettings(true)
+                setShowHistory(false)
+              }}
+            />
+          )}
+        </div>
         <button
           className="tb-btn"
           title={t('ai.newChatTip')}

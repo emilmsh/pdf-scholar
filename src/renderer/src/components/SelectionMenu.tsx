@@ -135,6 +135,58 @@ export interface MenuState {
   pagePoint?: { x: number; y: number }
 }
 
+/** Word Counter Plus-style stats for the current selection. Words split on
+ *  any Unicode whitespace; sentences on terminal punctuation (a non-empty
+ *  selection without punctuation still counts as one). Reading time at a
+ *  calm 200 wpm — the figure people quote for prose. */
+interface SelectionStats {
+  words: number
+  characters: number
+  charactersNoSpaces: number
+  sentences: number
+  /** whole minutes at 200 wpm; 0 means "under a minute" (with words > 0) */
+  minutes: number
+}
+
+function countSelection(text: string): SelectionStats {
+  const trimmed = text.trim()
+  const words = trimmed ? trimmed.split(/\s+/).length : 0
+  const characters = text.length
+  const charactersNoSpaces = text.replace(/\s/g, '').length
+  const sentenceMarks = (trimmed.match(/[.!?…]+(?=\s|$)/g) ?? []).length
+  const sentences = trimmed ? Math.max(1, sentenceMarks) : 0
+  return { words, characters, charactersNoSpaces, sentences, minutes: Math.floor(words / 200) }
+}
+
+/** Compact, always-visible count block at the foot of the selection menu. */
+function SelectionCount({ text }: { text: string }): React.JSX.Element | null {
+  useLang()
+  if (!text.trim()) return null
+  const s = countSelection(text)
+  const readingTime = s.words === 0 || s.minutes < 1 ? t('menu.readingUnderMin') : `${s.minutes} min`
+  const rows: [MsgKey, string][] = [
+    ['menu.words', String(s.words)],
+    ['menu.characters', String(s.characters)],
+    ['menu.charactersNoSpaces', String(s.charactersNoSpaces)],
+    ['menu.sentences', String(s.sentences)],
+    ['menu.readingTime', readingTime]
+  ]
+  return (
+    <>
+      <div className="menu-sep" />
+      <div className="menu-section-label">{t('menu.count')}</div>
+      <dl className="selection-stats">
+        {rows.map(([key, value]) => (
+          <div className="selection-stat" key={key}>
+            <dt>{t(key)}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </>
+  )
+}
+
 export type MenuAction =
   | { kind: 'highlight'; color: HighlightColor }
   | { kind: 'underline'; color: HighlightColor }
@@ -188,6 +240,9 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
   useLang()
   const isSelection = menu.mode === 'selection'
   const { ref, style } = useMeasuredPosition(menu.x, menu.y)
+  // Snapshot the selected text at mount — the menu preserves the live
+  // selection (mousedown is prevented), so this is stable while it's open.
+  const [selText] = useState(() => window.getSelection()?.toString() ?? '')
 
   return (
     <div
@@ -282,6 +337,7 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           <button className="menu-item" onClick={() => onAction({ kind: 'translate' })}>
             <span className="menu-icon"><IconTranslate size={15} /></span> {t('menu.translate')}
           </button>
+          <SelectionCount text={selText} />
         </>
       )}
       {!isSelection && (
