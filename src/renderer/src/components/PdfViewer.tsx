@@ -122,7 +122,7 @@ const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
 
 /** Drag-resizable panel widths: defaults, clamps and persistence */
-const PANEL_DEFAULTS = { sidebar: 212, ai: 340, web: 380 }
+const PANEL_DEFAULTS = { sidebar: 248, ai: 340, web: 380 }
 const PANEL_MIN = { sidebar: 160, ai: 264, web: 300 }
 const PANEL_MAX = { sidebar: 460, ai: 600, web: 560 }
 type PanelKey = keyof typeof PANEL_DEFAULTS
@@ -267,6 +267,11 @@ export default function PdfViewer({
   tocPeekRef.current = tocPeek
   const aiPeekRef = useRef(aiPeek)
   aiPeekRef.current = aiPeek
+  /** When a panel peek was last opened. A peek slides in from off-screen over
+   *  the animation, so for a beat the cursor still sits over the pages in the
+   *  region the panel is about to cover — retracting on that stray move makes
+   *  the panel flicker in and straight back out. Hold the retract off briefly. */
+  const peekOpenedAtRef = useRef(0)
   /** Which fit the zoom is locked to: a fit mode re-fits when the available
    *  width changes (panel open/close, window resize) so the page never gets
    *  shoved off-centre; 'custom' preserves the exact scale */
@@ -296,6 +301,8 @@ export default function PdfViewer({
   /** Side panels pinned open (persistent toggle from the toolbar or the edge
    *  rail); a panel is visible when pinned OR peeked */
   const [tocPinned, setTocPinned] = useState(false)
+  const tocPinnedRef = useRef(tocPinned)
+  tocPinnedRef.current = tocPinned
   /** Drag-resizable panel widths (px), persisted per user */
   const [panelW, setPanelW] = useState(loadPanelWidths)
   const panelWRef = useRef(panelW)
@@ -368,6 +375,8 @@ export default function PdfViewer({
   }>({ status: 'idle', hits: [], index: -1, note: null, cost: null })
   const semanticReqRef = useRef<number | null>(null)
   const [aiPinned, setAiPinned] = useState(false)
+  const aiPinnedRef = useRef(aiPinned)
+  aiPinnedRef.current = aiPinned
   /** In-app web-search side panel (Edge-style). Query drives the native view;
    *  mutually exclusive with the AI panel. */
   const [webOpen, setWebOpen] = useState(false)
@@ -512,6 +521,12 @@ export default function PdfViewer({
     const newW = el.clientWidth
     const oldW = pagesWidthRef.current
     pagesWidthRef.current = newW
+    // Only custom zoom needs manual scroll-preservation here. In a fit mode the
+    // page is re-fitted (and re-centred) to the new width by refit(); running
+    // the scroll shift below as well leaves a stale scrollLeft that refit()'s
+    // anchor then reads, pushing the page off-centre — worse on the AI (right)
+    // panel than the sidebar, which is the asymmetry the user hit.
+    if (fitModeRef.current !== 'custom') return
     if (oldW && newW && oldW !== newW && el.scrollWidth > newW + 1) {
       const center = el.scrollLeft + oldW / 2
       el.scrollLeft = Math.max(0, center - newW / 2)
@@ -1734,9 +1749,13 @@ export default function PdfViewer({
     if (now - hoverThrottleRef.current < 80) return
     hoverThrottleRef.current = now
     if (immersiveRef.current) wakeHudRef.current()
-    // Moving back over the pages retracts any peeked edge panel
-    if (tocPeekRef.current) setTocPeek(false)
-    if (aiPeekRef.current) setAiPeek(false)
+    // Moving back over the pages retracts any peeked edge panel — but not
+    // during the slide-in, or the panel flickers straight back out (see
+    // peekOpenedAtRef).
+    if (now - peekOpenedAtRef.current > 260) {
+      if (tocPeekRef.current) setTocPeek(false)
+      if (aiPeekRef.current) setAiPeek(false)
+    }
     if (drawToolRef.current || annotDragRef.current || annotsHiddenRef.current) {
       setHoverTip((tip) => (tip ? null : tip))
       return
@@ -1884,13 +1903,29 @@ export default function PdfViewer({
 
   // Pin / unpin the toolbar (Edge-style). Unpinned, it hides itself and
   // reveals on top-edge hover; the choice is remembered across sessions.
+  // Unpinning is treated as "immersive reading": the side panels collapse to
+  // hover-only too (their open state is remembered and restored on re-pin) so
+  // the whole chrome gets out of the way in one gesture.
+  const preUnpinPanelsRef = useRef<{ toc: boolean; ai: boolean } | null>(null)
   const togglePin = useCallback(() => {
     setToolbarPinned((pinned) => {
       const next = !pinned
       saveToolbarPinned(next)
       if (!next) {
         setToolbarPeek(false)
+        preUnpinPanelsRef.current = { toc: tocPinnedRef.current, ai: aiPinnedRef.current }
+        setTocPinned(false)
+        setAiPinned(false)
         showToast(t('viewer.toolbarUnpinnedToast'))
+      } else {
+        // Restore panels that were open before unpinning, but never close one
+        // the reader opened while immersive.
+        const saved = preUnpinPanelsRef.current
+        if (saved) {
+          if (saved.toc) setTocPinned(true)
+          if (saved.ai) setAiPinned(true)
+          preUnpinPanelsRef.current = null
+        }
       }
       return next
     })
@@ -2643,6 +2678,9 @@ export default function PdfViewer({
         } else if (k === 'a') {
           e.preventDefault()
           setAiPinned((o) => !o)
+        } else if (k === 'v') {
+          e.preventDefault()
+          togglePin()
         } else if (k === 'h') {
           e.preventDefault()
           setAnnotsHidden((h) => !h)
@@ -2691,7 +2729,8 @@ export default function PdfViewer({
     removeAnnotation,
     goBack,
     goForward,
-    rotateView
+    rotateView,
+    togglePin
   ])
 
   // Hiding annotations (H) or activating a draw tool pauses hit-testing —
@@ -2835,7 +2874,11 @@ export default function PdfViewer({
       <div
         className={`edge-rail edge-rail-left${tocVisible ? ' active' : ''}`}
         title={t('tb.tocRailTip')}
-        onMouseEnter={() => !tocPinned && setTocPeek(true)}
+        onMouseEnter={() => {
+          if (tocPinned) return
+          peekOpenedAtRef.current = performance.now()
+          setTocPeek(true)
+        }}
         onClick={() => {
           setTocPeek(false)
           setTocPinned((o) => !o)
@@ -2848,7 +2891,11 @@ export default function PdfViewer({
       <div
         className={`edge-rail edge-rail-right${aiVisible ? ' active' : ''}`}
         title={t('tb.aiRailTip')}
-        onMouseEnter={() => !aiPinned && setAiPeek(true)}
+        onMouseEnter={() => {
+          if (aiPinned) return
+          peekOpenedAtRef.current = performance.now()
+          setAiPeek(true)
+        }}
         onClick={() => {
           setAiPeek(false)
           setAiPinned((o) => !o)
