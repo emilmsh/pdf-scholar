@@ -4,7 +4,7 @@
 //
 // Load the result via edge://extensions or chrome://extensions → "Load unpacked"
 // → pick dist-extension/. See docs/BROWSER-EXTENSION.md.
-import { copyFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
@@ -12,12 +12,20 @@ import react from '@vitejs/plugin-react'
 const extensionDir = resolve(__dirname, 'src/extension')
 const outDir = resolve(__dirname, 'dist-extension')
 
-// Copy the static manifest into the build output after the bundle is written.
+// Copy the static manifest + the extension icons (icons/*.png, shared with the
+// desktop app — regenerate via scripts/render-extension-icons.cjs) into the
+// build output after the bundle is written.
 function copyManifest(): Plugin {
   return {
     name: 'pdfx-copy-manifest',
     writeBundle() {
       copyFileSync(resolve(extensionDir, 'manifest.json'), resolve(outDir, 'manifest.json'))
+      const iconsSrc = resolve(extensionDir, 'icons')
+      const iconsOut = resolve(outDir, 'icons')
+      mkdirSync(iconsOut, { recursive: true })
+      for (const file of readdirSync(iconsSrc)) {
+        copyFileSync(resolve(iconsSrc, file), resolve(iconsOut, file))
+      }
     }
   }
 }
