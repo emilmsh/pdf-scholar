@@ -8,9 +8,11 @@
   "scripts": {
     "dev": "electron-vite dev",
     "dev:web": "vite --config vite.web.config.ts",
+    "dev:ext": "vite build --watch --config vite.extension.config.ts",
     "build": "electron-vite build",
+    "build:ext": "vite build --config vite.extension.config.ts",
     "start": "electron-vite preview",
-    "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.extension.json",
     "sample": "node scripts/make-sample-pdf.mjs",
     "dist": "npm run build && electron-builder --win"
   },

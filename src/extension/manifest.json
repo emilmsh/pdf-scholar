@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "PDF Scholar",
+  "short_name": "PDF Scholar",
+  "version": "0.10.0",
+  "description": "PDF Expert-style leser og annotator — tar over PDF-visning i nettleseren.",
+  "minimum_chrome_version": "120",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Åpne PDF i PDF Scholar"
+  },
+  "permissions": ["declarativeNetRequest", "storage", "tabs"],
+  "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
+  "web_accessible_resources": [
+    {
+      "resources": ["viewer.html", "assets/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

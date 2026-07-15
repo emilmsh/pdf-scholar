@@ -10,5 +10,5 @@
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src/main", "src/preload", "src/shared", "electron.vite.config.ts", "vite.web.config.ts"]
+  "include": ["src/main", "src/preload", "src/shared", "electron.vite.config.ts", "vite.web.config.ts", "vite.extension.config.ts"]
 }
