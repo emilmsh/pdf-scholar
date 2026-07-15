@@ -28,37 +28,12 @@ import type {
   RecentFile,
   Settings
 } from '../../shared/types'
+import { store } from './extension-store'
+import { createExtensionAi } from './extension-ai'
 
 /** True when running inside a WebExtension page (has a runtime id). */
 export function isExtensionContext(): boolean {
   return typeof chrome !== 'undefined' && !!chrome?.runtime?.id
-}
-
-/** chrome.storage.local with a localStorage fallback (e.g. plain-page dev). */
-const store = {
-  async get<T>(key: string, fallback: T): Promise<T> {
-    if (chrome?.storage) {
-      const got = await chrome.storage.local.get(key)
-      return (got[key] as T) ?? fallback
-    }
-    try {
-      const raw = localStorage.getItem(key)
-      return raw ? (JSON.parse(raw) as T) : fallback
-    } catch {
-      return fallback
-    }
-  },
-  set(key: string, value: unknown): void {
-    if (chrome?.storage) {
-      void chrome.storage.local.set({ [key]: value })
-    } else {
-      try {
-        localStorage.setItem(key, JSON.stringify(value))
-      } catch {
-        /* ignore quota/serialization errors — parity with web fallback */
-      }
-    }
-  }
 }
 
 const K_SETTINGS = 'pdfx-settings'
@@ -97,6 +72,11 @@ function recordRecent(payload: { path: string; name: string }): void {
 export function createExtensionApi(base: PdfxApi): PdfxApi {
   return {
     ...base,
+
+    // Real multi-provider AI (BYO key) — overrides the web mock inherited from
+    // `base`. Keys live in chrome.storage.local; calls go straight to the
+    // provider from the viewer page (see extension-ai.ts).
+    ...createExtensionAi(),
 
     // ---------- Documents ----------
 
