@@ -58,6 +58,7 @@ import PresentationMode from './PresentationMode'
 import Sidebar from './Sidebar'
 import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
+import WebSearchPanel from './WebSearchPanel'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { getLanguage, locale, t, useLang } from '../i18n'
@@ -110,9 +111,10 @@ const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
 
 /** Drag-resizable panel widths: defaults, clamps and persistence */
-const PANEL_DEFAULTS = { sidebar: 212, ai: 340 }
-const PANEL_MIN = { sidebar: 160, ai: 264 }
-const PANEL_MAX = { sidebar: 460, ai: 600 }
+const PANEL_DEFAULTS = { sidebar: 212, ai: 340, web: 380 }
+const PANEL_MIN = { sidebar: 160, ai: 264, web: 300 }
+const PANEL_MAX = { sidebar: 460, ai: 600, web: 560 }
+type PanelKey = keyof typeof PANEL_DEFAULTS
 const PANEL_LS_KEY = 'pdfx-panel-widths'
 
 const TOOLBAR_PIN_LS_KEY = 'pdfx-toolbar-pinned'
@@ -134,12 +136,13 @@ function saveToolbarPinned(pinned: boolean): void {
   }
 }
 
-function loadPanelWidths(): { sidebar: number; ai: number } {
+function loadPanelWidths(): Record<PanelKey, number> {
   try {
     const parsed = JSON.parse(localStorage.getItem(PANEL_LS_KEY) ?? '{}')
     return {
       sidebar: clamp(Number(parsed.sidebar) || PANEL_DEFAULTS.sidebar, PANEL_MIN.sidebar, PANEL_MAX.sidebar),
-      ai: clamp(Number(parsed.ai) || PANEL_DEFAULTS.ai, PANEL_MIN.ai, PANEL_MAX.ai)
+      ai: clamp(Number(parsed.ai) || PANEL_DEFAULTS.ai, PANEL_MIN.ai, PANEL_MAX.ai),
+      web: clamp(Number(parsed.web) || PANEL_DEFAULTS.web, PANEL_MIN.web, PANEL_MAX.web)
     }
   } catch {
     return { ...PANEL_DEFAULTS }
@@ -276,7 +279,7 @@ export default function PdfViewer({
   const [panelW, setPanelW] = useState(loadPanelWidths)
   const panelWRef = useRef(panelW)
   panelWRef.current = panelW
-  const [resizingPanel, setResizingPanel] = useState<'sidebar' | 'ai' | null>(null)
+  const [resizingPanel, setResizingPanel] = useState<PanelKey | null>(null)
   const [navStacks, setNavStacks] = useState<{ back: NavPosition[]; forward: NavPosition[] }>({
     back: [],
     forward: []
@@ -344,6 +347,10 @@ export default function PdfViewer({
   }>({ status: 'idle', hits: [], index: -1, note: null, cost: null })
   const semanticReqRef = useRef<number | null>(null)
   const [aiPinned, setAiPinned] = useState(false)
+  /** In-app web-search side panel (Edge-style). Query drives the native view;
+   *  mutually exclusive with the AI panel. */
+  const [webOpen, setWebOpen] = useState(false)
+  const [webQuery, setWebQuery] = useState('')
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
   /** Bumped to make the AI panel fire the "ask my annotations" question */
@@ -488,7 +495,7 @@ export default function PdfViewer({
       const center = el.scrollLeft + oldW / 2
       el.scrollLeft = Math.max(0, center - newW / 2)
     }
-  }, [tocPinned, aiPinned])
+  }, [tocPinned, aiPinned, webOpen])
 
   // Pick an initial zoom if none was restored: fit the WHOLE first page
   // (fit-page), so a fresh document opens centered without vertical cropping
@@ -850,7 +857,7 @@ export default function PdfViewer({
     }
   }
 
-  const beginPanelResize = useCallback((panel: 'sidebar' | 'ai', e: React.PointerEvent) => {
+  const beginPanelResize = useCallback((panel: PanelKey, e: React.PointerEvent) => {
     e.preventDefault()
     const startX = e.clientX
     const startW = panelWRef.current[panel]
@@ -871,7 +878,7 @@ export default function PdfViewer({
     window.addEventListener('pointerup', onUp)
   }, [])
 
-  const resetPanelWidth = useCallback((panel: 'sidebar' | 'ai') => {
+  const resetPanelWidth = useCallback((panel: PanelKey) => {
     setPanelW((p) => ({ ...p, [panel]: PANEL_DEFAULTS[panel] }))
     window.setTimeout(persistPanelWidths, 0)
   }, [])
@@ -1293,6 +1300,26 @@ export default function PdfViewer({
     [collectSelectionRects, persistAnnotation]
   )
 
+  // Open the in-app web-search panel for the given text. The AI and web panels
+  // are mutually exclusive — opening web here retracts the AI panel, and the
+  // effect below retracts web whenever the AI panel opens.
+  const openWebSearch = useCallback((text: string) => {
+    const q = text.trim()
+    if (!isElectron) {
+      // No WebContentsView in the browser preview — fall back to a real tab
+      bridge.webSearchOpen(q || undefined)
+      return
+    }
+    setAiPinned(false)
+    setAiPeek(false)
+    setWebQuery(q)
+    setWebOpen(true)
+  }, [])
+
+  useEffect(() => {
+    if (aiPinned) setWebOpen(false)
+  }, [aiPinned])
+
   const onMenuAction = useCallback(
     (action: MenuAction) => {
       const selText = window.getSelection()?.toString().trim().slice(0, 500) ?? ''
@@ -1341,9 +1368,7 @@ export default function PdfViewer({
           setMenu(null)
           break
         case 'search':
-          if (selText) {
-            bridge.openExternal(`https://www.google.com/search?q=${encodeURIComponent(selText)}`)
-          }
+          if (selText) openWebSearch(selText)
           setMenu(null)
           break
         case 'dictionary':
@@ -1424,7 +1449,7 @@ export default function PdfViewer({
         }
       }
     },
-    [menu, pdf, payload.name, applyMarkup, collectSelectionRects]
+    [menu, pdf, payload.name, applyMarkup, collectSelectionRects, openWebSearch]
   )
 
   const saveNote = useCallback(
@@ -1748,6 +1773,7 @@ export default function PdfViewer({
     setToolbarPeek(false)
     setTocPeek(false)
     setAiPeek(false)
+    setWebOpen(false)
     showToast(t('viewer.presentToast'))
   }, [fullscreen, showToast])
 
@@ -2424,6 +2450,7 @@ export default function PdfViewer({
         else if (readAloud !== 'closed') stopReadAloud()
         else if (searchOpen) closeSearch()
         else if (searchHits) setSearchHits(null)
+        else if (webOpen) setWebOpen(false)
         else if (aiPinned) setAiPinned(false)
         else if (fullscreen) toggleFullscreen()
       } else if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
@@ -2480,6 +2507,7 @@ export default function PdfViewer({
     menu,
     aiQuick,
     aiPinned,
+    webOpen,
     annotPopover,
     selected,
     activeTool,
@@ -2564,10 +2592,14 @@ export default function PdfViewer({
   const toolbarVisible = toolbarPinned || toolbarPeek
   const tocVisible = tocPinned || tocPeek
   const aiVisible = aiPinned || aiPeek
+  // The native web view only ever shows for the active tab (a background tab's
+  // placeholder rect would float it over another document)
+  const webVisible = webOpen && active
 
   return (
     <div
-      className={`viewer${immersive ? ' toolbar-unpinned' : ''}${immersive && hudFaded ? ' hud-faded' : ''}`}
+      className={`viewer${immersive ? ' toolbar-unpinned' : ''}${immersive && hudFaded ? ' hud-faded' : ''}${webVisible ? ' web-open' : ''}`}
+      style={{ '--web-w': `${panelW.web}px` } as React.CSSProperties}
     >
       <div
         className={`toolbar-wrap${toolbarVisible ? '' : ' tucked'}`}
@@ -2813,6 +2845,15 @@ export default function PdfViewer({
             setAiPinned(false)
           }}
         />
+        {webVisible && (
+          <div
+            className={`panel-resizer${resizingPanel === 'web' ? ' active' : ''}`}
+            title={t('viewer.resizerTip')}
+            onPointerDown={(e) => beginPanelResize('web', e)}
+            onDoubleClick={() => resetPanelWidth('web')}
+          />
+        )}
+        {webVisible && <WebSearchPanel query={webQuery} onClose={() => setWebOpen(false)} />}
       </div>
 
       {(navStacks.back.length > 0 || navStacks.forward.length > 0) && layout && (

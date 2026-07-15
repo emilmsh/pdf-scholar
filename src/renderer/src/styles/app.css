@@ -2061,6 +2061,54 @@ button {
   overflow: hidden;
 }
 
+/* ---------- In-app web search (Edge-style side panel) ---------- */
+
+/* NO width transition here: the native WebContentsView bounds snap on
+   setBounds, so an animated placeholder would visibly desync from it. */
+.web-panel {
+  display: flex;
+  flex-direction: column;
+  width: var(--web-w, 380px);
+  flex-shrink: 0;
+  background: var(--bg-chrome);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.web-header {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 6px 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.web-url {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+}
+
+/* The empty placeholder the native surface floats over — white to match the
+   view's own background so there's no flash before the page paints. */
+.web-panel-body {
+  flex: 1;
+  min-height: 0;
+  background: #fff;
+}
+
+/* The search bar floats top-right; the native web view would cover it, so
+   nudge it left of the panel while web search is open. */
+.viewer.web-open .search-bar {
+  right: calc(var(--web-w, 380px) + 22px);
+}
+
 .ai-header {
   display: flex;
   align-items: center;

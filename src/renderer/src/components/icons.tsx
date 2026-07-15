@@ -363,3 +363,15 @@ export const IconArrowRight = (p: IconProps): React.JSX.Element => (
     <path d="M5 12h14M13 6l6 6-6 6" />
   </Svg>
 )
+
+export const IconReload = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v5h-5" />
+  </Svg>
+)
+
+export const IconExternal = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+  </Svg>
+)
