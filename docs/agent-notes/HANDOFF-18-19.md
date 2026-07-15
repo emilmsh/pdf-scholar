@@ -1,9 +1,10 @@
-# Handoff: web-search side panel (#18) + rotate / two-page spread (#19)
+# Handoff: web panel (#18), rotate/spread (#19), tab drag between windows (#30)
 
 Status as of branch `feature/ai-scholar-tools` (merged into `master`). The
 four-task AI batch is otherwise done: #13 chat history, #14 reference lookup,
 #15 annotation select/move, #16 semantic search all landed and verified.
-**#18 and #19 remain — this file is their brief.**
+**#18, #19 and #30 remain — this file is their brief.** Do #18 and #19 first
+(they're the substantive ones); #30 is a smaller polish task, spec at the end.
 
 ## Read first (hard-won context)
 
@@ -18,12 +19,12 @@ four-task AI batch is otherwise done: #13 chat history, #14 reference lookup,
   (presentation mode, pinnable toolbar, edge-rail panels, auto light/dark).
   Anchor edits to **function names / patterns, not line numbers**, and re-read
   each file before editing.
-- **Environment:** the repo lives under OneDrive and multiple Claude sessions
-  run against it concurrently (see `MEMORY.md` → parallel-sessions). If files
-  mutate under you mid-edit, it's a peer session — check `git log`/worktrees,
-  don't fight it with reverts. Edit source ONLY with Edit/Write (never
-  PowerShell pipelines — BOM/encoding corruption). Every new UI string goes in
-  BOTH nb and en dicts in `src/renderer/src/i18n.ts`. No new npm deps.
+- **Environment:** multiple Claude sessions run against this repo concurrently
+  (see `MEMORY.md` → parallel-sessions). If files mutate under you mid-edit,
+  it's a peer session, not disk corruption — check `git log`/worktrees, don't
+  fight it with reverts. Edit source ONLY with Edit/Write (never PowerShell
+  pipelines — BOM/encoding corruption). Every new UI string goes in BOTH nb and
+  en dicts in `src/renderer/src/i18n.ts`. No new npm deps.
 - Work in a fresh branch off `master`, verify `npm run typecheck` green after
   every step, commit per feature, don't push/merge to master unprompted
   (coordinate with Emil — a stress-test session may be active).
@@ -150,3 +151,38 @@ put ALL transforms in one new pure module and route every boundary through it.
 The full original plans (with code sketches / exact formulas) were produced by
 the planning workflow; if this file is insufficient, they can be regenerated,
 but everything needed to execute is above.
+
+---
+
+## #30 — Drag a tab to another window (Edge-style tear-off / merge)
+
+Smaller task, no plan was pre-written — spec it yourself. The app is
+multi-window with tabs in the titlebar (`TabBar.tsx`, frameless window). Goal:
+drag a document tab out of its window to (a) a new window (tear-off) and/or
+(b) another existing window's tab strip (merge), moving the document — open in
+the target, close in the source.
+
+Reality check on Electron: HTML5 drag events do NOT cross OS window
+boundaries, so "drop onto another window" can't be done with plain
+`dragover`/`drop` between renderers. Two workable routes:
+
+- **Pragmatic (recommended first):** make each tab draggable; on `dragend`,
+  ask main (over IPC) which window sits under the cursor via
+  `screen.getCursorScreenPoint()` + `BrowserWindow.getBounds()` hit-testing. If
+  it's another PDF Scholar window → main sends that window an `open-path` for
+  the doc and tells the source to close its tab (reuse the existing
+  `open-path` channel + tab-close flow). If it's outside every window → tear
+  off into a new window (`createWindow(path)` then close source tab). This
+  keeps all cross-window coordination in main, where the multi-window state
+  already lives (`openDocs`, `pendingPaths`).
+- Simpler fallback if drag proves fiddly: a tab context-menu item "Flytt til
+  vindu ▸" listing open windows (main already tracks them), plus the existing
+  "Åpne i nytt vindu". Ships the capability without the drag choreography.
+
+Guards: the source tab's unsaved-changes (draft) state must travel with the
+move — moving a dirty doc must not silently drop the draft; simplest is to
+require save/confirm on move, or move the draft file with it (see
+`src/main/drafts.ts`). Reuse the close-confirm flow. `isDestroyed()` guards on
+every cross-window `webContents.send` (this bug class has bitten us). Verify in
+a real `npm run dev` window (drag between two windows; tear-off to new window;
+dirty-doc move; no orphaned/duplicated tabs).
