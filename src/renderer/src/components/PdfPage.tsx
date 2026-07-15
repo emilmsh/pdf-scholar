@@ -1,9 +1,10 @@
 import { memo, useEffect, useRef } from 'react'
 import { AnnotationMode, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import type { PageRect } from '../../../shared/types'
+import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
 import { annotationCss, arrowHeadPoints, rgbCss, strokePathData } from '../annotations'
+import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 
 const SHAPE_TYPES = new Set(['square', 'circle', 'line', 'arrow'])
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -16,6 +17,11 @@ interface Props {
   cssWidth: number
   cssHeight: number
   scale: number
+  /** User view rotation (clockwise degrees), added on top of intrinsic /Rotate */
+  rotation: ViewRotation
+  /** Page-space dimensions (points), before the view rotation is applied */
+  pageW: number
+  pageH: number
   /** Only pages near the viewport actually render their canvas */
   active: boolean
   /** Annotations created this session, drawn by the overlay (PDF page space) */
@@ -56,6 +62,9 @@ function PdfPage({
   cssWidth,
   cssHeight,
   scale,
+  rotation,
+  pageW,
+  pageH,
   active,
   annotations,
   hideAnnots,
@@ -130,7 +139,10 @@ function PdfPage({
       const page = await pdf.getPage(pageNumber)
       if (cancelled) return
       const dpr = Math.min(window.devicePixelRatio || 1, 2)
-      const viewport = page.getViewport({ scale })
+      // Add the user rotation to the page's intrinsic /Rotate (don't replace
+      // it) — pdf.js swaps the viewport's width/height for 90°/270° so the
+      // canvas, text layer and link layer all come out rotated together.
+      const viewport = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 })
 
       // Render into a detached canvas and swap it in when finished, so the
       // previous (CSS-stretched) bitmap stays visible during zoom — no flash.
@@ -224,7 +236,7 @@ function PdfPage({
       renderTask?.cancel()
       textLayer?.cancel()
     }
-  }, [pdf, pageNumber, scale, active, hideAnnots, onInternalLink, onExternalLink])
+  }, [pdf, pageNumber, scale, rotation, active, hideAnnots, onInternalLink, onExternalLink])
 
   // ---------- Freehand drawing (pen/marker/eraser) ----------
 
@@ -423,12 +435,15 @@ function PdfPage({
                 key={a.id}
                 annotation={a}
                 scale={scale}
-                pageWidth={cssWidth / scale}
-                pageHeight={cssHeight / scale}
+                pageW={pageW}
+                pageH={pageH}
+                rotation={rotation}
               />
             ))}
         </div>
       )}
+      {/* Search hits arrive already in VIEW space (resolved from the rotated
+          text layer's client rects), so they paint directly — no rotation */}
       {searchRects.length > 0 && (
         <div className="annot-overlay">
           {searchRects.map((r, i) => (
@@ -442,12 +457,14 @@ function PdfPage({
       )}
       {!hideAnnots && selectedAnnot && (
         <div className="annot-overlay">
-          <SelectionFrame record={selectedAnnot} scale={scale} />
+          <SelectionFrame record={selectedAnnot} scale={scale} pageW={pageW} pageH={pageH} rotation={rotation} />
         </div>
       )}
       <div className="text-host" ref={textRef} />
       <div className="link-host" ref={linkRef} />
-      {drawTool && (
+      {/* Draw tools are disabled under rotation (their pointer/preview machinery
+          assumes an un-rotated page); PdfViewer also blocks selecting one */}
+      {drawTool && rotation === 0 && (
         <div
           className={`draw-layer${drawTool.type === 'eraser' ? ' erasing' : ''}${drawTool.type === 'text' ? ' text-mode' : ''}${drawTool.type === 'pen' ? ' pen-mode' : ''}${drawTool.type === 'marker' ? ' marker-mode' : ''}`}
           onPointerDown={onPointerDown}
@@ -471,10 +488,16 @@ function PdfPage({
  *  pointer-events:none .annot-overlay host — never make this interactive. */
 function SelectionFrame({
   record,
-  scale
+  scale,
+  pageW,
+  pageH,
+  rotation
 }: {
   record: PageAnnotation
   scale: number
+  pageW: number
+  pageH: number
+  rotation: ViewRotation
 }): React.JSX.Element {
   let minX = Infinity
   let minY = Infinity
@@ -487,14 +510,20 @@ function SelectionFrame({
     maxY = Math.max(maxY, q.y + q.h)
   }
   const PAD = 4
+  const v = pageRectToView(
+    { x: minX - PAD, y: minY - PAD, w: maxX - minX + 2 * PAD, h: maxY - minY + 2 * PAD },
+    pageW,
+    pageH,
+    rotation
+  )
   return (
     <div
       className="annot-selection"
       style={{
-        left: (minX - PAD) * scale,
-        top: (minY - PAD) * scale,
-        width: (maxX - minX + 2 * PAD) * scale,
-        height: (maxY - minY + 2 * PAD) * scale
+        left: v.x * scale,
+        top: v.y * scale,
+        width: v.w * scale,
+        height: v.h * scale
       }}
     >
       <i className="tl" />
@@ -508,33 +537,41 @@ function SelectionFrame({
 function AnnotationMarks({
   annotation,
   scale,
-  pageWidth,
-  pageHeight
+  pageW,
+  pageH,
+  rotation
 }: {
   annotation: PageAnnotation
   scale: number
-  pageWidth: number
-  pageHeight: number
+  pageW: number
+  pageH: number
+  rotation: ViewRotation
 }): React.JSX.Element {
+  // Ink/shape SVGs keep their page-space geometry and rotate it with a single
+  // group transform into a view-sized viewBox (no per-point maths).
+  const view = viewSize(pageW, pageH, rotation)
+  const gTransform = svgRotationTransform(pageW, pageH, rotation)
   if (annotation.type === 'ink' && annotation.strokes) {
     return (
       <svg
         className="annot-ink-svg"
-        viewBox={`0 0 ${pageWidth} ${pageHeight}`}
+        viewBox={`0 0 ${view.w} ${view.h}`}
         preserveAspectRatio="none"
       >
-        {annotation.strokes.map((stroke, i) => (
-          <path
-            key={i}
-            d={strokePathData(stroke)}
-            fill="none"
-            stroke={rgbCss(annotation.color, 1)}
-            strokeWidth={annotation.width ?? 2}
-            opacity={annotation.opacity}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        ))}
+        <g transform={gTransform}>
+          {annotation.strokes.map((stroke, i) => (
+            <path
+              key={i}
+              d={strokePathData(stroke)}
+              fill="none"
+              stroke={rgbCss(annotation.color, 1)}
+              strokeWidth={annotation.width ?? 2}
+              opacity={annotation.opacity}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+        </g>
       </svg>
     )
   }
@@ -546,37 +583,39 @@ function AnnotationMarks({
     return (
       <svg
         className="annot-ink-svg"
-        viewBox={`0 0 ${pageWidth} ${pageHeight}`}
+        viewBox={`0 0 ${view.w} ${view.h}`}
         preserveAspectRatio="none"
         opacity={annotation.opacity}
       >
-        {annotation.type === 'square' && (
-          <rect x={q.x} y={q.y} width={q.w} height={q.h} fill="none" stroke={color} strokeWidth={width} />
-        )}
-        {annotation.type === 'circle' && (
-          <ellipse
-            cx={q.x + q.w / 2}
-            cy={q.y + q.h / 2}
-            rx={q.w / 2}
-            ry={q.h / 2}
-            fill="none"
-            stroke={color}
-            strokeWidth={width}
-          />
-        )}
-        {(annotation.type === 'line' || annotation.type === 'arrow') && a && b && (
-          <>
-            <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={color} strokeWidth={width} />
-            {annotation.type === 'arrow' && (
-              <polygon points={arrowHeadPoints(a, b, Math.max(6, width * 3.2))} fill={color} />
-            )}
-          </>
-        )}
+        <g transform={gTransform}>
+          {annotation.type === 'square' && (
+            <rect x={q.x} y={q.y} width={q.w} height={q.h} fill="none" stroke={color} strokeWidth={width} />
+          )}
+          {annotation.type === 'circle' && (
+            <ellipse
+              cx={q.x + q.w / 2}
+              cy={q.y + q.h / 2}
+              rx={q.w / 2}
+              ry={q.h / 2}
+              fill="none"
+              stroke={color}
+              strokeWidth={width}
+            />
+          )}
+          {(annotation.type === 'line' || annotation.type === 'arrow') && a && b && (
+            <>
+              <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={color} strokeWidth={width} />
+              {annotation.type === 'arrow' && (
+                <polygon points={arrowHeadPoints(a, b, Math.max(6, width * 3.2))} fill={color} />
+              )}
+            </>
+          )}
+        </g>
       </svg>
     )
   }
   if (annotation.type === 'freetext') {
-    const css = annotationCss(annotation, annotation.quads[0], scale, pageHeight)
+    const css = annotationCss(annotation, annotation.quads[0], scale, { w: pageW, h: pageH }, rotation)
     return (
       <div
         className="annot annot-freetext"
@@ -587,12 +626,14 @@ function AnnotationMarks({
     )
   }
   if (annotation.type === 'note') {
-    // Modern comment marker (speech bubble) instead of a plain colored box
+    // Modern comment marker (speech bubble); stays upright, only its anchor
+    // point rotates
     const q = annotation.quads[0]
+    const [vx, vy] = pagePointToView(q.x, q.y, pageW, pageH, rotation)
     return (
       <svg
         className="annot annot-note-mark"
-        style={{ left: q.x * scale, top: q.y * scale }}
+        style={{ left: vx * scale, top: vy * scale }}
         width={q.w * scale}
         height={q.h * scale}
         viewBox="0 0 24 24"
@@ -614,7 +655,7 @@ function AnnotationMarks({
   return (
     <>
       {annotation.quads.map((q, i) => {
-        const css = annotationCss(annotation, q, scale, pageHeight)
+        const css = annotationCss(annotation, q, scale, { w: pageW, h: pageH }, rotation)
         return <div key={i} className={`annot annot-${annotation.type}`} style={css} />
       })}
     </>

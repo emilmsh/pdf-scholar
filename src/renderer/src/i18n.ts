@@ -80,6 +80,10 @@ const nb = {
   'tb.fullscreenTip': 'Fullskjerm (F11)',
   'tb.tocRailTip': 'Innhold — klikk for å feste, hover for et raskt blikk',
   'tb.aiRailTip': 'Assistent — klikk for å feste, hover for et raskt blikk',
+  'tb.layout': 'Sidevisning',
+  'tb.rotateCw': 'Roter med klokken (Shift+R / ])',
+  'tb.rotateCcw': 'Roter mot klokken ([)',
+  'tb.spread': 'To sider ved siden av hverandre',
 
   // Shapes
   'shape.square': 'Rektangel',
@@ -205,6 +209,7 @@ const nb = {
   'viewer.resizerTip': 'Dra for å endre bredde — dobbeltklikk nullstiller',
   'viewer.fullscreenToast': 'Fullskjerm — trykk Esc eller F11 for å avslutte',
   'viewer.presentToast': 'Presentasjonsmodus — piltaster eller klikk blar, Esc avslutter',
+  'viewer.rotatedToolsOff': 'Tegneverktøy er slått av mens siden er rotert',
   'present.prev': 'Forrige side (←)',
   'present.next': 'Neste side (→)',
   'present.exit': 'Avslutt presentasjon (Esc)',
@@ -363,6 +368,10 @@ const en: Dict = {
   'tb.fullscreenTip': 'Full screen (F11)',
   'tb.tocRailTip': 'Contents — click to pin, hover for a quick look',
   'tb.aiRailTip': 'Assistant — click to pin, hover for a quick look',
+  'tb.layout': 'Page layout',
+  'tb.rotateCw': 'Rotate clockwise (Shift+R / ])',
+  'tb.rotateCcw': 'Rotate counter-clockwise ([)',
+  'tb.spread': 'Two pages side by side',
 
   'shape.square': 'Rectangle',
   'shape.circle': 'Ellipse',
@@ -480,6 +489,7 @@ const en: Dict = {
   'viewer.resizerTip': 'Drag to resize — double-click to reset',
   'viewer.fullscreenToast': 'Full screen — press Esc or F11 to exit',
   'viewer.presentToast': 'Presentation mode — arrows or click to page, Esc to exit',
+  'viewer.rotatedToolsOff': 'Drawing tools are off while the page is rotated',
   'present.prev': 'Previous page (←)',
   'present.next': 'Next page (→)',
   'present.exit': 'Exit presentation (Esc)',

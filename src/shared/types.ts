@@ -24,12 +24,20 @@ export interface RecentFile {
   lastOpened: number
 }
 
+/** User-applied view rotation in clockwise degrees (added on top of the
+ *  page's intrinsic /Rotate). Not baked into the file — a display setting. */
+export type ViewRotation = 0 | 90 | 180 | 270
+
 export interface ReadingPosition {
   /** 1-based page number of the topmost visible page */
   page: number
   /** Scroll offset within that page as a fraction of page height (0–1) */
   offset: number
   zoom: number
+  /** View rotation (clockwise degrees); absent = 0 */
+  rotation?: ViewRotation
+  /** Two-page spread on? absent = false */
+  spread?: boolean
 }
 
 export interface FilePayload {

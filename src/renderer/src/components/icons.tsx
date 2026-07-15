@@ -375,3 +375,22 @@ export const IconExternal = (p: IconProps): React.JSX.Element => (
     <path d="M14 4h6v6M20 4l-9 9M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
   </Svg>
 )
+
+export const IconRotateCw = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v5h-5" />
+  </Svg>
+)
+
+export const IconRotateCcw = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M3 12a9 9 0 1 0 2.64-6.36M3 3v5h5" />
+  </Svg>
+)
+
+export const IconSpread = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="8" height="16" rx="1" />
+    <rect x="13" y="4" width="8" height="16" rx="1" />
+  </Svg>
+)
