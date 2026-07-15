@@ -18,6 +18,8 @@ import {
   explainSystem,
   explainUserMessage,
   formatCost,
+  referenceSystem,
+  referenceUserMessage,
   resolveCitation,
   summaryPrompt
 } from '../ai'
@@ -1066,29 +1068,42 @@ export default function AiPanel({
 export interface AiQuickState {
   x: number
   y: number
-  mode: 'explain' | 'simplify' | 'define'
+  mode: 'explain' | 'simplify' | 'define' | 'reference'
   selection: string
   pageNumber: number
   pageContext: string
+  /** Reference lookup needs the whole document attached so the model can find
+   *  the bibliography entry itself; explain/simplify/define do not.
+   *  pageStarts lets the citation chips resolve char offsets to page numbers. */
+  document?: { title: string; text: string; pageStarts: number[] } | null
 }
 
 const quickTitle = (mode: AiQuickState['mode']): string =>
-  mode === 'explain' ? t('ai.quickExplain') : mode === 'simplify' ? t('ai.quickSimplify') : t('ai.quickDefine')
+  mode === 'explain'
+    ? t('ai.quickExplain')
+    : mode === 'simplify'
+      ? t('ai.quickSimplify')
+      : mode === 'reference'
+        ? t('ai.quickReference')
+        : t('ai.quickDefine')
 
 interface QuickProps {
   state: AiQuickState
   onSendToChat(seed: AiSeed): void
+  onCitation?(citation: AiCitation): void
   onClose(): void
 }
 
-export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): React.JSX.Element {
+export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: QuickProps): React.JSX.Element {
   useLang()
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [meta, setMeta] = useState<string | null>(null)
+  const [parts, setParts] = useState<AiContentPart[] | null>(null)
   const requestIdRef = useRef<number | null>(null)
   const finalRef = useRef('')
+  const isReference = state.mode === 'reference'
 
   useEffect(() => {
     let stale = false
@@ -1100,11 +1115,20 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
     void (async () => {
       const result = await bridge.aiChat({
         requestId,
-        system: explainSystem(state.mode),
+        system: isReference ? referenceSystem() : explainSystem(state.mode as 'explain' | 'simplify' | 'define'),
         messages: [
-          { role: 'user', text: explainUserMessage(state.selection, state.pageNumber, state.pageContext) }
+          {
+            role: 'user',
+            text: isReference
+              ? referenceUserMessage(state.selection, state.pageNumber, state.pageContext)
+              : explainUserMessage(state.selection, state.pageNumber, state.pageContext)
+          }
         ],
-        document: null
+        // Reference lookup attaches the whole document so the model can find
+        // the bibliography entry; the others stay page-local.
+        document: isReference && state.document
+          ? { title: state.document.title, text: state.document.text }
+          : null
       })
       if (stale) return
       setDone(true)
@@ -1114,6 +1138,7 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
         const full = result.parts.map((p) => p.text).join('')
         finalRef.current = full
         setText(full)
+        setParts(result.parts)
         const cost = estimateCost(result.model, result.usage)
         if (cost !== null) setMeta(`≈ ${formatCost(cost)}`)
       }
@@ -1140,6 +1165,12 @@ export function AiQuickPopover({ state, onSendToChat, onClose }: QuickProps): Re
       <div className="ai-quick-body">
         {error ? (
           <div className="ai-error">{error}</div>
+        ) : parts && isReference ? (
+          <AssistantBody
+            parts={parts}
+            doc={state.document ? { text: state.document.text, pageStarts: state.document.pageStarts } : null}
+            onCitation={(c) => onCitation?.(c)}
+          />
         ) : text ? (
           renderMarkdown(text)
         ) : (

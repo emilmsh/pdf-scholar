@@ -10,7 +10,7 @@ import {
 import type { HighlightColor } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
-import { IconBook, IconCopy, IconGlobe, IconNote, IconSparkle, IconTranslate } from './icons'
+import { IconBook, IconCite, IconCopy, IconGlobe, IconNote, IconSparkle, IconTranslate } from './icons'
 
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/
 
@@ -200,6 +200,7 @@ export type MenuAction =
   | { kind: 'dictionary' }
   | { kind: 'translate' }
   | { kind: 'ai'; mode: 'explain' | 'simplify' | 'define' }
+  | { kind: 'reference' }
 
 interface MenuProps {
   menu: MenuState
@@ -328,6 +329,13 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             onClick={() => onAction({ kind: 'ai', mode: 'define' })}
           >
             {t('menu.aiDefine')}
+          </button>
+          <button
+            className="menu-item"
+            title={t('menu.aiReferenceTip')}
+            onClick={() => onAction({ kind: 'reference' })}
+          >
+            <span className="menu-icon"><IconCite size={15} /></span> {t('menu.aiReference')}
           </button>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'search' })}>

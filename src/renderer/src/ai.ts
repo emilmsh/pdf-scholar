@@ -210,6 +210,45 @@ export function explainUserMessage(selection: string, pageNumber: number, pageCo
     : `Selected text (from page ${pageNumber}):\n"${selection}"\n\nContext from the page:\n${pageContext}`
 }
 
+/** Reference lookup: the whole document is attached by the pipeline, so the
+ *  model can find the bibliography entry itself. Epistemic marking is the
+ *  point — never let it invent findings for a work it doesn't recognise. */
+export function referenceSystem(): string {
+  if (getLanguage() === 'nb') {
+    return `Du er referanseassistenten i PDF-leseren PDF Scholar. Brukeren har markert en litteraturhenvisning i et dokument de leser. Hele dokumentteksten er vedlagt med sidemarkører; bruk den til å finne referanselisten og konteksten rundt siteringen.
+
+Svar i tre korte deler, på norsk bokmål:
+
+1. **Referansen** – gjengi den fullstendige oppføringen fra dokumentets referanseliste. Finner du den ikke der, si det eksplisitt.
+2. **Hvorfor den siteres her** – 1–2 setninger basert på teksten rundt siteringen: hvilken påstand, metode eller premiss henvisningen underbygger på akkurat dette stedet. Siter passasjen.
+3. **Om verket** – maks 2–3 setninger, med eksplisitt epistemisk merking av hver opplysning:
+   - «Ifølge dokumentet: …» for alt som er hentet fra dokumentet selv.
+   - «Fra treningen min (kan være upresist): …» for bakgrunnskunnskap om verket – men BARE hvis du genuint gjenkjenner dette spesifikke verket (forfatter, årstall og tittel stemmer med noe du kjenner). At du kjenner forfatternavnet er IKKE nok.
+   - Kjenner du ikke verket, si det rett ut («Jeg kjenner ikke dette verket») og hold deg til det referanselisten og konteksten sier. Gjett aldri på funn, tidsskrift eller innhold.
+
+Hold hele svaret under ca. 120 ord.`
+  }
+  return `You are the reference assistant in the PDF reader PDF Scholar. The user has selected a literature citation in a document they are reading. The full document text is attached with page markers; use it to find the reference list and the context around the citation.
+
+Answer in three short parts, in English:
+
+1. **The reference** – reproduce the complete entry from the document's reference list. If you cannot find it there, say so explicitly.
+2. **Why it is cited here** – 1–2 sentences based on the text around the citation: which claim, method or premise the reference supports at this exact spot. Quote the passage.
+3. **About the work** – at most 2–3 sentences, with explicit epistemic marking of every statement:
+   - "According to the document: …" for anything taken from the document itself.
+   - "From my training (may be imprecise): …" for background knowledge about the work – but ONLY if you genuinely recognise this specific work (author, year and title match something you know). Knowing the author's name is NOT enough.
+   - If you do not know the work, say so plainly ("I don't know this work") and stick to what the reference list and context say. Never guess at findings, journal or content.
+
+Keep the whole answer under about 120 words.`
+}
+
+/** User-message scaffold for reference lookup */
+export function referenceUserMessage(selection: string, pageNumber: number, pageContext: string): string {
+  return getLanguage() === 'nb'
+    ? `Markert henvisning (side ${pageNumber}):\n«${selection}»\n\nTekst rundt henvisningen:\n${pageContext}`
+    : `Selected citation (page ${pageNumber}):\n"${selection}"\n\nText around the citation:\n${pageContext}`
+}
+
 /** Question scaffold for "ask my annotations": the block lists the user's
  *  own highlights/notes; keeping it inside the user message means follow-up
  *  questions retain it via the chat history. */

@@ -39,7 +39,7 @@ import type {
 } from '../annotations'
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
-import { buildAiDocument } from '../ai'
+import { buildAiDocument, citationPage, resolveCitation } from '../ai'
 import type { ResolvedCitation } from '../ai'
 import AnnotPopover from './AnnotPopover'
 import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
@@ -1369,9 +1369,42 @@ export default function PdfViewer({
           })()
           break
         }
+        case 'reference': {
+          if (!selText || !menu || !pdf) {
+            setMenu(null)
+            break
+          }
+          const { x, y, pageNumber } = menu
+          setMenu(null)
+          window.getSelection()?.removeAllRanges()
+          // Attach the whole document so the model can find the bibliography
+          // entry itself; also grab local context around the citation.
+          void (async () => {
+            let pageContext = ''
+            let document: { title: string; text: string; pageStarts: number[] } | null = null
+            try {
+              // Build the document inline (buildAiDocument is a module fn) —
+              // ensureAiDocument is declared later in the component, so
+              // depending on it here would hit the const TDZ.
+              const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
+              const doc = buildAiDocument(pages)
+              document = { title: payload.name, text: doc.text, pageStarts: doc.pageStarts }
+              const pageText = pages[pageNumber - 1]?.text ?? ''
+              const at = pageText.indexOf(selText.slice(0, 80))
+              pageContext =
+                at === -1
+                  ? pageText.slice(0, 1500)
+                  : pageText.slice(Math.max(0, at - 800), at + selText.length + 800)
+            } catch {
+              /* context is best-effort */
+            }
+            setAiQuick({ x, y, mode: 'reference', selection: selText, pageNumber, pageContext, document })
+          })()
+          break
+        }
       }
     },
-    [menu, pdf, applyMarkup, collectSelectionRects]
+    [menu, pdf, payload.name, applyMarkup, collectSelectionRects]
   )
 
   const saveNote = useCallback(
@@ -2773,6 +2806,17 @@ export default function PdfViewer({
             setAiSeed(seed)
             setAiQuick(null)
             setAiPinned(true)
+          }}
+          onCitation={(c) => {
+            const pages = pageTextsRef.current
+            if (!pages) return
+            const doc = buildAiDocument(pages)
+            const resolved = resolveCitation(c, pages, doc)
+            if (resolved) void jumpToAiCitation(resolved)
+            else {
+              const p = citationPage(c, doc)
+              if (p && p >= 1 && p <= pages.length) void jumpToAiCitation({ pageNumber: p, start: 0, end: 0 })
+            }
           }}
           onClose={() => setAiQuick(null)}
         />
