@@ -452,9 +452,12 @@ function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Elem
       )}
       <p className="ai-settings-note">
         {t('ai.settingsNote')}
-        {!config.encryptionAvailable && provider !== 'mock' && (
-          <strong>{t('ai.encryptionWarn')}</strong>
-        )}
+        {provider !== 'mock' &&
+          (config.encryptionAvailable ? (
+            t('ai.settingsNoteEncrypted')
+          ) : (
+            <strong>{t('ai.encryptionWarn')}</strong>
+          ))}
       </p>
       <div className="ai-settings-actions">
         <button className="btn-secondary" onClick={onClose}>

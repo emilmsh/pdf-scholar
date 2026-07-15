@@ -2068,6 +2068,10 @@ button {
   padding: 8px 8px 8px 14px;
   border-bottom: 1px solid var(--border);
   color: var(--text-secondary);
+  /* Positioning context for .ai-model-menu — anchoring the popover to the full
+     header width (not the narrow model chip) keeps it inside the panel and off
+     the left edge, which .ai-panel's overflow:hidden would otherwise clip. */
+  position: relative;
 }
 
 .ai-title {
@@ -2081,7 +2085,6 @@ button {
   min-width: 0;
   display: flex;
   justify-content: flex-end;
-  position: relative;
 }
 
 .ai-model {
@@ -2112,10 +2115,11 @@ button {
 
 .ai-model-menu {
   position: absolute;
-  top: 28px;
-  right: 0;
+  top: calc(100% + 4px);
+  right: 8px;
   z-index: 45;
-  min-width: 224px;
+  /* Cap to the panel width so the narrow extension panel never clips it. */
+  width: min(224px, calc(100% - 16px));
   padding: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);

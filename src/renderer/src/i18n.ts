@@ -260,8 +260,10 @@ const nb = {
   'ai.endpoint': 'Endepunkt',
   'ai.deployment': 'Deployment',
   'ai.settingsNote':
-    'Nøkkelen lagres kryptert på denne maskinen og brukes kun direkte mot leverandørens API. Dokumentteksten sendes til leverandøren først når du stiller et spørsmål.',
-  'ai.encryptionWarn': ' Merk: systemkryptering er utilgjengelig her; nøkkelen lagres uten kryptering.',
+    'Nøkkelen brukes kun direkte mot leverandørens API. Dokumentteksten sendes til leverandøren først når du stiller et spørsmål.',
+  'ai.settingsNoteEncrypted': ' Nøkkelen lagres kryptert på denne maskinen.',
+  'ai.encryptionWarn':
+    ' Nøkkelen lagres uten kryptering på denne maskinen (isolert til utvidelsen). Bruk en nøkkel med utgiftstak.',
   'ai.sendToChat': 'Send til chat',
   'ai.summaryBtn': 'Strukturert sammendrag',
   'ai.summaryTip': 'Strukturert artikkelsammendrag med kildehenvisninger',
@@ -524,8 +526,10 @@ const en: Dict = {
   'ai.endpoint': 'Endpoint',
   'ai.deployment': 'Deployment',
   'ai.settingsNote':
-    'The key is stored encrypted on this machine and used only directly against the provider’s API. The document text is sent to the provider only when you ask a question.',
-  'ai.encryptionWarn': ' Note: system encryption is unavailable here; the key is stored unencrypted.',
+    'The key is used only directly against the provider’s API. The document text is sent to the provider only when you ask a question.',
+  'ai.settingsNoteEncrypted': ' The key is stored encrypted on this machine.',
+  'ai.encryptionWarn':
+    ' The key is stored unencrypted on this machine (isolated to this extension). Use a key with a spending cap.',
   'ai.sendToChat': 'Send to chat',
   'ai.summaryBtn': 'Structured summary',
   'ai.summaryTip': 'Structured article summary with source references',
