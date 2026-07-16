@@ -10,7 +10,16 @@ import {
 import type { HighlightColor } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
-import { IconBook, IconCite, IconCopy, IconGlobe, IconNote, IconSparkle, IconTranslate } from './icons'
+import {
+  IconBook,
+  IconCite,
+  IconCopy,
+  IconGlobe,
+  IconNote,
+  IconSparkle,
+  IconTally,
+  IconTranslate
+} from './icons'
 
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/
 
@@ -160,7 +169,7 @@ function countSelection(text: string): SelectionStats {
   return { words, characters, charactersNoSpaces, sentences, minutes: Math.floor(words / 200) }
 }
 
-/** Compact, always-visible count block at the foot of the selection menu. */
+/** Count block expanded on demand from the «Ordtelling» menu item. */
 function SelectionCount({ text }: { text: string }): React.JSX.Element | null {
   useLang()
   if (!text.trim()) return null
@@ -174,18 +183,14 @@ function SelectionCount({ text }: { text: string }): React.JSX.Element | null {
     ['menu.readingTime', readingTime]
   ]
   return (
-    <>
-      <div className="menu-sep" />
-      <div className="menu-section-label">{t('menu.count')}</div>
-      <dl className="selection-stats">
-        {rows.map(([key, value]) => (
-          <div className="selection-stat" key={key}>
-            <dt>{t(key)}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
-    </>
+    <dl className="selection-stats">
+      {rows.map(([key, value]) => (
+        <div className="selection-stat" key={key}>
+          <dt>{t(key)}</dt>
+          <dd>{value}</dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 
@@ -246,6 +251,8 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
   // Snapshot the selected text at mount — the menu preserves the live
   // selection (mousedown is prevented), so this is stable while it's open.
   const [selText] = useState(() => window.getSelection()?.toString() ?? '')
+  /** Word count expands on demand instead of tailing every menu */
+  const [showCount, setShowCount] = useState(false)
 
   return (
     <div
@@ -309,27 +316,31 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             <IconSparkle size={11} />
             {t('menu.aiSection')}
           </div>
-          <button
-            className="menu-item"
-            title={t('menu.aiExplainTip')}
-            onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
-          >
-            {t('menu.aiExplain')}
-          </button>
-          <button
-            className="menu-item"
-            title={t('menu.aiSimplifyTip')}
-            onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
-          >
-            {t('menu.aiSimplify')}
-          </button>
-          <button
-            className="menu-item"
-            title={t('menu.aiDefineTip')}
-            onClick={() => onAction({ kind: 'ai', mode: 'define' })}
-          >
-            {t('menu.aiDefine')}
-          </button>
+          {/* The three quick questions are siblings of one gesture ("ask the
+              assistant about this") — one compact row, not three menu rows */}
+          <div className="ai-chip-row">
+            <button
+              className="ai-chip"
+              title={t('menu.aiExplainTip')}
+              onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
+            >
+              {t('menu.aiExplain')}
+            </button>
+            <button
+              className="ai-chip"
+              title={t('menu.aiSimplifyTip')}
+              onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
+            >
+              {t('menu.aiSimplify')}
+            </button>
+            <button
+              className="ai-chip"
+              title={t('menu.aiDefineTip')}
+              onClick={() => onAction({ kind: 'ai', mode: 'define' })}
+            >
+              {t('menu.aiDefine')}
+            </button>
+          </div>
           <button
             className="menu-item"
             title={t('menu.aiReferenceTip')}
@@ -347,7 +358,10 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           <button className="menu-item" onClick={() => onAction({ kind: 'translate' })}>
             <span className="menu-icon"><IconTranslate size={15} /></span> {t('menu.translate')}
           </button>
-          <SelectionCount text={selText} />
+          <button className="menu-item" onClick={() => setShowCount((v) => !v)}>
+            <span className="menu-icon"><IconTally size={15} /></span> {t('menu.count')}
+          </button>
+          {showCount && <SelectionCount text={selText} />}
         </>
       )}
       {!isSelection && (

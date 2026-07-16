@@ -474,12 +474,15 @@ export function isMovableAnnotation(a: PageAnnotation): boolean {
   return MOVABLE_TYPES.has(a.type) && a.quads.length > 0
 }
 
-function hitsQuads(a: PageAnnotation, x: number, y: number): boolean {
-  const PAD = 2
+function hitsQuads(a: PageAnnotation, x: number, y: number, pad = 2): boolean {
   return a.quads.some(
-    (q) => x >= q.x - PAD && x <= q.x + q.w + PAD && y >= q.y - PAD && y <= q.y + q.h + PAD
+    (q) => x >= q.x - pad && x <= q.x + q.w + pad && y >= q.y - pad && y <= q.y + q.h + pad
   )
 }
+
+/** Text boxes are grabbed to be dragged, so they answer well outside their
+ *  visual bounds (8 pt ≈ 11 px at 100 %) — PAD=2 made them finicky to catch. */
+const FREETEXT_PAD = 8
 
 /**
  * Topmost annotation whose GEOMETRY (not bbox) contains the given page-space
@@ -519,7 +522,7 @@ export function annotationHitTest(
       }
     } else if (a.type === 'ink') {
       if (inkHitTest(a, x, y, 4)) return a
-    } else if (hitsQuads(a, x, y)) {
+    } else if (hitsQuads(a, x, y, a.type === 'freetext' ? FREETEXT_PAD : 2)) {
       return a // markup, note, freetext: padded bbox (same PAD=2 as annotationAtPoint)
     }
   }

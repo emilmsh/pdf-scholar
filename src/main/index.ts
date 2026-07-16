@@ -22,7 +22,6 @@ import type {
   Settings
 } from '../shared/types'
 import { registerAiIpc } from './ai'
-import { registerWebSearchIpc } from './web-search'
 import {
   applyAnnotation,
   deleteAnnotation,
@@ -313,7 +312,6 @@ async function loadPdf(path: string): Promise<FilePayload | FileError> {
 
 function registerIpc(): void {
   registerAiIpc()
-  registerWebSearchIpc()
   ipcMain.handle('dialog:open', async (e) => {
     const parent = windowFor(e)
     if (!parent) return null

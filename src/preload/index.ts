@@ -8,9 +8,7 @@ import type {
   ModifyAnnotationRequest,
   PdfxApi,
   ReadingPosition,
-  Settings,
-  WebSearchBounds,
-  WebSearchState
+  Settings
 } from '../shared/types'
 
 const api: PdfxApi = {
@@ -71,19 +69,6 @@ const api: PdfxApi = {
     ipcRenderer.on('ai:delta', listener)
     return () => {
       ipcRenderer.removeListener('ai:delta', listener)
-    }
-  },
-  webSearchOpen: (query?: string) => ipcRenderer.send('web-search:open', query),
-  webSearchClose: () => ipcRenderer.send('web-search:close'),
-  webSearchSetBounds: (bounds: WebSearchBounds) => ipcRenderer.send('web-search:set-bounds', bounds),
-  webSearchBack: () => ipcRenderer.send('web-search:back'),
-  webSearchForward: () => ipcRenderer.send('web-search:forward'),
-  webSearchReload: () => ipcRenderer.send('web-search:reload'),
-  onWebSearchState: (cb: (state: WebSearchState) => void) => {
-    const listener = (_e: unknown, state: WebSearchState): void => cb(state)
-    ipcRenderer.on('web-search:state', listener)
-    return () => {
-      ipcRenderer.removeListener('web-search:state', listener)
     }
   }
 }

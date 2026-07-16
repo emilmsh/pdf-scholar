@@ -58,13 +58,17 @@ export default function AnnotPopover({
         onPick={(c) => onColor(c.rgb)}
       />
 
-      <textarea
-        className="annot-popover-text"
-        value={text}
-        placeholder={annotation.type === 'note' ? t('popover.notePlaceholder') : t('popover.commentPlaceholder')}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.stopPropagation()}
-      />
+      {/* Text boxes edit their text inline (click the box) — a comment field
+          here would just duplicate the box contents */}
+      {annotation.type !== 'freetext' && (
+        <textarea
+          className="annot-popover-text"
+          value={text}
+          placeholder={annotation.type === 'note' ? t('popover.notePlaceholder') : t('popover.commentPlaceholder')}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.stopPropagation()}
+        />
+      )}
 
       <div className="annot-popover-actions">
         <button className="annot-delete" onClick={onDelete}>

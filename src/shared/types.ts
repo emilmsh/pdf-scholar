@@ -179,28 +179,6 @@ export type AiChatResult =
   | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string }
   | FileError
 
-// ---------- In-app web search (Electron WebContentsView) ----------
-
-/** Placeholder rect in renderer CSS px — the frameless window maps 1:1 to DIP,
- *  so main hands these straight to WebContentsView.setBounds. */
-export interface WebSearchBounds {
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-/** State of the native web-search view, pushed to the renderer on navigation */
-export interface WebSearchState {
-  /** True while the view is attached (panel showing) */
-  open: boolean
-  canGoBack: boolean
-  canGoForward: boolean
-  url: string
-  loading: boolean
-  title: string
-}
-
 export interface PdfxApi {
   openFileDialog(): Promise<FilePayload | FileError | null>
   readFile(path: string): Promise<FilePayload | FileError>
@@ -256,19 +234,6 @@ export interface PdfxApi {
   aiChat(request: AiChatRequest): Promise<AiChatResult>
   aiAbort(requestId: number): void
   onAiDelta(cb: (requestId: number, text: string) => void): () => void
-  // ---------- In-app web search ----------
-  /** Open (or re-show) the web-search side view; a query navigates to a
-   *  DuckDuckGo results page, an empty/absent query just re-attaches the view */
-  webSearchOpen(query?: string): void
-  /** Detach the view (keeps the WebContents alive for a fast reopen) */
-  webSearchClose(): void
-  /** Push the placeholder's bounds so the native view tracks the panel body */
-  webSearchSetBounds(bounds: WebSearchBounds): void
-  webSearchBack(): void
-  webSearchForward(): void
-  webSearchReload(): void
-  /** Subscribe to navigation-state changes for the active window's view */
-  onWebSearchState(cb: (state: WebSearchState) => void): () => void
 }
 
 declare global {

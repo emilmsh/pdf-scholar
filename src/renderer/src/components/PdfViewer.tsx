@@ -69,7 +69,6 @@ import PresentationMode from './PresentationMode'
 import Sidebar from './Sidebar'
 import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
-import WebSearchPanel from './WebSearchPanel'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { getLanguage, locale, t, useLang } from '../i18n'
@@ -411,12 +410,6 @@ export default function PdfViewer({
   const [aiPinned, setAiPinned] = useState(false)
   const aiPinnedRef = useRef(aiPinned)
   aiPinnedRef.current = aiPinned
-  /** In-app web-search side panel (Edge-style). Query drives the native view;
-   *  mutually exclusive with the AI panel. */
-  /** Right sidebar active tab: the assistant chat, or the in-app web search.
-   *  They coexist as tabs (like the left sidebar's Innhold/Sider/Merknader)
-   *  rather than fighting over the same slot. */
-  const [rightTab, setRightTab] = useState<'ai' | 'web'>('ai')
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
   /** Bumped to make the AI panel fire the "ask my annotations" question */
@@ -1322,12 +1315,16 @@ export default function PdfViewer({
 
   const [dirty, setDirty] = useState(false)
   const markDirtyRef = useRef<() => void>(() => {})
-  markDirtyRef.current = () => {
-    setDirty((d) => {
-      if (!d) onDirtyChange(true)
-      return true
-    })
-  }
+  markDirtyRef.current = () => setDirty(true)
+
+  // Mirror the dirty flag up to App from an effect. Calling onDirtyChange
+  // inside the setDirty updater looked equivalent, but React runs updaters
+  // DURING render — updating App mid-render trips "Cannot update a component
+  // while rendering a different component". App's setTabDirty bails on
+  // unchanged values, so this can't ping-pong.
+  useEffect(() => {
+    onDirtyChange(dirty)
+  }, [dirty, onDirtyChange])
 
   // A leftover draft from a previous session is loaded silently — surface it
   useEffect(() => {
@@ -1335,7 +1332,6 @@ export default function PdfViewer({
     void bridge.docIsDirty(payload.path).then((isDirty) => {
       if (stale || !isDirty) return
       setDirty(true)
-      onDirtyChange(true)
       showToast(t('viewer.recovered'))
     })
     return () => {
@@ -1351,9 +1347,8 @@ export default function PdfViewer({
       return
     }
     setDirty(false)
-    onDirtyChange(false)
     showToast(t('viewer.saved'))
-  }, [payload.path, showToast, onDirtyChange])
+  }, [payload.path, showToast])
 
   /** Immutably patch one page's annotation list */
   const mutatePage = useCallback(
@@ -2015,6 +2010,12 @@ export default function PdfViewer({
         const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
         const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
         if (hit) {
+          // A text box goes straight into text editing — the properties
+          // popover (colour/delete) stays on right-click, where it belongs.
+          if (hit.type === 'freetext') {
+            openFreeTextEditor(pageNumber, hit)
+            return
+          }
           setSelected({ pageNumber, localId: hit.id })
           setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
         } else {
@@ -2022,7 +2023,7 @@ export default function PdfViewer({
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient, applyMarkup]
+    [openMenuAt, pagePointFromClient, applyMarkup, openFreeTextEditor]
   )
 
   // Double-click a text box to re-open it in the editor (edit text + resize the
@@ -2183,7 +2184,25 @@ export default function PdfViewer({
       annotDragRef.current = null
       if (!drag) return
       setDragGhost(null)
-      if (!drag.moved) return
+      if (!drag.moved) {
+        // Touch taps never get the compat mouseup (touchstart preventDefault
+        // suppresses it), so give them the same affordance as a mouse click:
+        // text boxes open for editing, everything else gets the popover.
+        if (e.pointerType === 'touch') {
+          if (drag.record.type === 'freetext') {
+            openFreeTextEditor(drag.pageNumber, drag.record)
+          } else {
+            setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id })
+            setAnnotPopover({
+              x: e.clientX,
+              y: e.clientY,
+              pageNumber: drag.pageNumber,
+              localId: drag.record.id
+            })
+          }
+        }
+        return
+      }
       dragEndAtRef.current = performance.now()
       const { x, y } = dragTarget(drag, e.clientX, e.clientY)
       const q = drag.record.quads[0]
@@ -2215,7 +2234,7 @@ export default function PdfViewer({
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
     }
-  }, [active, dragTarget, changeAnnotation])
+  }, [active, dragTarget, changeAnnotation, openFreeTextEditor])
 
   // ---------- Chrome / fullscreen / keyboard ----------
 
@@ -2977,7 +2996,6 @@ export default function PdfViewer({
         else if (readAloud !== 'closed') stopReadAloud()
         else if (searchOpen) closeSearch()
         else if (searchHits) setSearchHits(null)
-        else if (rightTab === 'web') setRightTab('ai')
         else if (aiPinned) setAiPinned(false)
         else if (fullscreen) toggleFullscreen()
       } else if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
@@ -3061,7 +3079,6 @@ export default function PdfViewer({
     saveDocument,
     searchOpen,
     searchHits,
-    rightTab,
     fullscreen,
     toggleFullscreen,
     closeSearch,
@@ -3208,10 +3225,7 @@ export default function PdfViewer({
             else stopReadAloud()
           }}
           aiOpen={aiPinned}
-          onToggleAi={() => {
-            if (!aiPinnedRef.current) setRightTab('ai') // opening → land on the assistant tab
-            setAiPinned((o) => !o)
-          }}
+          onToggleAi={() => setAiPinned((o) => !o)}
           toolbarPinned={toolbarPinned}
           onTogglePin={togglePin}
           onPresent={enterPresentation}
@@ -3428,19 +3442,10 @@ export default function PdfViewer({
             structure of the left sidebar. Mount-on-hover was the source of
             the peek jank the left side never had. */}
         <div className={`right-panel${aiVisible ? ' open' : ''}`}>
-          <div className="right-panel-tabs">
-            <button className={rightTab === 'ai' ? 'active' : ''} onClick={() => setRightTab('ai')}>
-              {t('ai.assistant')}
-            </button>
-            <button className={rightTab === 'web' ? 'active' : ''} onClick={() => setRightTab('web')}>
-              {t('web.title')}
-            </button>
-          </div>
           <div className="right-panel-body">
-            <div className="right-pane" hidden={rightTab !== 'ai'}>
+            <div className="right-pane">
               <AiPanel
                 open={aiVisible}
-                embedded
                 docTitle={payload.name}
                 docPath={payload.path}
                 seed={aiSeed}
@@ -3456,17 +3461,6 @@ export default function PdfViewer({
                 }}
               />
             </div>
-            {aiVisible && rightTab === 'web' && active && (
-              <div className="right-pane">
-                <WebSearchPanel
-                  query=""
-                  onClose={() => {
-                    setAiPeek(false)
-                    setAiPinned(false)
-                  }}
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>

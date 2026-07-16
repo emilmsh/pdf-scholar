@@ -1259,10 +1259,10 @@ button {
   font-weight: 600;
 }
 
-/* ---- Right sidebar: tabbed container (Assistent / Søk) — the EXACT mirror
-   of .sidebar / .sidebar.open on the left: always in the DOM, collapsed to
-   width 0 when closed (opening never mounts a fresh tree — that mount was
-   the hover-peek jank the left side never had). ---- */
+/* ---- Right sidebar (Assistent) — the EXACT mirror of .sidebar /
+   .sidebar.open on the left: always in the DOM, collapsed to width 0 when
+   closed (opening never mounts a fresh tree — that mount was the hover-peek
+   jank the left side never had). ---- */
 .right-panel {
   width: 0;
   overflow: hidden;
@@ -1278,31 +1278,6 @@ button {
   border-left-color: var(--border);
 }
 
-.right-panel-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 8px 8px 0;
-  flex-shrink: 0;
-}
-
-.right-panel-tabs button {
-  flex: 1;
-  padding: 6px 0;
-  border-radius: 7px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.right-panel-tabs button:hover {
-  background: var(--hover);
-}
-
-.right-panel-tabs button.active {
-  background: var(--active);
-  color: var(--text);
-  font-weight: 600;
-}
-
 .right-panel-body {
   flex: 1;
   min-height: 0;
@@ -1316,13 +1291,8 @@ button {
   display: flex;
 }
 
-.right-pane[hidden] {
-  display: none;
-}
-
-/* Panels fill the tab container instead of setting their own width/border */
-.right-panel .ai-panel,
-.right-panel .web-panel {
+/* The panel fills the container instead of setting its own width/border */
+.right-panel .ai-panel {
   width: 100%;
   flex: 1;
   min-height: 0;
@@ -1963,7 +1933,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 2px 10px 4px;
+  /* Indented under the «Ordtelling» item's label (10px pad + 16px icon + 9px gap) */
+  padding: 2px 12px 6px 35px;
   margin: 0;
 }
 
@@ -2337,54 +2308,6 @@ button {
   background: var(--bg-chrome);
   border-left: 1px solid var(--border);
   overflow: hidden;
-}
-
-/* ---------- In-app web search (Edge-style side panel) ---------- */
-
-/* NO width transition here: the native WebContentsView bounds snap on
-   setBounds, so an animated placeholder would visibly desync from it. */
-.web-panel {
-  display: flex;
-  flex-direction: column;
-  width: var(--web-w, 380px);
-  flex-shrink: 0;
-  background: var(--bg-chrome);
-  border-left: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.web-header {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 6px 6px 6px 8px;
-  border-bottom: 1px solid var(--border);
-  color: var(--text-secondary);
-}
-
-.web-url {
-  flex: 1;
-  min-width: 0;
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 4px;
-}
-
-/* The empty placeholder the native surface floats over — white to match the
-   view's own background so there's no flash before the page paints. */
-.web-panel-body {
-  flex: 1;
-  min-height: 0;
-  background: #fff;
-}
-
-/* The search bar floats top-right; the native web view would cover it, so
-   nudge it left of the panel while web search is open. */
-.viewer.web-open .search-bar {
-  right: calc(var(--web-w, 380px) + 22px);
 }
 
 .ai-header {
@@ -3114,6 +3037,29 @@ button {
   color: var(--text-secondary);
 }
 
+/* The three quick AI questions share one compact chip row — they are the
+   same "ask the assistant about this selection" gesture in three flavours */
+.ai-chip-row {
+  display: flex;
+  gap: 5px;
+  padding: 2px 4px 5px;
+}
+
+.ai-chip {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.ai-chip:hover {
+  background: var(--hover);
+}
+
 /* Custom-color pick at the end of each markup color row: a calm "+"
    swatch that opens the native color picker */
 
@@ -3549,11 +3495,29 @@ button {
   }
 }
 
+/* Anchors the invisible link overlays to the slide's exact canvas box */
+.presentation-page {
+  position: relative;
+  line-height: 0;
+}
+
 .presentation-canvas {
   /* Match the reading view's page recolouring (night inverts, sepia warms) */
   filter: var(--page-filter, none);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
   border-radius: 2px;
+}
+
+/* Invisible until hovered — no visible chrome on the slide itself */
+.presentation-link {
+  position: absolute;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.presentation-link:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .presentation-bar {

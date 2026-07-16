@@ -141,12 +141,12 @@ const nb = {
   'menu.aiExplainTip': 'Hva betyr dette – og hvorfor står det her?',
   'menu.aiSimplify': 'Forenkle',
   'menu.aiSimplifyTip': 'Si det samme med enklere ord',
-  'menu.aiDefine': 'Definer i kontekst',
+  'menu.aiDefine': 'Definer',
   'menu.aiDefineTip': 'Hva betyr akkurat dette begrepet i denne teksten?',
   'menu.aiReference': 'Slå opp referanse',
   'menu.aiReferenceTip': 'Hva er det som siteres her – og hvorfor?',
   'menu.webSearch': 'Søk på nettet',
-  'menu.dictionary': 'Slå opp i ordbok',
+  'menu.dictionary': 'Definer ord',
   'menu.translate': 'Oversett',
   'menu.newNoteHere': 'Nytt notat her',
   'menu.notePlaceholder': 'Skriv et notat …',
@@ -301,15 +301,7 @@ const nb = {
   'ai.historyDeleteTip': 'Slett samtalen',
   'ai.historyMessages': '{count} meldinger',
   'ai.jumpNewestTip': 'Hopp til nyeste melding',
-  'ai.untitledChat': 'Uten tittel',
-
-  // Web search panel
-  'web.title': 'Nettsøk',
-  'web.back': 'Tilbake',
-  'web.forward': 'Frem',
-  'web.reload': 'Last inn på nytt',
-  'web.openExternal': 'Åpne i nettleseren',
-  'web.close': 'Lukk (Esc)'
+  'ai.untitledChat': 'Uten tittel'
 }
 
 export type MsgKey = keyof typeof nb
@@ -440,12 +432,12 @@ const en: Dict = {
   'menu.aiExplainTip': 'What does this mean — and why is it here?',
   'menu.aiSimplify': 'Simplify',
   'menu.aiSimplifyTip': 'Say the same thing in plainer words',
-  'menu.aiDefine': 'Define in context',
+  'menu.aiDefine': 'Define',
   'menu.aiDefineTip': 'What does this exact term mean in this text?',
   'menu.aiReference': 'Look up reference',
   'menu.aiReferenceTip': 'What is being cited here — and why?',
   'menu.webSearch': 'Search the web',
-  'menu.dictionary': 'Look up in dictionary',
+  'menu.dictionary': 'Define word',
   'menu.translate': 'Translate',
   'menu.newNoteHere': 'New note here',
   'menu.notePlaceholder': 'Write a note …',
@@ -593,15 +585,7 @@ const en: Dict = {
   'ai.historyDeleteTip': 'Delete conversation',
   'ai.historyMessages': '{count} messages',
   'ai.jumpNewestTip': 'Jump to newest message',
-  'ai.untitledChat': 'Untitled',
-
-  // Web search panel
-  'web.title': 'Web search',
-  'web.back': 'Back',
-  'web.forward': 'Forward',
-  'web.reload': 'Reload',
-  'web.openExternal': 'Open in browser',
-  'web.close': 'Close (Esc)'
+  'ai.untitledChat': 'Untitled'
 }
 
 const DICTIONARIES: Record<Lang, Dict> = { nb, en }

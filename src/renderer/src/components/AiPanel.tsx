@@ -577,9 +577,6 @@ export interface AiSeed {
 
 interface PanelProps {
   open: boolean
-  /** Rendered inside the shared right-panel tab container — hide the panel's
-   *  own title (the tab already names it) so the chrome doesn't duplicate. */
-  embedded?: boolean
   docTitle: string
   docPath: string
   /** Exchange handed over from the explain-selection popover */
@@ -605,7 +602,6 @@ const chatTitle = (msgs: PanelMessage[]): string => {
 
 export default function AiPanel({
   open,
-  embedded,
   docTitle,
   docPath,
   seed,
@@ -880,7 +876,7 @@ export default function AiPanel({
     <aside className="ai-panel">
       <header className="ai-header">
         <IconSparkle size={16} />
-        {!embedded && <span className="ai-title">{t('ai.assistant')}</span>}
+        <span className="ai-title">{t('ai.assistant')}</span>
         <div className="ai-model-anchor">
           <button
             className="ai-model"

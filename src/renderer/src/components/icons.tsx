@@ -246,6 +246,13 @@ export const IconBook = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconTally = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M5.5 5.5v13M9.5 5.5v13M13.5 5.5v13M17.5 5.5v13" />
+    <path d="M3.5 16l17 -8" />
+  </Svg>
+)
+
 export const IconCite = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M6 7.5h8M6 12h8M6 16.5h5" />
