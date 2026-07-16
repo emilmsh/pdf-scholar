@@ -427,6 +427,93 @@ button {
   font-size: 12px;
 }
 
+/* First-run invitation to add an AI key (hidden once a key is configured) */
+.welcome-ai-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-top: 40px;
+  padding: 16px 18px;
+  text-align: left;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.welcome-ai-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.welcome-ai-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.welcome-ai-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.welcome-ai-body {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.welcome-ai-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.welcome-ai-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.welcome-ai-modal {
+  width: min(420px, calc(100vw - 48px));
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  padding: 16px 18px 18px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-menu);
+}
+
+.welcome-ai-modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.welcome-ai-guide {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
 .recents {
   margin-top: 56px;
   width: 100%;
@@ -542,17 +629,38 @@ button {
   z-index: 29;
 }
 
-/* ---- Edge rails: thin always-present grabbers at the extreme sides. Click
-   toggles the panel pinned; hover peeks it (retracts on page hover). ---- */
+/* Tap affordance for the tucked toolbar (hover has no touch twin): a slim,
+   always-visible pill at the top centre. Quiet enough for mouse users. */
+.toolbar-grip {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-secondary) 35%, transparent);
+  z-index: 29;
+  cursor: pointer;
+}
+
+.toolbar-grip:hover {
+  background: color-mix(in srgb, var(--text-secondary) 60%, transparent);
+}
+
+/* ---- Edge rails: the strip is a pure positioning container and NEVER takes
+   pointer events (the pages scrollbar lives at the right edge and must stay
+   draggable). Nearing an edge fades the handle in (.hint, set from a window
+   mousemove); resting on the handle peeks the panel, click toggles pin. ---- */
 .edge-rail {
   position: absolute;
   top: 46px;
   bottom: 0;
-  width: 15px;
+  width: 44px;
   z-index: 33;
   display: flex;
   align-items: center;
-  cursor: pointer;
+  pointer-events: none;
   -webkit-app-region: no-drag;
 }
 
@@ -566,36 +674,34 @@ button {
   justify-content: flex-end;
 }
 
+/* Inset from the window edge so it never covers the pages scrollbar; only
+   interactive while visible (hinted/active) so an invisible handle can't
+   swallow clicks on page text either. */
 .edge-rail-handle {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 48px;
+  margin: 0 16px;
   color: var(--text-secondary);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
+  border-radius: 9px;
   box-shadow: var(--shadow-menu);
+  cursor: pointer;
+  pointer-events: none;
   opacity: 0;
-  transform: translateX(-7px);
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  /* Fade ONLY — a handle that slides sideways is a moving target under the
+     cursor: the first hover after the hint re-arms would chase it (the
+     "first hover glitches, second is clean" report). */
+  transition: opacity 0.15s ease;
 }
 
-.edge-rail-left .edge-rail-handle {
-  border-left: none;
-  border-radius: 0 9px 9px 0;
-}
-
-.edge-rail-right .edge-rail-handle {
-  border-right: none;
-  border-radius: 9px 0 0 9px;
-  transform: translateX(7px);
-}
-
-.edge-rail:hover .edge-rail-handle,
+.edge-rail.hint .edge-rail-handle,
 .edge-rail.active .edge-rail-handle {
+  pointer-events: auto;
   opacity: 1;
-  transform: translateX(0);
 }
 
 .edge-rail.active .edge-rail-handle {
@@ -611,15 +717,21 @@ button {
   bottom: 0;
   z-index: 32;
   box-shadow: var(--shadow-menu);
+  /* Compositor promotion: the slide-in must stay smooth even while pdf.js is
+     painting freshly scrolled-to pages on the main thread — that contention
+     is exactly the "first peek after moving the pdf stutters" case. */
+  will-change: transform;
 }
 
-.viewer-body.ai-peek .ai-panel {
+.viewer-body.ai-peek .right-panel {
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
   z-index: 32;
   box-shadow: var(--shadow-menu);
+  transition: transform 0.16s ease;
+  will-change: transform;
 }
 
 .toolbar {
@@ -647,6 +759,19 @@ button {
   height: 20px;
   background: var(--border);
   margin: 0 6px;
+}
+
+/* Labelled bookend toggles (Innhold / Assistent) — icon + text so the two
+   panel toggles read clearly at the far left and far right edges */
+.tb-labeled {
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.tb-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .tb-btn {
@@ -1052,7 +1177,7 @@ button {
   animation: peek-in-left 0.16s ease;
 }
 
-.viewer-body.ai-peek .ai-panel {
+.viewer-body.ai-peek .right-panel.open {
   animation: peek-in-right 0.16s ease;
 }
 
@@ -1132,6 +1257,76 @@ button {
   background: var(--active);
   color: var(--text);
   font-weight: 600;
+}
+
+/* ---- Right sidebar: tabbed container (Assistent / Søk) — the EXACT mirror
+   of .sidebar / .sidebar.open on the left: always in the DOM, collapsed to
+   width 0 when closed (opening never mounts a fresh tree — that mount was
+   the hover-peek jank the left side never had). ---- */
+.right-panel {
+  width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: var(--bg-chrome);
+  border-left: 1px solid transparent;
+}
+
+.right-panel.open {
+  width: var(--ai-w, 340px);
+  border-left-color: var(--border);
+}
+
+.right-panel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 8px 0;
+  flex-shrink: 0;
+}
+
+.right-panel-tabs button {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.right-panel-tabs button:hover {
+  background: var(--hover);
+}
+
+.right-panel-tabs button.active {
+  background: var(--active);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.right-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.right-pane {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+}
+
+.right-pane[hidden] {
+  display: none;
+}
+
+/* Panels fill the tab container instead of setting their own width/border */
+.right-panel .ai-panel,
+.right-panel .web-panel {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  border-left: none;
 }
 
 .thumb-list {
@@ -3041,11 +3236,10 @@ button {
 .freetext-editor {
   position: absolute;
   z-index: 26;
-  min-width: 80px;
-  min-height: 1.4em;
-  max-width: 340px;
-  field-sizing: content;
-  resize: none;
+  min-width: 60px;
+  min-height: 24px;
+  resize: both;
+  overflow: auto;
   padding: 2px 4px;
   font-family: Helvetica, Arial, sans-serif;
   line-height: 1.35;
@@ -3422,3 +3616,53 @@ button {
   border-radius: 0 999px 999px 0;
 }
 
+
+/* ============================================================
+   Touch (coarse pointer): finger-sized targets + always-visible
+   affordances for everything hover normally gates. The tight
+   mouse aesthetics are untouched on fine pointers.
+   ============================================================ */
+@media (pointer: coarse) {
+  .tb-btn,
+  .tb-chevron {
+    min-width: 38px;
+    height: 38px;
+  }
+
+  .toolbar {
+    height: 54px;
+  }
+
+  /* Side-panel handles: no hover to hint them — keep them faintly visible
+     and always tappable (tap = pin/unpin; edge swipe opens the panel too) */
+  .edge-rail-handle {
+    pointer-events: auto;
+    opacity: 0.55;
+  }
+
+  /* Widen the resizer's hit area without thickening the visible line */
+  .panel-resizer {
+    flex-basis: 9px;
+  }
+
+  .panel-resizer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -9px;
+    right: -9px;
+  }
+
+  /* Hover-revealed icons must be visible before you can aim at them */
+  .tab-close,
+  .annot-delete,
+  .ai-history-delete {
+    opacity: 0.6;
+  }
+
+  .toolbar-grip {
+    width: 64px;
+    height: 8px;
+  }
+}

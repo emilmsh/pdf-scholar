@@ -6,8 +6,15 @@ import type {
   ThemePreference,
   ViewRotation
 } from '../../../shared/types'
-import { colorLabel, HIGHLIGHT_COLORS, SHAPE_TOOL_TYPES } from '../annotations'
-import type { DrawToolType, ShapeToolType } from '../annotations'
+import {
+  annotTypeLabel,
+  colorLabel,
+  HIGHLIGHT_COLORS,
+  MARKUP_TOOL_TYPES,
+  SHAPE_TOOL_TYPES,
+  UNDERLINE_COLORS
+} from '../annotations'
+import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import {
@@ -34,6 +41,7 @@ import {
   IconSearch,
   IconSpeaker,
   IconSpread,
+  IconTextMarkup,
   IconShapeArrow,
   IconShapeCircle,
   IconShapeLine,
@@ -78,6 +86,12 @@ interface Props {
   activeTool: ToolName | null
   toolPrefs: Record<'pen' | 'marker' | 'shape', ToolPref>
   onToolSelect(tool: ToolName | null): void
+  /** Text-anchored markup tool (highlight/underline/strikeout/squiggly) — a
+   *  persistent tool that marks up the text selection, distinct from freehand */
+  activeMarkup: MarkupToolType | null
+  markupColor: [number, number, number]
+  onMarkupSelect(type: MarkupToolType | null): void
+  onMarkupColorChange(color: [number, number, number]): void
   /** View rotation + two-page spread (view menu controls) */
   rotation: ViewRotation
   spread: boolean
@@ -142,6 +156,10 @@ export default function Toolbar({
   activeTool,
   toolPrefs,
   onToolSelect,
+  activeMarkup,
+  markupColor,
+  onMarkupSelect,
+  onMarkupColorChange,
   rotation,
   spread,
   onRotate,
@@ -181,7 +199,10 @@ export default function Toolbar({
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
-  const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | null>(null)
+  const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | 'markup' | null>(null)
+  // Last markup type the user activated, so the split button's main click
+  // re-arms that type rather than always defaulting to highlight
+  const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
 
@@ -238,12 +259,14 @@ export default function Toolbar({
     <div className="toolbar">
       <div className="toolbar-group">
         <button
-          className={`tb-btn${sidebarOpen ? ' is-active' : ''}`}
+          className={`tb-btn tb-labeled${sidebarOpen ? ' is-active' : ''}`}
           onClick={onToggleSidebar}
           title={t('tb.sidebarTip')}
         >
           <IconSidebar />
+          <span className="tb-label">{t('side.contents')}</span>
         </button>
+        <div className="toolbar-sep" />
         <button className="tb-btn" onClick={onNavBack} disabled={!canNavBack} title={t('tb.navBackTip')}>
           <IconArrowLeft />
         </button>
@@ -280,13 +303,25 @@ export default function Toolbar({
               </button>
             </span>
           ))}
-          <button
-            className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
-            onClick={() => selectTool('eraser')}
-            title={t('tb.eraserTip')}
-          >
-            <IconEraser />
-          </button>
+          <span className="tb-split">
+            <button
+              className={`tb-btn${activeMarkup ? ' is-active' : ''}`}
+              onClick={() => onMarkupSelect(activeMarkup ? null : markupType)}
+              title={t('tb.markupTip')}
+            >
+              <IconTextMarkup />
+            </button>
+            <button
+              className={`tb-chevron${toolMenu === 'markup' ? ' is-active' : ''}`}
+              title={t('tb.markupOptionsTip')}
+              onClick={() => {
+                if (!activeMarkup) onMarkupSelect(markupType)
+                setToolMenu((m) => (m === 'markup' ? null : 'markup'))
+              }}
+            >
+              <IconChevronDown size={11} />
+            </button>
+          </span>
           <button
             className={`tb-btn${shapeActive ? ' is-active' : ''}`}
             onClick={() => setToolMenu((m) => (m === 'shape' ? null : 'shape'))}
@@ -301,6 +336,14 @@ export default function Toolbar({
           >
             <IconText />
           </button>
+          <div className="toolbar-sep" />
+          <button
+            className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
+            onClick={() => selectTool('eraser')}
+            title={t('tb.eraserTip')}
+          >
+            <IconEraser />
+          </button>
           <button
             className={`tb-btn${annotsHidden ? ' is-active' : ''}`}
             onClick={onToggleAnnots}
@@ -309,7 +352,36 @@ export default function Toolbar({
             {annotsHidden ? <IconEyeOff /> : <IconEye />}
           </button>
 
-          {toolMenu && (
+          {toolMenu === 'markup' ? (
+            <div className="tool-menu">
+              <div className="theme-menu-label">{t('tb.markup')}</div>
+              <div className="lang-options">
+                {MARKUP_TOOL_TYPES.map((m) => (
+                  <button
+                    key={m}
+                    className={`lang-option${activeMarkup === m ? ' selected' : ''}`}
+                    onClick={() => {
+                      setMarkupType(m)
+                      onMarkupSelect(m)
+                    }}
+                  >
+                    {annotTypeLabel(m)}
+                  </button>
+                ))}
+              </div>
+              <div className="color-row">
+                {(markupType === 'highlight' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) => (
+                  <button
+                    key={c.hex}
+                    className={`color-dot${markupColor.join() === c.rgb.join() ? ' selected' : ''}`}
+                    style={{ background: c.hex }}
+                    title={colorLabel(c)}
+                    onClick={() => onMarkupColorChange(c.rgb)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : toolMenu ? (
             <div className="tool-menu">
               <div className="theme-menu-label">
                 {toolMenu === 'pen' ? t('tb.pen') : toolMenu === 'marker' ? t('tb.marker') : t('tb.shapes')}
@@ -356,14 +428,15 @@ export default function Toolbar({
                 aria-label={t('tb.strokeWidth')}
               />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Tabs in the titlebar carry the file name now — the centre is air */}
+      {/* Centre (freed by moving the file name to the tab strip) holds the
+          reading controls: page number + zoom, flanked by flex spacers */}
       <div className="toolbar-spacer" />
 
-      <div className="toolbar-group">
+      <div className="toolbar-group toolbar-center">
         <div className="page-indicator">
           <input
             value={pageInput}
@@ -424,9 +497,11 @@ export default function Toolbar({
         >
           {fitTarget === 'page' ? <IconFitPage /> : <IconFitWidth />}
         </button>
+      </div>
 
-        <div className="toolbar-sep" />
+      <div className="toolbar-spacer" />
 
+      <div className="toolbar-group">
         <button className="tb-btn" onClick={onToggleSearch} title={t('tb.searchTip')}>
           <IconSearch />
         </button>
@@ -439,6 +514,10 @@ export default function Toolbar({
           <IconSpeaker />
         </button>
 
+        <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
+          <IconPrint />
+        </button>
+
         <button
           className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
           onClick={onSave}
@@ -448,17 +527,7 @@ export default function Toolbar({
           <IconSave />
         </button>
 
-        <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
-          <IconPrint />
-        </button>
-
-        <button
-          className={`tb-btn${aiOpen ? ' is-active' : ''}`}
-          onClick={onToggleAi}
-          title={t('tb.aiTip')}
-        >
-          <IconSparkle />
-        </button>
+        <div className="toolbar-sep" />
 
         <div className="theme-menu-anchor" ref={menuRef}>
           <button
@@ -567,6 +636,9 @@ export default function Toolbar({
           )}
         </div>
 
+        <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
+          <IconPresent />
+        </button>
         <button
           className={`tb-btn${toolbarPinned ? '' : ' is-active'}`}
           onClick={onTogglePin}
@@ -574,11 +646,19 @@ export default function Toolbar({
         >
           {toolbarPinned ? <IconPin /> : <IconPinOff />}
         </button>
-        <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
-          <IconPresent />
-        </button>
         <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
           <IconFullscreen />
+        </button>
+
+        <div className="toolbar-sep" />
+
+        <button
+          className={`tb-btn tb-labeled${aiOpen ? ' is-active' : ''}`}
+          onClick={onToggleAi}
+          title={t('tb.aiTip')}
+        >
+          <IconSparkle />
+          <span className="tb-label">{t('ai.assistant')}</span>
         </button>
       </div>
     </div>

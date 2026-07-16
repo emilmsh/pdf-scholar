@@ -29,12 +29,14 @@ import {
   fromPdfJsAnnotation,
   inkHitTest,
   isMovableAnnotation,
+  markupDefaultColor,
   nextAnnotationId,
   selectionRectsForPage
 } from '../annotations'
 import type {
   DrawTool,
   DrawToolType,
+  MarkupToolType,
   PageAnnotation,
   PdfJsAnnotationData,
   ShapeToolType
@@ -121,10 +123,12 @@ const GESTURE_SETTLE = 160
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
 
-/** Drag-resizable panel widths: defaults, clamps and persistence */
-const PANEL_DEFAULTS = { sidebar: 248, ai: 340, web: 380 }
-const PANEL_MIN = { sidebar: 160, ai: 264, web: 300 }
-const PANEL_MAX = { sidebar: 460, ai: 600, web: 560 }
+/** Drag-resizable panel widths: defaults, clamps and persistence. Left (TOC)
+ *  and right (assistant/search) share identical defaults and clamps so the two
+ *  sides look and behave the same — the owner wants them symmetric. */
+const PANEL_DEFAULTS = { sidebar: 340, ai: 340, web: 340 }
+const PANEL_MIN = { sidebar: 264, ai: 264, web: 264 }
+const PANEL_MAX = { sidebar: 600, ai: 600, web: 600 }
 type PanelKey = keyof typeof PANEL_DEFAULTS
 const PANEL_LS_KEY = 'pdfx-panel-widths'
 
@@ -272,6 +276,14 @@ export default function PdfViewer({
    *  region the panel is about to cover — retracting on that stray move makes
    *  the panel flicker in and straight back out. Hold the retract off briefly. */
   const peekOpenedAtRef = useRef(0)
+  /** Which window edge the pointer is near. Only SHOWS the rail handle — the
+   *  edge strip itself is never interactive, so the pages scrollbar (which
+   *  lives exactly at the right edge) stays fully clickable/draggable. */
+  const [edgeHint, setEdgeHint] = useState<'left' | 'right' | null>(null)
+  /** Hover-intent timer: peek opens only after the pointer RESTS on the handle
+   *  briefly, so passing by (or aiming for the scrollbar) never yanks the
+   *  panel out. */
+  const peekTimerRef = useRef<number | null>(null)
   /** Which fit the zoom is locked to: a fit mode re-fits when the available
    *  width changes (panel open/close, window resize) so the page never gets
    *  shoved off-centre; 'custom' preserves the exact scale */
@@ -318,17 +330,39 @@ export default function PdfViewer({
   const [hudFaded, setHudFaded] = useState(false)
   const hudTimerRef = useRef<number | null>(null)
   const [activeTool, setActiveTool] = useState<DrawToolType | null>(null)
+  /** Text-anchored markup tool (highlight/underline/strikeout/squiggly). It
+   *  marks up the text selection on mouse-up and stays armed for the next one;
+   *  mutually exclusive with the freehand draw tools. */
+  const [markupTool, setMarkupTool] = useState<MarkupToolType | null>(null)
+  const markupToolRef = useRef(markupTool)
+  markupToolRef.current = markupTool
+  const [markupColors, setMarkupColors] = useState<Record<MarkupToolType, [number, number, number]>>({
+    highlight: markupDefaultColor('highlight'),
+    underline: markupDefaultColor('underline'),
+    strikeout: markupDefaultColor('strikeout'),
+    squiggly: markupDefaultColor('squiggly')
+  })
+  const markupColorsRef = useRef(markupColors)
+  markupColorsRef.current = markupColors
   const [toolPrefs, setToolPrefs] = useState({
     pen: PEN_DEFAULT,
     marker: MARKER_DEFAULT,
     shape: SHAPE_DEFAULT
   })
+  /** The floating text-box editor. Carries its own box size (page points) so it
+   *  is drag-resizable before commit; `editingId` is set when re-opening an
+   *  existing FreeText annotation (double-click) so commit resizes/edits it in
+   *  place rather than creating a new one. */
   const [freeTextDraft, setFreeTextDraft] = useState<{
     pageNumber: number
     x: number
     y: number
     clientX: number
     clientY: number
+    w: number
+    h: number
+    editingId?: string
+    text?: string
   } | null>(null)
 
   const drawTool = useMemo<DrawTool | null>(() => {
@@ -379,8 +413,10 @@ export default function PdfViewer({
   aiPinnedRef.current = aiPinned
   /** In-app web-search side panel (Edge-style). Query drives the native view;
    *  mutually exclusive with the AI panel. */
-  const [webOpen, setWebOpen] = useState(false)
-  const [webQuery, setWebQuery] = useState('')
+  /** Right sidebar active tab: the assistant chat, or the in-app web search.
+   *  They coexist as tabs (like the left sidebar's Innhold/Sider/Merknader)
+   *  rather than fighting over the same slot. */
+  const [rightTab, setRightTab] = useState<'ai' | 'web'>('ai')
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
   /** Bumped to make the AI panel fire the "ask my annotations" question */
@@ -388,6 +424,9 @@ export default function PdfViewer({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
+  /** The viewer root — used to reveal the unpinned toolbar from the whole top
+   *  strip (tab bar included), so the pointer only has to reach the top edge. */
+  const viewerRootRef = useRef<HTMLDivElement>(null)
   const scaleRef = useRef(scale)
   scaleRef.current = scale
   const restoreRef = useRef<ReadingPosition | null>(initialPosition)
@@ -509,11 +548,14 @@ export default function PdfViewer({
     return () => observer.disconnect()
   }, [])
 
-  // When a side panel is pinned open or closed the pages column changes width.
-  // If the page overflows horizontally (custom zoom), keep the same page point
-  // under the viewport centre so the document doesn't get shoved sideways and
-  // the reader never has to pan back. Runs synchronously after the panel is
-  // laid out (fit modes fit fully and re-fit via `refit` instead).
+  // When a side panel is pinned open or closed the pages column changes width
+  // in the SAME commit (flex reflow) — but the React layout (tops/lefts/
+  // centring) would only catch up via ResizeObserver -> setContainerWidth,
+  // which lands AFTER paint: the reader sees one frame of the old centring in
+  // the new width (a sideways jump), then the re-centre, then the re-fit.
+  // Resync everything synchronously here instead, pre-paint, so a panel
+  // toggle paints exactly once: measured width, re-centred layout and (in fit
+  // modes) the new fit scale all commit together.
   const pagesWidthRef = useRef(0)
   useLayoutEffect(() => {
     const el = containerRef.current
@@ -521,30 +563,42 @@ export default function PdfViewer({
     const newW = el.clientWidth
     const oldW = pagesWidthRef.current
     pagesWidthRef.current = newW
-    // Only custom zoom needs manual scroll-preservation here. In a fit mode the
-    // page is re-fitted (and re-centred) to the new width by refit(); running
-    // the scroll shift below as well leaves a stale scrollLeft that refit()'s
-    // anchor then reads, pushing the page off-centre — worse on the AI (right)
-    // panel than the sidebar, which is the asymmetry the user hit.
-    if (fitModeRef.current !== 'custom') return
-    if (oldW && newW && oldW !== newW && el.scrollWidth > newW + 1) {
-      const center = el.scrollLeft + oldW / 2
-      el.scrollLeft = Math.max(0, center - newW / 2)
+    if (oldW === newW) return
+    if (fitModeRef.current === 'custom') {
+      // Custom zoom keeps its exact scale — preserve the page point under the
+      // viewport centre so the document isn't shoved sideways.
+      if (oldW && newW && el.scrollWidth > newW + 1) {
+        const center = el.scrollLeft + oldW / 2
+        el.scrollLeft = Math.max(0, center - newW / 2)
+      }
+      setContainerWidth(newW)
+    } else {
+      // Fit modes: commit the new width AND the new fit scale in this same
+      // pre-paint pass (refit anchors the viewport-centre page point; the
+      // pending-anchor effect lands it against the fresh layout).
+      setContainerWidth(newW)
+      refitRef.current()
     }
-  }, [tocPinned, aiPinned, webOpen])
+  }, [tocPinned, aiPinned])
 
   // View-space reference dimensions (page units) that fit-width/fit-page zoom
   // against: the first page under the current rotation, widened to a pair when
   // spread is on.
   const fitDenom = useCallback((): { w: number; h: number } => {
     if (sizes.length === 0) return { w: 1, h: 1 }
-    const v0 = viewSize(sizes[0].w, sizes[0].h, rotation)
-    if (spread && sizes.length > 1) {
-      const v1 = viewSize(sizes[1].w, sizes[1].h, rotation)
+    // Fit against the page currently in view, not always page 1 — so a document
+    // that mixes portrait and landscape pages fits the page you are actually
+    // reading (fit-width on a wide page fills the width, not overflows it).
+    const idx = spread
+      ? clamp(currentPage - 1 - ((currentPage - 1) % 2), 0, sizes.length - 1)
+      : clamp(currentPage - 1, 0, sizes.length - 1)
+    const v0 = viewSize(sizes[idx].w, sizes[idx].h, rotation)
+    if (spread && idx + 1 < sizes.length) {
+      const v1 = viewSize(sizes[idx + 1].w, sizes[idx + 1].h, rotation)
       return { w: v0.w + v1.w + SPREAD_GAP, h: Math.max(v0.h, v1.h) }
     }
     return { w: v0.w, h: v0.h }
-  }, [sizes, rotation, spread])
+  }, [sizes, rotation, spread, currentPage])
 
   // Pick an initial zoom if none was restored: fit the WHOLE first page
   // (fit-page), so a fresh document opens centered without vertical cropping
@@ -663,6 +717,72 @@ export default function PdfViewer({
   const immersiveRef = useRef(immersive)
   immersiveRef.current = immersive
 
+  // Reveal the tucked toolbar from the ENTIRE top strip, not just a thin band
+  // below the tab bar: a window-level move check treats everything at or above
+  // (viewer top + a small margin) as the reveal zone. Because the tab bar sits
+  // above the viewer's top edge, hovering it — or just shoving the pointer to
+  // the very top of the screen — reveals the toolbar. Retract stays with the
+  // toolbar-wrap's onMouseLeave so open dropdowns are never yanked away.
+  useEffect(() => {
+    if (!active || !immersive) return
+    const onMove = (e: MouseEvent): void => {
+      const top = viewerRootRef.current?.getBoundingClientRect().top ?? 0
+      if (e.clientY <= top + 14) setToolbarPeek(true)
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [active, immersive])
+
+  // Edge-rail handles fade in when the pointer nears a side edge. This is a
+  // pure visibility hint — no overlay strip intercepts events, so the pages
+  // scrollbar at the right edge is always clickable and draggable.
+  useEffect(() => {
+    if (!active) return
+    // Hysteresis: the hint arms close to the edge but stays alive across the
+    // handle's full footprint (which reaches past the arm zone) — otherwise
+    // the handle would fade out under the cursor at its inner edge.
+    const ARM = 28
+    const KEEP = 46
+    const onMove = (e: MouseEvent): void => {
+      if (drawToolRef.current) {
+        setEdgeHint((h) => (h ? null : h))
+        return
+      }
+      const left = e.clientX
+      const right = window.innerWidth - e.clientX
+      setEdgeHint((h) => {
+        if (h === 'left' && left <= KEEP) return h
+        if (h === 'right' && right <= KEEP) return h
+        return left <= ARM ? 'left' : right <= ARM ? 'right' : null
+      })
+    }
+    window.addEventListener('mousemove', onMove)
+    return () => window.removeEventListener('mousemove', onMove)
+  }, [active])
+
+  const cancelPeekTimer = useCallback(() => {
+    if (peekTimerRef.current !== null) {
+      window.clearTimeout(peekTimerRef.current)
+      peekTimerRef.current = null
+    }
+  }, [])
+
+  /** Open a peek after a short rest on the handle (hover-intent) */
+  const armPeek = useCallback(
+    (side: 'left' | 'right') => {
+      cancelPeekTimer()
+      peekTimerRef.current = window.setTimeout(() => {
+        peekTimerRef.current = null
+        peekOpenedAtRef.current = performance.now()
+        if (side === 'left') setTocPeek(true)
+        else setAiPeek(true)
+      }, 120)
+    },
+    [cancelPeekTimer]
+  )
+
+  useEffect(() => cancelPeekTimer, [cancelPeekTimer])
+
   const onScroll = useCallback(() => {
     updateRange()
     schedulePositionSave()
@@ -773,9 +893,9 @@ export default function PdfViewer({
    *  (or near) fit-width, otherwise 'width' */
   const fitTarget: 'width' | 'page' = useMemo(() => {
     if (sizes.length === 0 || containerWidth === 0) return 'page'
-    const fitW = (containerWidth - SIDE_PAD) / sizes[0].w
+    const fitW = (containerWidth - SIDE_PAD) / fitDenom().w
     return Math.abs(scale - fitW) / fitW < 0.02 ? 'page' : 'width'
-  }, [scale, sizes, containerWidth])
+  }, [scale, sizes, containerWidth, fitDenom])
 
   /** Snap a pinch-commit scale to fit-width/fit-height/fit-page when close.
    *  Tight threshold: the snap adjusts the committed scale away from what the
@@ -784,7 +904,7 @@ export default function PdfViewer({
     (raw: number): number => {
       const el = containerRef.current
       if (!el || sizes.length === 0 || el.clientWidth === 0) return raw
-      const { w, h } = sizes[0]
+      const { w, h } = sizes[clamp(currentPage - 1, 0, sizes.length - 1)]
       const fitW = (el.clientWidth - SIDE_PAD) / w
       const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / h
       for (const candidate of [fitW, fitH, Math.min(fitW, fitH)]) {
@@ -798,7 +918,7 @@ export default function PdfViewer({
       }
       return raw
     },
-    [sizes]
+    [sizes, currentPage]
   )
 
   // Commit a pinch/ctrl-wheel gesture: swap the cheap CSS transform for a
@@ -891,6 +1011,175 @@ export default function PdfViewer({
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
+  // ---------- Touch input (Surface Pro & co.) ----------
+  // Chromium only synthesizes ctrl+wheel for TRACKPAD pinches; fingers on the
+  // glass arrive as touch events. One native handler set gives touch users:
+  //  - two-finger pinch zoom (same CSS-preview + anchored-commit pipeline)
+  //  - drag of movable annotations (scroll suppressed via touchstart)
+  //  - edge swipe-in to open the side panels (the touch twin of hover-peek)
+  //  - swipe down from the top strip to reveal a tucked toolbar
+  // Long-press already works: Chromium synthesizes contextmenu for touch.
+  const touchToolbarTimerRef = useRef<number | null>(null)
+  /** pagePointFromClient is declared further down (after the annotation
+   *  machinery) — the touch effect reads it through this ref to avoid TDZ */
+  const pagePointFromClientRef = useRef<(x: number, y: number, el: HTMLElement) => [number, number]>(
+    () => [0, 0]
+  )
+  /** Touch-revealed toolbar tucks itself back after a beat (no mouseleave on touch) */
+  const revealToolbarTouch = useCallback(() => {
+    setToolbarPeek(true)
+    if (touchToolbarTimerRef.current) window.clearTimeout(touchToolbarTimerRef.current)
+    touchToolbarTimerRef.current = window.setTimeout(() => setToolbarPeek(false), 6000)
+  }, [])
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !active) return
+    const EDGE = 24
+    const pinch = { active: false, startDist: 0 }
+    const swipe = { edge: null as 'left' | 'right' | 'top' | null, x: 0, y: 0, done: false }
+
+    const dist = (t: TouchList): number =>
+      Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+
+    const beginPinchSegment = (t: TouchList): void => {
+      const inner = innerRef.current
+      if (!inner || scaleRef.current <= 0) return
+      const rect = el.getBoundingClientRect()
+      const midX = (t[0].clientX + t[1].clientX) / 2 - rect.left
+      const midY = (t[0].clientY + t[1].clientY) / 2 - rect.top
+      const hasHScroll = el.scrollWidth > el.clientWidth + 1
+      const fx = hasHScroll ? midX : el.clientWidth / 2
+      gestureRef.current = {
+        factor: 1,
+        originX: el.scrollLeft + fx,
+        originY: el.scrollTop + midY,
+        fx,
+        fy: midY,
+        timer: 0
+      }
+      inner.style.willChange = 'transform'
+      inner.style.transformOrigin = `${gestureRef.current.originX}px ${gestureRef.current.originY}px`
+      pinch.startDist = dist(t)
+      pinch.active = true
+      setMenu((m) => (m ? null : m))
+    }
+
+    const onTouchStart = (e: TouchEvent): void => {
+      if (drawToolRef.current) return // the draw layer owns single-touch; pinch-while-drawing is a follow-up
+      if (e.touches.length >= 2) {
+        // Two fingers = pinch. preventDefault stops native panning/zooming so
+        // we keep receiving moves; a stray swipe/drag in progress is dropped.
+        e.preventDefault()
+        swipe.edge = null
+        annotDragRef.current = null
+        if (!pinch.active) beginPinchSegment(e.touches)
+        return
+      }
+      const t = e.touches[0]
+      // Single finger on a movable annotation arms the same drag the mouse
+      // path uses; preventDefault suppresses scrolling AND compat mouse events.
+      if (!annotsHiddenRef.current) {
+        const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+        if (pageEl) {
+          const pageNumber = Number(pageEl.dataset.page)
+          const [hx, hy] = pagePointFromClientRef.current(t.clientX, t.clientY, pageEl)
+          const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], hx, hy)
+          if (hit && isMovableAnnotation(hit) && hit.quads[0]) {
+            e.preventDefault()
+            annotDragRef.current = {
+              pageNumber,
+              record: hit,
+              startClientX: t.clientX,
+              startClientY: t.clientY,
+              moved: false
+            }
+            return
+          }
+        }
+      }
+      // Edge starts arm a swipe-in: left/right open the panels, top reveals a
+      // tucked toolbar. preventDefault so the browser doesn't claim the scroll.
+      const rect = el.getBoundingClientRect()
+      const fromLeft = t.clientX - rect.left
+      const fromRight = rect.right - t.clientX
+      const fromTop = t.clientY - rect.top
+      if (immersiveRef.current && !toolbarPinned && fromTop <= EDGE) {
+        swipe.edge = 'top'
+      } else if (fromLeft <= EDGE) {
+        swipe.edge = 'left'
+      } else if (fromRight <= EDGE) {
+        swipe.edge = 'right'
+      } else {
+        swipe.edge = null
+        return
+      }
+      e.preventDefault()
+      swipe.x = t.clientX
+      swipe.y = t.clientY
+      swipe.done = false
+    }
+
+    const onTouchMove = (e: TouchEvent): void => {
+      if (pinch.active && e.touches.length >= 2) {
+        e.preventDefault()
+        const g = gestureRef.current
+        const inner = innerRef.current
+        if (!g || !inner) return
+        const target = clamp(
+          scaleRef.current * (dist(e.touches) / pinch.startDist),
+          ZOOM_MIN,
+          ZOOM_MAX
+        )
+        g.factor = target / scaleRef.current
+        inner.style.transform = `scale(${g.factor})`
+        // Long pinches blur (CSS-scaled canvas) — commit mid-gesture and start
+        // a fresh segment, exactly like the wheel path.
+        if (g.factor > 1.3 || g.factor < 1 / 1.3) {
+          commitGestureRef.current(false)
+          beginPinchSegment(e.touches)
+        }
+        return
+      }
+      if (annotDragRef.current) e.preventDefault() // pointermove drives the ghost
+      if (swipe.edge && !swipe.done && e.touches.length === 1) {
+        e.preventDefault()
+        const t = e.touches[0]
+        const dx = t.clientX - swipe.x
+        const dy = t.clientY - swipe.y
+        if (swipe.edge === 'top' && dy > 36 && Math.abs(dx) < 48) {
+          swipe.done = true
+          revealToolbarTouch()
+        } else if (swipe.edge === 'left' && dx > 48 && Math.abs(dy) < 40) {
+          swipe.done = true
+          setTocPinned(true)
+        } else if (swipe.edge === 'right' && dx < -48 && Math.abs(dy) < 40) {
+          swipe.done = true
+          setAiPinned(true)
+        }
+      }
+    }
+
+    const onTouchEnd = (e: TouchEvent): void => {
+      if (pinch.active && e.touches.length < 2) {
+        pinch.active = false
+        commitGestureRef.current()
+      }
+      if (e.touches.length === 0) swipe.edge = null
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [active, toolbarPinned, revealToolbarTouch])
+
   // ---------- Annotation + context menu ----------
 
   const showToast = useCallback((message: string) => {
@@ -975,9 +1264,17 @@ export default function PdfViewer({
         return
       }
       setActiveTool(tool)
+      if (tool) setMarkupTool(null) // freehand and text-markup tools are exclusive
     },
     [showToast]
   )
+
+  /** Arm/disarm a text-markup tool. Turning one on clears any freehand tool so
+   *  the two modes never fight over the pointer. */
+  const selectMarkupTool = useCallback((type: MarkupToolType | null) => {
+    if (type) setActiveTool(null)
+    setMarkupTool(type)
+  }, [])
 
   // Hide all annotations (clean reading view) — hit-testing pauses too so
   // invisible annotations can't swallow clicks or show tooltips
@@ -1349,30 +1646,54 @@ export default function PdfViewer({
         editor.blur()
         return
       }
-      setFreeTextDraft({ pageNumber, x, y, clientX, clientY })
+      setFreeTextDraft({ pageNumber, x, y, clientX, clientY, w: 200, h: 48 })
     },
     []
   )
 
+  /** Re-open an existing FreeText box in the editor (double-click) so its text
+   *  and box size can be changed after insertion; commit updates it in place. */
+  const openFreeTextEditor = useCallback((pageNumber: number, record: PageAnnotation) => {
+    const q = record.quads[0]
+    if (!q) return
+    setSelected(null)
+    setAnnotPopover(null)
+    setFreeTextDraft({
+      pageNumber,
+      x: q.x,
+      y: q.y,
+      clientX: 0,
+      clientY: 0,
+      w: q.w,
+      h: q.h,
+      editingId: record.id,
+      text: record.contents ?? ''
+    })
+  }, [])
+
+  // Commit the editor. `wPt`/`hPt` are the editor's drag-resized box in page
+  // points; editing an existing box resizes/edits it in place, otherwise a new
+  // FreeText is created at the drawn box size.
   const saveFreeText = useCallback(
-    (text: string) => {
+    (text: string, wPt?: number, hPt?: number) => {
       if (!freeTextDraft) return
-      const lines = text.split('\n')
-      const longest = Math.max(...lines.map((l) => l.length))
-      const w = Math.min(260, Math.max(80, longest * FREETEXT_SIZE * 0.52 + 8))
-      const h = lines.length * FREETEXT_SIZE * 1.35 + 8
-      void persistAnnotation(
-        freeTextDraft.pageNumber,
-        'freetext',
-        [{ x: freeTextDraft.x, y: freeTextDraft.y, w, h }],
-        FREETEXT_COLOR,
-        1,
-        text,
-        { fontSize: FREETEXT_SIZE }
-      )
+      const w = wPt && wPt > 24 ? wPt : freeTextDraft.w
+      const h = hPt && hPt > 14 ? hPt : freeTextDraft.h
+      const rect = { x: freeTextDraft.x, y: freeTextDraft.y, w, h }
+      if (freeTextDraft.editingId) {
+        const record = (annotsRef.current.get(freeTextDraft.pageNumber) ?? []).find(
+          (r) => r.id === freeTextDraft.editingId
+        )
+        if (record) changeAnnotation(freeTextDraft.pageNumber, record, { quads: [rect], contents: text })
+        setFreeTextDraft(null)
+        return
+      }
+      void persistAnnotation(freeTextDraft.pageNumber, 'freetext', [rect], FREETEXT_COLOR, 1, text, {
+        fontSize: FREETEXT_SIZE
+      })
       setFreeTextDraft(null)
     },
-    [freeTextDraft, persistAnnotation]
+    [freeTextDraft, persistAnnotation, changeAnnotation]
   )
 
   // Stable identities for PdfPage (fresh callbacks would re-render canvases)
@@ -1449,25 +1770,6 @@ export default function PdfViewer({
     [collectSelectionRects, persistAnnotation]
   )
 
-  // Open the in-app web-search panel for the given text. The AI and web panels
-  // are mutually exclusive — opening web here retracts the AI panel, and the
-  // effect below retracts web whenever the AI panel opens.
-  const openWebSearch = useCallback((text: string) => {
-    const q = text.trim()
-    if (!isElectron) {
-      // No WebContentsView in the browser preview — fall back to a real tab
-      bridge.webSearchOpen(q || undefined)
-      return
-    }
-    setAiPinned(false)
-    setAiPeek(false)
-    setWebQuery(q)
-    setWebOpen(true)
-  }, [])
-
-  useEffect(() => {
-    if (aiPinned) setWebOpen(false)
-  }, [aiPinned])
 
   const onMenuAction = useCallback(
     (action: MenuAction) => {
@@ -1517,7 +1819,9 @@ export default function PdfViewer({
           setMenu(null)
           break
         case 'search':
-          if (selText) openWebSearch(selText)
+          if (selText) {
+            bridge.openExternal(`https://www.google.com/search?q=${encodeURIComponent(selText)}`)
+          }
           setMenu(null)
           break
         case 'dictionary':
@@ -1598,7 +1902,7 @@ export default function PdfViewer({
         }
       }
     },
-    [menu, pdf, payload.name, applyMarkup, collectSelectionRects, openWebSearch]
+    [menu, pdf, payload.name, applyMarkup, collectSelectionRects]
   )
 
   const saveNote = useCallback(
@@ -1628,6 +1932,7 @@ export default function PdfViewer({
     },
     []
   )
+  pagePointFromClientRef.current = pagePointFromClient
 
   const openMenuAt = useCallback((clientX: number, clientY: number, target: EventTarget | null) => {
     const pageEl = (target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
@@ -1690,6 +1995,13 @@ export default function PdfViewer({
       window.setTimeout(() => {
         const sel = window.getSelection()
         if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+          // An armed text-markup tool marks the selection immediately (and stays
+          // armed for the next one) instead of opening the selection menu.
+          const mt = markupToolRef.current
+          if (mt) {
+            applyMarkup(mt, markupColorsRef.current[mt])
+            return
+          }
           openMenuAt(clientX, clientY, target)
           return
         }
@@ -1710,7 +2022,25 @@ export default function PdfViewer({
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient]
+    [openMenuAt, pagePointFromClient, applyMarkup]
+  )
+
+  // Double-click a text box to re-open it in the editor (edit text + resize the
+  // box after insertion). Ignored while a draw/markup tool is armed.
+  const onPagesDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (drawToolRef.current || markupToolRef.current) return
+      const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+      if (!pageEl) return
+      const pageNumber = Number(pageEl.dataset.page)
+      const [px, py] = pagePointFromClient(e.clientX, e.clientY, pageEl)
+      const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
+      if (hit && hit.type === 'freetext') {
+        e.preventDefault()
+        openFreeTextEditor(pageNumber, hit)
+      }
+    },
+    [pagePointFromClient, openFreeTextEditor]
   )
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1821,9 +2151,12 @@ export default function PdfViewer({
     [sizes]
   )
 
+  // Pointer events serve BOTH mouse and touch here: the mouse arms the drag in
+  // onMouseDown, touch arms it in the touchstart handler (which suppresses
+  // scrolling); either way these listeners move the ghost and commit the drop.
   useEffect(() => {
     if (!active) return
-    const onMove = (e: MouseEvent): void => {
+    const onMove = (e: PointerEvent): void => {
       const drag = annotDragRef.current
       if (!drag) return
       if (
@@ -1845,7 +2178,7 @@ export default function PdfViewer({
         kind: drag.record.type === 'note' ? 'bubble' : 'outline'
       })
     }
-    const onUp = (e: MouseEvent): void => {
+    const onUp = (e: PointerEvent): void => {
       const drag = annotDragRef.current
       annotDragRef.current = null
       if (!drag) return
@@ -1869,11 +2202,18 @@ export default function PdfViewer({
       setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id })
       changeAnnotation(drag.pageNumber, drag.record, patch)
     }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
+    const onCancel = (): void => {
+      if (!annotDragRef.current) return
+      annotDragRef.current = null
+      setDragGhost(null)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
     return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
     }
   }, [active, dragTarget, changeAnnotation])
 
@@ -1953,7 +2293,6 @@ export default function PdfViewer({
     setToolbarPeek(false)
     setTocPeek(false)
     setAiPeek(false)
-    setWebOpen(false)
     showToast(t('viewer.presentToast'))
   }, [fullscreen, showToast])
 
@@ -2634,10 +2973,11 @@ export default function PdfViewer({
         else if (annotPopover) setAnnotPopover(null)
         else if (selected) setSelected(null)
         else if (activeTool) setActiveTool(null)
+        else if (markupTool) setMarkupTool(null)
         else if (readAloud !== 'closed') stopReadAloud()
         else if (searchOpen) closeSearch()
         else if (searchHits) setSearchHits(null)
-        else if (webOpen) setWebOpen(false)
+        else if (rightTab === 'web') setRightTab('ai')
         else if (aiPinned) setAiPinned(false)
         else if (fullscreen) toggleFullscreen()
       } else if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
@@ -2690,6 +3030,9 @@ export default function PdfViewer({
           else stopReadAloud()
         } else if (k === 'f') {
           e.preventDefault()
+          toggleFullscreen()
+        } else if (k === 'w') {
+          e.preventDefault()
           if (fitTarget === 'page') fitPage()
           else fitWidth()
         }
@@ -2708,16 +3051,17 @@ export default function PdfViewer({
     menu,
     aiQuick,
     aiPinned,
-    webOpen,
     annotPopover,
     selected,
     activeTool,
+    markupTool,
     readAloud,
     stopReadAloud,
     dirty,
     saveDocument,
     searchOpen,
     searchHits,
+    rightTab,
     fullscreen,
     toggleFullscreen,
     closeSearch,
@@ -2803,12 +3147,10 @@ export default function PdfViewer({
   const aiVisible = aiPinned || aiPeek
   // The native web view only ever shows for the active tab (a background tab's
   // placeholder rect would float it over another document)
-  const webVisible = webOpen && active
-
   return (
     <div
-      className={`viewer${immersive ? ' toolbar-unpinned' : ''}${immersive && hudFaded ? ' hud-faded' : ''}${webVisible ? ' web-open' : ''}`}
-      style={{ '--web-w': `${panelW.web}px` } as React.CSSProperties}
+      ref={viewerRootRef}
+      className={`viewer${immersive ? ' toolbar-unpinned' : ''}${immersive && hudFaded ? ' hud-faded' : ''}`}
     >
       <div
         className={`toolbar-wrap${toolbarVisible ? '' : ' tucked'}`}
@@ -2828,6 +3170,12 @@ export default function PdfViewer({
           activeTool={activeTool}
           toolPrefs={toolPrefs}
           onToolSelect={selectTool}
+          activeMarkup={markupTool}
+          markupColor={markupColors[markupTool ?? 'highlight']}
+          onMarkupSelect={selectMarkupTool}
+          onMarkupColorChange={(color) =>
+            setMarkupColors((prev) => ({ ...prev, [markupTool ?? 'highlight']: color }))
+          }
           rotation={rotation}
           spread={spread}
           onRotate={rotateView}
@@ -2860,7 +3208,10 @@ export default function PdfViewer({
             else stopReadAloud()
           }}
           aiOpen={aiPinned}
-          onToggleAi={() => setAiPinned((o) => !o)}
+          onToggleAi={() => {
+            if (!aiPinnedRef.current) setRightTab('ai') // opening → land on the assistant tab
+            setAiPinned((o) => !o)
+          }}
           toolbarPinned={toolbarPinned}
           onTogglePin={togglePin}
           onPresent={enterPresentation}
@@ -2868,40 +3219,48 @@ export default function PdfViewer({
         />
       </div>
       {immersive && <div className="reveal-zone" onMouseEnter={() => setToolbarPeek(true)} />}
+      {/* Tap affordance for the tucked toolbar: hover has no touch twin, so a
+          small always-visible grip marks the spot and a tap reveals. Subtle
+          enough not to disturb mouse users (who also get it as a hint). */}
+      {immersive && !toolbarVisible && (
+        <button className="toolbar-grip" title={t('tb.revealTip')} onClick={revealToolbarTouch} />
+      )}
 
-      {/* Edge rails — click toggles a panel pinned, hover gives a quick peek
-          that retracts when the pointer moves back over the pages */}
-      <div
-        className={`edge-rail edge-rail-left${tocVisible ? ' active' : ''}`}
-        title={t('tb.tocRailTip')}
-        onMouseEnter={() => {
-          if (tocPinned) return
-          peekOpenedAtRef.current = performance.now()
-          setTocPeek(true)
-        }}
-        onClick={() => {
-          setTocPeek(false)
-          setTocPinned((o) => !o)
-        }}
-      >
-        <span className="edge-rail-handle">
+      {/* Edge rails — pointer near an edge fades the HANDLE in (window-level
+          hint, no interactive strip: the pages scrollbar at the right edge
+          must stay clickable). Resting on the handle peeks the panel; click
+          toggles it pinned. */}
+      <div className={`edge-rail edge-rail-left${tocVisible ? ' active' : ''}${edgeHint === 'left' ? ' hint' : ''}`}>
+        <span
+          className="edge-rail-handle"
+          title={t('tb.tocRailTip')}
+          onMouseEnter={() => {
+            if (!tocPinned) armPeek('left')
+          }}
+          onMouseLeave={cancelPeekTimer}
+          onClick={() => {
+            cancelPeekTimer()
+            setTocPeek(false)
+            setTocPinned((o) => !o)
+          }}
+        >
           <IconPanelLeft size={15} />
         </span>
       </div>
-      <div
-        className={`edge-rail edge-rail-right${aiVisible ? ' active' : ''}`}
-        title={t('tb.aiRailTip')}
-        onMouseEnter={() => {
-          if (aiPinned) return
-          peekOpenedAtRef.current = performance.now()
-          setAiPeek(true)
-        }}
-        onClick={() => {
-          setAiPeek(false)
-          setAiPinned((o) => !o)
-        }}
-      >
-        <span className="edge-rail-handle">
+      <div className={`edge-rail edge-rail-right${aiVisible ? ' active' : ''}${edgeHint === 'right' ? ' hint' : ''}`}>
+        <span
+          className="edge-rail-handle"
+          title={t('tb.aiRailTip')}
+          onMouseEnter={() => {
+            if (!aiPinned) armPeek('right')
+          }}
+          onMouseLeave={cancelPeekTimer}
+          onClick={() => {
+            cancelPeekTimer()
+            setAiPeek(false)
+            setAiPinned((o) => !o)
+          }}
+        >
           <IconPanelRight size={15} />
         </span>
       </div>
@@ -2943,6 +3302,7 @@ export default function PdfViewer({
           onContextMenu={onContextMenu}
           onMouseUp={onMouseUp}
           onMouseDown={onMouseDown}
+          onDoubleClick={onPagesDoubleClick}
           onMouseMove={onPagesMouseMove}
           onMouseLeave={() => setHoverTip(null)}
         >
@@ -2989,25 +3349,30 @@ export default function PdfViewer({
                 <textarea
                   className="freetext-editor"
                   autoFocus
-                  rows={1}
                   spellCheck={false}
+                  defaultValue={freeTextDraft.text ?? ''}
                   style={{
                     left: layout.lefts[freeTextDraft.pageNumber - 1] + freeTextDraft.x * scale,
                     top: layout.tops[freeTextDraft.pageNumber - 1] + freeTextDraft.y * scale,
-                    fontSize: FREETEXT_SIZE * scale
+                    width: freeTextDraft.w * scale,
+                    height: freeTextDraft.h * scale,
+                    fontSize: FREETEXT_SIZE * scale,
+                    ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
                   }}
                   onKeyDown={(e) => {
                     e.stopPropagation()
                     if (e.key === 'Escape') setFreeTextDraft(null)
                     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      const value = (e.target as HTMLTextAreaElement).value.trim()
-                      if (value) saveFreeText(value)
+                      const el = e.target as HTMLTextAreaElement
+                      const value = el.value.trim()
+                      if (value) saveFreeText(value, el.offsetWidth / scale, el.offsetHeight / scale)
                       else setFreeTextDraft(null)
                     }
                   }}
                   onBlur={(e) => {
-                    const value = e.target.value.trim()
-                    if (value) saveFreeText(value)
+                    const el = e.target
+                    const value = el.value.trim()
+                    if (value) saveFreeText(value, el.offsetWidth / scale, el.offsetHeight / scale)
                     else setFreeTextDraft(null)
                   }}
                   onMouseDown={(e) => e.stopPropagation()}
@@ -3059,31 +3424,51 @@ export default function PdfViewer({
             onDoubleClick={() => resetPanelWidth('ai')}
           />
         )}
-        <AiPanel
-          open={aiVisible}
-          docTitle={payload.name}
-          docPath={payload.path}
-          seed={aiSeed}
-          onSeedConsumed={consumeAiSeed}
-          ensureDocument={ensureAiDocument}
-          hasAnnotations={hasAnnotations}
-          annotsAskId={annotsAskId}
-          getAnnotationsText={getAnnotationsText}
-          onCitationClick={(resolved) => void jumpToAiCitation(resolved)}
-          onClose={() => {
-            setAiPeek(false)
-            setAiPinned(false)
-          }}
-        />
-        {webVisible && (
-          <div
-            className={`panel-resizer${resizingPanel === 'web' ? ' active' : ''}`}
-            title={t('viewer.resizerTip')}
-            onPointerDown={(e) => beginPanelResize('web', e)}
-            onDoubleClick={() => resetPanelWidth('web')}
-          />
-        )}
-        {webVisible && <WebSearchPanel query={webQuery} onClose={() => setWebOpen(false)} />}
+        {/* Always mounted, collapsed to width 0 when closed — the EXACT
+            structure of the left sidebar. Mount-on-hover was the source of
+            the peek jank the left side never had. */}
+        <div className={`right-panel${aiVisible ? ' open' : ''}`}>
+          <div className="right-panel-tabs">
+            <button className={rightTab === 'ai' ? 'active' : ''} onClick={() => setRightTab('ai')}>
+              {t('ai.assistant')}
+            </button>
+            <button className={rightTab === 'web' ? 'active' : ''} onClick={() => setRightTab('web')}>
+              {t('web.title')}
+            </button>
+          </div>
+          <div className="right-panel-body">
+            <div className="right-pane" hidden={rightTab !== 'ai'}>
+              <AiPanel
+                open={aiVisible}
+                embedded
+                docTitle={payload.name}
+                docPath={payload.path}
+                seed={aiSeed}
+                onSeedConsumed={consumeAiSeed}
+                ensureDocument={ensureAiDocument}
+                hasAnnotations={hasAnnotations}
+                annotsAskId={annotsAskId}
+                getAnnotationsText={getAnnotationsText}
+                onCitationClick={(resolved) => void jumpToAiCitation(resolved)}
+                onClose={() => {
+                  setAiPeek(false)
+                  setAiPinned(false)
+                }}
+              />
+            </div>
+            {aiVisible && rightTab === 'web' && active && (
+              <div className="right-pane">
+                <WebSearchPanel
+                  query=""
+                  onClose={() => {
+                    setAiPeek(false)
+                    setAiPinned(false)
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {(navStacks.back.length > 0 || navStacks.forward.length > 0) && layout && (

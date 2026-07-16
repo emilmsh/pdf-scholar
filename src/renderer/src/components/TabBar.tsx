@@ -25,6 +25,8 @@ interface Props {
   onTabDragOut(id: string, path: string): void
   /** Context-menu fallback: tear the tab off into a new window */
   onMoveToNewWindow(id: string, path: string): void
+  /** Re-read the file from disk and remount the viewer (external updates) */
+  onReload(id: string, path: string): void
   /** Back to the library (closes the active document) */
   onLibrary(): void
 }
@@ -50,6 +52,7 @@ export default function TabBar({
   onShowInFolder,
   onTabDragOut,
   onMoveToNewWindow,
+  onReload,
   onLibrary
 }: Props): React.JSX.Element {
   useLang()
@@ -136,6 +139,15 @@ export default function TabBar({
           style={{ left: Math.min(menu.x, window.innerWidth - 220), top: menu.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >
+          <button
+            className="menu-item"
+            onClick={() => {
+              onReload(menu.tab.id, menu.tab.path)
+              setMenu(null)
+            }}
+          >
+            {t('tabs.reload')}
+          </button>
           <button
             className="menu-item"
             onClick={() => {

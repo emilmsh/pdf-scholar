@@ -353,7 +353,7 @@ interface SettingsProps {
   onClose(): void
 }
 
-function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Element {
+export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Element {
   useLang()
   const [provider, setProvider] = useState<AiProviderId>(config.provider)
   const [model, setModel] = useState(config.models[config.provider] ?? '')
@@ -577,6 +577,9 @@ export interface AiSeed {
 
 interface PanelProps {
   open: boolean
+  /** Rendered inside the shared right-panel tab container — hide the panel's
+   *  own title (the tab already names it) so the chrome doesn't duplicate. */
+  embedded?: boolean
   docTitle: string
   docPath: string
   /** Exchange handed over from the explain-selection popover */
@@ -602,6 +605,7 @@ const chatTitle = (msgs: PanelMessage[]): string => {
 
 export default function AiPanel({
   open,
+  embedded,
   docTitle,
   docPath,
   seed,
@@ -699,9 +703,10 @@ export default function AiPanel({
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [])
 
-  useEffect(() => {
-    if (open && !showSettings) inputRef.current?.focus()
-  }, [open, showSettings])
+  // Deliberately NO autofocus when the panel opens: stealing focus into the
+  // composer kills every single-key shortcut (A to toggle this very panel, V,
+  // W, F …) until the user clicks back out — rapid hotkey toggling must stay
+  // fluid. Explicit in-panel actions (new chat) still focus the composer.
 
   const send = useCallback(
     async (question: string, display?: string) => {
@@ -866,15 +871,16 @@ export default function AiPanel({
     return known ? sum : null
   }, [messages])
 
-  if (!open) return null
-
+  // Rendered even while closed: the host right-panel collapses to width 0
+  // (mirroring the left sidebar) so opening never mounts a fresh tree. All
+  // fetch/focus effects above stay gated on `open`.
   const providerLabel = providerLabels().find((p) => p.id === config?.provider)?.label ?? ''
 
   return (
     <aside className="ai-panel">
       <header className="ai-header">
         <IconSparkle size={16} />
-        <span className="ai-title">{t('ai.assistant')}</span>
+        {!embedded && <span className="ai-title">{t('ai.assistant')}</span>}
         <div className="ai-model-anchor">
           <button
             className="ai-model"

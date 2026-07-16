@@ -16,6 +16,9 @@ interface OpenTab {
   id: string
   payload: FilePayload
   initialPosition: ReadingPosition | null
+  /** Bumped when the file is re-opened with fresh bytes (e.g. from Explorer
+   *  after an external update) — keys the viewer so it remounts and reloads */
+  epoch: number
 }
 
 const FALLBACK_SETTINGS: Settings = {
@@ -111,10 +114,22 @@ export default function App(): React.JSX.Element {
     if (existing) {
       setActiveId(existing.id)
       setError(null)
+      // The file may have changed on disk since the tab loaded (opening an
+      // updated PDF from Explorer must never show stale bytes). Reload with
+      // the fresh payload — unless the tab has unsaved annotations, which the
+      // reader must not lose to an external update.
+      if (!dirtyTabsRef.current.has(existing.id)) {
+        const initialPosition = await bridge.getPosition(payload.path)
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === existing.id ? { ...t, payload, initialPosition, epoch: t.epoch + 1 } : t
+          )
+        )
+      }
       return
     }
     const initialPosition = await bridge.getPosition(payload.path)
-    const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition }
+    const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition, epoch: 0 }
     bridge.docOpened(payload.path)
     setTabs((prev) => [...prev, tab])
     setActiveId(tab.id)
@@ -178,6 +193,30 @@ export default function App(): React.JSX.Element {
     [reallyCloseTab]
   )
 
+  /** Explicit reload from the tab context menu: re-read the file from disk and
+   *  remount the viewer. Unsaved annotations go through the same save/discard/
+   *  cancel dialog as closing — an explicit reload may drop them, silence not. */
+  const reloadTab = useCallback(
+    async (id: string, path: string) => {
+      if (dirtyTabsRef.current.has(id)) {
+        const verdict = await bridge.docConfirmClose(path)
+        if (verdict === 'cancel') return
+        setTabDirty(id, false) // saved or discarded — the remounted viewer starts clean
+      }
+      const result = await bridge.readFile(path)
+      if ('error' in result) {
+        setError(`Kunne ikke åpne filen: ${result.error}`)
+        return
+      }
+      const initialPosition = await bridge.getPosition(path)
+      setTabs((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t))
+      )
+      setActiveId(id)
+    },
+    [setTabDirty]
+  )
+
   const cycleTab = useCallback((delta: number) => {
     setActiveId((current) => {
       const list = tabsRef.current
@@ -190,12 +229,19 @@ export default function App(): React.JSX.Element {
   const openPath = useCallback(
     async (path: string) => {
       const existing = tabsRef.current.find((t) => t.payload.path === path)
-      if (existing) {
+      if (existing && dirtyTabsRef.current.has(existing.id)) {
+        // Unsaved annotations trump the external update — just focus the tab
         setActiveId(existing.id)
         return
       }
+      // Existing-but-clean tabs fall through: re-read so an externally updated
+      // file shows its latest bytes (openPayload swaps them into the tab).
       const result = await bridge.readFile(path)
       if ('error' in result) {
+        if (existing) {
+          setActiveId(existing.id) // file gone/busy — keep showing what we have
+          return
+        }
         setError(`Kunne ikke åpne filen: ${result.error}`)
         return
       }
@@ -299,13 +345,14 @@ export default function App(): React.JSX.Element {
         onShowInFolder={(path) => bridge.showInFolder(path)}
         onTabDragOut={(id, path) => void moveTabOut(id, path)}
         onMoveToNewWindow={moveToNewWindow}
+        onReload={(id, path) => void reloadTab(id, path)}
         onLibrary={() => activeId && closeTab(activeId)}
       />
 
       {tabs.length > 0 ? (
         <div className="tab-views">
           {tabs.map((tab) => (
-            <div key={tab.id} className={`tab-view${tab.id === activeId ? ' active' : ''}`}>
+            <div key={`${tab.id}:${tab.epoch}`} className={`tab-view${tab.id === activeId ? ' active' : ''}`}>
               <PdfViewer
                 payload={tab.payload}
                 initialPosition={tab.initialPosition}

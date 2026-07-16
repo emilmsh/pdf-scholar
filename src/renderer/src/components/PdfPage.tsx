@@ -281,7 +281,7 @@ function PdfPage({
       group.append(el)
       if (type === 'arrow') {
         const head = document.createElementNS(SVG_NS, 'polygon')
-        head.setAttribute('points', arrowHeadPoints(a, b, Math.max(6, width * 3.2)))
+        head.setAttribute('points', arrowHeadPoints(a, b, Math.max(11, width * 4.5)))
         head.setAttribute('fill', color)
         head.setAttribute('stroke', 'none')
         group.append(head)
@@ -606,7 +606,7 @@ function AnnotationMarks({
             <>
               <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={color} strokeWidth={width} />
               {annotation.type === 'arrow' && (
-                <polygon points={arrowHeadPoints(a, b, Math.max(6, width * 3.2))} fill={color} />
+                <polygon points={arrowHeadPoints(a, b, Math.max(11, width * 4.5))} fill={color} />
               )}
             </>
           )}

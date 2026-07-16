@@ -42,7 +42,9 @@ function ensureHardenedSession(): Session {
 
 function searchUrl(query: string): string {
   const q = query.trim()
-  return q ? `https://duckduckgo.com/?q=${encodeURIComponent(q)}` : 'https://duckduckgo.com/'
+  return q
+    ? `https://www.google.com/search?q=${encodeURIComponent(q)}`
+    : 'https://www.google.com/'
 }
 
 function roundBounds(b: WebSearchBounds): Electron.Rectangle {

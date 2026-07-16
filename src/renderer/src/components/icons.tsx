@@ -163,6 +163,15 @@ export const IconMarker = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconTextMarkup = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    {/* Text lines with a marked baseline — the text-anchored markup tool */}
+    <path d="M5 6h14" />
+    <path d="M5 10h9" />
+    <path d="M4 15.5h16" />
+  </Svg>
+)
+
 export const IconEraser = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M20 20H8.5L3.5 15a2 2 0 0 1 0-2.8l8.7-8.7a2 2 0 0 1 2.8 0l5.5 5.5a2 2 0 0 1 0 2.8L14 18.3" />

@@ -23,8 +23,15 @@ import type {
 } from '../shared/types'
 import { registerAiIpc } from './ai'
 import { registerWebSearchIpc } from './web-search'
-import { applyAnnotation, deleteAnnotation, updateAnnotation } from './annotation-engine'
-import { discardDraft, ensureDraft, hasDraft, readPathFor, saveDraft } from './drafts'
+import {
+  applyAnnotation,
+  deleteAnnotation,
+  dropAnnotations,
+  flushAllAnnotations,
+  flushAnnotations,
+  updateAnnotation
+} from './annotation-engine-embedpdf'
+import { discardDraft, draftPathFor, ensureDraft, hasDraft, readPathFor, saveDraft } from './drafts'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
@@ -132,6 +139,7 @@ if (!gotLock) {
 
   app.whenReady().then(() => {
     app.setAppUserModelId('no.emil.pdfx')
+    console.log('[pdfx] annotation engine: embedpdf (MIT)')
     // Show the "Recent" category (fed by app.addRecentDocument) in the
     // taskbar Jump List
     if (process.platform === 'win32') {
@@ -153,6 +161,16 @@ if (!gotLock) {
 
   app.on('window-all-closed', () => {
     app.quit()
+  })
+
+  // Quit can land inside the debounce window of the engines' document caches —
+  // hold the quit once, flush everything to disk, then resume quitting.
+  let quitFlushed = false
+  app.on('before-quit', (event) => {
+    if (quitFlushed) return
+    quitFlushed = true
+    event.preventDefault()
+    void flushAllAnnotations().finally(() => app.quit())
   })
 }
 
@@ -217,11 +235,19 @@ function createWindow(openPath?: string | null): BrowserWindow {
           dirty.length === 1 ? s.message(basename(dirty[0])) : s.messageMany(dirty.length),
         detail: s.detail
       })
-      .then(({ response }) => {
+      .then(async ({ response }) => {
         if (response === 2) return // Avbryt
         for (const path of dirty) {
-          if (response === 0) saveDraft(path)
-          else discardDraft(path)
+          if (response === 0) {
+            // Pending annotation writes may still sit in the engine cache
+            await flushDraft(path)
+            saveDraft(path)
+          } else {
+            // Drop cached changes FIRST so a late debounced flush can't
+            // resurrect the draft file we're about to delete
+            await dropAnnotations(draftPathFor(path)).catch(() => {})
+            discardDraft(path)
+          }
         }
         forceClose.add(wcId)
         if (!win.isDestroyed()) win.close()
@@ -256,8 +282,23 @@ function createWindow(openPath?: string | null): BrowserWindow {
   return win
 }
 
+/** The write-engines cache open docs keyed on the DRAFT path and flush to
+ *  disk on a debounce (see doc-cache.ts) — force the flush before any code
+ *  path reads or copies the draft's bytes. Logs instead of throwing: reading
+ *  a briefly-stale draft beats failing the caller outright. */
+async function flushDraft(originalPath: string): Promise<void> {
+  try {
+    await flushAnnotations(draftPathFor(originalPath))
+  } catch (err) {
+    console.error(`[pdfx] annotation flush failed for ${originalPath}:`, err)
+  }
+}
+
 async function loadPdf(path: string): Promise<FilePayload | FileError> {
   try {
+    // Recent annotation writes may still sit in the engine's cached doc —
+    // flush so the bytes we hand the renderer include them
+    await flushDraft(path)
     // A leftover draft means unsaved changes from a previous session —
     // load those bytes so the work is silently recovered
     const data = await readFile(readPathFor(path))
@@ -370,8 +411,12 @@ function registerIpc(): void {
 
   ipcMain.handle('doc:is-dirty', (_e, path: string) => hasDraft(path))
 
-  ipcMain.handle('doc:save', (_e, path: string) => {
+  ipcMain.handle('doc:save', async (_e, path: string) => {
     try {
+      // Persist pending cached annotation writes into the draft BEFORE it is
+      // copied over the original. Throwing (not flushDraft) is deliberate:
+      // silently saving a stale draft would lose the user's latest marks.
+      await flushAnnotations(draftPathFor(path))
       saveDraft(path)
       return { ok: true }
     } catch (err) {
@@ -397,9 +442,13 @@ function registerIpc(): void {
     })
     if (response === 2) return 'cancel'
     if (response === 0) {
+      await flushDraft(path)
       saveDraft(path)
       return 'save'
     }
+    // Drop cached changes FIRST: a late debounced flush must not resurrect
+    // the draft file we are about to delete
+    await dropAnnotations(draftPathFor(path)).catch(() => {})
     discardDraft(path)
     return 'discard'
   })
@@ -448,6 +497,8 @@ function registerIpc(): void {
   // renders the file (with saved annotations) and drives the print dialog.
   ipcMain.handle('file:print', async (_e, path: string) => {
     try {
+      // Print what the user just annotated — flush the engine cache first
+      await flushDraft(path)
       const printWin = new BrowserWindow({
         show: false,
         webPreferences: { plugins: true }

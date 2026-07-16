@@ -140,6 +140,18 @@ export interface DrawTool {
 export const SHAPE_TOOL_TYPES = ['square', 'circle', 'line', 'arrow'] as const
 export type ShapeToolType = (typeof SHAPE_TOOL_TYPES)[number]
 
+/** Text-anchored markup tools: unlike pen/marker these have no freehand form —
+ *  they attach to the current text selection (like the context-menu markup). */
+export const MARKUP_TOOL_TYPES = ['highlight', 'underline', 'strikeout', 'squiggly'] as const
+export type MarkupToolType = (typeof MARKUP_TOOL_TYPES)[number]
+
+/** Default colour for each markup tool (pastel fill for highlight, saturated
+ *  line colour for the others so a thin stroke stays visible). */
+export function markupDefaultColor(type: MarkupToolType): [number, number, number] {
+  if (type === 'highlight') return HIGHLIGHT_COLORS[0].rgb
+  return UNDERLINE_COLOR
+}
+
 export function rgbCss(rgb: [number, number, number], alpha: number): string {
   const [r, g, b] = rgb.map((v) => Math.round(v * 255))
   return `rgba(${r}, ${g}, ${b}, ${alpha})`

@@ -138,9 +138,11 @@ Personal project under active development. Installers are attached to the
 
 ## License
 
-PDF Scholar is free software, licensed under the
-**[GNU AGPL-3.0-or-later](LICENSE)** — the same license as
-[mupdf](https://mupdf.com/) (© Artifex Software), which powers the annotation engine.
-Other major components: [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0),
+PDF Scholar is licensed under the **[MIT License](LICENSE)**. Every bundled
+component is permissively licensed: annotations are written by
+[EmbedPDF](https://www.embedpdf.com/)'s PDFium build (MIT / BSD-3-Clause),
+rendering by [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0), plus
 [Electron](https://www.electronjs.org/) (MIT), [React](https://react.dev/) (MIT) and the
 [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (MIT).
+([mupdf](https://mupdf.com/), AGPL, is used only as a development-time test
+verifier and ships with no release build.)

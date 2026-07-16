@@ -97,6 +97,16 @@ Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 refera
 - Innholdssøk på tvers av filer i valgt mappe
 - Sky: primært via synkmapper (OneDrive/Dropbox) + filovervåking; API-integrasjon bare hvis nødvendig
 - **Beslutningsport for distribusjon**: mupdf AGPL-avklaring, kodesignering, auto-oppdatering
+  - *AVGJORT 2026-07-16*: **EmbedPDF er eneste produksjonsmotor og repoet er omlisensiert til MIT.**
+    Spike + produksjonstester bestått (alle 11 annotasjonstyper med appearance streams, objektnummer-
+    kontrakt via EPDF-utvidelsene, obj# stabile gjennom `saveAsCopy`); interop bekreftet i praksis
+    (redigerbar annotering i Edges PDF-leser). Skrivemotor: `src/main/annotation-engine-embedpdf.ts`
+    med dokument-cache + debounced flush (`doc-cache.ts`, ~40× raskere burst-annotering). mupdf er
+    degradert til devDependency (uavhengig verifikator i `npm run test:engine`/`bench:engine`) og
+    følger ikke med i release-bygg. Store filer (≥150 MB) skrives av den inkrementelle appenderen
+    (`src/main/incremental-appender.ts`, ren Node, ingen WASM — appends objekter + AP + xref direkte;
+    verifisert av mupdf/EmbedPDF/pdf.js, 413 MB-fil annoteres på ~0,3–0,5 s). Under 150 MB: doc-cache
+    med debounced flush. Test: `npm run test:appender`.
 
 ## Tankeboks (ikke planlagt, ikke glemt)
 - **Zotero-integrasjon** (Emils notat 2026-07-12): vurdere kobling mot referanseverktøy — import av PDF-er fra Zotero-bibliotek, eksport av annoteringer/notater tilbake, evt. Better BibTeX-nøkler i referanseoppslaget.

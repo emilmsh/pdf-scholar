@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "A faithful PDF Expert-style PDF reader and annotator for Windows",
   "main": "out/main/index.js",
   "private": true,
@@ -15,16 +15,22 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.extension.json",
     "sample": "node scripts/make-sample-pdf.mjs",
+    "test:engine": "esbuild src/main/annotation-engine-embedpdf.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.engine-test-bundle.mjs && node scripts/test-engine-embedpdf.mjs",
+    "test:appender": "node scripts/test-appender.mjs",
+    "bench:engine": "node scripts/engine-bench.mjs",
     "dist": "npm run build && electron-builder --win"
   },
   "author": "Emil Mathias Strøm Halseth",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
-    "mupdf": "1.28.0"
+    "@embedpdf/engines": "^2.14.4",
+    "@embedpdf/models": "^2.14.4",
+    "@embedpdf/pdfium": "^2.14.4"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
+    "mupdf": "1.28.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.2.0",
