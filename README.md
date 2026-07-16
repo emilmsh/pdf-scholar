@@ -31,16 +31,21 @@ The same viewer, but each PDF opens as an ordinary browser tab instead of the
 browser's built-in reader. Make your browser the default PDF app and double-clicking a
 PDF in Explorer opens it in PDF Scholar too.
 
-The extension is **not on the Chrome Web Store / Edge Add-ons yet**. Publishing there
-takes a separate step — a developer account and a review pass for each store — so
-until that lands you install it manually, which is the normal route for a pre-release
-extension:
+[![Extension download](https://img.shields.io/badge/Edge%20%2F%20Chrome-download%20extension-327cf6?logo=googlechrome&logoColor=white)](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)
 
-1. Build it: `npm run build:ext` → produces `dist-extension/`.
+**[⬇ Download the extension](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)** —
+no build step needed:
+
+1. Download `pdf-scholar-extension.zip` and unzip it anywhere.
 2. Open `edge://extensions` or `chrome://extensions` and turn on **Developer mode**.
-3. **Load unpacked** → select the `dist-extension/` folder.
+3. **Load unpacked** → select the unzipped folder.
 4. For local files (the Explorer double-click case): open the extension's **Details**
    and enable **Allow access to file URLs** — a one-time toggle only you can grant.
+
+The extension is **not on the Chrome Web Store / Edge Add-ons yet** — publishing
+there takes a developer account and a review pass per store, and browsers
+deliberately block one-click installs from anywhere else. Until the store
+listings land, the four steps above are as easy as it gets.
 
 See [`docs/BROWSER-EXTENSION.md`](docs/BROWSER-EXTENSION.md) for the architecture and
 the current desktop-vs-extension parity.
@@ -123,7 +128,7 @@ npm run dist       # NSIS installer (Windows)
 npm run build:ext  # browser-extension bundle → dist-extension/
 ```
 
-Architecture in short: **pdf.js v6 renders, mupdf WASM writes.** The React renderer
+Architecture in short: **pdf.js v6 renders, EmbedPDF (PDFium WASM) writes.** The React renderer
 draws annotations in its own overlay (never pdf.js's editor layer); the Electron main
 process owns the annotation engine, the AI providers and the draft-based save model.
 The renderer is platform-agnostic — every platform call goes through one interface

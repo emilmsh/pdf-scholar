@@ -11,9 +11,7 @@ files:
   - out/**/*
   - '!**/*.map'
 asarUnpack:
-  # mupdf loads its .wasm from disk at runtime
-  - node_modules/mupdf/**
-  # loaded via dynamic import() — keep it on real disk like mupdf
+  # loaded via dynamic import() — keep it on real disk
   - node_modules/@anthropic-ai/sdk/**
 win:
   target:
