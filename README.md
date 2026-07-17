@@ -36,9 +36,10 @@ PDF in Explorer opens it in PDF Scholar too.
 **[⬇ Download the extension](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)** —
 no build step needed:
 
-1. Download `pdf-scholar-extension.zip` and unzip it anywhere.
+1. Download `pdf-scholar-extension.zip` and unzip it anywhere — it unpacks to a
+   single `pdf-scholar-extension` folder.
 2. Open `edge://extensions` or `chrome://extensions` and turn on **Developer mode**.
-3. **Load unpacked** → select the unzipped folder.
+3. **Load unpacked** → select the `pdf-scholar-extension` folder.
 4. For local files (the Explorer double-click case): open the extension's **Details**
    and enable **Allow access to file URLs** — a one-time toggle only you can grant.
 
