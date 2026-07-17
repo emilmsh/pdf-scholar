@@ -301,7 +301,7 @@ export default function PdfViewer({
   /** Which fit the zoom is locked to: a fit mode re-fits when the available
    *  width changes (panel open/close, window resize) so the page never gets
    *  shoved off-centre; 'custom' preserves the exact scale */
-  const [fitMode, setFitMode] = useState<'width' | 'page' | 'custom'>(
+  const [fitMode, setFitMode] = useState<'width' | 'height' | 'page' | 'custom'>(
     initialPosition?.zoom ? 'custom' : 'page'
   )
   const fitModeRef = useRef(fitMode)
@@ -858,6 +858,14 @@ export default function PdfViewer({
     zoomTo((containerWidth - SIDE_PAD) / fitDenom().w)
   }, [sizes, containerWidth, zoomTo, fitDenom])
 
+  /** Fill the viewport height; width may overflow (good for landscape/slides) */
+  const fitHeight = useCallback(() => {
+    const el = containerRef.current
+    if (!el || sizes.length === 0 || el.clientHeight === 0) return
+    setFitMode('height')
+    zoomTo((el.clientHeight - PAD_TOP - PAD_BOTTOM) / fitDenom().h)
+  }, [sizes, zoomTo, fitDenom])
+
   /** Whole page visible (Edge-style toggle companion to fit-width) */
   const fitPage = useCallback(() => {
     const el = containerRef.current
@@ -883,7 +891,11 @@ export default function PdfViewer({
     const denom = fitDenom()
     const fitW = (cw - SIDE_PAD) / denom.w
     const fitH = (ch - PAD_TOP - PAD_BOTTOM) / denom.h
-    const next = clamp(mode === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
+    const next = clamp(
+      mode === 'width' ? fitW : mode === 'height' ? fitH : Math.min(fitW, fitH),
+      ZOOM_MIN,
+      ZOOM_MAX
+    )
     const prev = scaleRef.current
     if (prev <= 0 || Math.abs(next - prev) / prev < 0.002) return
     pendingAnchorRef.current = makeAnchor(cw / 2, ch / 2)
@@ -3026,8 +3038,9 @@ export default function PdfViewer({
         e.preventDefault()
         manualZoom(scaleRef.current / 1.15)
       } else if (e.ctrlKey && e.key === '0') {
+        // Actual size (100%), matching Acrobat/PDF Expert convention
         e.preventDefault()
-        fitWidth()
+        manualZoom(1)
       } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
         // Single-key reading shortcuts (never fire while typing)
         const k = e.key.toLowerCase()
@@ -3221,8 +3234,9 @@ export default function PdfViewer({
           onZoomOut={() => manualZoom(scaleRef.current / 1.15)}
           onZoomTo={(percent) => manualZoom(percent / 100)}
           onFitWidth={fitWidth}
+          onFitHeight={fitHeight}
           onFitPage={fitPage}
-          fitTarget={fitTarget}
+          fitMode={fitMode}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
           dirty={dirty}

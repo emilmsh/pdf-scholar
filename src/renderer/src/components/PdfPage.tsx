@@ -5,9 +5,17 @@ import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
 import { annotationCss, arrowHeadPoints, rgbCss, strokePathData } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
+import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 
 const SHAPE_TYPES = new Set(['square', 'circle', 'line', 'arrow'])
 const SVG_NS = 'http://www.w3.org/2000/svg'
+
+// Canvas bitmaps render at full device-pixel density for crispness on high-DPI
+// screens. These ceilings keep a bitmap under Chromium's limits so a large page
+// at high zoom never silently produces a blank canvas: ~16k px on any side and
+// ~2^28 px total area (both GPU-safe across Chromium/Edge).
+const MAX_CANVAS_DIM = 16384
+const MAX_CANVAS_AREA = 16384 * 16384
 
 interface Props {
   pdf: PDFDocumentProxy
@@ -138,11 +146,26 @@ function PdfPage({
     ;(async () => {
       const page = await pdf.getPage(pageNumber)
       if (cancelled) return
-      const dpr = Math.min(window.devicePixelRatio || 1, 2)
       // Add the user rotation to the page's intrinsic /Rotate (don't replace
       // it) — pdf.js swaps the viewport's width/height for 90°/270° so the
       // canvas, text layer and link layer all come out rotated together.
       const viewport = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 })
+
+      // Target the screen's full pixel density for maximum sharpness, but let
+      // the adaptive controller trade it back toward native when the machine is
+      // struggling to keep raster times within budget. Then clamp so a large
+      // page at high zoom can't exceed Chromium's per-side / total-area canvas
+      // limits (which would render blank).
+      const cssPixels = viewport.width * viewport.height
+      const dpr = Math.max(
+        0.1,
+        Math.min(
+          chooseRenderDpr(cssPixels, window.devicePixelRatio || 1),
+          MAX_CANVAS_DIM / viewport.width,
+          MAX_CANVAS_DIM / viewport.height,
+          Math.sqrt(MAX_CANVAS_AREA / cssPixels)
+        )
+      )
 
       // Render into a detached canvas and swap it in when finished, so the
       // previous (CSS-stretched) bitmap stays visible during zoom — no flash.
@@ -156,7 +179,20 @@ function PdfPage({
         annotationMode: hideAnnots ? AnnotationMode.DISABLE : AnnotationMode.ENABLE
       })
       renderTask = task
-      await task.promise
+      // Time the raster so the controller learns this machine's throughput.
+      // Only feed back clean, completed samples (pixels = 0 skips the sample).
+      beginRender()
+      const startedAt = performance.now()
+      let rasterOk = false
+      try {
+        await task.promise
+        rasterOk = true
+      } finally {
+        endRender(
+          rasterOk && !cancelled ? canvas.width * canvas.height : 0,
+          performance.now() - startedAt
+        )
+      }
       if (cancelled) return
       host.replaceChildren(canvas)
 

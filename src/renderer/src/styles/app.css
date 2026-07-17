@@ -3313,16 +3313,27 @@ button {
 /* Zoom: click the percentage to type an exact value */
 
 .zoom-label {
-  min-width: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 58px;
   text-align: center;
   font-size: 12px;
   color: var(--text);
   border-radius: 6px;
   padding: 3px 4px;
+  font-variant-numeric: tabular-nums;
 }
 
-.zoom-label:hover {
+.zoom-label:hover,
+.zoom-label.is-active {
   background: var(--hover);
+}
+
+.zoom-caret {
+  color: var(--text-secondary);
+  flex: none;
 }
 
 .zoom-input {
@@ -3336,6 +3347,101 @@ button {
   font-size: 12px;
   padding: 2px 4px;
   outline: none;
+}
+
+/* Zoom dropdown (actual size / fit / presets / custom) */
+.zoom-menu-anchor {
+  position: relative;
+}
+
+.zoom-menu {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 220px;
+  padding: 8px;
+}
+
+.zoom-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+
+.zoom-menu-item svg {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.zoom-menu-item span {
+  flex: 1;
+}
+
+.zoom-menu-item .zoom-menu-hint {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-menu-item:hover {
+  background: var(--hover);
+}
+
+.zoom-menu-item.selected {
+  background: var(--active);
+  color: var(--accent);
+}
+
+.zoom-menu-item.selected svg {
+  color: var(--accent);
+}
+
+.zoom-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.zoom-preset {
+  padding: 6px 0;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--text);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.zoom-preset:hover {
+  background: var(--hover);
+}
+
+.zoom-preset.selected {
+  background: var(--active);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.zoom-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.zoom-custom-label {
+  flex: 1;
+}
+
+.zoom-custom-row .zoom-input {
+  width: 56px;
 }
 
 /* Pen and marker get tool-shaped cursors (hotspot at the tip) */

@@ -1,9 +1,14 @@
 // Small stroke-based icons in the style of PDF Expert's minimal line icons.
 interface IconProps {
   size?: number
+  className?: string
 }
 
-function Svg({ size = 18, children }: IconProps & { children: React.ReactNode }): React.JSX.Element {
+function Svg({
+  size = 18,
+  className,
+  children
+}: IconProps & { children: React.ReactNode }): React.JSX.Element {
   return (
     <svg
       width={size}
@@ -15,6 +20,7 @@ function Svg({ size = 18, children }: IconProps & { children: React.ReactNode })
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      className={className}
     >
       {children}
     </svg>
@@ -48,6 +54,12 @@ export const IconMinus = (p: IconProps): React.JSX.Element => (
 export const IconFitWidth = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M7 8l-4 4 4 4M17 8l4 4-4 4M3 12h18" />
+  </Svg>
+)
+
+export const IconFitHeight = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M8 7l4-4 4 4M8 17l4 4 4-4M12 3v18" />
   </Svg>
 )
 

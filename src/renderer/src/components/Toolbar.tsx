@@ -24,6 +24,7 @@ import {
   IconEraser,
   IconEye,
   IconEyeOff,
+  IconFitHeight,
   IconFitPage,
   IconFitWidth,
   IconFullscreen,
@@ -54,6 +55,9 @@ import {
 } from './icons'
 
 export type ToolName = DrawToolType
+
+/** Preset zoom levels in the zoom dropdown (100% lives in "Actual size") */
+const ZOOM_PRESETS = [50, 75, 125, 150, 200] as const
 
 export interface ToolPref {
   color: [number, number, number]
@@ -106,9 +110,10 @@ interface Props {
   onZoomOut(): void
   onZoomTo(percent: number): void
   onFitWidth(): void
+  onFitHeight(): void
   onFitPage(): void
-  /** What the fit toggle offers next (Edge-style width↔page toggle) */
-  fitTarget: 'width' | 'page'
+  /** Current fit mode, so the active fit button can be highlighted */
+  fitMode: 'width' | 'height' | 'page' | 'custom'
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
   /** Unsaved annotation changes exist (enables the save button) */
@@ -173,8 +178,9 @@ export default function Toolbar({
   onZoomOut,
   onZoomTo,
   onFitWidth,
+  onFitHeight,
   onFitPage,
-  fitTarget,
+  fitMode,
   onSettingsChange,
   onToggleSearch,
   dirty,
@@ -193,8 +199,8 @@ export default function Toolbar({
 }: Props): React.JSX.Element {
   useLang()
   const [pageInput, setPageInput] = useState(String(page))
-  const [zoomEditing, setZoomEditing] = useState(false)
   const [zoomInput, setZoomInput] = useState('')
+  const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
@@ -205,6 +211,17 @@ export default function Toolbar({
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
+  const zoomMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!zoomMenuOpen) return
+    const close = (e: Event): void => {
+      if (zoomMenuRef.current && !zoomMenuRef.current.contains(e.target as Node))
+        setZoomMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
+  }, [zoomMenuOpen])
 
   useEffect(() => {
     if (!toolMenu) return
@@ -456,46 +473,100 @@ export default function Toolbar({
         <button className="tb-btn" onClick={onZoomOut} title={t('tb.zoomOutTip')}>
           <IconMinus />
         </button>
-        {zoomEditing ? (
-          <input
-            className="zoom-input"
-            autoFocus
-            value={zoomInput}
-            onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
-            onFocus={(e) => e.currentTarget.select()}
-            onBlur={() => setZoomEditing(false)}
-            onKeyDown={(e) => {
-              e.stopPropagation()
-              if (e.key === 'Enter') {
-                const n = parseInt(zoomInput, 10)
-                if (!Number.isNaN(n)) onZoomTo(n)
-                setZoomEditing(false)
-              }
-              if (e.key === 'Escape') setZoomEditing(false)
-            }}
-            aria-label="Zoom %"
-          />
-        ) : (
+        <div className="zoom-menu-anchor" ref={zoomMenuRef}>
           <button
-            className="zoom-label"
-            title={t('tb.zoomExactTip')}
-            onClick={() => {
-              setZoomInput(String(zoomPercent))
-              setZoomEditing(true)
-            }}
+            className={`zoom-label${zoomMenuOpen ? ' is-active' : ''}`}
+            title={t('tb.zoomMenuTip')}
+            onClick={() => setZoomMenuOpen((o) => !o)}
           >
             {zoomPercent}%
+            <IconChevronDown size={13} className="zoom-caret" />
           </button>
-        )}
+          {zoomMenuOpen && (
+            <div className="theme-menu zoom-menu">
+              <button
+                className={`zoom-menu-item${fitMode === 'custom' && zoomPercent === 100 ? ' selected' : ''}`}
+                onClick={() => {
+                  onZoomTo(100)
+                  setZoomMenuOpen(false)
+                }}
+              >
+                <span>{t('tb.actualSize')}</span>
+                <span className="zoom-menu-hint">Ctrl+0</span>
+              </button>
+              <button
+                className={`zoom-menu-item${fitMode === 'width' ? ' selected' : ''}`}
+                onClick={() => {
+                  onFitWidth()
+                  setZoomMenuOpen(false)
+                }}
+              >
+                <IconFitWidth />
+                <span>{t('tb.fitWidth')}</span>
+              </button>
+              <button
+                className={`zoom-menu-item${fitMode === 'height' ? ' selected' : ''}`}
+                onClick={() => {
+                  onFitHeight()
+                  setZoomMenuOpen(false)
+                }}
+              >
+                <IconFitHeight />
+                <span>{t('tb.fitHeight')}</span>
+              </button>
+              <button
+                className={`zoom-menu-item${fitMode === 'page' ? ' selected' : ''}`}
+                onClick={() => {
+                  onFitPage()
+                  setZoomMenuOpen(false)
+                }}
+              >
+                <IconFitPage />
+                <span>{t('tb.fitPage')}</span>
+              </button>
+              <div className="theme-menu-sep" />
+              <div className="zoom-preset-grid">
+                {ZOOM_PRESETS.map((pct) => (
+                  <button
+                    key={pct}
+                    className={`zoom-preset${fitMode === 'custom' && zoomPercent === pct ? ' selected' : ''}`}
+                    onClick={() => {
+                      onZoomTo(pct)
+                      setZoomMenuOpen(false)
+                    }}
+                  >
+                    {pct}%
+                  </button>
+                ))}
+              </div>
+              <div className="theme-menu-sep" />
+              <div className="zoom-custom-row">
+                <span className="zoom-custom-label">{t('tb.customZoom')}</span>
+                <input
+                  className="zoom-input"
+                  value={zoomInput}
+                  placeholder={String(zoomPercent)}
+                  onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onKeyDown={(e) => {
+                    e.stopPropagation()
+                    if (e.key === 'Enter') {
+                      const n = parseInt(zoomInput, 10)
+                      if (!Number.isNaN(n)) onZoomTo(n)
+                      setZoomInput('')
+                      setZoomMenuOpen(false)
+                    }
+                    if (e.key === 'Escape') setZoomMenuOpen(false)
+                  }}
+                  aria-label={t('tb.customZoom')}
+                />
+                <span>%</span>
+              </div>
+            </div>
+          )}
+        </div>
         <button className="tb-btn" onClick={onZoomIn} title={t('tb.zoomInTip')}>
           <IconPlus />
-        </button>
-        <button
-          className="tb-btn"
-          onClick={fitTarget === 'page' ? onFitPage : onFitWidth}
-          title={fitTarget === 'page' ? t('tb.fitPageTip') : t('tb.fitWidthTip')}
-        >
-          {fitTarget === 'page' ? <IconFitPage /> : <IconFitWidth />}
         </button>
       </div>
 
