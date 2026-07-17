@@ -8,6 +8,19 @@
       "port": 5199
     },
     {
+      "name": "homepage-static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "-y",
+        "http-server",
+        "C:/Users/EmilMathiasStrømHals/Documents/GitHub/emilmsh.github.io",
+        "-p",
+        "5320",
+        "-c-1"
+      ],
+      "port": 5320
+    },
+    {
       "name": "scratchpad-static",
       "runtimeExecutable": "npx",
       "runtimeArgs": [

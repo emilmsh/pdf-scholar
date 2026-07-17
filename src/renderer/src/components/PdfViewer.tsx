@@ -84,9 +84,24 @@ interface DocResources {
   port: Worker
 }
 
+// pdf.js side-loads binary companions from URLs: wasm image decoders (scanned
+// pages are JBIG2/JPX — without wasmUrl they render BLANK), CJK CMaps, the 14
+// standard fonts and a CMYK ICC profile. vite.pdfjs-assets.ts ships the dirs
+// next to index.html in every target, so resolving against the page URL works
+// under http (dev), file:// (packaged app) and chrome-extension:// (extension)
+// — pdf.js falls back to XHR for the non-http schemes.
+const pdfjsAssetUrl = (dir: string): string => new URL(`${dir}/`, document.baseURI).href
+
 function openDocument(data: Uint8Array): DocResources {
   const port = new PdfWorkerCtor()
-  const task = getDocument({ data, worker: PDFWorker.create({ port }) })
+  const task = getDocument({
+    data,
+    worker: PDFWorker.create({ port }),
+    wasmUrl: pdfjsAssetUrl('wasm'),
+    cMapUrl: pdfjsAssetUrl('cmaps'),
+    standardFontDataUrl: pdfjsAssetUrl('standard_fonts'),
+    iccUrl: pdfjsAssetUrl('iccs')
+  })
   return { task, port }
 }
 

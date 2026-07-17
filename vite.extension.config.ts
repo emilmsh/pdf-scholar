@@ -8,6 +8,7 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } fro
 import { resolve } from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { pdfjsAssets } from './vite.pdfjs-assets'
 
 const extensionDir = resolve(__dirname, 'src/extension')
 const outDir = resolve(__dirname, 'dist-extension')
@@ -36,7 +37,7 @@ function copyManifest(): Plugin {
 export default defineConfig({
   root: extensionDir,
   base: './',
-  plugins: [react(), copyManifest()],
+  plugins: [react(), copyManifest(), pdfjsAssets()],
   build: {
     outDir,
     emptyOutDir: true,
