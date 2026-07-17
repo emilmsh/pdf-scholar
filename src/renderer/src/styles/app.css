@@ -1709,7 +1709,9 @@ button {
   top: 54px;
   right: 14px;
   z-index: 55;
-  width: 380px;
+  /* Wide enough that the query input isn't squeezed to a few characters by
+     the mode toggle + counter + nav buttons sharing its row */
+  width: 500px;
   max-width: calc(100vw - 28px);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -1760,21 +1762,54 @@ button {
   text-decoration: underline;
 }
 
-.search-row input {
+/* The query field: a bordered wrapper holding the input plus the Aa / |ab|
+   toggles, so the toggles ride inside the field instead of eating row width */
+.search-field {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
   height: 30px;
-  padding: 0 10px;
-  font: inherit;
-  color: var(--text);
+  padding-right: 3px;
   background: var(--bg-chrome);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.search-field:focus-within {
+  border-color: var(--accent);
+}
+
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 4px 0 10px;
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: none;
   outline: none;
 }
 
-.search-row input:focus {
-  border-color: var(--accent);
+.search-field-opt {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.search-field-opt:hover {
+  background: var(--hover);
+}
+
+.search-field-opt.is-active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
 }
 
 .search-status {
@@ -1783,16 +1818,6 @@ button {
   white-space: nowrap;
   padding: 0 4px;
   font-variant-numeric: tabular-nums;
-}
-
-.search-opt {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.search-opt.is-active {
-  color: var(--accent);
 }
 
 .search-row .tb-btn:disabled {

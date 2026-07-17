@@ -110,24 +110,46 @@ export default function SearchBar({
             ✦ {t('search.modeAi')}
           </button>
         </div>
-        <input
-          ref={inputRef}
-          value={query}
-          placeholder={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
-          onChange={(e) => onQueryChange(e.target.value)}
-          onKeyDown={(e) => {
-            e.stopPropagation()
-            if (isAi) {
-              if (e.key === 'Enter') onAiSearch()
-              else if (e.key === 'Escape') onClose()
-            } else {
-              if (e.key === 'Enter' && e.shiftKey) onPrev()
-              else if (e.key === 'Enter') onNext()
-              else if (e.key === 'Escape') onClose()
-            }
-          }}
-          aria-label={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
-        />
+        {/* The option toggles live INSIDE the field (VS Code-style) so they
+            don't shrink the visible query text by taking their own row slots */}
+        <div className="search-field">
+          <input
+            ref={inputRef}
+            value={query}
+            placeholder={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (isAi) {
+                if (e.key === 'Enter') onAiSearch()
+                else if (e.key === 'Escape') onClose()
+              } else {
+                if (e.key === 'Enter' && e.shiftKey) onPrev()
+                else if (e.key === 'Enter') onNext()
+                else if (e.key === 'Escape') onClose()
+              }
+            }}
+            aria-label={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
+          />
+          {!isAi && (
+            <>
+              <button
+                className={`search-field-opt${options.matchCase ? ' is-active' : ''}`}
+                onClick={() => onOptionsChange({ ...options, matchCase: !options.matchCase })}
+                title={t('search.matchCaseTip')}
+              >
+                Aa
+              </button>
+              <button
+                className={`search-field-opt${options.wholeWords ? ' is-active' : ''}`}
+                onClick={() => onOptionsChange({ ...options, wholeWords: !options.wholeWords })}
+                title={t('search.wholeWordsTip')}
+              >
+                |ab|
+              </button>
+            </>
+          )}
+        </div>
         <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
         {!isAi && (
           <>
@@ -136,20 +158,6 @@ export default function SearchBar({
             </button>
             <button className="tb-btn" onClick={onNext} disabled={count === 0} title={t('search.nextTip')}>
               ↓
-            </button>
-            <button
-              className={`tb-btn search-opt${options.matchCase ? ' is-active' : ''}`}
-              onClick={() => onOptionsChange({ ...options, matchCase: !options.matchCase })}
-              title={t('search.matchCaseTip')}
-            >
-              Aa
-            </button>
-            <button
-              className={`tb-btn search-opt${options.wholeWords ? ' is-active' : ''}`}
-              onClick={() => onOptionsChange({ ...options, wholeWords: !options.wholeWords })}
-              title={t('search.wholeWordsTip')}
-            >
-              |ab|
             </button>
           </>
         )}
