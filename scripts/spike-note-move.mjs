@@ -2,9 +2,11 @@
 // and verify the rect moved. Mirrors annotation-engine's update path.
 import * as mupdf from 'mupdf'
 import { readFileSync, writeFileSync, copyFileSync } from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 
-const SRC = 'C:/Users/EmilMathiasStrømHals/Documents/GitHub/pdfexpert clone/src/renderer/public/sample.pdf'
-const TMP = 'C:/Emil/temp/claude/C--Users-EmilMathiasStr-mHals-Documents-GitHub-pdfexpert-clone/0fa094fd-bd2a-4477-860c-1cd9e844b41e/scratchpad/note-move-test.pdf'
+const SRC = path.join(import.meta.dirname, '../src/renderer/public/sample.pdf')
+const TMP = path.join(os.tmpdir(), 'note-move-test.pdf')
 copyFileSync(SRC, TMP)
 
 // 1. Create a note at (100, 100)

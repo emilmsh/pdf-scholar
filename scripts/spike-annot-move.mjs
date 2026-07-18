@@ -4,9 +4,11 @@
 // after reopening. Companion to spike-note-move.mjs (setRect path).
 import * as mupdf from 'mupdf'
 import { readFileSync, writeFileSync, copyFileSync } from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 
-const SRC = 'C:/Users/EmilMathiasStrømHals/Documents/GitHub/pdfexpert clone/src/renderer/public/sample.pdf'
-const TMP = 'C:/Emil/temp/claude/C--Users-EmilMathiasStr-mHals-Documents-GitHub-pdfexpert-clone/0fa094fd-bd2a-4477-860c-1cd9e844b41e/scratchpad/annot-move-test.pdf'
+const SRC = path.join(import.meta.dirname, '../src/renderer/public/sample.pdf')
+const TMP = path.join(os.tmpdir(), 'annot-move-test.pdf')
 copyFileSync(SRC, TMP)
 
 const DX = 40

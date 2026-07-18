@@ -8,4 +8,4 @@ release/
 *.local
 scripts/.engine-test-bundle.mjs
 scripts/spike-*output*.pdf
-.claude/worktrees/
+.claude/
