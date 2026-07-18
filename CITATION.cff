@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: If you use this software, please cite it as below.
+title: PDF Scholar
+type: software
+authors:
+  - family-names: Halseth
+    given-names: Emil Mathias Strøm
+repository-code: https://github.com/emilmsh/pdf-scholar
+url: https://emilmsh.github.io
+license: MIT
+abstract: >-
+  A reading-first PDF reader and annotator for Windows, built for people who
+  read to work — real PDF annotations, grounded AI assistance with clickable
+  citations, and Norwegian/English UI. Available as a desktop app and a
+  browser extension.
+keywords:
+  - pdf
+  - annotation
+  - reading
+  - research-tools
+  - electron

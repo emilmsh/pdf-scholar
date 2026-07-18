@@ -142,6 +142,11 @@ road ahead.
 Personal project under active development. Installers are attached to the
 [GitHub releases](https://github.com/emilmsh/pdf-scholar/releases).
 
+## Citing
+
+If PDF Scholar was useful in your research workflow, a citation is appreciated —
+use GitHub's **Cite this repository** button, backed by [`CITATION.cff`](CITATION.cff).
+
 ## License
 
 PDF Scholar is licensed under the **[MIT License](LICENSE)**. Every bundled
