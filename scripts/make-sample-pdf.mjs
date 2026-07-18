@@ -16,10 +16,10 @@ const BODY_SIZE = 11.5
 const LEADING = 17
 
 const LOREM = [
-  'Dette er et eksempeldokument for PDFX, en tro kopi av PDF Expert for Windows.',
+  'Dette er et eksempeldokument for PDF Scholar, en lese- og annoteringsapp laget for forskning.',
   'Målet med appen er en vakker og distraksjonsfri leseopplevelse, med annoteringsverktøy som alltid er lett tilgjengelige, god navigasjon i dokumentet og full kontroll over lesemodus og kontrast.',
   'Avsnittet du leser nå finnes bare for å fylle siden med tekst, slik at tekstmarkering, søk og annotering kan testes på ekte innhold. Marker gjerne en setning for å prøve markeringsverktøyet.',
-  'God typografi og rolige farger er en stor del av grunnen til at PDF Expert oppleves så behagelig. Denne kopien forsøker å gjenskape den samme roen: dempede verktøylinjer, myke skygger og et lesefelt som får all oppmerksomheten.',
+  'God typografi og rolige farger gjør lange lesestunder behagelige. Dempede verktøylinjer, myke skygger og et lesefelt som får all oppmerksomheten er en sentral del av designet.',
   'Når du følger en intern lenke i et dokument, skal det alltid være enkelt å komme tilbake til der du var. Navigasjonshistorikk med en tydelig tilbake-knapp er derfor en sentral del av planen.',
   'Sepia- og nattmodus er mer enn bare estetikk. For lange lesestunder betyr riktig kontrast mindre slitne øyne, og derfor skal kontrasten i hver lesemodus kunne justeres.'
 ]
@@ -54,13 +54,13 @@ const doc = await PDFDocument.create()
 const body = await doc.embedFont(StandardFonts.Helvetica)
 const bold = await doc.embedFont(StandardFonts.HelveticaBold)
 
-doc.setTitle('PDFX eksempeldokument')
+doc.setTitle('PDF Scholar eksempeldokument')
 
 // Cover page (TOC list is drawn after the sections are laid out)
 const cover = doc.addPage([W, H])
-cover.drawText('PDFX', { x: MARGIN, y: H - 260, size: 64, font: bold, color: rgb(0.2, 0.45, 0.95) })
+cover.drawText('PDF Scholar', { x: MARGIN, y: H - 260, size: 52, font: bold, color: rgb(0.2, 0.45, 0.95) })
 cover.drawText('Eksempeldokument', { x: MARGIN, y: H - 300, size: 20, font: body, color: rgb(0.2, 0.2, 0.22) })
-cover.drawText('En tro kopi av PDF Expert – for Windows', {
+cover.drawText('Laget for forskning – PDF-lesing og annotering for Windows', {
   x: MARGIN,
   y: H - 326,
   size: 12,
@@ -129,7 +129,7 @@ const tocLinks = []
     })
     ty -= 22
   }
-  cover.drawText('Les mer på pdfexpert.com', { x: MARGIN, y: 80, size: 10, font: body, color: rgb(0.45, 0.45, 0.48) })
+  cover.drawText('Les mer på github.com/emilmsh/pdf-scholar', { x: MARGIN, y: 80, size: 10, font: body, color: rgb(0.45, 0.45, 0.48) })
 }
 
 const generated = await doc.save()
@@ -151,7 +151,7 @@ const coverPage = pdf.loadPage(0)
 for (const link of tocLinks) {
   coverPage.createLink(link.rect, destUri(link.pageIndex, link.destY))
 }
-coverPage.createLink([MARGIN - 2, H - 94, MARGIN + 140, H - 74], 'https://pdfexpert.com/')
+coverPage.createLink([MARGIN - 2, H - 94, MARGIN + 220, H - 74], 'https://github.com/emilmsh/pdf-scholar')
 
 // Pre-existing annotations "from another app" so select/edit/delete of
 // foreign annotations can be tested
@@ -163,7 +163,7 @@ coverPage.createLink([MARGIN - 2, H - 94, MARGIN + 140, H - 74], 'https://pdfexp
     hl.setQuadPoints(hits[0])
     hl.setColor([0.494, 0.827, 0.494])
     hl.setOpacity(0.5)
-    hl.setAuthor('PDF Expert (test)')
+    hl.setAuthor('En annen app (test)')
     hl.setCreationDate(new Date('2026-07-01T10:00:00Z'))
     hl.update()
   }
@@ -172,7 +172,7 @@ coverPage.createLink([MARGIN - 2, H - 94, MARGIN + 140, H - 74], 'https://pdfexp
   note.setRect([W - MARGIN - 20, 120, W - MARGIN, 140])
   note.setColor([1, 0.835, 0.29])
   note.setContents('Et eksisterende notat fra en annen app.')
-  note.setAuthor('PDF Expert (test)')
+  note.setAuthor('En annen app (test)')
   note.setIcon('Note')
   note.setIsOpen(false)
   note.update()

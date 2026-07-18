@@ -73,6 +73,9 @@ the current desktop-vs-extension parity.
   into its own window** to put two documents side by side
 
 **Annotation**
+
+![Annotation tools](docs/screenshots/annotations.png)
+
 - Highlight, underline, strikeout, squiggly — with labeled color rows and custom hex
   colors
 - Pen and marker with hold-to-straighten (hold still mid-stroke to snap a straight line)
@@ -116,7 +119,10 @@ the current desktop-vs-extension parity.
 
 Norwegian and English UI throughout — the language also drives the AI prompts, export
 documents and date formats. The Sepia theme brings a warm ivory reading mood with a
-terracotta accent, calm on the eyes for long sessions.
+terracotta accent, calm on the eyes for long sessions — and the two night modes keep
+late reading easy on the eyes.
+
+![Night theme](docs/screenshots/night.png)
 
 ## Development
 
