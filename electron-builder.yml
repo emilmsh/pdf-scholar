@@ -40,13 +40,19 @@ mac:
   # required for the binary to run at all on Apple Silicon. Gatekeeper will
   # show the "damaged/unverified" flow; README documents the workaround.
   # Do NOT set identity: null (that would skip signing entirely).
+  #
+  # SEPARATE arm64 + x64 dmgs, NOT a universal binary: @electron/universal's
+  # asar merge throws "pattern is too long" on this app's file set, and a
+  # universal binary buys us nothing here (unsigned → no auto-update anyway;
+  # two smaller downloads are actually better). Apple Silicon users take the
+  # -arm64 dmg, Intel users the -x64.
   notarize: false
   target:
     - target: dmg
-      arch: [universal]
+      arch: [arm64, x64]
   icon: build/icon.png
   category: public.app-category.productivity
-  artifactName: PDF-Scholar-${version}.${ext}
+  artifactName: PDF-Scholar-${version}-${arch}.${ext}
 dmg:
   writeUpdateInfo: false
 linux:
