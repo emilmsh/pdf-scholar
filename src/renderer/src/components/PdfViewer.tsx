@@ -52,6 +52,11 @@ import {
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
 import {
+  browserCurrentBytes,
+  registerBrowserDoc,
+  releaseBrowserDoc
+} from '../annotation-engine-browser'
+import {
   buildAiDocument,
   chatSystem,
   citationPage,
@@ -301,7 +306,7 @@ export default function PdfViewer({
   /** Which fit the zoom is locked to: a fit mode re-fits when the available
    *  width changes (panel open/close, window resize) so the page never gets
    *  shoved off-centre; 'custom' preserves the exact scale */
-  const [fitMode, setFitMode] = useState<'width' | 'height' | 'page' | 'custom'>(
+  const [fitMode, setFitMode] = useState<'width' | 'page' | 'custom'>(
     initialPosition?.zoom ? 'custom' : 'page'
   )
   const fitModeRef = useRef(fitMode)
@@ -492,6 +497,10 @@ export default function PdfViewer({
 
   useEffect(() => {
     let destroyed = false
+    // In the browser the annotation engine edits an in-memory twin of the
+    // document (desktop edits a draft file instead) — register the bytes so
+    // bridge.annotate/update/delete have a document to write into.
+    if (!isElectron) registerBrowserDoc(payload.path, payload.data)
     // pdf.js transfers the underlying buffer to its worker, so hand it a copy
     const resources = openDocument(payload.data.slice())
     docResourcesRef.current = resources
@@ -514,6 +523,7 @@ export default function PdfViewer({
     })
     return () => {
       destroyed = true
+      if (!isElectron) void releaseBrowserDoc(payload.path)
       // Destroy whatever is CURRENT (a reload may have swapped resources)
       docResourcesRef.current?.task.destroy()
       docResourcesRef.current?.port.terminate()
@@ -521,13 +531,22 @@ export default function PdfViewer({
     }
   }, [payload])
 
-  /** Re-open the file after the engine rewrote it, seamlessly swapping the
-   *  document (old canvases stay visible until re-rendered). */
+  /** Re-open the document after the engine rewrote it, seamlessly swapping it
+   *  (old canvases stay visible until re-rendered). Desktop re-reads the draft
+   *  file; the browser serializes the live in-memory document — same effect:
+   *  pdf.js repaints file annotations as the engine now has them. */
   const reloadDocument = useCallback(async () => {
-    if (!isElectron) return
-    const result = await bridge.readFile(payload.path)
-    if ('error' in result) return
-    const resources = openDocument(result.data.slice())
+    let data: Uint8Array
+    if (isElectron) {
+      const result = await bridge.readFile(payload.path)
+      if ('error' in result) return
+      data = result.data
+    } else {
+      const bytes = await browserCurrentBytes(payload.path)
+      if (!bytes) return
+      data = bytes
+    }
+    const resources = openDocument(data.slice())
     try {
       const doc = await resources.task.promise
       const fileAnnots = await collectAnnotations(doc)
@@ -858,14 +877,6 @@ export default function PdfViewer({
     zoomTo((containerWidth - SIDE_PAD) / fitDenom().w)
   }, [sizes, containerWidth, zoomTo, fitDenom])
 
-  /** Fill the viewport height; width may overflow (good for landscape/slides) */
-  const fitHeight = useCallback(() => {
-    const el = containerRef.current
-    if (!el || sizes.length === 0 || el.clientHeight === 0) return
-    setFitMode('height')
-    zoomTo((el.clientHeight - PAD_TOP - PAD_BOTTOM) / fitDenom().h)
-  }, [sizes, zoomTo, fitDenom])
-
   /** Whole page visible (Edge-style toggle companion to fit-width) */
   const fitPage = useCallback(() => {
     const el = containerRef.current
@@ -891,11 +902,7 @@ export default function PdfViewer({
     const denom = fitDenom()
     const fitW = (cw - SIDE_PAD) / denom.w
     const fitH = (ch - PAD_TOP - PAD_BOTTOM) / denom.h
-    const next = clamp(
-      mode === 'width' ? fitW : mode === 'height' ? fitH : Math.min(fitW, fitH),
-      ZOOM_MIN,
-      ZOOM_MAX
-    )
+    const next = clamp(mode === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
     const prev = scaleRef.current
     if (prev <= 0 || Math.abs(next - prev) / prev < 0.002) return
     pendingAnchorRef.current = makeAnchor(cw / 2, ch / 2)
@@ -1368,14 +1375,50 @@ export default function PdfViewer({
   }, [payload.path])
 
   const saveDocument = useCallback(async () => {
-    const result = await bridge.docSave(payload.path)
-    if (result && 'error' in result) {
+    // Electron writes annotation changes back to the file in place via the
+    // in-process engine.
+    if (isElectron) {
+      const result = await bridge.docSave(payload.path)
+      if (result && 'error' in result) {
+        showToast(t('viewer.saveFailed', { error: result.error }))
+        return
+      }
+      setDirty(false)
+      showToast(t('viewer.saved'))
+      return
+    }
+    // Browser/extension: the engine's live document already carries every
+    // annotation edit (create/update/delete — session AND pre-existing file
+    // annotations). Serialize it, then overwrite the local file if it was
+    // opened from disk, or save-picker/download for a URL-opened PDF.
+    const bytes = await browserCurrentBytes(payload.path)
+    if (!bytes) {
+      showToast(t('viewer.saveFailed', { error: 'dokumentet er ikke åpent' }))
+      return
+    }
+    const result = await bridge.saveDocumentBytes(payload.path, payload.name, bytes)
+    if (!result) return // user cancelled the location picker
+    if ('error' in result) {
       showToast(t('viewer.saveFailed', { error: result.error }))
       return
     }
     setDirty(false)
     showToast(t('viewer.saved'))
-  }, [payload.path, showToast])
+  }, [payload.path, payload.name, payload.data, showToast])
+
+  // Save a copy to a user-chosen location. Electron pulls the current bytes
+  // (draft-or-original) from `path`; the browser serializes its live document
+  // so the copy carries annotation edits — parity with the desktop draft.
+  const saveDocumentAs = useCallback(async () => {
+    const bytes = isElectron ? payload.data.slice() : ((await browserCurrentBytes(payload.path)) ?? payload.data.slice())
+    const result = await bridge.saveFileAs(payload.name, bytes, payload.path)
+    if (!result) return // user cancelled the dialog
+    if ('error' in result) {
+      showToast(t('viewer.saveFailed', { error: result.error }))
+      return
+    }
+    showToast(t('viewer.savedCopy'))
+  }, [payload.name, payload.data, payload.path, showToast])
 
   /** Immutably patch one page's annotation list */
   const mutatePage = useCallback(
@@ -1659,20 +1702,6 @@ export default function PdfViewer({
     [persistAnnotation]
   )
 
-  const placeFreeText = useCallback(
-    (pageNumber: number, x: number, y: number, clientX: number, clientY: number) => {
-      // Pointerdown fires before the editor's blur: clicking outside an open
-      // draft must commit it in place, never re-anchor it under the cursor.
-      const editor = document.querySelector<HTMLTextAreaElement>('.freetext-editor')
-      if (editor) {
-        editor.blur()
-        return
-      }
-      setFreeTextDraft({ pageNumber, x, y, clientX, clientY, w: 200, h: 48 })
-    },
-    []
-  )
-
   /** Re-open an existing FreeText box in the editor (double-click) so its text
    *  and box size can be changed after insertion; commit updates it in place. */
   const openFreeTextEditor = useCallback((pageNumber: number, record: PageAnnotation) => {
@@ -1692,6 +1721,31 @@ export default function PdfViewer({
       text: record.contents ?? ''
     })
   }, [])
+
+  const placeFreeText = useCallback(
+    (pageNumber: number, x: number, y: number, clientX: number, clientY: number) => {
+      // Pointerdown fires before the editor's blur: clicking outside an open
+      // draft must commit it in place, never re-anchor it under the cursor.
+      const editor = document.querySelector<HTMLTextAreaElement>('.freetext-editor')
+      if (editor) {
+        editor.blur()
+        return
+      }
+      // Clicking an existing text box with the tool armed edits that box —
+      // stacking a fresh draft on top of it is never what the user meant.
+      const existing = annotationHitTest(
+        (annotsRef.current.get(pageNumber) ?? []).filter((a) => a.type === 'freetext'),
+        x,
+        y
+      )
+      if (existing) {
+        openFreeTextEditor(pageNumber, existing)
+        return
+      }
+      setFreeTextDraft({ pageNumber, x, y, clientX, clientY, w: 200, h: 48 })
+    },
+    [openFreeTextEditor]
+  )
 
   // Commit the editor. `wPt`/`hPt` are the editor's drag-resized box in page
   // points; editing an existing box resizes/edits it in place, otherwise a new
@@ -1714,6 +1768,9 @@ export default function PdfViewer({
         fontSize: FREETEXT_SIZE
       })
       setFreeTextDraft(null)
+      // Text boxes are one-shot: unlike pen strokes, nobody places several in
+      // a row, and a lingering armed tool blocks selecting/moving the new box
+      setActiveTool((tool) => (tool === 'text' ? null : tool))
     },
     [freeTextDraft, persistAnnotation, changeAnnotation]
   )
@@ -2037,12 +2094,8 @@ export default function PdfViewer({
         const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
         const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
         if (hit) {
-          // A text box goes straight into text editing — the properties
-          // popover (colour/delete) stays on right-click, where it belongs.
-          if (hit.type === 'freetext') {
-            openFreeTextEditor(pageNumber, hit)
-            return
-          }
+          // PDF Expert model: a single click SELECTS a text box (frame +
+          // drag-to-move); double-click opens the text editor.
           setSelected({ pageNumber, localId: hit.id })
           setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
         } else {
@@ -2050,7 +2103,7 @@ export default function PdfViewer({
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient, applyMarkup, openFreeTextEditor]
+    [openMenuAt, pagePointFromClient, applyMarkup]
   )
 
   // Double-click a text box to re-open it in the editor (edit text + resize the
@@ -2214,9 +2267,15 @@ export default function PdfViewer({
       if (!drag.moved) {
         // Touch taps never get the compat mouseup (touchstart preventDefault
         // suppresses it), so give them the same affordance as a mouse click:
-        // text boxes open for editing, everything else gets the popover.
+        // tap selects (frame + popover); a second tap on an already-selected
+        // text box opens the editor (the touch stand-in for double-click).
         if (e.pointerType === 'touch') {
-          if (drag.record.type === 'freetext') {
+          const sel = selectedRef.current
+          if (
+            drag.record.type === 'freetext' &&
+            sel?.pageNumber === drag.pageNumber &&
+            sel.localId === drag.record.id
+          ) {
             openFreeTextEditor(drag.pageNumber, drag.record)
           } else {
             setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id })
@@ -3003,7 +3062,13 @@ export default function PdfViewer({
         goForward()
       } else if (e.ctrlKey && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault()
-        if (dirty) void saveDocument()
+        // Electron writes changes back in place (only when there are changes);
+        // web/extension bakes annotations and saves to disk (overwrite/download).
+        if (isElectron) {
+          if (dirty) void saveDocument()
+        } else {
+          void saveDocument()
+        }
       } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && (selected ?? annotPopover)) {
         e.preventDefault()
         const target = selected ?? annotPopover!
@@ -3105,6 +3170,7 @@ export default function PdfViewer({
     stopReadAloud,
     dirty,
     saveDocument,
+    saveDocumentAs,
     searchOpen,
     searchHits,
     fullscreen,
@@ -3221,7 +3287,6 @@ export default function PdfViewer({
           onMarkupColorChange={(color) =>
             setMarkupColors((prev) => ({ ...prev, [markupTool ?? 'highlight']: color }))
           }
-          rotation={rotation}
           spread={spread}
           onRotate={rotateView}
           onToggleSpread={toggleSpread}
@@ -3234,19 +3299,33 @@ export default function PdfViewer({
           onZoomOut={() => manualZoom(scaleRef.current / 1.15)}
           onZoomTo={(percent) => manualZoom(percent / 100)}
           onFitWidth={fitWidth}
-          onFitHeight={fitHeight}
           onFitPage={fitPage}
           fitMode={fitMode}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
           dirty={dirty}
           onSave={() => void saveDocument()}
+          onSaveAs={() => void saveDocumentAs()}
+          canSaveInPlace={isElectron}
           annotsHidden={annotsHidden}
           onToggleAnnots={() => setAnnotsHidden((h) => !h)}
           onPrint={() => {
-            void bridge.printFile(payload.path).then((result) => {
+            void (async () => {
+              // Browser parity: print the live document (annotation edits
+              // included) via a blob in Chromium's viewer — the desktop prints
+              // the draft file the same way through a hidden window.
+              if (!isElectron) {
+                const bytes = await browserCurrentBytes(payload.path)
+                if (bytes) {
+                  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }))
+                  window.open(url, '_blank', 'noopener')
+                  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                  return
+                }
+              }
+              const result = await bridge.printFile(payload.path)
               if (result && 'error' in result) showToast(t('viewer.printFailed', { error: result.error }))
-            })
+            })()
           }}
           readAloudOpen={readAloud !== 'closed'}
           onToggleReadAloud={() => {
@@ -3261,19 +3340,16 @@ export default function PdfViewer({
           onToggleFullscreen={toggleFullscreen}
         />
       </div>
+      {/* Tucked-toolbar reveal: mouse hovers this top hot-zone; touch swipes
+          down from the top edge (handled in the touch effect) — no permanent
+          on-screen affordance. */}
       {immersive && <div className="reveal-zone" onMouseEnter={() => setToolbarPeek(true)} />}
-      {/* Tap affordance for the tucked toolbar: hover has no touch twin, so a
-          small always-visible grip marks the spot and a tap reveals. Subtle
-          enough not to disturb mouse users (who also get it as a hint). */}
-      {immersive && !toolbarVisible && (
-        <button className="toolbar-grip" title={t('tb.revealTip')} onClick={revealToolbarTouch} />
-      )}
 
       {/* Edge rails — pointer near an edge fades the HANDLE in (window-level
           hint, no interactive strip: the pages scrollbar at the right edge
           must stay clickable). Resting on the handle peeks the panel; click
           toggles it pinned. */}
-      <div className={`edge-rail edge-rail-left${tocVisible ? ' active' : ''}${edgeHint === 'left' ? ' hint' : ''}`}>
+      <div className={`edge-rail edge-rail-left${tocVisible ? ' panel-open' : ''}${edgeHint === 'left' && !tocVisible ? ' hint' : ''}`}>
         <span
           className="edge-rail-handle"
           title={t('tb.tocRailTip')}
@@ -3290,7 +3366,7 @@ export default function PdfViewer({
           <IconPanelLeft size={15} />
         </span>
       </div>
-      <div className={`edge-rail edge-rail-right${aiVisible ? ' active' : ''}${edgeHint === 'right' ? ' hint' : ''}`}>
+      <div className={`edge-rail edge-rail-right${aiVisible ? ' panel-open' : ''}${edgeHint === 'right' && !aiVisible ? ' hint' : ''}`}>
         <span
           className="edge-rail-handle"
           title={t('tb.aiRailTip')}

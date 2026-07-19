@@ -3,8 +3,7 @@ import type {
   LanguagePreference,
   Settings,
   ThemeName,
-  ThemePreference,
-  ViewRotation
+  ThemePreference
 } from '../../../shared/types'
 import {
   annotTypeLabel,
@@ -24,7 +23,7 @@ import {
   IconEraser,
   IconEye,
   IconEyeOff,
-  IconFitHeight,
+  IconActualSize,
   IconFitPage,
   IconFitWidth,
   IconFullscreen,
@@ -36,7 +35,7 @@ import {
   IconPlus,
   IconPresent,
   IconPrint,
-  IconRotateCcw,
+  IconSaveAs,
   IconRotateCw,
   IconSave,
   IconSearch,
@@ -55,9 +54,6 @@ import {
 } from './icons'
 
 export type ToolName = DrawToolType
-
-/** Preset zoom levels in the zoom dropdown (100% lives in "Actual size") */
-const ZOOM_PRESETS = [50, 75, 125, 150, 200] as const
 
 export interface ToolPref {
   color: [number, number, number]
@@ -96,8 +92,7 @@ interface Props {
   markupColor: [number, number, number]
   onMarkupSelect(type: MarkupToolType | null): void
   onMarkupColorChange(color: [number, number, number]): void
-  /** View rotation + two-page spread (view menu controls) */
-  rotation: ViewRotation
+  /** View rotation + two-page spread (reading controls next to zoom) */
   spread: boolean
   onRotate(dir: 1 | -1): void
   onToggleSpread(): void
@@ -110,15 +105,19 @@ interface Props {
   onZoomOut(): void
   onZoomTo(percent: number): void
   onFitWidth(): void
-  onFitHeight(): void
   onFitPage(): void
   /** Current fit mode, so the active fit button can be highlighted */
-  fitMode: 'width' | 'height' | 'page' | 'custom'
+  fitMode: 'width' | 'page' | 'custom'
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
   /** Unsaved annotation changes exist (enables the save button) */
   dirty: boolean
   onSave(): void
+  /** Save a copy of the document to a user-chosen location */
+  onSaveAs(): void
+  /** Platform can write annotation changes back to the file in place (Electron).
+   *  When false the in-place Save button is hidden — Save-to-disk is the save. */
+  canSaveInPlace: boolean
   /** All annotations temporarily hidden (clean reading view) */
   annotsHidden: boolean
   onToggleAnnots(): void
@@ -165,7 +164,6 @@ export default function Toolbar({
   markupColor,
   onMarkupSelect,
   onMarkupColorChange,
-  rotation,
   spread,
   onRotate,
   onToggleSpread,
@@ -178,13 +176,14 @@ export default function Toolbar({
   onZoomOut,
   onZoomTo,
   onFitWidth,
-  onFitHeight,
   onFitPage,
   fitMode,
   onSettingsChange,
   onToggleSearch,
   dirty,
   onSave,
+  onSaveAs,
+  canSaveInPlace,
   annotsHidden,
   onToggleAnnots,
   onPrint,
@@ -199,8 +198,8 @@ export default function Toolbar({
 }: Props): React.JSX.Element {
   useLang()
   const [pageInput, setPageInput] = useState(String(page))
+  const [zoomEditing, setZoomEditing] = useState(false)
   const [zoomInput, setZoomInput] = useState('')
-  const [zoomMenuOpen, setZoomMenuOpen] = useState(false)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
@@ -211,17 +210,6 @@ export default function Toolbar({
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
-  const zoomMenuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!zoomMenuOpen) return
-    const close = (e: Event): void => {
-      if (zoomMenuRef.current && !zoomMenuRef.current.contains(e.target as Node))
-        setZoomMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [zoomMenuOpen])
 
   useEffect(() => {
     if (!toolMenu) return
@@ -473,100 +461,72 @@ export default function Toolbar({
         <button className="tb-btn" onClick={onZoomOut} title={t('tb.zoomOutTip')}>
           <IconMinus />
         </button>
-        <div className="zoom-menu-anchor" ref={zoomMenuRef}>
+        {zoomEditing ? (
+          <input
+            className="zoom-input"
+            autoFocus
+            value={zoomInput}
+            onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={() => setZoomEditing(false)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') {
+                const n = parseInt(zoomInput, 10)
+                if (!Number.isNaN(n)) onZoomTo(n)
+                setZoomEditing(false)
+              }
+              if (e.key === 'Escape') setZoomEditing(false)
+            }}
+            aria-label={t('tb.zoomExactTip')}
+          />
+        ) : (
           <button
-            className={`zoom-label${zoomMenuOpen ? ' is-active' : ''}`}
-            title={t('tb.zoomMenuTip')}
-            onClick={() => setZoomMenuOpen((o) => !o)}
+            className="zoom-label"
+            title={t('tb.zoomExactTip')}
+            onClick={() => {
+              setZoomInput(String(zoomPercent))
+              setZoomEditing(true)
+            }}
           >
             {zoomPercent}%
-            <IconChevronDown size={13} className="zoom-caret" />
           </button>
-          {zoomMenuOpen && (
-            <div className="theme-menu zoom-menu">
-              <button
-                className={`zoom-menu-item${fitMode === 'custom' && zoomPercent === 100 ? ' selected' : ''}`}
-                onClick={() => {
-                  onZoomTo(100)
-                  setZoomMenuOpen(false)
-                }}
-              >
-                <span>{t('tb.actualSize')}</span>
-                <span className="zoom-menu-hint">Ctrl+0</span>
-              </button>
-              <button
-                className={`zoom-menu-item${fitMode === 'width' ? ' selected' : ''}`}
-                onClick={() => {
-                  onFitWidth()
-                  setZoomMenuOpen(false)
-                }}
-              >
-                <IconFitWidth />
-                <span>{t('tb.fitWidth')}</span>
-              </button>
-              <button
-                className={`zoom-menu-item${fitMode === 'height' ? ' selected' : ''}`}
-                onClick={() => {
-                  onFitHeight()
-                  setZoomMenuOpen(false)
-                }}
-              >
-                <IconFitHeight />
-                <span>{t('tb.fitHeight')}</span>
-              </button>
-              <button
-                className={`zoom-menu-item${fitMode === 'page' ? ' selected' : ''}`}
-                onClick={() => {
-                  onFitPage()
-                  setZoomMenuOpen(false)
-                }}
-              >
-                <IconFitPage />
-                <span>{t('tb.fitPage')}</span>
-              </button>
-              <div className="theme-menu-sep" />
-              <div className="zoom-preset-grid">
-                {ZOOM_PRESETS.map((pct) => (
-                  <button
-                    key={pct}
-                    className={`zoom-preset${fitMode === 'custom' && zoomPercent === pct ? ' selected' : ''}`}
-                    onClick={() => {
-                      onZoomTo(pct)
-                      setZoomMenuOpen(false)
-                    }}
-                  >
-                    {pct}%
-                  </button>
-                ))}
-              </div>
-              <div className="theme-menu-sep" />
-              <div className="zoom-custom-row">
-                <span className="zoom-custom-label">{t('tb.customZoom')}</span>
-                <input
-                  className="zoom-input"
-                  value={zoomInput}
-                  placeholder={String(zoomPercent)}
-                  onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
-                  onFocus={(e) => e.currentTarget.select()}
-                  onKeyDown={(e) => {
-                    e.stopPropagation()
-                    if (e.key === 'Enter') {
-                      const n = parseInt(zoomInput, 10)
-                      if (!Number.isNaN(n)) onZoomTo(n)
-                      setZoomInput('')
-                      setZoomMenuOpen(false)
-                    }
-                    if (e.key === 'Escape') setZoomMenuOpen(false)
-                  }}
-                  aria-label={t('tb.customZoom')}
-                />
-                <span>%</span>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
         <button className="tb-btn" onClick={onZoomIn} title={t('tb.zoomInTip')}>
           <IconPlus />
+        </button>
+        <div className="toolbar-sep" />
+        <button
+          className={`tb-btn${fitMode === 'custom' && zoomPercent === 100 ? ' is-active' : ''}`}
+          onClick={() => onZoomTo(100)}
+          title={t('tb.actualSizeTip')}
+        >
+          <IconActualSize />
+        </button>
+        <button
+          className={`tb-btn${fitMode === 'page' ? ' is-active' : ''}`}
+          onClick={onFitPage}
+          title={t('tb.fitPageTip')}
+        >
+          <IconFitPage />
+        </button>
+        <button
+          className={`tb-btn${fitMode === 'width' ? ' is-active' : ''}`}
+          onClick={onFitWidth}
+          title={t('tb.fitWidthTip')}
+        >
+          <IconFitWidth />
+        </button>
+        <div className="toolbar-sep" />
+        <button className="tb-btn" onClick={() => onRotate(1)} title={t('tb.rotateCw')}>
+          <IconRotateCw />
+        </button>
+        <button
+          className={`tb-btn${spread ? ' is-active' : ''}`}
+          onClick={onToggleSpread}
+          title={t('tb.spread')}
+        >
+          <IconSpread />
         </button>
       </div>
 
@@ -589,14 +549,32 @@ export default function Toolbar({
           <IconPrint />
         </button>
 
-        <button
-          className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
-          onClick={onSave}
-          disabled={!dirty}
-          title={t('tb.saveTip')}
-        >
-          <IconSave />
-        </button>
+        {canSaveInPlace ? (
+          <>
+            {/* Desktop: write changes back to the file in place, plus save-a-copy */}
+            <button
+              className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
+              onClick={onSave}
+              disabled={!dirty}
+              title={t('tb.saveTip')}
+            >
+              <IconSave />
+            </button>
+            <button className="tb-btn" onClick={onSaveAs} title={t('tb.saveAsTip')}>
+              <IconSaveAs />
+            </button>
+          </>
+        ) : (
+          // Browser/extension: one Save that bakes annotations in, then
+          // overwrites the local file (opened from disk) or downloads (URL).
+          <button
+            className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
+            onClick={onSave}
+            title={t('tb.saveToDiskTip')}
+          >
+            <IconSaveAs />
+          </button>
+        )}
 
         <div className="toolbar-sep" />
 
@@ -671,26 +649,6 @@ export default function Toolbar({
                     {lang.id === 'auto' ? t('tb.langAuto') : lang.label}
                   </button>
                 ))}
-              </div>
-
-              <div className="theme-menu-sep" />
-
-              <div className="theme-menu-label">{t('tb.layout')}</div>
-              <div className="view-layout-row">
-                <button className="view-layout-btn" onClick={() => onRotate(-1)} title={t('tb.rotateCcw')}>
-                  <IconRotateCcw size={16} />
-                </button>
-                <button className="view-layout-btn" onClick={() => onRotate(1)} title={t('tb.rotateCw')}>
-                  <IconRotateCw size={16} />
-                </button>
-                <span className="view-rotation-label">{rotation}°</span>
-                <button
-                  className={`view-layout-btn spread-btn${spread ? ' selected' : ''}`}
-                  onClick={onToggleSpread}
-                  title={t('tb.spread')}
-                >
-                  <IconSpread size={16} />
-                </button>
               </div>
 
               <div className="theme-menu-sep" />

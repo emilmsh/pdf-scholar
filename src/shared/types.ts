@@ -216,6 +216,23 @@ export interface PdfxApi {
   printFile(path: string): Promise<{ ok: true } | FileError>
   /** Save text content via a save dialog; null = user cancelled */
   saveTextFile(defaultName: string, content: string): Promise<{ path: string } | FileError | null>
+  /** Save a copy of the current PDF to a user-chosen location. `data` is the
+   *  renderer's bytes (used by the web/extension download path); Electron
+   *  prefers `path` so unsaved annotation edits (the draft) are included.
+   *  null = user cancelled. */
+  saveFileAs(
+    defaultName: string,
+    data: Uint8Array,
+    path?: string
+  ): Promise<{ path: string } | FileError | null>
+  /** Persist final PDF bytes for the browser save flow: overwrites the original
+   *  local file when it was opened via a file handle, otherwise prompts for a
+   *  location. `name` is the suggested filename. null = user cancelled. */
+  saveDocumentBytes(
+    path: string,
+    name: string,
+    data: Uint8Array
+  ): Promise<{ path: string } | FileError | null>
   /** Reveal the file in Windows File Explorer */
   showInFolder(path: string): void
   setFullscreen(on: boolean): void

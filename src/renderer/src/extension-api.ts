@@ -13,10 +13,10 @@
 // Passing `base` in (rather than importing it) keeps bridge.ts the single owner
 // of platform selection and avoids an import cycle.
 //
-// Deliberately staged for later (documented in docs/BROWSER-EXTENSION.md):
-//   - annotate/updateAnnotation/deleteAnnotation still use the mock — real
-//     write-back needs the mupdf-WASM engine + a save target (File System
-//     Access handle or a native-messaging host). The seams are marked TODO.
+// annotate/updateAnnotation/deleteAnnotation are inherited from the web
+// fallback, which routes them to the real browser annotation engine
+// (annotation-engine-browser.ts — same EmbedPDF pdfium as the desktop).
+// Persistence is this module's saveDocumentBytes/saveFileAs below.
 
 import type {
   FilePayload,
@@ -155,25 +155,59 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     },
 
     // ---------- Save model ----------
+    // NOTE: docSave/docConfirmClose stay on the inherited base no-ops. In the
+    // browser the real save path is saveDocumentBytes (below) fed by the
+    // renderer's live annotation engine, and the unsaved-changes prompt is the
+    // in-app dialog in App.tsx — same three verdicts as the desktop's native
+    // dialog, with 'save' wired to this same byte path.
 
-    // TODO(annotations): once the mupdf-WASM engine produces modified bytes,
-    // write them here — via the retained File System Access handle when we have
-    // one (silent), else showSaveFilePicker (one dialog, then silent in-session),
-    // or a native-messaging host for true silent overwrite of file:// paths.
-    docSave: async (path): Promise<{ ok: true } | FileError> => {
+    // Save a copy anywhere on disk. The File System Access picker is a real
+    // native Save dialog (choose folder + name); fall back to a plain download
+    // when it is unavailable.
+    saveFileAs: (defaultName, data) => saveViaPicker(defaultName, data, base),
+
+    // Browser save: overwrite the original local file silently when it was
+    // opened via a retained file handle (the "save over" case); otherwise a
+    // URL-opened PDF has no such target, so prompt for a location.
+    saveDocumentBytes: async (path, name, data): Promise<{ path: string } | FileError | null> => {
       const handle = handles.get(path)
-      if (!handle) return { ok: true } // nothing persisted yet (mock annotate)
-      try {
-        // Placeholder: no modified bytes to write until the engine lands.
-        return { ok: true }
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
+      if (handle) {
+        try {
+          const writable = await handle.createWritable()
+          await writable.write(data as unknown as BufferSource)
+          await writable.close()
+          return { path }
+        } catch (err) {
+          return { error: err instanceof Error ? err.message : String(err) }
+        }
       }
-    },
-    docConfirmClose: async (): Promise<'save' | 'discard' | 'cancel'> => {
-      // No native tri-state dialog in a browser tab; a confirm() is the honest
-      // stand-in until the save model is wired. Cancel keeps the tab open.
-      return window.confirm('Lagre endringer før lukking?') ? 'save' : 'discard'
+      return saveViaPicker(name, data, base)
     }
+  }
+}
+
+/** Save bytes through the File System Access "Save file" picker (real folder
+ *  chooser); fall back to a plain download when the API is unavailable. */
+async function saveViaPicker(
+  suggestedName: string,
+  data: Uint8Array,
+  base: PdfxApi
+): Promise<{ path: string } | FileError | null> {
+  const picker = (window as unknown as {
+    showSaveFilePicker?: (opts: unknown) => Promise<FileSystemFileHandle>
+  }).showSaveFilePicker
+  if (!picker) return base.saveFileAs(suggestedName, data)
+  try {
+    const handle = await picker({
+      suggestedName,
+      types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]
+    })
+    const writable = await handle.createWritable()
+    await writable.write(data as unknown as BufferSource)
+    await writable.close()
+    return { path: handle.name }
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return null // cancelled
+    return { error: err instanceof Error ? err.message : String(err) }
   }
 }

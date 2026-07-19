@@ -639,6 +639,15 @@ export default function AiPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // ChatGPT-style composer: one line at rest, grows with the text (the CSS
+  // max-height caps it and hands over to scrolling)
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [input])
+
   useEffect(() => {
     if (!open) return
     let stale = false
@@ -872,6 +881,70 @@ export default function AiPanel({
   // fetch/focus effects above stay gated on `open`.
   const providerLabel = providerLabels().find((p) => p.id === config?.provider)?.label ?? ''
 
+  // One composer, reused in both layouts: centred on the empty "landing"
+  // (ChatGPT-style) and pinned to the bottom once the chat has content.
+  const composer = (
+    <footer className="ai-composer">
+      {/* ChatGPT-style field: the textarea and its controls live INSIDE one
+          rounded surface — the buttons sit bottom-right, never beside it. */}
+      <div className="ai-composer-field">
+        <textarea
+          ref={inputRef}
+          value={input}
+          rows={1}
+          placeholder={t('ai.composerPlaceholder')}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              void send(input)
+            }
+            e.stopPropagation()
+          }}
+        />
+        <div className="ai-composer-controls">
+          {busy ? (
+            <button className="ai-send" title={t('ai.stopTip')} onClick={stop}>
+              <IconStop size={15} />
+            </button>
+          ) : (
+            <button
+              className="ai-send"
+              title={t('ai.sendTip')}
+              disabled={!input.trim()}
+              onClick={() => void send(input)}
+            >
+              <IconSend size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+    </footer>
+  )
+
+  const suggestionsBlock = (
+    <div className="ai-suggestions">
+      <button
+        className="ai-summary-btn"
+        title={t('ai.summaryTip')}
+        onClick={() => void send(summaryPrompt(), t('ai.summaryBtn'))}
+      >
+        <IconSummary size={15} />
+        {t('ai.summaryBtn')}
+      </button>
+      {hasAnnotations && (
+        <button title={t('ai.annotsTip')} onClick={() => void sendAnnots()}>
+          {t('ai.annotsBtn')}
+        </button>
+      )}
+      {suggestions().map((s) => (
+        <button key={s} onClick={() => void send(s)}>
+          {s}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <aside className="ai-panel">
       <header className="ai-header">
@@ -986,106 +1059,63 @@ export default function AiPanel({
             ))
           )}
         </div>
+      ) : messages.length === 0 && !busy ? (
+        <div className="ai-landing">
+          <div className="ai-landing-inner">
+            <div className="ai-landing-head">
+              <IconSparkle size={22} />
+              <p>{t('ai.emptyIntro')}</p>
+            </div>
+            {composer}
+            {suggestionsBlock}
+          </div>
+        </div>
       ) : (
         <>
           <div className="ai-messages-wrap">
-          <div className="ai-messages" ref={scrollRef} onScroll={handleScroll}>
-            {messages.length === 0 && !busy && (
-              <div className="ai-empty">
-                <p>{t('ai.emptyIntro')}</p>
-                <div className="ai-suggestions">
-                  <button
-                    className="ai-summary-btn"
-                    title={t('ai.summaryTip')}
-                    onClick={() => void send(summaryPrompt(), t('ai.summaryBtn'))}
-                  >
-                    <IconSummary size={15} />
-                    {t('ai.summaryBtn')}
-                  </button>
-                  {hasAnnotations && (
-                    <button title={t('ai.annotsTip')} onClick={() => void sendAnnots()}>
-                      {t('ai.annotsBtn')}
-                    </button>
-                  )}
-                  {suggestions().map((s) => (
-                    <button key={s} onClick={() => void send(s)}>
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {messages.map((m, i) =>
-              m.role === 'user' ? (
-                <div className="ai-msg ai-user" key={i}>
-                  {m.display ?? m.text}
-                </div>
-              ) : (
-                <div className="ai-msg ai-assistant" key={i}>
-                  {m.error ? (
-                    <div className="ai-error">{m.error}</div>
-                  ) : (
-                    <AssistantBody parts={m.parts} doc={docRef.current?.doc ?? null} onCitation={handleCitation} />
-                  )}
-                  {m.usage && m.model && (
-                    <div className="ai-meta">
-                      {(() => {
-                        const cost = estimateCost(m.model, m.usage)
-                        const tokens = `${m.usage.inputTokens + m.usage.cacheReadTokens + m.usage.cacheWriteTokens}→${m.usage.outputTokens} tokens`
-                        return cost !== null ? `≈ ${formatCost(cost)} · ${tokens}` : tokens
-                      })()}
-                    </div>
-                  )}
-                </div>
-              )
-            )}
-            {busy && (
-              <div className="ai-msg ai-assistant">
-                {streamText ? (
-                  renderMarkdown(streamText)
+            <div className="ai-messages" ref={scrollRef} onScroll={handleScroll}>
+              {messages.map((m, i) =>
+                m.role === 'user' ? (
+                  <div className="ai-msg ai-user" key={i}>
+                    {m.display ?? m.text}
+                  </div>
                 ) : (
-                  <div className="ai-thinking">{t('ai.readingDoc')}</div>
-                )}
-              </div>
+                  <div className="ai-msg ai-assistant" key={i}>
+                    {m.error ? (
+                      <div className="ai-error">{m.error}</div>
+                    ) : (
+                      <AssistantBody parts={m.parts} doc={docRef.current?.doc ?? null} onCitation={handleCitation} />
+                    )}
+                    {m.usage && m.model && (
+                      <div className="ai-meta">
+                        {(() => {
+                          const cost = estimateCost(m.model, m.usage)
+                          const tokens = `${m.usage.inputTokens + m.usage.cacheReadTokens + m.usage.cacheWriteTokens}→${m.usage.outputTokens} tokens`
+                          return cost !== null ? `≈ ${formatCost(cost)} · ${tokens}` : tokens
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )
+              )}
+              {busy && (
+                <div className="ai-msg ai-assistant">
+                  {streamText ? (
+                    renderMarkdown(streamText)
+                  ) : (
+                    <div className="ai-thinking">{t('ai.readingDoc')}</div>
+                  )}
+                </div>
+              )}
+            </div>
+            {!pinned && (
+              <button className="ai-jump-bottom" title={t('ai.jumpNewestTip')} onClick={jumpToBottom}>
+                <IconChevronDown size={14} />
+              </button>
             )}
-          </div>
-          {!pinned && (
-            <button className="ai-jump-bottom" title={t('ai.jumpNewestTip')} onClick={jumpToBottom}>
-              <IconChevronDown size={14} />
-            </button>
-          )}
           </div>
 
-          <footer className="ai-composer">
-            <textarea
-              ref={inputRef}
-              value={input}
-              rows={2}
-              placeholder={t('ai.composerPlaceholder')}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  void send(input)
-                }
-                e.stopPropagation()
-              }}
-            />
-            {busy ? (
-              <button className="ai-send" title={t('ai.stopTip')} onClick={stop}>
-                <IconStop size={16} />
-              </button>
-            ) : (
-              <button
-                className="ai-send"
-                title={t('ai.sendTip')}
-                disabled={!input.trim()}
-                onClick={() => void send(input)}
-              >
-                <IconSend size={16} />
-              </button>
-            )}
-          </footer>
+          {composer}
           {totalCost !== null && (
             <div className="ai-total">{t('ai.totalCost', { cost: formatCost(totalCost) })}</div>
           )}

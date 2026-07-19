@@ -11,6 +11,11 @@ import type {
 } from '../../shared/types'
 import { t } from './i18n'
 import { createExtensionApi, isExtensionContext } from './extension-api'
+import {
+  browserApplyAnnotation,
+  browserDeleteAnnotation,
+  browserUpdateAnnotation
+} from './annotation-engine-browser'
 
 export const isElectron = typeof window !== 'undefined' && !!window.api
 
@@ -88,20 +93,12 @@ export const webApi: PdfxApi = {
     state.settings = { ...state.settings, ...patch }
     saveWebState(state)
   },
-  // Browser preview cannot write to disk — accept the annotation so the UI
-  // flow (overlay, menus) can be exercised, but nothing is persisted.
-  annotate: async (req) => {
-    console.debug('pdfx (web): annotate mock', req)
-    return { ok: true, id: -Math.floor(Math.random() * 1e9) }
-  },
-  updateAnnotation: async (req) => {
-    console.debug('pdfx (web): updateAnnotation mock', req)
-    return { ok: true, id: req.id }
-  },
-  deleteAnnotation: async (req) => {
-    console.debug('pdfx (web): deleteAnnotation mock', req)
-    return { ok: true, id: req.id }
-  },
+  // Real annotation writes in the browser: the same EmbedPDF pdfium engine the
+  // desktop uses, editing an in-memory twin of the document (the viewer
+  // registers the bytes on mount). Platform parity — not a mock.
+  annotate: (req) => browserApplyAnnotation(req),
+  updateAnnotation: (req) => browserUpdateAnnotation(req),
+  deleteAnnotation: (req) => browserDeleteAnnotation(req),
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')
   },
@@ -134,6 +131,10 @@ export const webApi: PdfxApi = {
     URL.revokeObjectURL(url)
     return { path: defaultName }
   },
+  // Browser preview: a blob download stands in for a save dialog (the browser's
+  // own "ask where to save" setting decides whether the user picks a folder).
+  saveFileAs: async (defaultName, data) => downloadBlob(defaultName, data),
+  saveDocumentBytes: async (_path, name, data) => downloadBlob(name, data),
   showInFolder: () => {},
   setFullscreen: (on) => {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
@@ -234,6 +235,18 @@ export const webApi: PdfxApi = {
       webAiDeltaListeners.delete(cb)
     }
   }
+}
+
+/** Trigger a browser download of PDF bytes (the browser decides folder prompt). */
+function downloadBlob(name: string, data: Uint8Array): { path: string } {
+  const blob = new Blob([data as BlobPart], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  URL.revokeObjectURL(url)
+  return { path: name }
 }
 
 const webAiDeltaListeners = new Set<(requestId: number, text: string) => void>()

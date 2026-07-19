@@ -271,6 +271,20 @@ export function annotationCss(
   }
 }
 
+/** Where the arrow SHAFT should end: pulled back from the tip so the stroke
+ *  (including its round cap) stays hidden under the head polygon instead of
+ *  poking out past its base edge */
+export function arrowShaftEnd(
+  from: [number, number],
+  to: [number, number],
+  size: number
+): [number, number] {
+  const len = Math.hypot(to[0] - from[0], to[1] - from[1])
+  if (len < 1e-6) return to
+  const k = Math.max(0, len - size * 0.75) / len
+  return [from[0] + (to[0] - from[0]) * k, from[1] + (to[1] - from[1]) * k]
+}
+
 /** SVG polygon points for an arrowhead at `to`, pointing from `from` */
 export function arrowHeadPoints(
   from: [number, number],

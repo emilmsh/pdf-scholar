@@ -635,25 +635,6 @@ button {
   z-index: 29;
 }
 
-/* Tap affordance for the tucked toolbar (hover has no touch twin): a slim,
-   always-visible pill at the top centre. Quiet enough for mouse users. */
-.toolbar-grip {
-  position: absolute;
-  top: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 44px;
-  height: 6px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text-secondary) 35%, transparent);
-  z-index: 29;
-  cursor: pointer;
-}
-
-.toolbar-grip:hover {
-  background: color-mix(in srgb, var(--text-secondary) 60%, transparent);
-}
-
 /* ---- Edge rails: the strip is a pure positioning container and NEVER takes
    pointer events (the pages scrollbar lives at the right edge and must stay
    draggable). Nearing an edge fades the handle in (.hint, set from a window
@@ -704,14 +685,15 @@ button {
   transition: opacity 0.15s ease;
 }
 
-.edge-rail.hint .edge-rail-handle,
-.edge-rail.active .edge-rail-handle {
+.edge-rail.hint .edge-rail-handle {
   pointer-events: auto;
   opacity: 1;
 }
 
-.edge-rail.active .edge-rail-handle {
-  color: var(--accent);
+/* When the panel is already open the reveal handle is redundant and just sits
+   in the way — hide it entirely (covers the always-on touch grip below too). */
+.edge-rail.panel-open .edge-rail-handle {
+  display: none;
 }
 
 /* A peeked panel overlays the pages (no layout shift). A pinned panel stays
@@ -1005,46 +987,6 @@ button {
   letter-spacing: 0.06em;
   color: var(--text-secondary);
   margin-bottom: 8px;
-}
-
-/* Rotate + two-page-spread controls in the view menu */
-.view-layout-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.view-layout-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 7px;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
-}
-
-.view-layout-btn:hover {
-  background: var(--hover);
-  color: var(--text);
-}
-
-.view-layout-btn.selected {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.view-rotation-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  min-width: 34px;
-  text-align: center;
-}
-
-.spread-btn {
-  margin-left: auto;
 }
 
 .theme-options {
@@ -2472,6 +2414,56 @@ button {
   padding: 8px 2px;
 }
 
+/* Empty-chat landing: the composer floats to the vertical middle (ChatGPT
+   style) with a greeting above and suggestions below. Flexible pseudo-element
+   spacers centre the block but collapse first when space is tight, so a tall
+   suggestion list scrolls instead of clipping at the top. */
+.ai-landing {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-landing::before,
+.ai-landing::after {
+  content: '';
+  flex: 1 1 0;
+}
+
+.ai-landing-inner {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 14px;
+}
+
+.ai-landing-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ai-landing-head svg {
+  color: var(--accent);
+}
+
+.ai-landing .ai-composer {
+  border-top: none;
+  padding: 0;
+}
+
+.ai-landing .ai-suggestions {
+  margin-top: 0;
+}
+
 .ai-suggestions {
   display: flex;
   flex-direction: column;
@@ -2680,40 +2672,58 @@ button {
   }
 }
 
+/* ChatGPT-style composer: ONE rounded surface holding the textarea with the
+   mic + send controls anchored bottom-right inside it — nothing beside it, so
+   a narrow panel never gets cramped. */
 .ai-composer {
+  padding: 10px 12px 4px;
+}
+
+.ai-composer-field {
   display: flex;
-  align-items: flex-end;
-  gap: 7px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  transition: border-color 0.12s;
+}
+
+.ai-composer-field:focus-within {
+  border-color: var(--accent);
 }
 
 .ai-composer textarea {
-  flex: 1;
   resize: none;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg-elevated);
+  border: none;
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: 13px;
   line-height: 1.45;
-  padding: 8px 10px;
+  padding: 10px 12px 2px;
   max-height: 120px;
+  overflow-y: auto;
 }
 
 .ai-composer textarea:focus {
   outline: none;
-  border-color: var(--accent);
+}
+
+.ai-composer-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 4px 6px 6px;
 }
 
 .ai-send {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  border-radius: 9px;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--accent-text);
 }
@@ -3322,11 +3332,7 @@ button {
 /* Zoom: click the percentage to type an exact value */
 
 .zoom-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 58px;
+  min-width: 52px;
   text-align: center;
   font-size: 12px;
   color: var(--text);
@@ -3335,14 +3341,8 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
-.zoom-label:hover,
-.zoom-label.is-active {
+.zoom-label:hover {
   background: var(--hover);
-}
-
-.zoom-caret {
-  color: var(--text-secondary);
-  flex: none;
 }
 
 .zoom-input {
@@ -3358,99 +3358,43 @@ button {
   outline: none;
 }
 
-/* Zoom dropdown (actual size / fit / presets / custom) */
-.zoom-menu-anchor {
-  position: relative;
-}
+/* Unsaved-changes dialog (browser twin of the desktop's native prompt) */
 
-.zoom-menu {
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  min-width: 220px;
-  padding: 8px;
-}
-
-.zoom-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--text);
-  text-align: left;
-}
-
-.zoom-menu-item svg {
-  flex: none;
-  color: var(--text-secondary);
-}
-
-.zoom-menu-item span {
-  flex: 1;
-}
-
-.zoom-menu-item .zoom-menu-hint {
-  flex: none;
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.zoom-menu-item:hover {
-  background: var(--hover);
-}
-
-.zoom-menu-item.selected {
-  background: var(--active);
-  color: var(--accent);
-}
-
-.zoom-menu-item.selected svg {
-  color: var(--accent);
-}
-
-.zoom-preset-grid {
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.35);
 }
 
-.zoom-preset {
-  padding: 6px 0;
-  border-radius: 7px;
-  font-size: 12.5px;
-  color: var(--text);
-  text-align: center;
-  font-variant-numeric: tabular-nums;
+.confirm-dialog {
+  width: min(420px, calc(100vw - 48px));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  padding: 20px;
 }
 
-.zoom-preset:hover {
-  background: var(--hover);
-}
-
-.zoom-preset.selected {
-  background: var(--active);
-  color: var(--accent);
+.confirm-message {
+  font-size: 14px;
   font-weight: 600;
+  color: var(--text);
+  margin: 0 0 6px;
 }
 
-.zoom-custom-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.confirm-detail {
   font-size: 12.5px;
   color: var(--text-secondary);
+  margin: 0 0 16px;
 }
 
-.zoom-custom-label {
-  flex: 1;
-}
-
-.zoom-custom-row .zoom-input {
-  width: 56px;
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 /* Pen and marker get tool-shaped cursors (hotspot at the tip) */

@@ -3,7 +3,7 @@ import { AnnotationMode, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
-import { annotationCss, arrowHeadPoints, rgbCss, strokePathData } from '../annotations'
+import { annotationCss, arrowHeadPoints, arrowShaftEnd, rgbCss, strokePathData } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 
@@ -309,15 +309,17 @@ function PdfPage({
       el.setAttribute('ry', String(h / 2))
       group.append(el)
     } else {
+      const headSize = Math.max(11, width * 4.5)
+      const shaftEnd = type === 'arrow' ? arrowShaftEnd(a, b, headSize) : b
       const el = document.createElementNS(SVG_NS, 'line')
       el.setAttribute('x1', String(a[0]))
       el.setAttribute('y1', String(a[1]))
-      el.setAttribute('x2', String(b[0]))
-      el.setAttribute('y2', String(b[1]))
+      el.setAttribute('x2', String(shaftEnd[0]))
+      el.setAttribute('y2', String(shaftEnd[1]))
       group.append(el)
       if (type === 'arrow') {
         const head = document.createElementNS(SVG_NS, 'polygon')
-        head.setAttribute('points', arrowHeadPoints(a, b, Math.max(11, width * 4.5)))
+        head.setAttribute('points', arrowHeadPoints(a, b, headSize))
         head.setAttribute('fill', color)
         head.setAttribute('stroke', 'none')
         group.append(head)
@@ -638,14 +640,21 @@ function AnnotationMarks({
               strokeWidth={width}
             />
           )}
-          {(annotation.type === 'line' || annotation.type === 'arrow') && a && b && (
-            <>
-              <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={color} strokeWidth={width} />
-              {annotation.type === 'arrow' && (
-                <polygon points={arrowHeadPoints(a, b, Math.max(11, width * 4.5))} fill={color} />
-              )}
-            </>
-          )}
+          {(annotation.type === 'line' || annotation.type === 'arrow') &&
+            a &&
+            b &&
+            (() => {
+              const headSize = Math.max(11, width * 4.5)
+              const end = annotation.type === 'arrow' ? arrowShaftEnd(a, b, headSize) : b
+              return (
+                <>
+                  <line x1={a[0]} y1={a[1]} x2={end[0]} y2={end[1]} stroke={color} strokeWidth={width} />
+                  {annotation.type === 'arrow' && (
+                    <polygon points={arrowHeadPoints(a, b, headSize)} fill={color} />
+                  )}
+                </>
+              )
+            })()}
         </g>
       </svg>
     )

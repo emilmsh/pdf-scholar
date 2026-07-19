@@ -476,6 +476,53 @@ function registerIpc(): void {
     }
   })
 
+  // Save a copy of the open PDF wherever the user chooses. Prefer the on-disk
+  // source (draft when there are unsaved edits, else the original) so the copy
+  // carries annotations; fall back to the renderer's bytes for path-less docs.
+  ipcMain.handle('file:save-as', async (e, path: string, defaultName: string, data: Uint8Array) => {
+    const parent = windowFor(e)
+    if (!parent) return null
+    const result = await dialog.showSaveDialog(parent, {
+      defaultPath: defaultName,
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (result.canceled || !result.filePath) return null
+    try {
+      if (path && existsSync(path)) {
+        await flushDraft(path)
+        copyFileSync(readPathFor(path), result.filePath)
+      } else {
+        await writeFile(result.filePath, Buffer.from(data))
+      }
+      return { path: result.filePath }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Browser save flow's byte-writer. Electron's own Save uses the in-process
+  // engine (doc:save) instead, so this is only a safe fallback: overwrite the
+  // given path when it exists, else prompt for a location.
+  ipcMain.handle('file:save-bytes', async (e, path: string, name: string, data: Uint8Array) => {
+    try {
+      if (path && existsSync(path)) {
+        await writeFile(path, Buffer.from(data))
+        return { path }
+      }
+      const parent = windowFor(e)
+      if (!parent) return null
+      const result = await dialog.showSaveDialog(parent, {
+        defaultPath: name,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      })
+      if (result.canceled || !result.filePath) return null
+      await writeFile(result.filePath, Buffer.from(data))
+      return { path: result.filePath }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   ipcMain.on('window:set-fullscreen', (e, on: boolean) => {
     windowFor(e)?.setFullScreen(!!on)
   })

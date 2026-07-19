@@ -57,17 +57,19 @@ export const IconFitWidth = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
-export const IconFitHeight = (p: IconProps): React.JSX.Element => (
-  <Svg {...p}>
-    <path d="M8 7l4-4 4 4M8 17l4 4 4-4M12 3v18" />
-  </Svg>
-)
-
 export const IconFitPage = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="6.5" y="3.5" width="11" height="17" rx="1.5" />
     <path d="M2.5 8.5v-5h5" />
     <path d="M21.5 15.5v5h-5" />
+  </Svg>
+)
+
+export const IconActualSize = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M5.5 9l2.5-2v10" />
+    <path d="M16 9l2.5-2v10" />
+    <path d="M12 10.4v.01M12 14.6v.01" />
   </Svg>
 )
 
@@ -177,10 +179,10 @@ export const IconMarker = (p: IconProps): React.JSX.Element => (
 
 export const IconTextMarkup = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
-    {/* Text lines with a marked baseline — the text-anchored markup tool */}
-    <path d="M5 6h14" />
-    <path d="M5 10h9" />
-    <path d="M4 15.5h16" />
+    {/* "A" over a highlight bar — the text-anchored markup tool */}
+    <path d="M7 14.5L12 3.5l5 11" />
+    <path d="M8.6 11h6.8" />
+    <rect x="5" y="18" width="14" height="3.4" rx="1" fill="currentColor" stroke="none" />
   </Svg>
 )
 
@@ -322,6 +324,15 @@ export const IconSave = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** Save a copy to disk (download-style down arrow into a tray) */
+export const IconSaveAs = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M12 3v11" />
+    <path d="M7.5 9.5 12 14l4.5-4.5" />
+    <path d="M4 20.5h16" />
+  </Svg>
+)
+
 export const IconPrint = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M7 8V3.5h10V8" />
@@ -363,7 +374,6 @@ export const IconStop = (p: IconProps): React.JSX.Element => (
     <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" />
   </Svg>
 )
-
 export const IconEye = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
@@ -407,12 +417,6 @@ export const IconExternal = (p: IconProps): React.JSX.Element => (
 export const IconRotateCw = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v5h-5" />
-  </Svg>
-)
-
-export const IconRotateCcw = (p: IconProps): React.JSX.Element => (
-  <Svg {...p}>
-    <path d="M3 12a9 9 0 1 0 2.64-6.36M3 3v5h5" />
   </Svg>
 )
 

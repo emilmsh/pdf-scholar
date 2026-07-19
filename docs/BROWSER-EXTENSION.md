@@ -95,31 +95,40 @@ Then in `edge://extensions` (or `chrome://extensions`):
 | Themes / recoloring / i18n | ✅ | ✅ | Shared |
 | Reading position / recents / settings | JSON store | `chrome.storage.local` | Parity, different backend |
 | Annotation UI (draw, notes, shapes) | ✅ | ✅ | Overlay is renderer-side |
-| **Persist annotations to disk** | ✅ | ⏳ | See roadmap — the one real gap |
+| **Persist annotations to disk** | ✅ | ✅¹ | ¹ real EmbedPDF pdfium writes in-page (`annotation-engine-browser.ts`); files opened via the in-app picker save silently over the original, URL/`file://` PDFs prompt once for a location — see roadmap for silent-overwrite full parity |
 | AI chat / grounded citations | ✅ live | ✅ live¹ | ¹ real Anthropic/OpenAI/Azure, BYO key in `chrome.storage.local` (not encrypted — see roadmap); shares the provider core `src/shared/ai-chat.ts` |
 | New window / side-by-side | native window | `chrome.tabs.create` | Adapted |
 | Print | ✅ | ✅ | Browser print |
 
-## Roadmap — closing the two gaps
+## Roadmap — the remaining gaps
 
-Both gaps have the same root cause and the same fix: the browser sandbox
-withholds privileged operations (silent disk writes, cross-origin API calls with
-secret keys) that the Electron **main process** performs freely today.
+The remaining gaps share one root cause: the browser sandbox withholds
+privileged operations (silent disk writes to arbitrary paths, secret keys at
+rest) that the Electron **main process** performs freely today.
 
-### 1. Annotation write-back
-The mupdf-WASM engine runs fine in the viewer page to produce modified bytes;
-the constraint is persisting them to the original path.
+### 1. Annotation write-back — DONE (in-page engine), two refinements left
+Annotation writes are live: the viewer page runs the same EmbedPDF pdfium WASM
+engine as the desktop (`src/renderer/src/annotation-engine-browser.ts`), baking
+annotations into an in-memory twin of the document via the shared
+`src/shared/annotation-build.ts`, so both platforms produce identical bytes.
+Persistence:
 
 - **In-app "Open" (File System Access handle)**: `showOpenFilePicker` yields a
-  writable handle → silent save for the rest of the session. Already wired as a
-  seam in `extension-api.ts` (`handles` map, `docSave`).
-- **file:// double-click**: no automatic writable handle. First save needs one
-  `showSaveFilePicker` dialog (pre-filled name), then silent in-session.
-- **Full parity — native messaging host**: a tiny companion binary the extension
-  talks to via `chrome.runtime.connectNative`, with real filesystem access.
-  This restores silent overwrite of any path. Notably it is nearly the same
-  privileged layer the Electron main process already is — the `annotate`/
-  `docSave` logic can largely be reused behind a native-messaging shim.
+  writable handle → silent save over the original for the rest of the session
+  (`extension-api.ts`: `handles` map, `saveDocumentBytes`).
+- **URL / file:// double-click**: no automatic writable handle. First save shows
+  one `showSaveFilePicker` dialog (pre-filled name); plain download as fallback.
+
+Refinements for full parity:
+
+- **Native messaging host**: a tiny companion binary the extension talks to via
+  `chrome.runtime.connectNative`, with real filesystem access. This restores
+  silent overwrite of any path — nearly the same privileged layer the Electron
+  main process already is.
+- **Huge files**: the in-page engine refuses documents over `WASM_SAFE_LIMIT`
+  (300 MB — the wasm32 heap makes serialization impossible beyond that). The
+  desktop routes these to its incremental appender; porting the appender to the
+  browser closes this.
 
 ### 2. Live AI — DONE (first step), one gap left
 Real Anthropic/OpenAI/Azure chat now runs directly from the viewer page

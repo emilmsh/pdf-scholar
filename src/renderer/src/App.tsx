@@ -6,8 +6,9 @@ import type {
   Settings,
   ThemeName
 } from '../../shared/types'
-import { bridge } from './bridge'
-import { setLanguage } from './i18n'
+import { bridge, isElectron } from './bridge'
+import { setLanguage, t, useLang } from './i18n'
+import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
 import TabBar from './components/TabBar'
 import Welcome from './components/Welcome'
@@ -32,6 +33,7 @@ const FALLBACK_SETTINGS: Settings = {
 let tabCounter = 0
 
 export default function App(): React.JSX.Element {
+  useLang()
   const [tabs, setTabs] = useState<OpenTab[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [recents, setRecents] = useState<RecentFile[]>([])
@@ -156,6 +158,36 @@ export default function App(): React.JSX.Element {
     })
   }, [])
 
+  /** Browser stand-in for the desktop's native save/discard/cancel prompt:
+   *  an in-app dialog with the same three verdicts and the same wording. */
+  const [confirmState, setConfirmState] = useState<{
+    name: string
+    resolve(verdict: 'save' | 'discard' | 'cancel'): void
+  } | null>(null)
+
+  /** Platform-neutral unsaved-changes prompt. Electron shows the native dialog
+   *  (main performs the save itself); the browser shows the in-app dialog and
+   *  performs the save here — serialize the live document, then overwrite the
+   *  local file or open the save picker. A cancelled picker cancels the close
+   *  (the browser CAN still cancel at that stage; losing the marks would be
+   *  worse than desktop, which has no picker step). */
+  const confirmCloseVerdict = useCallback(
+    async (path: string, name: string): Promise<'save' | 'discard' | 'cancel'> => {
+      if (isElectron) return bridge.docConfirmClose(path)
+      const verdict = await new Promise<'save' | 'discard' | 'cancel'>((resolve) =>
+        setConfirmState({ name, resolve })
+      )
+      setConfirmState(null)
+      if (verdict !== 'save') return verdict
+      const bytes = await browserCurrentBytes(path)
+      if (!bytes) return 'cancel'
+      const result = await bridge.saveDocumentBytes(path, name, bytes)
+      if (!result || 'error' in result) return 'cancel'
+      return 'save'
+    },
+    []
+  )
+
   /** Close with the unsaved-changes prompt when the tab is dirty */
   const closeTab = useCallback(
     (id: string) => {
@@ -165,12 +197,12 @@ export default function App(): React.JSX.Element {
         reallyCloseTab(id)
         return
       }
-      void bridge.docConfirmClose(tab.payload.path).then((verdict) => {
+      void confirmCloseVerdict(tab.payload.path, tab.payload.name).then((verdict) => {
         if (verdict === 'cancel') return
         reallyCloseTab(id)
       })
     },
-    [reallyCloseTab]
+    [reallyCloseTab, confirmCloseVerdict]
   )
 
   // Move a tab to another window (drag) or tear it off into a new one. The
@@ -199,7 +231,8 @@ export default function App(): React.JSX.Element {
   const reloadTab = useCallback(
     async (id: string, path: string) => {
       if (dirtyTabsRef.current.has(id)) {
-        const verdict = await bridge.docConfirmClose(path)
+        const tab = tabsRef.current.find((t) => t.id === id)
+        const verdict = await confirmCloseVerdict(path, tab?.payload.name ?? path)
         if (verdict === 'cancel') return
         setTabDirty(id, false) // saved or discarded — the remounted viewer starts clean
       }
@@ -214,7 +247,7 @@ export default function App(): React.JSX.Element {
       )
       setActiveId(id)
     },
-    [setTabDirty]
+    [setTabDirty, confirmCloseVerdict]
   )
 
   const cycleTab = useCallback((delta: number) => {
@@ -369,6 +402,27 @@ export default function App(): React.JSX.Element {
         </div>
       ) : (
         <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+      )}
+      {confirmState && (
+        <div className="confirm-overlay" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+            <p className="confirm-message">
+              {t('app.confirmCloseMessage', { name: confirmState.name })}
+            </p>
+            <p className="confirm-detail">{t('app.confirmCloseDetail')}</p>
+            <div className="confirm-actions">
+              <button className="btn-secondary" onClick={() => confirmState.resolve('cancel')}>
+                {t('app.cancel')}
+              </button>
+              <button className="btn-secondary" onClick={() => confirmState.resolve('discard')}>
+                {t('app.dontSave')}
+              </button>
+              <button className="btn-primary" autoFocus onClick={() => confirmState.resolve('save')}>
+                {t('app.save')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
