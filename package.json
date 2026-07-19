@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "A faithful PDF Expert-style PDF reader and annotator for Windows",
   "main": "out/main/index.js",
   "private": true,

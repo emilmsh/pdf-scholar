@@ -45,6 +45,11 @@ app distributed outside the App Store without Apple's paid program. To open it:
 Because the app is unsigned, macOS builds also have **no auto-update** — grab new
 versions from the releases page.
 
+> **The macOS build hasn't yet been tested on real Apple hardware.** It builds
+> cleanly in CI, but the developer works on Windows — so if you run it on a Mac,
+> feedback (what works, what looks off, what breaks) is genuinely appreciated:
+> please [open an issue](https://github.com/emilmsh/pdf-scholar/issues).
+
 ### Desktop app (Linux) — beta
 
 From the [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest):
