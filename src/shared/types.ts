@@ -243,6 +243,11 @@ export interface PdfxApi {
   /** Resolve the real filesystem path of a File dropped onto the window (Electron only) */
   getPathForFile(file: File): string | null
   onOpenPath(cb: (path: string) => void): () => void
+  // ---------- Auto-update (Electron only; no-ops elsewhere) ----------
+  /** Fires when an app update has been downloaded and will install on quit */
+  onUpdateReady(cb: (version: string) => void): () => void
+  /** Quit and install the downloaded update now (no-op when none is ready) */
+  updateRestart(): void
   // ---------- AI ----------
   aiGetConfig(): Promise<AiConfigView>
   /** Patch config; `keys` entries are plaintext and encrypted at rest in main */

@@ -39,8 +39,13 @@ interface ChromeApi {
   runtime: {
     id?: string
     getURL(path: string): string
+    getManifest(): { version: string }
     onInstalled: ChromeEvent<(details: { reason: string }) => void>
     lastError?: { message?: string }
+  }
+  // getSelf is callable WITHOUT the "management" permission (own extension only)
+  management?: {
+    getSelf(): Promise<{ installType: 'development' | 'normal' | 'sideload' | 'admin' | 'other' }>
   }
   declarativeNetRequest?: {
     updateDynamicRules(opts: { addRules?: DnrRule[]; removeRuleIds?: number[] }): Promise<void>

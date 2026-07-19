@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FilePayload, ReadingPosition, RecentFile, Settings, ThemeName } from '../../shared/types'
 import { bridge } from './bridge'
-import { setLanguage } from './i18n'
+import { setLanguage, t } from './i18n'
+import {
+  checkForExtensionUpdate,
+  skipExtensionUpdate,
+  EXTENSION_DOWNLOAD_URL
+} from './extension-update'
 import PdfViewer from './components/PdfViewer'
 import Welcome from './components/Welcome'
 
@@ -138,6 +143,14 @@ export default function ExtensionApp(): React.JSX.Element {
     window.close()
   }, [])
 
+  // Sideloaded installs have no update channel (only store installs
+  // auto-update) — surface new releases with a dismissible toast instead.
+  // Store installs never see this (see extension-update.ts).
+  const [extUpdate, setExtUpdate] = useState<string | null>(null)
+  useEffect(() => {
+    void checkForExtensionUpdate().then(setExtUpdate)
+  }, [])
+
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
       {error && (
@@ -169,6 +182,28 @@ export default function ExtensionApp(): React.JSX.Element {
         <div className="ext-loading" />
       ) : (
         <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+      )}
+      {extUpdate && (
+        <div className="update-toast" role="status">
+          <div className="update-toast-text">
+            <strong>{t('update.extAvailable')}</strong>
+            <span>{t('update.extBody', { version: extUpdate })}</span>
+          </div>
+          <button className="btn-primary" onClick={() => bridge.openExternal(EXTENSION_DOWNLOAD_URL)}>
+            {t('update.extDownload')}
+          </button>
+          <button
+            className="update-toast-close"
+            aria-label={t('update.dismissTip')}
+            title={t('update.dismissTip')}
+            onClick={() => {
+              void skipExtensionUpdate(extUpdate)
+              setExtUpdate(null)
+            }}
+          >
+            ✕
+          </button>
+        </div>
       )}
     </div>
   )

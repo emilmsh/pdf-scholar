@@ -2,16 +2,16 @@
 
 **A calm, reading-first PDF app for Windows — built for people who work with texts.**
 
-PDF Scholar is a PDF reader and annotator for Windows, made for people who *read to
-work*: research articles, reports, books. Reading comes first — the annotation tools
-stay within reach, the AI help stays grounded in the document, and nothing gets
-between you and the page.
+PDF Scholar is a PDF reader and annotator for Windows — with beta builds for macOS
+and Linux — made for people who *read to work*: research articles, reports, books.
+Reading comes first — the annotation tools stay within reach, the AI help stays
+grounded in the document, and nothing gets between you and the page.
 
 ![Reading view](docs/screenshots/reading.png)
 
 ## Download
 
-There are two ways to run PDF Scholar — a native Windows app, or a browser extension
+There are two ways to run PDF Scholar — a native desktop app, or a browser extension
 that takes over PDFs inside Edge/Chrome. They share the same reader, annotator and
 assistant, so you can pick whichever fits how you already open documents.
 
@@ -22,8 +22,39 @@ assistant, so you can pick whichever fits how you already open documents.
 **[⬇ Get PDF Scholar for Windows](https://github.com/emilmsh/pdf-scholar/releases/latest)** —
 download `PDF-Scholar-Setup-*.exe` from the latest release and run it. It's a per-user
 install (no admin rights), sets up in seconds, opens PDFs straight from Explorer and
-adds a "Recent" Jump List to the taskbar. Everything works offline; add your own
-Anthropic or OpenAI key in the assistant settings if you want the AI features.
+adds a "Recent" Jump List to the taskbar. The installer carries both **x64 and native
+arm64** builds and picks the right one for your machine (Surface and other
+Windows-on-ARM devices get the native version — no emulation). Everything works
+offline; add your own Anthropic or OpenAI key in the assistant settings if you want
+the AI features.
+
+### Desktop app (macOS) — beta
+
+Download `PDF-Scholar-*.dmg` from the
+[latest release](https://github.com/emilmsh/pdf-scholar/releases/latest) (universal:
+Apple Silicon + Intel). PDF Scholar is free and open source, and **not signed with an
+Apple Developer certificate** — macOS will claim the app is "damaged" or from an
+unverified developer on first launch. It isn't; that's Gatekeeper's default for any
+app distributed outside the App Store without Apple's paid program. To open it:
+
+1. Move the app to Applications and try to open it once.
+2. Go to **System Settings → Privacy & Security**, scroll down, and click
+   **Open Anyway** — or, in Terminal: `xattr -cr "/Applications/PDF Scholar.app"`.
+
+Because the app is unsigned, macOS builds also have **no auto-update** — grab new
+versions from the releases page.
+
+### Desktop app (Linux) — beta
+
+From the [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest):
+
+- **Ubuntu/Debian:** install the `.deb` (recommended — it registers the PDF file
+  association, and Ubuntu 24.04+'s AppArmor policy blocks parts of the sandbox for
+  AppImages).
+- **Other distros:** the `.AppImage` runs anywhere — `chmod +x` and go. No libfuse2
+  needed.
+
+Both auto-update in place when a new release is published.
 
 ### Browser extension (Edge / Chrome) — beta
 

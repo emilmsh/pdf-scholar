@@ -1,6 +1,6 @@
 # PDFX — PDF Expert clone for Windows
 
-A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in Norwegian — respond in Norwegian). Product spec: `docs/SPEC.md`. Phased plan + architecture decisions: `ROADMAP.md`.
+A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in Norwegian — respond in Norwegian). Product spec: `docs/SPEC.md`. Phased plan + architecture decisions: `ROADMAP.md`. **Platform tiers + parity contract: `PLATFORMS.md`** — Windows x64 is the reference; win-arm64/macOS/Linux and the extension are held to it, and any cross-platform divergence must be listed there. CI (`.github/workflows/ci.yml`) builds all three OSes on every push.
 
 ## Commands
 - `npm run dev` — full Electron app with HMR
@@ -9,6 +9,7 @@ A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in N
 - `npm run typecheck` — tsc for renderer (`tsconfig.web.json`) and main/preload (`tsconfig.node.json`)
 - `npm run build` — electron-vite production build to `out/`
 - `npm run sample` — regenerate `src/renderer/public/sample.pdf` (test document)
+- `npm run dist` / `dist:mac` / `dist:linux` — local installer builds (host-OS-bound: mac/linux targets only build on those OSes; release artifacts come from CI). `dist:store` — MSIX for Microsoft Store (needs identity env vars, see `docs/STORE.md`)
 
 ## Architecture
 - **electron-vite** layout: `src/main` (Electron main), `src/preload` (contextBridge → `window.api`), `src/renderer` (React 19 + TS), `src/shared/types.ts` (types shared across all three; `PdfxApi` is the single IPC surface).

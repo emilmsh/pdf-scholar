@@ -148,6 +148,9 @@ export const webApi: PdfxApi = {
   setTitleBarColors: () => {},
   getPathForFile: () => null,
   onOpenPath: () => () => {},
+  // Auto-update is a desktop concern — the browser/extension just no-ops
+  onUpdateReady: () => () => {},
+  updateRestart: () => {},
   // AI in the browser preview: only the offline mock provider is available,
   // so the chat UI (streaming, citation chips, jump+highlight) can be tested.
   aiGetConfig: async () => ({

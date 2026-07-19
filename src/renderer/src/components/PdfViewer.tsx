@@ -13,6 +13,7 @@ import type {
   ViewRotation
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
+import { primaryMod } from '../platform'
 import {
   FREETEXT_COLOR,
   FREETEXT_SIZE,
@@ -3044,12 +3045,12 @@ export default function PdfViewer({
       if (e.key === 'F11') {
         e.preventDefault()
         toggleFullscreen()
-      } else if (!isTyping && e.ctrlKey && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      } else if (!isTyping && primaryMod(e) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
         e.preventDefault()
         void performUndoRedo('undo')
       } else if (
         !isTyping &&
-        e.ctrlKey &&
+        primaryMod(e) &&
         ((e.shiftKey && (e.key === 'z' || e.key === 'Z')) || e.key === 'y' || e.key === 'Y')
       ) {
         e.preventDefault()
@@ -3060,7 +3061,7 @@ export default function PdfViewer({
       } else if (!isTyping && e.altKey && e.key === 'ArrowRight') {
         e.preventDefault()
         goForward()
-      } else if (e.ctrlKey && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
+      } else if (primaryMod(e) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault()
         // Electron writes changes back in place (only when there are changes);
         // web/extension bakes annotations and saves to disk (overwrite/download).
@@ -3090,19 +3091,19 @@ export default function PdfViewer({
         else if (searchHits) setSearchHits(null)
         else if (aiPinned) setAiPinned(false)
         else if (fullscreen) toggleFullscreen()
-      } else if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
+      } else if (primaryMod(e) && (e.key === 'f' || e.key === 'F')) {
         e.preventDefault()
         openSearch()
       } else if (e.key === 'F3') {
         e.preventDefault()
         searchStep(e.shiftKey ? -1 : 1)
-      } else if (e.ctrlKey && (e.key === '+' || e.key === '=')) {
+      } else if (primaryMod(e) && (e.key === '+' || e.key === '=')) {
         e.preventDefault()
         manualZoom(scaleRef.current * 1.15)
-      } else if (e.ctrlKey && e.key === '-') {
+      } else if (primaryMod(e) && e.key === '-') {
         e.preventDefault()
         manualZoom(scaleRef.current / 1.15)
-      } else if (e.ctrlKey && e.key === '0') {
+      } else if (primaryMod(e) && e.key === '0') {
         // Actual size (100%), matching Acrobat/PDF Expert convention
         e.preventDefault()
         manualZoom(1)

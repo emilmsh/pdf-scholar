@@ -8,6 +8,7 @@ import type {
 } from '../../shared/types'
 import { bridge, isElectron } from './bridge'
 import { setLanguage, t, useLang } from './i18n'
+import { primaryMod } from './platform'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
 import TabBar from './components/TabBar'
@@ -94,6 +95,12 @@ export default function App(): React.JSX.Element {
   // OS fullscreen hides the titlebar strip (the native controls hide too)
   const [fullscreen, setFullscreen] = useState(false)
   useEffect(() => bridge.onFullScreen(setFullscreen), [])
+
+  // Auto-update (Electron only): a downloaded update installs itself on quit;
+  // the toast just says so and offers an immediate restart. Dismissing it
+  // changes nothing about the install-on-quit behavior.
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+  useEffect(() => bridge.onUpdateReady(setUpdateVersion), [])
 
   // Keep the i18n store in sync with the language setting
   useEffect(() => {
@@ -307,22 +314,23 @@ export default function App(): React.JSX.Element {
     if (tabs.length === 0) refreshRecents()
   }, [tabs.length, refreshRecents])
 
-  // Tab shortcuts: Ctrl+Tab / Ctrl+Shift+Tab cycle, Ctrl+W close, Ctrl+O open
+  // Tab shortcuts: Ctrl+Tab / Ctrl+Shift+Tab cycle (Ctrl also on mac — Cmd+Tab
+  // is the OS app switcher), Cmd/Ctrl+W close, Cmd/Ctrl+O open
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (e.ctrlKey && e.key === 'Tab') {
         e.preventDefault()
         cycleTab(e.shiftKey ? -1 : 1)
-      } else if (e.ctrlKey && (e.key === 'w' || e.key === 'W')) {
+      } else if (primaryMod(e) && (e.key === 'w' || e.key === 'W')) {
         e.preventDefault()
         setActiveId((current) => {
           if (current) closeTab(current)
           return current
         })
-      } else if (e.ctrlKey && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
+      } else if (primaryMod(e) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault()
         bridge.newWindow()
-      } else if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) {
+      } else if (primaryMod(e) && (e.key === 'o' || e.key === 'O')) {
         e.preventDefault()
         void openDialog()
       }
@@ -402,6 +410,25 @@ export default function App(): React.JSX.Element {
         </div>
       ) : (
         <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+      )}
+      {isElectron && updateVersion && (
+        <div className="update-toast" role="status">
+          <div className="update-toast-text">
+            <strong>{t('update.ready')}</strong>
+            <span>{t('update.body', { version: updateVersion })}</span>
+          </div>
+          <button className="btn-primary" onClick={() => bridge.updateRestart()}>
+            {t('update.restartNow')}
+          </button>
+          <button
+            className="update-toast-close"
+            aria-label={t('update.dismissTip')}
+            title={t('update.dismissTip')}
+            onClick={() => setUpdateVersion(null)}
+          >
+            ✕
+          </button>
+        </div>
       )}
       {confirmState && (
         <div className="confirm-overlay" onMouseDown={(e) => e.stopPropagation()}>

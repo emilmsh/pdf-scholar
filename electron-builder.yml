@@ -1,6 +1,11 @@
-# Installer configuration. Per-user NSIS install (no admin) with a .pdf
-# "Open with" association — we do NOT hijack the default PDF handler; the
-# user opts in via Windows' "Open with" / default apps UI.
+# Installer configuration. See PLATFORMS.md for the platform tier matrix and
+# the parity contract between targets.
+#
+# Windows: per-user NSIS install (no admin) with a .pdf "Open with"
+# association — we do NOT hijack the default PDF handler; the user opts in
+# via Windows' "Open with" / default apps UI. x64 + arm64 are combined into
+# ONE universal installer (buildUniversalInstaller default) that picks the
+# native arch at install time — keeps the version-stable download name.
 # appId stays no.emil.pdfx so NSIS recognizes existing installs and upgrades
 appId: no.emil.pdfx
 productName: PDF Scholar
@@ -13,17 +18,58 @@ files:
 asarUnpack:
   # loaded via dynamic import() — keep it on real disk
   - node_modules/@anthropic-ai/sdk/**
+# Updater/release metadata (latest*.yml) for electron-updater. CI builds with
+# --publish never and uploads assets itself; nothing publishes from dev machines.
+publish:
+  provider: github
+  owner: emilmsh
+  repo: pdf-scholar
 win:
   target:
-    - nsis
+    - target: nsis
+      arch: [x64, arm64]
   icon: build/icon.png
 nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
   artifactName: PDF-Scholar-Setup-${version}.${ext}
+mac:
+  # No Apple Developer membership (deliberate, zero recurring cost): CI has no
+  # signing identity, so electron-builder falls back to an AD-HOC signature —
+  # required for the binary to run at all on Apple Silicon. Gatekeeper will
+  # show the "damaged/unverified" flow; README documents the workaround.
+  # Do NOT set identity: null (that would skip signing entirely).
+  notarize: false
+  target:
+    - target: dmg
+      arch: [universal]
+  icon: build/icon.png
+  category: public.app-category.productivity
+  artifactName: PDF-Scholar-${version}.${ext}
+dmg:
+  writeUpdateInfo: false
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: build/icon.png
+  category: Office
+  synopsis: PDF reader and annotator for scholars
+  maintainer: Emil Mathias Strøm Halseth <emilmsh@users.noreply.github.com>
+  executableName: pdf-scholar
+  artifactName: PDF-Scholar-${version}.${ext}
+appImage:
+  artifactName: PDF-Scholar-${version}.${ext}
+# Static AppImage runtime (no libfuse2 dependency — required on Ubuntu 24.04+
+# where the legacy FUSE2 runtime no longer works out of the box)
+toolsets:
+  appimage: '1.0.3'
 fileAssociations:
   - ext: pdf
     name: PDF-dokument
     description: PDF-dokument
     role: Viewer
+    mimeType: application/pdf

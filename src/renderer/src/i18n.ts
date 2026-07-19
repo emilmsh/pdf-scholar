@@ -305,7 +305,18 @@ const nb = {
   'ai.historyDeleteTip': 'Slett samtalen',
   'ai.historyMessages': '{count} meldinger',
   'ai.jumpNewestTip': 'Hopp til nyeste melding',
-  'ai.untitledChat': 'Uten tittel'
+  'ai.untitledChat': 'Uten tittel',
+
+  // Auto-update (Electron only)
+  'update.ready': 'Oppdatering klar',
+  'update.body': 'PDF Scholar {version} installeres når du avslutter.',
+  'update.restartNow': 'Start på nytt nå',
+  'update.dismissTip': 'Lukk',
+
+  // Update notice (sideloaded extension only — store installs auto-update)
+  'update.extAvailable': 'Ny versjon tilgjengelig',
+  'update.extBody': 'PDF Scholar-utvidelsen {version} er ute. Last ned og last inn utvidelsen på nytt for å oppdatere.',
+  'update.extDownload': 'Last ned'
 }
 
 export type MsgKey = keyof typeof nb
@@ -593,7 +604,16 @@ const en: Dict = {
   'ai.historyDeleteTip': 'Delete conversation',
   'ai.historyMessages': '{count} messages',
   'ai.jumpNewestTip': 'Jump to newest message',
-  'ai.untitledChat': 'Untitled'
+  'ai.untitledChat': 'Untitled',
+
+  'update.ready': 'Update ready',
+  'update.body': 'PDF Scholar {version} will be installed when you quit.',
+  'update.restartNow': 'Restart now',
+  'update.dismissTip': 'Dismiss',
+
+  'update.extAvailable': 'New version available',
+  'update.extBody': 'PDF Scholar extension {version} is out. Download and reload the extension to update.',
+  'update.extDownload': 'Download'
 }
 
 const DICTIONARIES: Record<Lang, Dict> = { nb, en }
