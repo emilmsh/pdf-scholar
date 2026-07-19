@@ -17,7 +17,7 @@ One-time fees (Microsoft Partner Center, Chrome Web Store) are acceptable.
 | Windows x64 | 1 | `PDF-Scholar-Setup-<v>.exe` (universal NSIS) | electron-updater |
 | Windows arm64 | 1 | same universal installer (arch picked at install) | electron-updater |
 | Extension (Edge/Chrome) | 1 | `pdf-scholar-extension.zip` | store auto-update; sideload = in-app notice |
-| macOS 11+ (universal) | 2 | `PDF-Scholar-<v>.dmg` — **unsigned** | none (see below) |
+| macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | none (see below) |
 | Linux x64 | 2 | `PDF-Scholar-<v>.AppImage` + `.deb` | electron-updater |
 
 Deferred (revisit deliberately, don't drift into them): Linux arm64 (free GitHub

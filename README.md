@@ -30,9 +30,10 @@ the AI features.
 
 ### Desktop app (macOS) — beta
 
-Download `PDF-Scholar-*.dmg` from the
-[latest release](https://github.com/emilmsh/pdf-scholar/releases/latest) (universal:
-Apple Silicon + Intel). PDF Scholar is free and open source, and **not signed with an
+Download the `.dmg` from the
+[latest release](https://github.com/emilmsh/pdf-scholar/releases/latest) — the
+**`-arm64`** build for Apple Silicon (M1 and later), the **`-x64`** build for older
+Intel Macs. PDF Scholar is free and open source, and **not signed with an
 Apple Developer certificate** — macOS will claim the app is "damaged" or from an
 unverified developer on first launch. It isn't; that's Gatekeeper's default for any
 app distributed outside the App Store without Apple's paid program. To open it:
