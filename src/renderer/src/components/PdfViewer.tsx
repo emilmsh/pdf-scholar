@@ -17,6 +17,7 @@ import { primaryMod } from '../platform'
 import {
   FREETEXT_COLOR,
   FREETEXT_SIZE,
+  HIGHLIGHT_FILL_ALPHA,
   MARKER_DEFAULT,
   MARKER_OPACITY,
   NOTE_COLOR,
@@ -57,6 +58,7 @@ import {
   registerBrowserDoc,
   releaseBrowserDoc
 } from '../annotation-engine-browser'
+import { registerPdfiumDoc, releasePdfiumDoc } from '../pdfium-renderer'
 import {
   buildAiDocument,
   chatSystem,
@@ -502,6 +504,9 @@ export default function PdfViewer({
     // document (desktop edits a draft file instead) — register the bytes so
     // bridge.annotate/update/delete have a document to write into.
     if (!isElectron) registerBrowserDoc(payload.path, payload.data)
+    // Spike: when the PDFium raster flag is on, the same bytes also feed the
+    // render engine (no-op otherwise — the register call guards on the flag)
+    registerPdfiumDoc(payload.path, payload.data)
     // pdf.js transfers the underlying buffer to its worker, so hand it a copy
     const resources = openDocument(payload.data.slice())
     docResourcesRef.current = resources
@@ -525,6 +530,7 @@ export default function PdfViewer({
     return () => {
       destroyed = true
       if (!isElectron) void releaseBrowserDoc(payload.path)
+      void releasePdfiumDoc(payload.path)
       // Destroy whatever is CURRENT (a reload may have swapped resources)
       docResourcesRef.current?.task.destroy()
       docResourcesRef.current?.port.terminate()
@@ -547,6 +553,9 @@ export default function PdfViewer({
       if (!bytes) return
       data = bytes
     }
+    // Fresh bytes carry the engine's annotation edits — the PDFium raster
+    // source must see them too (no-op when the spike flag is off)
+    registerPdfiumDoc(payload.path, data)
     const resources = openDocument(data.slice())
     try {
       const doc = await resources.task.promise
@@ -1472,7 +1481,8 @@ export default function PdfViewer({
         author: snapshot.author,
         strokes: snapshot.strokes,
         width: snapshot.width,
-        fontSize: snapshot.fontSize
+        fontSize: snapshot.fontSize,
+        blend: snapshot.blend
       })
       if ('error' in result) {
         showToast(t('viewer.annotSaveFailed', { error: result.error }))
@@ -1586,7 +1596,12 @@ export default function PdfViewer({
       color: [number, number, number],
       opacity: number,
       contents?: string,
-      extras?: { strokes?: [number, number][][]; width?: number; fontSize?: number }
+      extras?: {
+        strokes?: [number, number][][]
+        width?: number
+        fontSize?: number
+        blend?: 'multiply'
+      }
     ) => {
       const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
       const snapshot: PageAnnotation = {
@@ -1601,7 +1616,8 @@ export default function PdfViewer({
         author: 'PDF Scholar',
         strokes: extras?.strokes,
         width: extras?.width,
-        fontSize: extras?.fontSize
+        fontSize: extras?.fontSize,
+        blend: extras?.blend
       }
       pushUndo({ kind: 'create', handle, snapshot })
       await engineCreate(handle, snapshot)
@@ -1657,7 +1673,10 @@ export default function PdfViewer({
       ]
       void persistAnnotation(pageNumber, 'ink', quads, tool.color, tool.opacity, undefined, {
         strokes: [points],
-        width: tool.width
+        width: tool.width,
+        // The marker is the freehand twin of a text highlight: multiply keeps
+        // the text under the stroke black, live and in the saved file alike
+        blend: tool.type === 'marker' ? 'multiply' : undefined
       })
     },
     [persistAnnotation]
@@ -1841,7 +1860,7 @@ export default function PdfViewer({
       const perPage = collectSelectionRects()
       setMenu(null)
       if (perPage.length === 0) return
-      const opacity = type === 'highlight' ? 0.5 : 1
+      const opacity = type === 'highlight' ? HIGHLIGHT_FILL_ALPHA : 1
       for (const { pageNumber, rects } of perPage) {
         void persistAnnotation(pageNumber, type, rects, color, opacity)
       }
@@ -3439,6 +3458,7 @@ export default function PdfViewer({
                   <PdfPage
                     key={pageNumber}
                     pdf={pdf}
+                    docKey={payload.path}
                     pageNumber={pageNumber}
                     top={layout.tops[i]}
                     left={layout.lefts[i]}

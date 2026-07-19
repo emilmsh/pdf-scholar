@@ -1,11 +1,12 @@
 import { memo, useEffect, useRef } from 'react'
 import { AnnotationMode, TextLayer } from 'pdfjs-dist'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
 import { annotationCss, arrowHeadPoints, arrowShaftEnd, rgbCss, strokePathData } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
+import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 
 const SHAPE_TYPES = new Set(['square', 'circle', 'line', 'arrow'])
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -19,6 +20,8 @@ const MAX_CANVAS_AREA = 16384 * 16384
 
 interface Props {
   pdf: PDFDocumentProxy
+  /** Document path — key into the PDFium raster registry (spike flag only) */
+  docKey: string
   pageNumber: number
   top: number
   left: number
@@ -64,6 +67,7 @@ interface Cancellable {
 
 function PdfPage({
   pdf,
+  docKey,
   pageNumber,
   top,
   left,
@@ -90,6 +94,16 @@ function PdfPage({
   const textRef = useRef<HTMLDivElement>(null)
   const linkRef = useRef<HTMLDivElement>(null)
   const drawSvgRef = useRef<SVGSVGElement>(null)
+  // The built text layer + its page, kept so a zoom can call the cheap
+  // TextLayer.update() instead of rebuilding. scaleRef/rotationRef let the
+  // text-layer effect read the live scale/rotation without taking `scale` as a
+  // dependency (which would defeat the whole point — a full rebuild per zoom).
+  const textLayerRef = useRef<InstanceType<typeof TextLayer> | null>(null)
+  const pageRef = useRef<PDFPageProxy | null>(null)
+  const scaleRef = useRef(scale)
+  scaleRef.current = scale
+  const rotationRef = useRef(rotation)
+  rotationRef.current = rotation
   const strokeRef = useRef<{
     pointerId: number
     points: [number, number][]
@@ -126,22 +140,21 @@ function PdfPage({
     group: SVGGElement
   } | null>(null)
 
+  // ---- Canvas raster ----
+  // Re-runs on zoom because a crisp bitmap must be rasterised at the new scale.
+  // Deliberately separate from the text/link layers below: a zoom re-rasters
+  // only this canvas and must NOT rebuild the text layer (streamTextContent +
+  // a DOM node per span) or re-fetch link annotations — those are scale-free.
   useEffect(() => {
     const host = hostRef.current
-    const textHost = textRef.current
-    const linkHost = linkRef.current
-    if (!host || !textHost || !linkHost) return
+    if (!host) return
     if (!active) {
-      // Free bitmap + text nodes when far outside the viewport
-      host.replaceChildren()
-      textHost.replaceChildren()
-      linkHost.replaceChildren()
+      host.replaceChildren() // free the bitmap when far outside the viewport
       return
     }
 
     let cancelled = false
     let renderTask: Cancellable | null = null
-    let textLayer: Cancellable | null = null
 
     ;(async () => {
       const page = await pdf.getPage(pageNumber)
@@ -172,29 +185,106 @@ function PdfPage({
       const canvas = document.createElement('canvas')
       canvas.width = Math.floor(viewport.width * dpr)
       canvas.height = Math.floor(viewport.height * dpr)
-      const task = page.render({
-        canvas,
-        viewport,
-        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
-        annotationMode: hideAnnots ? AnnotationMode.DISABLE : AnnotationMode.ENABLE
-      })
-      renderTask = task
       // Time the raster so the controller learns this machine's throughput.
       // Only feed back clean, completed samples (pixels = 0 skips the sample).
       beginRender()
       const startedAt = performance.now()
       let rasterOk = false
       try {
-        await task.promise
-        rasterOk = true
+        if (PDFIUM_RENDER) {
+          // Spike path: PDFium (EmbedPDF worker) supplies the bitmap; pdf.js
+          // keeps every other job (text layer, links, search, metadata).
+          const handle = renderPdfiumPage(docKey, pageNumber - 1, {
+            scale,
+            dpr,
+            rotation,
+            withAnnotations: !hideAnnots
+          })
+          renderTask = handle
+          const img = await handle.promise
+          if (img) {
+            // Adopt PDFium's own rounding — the CSS box stretches the bitmap,
+            // so a ±1px difference from the pdf.js-derived size is invisible.
+            canvas.width = img.width
+            canvas.height = img.height
+            canvas.getContext('2d')?.putImageData(img, 0, 0)
+            rasterOk = true
+          }
+        } else {
+          const task = page.render({
+            canvas,
+            viewport,
+            transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+            annotationMode: hideAnnots ? AnnotationMode.DISABLE : AnnotationMode.ENABLE
+          })
+          renderTask = task
+          await task.promise
+          rasterOk = true
+        }
       } finally {
         endRender(
           rasterOk && !cancelled ? canvas.width * canvas.height : 0,
           performance.now() - startedAt
         )
       }
-      if (cancelled) return
+      if (cancelled || !rasterOk) return
+      if (import.meta.env.DEV) {
+        // Spike telemetry: per-raster samples for the engine comparison,
+        // readable from the console as window.__rasterLog.
+        const w = window as unknown as { __rasterLog?: unknown[] }
+        ;(w.__rasterLog ??= []).push({
+          engine: PDFIUM_RENDER ? 'pdfium' : 'pdfjs',
+          page: pageNumber,
+          ms: Math.round(performance.now() - startedAt),
+          px: canvas.width * canvas.height
+        })
+      }
       host.replaceChildren(canvas)
+    })().catch((err: unknown) => {
+      const name = err instanceof Error ? err.name : ''
+      if (!cancelled && name !== 'RenderingCancelledException' && name !== 'AbortException') {
+        console.error(`pdfx: klarte ikke å tegne side ${pageNumber}`, err)
+      }
+    })
+
+    return () => {
+      cancelled = true
+      renderTask?.cancel()
+    }
+  }, [pdf, docKey, pageNumber, scale, rotation, active, hideAnnots])
+
+  // ---- Text layer + clickable links ----
+  // Built ONCE per page/rotation, NOT per zoom. pdf.js v6 lays spans out in
+  // page-relative units (% offsets + the --scale-factor CSS var for font size),
+  // and links are positioned as % of the page box, so a zoom reflows both via
+  // CSS. The scale effect below only calls the cheap TextLayer.update() to
+  // refine per-glyph fitting — never this rebuild. `scale` is intentionally NOT
+  // a dependency (read via scaleRef for the initial build only).
+  useEffect(() => {
+    const textHost = textRef.current
+    const linkHost = linkRef.current
+    if (!textHost || !linkHost) return
+    if (!active) {
+      textHost.replaceChildren()
+      linkHost.replaceChildren()
+      textLayerRef.current = null
+      pageRef.current = null
+      return
+    }
+
+    let cancelled = false
+    let textLayer: Cancellable | null = null
+
+    ;(async () => {
+      const page = await pdf.getPage(pageNumber)
+      if (cancelled) return
+      pageRef.current = page
+      // Build at the live scale so first paint's glyph fit is already correct;
+      // subsequent zooms refine via TextLayer.update() (the scale effect below).
+      const viewport = page.getViewport({
+        scale: scaleRef.current,
+        rotation: (page.rotate + rotation) % 360
+      })
 
       const textDiv = document.createElement('div')
       textDiv.className = 'textLayer'
@@ -206,6 +296,7 @@ function PdfPage({
       textLayer = tl
       await tl.render()
       if (cancelled) return
+      textLayerRef.current = tl
       // Whitespace-only items (LaTeX PDFs often park them in the margins,
       // one per line) must not paint their own selection box — they stay
       // in the DOM so copied text keeps its spaces, but render no highlight.
@@ -230,7 +321,8 @@ function PdfPage({
       })
       textHost.replaceChildren(textDiv)
 
-      // Clickable link annotations (internal destinations + external URLs)
+      // Clickable link annotations (internal destinations + external URLs).
+      // Positioned as % of the page box so they reflow on zoom (no baked scale).
       const annots = (await page.getAnnotations()) as {
         subtype: string
         rect: number[]
@@ -246,10 +338,10 @@ function PdfPage({
         const anchor = document.createElement('a')
         anchor.className = 'pdf-link'
         anchor.href = '#'
-        anchor.style.left = `${Math.min(px1, px2)}px`
-        anchor.style.top = `${Math.min(py1, py2)}px`
-        anchor.style.width = `${Math.abs(px2 - px1)}px`
-        anchor.style.height = `${Math.abs(py2 - py1)}px`
+        anchor.style.left = `${(100 * Math.min(px1, px2)) / viewport.width}%`
+        anchor.style.top = `${(100 * Math.min(py1, py2)) / viewport.height}%`
+        anchor.style.width = `${(100 * Math.abs(px2 - px1)) / viewport.width}%`
+        anchor.style.height = `${(100 * Math.abs(py2 - py1)) / viewport.height}%`
         if (link.url) anchor.title = link.url
         anchor.addEventListener('click', (e) => {
           e.preventDefault()
@@ -263,16 +355,28 @@ function PdfPage({
     })().catch((err: unknown) => {
       const name = err instanceof Error ? err.name : ''
       if (!cancelled && name !== 'RenderingCancelledException' && name !== 'AbortException') {
-        console.error(`pdfx: klarte ikke å tegne side ${pageNumber}`, err)
+        console.error(`pdfx: klarte ikke å bygge tekstlaget for side ${pageNumber}`, err)
       }
     })
 
     return () => {
       cancelled = true
-      renderTask?.cancel()
       textLayer?.cancel()
     }
-  }, [pdf, pageNumber, scale, rotation, active, hideAnnots, onInternalLink, onExternalLink])
+  }, [pdf, pageNumber, rotation, active, onInternalLink, onExternalLink])
+
+  // ---- Zoom refinement for the text layer ----
+  // The spans' horizontal glyph fit (--scale-x) is measured at build scale; on
+  // zoom pdf.js re-lays-out the EXISTING spans in place (no DOM rebuild, no text
+  // re-stream), keeping text crisp. rotation is read via ref because a rotation
+  // change already triggers a full rebuild in the effect above.
+  useEffect(() => {
+    const tl = textLayerRef.current
+    const page = pageRef.current
+    if (!tl || !page) return
+    const viewport = page.getViewport({ scale, rotation: (page.rotate + rotationRef.current) % 360 })
+    tl.update({ viewport })
+  }, [scale])
 
   // ---------- Freehand drawing (pen/marker/eraser) ----------
 
@@ -461,14 +565,26 @@ function PdfPage({
 
   const selectedAnnot = selectedId ? annotations.find((a) => a.id === selectedId) ?? null : null
 
+  // Text highlights AND marker strokes blend (multiply — pixel-parity with the
+  // saved appearance stream, see annotationCss/buildAnnotation) against the
+  // raw page inside .page-raster, BEFORE the theme recolouring, so the tint
+  // stays contained and text under them stays black. Pen/shape/note marks keep
+  // their own recoloured layer on top so they also work as opaque strokes.
+  const sessionAnnots = !hideAnnots ? annotations.filter((a) => a.source === 'session') : []
+  const highlightMarks = sessionAnnots.filter(
+    (a) => a.type === 'highlight' || a.blend === 'multiply'
+  )
+  const otherMarks = sessionAnnots.filter(
+    (a) => a.type !== 'highlight' && a.blend !== 'multiply'
+  )
+
   return (
     <div className="pdf-page" data-page={pageNumber} style={style}>
-      <div className="canvas-host" ref={hostRef} />
-      {!hideAnnots && annotations.some((a) => a.source === 'session') && (
-        <div className="annot-overlay annot-marks">
-          {annotations
-            .filter((a) => a.source === 'session')
-            .map((a) => (
+      <div className="page-raster">
+        <div className="canvas-host" ref={hostRef} />
+        {highlightMarks.length > 0 && (
+          <div className="annot-overlay annot-highlights">
+            {highlightMarks.map((a) => (
               <AnnotationMarks
                 key={a.id}
                 annotation={a}
@@ -478,6 +594,21 @@ function PdfPage({
                 rotation={rotation}
               />
             ))}
+          </div>
+        )}
+      </div>
+      {otherMarks.length > 0 && (
+        <div className="annot-overlay annot-marks">
+          {otherMarks.map((a) => (
+            <AnnotationMarks
+              key={a.id}
+              annotation={a}
+              scale={scale}
+              pageW={pageW}
+              pageH={pageH}
+              rotation={rotation}
+            />
+          ))}
         </div>
       )}
       {/* Search hits arrive already in VIEW space (resolved from the rotated
@@ -595,6 +726,11 @@ function AnnotationMarks({
         className="annot-ink-svg"
         viewBox={`0 0 ${view.w} ${view.h}`}
         preserveAspectRatio="none"
+        // Marker strokes multiply against the page (inside .page-raster's
+        // isolated group — see .annot-highlights) so text stays legible; the
+        // blend must sit on the svg ELEMENT: an svg's children only ever blend
+        // against the svg's own canvas, never the HTML behind it.
+        style={annotation.blend === 'multiply' ? { mixBlendMode: 'multiply' } : undefined}
       >
         <g transform={gTransform}>
           {annotation.strokes.map((stroke, i) => (

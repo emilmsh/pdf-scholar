@@ -29,6 +29,8 @@ export interface PageAnnotation {
   width?: number
   /** freetext only */
   fontSize?: number
+  /** ink (marker): drawn AND baked with multiply so text stays legible */
+  blend?: 'multiply'
 }
 
 export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange' | 'custom'
@@ -76,6 +78,16 @@ export function addCustomColor(hex: string): void {
     /* remembering colors is cosmetic */
   }
 }
+
+/** Fill opacity for text highlights — the SINGLE source for both the live
+ *  overlay and the value persisted into the PDF (see applyMarkup), so a
+ *  highlight looks identical before and after a save+reload. 0.5 is the tone
+ *  the owner approved on saved annotations ("riktig", prettier than Edge);
+ *  an earlier attempt to unify at 0.4 made every new highlight visibly paler
+ *  than the existing ones. Changing this value changes NEW highlights only —
+ *  saved ones keep the opacity they were written with, so any change here
+ *  reintroduces a visible old-vs-new mismatch. Don't. */
+export const HIGHLIGHT_FILL_ALPHA = 0.5
 
 export const HIGHLIGHT_COLORS: HighlightColor[] = [
   { key: 'yellow', hex: '#ffd54a', rgb: [1, 0.835, 0.29] },
@@ -228,7 +240,23 @@ export function annotationCss(
   }
   switch (a.type) {
     case 'highlight':
-      return { ...toCss(q), background: rgbCss(a.color, 0.42), mixBlendMode: 'multiply' }
+      // `multiply` — parity with the saved form: the appearance stream the
+      // engine bakes renders through pdf.js as exactly this formula (verified
+      // numerically: text (64,64,71) → (64,60,51) = (1-α)·C + α·C·S/255), so a
+      // live highlight is pixel-identical to the same highlight after
+      // save+reload. NOTE: the blend only works because .annot-highlights
+      // carries `z-index: auto` (app.css) — any stacking-context trigger on an
+      // ancestor between this div and the page canvas (z-index, filter,
+      // opacity, transform) forms an isolated group and silently degrades the
+      // blend to a plain alpha wash that greys the text. That exact bug
+      // shipped for a while and produced every "markeringen gjør teksten dus"
+      // complaint. Keep opacity coming from the RECORD (a.opacity), and keep
+      // blend + color in lockstep with the engine.
+      // The RECORD's opacity, never the global constant: the constant only
+      // seeds NEW highlights (applyMarkup). Drawing with the constant made an
+      // annotation saved under an older value render differently live vs after
+      // reload — the overlay must always show exactly what the file will.
+      return { ...toCss(q), background: rgbCss(a.color, a.opacity), mixBlendMode: 'multiply' }
     case 'underline': {
       const thick = Math.max(1.5 / scale, 1.2)
       const off = Math.max(1.5 / scale, 0.045 * q.h)

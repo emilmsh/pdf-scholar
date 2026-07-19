@@ -7,6 +7,7 @@ import type { PdfAnnotationObject } from '@embedpdf/models'
 import {
   PdfAnnotationLineEnding,
   PdfAnnotationSubtype,
+  PdfBlendMode,
   PdfStandardFont,
   PdfTextAlignment,
   PdfVerticalAlignment
@@ -101,7 +102,11 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | { e
         inkList: req.strokes.map((s) => ({ points: s.map(([x, y]) => ({ x, y })) })),
         strokeColor: color,
         strokeWidth: width,
-        opacity: req.opacity
+        opacity: req.opacity,
+        // Marker strokes bake /BM Multiply so the text under them stays black
+        // (verified: pdf.js renders the baked appearance as a true multiply) —
+        // the freehand twin of a text highlight. Pen strokes stay Normal.
+        ...(req.blend === 'multiply' ? { blendMode: PdfBlendMode.Multiply } : {})
       } as PdfAnnotationObject
     }
     case 'square':

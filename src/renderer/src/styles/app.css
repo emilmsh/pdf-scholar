@@ -876,6 +876,17 @@ button {
   touch-action: none;
 }
 
+/* The in-progress marker stroke previews with the same multiply it will bake
+   with. The blend sits on the LAYER itself: z-index: 5 makes .draw-layer a
+   stacking context (= isolated group), so a blend on any child would silently
+   blend against the layer's transparent background — the same trap that broke
+   highlights (see .annot-highlights). The layer's own blend composites the
+   whole group against the page beneath, which in marker mode contains only
+   the active stroke. */
+.draw-layer.marker-mode {
+  mix-blend-mode: multiply;
+}
+
 .draw-layer.text-mode {
   cursor: text;
 }
@@ -1444,12 +1455,26 @@ button {
   inset: 0;
 }
 
+/* The raster group holds the page canvas AND the blending annotations (text
+   highlights, marker strokes), so their multiply blends against the raw page
+   FIRST — text under them stays black — and only then does the theme
+   recolouring (--page-filter) recolour the whole composite. isolation keeps
+   that blend contained to the page; the cream --page-bg is the surface the
+   canvas multiplies onto for the sepia paper tone. */
+.page-raster {
+  position: absolute;
+  inset: 0;
+  border-radius: 2px;
+  background: var(--page-bg);
+  filter: var(--page-filter);
+  isolation: isolate;
+}
+
 .canvas-host canvas {
   display: block;
   width: 100%;
   height: 100%;
   border-radius: 2px;
-  filter: var(--page-filter);
   mix-blend-mode: var(--page-blend);
 }
 
@@ -1462,9 +1487,24 @@ button {
   pointer-events: none;
 }
 
-/* Annotation marks belong to the paper: they follow the page recolouring
-   (sepia warmth, night inversion) so e.g. a yellow highlight dims with the
-   page instead of glowing at full brightness over an inverted canvas.
+/* Highlights sit inside .page-raster so they inherit the theme recolouring
+   through the group and must NOT be filtered again here — a filter would
+   isolate the layer and defeat the blend. Same for z-index: the base
+   .annot-overlay's `z-index: 1` makes a positioned element a stacking context,
+   and per CSS compositing EVERY stacking context is an ISOLATED group — the
+   children's mix-blend-mode then blends against this host's transparent
+   background instead of the page canvas, silently degrading highlights to a
+   plain alpha wash that greys the text (pixel-verified 2026-07-20: text under
+   a highlight went (64,64,71)→(160,139,72) with z-index vs (64,59,46) — true
+   multiply — without). DOM order already stacks this host above the canvas. */
+.annot-highlights {
+  filter: none;
+  z-index: auto;
+}
+
+/* Pen/shape/note marks are opaque strokes that don't blend with the page, so
+   they ride above the raster and follow the recolouring on their own layer
+   (a red pen dims with a night page instead of glowing).
    Search hits and the selection frame are UI chrome and stay unfiltered. */
 .annot-overlay.annot-marks,
 .draw-layer svg {
@@ -2379,17 +2419,19 @@ button {
 .ai-model {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   max-width: 100%;
-  font-size: 11px;
-  color: var(--text-secondary);
-  padding: 3px 6px;
-  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-elevated);
 }
 
 .ai-model:hover:not(:disabled) {
   background: var(--hover);
-  color: var(--text);
 }
 
 .ai-model:disabled {

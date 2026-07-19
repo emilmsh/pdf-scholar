@@ -2,7 +2,10 @@ node_modules/
 out/
 dist/
 dist-extension/
+dist-extension-firefox/
 release/
+# House demo doc for README screenshots (arXiv 1706.03762) — never ship it
+docs/screenshots/attention.pdf
 *.log
 .DS_Store
 *.local

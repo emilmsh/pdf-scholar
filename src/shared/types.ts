@@ -92,6 +92,9 @@ export interface AnnotateRequest {
   width?: number
   /** freetext only */
   fontSize?: number
+  /** ink (marker): bake the appearance with /BM Multiply so text under the
+   *  stroke stays legible — the freehand twin of a text highlight */
+  blend?: 'multiply'
 }
 
 /** On success carries the PDF object number of the (new) annotation */
