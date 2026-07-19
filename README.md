@@ -138,8 +138,13 @@ the current desktop-vs-extension parity.
 
 ![AI assistant](docs/screenshots/assistant.png)
 
-- Chat with the document — every claim gets a clickable source chip ("s. 12") that
-  jumps to and highlights the exact passage, down to sentence level
+Stuck on a dense passage? Ask the assistant to explain it in plain terms — the answer
+is grounded in the document, with clickable source chips that take you straight to the
+sentences it drew from.
+
+- Understand hard passages in plain language — ask "explain this simply" or "what does
+  this term mean here?" and every claim comes with a clickable source chip ("s. 12")
+  that jumps to and highlights the exact passage, down to sentence level
 - Structured article summaries (research question / method / data / findings /
   limitations)
 - Ask your own annotations: "summarize what I've highlighted"
