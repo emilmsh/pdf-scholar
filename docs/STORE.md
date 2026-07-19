@@ -40,17 +40,18 @@ Individual account now costs nothing.
    the right choice here.
 2. **[Emil]** Once enrolled, open the Microsoft Store dashboard: **Apps and
    games → New product → MSIX or PWA app**, reserve the name **PDF Scholar**.
-3. **[Emil]** Open **Product management → Product identity** and copy three
-   values into `electron-builder.store.yml`:
-   - `Package/Identity/Name` → `appx.identityName`
-   - `Package/Identity/Publisher` (a `CN={GUID}`) → `appx.publisher`
-   - `Package/Properties/PublisherDisplayName` → `appx.publisherDisplayName`
+3. **DONE** — the three identity values are filled into
+   `electron-builder.store.yml` (Store ID `9N75CPC0G9M2`, PFN
+   `EmilMathiasStrmHalseth.PDFScholar_9ddn91dy4x8sa`).
 4. Run `npm run dist:store` → `release/PDF-Scholar-<version>-x64.appx` and
-   `…-arm64.appx`. Do **not** sign them — the Store signs on ingestion.
-5. **[Emil]** Create a submission, upload **both** packages (same version,
-   different architecture — the Store serves the right one per device), fill in
-   the listing (screenshots exist under `docs/screenshots/`), set the privacy
-   policy URL to
+   `…-arm64.appx` (both **unsigned** — the Store signs on ingestion; the log
+   line "AppX is not signed — reason=Windows Store only build" is expected). A
+   NSIS `.exe` is also emitted as a byproduct — ignore it; only the `.appx`
+   files go to the Store.
+5. **[Emil]** In the submission's **Packages** step, upload **both** `.appx`
+   files (same version, different architecture — the Store serves the right one
+   per device). Fill in the listing (screenshots under `docs/screenshots/`),
+   set the privacy policy URL to
    `https://github.com/emilmsh/pdf-scholar/blob/master/PRIVACY.md`, and submit
    for certification (typically 1–3 days).
 6. Notes already handled in code/config: electron-updater disables itself in
