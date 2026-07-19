@@ -28,10 +28,12 @@ import type {
 } from '../../shared/types'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
+import { ext } from './ext'
 
-/** True when running inside a WebExtension page (has a runtime id). */
+/** True when running inside a WebExtension page (has a runtime id). Uses the
+ *  `ext` alias so it is true on Firefox (browser.*) as well as Chrome. */
 export function isExtensionContext(): boolean {
-  return typeof chrome !== 'undefined' && !!chrome?.runtime?.id
+  return !!ext?.runtime?.id
 }
 
 const K_SETTINGS = 'pdfx-settings'
@@ -53,7 +55,7 @@ const handles = new Map<string, FileSystemFileHandle>()
 
 /** The extension viewer URL for a given source path/URL. */
 function viewerUrl(path: string): string {
-  const base = chrome?.runtime?.getURL('viewer.html') ?? 'viewer.html'
+  const base = ext?.runtime?.getURL('viewer.html') ?? 'viewer.html'
   return `${base}?file=${encodeURIComponent(path)}`
 }
 
@@ -124,7 +126,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // A "new window" in the native app is a new browser tab here.
     newWindow: (path?: string) => {
       const url = path ? viewerUrl(path) : viewerUrl('')
-      if (chrome?.tabs) void chrome.tabs.create({ url, active: true })
+      if (ext?.tabs) void ext.tabs.create({ url, active: true })
       else window.open(url, '_blank')
     },
 

@@ -10,6 +10,7 @@
 
 import { isExtensionContext } from './extension-api'
 import { store } from './extension-store'
+import { ext } from './ext'
 
 const K_UPDATE = 'pdfx-update-check'
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
@@ -43,9 +44,9 @@ function isNewer(a: string, b: string): boolean {
 export async function checkForExtensionUpdate(): Promise<string | null> {
   if (!isExtensionContext()) return null
   try {
-    const self = await chrome?.management?.getSelf()
+    const self = await ext?.management?.getSelf()
     if (self?.installType !== 'development') return null
-    const current = chrome?.runtime.getManifest().version
+    const current = ext?.runtime.getManifest().version
     if (!current) return null
 
     const state = await store.get<UpdateCheckState>(K_UPDATE, {})

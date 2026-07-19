@@ -12,8 +12,9 @@ grounded in the document, and nothing gets between you and the page.
 ## Download
 
 There are two ways to run PDF Scholar — a native desktop app, or a browser extension
-that takes over PDFs inside Edge/Chrome. They share the same reader, annotator and
-assistant, so you can pick whichever fits how you already open documents.
+that takes over PDFs inside Edge/Chrome and Firefox (desktop **and** Firefox for
+Android). They share the same reader, annotator and assistant, so you can pick
+whichever fits how you already open documents.
 
 ### Desktop app (Windows)
 
@@ -62,11 +63,13 @@ From the [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest
 
 Both auto-update in place when a new release is published.
 
-### Browser extension (Edge / Chrome) — beta
+### Browser extension (Edge / Chrome / Firefox) — beta
 
 The same viewer, but each PDF opens as an ordinary browser tab instead of the
 browser's built-in reader. Make your browser the default PDF app and double-clicking a
-PDF in Explorer opens it in PDF Scholar too.
+PDF in Explorer opens it in PDF Scholar too. The same extension runs on Chromium
+(Edge/Chrome) and Firefox — and the Firefox build installs unchanged on **Firefox
+for Android**, so you get the annotator on a phone/tablet too.
 
 [![Extension download](https://img.shields.io/badge/Edge%20%2F%20Chrome-download%20extension-327cf6?logo=googlechrome&logoColor=white)](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)
 
@@ -84,6 +87,26 @@ The extension is **not on the Chrome Web Store / Edge Add-ons yet** — publishi
 there takes a developer account and a review pass per store, and browsers
 deliberately block one-click installs from anywhere else. Until the store
 listings land, the four steps above are as easy as it gets.
+
+#### Firefox (desktop + Android)
+
+Firefox uses a separate build, `dist-extension-firefox/` (`npm run build:ext:firefox`).
+
+- **Testing / sideloading (desktop):** go to `about:debugging#/runtime/this-firefox`
+  → **Load Temporary Add-on…** → pick any file inside `dist-extension-firefox/`
+  (e.g. `manifest.json`). It stays loaded until you restart Firefox. For local
+  `file://` PDFs, note Firefox has no per-extension "allow file URLs" toggle — see
+  the limitation note in `docs/BROWSER-EXTENSION.md`.
+- **Firefox for Android:** the *same signed XPI* installs on Android. For testing,
+  use a debug build of Firefox/Nightly with the extension loaded via
+  `about:debugging` from a connected desktop; for real use, install from AMO.
+- **Distribution:** Firefox requires every add-on to be **signed by Mozilla (AMO)** —
+  this is **mandatory but free**. Either submit through
+  [addons.mozilla.org](https://addons.mozilla.org) for a listed add-on (which then
+  auto-updates and covers desktop + Android), or self-host a signed XPI produced with
+  [`web-ext sign`](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/)
+  / the AMO signing API (the add-on id `pdf-scholar@emilmsh.github.io` is already set
+  in the manifest, as `web-ext sign` requires).
 
 See [`docs/BROWSER-EXTENSION.md`](docs/BROWSER-EXTENSION.md) for the architecture and
 the current desktop-vs-extension parity.
@@ -169,7 +192,8 @@ npm run dev        # full Electron app with HMR
 npm run dev:web    # renderer only, in a plain browser on :5199
 npm run typecheck  # tsc for renderer + main/preload
 npm run dist       # NSIS installer (Windows)
-npm run build:ext  # browser-extension bundle → dist-extension/
+npm run build:ext          # Chromium extension bundle → dist-extension/
+npm run build:ext:firefox  # Firefox extension bundle → dist-extension-firefox/
 ```
 
 Architecture in short: **pdf.js v6 renders, EmbedPDF (PDFium WASM) writes.** The React renderer

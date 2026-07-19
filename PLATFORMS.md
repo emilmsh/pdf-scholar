@@ -17,13 +17,20 @@ One-time fees (Microsoft Partner Center, Chrome Web Store) are acceptable.
 | Windows x64 | 1 | `PDF-Scholar-Setup-<v>.exe` (universal NSIS) | electron-updater |
 | Windows arm64 | 1 | same universal installer (arch picked at install) | electron-updater |
 | Extension (Edge/Chrome) | 1 | `pdf-scholar-extension.zip` | store auto-update; sideload = in-app notice |
+| Extension (Firefox desktop + Android) | 2 | AMO-signed `.xpi` (`dist-extension-firefox/`) | AMO auto-update; sideload = in-app notice |
 | macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | none (see below) |
 | Linux x64 | 2 | `PDF-Scholar-<v>.AppImage` + `.deb` | electron-updater |
 
 Deferred (revisit deliberately, don't drift into them): Linux arm64 (free GitHub
-arm runners exist when wanted), Firefox port of the extension (≈days of work,
-unlocks Firefox for Android too), Microsoft Store MSIX (`docs/STORE.md`),
+arm runners exist when wanted), Microsoft Store MSIX (`docs/STORE.md`),
 PWA/iPad/Android.
+
+The **Firefox port of the extension** (once deferred) has landed — the same
+codebase builds a Firefox flavour (`npm run build:ext:firefox` →
+`dist-extension-firefox/`), which is also the Firefox for Android artifact. It is
+Tier 2: built from shared code, but held to the Chromium extension's parity and
+manually spot-checked, not release-blocked on owner hardware. Distribution needs a
+free AMO signature (mandatory for Firefox); see `docs/BROWSER-EXTENSION.md`.
 
 **Tier 1** — full feature parity, manually verified, release-blocking.
 **Tier 2** — same renderer and features *by construction* (shared code, `PdfxApi`
@@ -66,7 +73,24 @@ not as acceptable platform lag.
    ("Load unpacked") installs NO update channel, so those get a once-a-day
    GitHub-release check + dismissible notice
    (`src/renderer/src/extension-update.ts`), gated on
-   `chrome.management.getSelf().installType === 'development'`.
+   `management.getSelf().installType === 'development'` (via the `ext` alias, so it
+   also fires for Firefox `about:debugging` temporary installs).
+9. **Extension redirect engine (Chromium vs Firefox)**: Chromium redirects PDF
+   navigations with **declarativeNetRequest** (Chrome MV3 removed blocking
+   webRequest for normal installs); Firefox uses **blocking webRequest**
+   (`webRequest.onBeforeRequest` → `{redirectUrl}`) because main_frame→extension
+   redirect via DNR is unreliable on Firefox while blocking webRequest is fully
+   supported there. Chosen at runtime by manifest-driven feature detection in
+   `src/extension/background.ts`; both hit the same `viewer.html?file=` entry, so
+   nothing downstream diverges. Rationale in `docs/BROWSER-EXTENSION.md`.
+10. **Extension background type**: Chromium ships an MV3 **service worker**;
+    Firefox ships an MV3 **event page** (`background.scripts`, no extension service
+    workers on Firefox as of 2026). Same `background.js` in both bundles.
+11. **Firefox `file://` PDFs**: no per-extension "allow file URLs" toggle exists on
+    Firefox and blocking webRequest on `file://` navigations is version-dependent, so
+    local-file takeover on Firefox is best-effort, not guaranteed. http(s) is the
+    fully-supported path. (Chromium's file case is divergence-free once the user
+    grants "Allow access to file URLs".)
 
 ## Maintenance rules
 

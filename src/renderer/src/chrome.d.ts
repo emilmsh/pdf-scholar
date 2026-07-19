@@ -35,6 +35,24 @@ interface DnrRule {
   }
 }
 
+/** Blocking webRequest — the Firefox redirect path (Chrome MV3 forbids it for
+ *  non-policy installs, so this branch only runs on Firefox; see background.ts). */
+interface WebRequestDetails {
+  url: string
+  type: string
+  tabId: number
+}
+type WebRequestBlockingResponse = { redirectUrl?: string; cancel?: boolean } | void
+interface WebRequestOnBeforeRequest {
+  addListener(
+    cb: (details: WebRequestDetails) => WebRequestBlockingResponse,
+    filter: { urls: string[]; types?: string[] },
+    extraInfoSpec?: string[]
+  ): void
+  removeListener(cb: (details: WebRequestDetails) => WebRequestBlockingResponse): void
+  hasListener(cb: (details: WebRequestDetails) => WebRequestBlockingResponse): boolean
+}
+
 interface ChromeApi {
   runtime: {
     id?: string
@@ -51,6 +69,9 @@ interface ChromeApi {
     updateDynamicRules(opts: { addRules?: DnrRule[]; removeRuleIds?: number[] }): Promise<void>
     getDynamicRules(): Promise<DnrRule[]>
   }
+  webRequest?: {
+    onBeforeRequest: WebRequestOnBeforeRequest
+  }
   storage?: {
     local: ChromeStorageArea
   }
@@ -64,4 +85,9 @@ interface ChromeApi {
   }
 }
 
+// Chrome exposes `chrome` (promise-based in MV3). Firefox exposes BOTH `chrome`
+// (callback-based) and `browser` (promise-based). Renderer/background code must
+// therefore route promise-style calls through the `browser ?? chrome` alias in
+// `ext.ts` (renderer) / the local alias in `background.ts`, never bare `chrome`.
 declare const chrome: ChromeApi | undefined
+declare const browser: ChromeApi | undefined
