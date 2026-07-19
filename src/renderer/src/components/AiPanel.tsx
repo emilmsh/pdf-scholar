@@ -32,7 +32,6 @@ import type { ChatMessage, StoredConversation } from '../chat-store'
 import { deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
 import {
   IconChevronDown,
-  IconGear,
   IconHistory,
   IconPlus,
   IconSend,
@@ -315,21 +314,38 @@ const providerLabels = (): { id: AiProviderId; label: string }[] => [
   { id: 'mock', label: t('ai.providerMock') }
 ]
 
-// Curated, verified model lists (see docs/agent-notes/modeller-api.md)
-const MODELS: Record<AiProviderId, { id: string; label: string }[]> = {
+// Curated, verified model lists (see docs/agent-notes/modeller-api.md).
+// `label` is the full descriptor for the dropdowns; `short` is the clean,
+// human-readable name for the compact header chip (never the raw hyphenated id).
+const MODELS: Record<AiProviderId, { id: string; label: string; short: string }[]> = {
   anthropic: [
-    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — anbefalt' },
-    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 — mest kapabel' },
-    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — rask/billig' },
-    { id: 'claude-fable-5', label: 'Claude Fable 5 — tyngst/dyrest' }
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — anbefalt', short: 'Sonnet 5' },
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 — mest kapabel', short: 'Opus 4.8' },
+    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — rask/billig', short: 'Haiku 4.5' },
+    { id: 'claude-fable-5', label: 'Claude Fable 5 — tyngst/dyrest', short: 'Fable 5' }
   ],
   openai: [
-    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — anbefalt' },
-    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol — flaggskip' },
-    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — rask' }
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — anbefalt', short: 'GPT-5.6 Terra' },
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol — flaggskip', short: 'GPT-5.6 Sol' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — rask', short: 'GPT-5.6 Luna' }
   ],
   azure: [],
-  mock: [{ id: 'mock-1', label: 'mock-1' }]
+  mock: [{ id: 'mock-1', label: 'Testmodell (mock)', short: 'Testmodell' }]
+}
+
+/** Clean display name for the header chip. Uses the curated `short` name when the
+ *  model is one we know; for custom ids the user typed themselves we title-case
+ *  the segments so the chip never shows a raw lowercase-with-hyphens id. */
+function prettyModelName(provider: AiProviderId, id: string): string {
+  const found = MODELS[provider]?.find((m) => m.id === id)
+  if (found) return found.short
+  if (!id) return ''
+  return id
+    .replace(/^claude-/i, 'Claude ')
+    .replace(/^gpt-/i, 'GPT-')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase())
+    .trim()
 }
 
 // Where each provider lets you set a spending cap — linked from the key field
@@ -970,7 +986,7 @@ export default function AiPanel({
               {config
                 ? config.provider === 'azure'
                   ? config.azure.deployment
-                  : config.models[config.provider]
+                  : prettyModelName(config.provider, config.models[config.provider] ?? '')
                 : ''}
             </span>
             {config && config.provider !== 'azure' && <IconChevronDown size={11} />}
@@ -1004,16 +1020,10 @@ export default function AiPanel({
         >
           <IconHistory size={15} />
         </button>
-        <button
-          className={`tb-btn${showSettings ? ' is-active' : ''}`}
-          title={t('ai.settingsTip')}
-          onClick={() => {
-            setShowSettings((s) => !s)
-            setShowHistory(false)
-          }}
-        >
-          <IconGear size={15} />
-        </button>
+        {/* No settings gear: AI settings live one click inside the model chip's
+            menu ("KI-innstillinger"), open straight from the chip for Azure, and
+            auto-open on first run when no key is set — so the header stays
+            uncluttered and the model name gets the freed width. */}
         <button className="tb-btn" title={t('ai.closeTip')} onClick={onClose}>
           ✕
         </button>
