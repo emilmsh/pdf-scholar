@@ -11,7 +11,8 @@ they happen.
   SmartScreen "unknown publisher" scare (the Store signs the package on
   ingestion) and updates handled by the Store. SmartScreen reputation for the
   unsigned GitHub exe builds per-file and resets with every release, so it will
-  keep warning users — the Store listing is the proper fix while staying free.
+  keep warning users — the Store listing is the proper fix, and registration is
+  now free.
 - **Edge Add-ons / Chrome Web Store** turn the extension's four-step
   "Load unpacked" install into one click, and stores auto-update extensions.
 
@@ -19,14 +20,26 @@ they happen.
 
 ## Track A — Microsoft Store (desktop app, MSIX)
 
-**One-time cost: ~USD 19** (individual developer account; companies pay more —
-check the current price at signup).
+**Cost: FREE.** Microsoft dropped the individual-developer registration fee — an
+Individual account now costs nothing.
 
-1. **[Emil]** Register a Partner Center developer account (individual):
-   <https://partner.microsoft.com/dashboard/registration> using a personal
-   Microsoft account. Pay the one-time fee.
-2. **[Emil]** In Partner Center: **Apps and games → New product → MSIX or PWA
-   app**, reserve the name **PDF Scholar**.
+> **Don't start from `partner.microsoft.com`'s generic dashboard.** That lands
+> you in the Cloud Partner Program (for companies with Entra admin roles) — it
+> looks empty and says you have no admin access. That is the WRONG program.
+> Use the dedicated Microsoft Store enrollment door below.
+
+1. **[Emil]** Enroll via **<https://developer.microsoft.com/microsoft-store/register>**
+   (Microsoft Learn walkthrough:
+   <https://learn.microsoft.com/windows/apps/publish/partner-center/open-a-developer-account>).
+   Choose the **Individual** account type (for non-commercial / personal apps —
+   fits a free open-source project). It **requires a personal Microsoft account
+   (MSA)**, not a work/Entra account; a Gmail address works as long as it's
+   registered as a Microsoft account. Individual enrollment now includes
+   **identity verification** (government-issued ID + a selfie). Note: an
+   Individual account can't later be converted to Company — but Individual is
+   the right choice here.
+2. **[Emil]** Once enrolled, open the Microsoft Store dashboard: **Apps and
+   games → New product → MSIX or PWA app**, reserve the name **PDF Scholar**.
 3. **[Emil]** Open **Product management → Product identity** and copy three
    values into `electron-builder.store.yml`:
    - `Package/Identity/Name` → `appx.identityName`
