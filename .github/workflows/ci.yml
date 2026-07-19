@@ -1,0 +1,36 @@
+# Parity backbone (see PLATFORMS.md): every push builds and packages the app
+# on all three desktop OSes, so a change that breaks a non-Windows platform
+# fails here instead of rotting until release time.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['v*'] # tag pushes run release.yml instead
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # Engine round-trip test (EmbedPDF writes, mupdf independently verifies) —
+      # pure Node + WASM, runs identically on every OS
+      - run: npm run test:engine
+      - run: npm run build
+      # Package for the host OS without publishing anything
+      - run: npx electron-builder --publish never
+      # The browser extension is platform-neutral; one build catches breakage
+      - if: matrix.os == 'ubuntu-latest'
+        run: npm run build:ext

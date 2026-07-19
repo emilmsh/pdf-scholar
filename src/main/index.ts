@@ -3,6 +3,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  Menu,
   nativeTheme,
   powerSaveBlocker,
   screen,
@@ -32,6 +33,7 @@ import {
 } from './annotation-engine-embedpdf'
 import { discardDraft, draftPathFor, ensureDraft, hasDraft, readPathFor, saveDraft } from './drafts'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
+import { initUpdater } from './updater'
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
 // carry the state file over so recents, positions and encrypted AI keys
@@ -136,6 +138,24 @@ if (!gotLock) {
     if (path) w.webContents.send('open-path', path)
   })
 
+  // macOS delivers Finder double-clicks / "Open with" via open-file, not argv.
+  // Must be registered before 'ready' to catch the launch document.
+  app.on('open-file', (event, path) => {
+    event.preventDefault()
+    if (!app.isReady()) {
+      firstPending = path
+      return
+    }
+    const w = windowFor()
+    if (!w) {
+      createWindow(path)
+      return
+    }
+    if (w.isMinimized()) w.restore()
+    w.focus()
+    w.webContents.send('open-path', path)
+  })
+
   app.whenReady().then(() => {
     app.setAppUserModelId('no.emil.pdfx')
     console.log('[pdfx] annotation engine: embedpdf (MIT)')
@@ -148,7 +168,26 @@ if (!gotLock) {
         /* Jump List is cosmetic — never block startup on it */
       }
     }
+    // macOS: without an application menu the standard Cmd shortcuts
+    // (copy/paste/quit/hide) are dead. Keep it minimal — File/tab shortcuts
+    // (Cmd+O/W/T…) are handled by the renderer's keydown listeners, and the
+    // Window menu deliberately omits the Close role so Cmd+W keeps closing
+    // the active TAB, not the window. Windows/Linux keep the hidden default
+    // menu (autoHideMenuBar) untouched.
+    if (process.platform === 'darwin') {
+      Menu.setApplicationMenu(
+        Menu.buildFromTemplate([
+          { role: 'appMenu' },
+          { role: 'editMenu' },
+          {
+            label: 'Vindu',
+            submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }]
+          }
+        ])
+      )
+    }
     registerIpc()
+    initUpdater()
     applyKeepAwake(getState().settings.keepAwake)
     createWindow(firstPending)
     firstPending = null
@@ -159,7 +198,8 @@ if (!gotLock) {
   })
 
   app.on('window-all-closed', () => {
-    app.quit()
+    // macOS convention: the app stays in the Dock; 'activate' reopens a window
+    if (process.platform !== 'darwin') app.quit()
   })
 
   // Quit can land inside the debounce window of the engines' document caches —
@@ -190,9 +230,15 @@ function createWindow(openPath?: string | null): BrowserWindow {
     autoHideMenuBar: true,
     backgroundColor: '#1c1c1e',
     // Edge-style: frameless with native window controls overlaying our
-    // own titlebar strip (which hosts the document tabs)
+    // own titlebar strip (which hosts the document tabs). On macOS the
+    // overlay is the traffic lights (left side, colors not configurable);
+    // the strip insets itself via env(titlebar-area-*) on both platforms.
     titleBarStyle: 'hidden',
-    titleBarOverlay: { ...initialTitleBarColors(), height: 36 },
+    titleBarOverlay:
+      process.platform === 'darwin'
+        ? { height: 36 }
+        : { ...initialTitleBarColors(), height: 36 },
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 12, y: 10 } } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js')
     }

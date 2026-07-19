@@ -1,0 +1,22 @@
+# Microsoft Store build: MSIX/appx packages for x64 + arm64.
+# Usage: npm run dist:store  (see docs/STORE.md for the full submission guide)
+#
+# The three identity values below MUST match what Partner Center shows under
+# Product management → Product identity AFTER Emil reserves the app name.
+# The package is deliberately left unsigned — the Store signs it on ingestion.
+# electron-updater is auto-disabled in Store installs (process.windowsStore).
+extends: ./electron-builder.yml
+win:
+  target:
+    - target: appx
+      arch: [x64, arm64]
+appx:
+  # ── Fill these from Partner Center (placeholders fail the build on purpose) ──
+  identityName: REPLACE.WITH.IdentityName
+  publisher: CN=REPLACE-WITH-PUBLISHER-GUID
+  publisherDisplayName: REPLACE WITH PublisherDisplayName
+  # ─────────────────────────────────────────────────────────────────────────────
+  applicationId: PDFScholar
+  displayName: PDF Scholar
+  backgroundColor: '#1c1c1e'
+  artifactName: PDF-Scholar-${version}-${arch}.${ext}

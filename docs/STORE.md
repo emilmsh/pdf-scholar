@@ -1,0 +1,94 @@
+# Store distribution guide
+
+Three store tracks, all without recurring costs. Account registration and the
+one-time fees are personal steps Emil does himself; everything technical is
+prepared in the repo. Status lives in the checklists below — tick them off as
+they happen.
+
+## Why stores at all
+
+- **Microsoft Store** solves the two real problems with the GitHub exe: no more
+  SmartScreen "unknown publisher" scare (the Store signs the package on
+  ingestion) and updates handled by the Store. SmartScreen reputation for the
+  unsigned GitHub exe builds per-file and resets with every release, so it will
+  keep warning users — the Store listing is the proper fix while staying free.
+- **Edge Add-ons / Chrome Web Store** turn the extension's four-step
+  "Load unpacked" install into one click, and stores auto-update extensions.
+
+---
+
+## Track A — Microsoft Store (desktop app, MSIX)
+
+**One-time cost: ~USD 19** (individual developer account; companies pay more —
+check the current price at signup).
+
+1. **[Emil]** Register a Partner Center developer account (individual):
+   <https://partner.microsoft.com/dashboard/registration> using a personal
+   Microsoft account. Pay the one-time fee.
+2. **[Emil]** In Partner Center: **Apps and games → New product → MSIX or PWA
+   app**, reserve the name **PDF Scholar**.
+3. **[Emil]** Open **Product management → Product identity** and copy three
+   values into `electron-builder.store.yml`:
+   - `Package/Identity/Name` → `appx.identityName`
+   - `Package/Identity/Publisher` (a `CN={GUID}`) → `appx.publisher`
+   - `Package/Properties/PublisherDisplayName` → `appx.publisherDisplayName`
+4. Run `npm run dist:store` → `release/PDF-Scholar-<version>-x64.appx` and
+   `…-arm64.appx`. Do **not** sign them — the Store signs on ingestion.
+5. **[Emil]** Create a submission, upload **both** packages (same version,
+   different architecture — the Store serves the right one per device), fill in
+   the listing (screenshots exist under `docs/screenshots/`), set the privacy
+   policy URL to
+   `https://github.com/emilmsh/pdf-scholar/blob/master/PRIVACY.md`, and submit
+   for certification (typically 1–3 days).
+6. Notes already handled in code/config: electron-updater disables itself in
+   Store installs (`process.windowsStore`); the `.pdf` file association rides
+   along in the MSIX manifest via `fileAssociations`.
+
+Version bumps: run `dist:store` again and add the new packages to a new
+submission. (This can be folded into `release.yml` later once the identity
+values are in the repo.)
+
+## Track B — Edge Add-ons (extension)
+
+**Cost: free.** Uses the same Partner Center account (the Edge program is a
+separate, free enrollment).
+
+1. **[Emil]** Enroll: <https://partner.microsoft.com/dashboard/microsoftedge/> —
+   free.
+2. Build the store zip: it is produced by the release workflow as
+   `pdf-scholar-extension-store.zip` (manifest at the zip root — the
+   folder-wrapped `pdf-scholar-extension.zip` is for Load-unpacked and will be
+   REJECTED by store uploaders).
+3. **[Emil]** New extension → upload the store zip → listing (Norwegian +
+   English descriptions), privacy policy URL as above.
+4. Permission justifications the reviewer will ask about (copy-paste ready):
+   - `<all_urls>` + `declarativeNetRequest`: "Detects navigations to PDF files
+     and opens them in the extension's viewer instead of the browser's built-in
+     one. No page content on non-PDF sites is read or modified."
+   - `file:///*`: "Lets users open local PDF files in the viewer (users must
+     additionally enable 'Allow access to file URLs' themselves)."
+5. Review typically takes up to ~7 days.
+
+## Track C — Chrome Web Store (extension)
+
+**One-time cost: USD 5** (developer registration).
+
+1. **[Emil]** Register:
+   <https://chrome.google.com/webstore/devconsole> with a Google account, pay
+   the one-time USD 5 fee.
+2. Upload the same `pdf-scholar-extension-store.zip`.
+3. **[Emil]** Fill the **Privacy practices** tab: single purpose ("Open and
+   annotate PDF files in a custom viewer"), the permission justifications from
+   Track B, privacy policy URL, and "no remote code" / data-usage declarations
+   (the extension collects nothing — see `PRIVACY.md`).
+4. Broad host permissions (`<all_urls>`) usually route the review to the slower
+   queue — expect days to a few weeks on first submission.
+
+---
+
+## Listing assets checklist (shared)
+
+- [ ] Screenshots 1280×800 (crop/re-shoot from `docs/screenshots/` as needed)
+- [ ] Chrome small promo tile 440×280 (optional but helps)
+- [ ] Store icon: `build/icon.png` (512×512) works everywhere
+- [ ] Short description (NO + EN) — reuse the README tagline

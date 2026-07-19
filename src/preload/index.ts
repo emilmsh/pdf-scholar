@@ -63,6 +63,14 @@ const api: PdfxApi = {
       ipcRenderer.removeListener('open-path', listener)
     }
   },
+  onUpdateReady: (cb: (version: string) => void) => {
+    const listener = (_e: unknown, version: string): void => cb(version)
+    ipcRenderer.on('update:ready', listener)
+    return () => {
+      ipcRenderer.removeListener('update:ready', listener)
+    }
+  },
+  updateRestart: () => ipcRenderer.send('update:restart'),
   aiGetConfig: () => ipcRenderer.invoke('ai:get-config'),
   aiSetConfig: (patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }) =>
     ipcRenderer.invoke('ai:set-config', patch),

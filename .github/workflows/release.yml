@@ -1,0 +1,82 @@
+# Tag v* → build every desktop target + the extension zips, and create a
+# DRAFT GitHub Release holding all assets. Emil reviews and publishes the
+# draft manually. Asset-name contracts (do not break):
+#   PDF-Scholar-Setup-<version>.exe   — universal x64+arm64 NSIS installer
+#   pdf-scholar-extension.zip         — version-stable name; README's
+#                                       releases/latest/download/ button
+#                                       points at it (folder-wrapped for
+#                                       "Load unpacked")
+#   pdf-scholar-extension-store.zip   — manifest at zip ROOT, as the Chrome
+#                                       Web Store / Edge Add-ons uploaders
+#                                       require
+#   latest.yml / latest-linux.yml     — electron-updater metadata (win/linux;
+#                                       macOS has no auto-update: unsigned)
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx electron-builder --publish never
+      - name: Build extension zips
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          npm run build:ext
+          # Load-unpacked variant: single top-level folder (mirrors scripts/pack-extension.mjs)
+          stage="$(mktemp -d)"
+          mkdir -p "$stage/pdf-scholar-extension"
+          cp -r dist-extension/. "$stage/pdf-scholar-extension/"
+          (cd "$stage" && zip -qr "$GITHUB_WORKSPACE/release/pdf-scholar-extension.zip" pdf-scholar-extension)
+          # Store-upload variant: manifest.json at the zip root
+          (cd dist-extension && zip -qr "$GITHUB_WORKSPACE/release/pdf-scholar-extension-store.zip" .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+            release/*.deb
+            release/*.zip
+            release/*.blockmap
+            release/latest*.yml
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create '${{ github.ref_name }}' \
+            --repo '${{ github.repository }}' \
+            --draft \
+            --title 'PDF Scholar ${{ github.ref_name }}' \
+            --generate-notes \
+            artifacts/*

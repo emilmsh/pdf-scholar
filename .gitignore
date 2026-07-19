@@ -8,4 +8,6 @@ release/
 *.local
 scripts/.engine-test-bundle.mjs
 scripts/spike-*output*.pdf
-.claude/
+# Local Claude config stays untracked, but shared skills ship with the repo
+.claude/*
+!.claude/skills/
