@@ -5,7 +5,7 @@ Add-ons** (free) and the **Chrome Web Store** ($5 one-time). Upload
 `pdf-scholar-extension-store.zip` (manifest at the zip root — from the v0.15.0
 release, or run `npm run build:ext` and zip the contents of `dist-extension/`).
 See `docs/STORE.md` for the account setup. Privacy policy URL (both stores):
-`https://github.com/emilmsh/pdf-scholar/blob/master/PRIVACY.md`
+`https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`
 
 Category: **Productivity**. Language: primary English, add Norwegian if the
 store supports a localized listing.
@@ -93,14 +93,14 @@ Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt 
 
 ## Data-use / privacy declarations
 
-Answer the stores' data questions as follows (all true — see `PRIVACY.md`):
+Answer the stores' data questions as follows (all true — see `docs/PRIVACY.md`):
 
 - **Does this extension collect or use user data?** The extension itself collects and transmits **nothing** — no analytics, no telemetry, no accounts.
 - **Website content:** the extension processes PDF content **locally, on the device**, only to render and annotate it. It is not sent anywhere by the reader.
 - **The optional AI assistant** only runs when the user has entered **their own** API key and explicitly asks a question. It then sends the relevant document text **directly from the user's browser to the AI provider the user chose** (Anthropic / OpenAI / Azure OpenAI), under the user's key and that provider's terms. PDF Scholar operates **no server** and receives none of this data.
 - **Not sold or transferred** to third parties, except the user-directed AI call above.
 - **No remote code:** all executable code ships inside the package; nothing is fetched and run at runtime. (The AI calls are data requests to the user's provider, not code.)
-- **Privacy policy URL:** `https://github.com/emilmsh/pdf-scholar/blob/master/PRIVACY.md`
+- **Privacy policy URL:** `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`
 
 > Note on the broad host permissions: `<all_urls>` + `file:///*` +
 > `declarativeNetRequest` routinely send a listing to the slower review queue.

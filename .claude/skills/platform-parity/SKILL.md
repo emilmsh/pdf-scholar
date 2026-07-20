@@ -1,12 +1,12 @@
 ---
 name: platform-parity
-description: Audit the working diff (or a named commit range) for cross-platform pitfalls against the PLATFORMS.md parity contract — Windows x64 is the reference; win-arm64, macOS, Linux and the browser extension must not silently regress. Use before releases, after changes to keyboard handling, window chrome, file paths, packaging, dependencies, or main-process code, and as a review dimension in code review. Trigger phrases; "platform parity", "paritetssjekk", "sjekk plattformene", "virker dette på mac/linux".
+description: Audit the working diff (or a named commit range) for cross-platform pitfalls against the docs/PLATFORMS.md parity contract — Windows x64 is the reference; win-arm64, macOS, Linux and the browser extension must not silently regress. Use before releases, after changes to keyboard handling, window chrome, file paths, packaging, dependencies, or main-process code, and as a review dimension in code review. Trigger phrases; "platform parity", "paritetssjekk", "sjekk plattformene", "virker dette på mac/linux".
 ---
 
 # Platform parity audit
 
 Audit scope: the uncommitted working diff by default; a commit range or PR if the
-user names one. Read `PLATFORMS.md` first — it is the contract; this skill checks
+user names one. Read `docs/PLATFORMS.md` first — it is the contract; this skill checks
 diffs against it.
 
 ## Method
@@ -16,11 +16,11 @@ diffs against it.
    (report "not parity-relevant" and stop).
 3. Check every finding against the checklist below. For each hit, verify in the
    surrounding code whether it is actually guarded (a `process.platform` branch, a
-   `primaryMod()` call, an entry in PLATFORMS.md's allowed-divergence list) before
+   `primaryMod()` call, an entry in docs/PLATFORMS.md's allowed-divergence list) before
    reporting it.
 4. Report findings with file:line, the platform(s) affected, and a concrete fix.
    No findings → say so explicitly. If a divergence is genuinely platform-forced,
-   the fix is to add it to PLATFORMS.md's list, not to hide it.
+   the fix is to add it to docs/PLATFORMS.md's list, not to hide it.
 
 ## Checklist
 
@@ -38,7 +38,7 @@ diffs against it.
 - `setTitleBarOverlay` / `titleBarOverlay` colors: Windows-only — must stay
   behind the existing guard/try-catch; macOS traffic lights are the divergence.
 - New `process.platform === 'win32'` branches: is there a macOS/Linux equivalent,
-  or is the omission listed in PLATFORMS.md?
+  or is the omission listed in docs/PLATFORMS.md?
 - New Electron APIs: check the docs' platform column — anything marked
   Windows-only or macOS-only needs a guard AND a parity story.
 - File-open plumbing: argv/`second-instance` changes need the matching
@@ -70,4 +70,4 @@ diffs against it.
 
 **Extension parity**
 - Feature added on desktop only? The standing rule is both-or-documented
-  (`docs/BROWSER-EXTENSION.md` + PLATFORMS.md item 7).
+  (`docs/BROWSER-EXTENSION.md` + docs/PLATFORMS.md item 7).

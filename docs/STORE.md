@@ -52,7 +52,7 @@ Individual account now costs nothing.
    files (same version, different architecture — the Store serves the right one
    per device). Fill in the listing (screenshots under `docs/screenshots/`),
    set the privacy policy URL to
-   `https://github.com/emilmsh/pdf-scholar/blob/master/PRIVACY.md`, and submit
+   `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`, and submit
    for certification (typically 1–3 days).
 6. Notes already handled in code/config: electron-updater disables itself in
    Store installs (`process.windowsStore`); the `.pdf` file association rides
@@ -94,7 +94,7 @@ separate, free enrollment).
 3. **[Emil]** Fill the **Privacy practices** tab: single purpose ("Open and
    annotate PDF files in a custom viewer"), the permission justifications from
    Track B, privacy policy URL, and "no remote code" / data-usage declarations
-   (the extension collects nothing — see `PRIVACY.md`).
+   (the extension collects nothing — see `docs/PRIVACY.md`).
 4. Broad host permissions (`<all_urls>`) usually route the review to the slower
    queue — expect days to a few weeks on first submission.
 

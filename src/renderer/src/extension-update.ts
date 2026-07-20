@@ -6,7 +6,7 @@
 // when chrome.management.getSelf() reports installType 'development'
 // (getSelf needs no extra permission); store installs auto-update and never
 // see the notice. The check is an anonymous HTTPS request to the GitHub
-// releases API, throttled to once per day (see PRIVACY.md).
+// releases API, throttled to once per day (see docs/PRIVACY.md).
 
 import { isExtensionContext } from './extension-api'
 import { store } from './extension-store'

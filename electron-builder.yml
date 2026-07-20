@@ -1,4 +1,4 @@
-# Installer configuration. See PLATFORMS.md for the platform tier matrix and
+# Installer configuration. See docs/PLATFORMS.md for the platform tier matrix and
 # the parity contract between targets.
 #
 # Windows: per-user NSIS install (no admin) with a .pdf "Open with"

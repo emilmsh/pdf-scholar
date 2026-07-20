@@ -188,7 +188,7 @@ draws annotations in its own overlay (never pdf.js's editor layer); the Electron
 process owns the annotation engine, the AI providers and the draft-based save model.
 The renderer is platform-agnostic — every platform call goes through one interface
 (`PdfxApi`), so the same UI powers the desktop app, the browser extension and the
-plain-browser dev preview. See `CLAUDE.md` and `ROADMAP.md` for the details and the
+plain-browser dev preview. See `CLAUDE.md` and `docs/ROADMAP.md` for the details and the
 road ahead.
 
 ## Status

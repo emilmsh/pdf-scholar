@@ -1,4 +1,4 @@
-# Parity backbone (see PLATFORMS.md): every push builds and packages the app
+# Parity backbone (see docs/PLATFORMS.md): every push builds and packages the app
 # on all three desktop OSes, so a change that breaks a non-Windows platform
 # fails here instead of rotting until release time.
 name: CI
