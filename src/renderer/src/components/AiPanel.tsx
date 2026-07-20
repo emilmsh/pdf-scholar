@@ -1080,6 +1080,20 @@ export default function AiPanel({
               <IconSparkle size={22} />
               <p>{t('ai.emptyIntro')}</p>
             </div>
+            {config?.keysSupported && (config.provider === 'mock' || !config.hasKey[config.provider]) && (
+              <div className="ai-key-callout">
+                <p>{t(config.provider === 'mock' ? 'ai.calloutMock' : 'ai.calloutNoKey')}</p>
+                <button
+                  className="btn-primary"
+                  onClick={() => {
+                    setShowSettings(true)
+                    setShowHistory(false)
+                  }}
+                >
+                  {t('ai.calloutCta')}
+                </button>
+              </div>
+            )}
             {composer}
             {suggestionsBlock}
           </div>

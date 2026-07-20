@@ -60,7 +60,8 @@ function toView(config: AiConfig, keys: Keys): AiConfigView {
     thinking: config.thinking,
     hasKey,
     // chrome.storage.local is not an encrypted store; the UI shows a warning.
-    encryptionAvailable: false
+    encryptionAvailable: false,
+    keysSupported: true
   }
 }
 

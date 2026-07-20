@@ -54,7 +54,8 @@ function configView(): AiConfigView {
     azure: { ...ai.azure },
     thinking: ai.thinking,
     hasKey,
-    encryptionAvailable: safeStorage.isEncryptionAvailable()
+    encryptionAvailable: safeStorage.isEncryptionAvailable(),
+    keysSupported: true
   }
 }
 

@@ -144,6 +144,10 @@ export interface AiConfig {
 export interface AiConfigView extends AiConfig {
   hasKey: Record<AiProviderId, boolean>
   encryptionAvailable: boolean
+  /** Whether this platform can store provider API keys at all (desktop and
+   *  extension can; the plain-web preview is mock-only). Drives the
+   *  "add your API key" callout in the assistant. */
+  keysSupported: boolean
 }
 
 export interface AiMessage {

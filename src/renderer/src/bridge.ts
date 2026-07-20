@@ -162,7 +162,8 @@ export const webApi: PdfxApi = {
   aiGetConfig: async () => ({
     ...loadWebAiConfig(),
     hasKey: { anthropic: false, openai: false, azure: false, mock: true },
-    encryptionAvailable: false
+    encryptionAvailable: false,
+    keysSupported: false
   }),
   aiSetConfig: async (patch) => {
     const current = loadWebAiConfig()
@@ -176,7 +177,8 @@ export const webApi: PdfxApi = {
     return {
       ...next,
       hasKey: { anthropic: false, openai: false, azure: false, mock: true },
-      encryptionAvailable: false
+      encryptionAvailable: false,
+      keysSupported: false
     }
   },
   aiChat: async (request): Promise<AiChatResult> => {

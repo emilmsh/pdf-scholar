@@ -304,6 +304,10 @@ const nb = {
   'ai.quickReference': 'Referanse',
   'ai.quickQuestion': '{title}: «{selection}» (s. {page})',
   'ai.mockOnlyWeb': 'Nettleser-forhåndsvisningen støtter kun mock-leverandøren. Bruk appen for ekte KI.',
+  'ai.calloutMock':
+    'Assistenten svarer nå med en innebygd testmodell — ikke ekte KI. Legg inn din egen API-nøkkel for å komme i gang.',
+  'ai.calloutNoKey': 'Ingen API-nøkkel er lagret for valgt leverandør, så assistenten kan ikke svare ennå.',
+  'ai.calloutCta': 'Legg til API-nøkkel',
   'ai.aborted': 'Avbrutt',
   'ai.newChatTip': 'Ny samtale',
   'ai.historyTip': 'Samtalehistorikk for dette dokumentet',
@@ -624,6 +628,10 @@ const en: Dict = {
   'ai.quickReference': 'Reference',
   'ai.quickQuestion': '{title}: «{selection}» (p. {page})',
   'ai.mockOnlyWeb': 'The browser preview only supports the mock provider. Use the app for real AI.',
+  'ai.calloutMock':
+    'The assistant is currently answering with a built-in test model — not real AI. Add your own API key to get started.',
+  'ai.calloutNoKey': 'No API key is stored for the selected provider, so the assistant cannot answer yet.',
+  'ai.calloutCta': 'Add API key',
   'ai.aborted': 'Stopped',
   'ai.newChatTip': 'New conversation',
   'ai.historyTip': 'Conversation history for this document',

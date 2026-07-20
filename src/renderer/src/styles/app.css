@@ -2820,6 +2820,26 @@ button {
   padding: 0;
 }
 
+/* "Add your API key" callout — shown until a real provider has a stored key */
+.ai-key-callout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.ai-key-callout p {
+  margin: 0;
+}
+
 .ai-landing .ai-suggestions {
   margin-top: 0;
 }
