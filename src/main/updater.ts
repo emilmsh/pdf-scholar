@@ -1,5 +1,5 @@
 // Auto-update via electron-updater against the GitHub releases feed
-// (publish config in electron-builder.yml → app-update.yml in the package).
+// (publish config in config/electron-builder.yml → app-update.yml in the package).
 // Policy: CHECKS are quiet and automatic, but downloading is the USER'S
 // decision — the renderer gets an "update available" notice with a download
 // button, and nothing is fetched or installed without that click. Once the

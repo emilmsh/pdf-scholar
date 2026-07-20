@@ -37,7 +37,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
-      - run: npx electron-builder --publish never
+      - run: npx electron-builder --publish never --config config/electron-builder.yml
       - name: Build extension zips
         if: matrix.os == 'ubuntu-latest'
         shell: bash

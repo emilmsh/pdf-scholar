@@ -41,7 +41,7 @@ Individual account now costs nothing.
 2. **[Emil]** Once enrolled, open the Microsoft Store dashboard: **Apps and
    games → New product → MSIX or PWA app**, reserve the name **PDF Scholar**.
 3. **DONE** — the three identity values are filled into
-   `electron-builder.store.yml` (Store ID `9N75CPC0G9M2`, PFN
+   `config/electron-builder.store.yml` (Store ID `9N75CPC0G9M2`, PFN
    `EmilMathiasStrmHalseth.PDFScholar_9ddn91dy4x8sa`).
 4. Run `npm run dist:store` → `release/PDF-Scholar-<version>-x64.appx` and
    `…-arm64.appx` (both **unsigned** — the Store signs on ingestion; the log

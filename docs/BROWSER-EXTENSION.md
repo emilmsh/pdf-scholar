@@ -44,8 +44,8 @@ it.
 | `src/renderer/src/ExtensionApp.tsx`   | Single-document shell (no in-app TabBar) |
 | `src/renderer/src/extension-api.ts`   | `PdfxApi` over `chrome.*` + File System Access |
 | `src/renderer/src/chrome.d.ts`        | Minimal ambient `chrome.*` types (no new dep) |
-| `vite.extension.config.ts`     | Builds `dist-extension/` |
-| `tsconfig.extension.json`      | Typecheck for the background worker |
+| `config/vite.extension.config.ts`     | Builds `dist-extension/` |
+| `config/tsconfig.extension.json`      | Typecheck for the background worker |
 
 `ExtensionApp` mirrors the chrome around the viewer in `App.tsx` (theme
 resolution, settings, fullscreen, language). Once the tab-mode work in `App.tsx`

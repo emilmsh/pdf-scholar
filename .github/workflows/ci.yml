@@ -30,7 +30,7 @@ jobs:
       - run: npm run test:engine
       - run: npm run build
       # Package for the host OS without publishing anything
-      - run: npx electron-builder --publish never
+      - run: npx electron-builder --publish never --config config/electron-builder.yml
       # The browser extension is platform-neutral; one build catches breakage
       - if: matrix.os == 'ubuntu-latest'
         run: npm run build:ext

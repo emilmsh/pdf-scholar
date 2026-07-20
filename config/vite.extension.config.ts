@@ -10,8 +10,8 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { pdfjsAssets } from './vite.pdfjs-assets'
 
-const extensionDir = resolve(__dirname, 'src/extension')
-const outDir = resolve(__dirname, 'dist-extension')
+const extensionDir = resolve(__dirname, '../src/extension')
+const outDir = resolve(__dirname, '../dist-extension')
 
 // Copy the static manifest + the extension icons (icons/*.png, shared with the
 // desktop app — regenerate via scripts/render-extension-icons.cjs) into the
@@ -22,7 +22,7 @@ function copyManifest(): Plugin {
     name: 'pdfx-copy-manifest',
     writeBundle() {
       const manifest = JSON.parse(readFileSync(resolve(extensionDir, 'manifest.json'), 'utf8'))
-      manifest.version = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version
+      manifest.version = JSON.parse(readFileSync(resolve(__dirname, '../package.json'), 'utf8')).version
       writeFileSync(resolve(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
       const iconsSrc = resolve(extensionDir, 'icons')
       const iconsOut = resolve(outDir, 'icons')

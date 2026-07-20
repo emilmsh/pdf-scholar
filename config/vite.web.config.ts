@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react'
 import { pdfjsAssets } from './vite.pdfjs-assets'
 
 export default defineConfig({
-  root: 'src/renderer',
+  root: '../src/renderer',
   plugins: [react(), pdfjsAssets()],
   server: { port: Number(process.env.PORT) || 5199, strictPort: true }
 })

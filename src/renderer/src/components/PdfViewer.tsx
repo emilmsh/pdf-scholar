@@ -96,7 +96,7 @@ interface DocResources {
 
 // pdf.js side-loads binary companions from URLs: wasm image decoders (scanned
 // pages are JBIG2/JPX — without wasmUrl they render BLANK), CJK CMaps, the 14
-// standard fonts and a CMYK ICC profile. vite.pdfjs-assets.ts ships the dirs
+// standard fonts and a CMYK ICC profile. config/vite.pdfjs-assets.ts ships the dirs
 // next to index.html in every target, so resolving against the page URL works
 // under http (dev), file:// (packaged app) and chrome-extension:// (extension)
 // — pdf.js falls back to XHR for the non-http schemes.
