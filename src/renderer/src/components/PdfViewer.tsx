@@ -1560,12 +1560,22 @@ export default function PdfViewer({
   const undoStackRef = useRef<UndoEntry[]>([])
   const redoStackRef = useRef<UndoEntry[]>([])
   const undoBusyRef = useRef(false)
+  // Mirrored stack depths so the toolbar's undo/redo buttons re-render
+  const [undoDepths, setUndoDepths] = useState({ undo: 0, redo: 0 })
 
-  const pushUndo = useCallback((entry: UndoEntry) => {
-    undoStackRef.current.push(entry)
-    if (undoStackRef.current.length > 100) undoStackRef.current.shift()
-    redoStackRef.current = []
+  const syncUndoDepths = useCallback(() => {
+    setUndoDepths({ undo: undoStackRef.current.length, redo: redoStackRef.current.length })
   }, [])
+
+  const pushUndo = useCallback(
+    (entry: UndoEntry) => {
+      undoStackRef.current.push(entry)
+      if (undoStackRef.current.length > 100) undoStackRef.current.shift()
+      redoStackRef.current = []
+      syncUndoDepths()
+    },
+    [syncUndoDepths]
+  )
 
   const performUndoRedo = useCallback(
     async (direction: 'undo' | 'redo') => {
@@ -1588,9 +1598,10 @@ export default function PdfViewer({
         target.current.push(entry)
       } finally {
         undoBusyRef.current = false
+        syncUndoDepths()
       }
     },
-    [engineCreate, engineDelete, engineChange]
+    [engineCreate, engineDelete, engineChange, syncUndoDepths]
   )
 
   // ---------- User-facing annotation actions ----------
@@ -3336,6 +3347,10 @@ export default function PdfViewer({
           canSaveInPlace={isElectron}
           annotsHidden={annotsHidden}
           onToggleAnnots={() => setAnnotsHidden((h) => !h)}
+          canUndo={undoDepths.undo > 0}
+          canRedo={undoDepths.redo > 0}
+          onUndo={() => void performUndoRedo('undo')}
+          onRedo={() => void performUndoRedo('redo')}
           onPrint={() => {
             void (async () => {
               // Browser parity: print the live document (annotation edits

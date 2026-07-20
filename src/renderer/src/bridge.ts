@@ -11,6 +11,7 @@ import type {
 } from '../../shared/types'
 import { t } from './i18n'
 import { createExtensionApi, isExtensionContext } from './extension-api'
+import { version as appVersion } from '../../../package.json'
 import {
   browserApplyAnnotation,
   browserDeleteAnnotation,
@@ -148,6 +149,7 @@ export const webApi: PdfxApi = {
   setTitleBarColors: () => {},
   getPathForFile: () => null,
   onOpenPath: () => () => {},
+  getVersion: async () => appVersion,
   // Auto-update is a desktop concern — the browser/extension just no-ops
   onUpdateAvailable: () => () => {},
   onUpdateProgress: () => () => {},

@@ -454,6 +454,26 @@ export const IconRotateCw = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconRotateCcw = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M3 12a9 9 0 1 0 2.64-6.36M3 3v5h5" />
+  </Svg>
+)
+
+export const IconUndo = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M9 14L4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </Svg>
+)
+
+export const IconRedo = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M15 14l5-5-5-5" />
+    <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+  </Svg>
+)
+
 export const IconSpread = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="3" y="4" width="8" height="16" rx="1" />

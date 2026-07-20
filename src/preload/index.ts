@@ -63,6 +63,7 @@ const api: PdfxApi = {
       ipcRenderer.removeListener('open-path', listener)
     }
   },
+  getVersion: () => ipcRenderer.invoke('app:version'),
   onUpdateAvailable: (cb: (version: string) => void) => {
     const listener = (_e: unknown, version: string): void => cb(version)
     ipcRenderer.on('update:available', listener)

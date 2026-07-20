@@ -583,6 +583,16 @@ button {
   color: var(--text-secondary);
 }
 
+.welcome-version {
+  color: var(--text-secondary);
+}
+
+.welcome-version + .welcome-updates-btn::before {
+  content: '·';
+  margin-right: 10px;
+  color: var(--text-secondary);
+}
+
 .recent-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -1135,6 +1145,95 @@ button {
   font-size: 11px;
   color: var(--text-secondary);
   line-height: 1.35;
+}
+
+/* View section inside the Aa menu (rotate + spread moved in from the toolbar) */
+
+.view-row-label {
+  flex: 1;
+  font-size: 12.5px;
+}
+
+.view-row-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.view-row-toggle {
+  margin-top: 8px;
+}
+
+.view-row-toggle svg {
+  color: var(--text-secondary);
+}
+
+/* Gear menu — the app's one settings surface */
+
+.menu-action {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-size: 12.5px;
+  padding: 7px 8px;
+  margin: 0 -2px;
+  border-radius: 8px;
+  color: var(--text);
+}
+
+.menu-action svg {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.menu-action:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.menu-action:disabled {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.menu-hint {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  padding: 2px 8px 4px;
+}
+
+.menu-about {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  padding: 0 4px;
+}
+
+.menu-link {
+  color: var(--accent);
+  font-size: 11.5px;
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+
+.menu-link:hover {
+  background: var(--hover);
+}
+
+/* Full-window modal host (AI settings from the gear menu). Portaled to <body>
+   — position:fixed would be trapped by the toolbar-wrap transform. */
+.app-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
 }
 
 /* Viewer body: sidebar + pages side by side */

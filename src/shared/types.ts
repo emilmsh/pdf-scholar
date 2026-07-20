@@ -263,6 +263,8 @@ export interface PdfxApi {
   /** Resolve the real filesystem path of a File dropped onto the window (Electron only) */
   getPathForFile(file: File): string | null
   onOpenPath(cb: (path: string) => void): () => void
+  /** App version for the About/settings surface (package.json / manifest) */
+  getVersion(): Promise<string>
   // ---------- Auto-update (Electron only; no-ops elsewhere) ----------
   // Policy: checks are quiet and automatic, but DOWNLOADING an update is
   // always the user's decision — nothing is fetched or installed silently.

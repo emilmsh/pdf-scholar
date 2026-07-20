@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
+  AiConfigView,
   LanguagePreference,
   Settings,
   ThemeName,
-  ThemePreference
+  ThemePreference,
+  UpdateCheckOutcome
 } from '../../../shared/types'
+import { bridge, isElectron } from '../bridge'
 import {
   annotTypeLabel,
   colorLabel,
@@ -16,6 +20,8 @@ import {
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
+import { AiSettings } from './AiPanel'
+import { updateOutcomeText } from './Welcome'
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -27,6 +33,7 @@ import {
   IconFitPage,
   IconFitWidth,
   IconFullscreen,
+  IconGear,
   IconMarker,
   IconMarkupHighlight,
   IconMarkupSquiggly,
@@ -39,9 +46,13 @@ import {
   IconPlus,
   IconPresent,
   IconPrint,
+  IconRedo,
+  IconReload,
   IconSaveAs,
+  IconRotateCcw,
   IconRotateCw,
   IconSave,
+  IconUndo,
   IconSearch,
   IconSpeaker,
   IconSpread,
@@ -132,6 +143,11 @@ interface Props {
   /** All annotations temporarily hidden (clean reading view) */
   annotsHidden: boolean
   onToggleAnnots(): void
+  /** Annotation undo/redo (mirrors Ctrl+Z/Y — needed for pen/touch use) */
+  canUndo: boolean
+  canRedo: boolean
+  onUndo(): void
+  onRedo(): void
   onPrint(): void
   readAloudOpen: boolean
   onToggleReadAloud(): void
@@ -197,6 +213,10 @@ export default function Toolbar({
   canSaveInPlace,
   annotsHidden,
   onToggleAnnots,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onPrint,
   readAloudOpen,
   onToggleReadAloud,
@@ -212,6 +232,14 @@ export default function Toolbar({
   const [zoomEditing, setZoomEditing] = useState(false)
   const [zoomInput, setZoomInput] = useState('')
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
+  // The gear menu: the app's one settings surface (language, keep-awake,
+  // AI setup, update check, version/about)
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+  const [updChecking, setUpdChecking] = useState(false)
+  const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
+  const [aiConfig, setAiConfig] = useState<AiConfigView | null>(null)
+  const [aiModalOpen, setAiModalOpen] = useState(false)
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
@@ -221,6 +249,7 @@ export default function Toolbar({
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
+  const settingsMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!toolMenu) return
@@ -264,6 +293,40 @@ export default function Toolbar({
     window.addEventListener('pointerdown', close, true)
     return () => window.removeEventListener('pointerdown', close, true)
   }, [viewMenuOpen])
+
+  useEffect(() => {
+    if (!settingsMenuOpen) return
+    const close = (e: Event): void => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node))
+        setSettingsMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
+  }, [settingsMenuOpen])
+
+  // Version is static — fetch once, the first time the gear menu opens
+  useEffect(() => {
+    if (settingsMenuOpen && !appVersion) void bridge.getVersion().then(setAppVersion)
+  }, [settingsMenuOpen, appVersion])
+
+  const checkForUpdates = (): void => {
+    if (updChecking) return
+    setUpdChecking(true)
+    setUpdOutcome(null)
+    void bridge
+      .updateCheck()
+      .then(setUpdOutcome)
+      .catch(() => setUpdOutcome({ status: 'error', current: '' }))
+      .finally(() => setUpdChecking(false))
+  }
+
+  const openAiSettings = (): void => {
+    setSettingsMenuOpen(false)
+    void bridge.aiGetConfig().then((view) => {
+      setAiConfig(view)
+      setAiModalOpen(true)
+    })
+  }
 
   const commitPage = (): void => {
     const n = parseInt(pageInput, 10)
@@ -366,6 +429,15 @@ export default function Toolbar({
             title={annotsHidden ? t('tb.showAnnotsTip') : t('tb.hideAnnotsTip')}
           >
             {annotsHidden ? <IconEyeOff /> : <IconEye />}
+          </button>
+
+          <div className="toolbar-sep" />
+
+          <button className="tb-btn" onClick={onUndo} disabled={!canUndo} title={t('tb.undoTip')}>
+            <IconUndo />
+          </button>
+          <button className="tb-btn" onClick={onRedo} disabled={!canRedo} title={t('tb.redoTip')}>
+            <IconRedo />
           </button>
 
           {toolMenu === 'markup' ? (
@@ -543,17 +615,6 @@ export default function Toolbar({
         >
           <IconFitWidth />
         </button>
-        <div className="toolbar-sep" />
-        <button className="tb-btn" onClick={() => onRotate(1)} title={t('tb.rotateCw')}>
-          <IconRotateCw />
-        </button>
-        <button
-          className={`tb-btn${spread ? ' is-active' : ''}`}
-          onClick={onToggleSpread}
-          title={t('tb.spread')}
-        >
-          <IconSpread />
-        </button>
       </div>
 
       <div className="toolbar-spacer" />
@@ -570,6 +631,8 @@ export default function Toolbar({
         >
           <IconSpeaker />
         </button>
+
+        <div className="toolbar-sep" />
 
         <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
           <IconPrint />
@@ -664,6 +727,53 @@ export default function Toolbar({
 
               <div className="theme-menu-sep" />
 
+              <div className="theme-menu-label">{t('tb.view')}</div>
+              <div className="theme-auto-row">
+                <span className="view-row-label">{t('tb.rotate')}</span>
+                <span className="view-row-controls">
+                  <button className="tb-btn" onClick={() => onRotate(-1)} title={t('tb.rotateCcwTip')}>
+                    <IconRotateCcw />
+                  </button>
+                  <button className="tb-btn" onClick={() => onRotate(1)} title={t('tb.rotateCwTip')}>
+                    <IconRotateCw />
+                  </button>
+                </span>
+              </div>
+              <label className="theme-menu-toggle view-row-toggle">
+                <input type="checkbox" checked={spread} onChange={onToggleSpread} />
+                <IconSpread size={15} />
+                {t('tb.spread')}
+              </label>
+            </div>
+          )}
+        </div>
+
+        <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
+          <IconPresent />
+        </button>
+        <button
+          className={`tb-btn${toolbarPinned ? '' : ' is-active'}`}
+          onClick={onTogglePin}
+          title={toolbarPinned ? t('tb.unpinTip') : t('tb.pinTip')}
+        >
+          {toolbarPinned ? <IconPin /> : <IconPinOff />}
+        </button>
+        <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
+          <IconFullscreen />
+        </button>
+
+        <div className="toolbar-sep" />
+
+        <div className="theme-menu-anchor" ref={settingsMenuRef}>
+          <button
+            className={`tb-btn${settingsMenuOpen ? ' is-active' : ''}`}
+            onClick={() => setSettingsMenuOpen((o) => !o)}
+            title={t('tb.settingsTip')}
+          >
+            <IconGear />
+          </button>
+          {settingsMenuOpen && (
+            <div className="theme-menu settings-menu">
               <div className="theme-menu-label">{t('tb.language')}</div>
               <div className="lang-options">
                 {LANGUAGES.map((lang) => (
@@ -687,23 +797,35 @@ export default function Toolbar({
                 />
                 {t('tb.keepAwake')}
               </label>
+
+              <div className="theme-menu-sep" />
+
+              <button className="menu-action" onClick={openAiSettings}>
+                <IconSparkle size={15} />
+                {t('ai.settingsTip')} …
+              </button>
+              {isElectron && (
+                <button className="menu-action" onClick={checkForUpdates} disabled={updChecking}>
+                  <IconReload size={15} />
+                  {updChecking ? t('update.checking') : t('update.check')}
+                </button>
+              )}
+              {updOutcome && <div className="menu-hint">{updateOutcomeText(updOutcome)}</div>}
+
+              <div className="theme-menu-sep" />
+
+              <div className="menu-about">
+                <span>{t('settings.about', { version: appVersion })}</span>
+                <button
+                  className="menu-link"
+                  onClick={() => bridge.openExternal('https://github.com/emilmsh/pdf-scholar')}
+                >
+                  GitHub
+                </button>
+              </div>
             </div>
           )}
         </div>
-
-        <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
-          <IconPresent />
-        </button>
-        <button
-          className={`tb-btn${toolbarPinned ? '' : ' is-active'}`}
-          onClick={onTogglePin}
-          title={toolbarPinned ? t('tb.unpinTip') : t('tb.pinTip')}
-        >
-          {toolbarPinned ? <IconPin /> : <IconPinOff />}
-        </button>
-        <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
-          <IconFullscreen />
-        </button>
 
         <div className="toolbar-sep" />
 
@@ -716,6 +838,28 @@ export default function Toolbar({
           <span className="tb-label">{t('ai.assistant')}</span>
         </button>
       </div>
+
+      {/* AI setup modal (same panel as the welcome screen); portaled to <body>
+          because .toolbar-wrap animates with a transform, which would trap a
+          position:fixed backdrop */}
+      {aiModalOpen &&
+        aiConfig &&
+        createPortal(
+          <div className="app-modal-backdrop" onMouseDown={() => setAiModalOpen(false)}>
+            <div className="welcome-ai-modal" onMouseDown={(e) => e.stopPropagation()}>
+              <header className="welcome-ai-modal-head">
+                <IconSparkle size={16} />
+                <span>{t('ai.settingsTip')}</span>
+              </header>
+              <AiSettings
+                config={aiConfig}
+                onSaved={() => setAiModalOpen(false)}
+                onClose={() => setAiModalOpen(false)}
+              />
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   )
 }

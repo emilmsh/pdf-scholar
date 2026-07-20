@@ -410,6 +410,8 @@ function registerIpc(): void {
 
   ipcMain.handle('settings:get', () => getState().settings)
 
+  ipcMain.handle('app:version', () => app.getVersion())
+
   ipcMain.handle('position:get', (_e, path: string) => getState().positions[path] ?? null)
 
   ipcMain.handle('pending-path:get', (e) => {

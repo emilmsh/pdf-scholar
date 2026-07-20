@@ -15,7 +15,7 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function updateOutcomeText(outcome: UpdateCheckOutcome): string {
+export function updateOutcomeText(outcome: UpdateCheckOutcome): string {
   switch (outcome.status) {
     case 'none':
       return t('update.upToDate', { current: outcome.current })
@@ -38,6 +38,11 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
   const [showAiSetup, setShowAiSetup] = useState(false)
   const [updateChecking, setUpdateChecking] = useState(false)
   const [updateOutcome, setUpdateOutcome] = useState<UpdateCheckOutcome | null>(null)
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    void bridge.getVersion().then(setVersion)
+  }, [])
 
   const checkForUpdates = (): void => {
     if (updateChecking) return
@@ -114,18 +119,19 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
           </div>
         )}
 
-        {/* Manual update check — the app has no settings surface, so this
-            lives quietly at the bottom of the start screen. If a newer
-            version is found, the regular update toast (with its download
-            button) appears alongside the result text. */}
-        {isElectron && (
-          <div className="welcome-updates">
+        {/* Quiet footer: version + manual update check (the toolbar's gear
+            menu offers the same — this is the copy you see before any
+            document is open). If a newer version is found, the regular
+            update toast (with its download button) appears alongside. */}
+        <div className="welcome-updates">
+          {version && <span className="welcome-version">PDF Scholar {version}</span>}
+          {isElectron && (
             <button className="welcome-updates-btn" onClick={checkForUpdates} disabled={updateChecking}>
               {updateChecking ? t('update.checking') : t('update.check')}
             </button>
-            {updateOutcome && <span className="welcome-updates-result">{updateOutcomeText(updateOutcome)}</span>}
-          </div>
-        )}
+          )}
+          {updateOutcome && <span className="welcome-updates-result">{updateOutcomeText(updateOutcome)}</span>}
+        </div>
       </div>
 
       {showAiSetup && config && (
