@@ -147,7 +147,10 @@ async function chatAnthropic(
   }
   const api = isFable ? client.beta.messages : client.messages
   type AnthropicStream = ReturnType<typeof client.messages.stream>
-  const streamFn = api.stream as unknown as (p: unknown, o: unknown) => AnthropicStream
+  // Bind to `api`: the SDK's stream() reads this._client internally, so calling it
+  // detached from client.messages throws "Cannot read properties of undefined
+  // (reading '_client')". The cast is only to bridge the beta/non-beta type gap.
+  const streamFn = api.stream.bind(api) as unknown as (p: unknown, o: unknown) => AnthropicStream
   const stream = streamFn(params, { signal })
   stream.on('text', (delta: string) => emit(delta))
   const final = await stream.finalMessage()
@@ -189,15 +192,26 @@ async function chatAnthropic(
 
 /** Split text on [KILDE s.N: "quote"] markers into parts with quote citations */
 function parseQuoteContract(text: string): AiContentPart[] {
-  // Tolerant: curly quotes, «Kilde» casing, flexible spacing around the colon
-  const regex = /\s*\[KILDE\s+s\.?\s*(\d+)\s*:\s*[«"“]([^"«»“”\]]{5,300})["»”]\]/gi
+  // Tolerant: curly quotes, «Kilde» casing, flexible spacing around the colon, and
+  // inner quotes inside the excerpt — the content is matched lazily and only closes
+  // on a quote immediately followed by "]", so a model that puts (often escaped)
+  // quotes inside the excerpt no longer breaks the match. Escapes are stripped below
+  // so the quote stays a verbatim document substring for locate + highlight.
+  const regex = /\s*\[KILDE\s+s\.?\s*(\d+)\s*:\s*[«"“]([\s\S]{5,300}?)["»”]\]/gi
   const parts: AiContentPart[] = []
   let last = 0
   let match: RegExpExecArray | null
   while ((match = regex.exec(text)) !== null) {
     parts.push({
       text: text.slice(last, match.index),
-      citations: [{ kind: 'quote', pageNumber: parseInt(match[1], 10), quote: match[2] }]
+      citations: [
+        {
+          kind: 'quote',
+          pageNumber: parseInt(match[1], 10),
+          // Unescape \" and \\ so the quote is a verbatim document substring
+          quote: match[2].replace(/\\(["\\])/g, '$1').trim()
+        }
+      ]
     })
     last = regex.lastIndex
   }
