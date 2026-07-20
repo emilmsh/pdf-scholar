@@ -26,6 +26,7 @@ import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import { DocCache } from './doc-cache'
 import { appendAnnotation, appendDeleteAnnotation, appendUpdateAnnotation } from './incremental-appender'
 import { buildAnnotation, rgbToHex, toRect } from '../shared/annotation-build'
+import { snapshotApLessLinks, stripGeneratedLinkAPs } from '../shared/link-ap-guard'
 
 /** Files at/above this size never touch the WASM engine: annotations are
  *  written by the incremental appender (src/main/incremental-appender.ts),
@@ -74,6 +75,9 @@ interface RawBridge {
     FPDFPage_GetAnnotCount(pagePtr: number): number
     FPDFPage_GetAnnot(pagePtr: number, index: number): number
     FPDFPage_CloseAnnot(annotPtr: number): void
+    FPDFAnnot_GetSubtype(annotPtr: number): number
+    FPDFAnnot_HasKey(annotPtr: number, key: string): boolean
+    FPDFAnnot_SetAP(annotPtr: number, appearanceMode: number, value: number): boolean
     EPDFAnnot_GetObjectNumber(annotPtr: number): number
     EPDFPage_RemoveAnnotByObjectNumber(pagePtr: number, objNum: number): boolean
   }
@@ -86,6 +90,33 @@ function withPageHandle<T>(engine: PdfiumNative, docId: string, pageIndex: numbe
   }
   const raw = anyEngine.pdfiumModule
   return anyEngine.cache.getContext(docId).borrowPage(pageIndex, (ctx) => fn(ctx.pagePtr, raw))
+}
+
+/** Bracket an engine op so it can't leak PDFium-synthesized link borders:
+ *  getPageAnnotations gives border-only Link annots (hyperref's green/red
+ *  citation boxes) a generated /AP, which the next flush would bake into the
+ *  file — see src/shared/link-ap-guard.ts. The strip runs in `finally` but
+ *  never masks the op's own error. */
+async function withLinkApGuard<T>(
+  engine: PdfiumNative,
+  docId: string,
+  pageIndex: number,
+  fn: () => Promise<T>
+): Promise<T> {
+  const apLess = withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
+    snapshotApLessLinks(pagePtr, raw)
+  )
+  try {
+    return await fn()
+  } finally {
+    try {
+      withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
+        stripGeneratedLinkAPs(pagePtr, raw, apLess)
+      )
+    } catch {
+      /* op failed hard (e.g. OOM killed the instance) — nothing left to strip */
+    }
+  }
 }
 
 /** index -> PDF object number for every annotation on the page (in /Annots order) */
@@ -230,66 +261,72 @@ export async function applyAnnotation(req: AnnotateRequest): Promise<AnnotateRes
   // the path never enters the doc cache). The appender NEVER falls back here:
   // above WASM_SAFE_LIMIT that fallback would be silent data loss.
   if (await isAppenderFile(req.path)) return appendAnnotation(req)
-  return withPdf(req.path, async (engine, doc, docId) => {
-    const spec = buildAnnotation(req)
-    if ('error' in spec) return spec
-    const page = doc.pages[req.pageIndex]
-    await engine.createPageAnnotation(doc, page, spec).toPromise()
-    // The new annotation is last in /Annots order; its object number is stable
-    // through saveAsCopy (proven in spike-embedpdf-objnum.mjs).
-    const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
-    const id = objNums[objNums.length - 1]
-    if (!id) return { error: 'Fikk ikke objektnummer for annotasjonen' }
-    return { ok: true, id }
-  })
+  return withPdf(req.path, (engine, doc, docId) =>
+    withLinkApGuard(engine, docId, req.pageIndex, async () => {
+      const spec = buildAnnotation(req)
+      if ('error' in spec) return spec
+      const page = doc.pages[req.pageIndex]
+      await engine.createPageAnnotation(doc, page, spec).toPromise()
+      // The new annotation is last in /Annots order; its object number is stable
+      // through saveAsCopy (proven in spike-embedpdf-objnum.mjs).
+      const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
+      const id = objNums[objNums.length - 1]
+      if (!id) return { error: 'Fikk ikke objektnummer for annotasjonen' }
+      return { ok: true, id }
+    })
+  )
 }
 
 export async function updateAnnotation(req: ModifyAnnotationRequest): Promise<AnnotateResult> {
   if (await isAppenderFile(req.path)) return appendUpdateAnnotation(req)
-  return withPdf(req.path, async (engine, doc, docId) => {
-    const model = await findByObjectNumber(engine, doc, docId, req.pageIndex, req.id)
-    if ('error' in model) return model
-    const m = model as PdfAnnotationObject & {
-      strokeColor?: string
-      fontColor?: string
-      linePoints?: { start: { x: number; y: number }; end: { x: number; y: number } }
-      inkList?: { points: { x: number; y: number }[] }[]
-    }
-    if (req.color) {
-      const hex = rgbToHex(req.color)
-      if (m.type === PdfAnnotationSubtype.FREETEXT) m.fontColor = hex
-      else m.strokeColor = hex
-    }
-    if (req.opacity !== undefined) (m as { opacity?: number }).opacity = req.opacity
-    if (req.contents !== undefined) m.contents = req.contents
-    if (req.rect && m.type !== PdfAnnotationSubtype.LINE) m.rect = toRect(req.rect)
-    if (req.translate) {
-      const { dx, dy } = req.translate
-      if (m.type === PdfAnnotationSubtype.LINE && m.linePoints) {
-        m.linePoints = {
-          start: { x: m.linePoints.start.x + dx, y: m.linePoints.start.y + dy },
-          end: { x: m.linePoints.end.x + dx, y: m.linePoints.end.y + dy }
+  return withPdf(req.path, (engine, doc, docId) =>
+    withLinkApGuard(engine, docId, req.pageIndex, async () => {
+      const model = await findByObjectNumber(engine, doc, docId, req.pageIndex, req.id)
+      if ('error' in model) return model
+      const m = model as PdfAnnotationObject & {
+        strokeColor?: string
+        fontColor?: string
+        linePoints?: { start: { x: number; y: number }; end: { x: number; y: number } }
+        inkList?: { points: { x: number; y: number }[] }[]
+      }
+      if (req.color) {
+        const hex = rgbToHex(req.color)
+        if (m.type === PdfAnnotationSubtype.FREETEXT) m.fontColor = hex
+        else m.strokeColor = hex
+      }
+      if (req.opacity !== undefined) (m as { opacity?: number }).opacity = req.opacity
+      if (req.contents !== undefined) m.contents = req.contents
+      if (req.rect && m.type !== PdfAnnotationSubtype.LINE) m.rect = toRect(req.rect)
+      if (req.translate) {
+        const { dx, dy } = req.translate
+        if (m.type === PdfAnnotationSubtype.LINE && m.linePoints) {
+          m.linePoints = {
+            start: { x: m.linePoints.start.x + dx, y: m.linePoints.start.y + dy },
+            end: { x: m.linePoints.end.x + dx, y: m.linePoints.end.y + dy }
+          }
+        } else if (m.type === PdfAnnotationSubtype.INK && m.inkList) {
+          m.inkList = m.inkList.map((s) => ({ points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) }))
         }
-      } else if (m.type === PdfAnnotationSubtype.INK && m.inkList) {
-        m.inkList = m.inkList.map((s) => ({ points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) }))
+        m.rect = {
+          origin: { x: m.rect.origin.x + dx, y: m.rect.origin.y + dy },
+          size: m.rect.size
+        }
       }
-      m.rect = {
-        origin: { x: m.rect.origin.x + dx, y: m.rect.origin.y + dy },
-        size: m.rect.size
-      }
-    }
-    ;(m as { modified?: Date }).modified = new Date()
-    const ok = await engine.updatePageAnnotation(doc, doc.pages[req.pageIndex], m).toPromise()
-    return ok ? { ok: true, id: req.id } : { error: 'Oppdateringen ble avvist av motoren' }
-  })
+      ;(m as { modified?: Date }).modified = new Date()
+      const ok = await engine.updatePageAnnotation(doc, doc.pages[req.pageIndex], m).toPromise()
+      return ok ? { ok: true, id: req.id } : { error: 'Oppdateringen ble avvist av motoren' }
+    })
+  )
 }
 
 export async function deleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult> {
   if (await isAppenderFile(req.path)) return appendDeleteAnnotation(req)
-  return withPdf(req.path, async (engine, _doc, docId) => {
-    const removed = withPageHandle(engine, docId, req.pageIndex, (pagePtr, raw) =>
-      raw.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, req.id)
-    )
-    return removed ? { ok: true, id: req.id } : { error: 'Fant ikke annotasjonen i filen' }
-  })
+  return withPdf(req.path, (engine, _doc, docId) =>
+    withLinkApGuard(engine, docId, req.pageIndex, async () => {
+      const removed = withPageHandle(engine, docId, req.pageIndex, (pagePtr, raw) =>
+        raw.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, req.id)
+      )
+      return removed ? { ok: true, id: req.id } : { error: 'Fant ikke annotasjonen i filen' }
+    })
+  )
 }

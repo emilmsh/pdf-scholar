@@ -131,5 +131,68 @@ for (const req of reqs) {
   pdf.destroy()
 }
 
+// 8. link-AP guard: getPageAnnotations (run by updateAnnotation) makes PDFium
+// synthesize /AP for border-only Link annots — hyperref's green citation
+// boxes. The guard must strip exactly those after every op, while a link that
+// legitimately shipped WITH an /AP keeps it. See src/shared/link-ap-guard.ts.
+{
+  // Minimal single-page PDF: link #1 is hyperref-style (/Border+/C, no /AP),
+  // link #2 carries its own appearance stream. Offsets computed, not typed.
+  const buildLinkFixture = () => {
+    const objs = [
+      '<</Type/Catalog/Pages 2 0 R>>',
+      '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+      '<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Annots[4 0 R 5 0 R]/Contents 6 0 R>>',
+      '<</Type/Annot/Subtype/Link/Rect[100 700 160 715]/Border[0 0 1]/C[0 1 0]/A<</S/URI/URI(https://example.org)>>>>',
+      '<</Type/Annot/Subtype/Link/Rect[100 650 160 665]/Border[0 0 1]/C[0 1 0]/AP<</N 7 0 R>>/A<</S/URI/URI(https://example.org)>>>>',
+      '<</Length 0>>\nstream\n\nendstream',
+      '<</Type/XObject/Subtype/Form/BBox[100 650 160 665]/Length 31>>\nstream\n0 1 0 RG 1 w 100 650 60 15 re S\nendstream'
+    ]
+    let out = '%PDF-1.4\n'
+    const offsets = []
+    for (let i = 0; i < objs.length; i++) {
+      offsets.push(out.length)
+      out += `${i + 1} 0 obj\n${objs[i]}\nendobj\n`
+    }
+    const xref = out.length
+    out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`
+    for (const off of offsets) out += `${String(off).padStart(10, '0')} 00000 n \n`
+    out += `trailer\n<</Size ${objs.length + 1}/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF\n`
+    return Buffer.from(out, 'latin1')
+  }
+  const LINKFILE = path.join(os.tmpdir(), 'pdfx-linkguard-test.pdf')
+  fs.writeFileSync(LINKFILE, buildLinkFixture())
+
+  const lbase = { path: LINKFILE, pageIndex: 0, opacity: 0.5, color: [1, 0.84, 0.29], author: 'test' }
+  const r1 = await applyAnnotation({ ...lbase, type: 'highlight', quads: q(100, 600, 200, 16) })
+  check('linkguard: create highlight', 'ok' in r1, 'error' in r1 ? r1.error : '')
+  // update runs getPageAnnotations — the call that synthesizes link /AP
+  const r2 = await updateAnnotation({ path: LINKFILE, pageIndex: 0, id: r1.id, color: [0.44, 0.71, 1] })
+  check('linkguard: update highlight', 'ok' in r2, 'error' in r2 ? r2.error : '')
+  await flushAnnotations(LINKFILE)
+
+  const pdf = mupdf.Document.openDocument(fs.readFileSync(LINKFILE), 'application/pdf').asPDF()
+  const pageObj = pdf.findPage(0)
+  const arr = pageObj.get('Annots')
+  const links = []
+  let hlAp = false
+  for (let i = 0; i < arr.length; i++) {
+    const a = arr.get(i)
+    const st = a.get('Subtype').asName()
+    if (st === 'Link') links.push(a)
+    else if (st === 'Highlight') hlAp = !a.get('AP').isNull()
+  }
+  const bare = links.find((a) => a.get('AP').isNull())
+  const owned = links.find((a) => !a.get('AP').isNull())
+  check('linkguard: border-only link kept AP-less', links.length === 2 && !!bare,
+    `${links.filter((a) => a.get('AP').isNull()).length} of ${links.length} AP-less`)
+  check('linkguard: /Border + /C intact', !!bare && bare.get('Border').toString() === '[0 0 1]' && bare.get('C').toString() === '[0 1 0]',
+    bare ? `${bare.get('Border')} ${bare.get('C')}` : 'missing')
+  check('linkguard: shipped link AP survives', !!owned)
+  check('linkguard: highlight has /AP', hlAp)
+  pdf.destroy()
+  fs.rmSync(LINKFILE, { force: true })
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)
