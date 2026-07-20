@@ -72,6 +72,7 @@ import {
 import type { ResolvedCitation } from '../ai'
 import AnnotPopover from './AnnotPopover'
 import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
+import { OverlayScrollbars } from './OverlayScrollbars'
 import PdfPage from './PdfPage'
 import PresentationMode from './PresentationMode'
 import Sidebar from './Sidebar'
@@ -3433,6 +3434,7 @@ export default function PdfViewer({
           />
         )}
 
+        <div className="pages-host">
         <div
           className={`pages${drawTool ? ' drawing' : ''}`}
           ref={containerRef}
@@ -3554,6 +3556,11 @@ export default function PdfViewer({
               <span>{t('viewer.opening', { name: payload.name })}</span>
             </div>
           )}
+        </div>
+        <OverlayScrollbars
+          scrollRef={containerRef}
+          layoutKey={layout ? `${layout.total}:${layout.contentWidth}` : 'none'}
+        />
         </div>
 
         {aiPinned && (

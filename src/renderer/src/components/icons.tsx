@@ -186,6 +186,40 @@ export const IconTextMarkup = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/* Text-markup family: the same letter "A" with each markup applied, so the
+   four variants read as siblings in the markup menus. */
+
+export const IconMarkupHighlight = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="4.5" y="7.5" width="15" height="8.8" rx="1.6" fill="currentColor" stroke="none" opacity="0.3" />
+    <path d="M7.2 15.5L12 4.5l4.8 11" />
+    <path d="M8.9 11.5h6.2" />
+  </Svg>
+)
+
+export const IconMarkupUnderline = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M7.2 15.5L12 4.5l4.8 11" />
+    <path d="M8.9 11.5h6.2" />
+    <path d="M6 19.5h12" />
+  </Svg>
+)
+
+export const IconMarkupStrikeout = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M7.2 15.5L12 4.5l4.8 11" />
+    <path d="M5 11h14" />
+  </Svg>
+)
+
+export const IconMarkupSquiggly = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M7.2 15.5L12 4.5l4.8 11" />
+    <path d="M8.9 11.5h6.2" />
+    <path d="M6 19.3q2-2.6 4 0t4 0t4 0" />
+  </Svg>
+)
+
 export const IconEraser = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M20 20H8.5L3.5 15a2 2 0 0 1 0-2.8l8.7-8.7a2 2 0 0 1 2.8 0l5.5 5.5a2 2 0 0 1 0 2.8L14 18.3" />

@@ -15,6 +15,10 @@ import {
   IconCite,
   IconCopy,
   IconGlobe,
+  IconMarkupHighlight,
+  IconMarkupSquiggly,
+  IconMarkupStrikeout,
+  IconMarkupUnderline,
   IconNote,
   IconSparkle,
   IconTally,
@@ -269,7 +273,9 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
       {isSelection && (
         <>
           <div className="menu-color-group">
-            <span className="menu-row-label">{t('menu.marker')}</span>
+            <span className="menu-row-label" title={t('menu.marker')}>
+              <IconMarkupHighlight size={19} />
+            </span>
             <MarkupColorRow
               palette={HIGHLIGHT_COLORS}
               swatch="dot"
@@ -278,7 +284,9 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             />
           </div>
           <div className="menu-color-group">
-            <span className="menu-row-label">{t('menu.underline')}</span>
+            <span className="menu-row-label" title={t('menu.underline')}>
+              <IconMarkupUnderline size={19} />
+            </span>
             <MarkupColorRow
               palette={UNDERLINE_COLORS}
               swatch="bar"
@@ -287,7 +295,9 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             />
           </div>
           <div className="menu-color-group">
-            <span className="menu-row-label">{t('menu.strikeout')}</span>
+            <span className="menu-row-label" title={t('menu.strikeout')}>
+              <IconMarkupStrikeout size={19} />
+            </span>
             <MarkupColorRow
               palette={UNDERLINE_COLORS}
               swatch="bar"
@@ -296,7 +306,9 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             />
           </div>
           <div className="menu-color-group">
-            <span className="menu-row-label">{t('menu.squiggly')}</span>
+            <span className="menu-row-label" title={t('menu.squiggly')}>
+              <IconMarkupSquiggly size={19} />
+            </span>
             <MarkupColorRow
               palette={UNDERLINE_COLORS}
               swatch="bar"

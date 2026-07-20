@@ -106,8 +106,10 @@ export const UNDERLINE_COLORS: HighlightColor[] = [
   { key: 'purple', hex: '#8f52d6', rgb: [0.561, 0.322, 0.839] }
 ]
 
-export const UNDERLINE_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
-export const STRIKEOUT_COLOR: [number, number, number] = [0.886, 0.29, 0.29]
+/* Defaults match the palette's red exactly so the "selected" swatch ring
+   recognizes them (compared componentwise in the toolbar menu) */
+export const UNDERLINE_COLOR: [number, number, number] = [0.886, 0.286, 0.29]
+export const STRIKEOUT_COLOR: [number, number, number] = [0.886, 0.286, 0.29]
 export const NOTE_COLOR: [number, number, number] = [1, 0.835, 0.29]
 
 /** Localized display name for an annotation type */

@@ -28,6 +28,10 @@ import {
   IconFitWidth,
   IconFullscreen,
   IconMarker,
+  IconMarkupHighlight,
+  IconMarkupSquiggly,
+  IconMarkupStrikeout,
+  IconMarkupUnderline,
   IconMinus,
   IconPen,
   IconPin,
@@ -65,6 +69,13 @@ const SHAPE_ICONS: Record<ShapeToolType, (p: { size?: number }) => React.JSX.Ele
   circle: IconShapeCircle,
   line: IconShapeLine,
   arrow: IconShapeArrow
+}
+
+const MARKUP_ICONS: Record<MarkupToolType, (p: { size?: number }) => React.JSX.Element> = {
+  highlight: IconMarkupHighlight,
+  underline: IconMarkupUnderline,
+  strikeout: IconMarkupStrikeout,
+  squiggly: IconMarkupSquiggly
 }
 
 const SHAPE_LABEL_KEYS: Record<ShapeToolType, MsgKey> = {
@@ -360,30 +371,45 @@ export default function Toolbar({
           {toolMenu === 'markup' ? (
             <div className="tool-menu">
               <div className="theme-menu-label">{t('tb.markup')}</div>
-              <div className="lang-options">
-                {MARKUP_TOOL_TYPES.map((m) => (
-                  <button
-                    key={m}
-                    className={`lang-option${activeMarkup === m ? ' selected' : ''}`}
-                    onClick={() => {
-                      setMarkupType(m)
-                      onMarkupSelect(m)
-                    }}
-                  >
-                    {annotTypeLabel(m)}
-                  </button>
-                ))}
+              <div className="markup-grid">
+                {MARKUP_TOOL_TYPES.map((m) => {
+                  const Icon = MARKUP_ICONS[m]
+                  return (
+                    <button
+                      key={m}
+                      className={`markup-option${activeMarkup === m ? ' selected' : ''}`}
+                      onClick={() => {
+                        setMarkupType(m)
+                        onMarkupSelect(m)
+                      }}
+                    >
+                      <Icon size={16} />
+                      <span>{annotTypeLabel(m)}</span>
+                    </button>
+                  )
+                })}
               </div>
               <div className="color-row">
-                {(markupType === 'highlight' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) => (
-                  <button
-                    key={c.hex}
-                    className={`color-dot${markupColor.join() === c.rgb.join() ? ' selected' : ''}`}
-                    style={{ background: c.hex }}
-                    title={colorLabel(c)}
-                    onClick={() => onMarkupColorChange(c.rgb)}
-                  />
-                ))}
+                {(markupType === 'highlight' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) =>
+                  markupType === 'highlight' ? (
+                    <button
+                      key={c.hex}
+                      className={`color-dot${markupColor.join() === c.rgb.join() ? ' selected' : ''}`}
+                      style={{ background: c.hex }}
+                      title={colorLabel(c)}
+                      onClick={() => onMarkupColorChange(c.rgb)}
+                    />
+                  ) : (
+                    <button
+                      key={c.hex}
+                      className={`color-bar${markupColor.join() === c.rgb.join() ? ' selected' : ''}`}
+                      title={colorLabel(c)}
+                      onClick={() => onMarkupColorChange(c.rgb)}
+                    >
+                      <span style={{ background: c.hex }} />
+                    </button>
+                  )
+                )}
               </div>
             </div>
           ) : toolMenu ? (
