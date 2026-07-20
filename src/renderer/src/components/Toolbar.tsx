@@ -20,6 +20,7 @@ import {
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
+import { READ_ALOUD } from '../flags'
 import { AiSettings } from './AiPanel'
 import { updateOutcomeText } from './Welcome'
 import {
@@ -624,13 +625,15 @@ export default function Toolbar({
           <IconSearch />
         </button>
 
-        <button
-          className={`tb-btn${readAloudOpen ? ' is-active' : ''}`}
-          onClick={onToggleReadAloud}
-          title={t('tb.readAloudTip')}
-        >
-          <IconSpeaker />
-        </button>
+        {READ_ALOUD && (
+          <button
+            className={`tb-btn${readAloudOpen ? ' is-active' : ''}`}
+            onClick={onToggleReadAloud}
+            title={t('tb.readAloudTip')}
+          >
+            <IconSpeaker />
+          </button>
+        )}
 
         <div className="toolbar-sep" />
 

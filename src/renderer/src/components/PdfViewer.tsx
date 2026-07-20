@@ -14,6 +14,7 @@ import type {
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
 import { primaryMod } from '../platform'
+import { READ_ALOUD } from '../flags'
 import {
   FREETEXT_COLOR,
   FREETEXT_SIZE,
@@ -3173,7 +3174,7 @@ export default function PdfViewer({
         } else if (k === 'h') {
           e.preventDefault()
           setAnnotsHidden((h) => !h)
-        } else if (k === 'r') {
+        } else if (k === 'r' && READ_ALOUD) {
           e.preventDefault()
           if (readAloud === 'closed') void startReadAloud()
           else stopReadAloud()
