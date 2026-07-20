@@ -445,6 +445,8 @@ export default function PdfViewer({
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
   /** Bumped to make the AI panel fire the "ask my annotations" question */
   const [annotsAskId, setAnnotsAskId] = useState(0)
+  /** Bumped to open the AI panel showing its key settings (gear menu, search) */
+  const [aiSettingsAskId, setAiSettingsAskId] = useState(0)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
@@ -3394,6 +3396,10 @@ export default function PdfViewer({
           }}
           aiOpen={aiPinned}
           onToggleAi={() => setAiPinned((o) => !o)}
+          onOpenAiSettings={() => {
+            setAiPinned(true)
+            setAiSettingsAskId((n) => n + 1)
+          }}
           toolbarPinned={toolbarPinned}
           onTogglePin={togglePin}
           onPresent={enterPresentation}
@@ -3632,6 +3638,7 @@ export default function PdfViewer({
                 hasAnnotations={hasAnnotations}
                 annotsAskId={annotsAskId}
                 getAnnotationsText={getAnnotationsText}
+                openSettingsAskId={aiSettingsAskId}
                 onCitationClick={(resolved) => void jumpToAiCitation(resolved)}
                 onClose={() => {
                   setAiPeek(false)
@@ -3721,6 +3728,7 @@ export default function PdfViewer({
           onOpenAiSettings={() => {
             closeSearch()
             setAiPinned(true)
+            setAiSettingsAskId((n) => n + 1)
           }}
           onQueryChange={setSearchQuery}
           onOptionsChange={setSearchOptions}

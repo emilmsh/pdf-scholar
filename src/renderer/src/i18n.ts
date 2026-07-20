@@ -29,7 +29,7 @@ const nb = {
     'Bruk din egen API-nøkkel (Claude eller OpenAI). Da holdes dokumentet privat, svarene får sidehenvisninger, og du styrer kostnaden selv.',
   'welcome.aiSetup': 'Legg til API-nøkkel',
   'welcome.aiGuide':
-    'Velg leverandør og lim inn nøkkelen din. Du finner nøkler i leverandørens konsoll — vi anbefaler å sette en utgiftsgrense samme sted. Nøkkelen lagres kryptert lokalt og sendes aldri til andre enn leverandøren.',
+    'Lim inn nøkkelen for leverandørene du har — resten lar du stå tomt. Du finner nøkler i leverandørens konsoll — vi anbefaler å sette en utgiftsgrense samme sted. Nøkkelen lagres kryptert lokalt og sendes aldri til andre enn leverandøren.',
   'welcome.recents': 'Nylig lest',
 
   // Tabs
@@ -257,7 +257,9 @@ const nb = {
 
   // AI panel
   'ai.assistant': 'Assistent',
-  'ai.settingsTip': 'KI-innstillinger',
+  'ai.keysTitle': 'API-nøkler og leverandører',
+  'ai.keyMissing': 'nøkkel mangler',
+  'ai.noKeysYet': 'Ingen API-nøkkel er lagt inn ennå.',
   'ai.modelMenuTip': 'Bytt modell og tenkeinnsats',
   'ai.closeTip': 'Lukk (Esc)',
   'ai.emptyIntro':
@@ -366,7 +368,7 @@ const en: Dict = {
     'Use your own API key (Claude or OpenAI). Your document stays private, answers carry page citations, and you control the cost.',
   'welcome.aiSetup': 'Add API key',
   'welcome.aiGuide':
-    'Pick a provider and paste your key. You get keys from the provider console — we recommend setting a spending cap there too. The key is stored encrypted locally and only ever sent to the provider.',
+    'Paste the key for the providers you have — leave the rest empty. You get keys from the provider console — we recommend setting a spending cap there too. The key is stored encrypted locally and only ever sent to the provider.',
   'welcome.recents': 'Recently read',
 
   'tabs.close': 'Close tab',
@@ -581,7 +583,9 @@ const en: Dict = {
   'export.suffix': 'annotations',
 
   'ai.assistant': 'Assistant',
-  'ai.settingsTip': 'AI settings',
+  'ai.keysTitle': 'API keys & providers',
+  'ai.keyMissing': 'no key',
+  'ai.noKeysYet': 'No API key has been added yet.',
   'ai.modelMenuTip': 'Change model and reasoning effort',
   'ai.closeTip': 'Close (Esc)',
   'ai.emptyIntro':

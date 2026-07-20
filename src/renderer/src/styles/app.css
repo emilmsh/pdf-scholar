@@ -1230,20 +1230,6 @@ button {
   background: var(--hover);
 }
 
-/* The gear menu hosts the AI settings form inline (between dividers, like
-   the other settings) — wide enough for the form, scrollable when a small
-   window can't fit the whole menu. */
-.settings-menu {
-  width: 316px;
-  max-height: calc(100vh - 110px);
-  overflow-y: auto;
-}
-
-.settings-menu .ai-settings {
-  padding: 8px 0 2px;
-  overflow-y: visible;
-}
-
 /* Viewer body: sidebar + pages side by side */
 
 .viewer-body {
@@ -2711,8 +2697,10 @@ button {
   top: calc(100% + 4px);
   right: 8px;
   z-index: 45;
-  /* Cap to the panel width so the narrow extension panel never clips it. */
-  width: min(224px, calc(100% - 16px));
+  /* Wide enough that the longest curated label ("Claude Fable 5 —
+     tyngst/dyrest") survives the select's arrow + padding untruncated;
+     capped to the panel width so the narrow extension panel never clips. */
+  width: min(276px, calc(100% - 16px));
   padding: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -3207,6 +3195,19 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.ai-settings-heading {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* "No key yet" note inside the model chip's menu */
+.ai-model-menu-note {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
 }
 
 .ai-field {

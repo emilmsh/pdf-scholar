@@ -318,23 +318,32 @@ const providerLabels = (): { id: AiProviderId; label: string }[] => [
   { id: 'mock', label: t('ai.providerMock') }
 ]
 
-// Curated, verified model lists (see docs/agent-notes/modeller-api.md).
-// `label` is the full descriptor for the dropdowns; `short` is the clean,
-// human-readable name for the compact header chip (never the raw hyphenated id).
+// Curated, verified model lists (see docs/agent-notes/modeller-api.md),
+// ordered by capability (heaviest first) with clean names only — no
+// descriptor phrases. `label` is the dropdown text; `short` is for the
+// compact header chip (never the raw hyphenated id).
 const MODELS: Record<AiProviderId, { id: string; label: string; short: string }[]> = {
   anthropic: [
-    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — anbefalt', short: 'Sonnet 5' },
-    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8 — mest kapabel', short: 'Opus 4.8' },
-    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — rask/billig', short: 'Haiku 4.5' },
-    { id: 'claude-fable-5', label: 'Claude Fable 5 — tyngst/dyrest', short: 'Fable 5' }
+    { id: 'claude-fable-5', label: 'Claude Fable 5', short: 'Fable 5' },
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', short: 'Opus 4.8' },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5' },
+    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5' }
   ],
   openai: [
-    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — anbefalt', short: 'GPT-5.6 Terra' },
-    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol — flaggskip', short: 'GPT-5.6 Sol' },
-    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — rask', short: 'GPT-5.6 Luna' }
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', short: 'GPT-5.6 Sol' },
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', short: 'GPT-5.6 Terra' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna' }
   ],
   azure: [],
   mock: [{ id: 'mock-1', label: 'Testmodell (mock)', short: 'Testmodell' }]
+}
+
+/** Fallback default per provider when no model is stored yet. Mirrors main's
+ *  storage defaults — MODELS is display-ordered by capability, so [0] is the
+ *  heaviest model, NOT the default. */
+const DEFAULT_MODELS: Partial<Record<AiProviderId, string>> = {
+  anthropic: 'claude-sonnet-5',
+  openai: 'gpt-5.6-terra'
 }
 
 /** Clean display name for the header chip. Uses the curated `short` name when the
@@ -373,138 +382,129 @@ interface SettingsProps {
   onClose(): void
 }
 
+/** Key-holding providers, in display order (mock is not key-based) */
+const KEY_PROVIDERS: { id: AiProviderId; name: string }[] = [
+  { id: 'anthropic', name: 'Claude (Anthropic)' },
+  { id: 'openai', name: 'OpenAI' },
+  { id: 'azure', name: 'Azure OpenAI' }
+]
+
+/** Key manager: one view with every provider's key field stacked — fill in
+ *  the keys you have, leave the rest empty. Model and reasoning effort are
+ *  NOT here: they are picked from the header chip's menu in the chat. */
 export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Element {
   useLang()
-  const [provider, setProvider] = useState<AiProviderId>(config.provider)
-  const [model, setModel] = useState(config.models[config.provider] ?? '')
-  const [thinking, setThinking] = useState<ThinkingLevel>(config.thinking ?? 'medium')
-  const [key, setKey] = useState('')
+  const [keys, setKeys] = useState<Record<AiProviderId, string>>({
+    anthropic: '',
+    openai: '',
+    azure: '',
+    mock: ''
+  })
   const [endpoint, setEndpoint] = useState(config.azure.endpoint)
   const [deployment, setDeployment] = useState(config.azure.deployment)
   const [saving, setSaving] = useState(false)
 
-  const pickProvider = (p: AiProviderId): void => {
-    setProvider(p)
-    setModel(config.models[p] || MODELS[p][0]?.id || '')
-    setKey('')
-  }
-
-  // Haiku ignores reasoning effort — hide the control for it
-  const thinkingApplies = !/haiku/i.test(model) && provider !== 'mock'
-
   const save = async (): Promise<void> => {
     setSaving(true)
     const patch: Parameters<typeof bridge.aiSetConfig>[0] = {
-      provider,
-      models: { ...config.models, [provider]: model.trim() },
-      azure: { endpoint: endpoint.trim(), deployment: deployment.trim() },
-      thinking
+      azure: { endpoint: endpoint.trim(), deployment: deployment.trim() }
     }
-    if (key.trim()) patch.keys = { [provider]: key.trim() }
-    const next = await bridge.aiSetConfig(patch)
+    for (const { id } of KEY_PROVIDERS) {
+      if (keys[id].trim()) (patch.keys ??= {})[id] = keys[id].trim()
+    }
+    let next = await bridge.aiSetConfig(patch)
+    // If the active provider still has no key but another one now does,
+    // switch to it (with its stored or default model) so the chat is usable
+    // right after saving the very first key
+    if (!next.hasKey[next.provider]) {
+      const first = KEY_PROVIDERS.find((p) => next.hasKey[p.id])?.id
+      if (first) {
+        next = await bridge.aiSetConfig({
+          provider: first,
+          models: { ...next.models, [first]: next.models[first] || DEFAULT_MODELS[first] || '' }
+        })
+      }
+    }
     setSaving(false)
     onSaved(next)
   }
 
+  // The plain-web preview cannot store keys at all — just say so
+  if (!config.keysSupported) {
+    return (
+      <div className="ai-settings">
+        <p className="ai-settings-note">{t('ai.calloutMock')}</p>
+        <div className="ai-settings-actions">
+          <button className="btn-secondary" onClick={onClose}>
+            {t('app.cancel')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="ai-settings">
-      <label className="ai-field">
-        <span>{t('ai.provider')}</span>
-        <select value={provider} onChange={(e) => pickProvider(e.target.value as AiProviderId)}>
-          {providerLabels().map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {provider !== 'mock' && (
-        <div className="ai-field-group">
+      <div className="ai-settings-heading">{t('ai.keysTitle')}</div>
+      <p className="ai-field-hint">
+        {t('ai.keyCapHint')}{' '}
+        {KEY_PROVIDERS.map(({ id }, i) => (
+          <span key={id}>
+            {i > 0 && ' · '}
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                bridge.openExternal(SPEND_CAP_URLS[id]!)
+              }}
+            >
+              {id === 'anthropic' ? 'Anthropic' : id === 'openai' ? 'OpenAI' : 'Azure'}
+            </a>
+          </span>
+        ))}
+      </p>
+      {KEY_PROVIDERS.map(({ id, name }) => (
+        <div className="ai-field-group" key={id}>
           <label className="ai-field">
-            <span>{t('ai.apiKey')}</span>
+            <span>{name}</span>
             <input
               type="password"
-              value={key}
-              placeholder={config.hasKey[provider] ? t('ai.keySaved') : t('ai.keyNew')}
-              onChange={(e) => setKey(e.target.value)}
+              value={keys[id]}
+              placeholder={config.hasKey[id] ? t('ai.keySaved') : t('ai.keyNew')}
+              onChange={(e) => setKeys((k) => ({ ...k, [id]: e.target.value }))}
               spellCheck={false}
             />
           </label>
-          <p className="ai-field-hint">
-            {t('ai.keyCapHint')}
-            {SPEND_CAP_URLS[provider] && (
-              <>
-                {' '}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    bridge.openExternal(SPEND_CAP_URLS[provider]!)
-                  }}
-                >
-                  {t('ai.keyCapLink')}
-                </a>
-              </>
-            )}
-          </p>
+          {id === 'azure' && (
+            <>
+              <label className="ai-field">
+                <span>{t('ai.endpoint')}</span>
+                <input
+                  value={endpoint}
+                  placeholder="https://…openai.azure.com"
+                  onChange={(e) => setEndpoint(e.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+              <label className="ai-field">
+                <span>{t('ai.deployment')}</span>
+                <input
+                  value={deployment}
+                  onChange={(e) => setDeployment(e.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+            </>
+          )}
         </div>
-      )}
-      {provider !== 'azure' && provider !== 'mock' && (
-        <label className="ai-field">
-          <span>{t('ai.model')}</span>
-          <select value={model} onChange={(e) => setModel(e.target.value)}>
-            {MODELS[provider].map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-            {!MODELS[provider].some((m) => m.id === model) && model && (
-              <option value={model}>{model}</option>
-            )}
-          </select>
-        </label>
-      )}
-      {thinkingApplies && (
-        <label className="ai-field">
-          <span>{t('ai.reasoning')}</span>
-          <select value={thinking} onChange={(e) => setThinking(e.target.value as ThinkingLevel)}>
-            {THINKING_LEVELS.map((l) => (
-              <option key={l.id} value={l.id}>
-                {t(l.key)}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {provider === 'azure' && (
-        <>
-          <label className="ai-field">
-            <span>{t('ai.endpoint')}</span>
-            <input
-              value={endpoint}
-              placeholder="https://…openai.azure.com"
-              onChange={(e) => setEndpoint(e.target.value)}
-              spellCheck={false}
-            />
-          </label>
-          <label className="ai-field">
-            <span>{t('ai.deployment')}</span>
-            <input
-              value={deployment}
-              onChange={(e) => setDeployment(e.target.value)}
-              spellCheck={false}
-            />
-          </label>
-        </>
-      )}
+      ))}
       <p className="ai-settings-note">
         {t('ai.settingsNote')}
-        {provider !== 'mock' &&
-          (config.encryptionAvailable ? (
-            t('ai.settingsNoteEncrypted')
-          ) : (
-            <strong>{t('ai.encryptionWarn')}</strong>
-          ))}
+        {config.encryptionAvailable ? (
+          t('ai.settingsNoteEncrypted')
+        ) : (
+          <strong>{t('ai.encryptionWarn')}</strong>
+        )}
       </p>
       <div className="ai-settings-actions">
         <button className="btn-secondary" onClick={onClose}>
@@ -527,8 +527,11 @@ interface ModelMenuProps {
   onOpenSettings(): void
 }
 
-/** Small popover under the header model chip: switch model + reasoning effort
- *  for the current provider without opening full settings. */
+/** Popover under the header model chip: EVERY provider's models in one flat
+ *  list (keyless providers greyed out) plus reasoning effort. Selecting a
+ *  model from another provider switches provider too — the chat history is
+ *  resent in full on the next question, so mid-chat switches are safe.
+ *  Keys/providers are managed in the key settings (button at the bottom). */
 function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuProps): React.JSX.Element {
   useLang()
   const ref = useRef<HTMLDivElement>(null)
@@ -542,7 +545,7 @@ function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuP
 
   const provider = config.provider
   const model = config.models[provider] ?? ''
-  const models = MODELS[provider] ?? []
+  const anyKey = KEY_PROVIDERS.some((p) => config.hasKey[p.id])
   // Haiku ignores reasoning effort; mock has none — mirror AiSettings
   const thinkingApplies = !/haiku/i.test(model) && provider !== 'mock'
 
@@ -550,22 +553,56 @@ function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuP
     void bridge.aiSetConfig(p).then(onSaved)
   }
 
+  // One flat <select> across providers; option values are "<provider>:<id>".
+  // Azure has no curated list — its configured deployment is the entry.
+  const value = provider === 'azure' ? `azure:${config.azure.deployment}` : `${provider}:${model}`
+  const pick = (v: string): void => {
+    const sep = v.indexOf(':')
+    const p = v.slice(0, sep) as AiProviderId
+    const id = v.slice(sep + 1)
+    patch(p === 'azure' ? { provider: p } : { provider: p, models: { ...config.models, [p]: id } })
+  }
+
+  const groups = KEY_PROVIDERS.map(({ id, name }) => {
+    const options = MODELS[id].map((m) => ({ value: `${id}:${m.id}`, label: m.label }))
+    if (id === 'azure' && config.azure.deployment)
+      options.push({ value: `azure:${config.azure.deployment}`, label: config.azure.deployment })
+    // A custom model id typed in an older version still shows up
+    if (id === provider && id !== 'azure' && model && !MODELS[id].some((m) => m.id === model))
+      options.push({ value: `${id}:${model}`, label: model })
+    return { id: id as string, name, options, enabled: config.hasKey[id] }
+    // Platforms that cannot store keys (plain-web preview) hide the keyless
+    // real providers instead of greying them — there is no way to enable them
+  }).filter((g) => g.options.length > 0 && (config.keysSupported || g.enabled))
+  if (provider === 'mock' || !config.keysSupported)
+    groups.push({
+      id: 'mock',
+      name: t('ai.providerMock'),
+      options: MODELS.mock.map((m) => ({ value: `mock:${m.id}`, label: m.label })),
+      enabled: true
+    })
+
   return (
     <div className="ai-model-menu" ref={ref}>
-      <label className="ai-field">
-        <span>{t('ai.model')}</span>
-        <select
-          value={model}
-          onChange={(e) => patch({ models: { ...config.models, [provider]: e.target.value } })}
-        >
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-          {!models.some((m) => m.id === model) && model && <option value={model}>{model}</option>}
-        </select>
-      </label>
+      {anyKey || provider === 'mock' || !config.keysSupported ? (
+        <label className="ai-field">
+          <span>{t('ai.model')}</span>
+          <select value={value} onChange={(e) => pick(e.target.value)}>
+            {groups.map((g) => (
+              <optgroup key={g.id} label={g.enabled ? g.name : `${g.name} — ${t('ai.keyMissing')}`}>
+                {g.options.map((o) => (
+                  <option key={o.value} value={o.value} disabled={!g.enabled}>
+                    {o.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      ) : (
+        // No key anywhere: nothing to pick yet — send them to the key manager
+        <p className="ai-model-menu-note">{t('ai.noKeysYet')}</p>
+      )}
       {thinkingApplies && (
         <label className="ai-field">
           <span>{t('ai.reasoning')}</span>
@@ -582,7 +619,7 @@ function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuP
         </label>
       )}
       <button className="ai-model-more" onClick={onOpenSettings}>
-        {t('ai.settingsTip')}
+        {anyKey ? t('ai.keysTitle') : t('ai.calloutCta')}
       </button>
     </div>
   )
@@ -608,6 +645,8 @@ interface PanelProps {
   /** Bumped by the viewer (sidebar ✦) to fire the annotations question */
   annotsAskId: number
   getAnnotationsText(): Promise<string | null>
+  /** Bumped from outside (gear menu, search) to open the key settings view */
+  openSettingsAskId: number
   onCitationClick(resolved: ResolvedCitation): void
   onClose(): void
 }
@@ -630,6 +669,7 @@ export default function AiPanel({
   hasAnnotations,
   annotsAskId,
   getAnnotationsText,
+  openSettingsAskId,
   onCitationClick,
   onClose
 }: PanelProps): React.JSX.Element | null {
@@ -793,6 +833,16 @@ export default function AiPanel({
     lastAnnotsAskRef.current = annotsAskId
     void sendAnnots()
   }, [open, annotsAskId, sendAnnots])
+
+  // Gear menu / search bump openSettingsAskId to land in the key settings
+  const lastSettingsAskRef = useRef(openSettingsAskId)
+  useEffect(() => {
+    if (!open || openSettingsAskId === lastSettingsAskRef.current) return
+    lastSettingsAskRef.current = openSettingsAskId
+    setShowSettings(true)
+    setShowHistory(false)
+    setShowModelMenu(false)
+  }, [open, openSettingsAskId])
 
   // Write-through: persist only settled states (never mid-stream). An aborted
   // send still settles (error message appended, busy=false) and is persisted.
@@ -977,12 +1027,6 @@ export default function AiPanel({
             disabled={!config}
             onClick={() => {
               if (!config) return
-              // Azure has no curated model list — send them to full settings
-              if (config.provider === 'azure') {
-                setShowSettings(true)
-                setShowHistory(false)
-                return
-              }
               setShowModelMenu((s) => !s)
             }}
           >
@@ -993,7 +1037,7 @@ export default function AiPanel({
                   : prettyModelName(config.provider, config.models[config.provider] ?? '')
                 : ''}
             </span>
-            {config && config.provider !== 'azure' && <IconChevronDown size={11} />}
+            {config && <IconChevronDown size={11} />}
           </button>
           {showModelMenu && config && (
             <ModelQuickMenu

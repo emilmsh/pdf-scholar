@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
-  AiConfigView,
   LanguagePreference,
   Settings,
   ThemeName,
@@ -20,7 +19,6 @@ import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import { READ_ALOUD } from '../flags'
-import { AiSettings } from './AiPanel'
 import { updateOutcomeText } from './Welcome'
 import {
   IconArrowLeft,
@@ -153,6 +151,8 @@ interface Props {
   onToggleReadAloud(): void
   aiOpen: boolean
   onToggleAi(): void
+  /** Open the assistant panel showing its key settings (gear-menu shortcut) */
+  onOpenAiSettings(): void
   /** Toolbar auto-hide: pinned = always shown, unpinned = reveals on hover */
   toolbarPinned: boolean
   onTogglePin(): void
@@ -222,6 +222,7 @@ export default function Toolbar({
   onToggleReadAloud,
   aiOpen,
   onToggleAi,
+  onOpenAiSettings,
   toolbarPinned,
   onTogglePin,
   onPresent,
@@ -238,7 +239,6 @@ export default function Toolbar({
   const [appVersion, setAppVersion] = useState('')
   const [updChecking, setUpdChecking] = useState(false)
   const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
-  const [aiConfig, setAiConfig] = useState<AiConfigView | null>(null)
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
@@ -319,14 +319,6 @@ export default function Toolbar({
       .finally(() => setUpdChecking(false))
   }
 
-  // The gear menu embeds the AI settings inline — (re)fetch the config each
-  // time it opens so the form always mounts with the stored state (it may
-  // have changed from the AI panel since last time)
-  useEffect(() => {
-    if (!settingsMenuOpen) return
-    setAiConfig(null)
-    void bridge.aiGetConfig().then(setAiConfig)
-  }, [settingsMenuOpen])
 
   const commitPage = (): void => {
     const n = parseInt(pageInput, 10)
@@ -802,26 +794,21 @@ export default function Toolbar({
 
               <div className="theme-menu-sep" />
 
-              <div className="theme-menu-label">{t('ai.settingsTip')}</div>
-              {aiConfig && (
-                <AiSettings
-                  config={aiConfig}
-                  onSaved={(next) => {
-                    setAiConfig(next)
-                    setSettingsMenuOpen(false)
-                  }}
-                  onClose={() => setSettingsMenuOpen(false)}
-                />
-              )}
-
+              <button
+                className="menu-action"
+                onClick={() => {
+                  setSettingsMenuOpen(false)
+                  onOpenAiSettings()
+                }}
+              >
+                <IconSparkle size={15} />
+                {t('ai.keysTitle')}
+              </button>
               {isElectron && (
-                <>
-                  <div className="theme-menu-sep" />
-                  <button className="menu-action" onClick={checkForUpdates} disabled={updChecking}>
-                    <IconReload size={15} />
-                    {updChecking ? t('update.checking') : t('update.check')}
-                  </button>
-                </>
+                <button className="menu-action" onClick={checkForUpdates} disabled={updChecking}>
+                  <IconReload size={15} />
+                  {updChecking ? t('update.checking') : t('update.check')}
+                </button>
               )}
               {updOutcome && <div className="menu-hint">{updateOutcomeText(updOutcome)}</div>}
 
