@@ -1,6 +1,7 @@
 # Tag v* → build every desktop target + the extension zips, and create a
-# DRAFT GitHub Release holding all assets. Emil reviews and publishes the
-# draft manually. Asset-name contracts (do not break):
+# DRAFT GitHub Release holding all assets. The draft's notes lead with a
+# per-platform download table; it is reviewed and published from the repo
+# (gh release edit <tag> --draft=false). Asset-name contracts (do not break):
 #   PDF-Scholar-Setup-<version>.exe   — universal x64+arm64 NSIS installer
 #   pdf-scholar-extension.zip         — version-stable name; README's
 #                                       releases/latest/download/ button
@@ -74,9 +75,35 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create '${{ github.ref_name }}' \
-            --repo '${{ github.repository }}' \
+          TAG='${{ github.ref_name }}'
+          REPO='${{ github.repository }}'
+          gh release create "$TAG" \
+            --repo "$REPO" \
             --draft \
-            --title 'PDF Scholar ${{ github.ref_name }}' \
+            --title "PDF Scholar $TAG" \
             --generate-notes \
             artifacts/*
+          # Prepend a per-platform download table: the raw asset list is
+          # cryptic to non-developers (AppImage? blockmap?), so the notes
+          # lead with exactly one link per platform and wave the rest off.
+          VERSION="${TAG#v}"
+          BASE="https://github.com/$REPO/releases/download/$TAG"
+          {
+            cat <<EOF
+          ## Downloads — which file do I need?
+
+          | Platform | Download |
+          |---|---|
+          | **Windows** 10/11 (x64 & arm64) | [PDF-Scholar-Setup-$VERSION.exe]($BASE/PDF-Scholar-Setup-$VERSION.exe) |
+          | **macOS** — Apple Silicon (M1 and newer) | [PDF-Scholar-$VERSION-arm64.dmg]($BASE/PDF-Scholar-$VERSION-arm64.dmg) |
+          | **macOS** — Intel | [PDF-Scholar-$VERSION-x64.dmg]($BASE/PDF-Scholar-$VERSION-x64.dmg) |
+          | **Linux** — any distribution | [PDF-Scholar-$VERSION.AppImage]($BASE/PDF-Scholar-$VERSION.AppImage) (make executable and run — no install needed) |
+          | **Linux** — Debian/Ubuntu | [PDF-Scholar-$VERSION.deb]($BASE/PDF-Scholar-$VERSION.deb) |
+          | **Browser extension** — Edge/Chrome | [pdf-scholar-extension.zip]($BASE/pdf-scholar-extension.zip) (unzip, then "Load unpacked" at \`edge://extensions\`) |
+
+          <sub>The remaining files are plumbing: \`latest*.yml\` + \`.exe.blockmap\` drive the built-in auto-updater, and \`pdf-scholar-extension-store.zip\` is the store-submission variant. You never need to download them.</sub>
+
+          EOF
+            gh release view "$TAG" --repo "$REPO" --json body --jq .body
+          } > /tmp/notes.md
+          gh release edit "$TAG" --repo "$REPO" --notes-file /tmp/notes.md
