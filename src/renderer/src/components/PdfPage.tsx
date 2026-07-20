@@ -18,6 +18,19 @@ const SVG_NS = 'http://www.w3.org/2000/svg'
 const MAX_CANVAS_DIM = 16384
 const MAX_CANVAS_AREA = 16384 * 16384
 
+// Zoom-OUT reuses the displayed bitmap while it's ≤ this factor denser than
+// the target (CSS downscale is sharp, so the step costs zero rasters). Beyond
+// it, re-raster immediately — zoomed far out, holding full-zoom bitmaps on
+// every mounted page would waste real memory. Zoom-IN always re-rasters at
+// exactly the new scale right away: speculative/headroom bitmaps were tried
+// (2026-07-20) and reverted — pinch commits arbitrary ratios that miss any
+// pre-rendered band, and the extra raster rounds made the gesture janky.
+const MAX_OVERSAMPLE = 2
+// Once a zoom-out pause lasts this long, re-raster at exactly the current
+// scale. Text sharpness is king: the downscaled bitmap is a mid-gesture
+// convenience, never the resting state.
+const SETTLE_MS = 300
+
 interface Props {
   pdf: PDFDocumentProxy
   /** Document path — key into the PDFium raster registry (spike flag only) */
@@ -104,6 +117,18 @@ function PdfPage({
   scaleRef.current = scale
   const rotationRef = useRef(rotation)
   rotationRef.current = rotation
+  // What the displayed bitmap was rastered as. Lets a zoom step reuse a
+  // still-dense-enough bitmap (CSS downscale is sharp) instead of re-rastering,
+  // and marks zoom re-rasters (same rotation/annots context) for headroom.
+  const rasterInfoRef = useRef<{
+    scale: number
+    dpr: number
+    rotation: ViewRotation
+    hideAnnots: boolean
+  } | null>(null)
+  // Guards rasterInfo against a swapped document object (same component
+  // instance, new pdf) — density bookkeeping must never outlive its document.
+  const pdfIdentityRef = useRef<PDFDocumentProxy | null>(null)
   const strokeRef = useRef<{
     pointerId: number
     points: [number, number][]
@@ -148,40 +173,36 @@ function PdfPage({
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
+    if (pdfIdentityRef.current !== pdf) {
+      pdfIdentityRef.current = pdf
+      rasterInfoRef.current = null
+    }
     if (!active) {
       host.replaceChildren() // free the bitmap when far outside the viewport
+      rasterInfoRef.current = null
       return
     }
 
     let cancelled = false
     let renderTask: Cancellable | null = null
+    let settleTimer = 0
 
-    ;(async () => {
-      const page = await pdf.getPage(pageNumber)
-      if (cancelled) return
-      // Add the user rotation to the page's intrinsic /Rotate (don't replace
-      // it) — pdf.js swaps the viewport's width/height for 90°/270° so the
-      // canvas, text layer and link layer all come out rotated together.
-      const viewport = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 })
+    const onRasterError = (err: unknown): void => {
+      const name = err instanceof Error ? err.name : ''
+      if (!cancelled && name !== 'RenderingCancelledException' && name !== 'AbortException') {
+        console.error(`pdfx: klarte ikke å tegne side ${pageNumber}`, err)
+      }
+    }
 
-      // Target the screen's full pixel density for maximum sharpness, but let
-      // the adaptive controller trade it back toward native when the machine is
-      // struggling to keep raster times within budget. Then clamp so a large
-      // page at high zoom can't exceed Chromium's per-side / total-area canvas
-      // limits (which would render blank).
-      const cssPixels = viewport.width * viewport.height
-      const dpr = Math.max(
-        0.1,
-        Math.min(
-          chooseRenderDpr(cssPixels, window.devicePixelRatio || 1),
-          MAX_CANVAS_DIM / viewport.width,
-          MAX_CANVAS_DIM / viewport.height,
-          Math.sqrt(MAX_CANVAS_AREA / cssPixels)
-        )
-      )
-
-      // Render into a detached canvas and swap it in when finished, so the
-      // previous (CSS-stretched) bitmap stays visible during zoom — no flash.
+    /** Rasterise this page into a DETACHED canvas at the given device-pixel
+     *  scale. Returns null when cancelled or the engine produced nothing. */
+    const renderBitmap = async (
+      page: PDFPageProxy,
+      viewport: ReturnType<PDFPageProxy['getViewport']>,
+      dpr: number
+    ): Promise<HTMLCanvasElement | null> => {
+      // Render off-DOM so the previous bitmap stays visible until the caller
+      // blits (show) or parks (speculative) the finished one — no flash.
       const canvas = document.createElement('canvas')
       canvas.width = Math.floor(viewport.width * dpr)
       canvas.height = Math.floor(viewport.height * dpr)
@@ -227,7 +248,7 @@ function PdfPage({
           performance.now() - startedAt
         )
       }
-      if (cancelled || !rasterOk) return
+      if (cancelled || !rasterOk) return null
       if (import.meta.env.DEV) {
         // Spike telemetry: per-raster samples for the engine comparison,
         // readable from the console as window.__rasterLog.
@@ -239,16 +260,97 @@ function PdfPage({
           px: canvas.width * canvas.height
         })
       }
-      host.replaceChildren(canvas)
-    })().catch((err: unknown) => {
-      const name = err instanceof Error ? err.name : ''
-      if (!cancelled && name !== 'RenderingCancelledException' && name !== 'AbortException') {
-        console.error(`pdfx: klarte ikke å tegne side ${pageNumber}`, err)
+      return canvas
+    }
+
+    /** Blit a finished bitmap into the displayed canvas and book its density.
+     *  Keep the DISPLAYED canvas element stable across re-rasters (zoom,
+     *  hide-annots): swapping the node tears down and rebuilds the composited
+     *  layer (.page-raster is an isolated blend/filter group), which can
+     *  flash for a frame. Resize + drawImage run in one synchronous task, so
+     *  the compositor never sees an intermediate state. First render (or
+     *  reactivation after scroll-out) has no canvas yet — append then. */
+    const show = (canvas: HTMLCanvasElement, dpr: number): void => {
+      const shown = host.firstElementChild
+      if (shown instanceof HTMLCanvasElement) {
+        shown.width = canvas.width
+        shown.height = canvas.height
+        shown.getContext('2d')?.drawImage(canvas, 0, 0)
+      } else {
+        host.replaceChildren(canvas)
       }
-    })
+      rasterInfoRef.current = { scale, dpr, rotation, hideAnnots }
+    }
+
+    ;(async () => {
+      const page = await pdf.getPage(pageNumber)
+      if (cancelled) return
+      // Add the user rotation to the page's intrinsic /Rotate (don't replace
+      // it) — pdf.js swaps the viewport's width/height for 90°/270° so the
+      // canvas, text layer and link layer all come out rotated together.
+      const viewport = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 })
+
+      // Target the screen's full pixel density for maximum sharpness, but let
+      // the adaptive controller trade it back toward native when the machine is
+      // struggling to keep raster times within budget. Then clamp so a large
+      // page at high zoom can't exceed Chromium's per-side / total-area canvas
+      // limits (which would render blank).
+      const cssPixels = viewport.width * viewport.height
+      const clampDpr = (d: number): number =>
+        Math.max(
+          0.1,
+          Math.min(
+            d,
+            MAX_CANVAS_DIM / viewport.width,
+            MAX_CANVAS_DIM / viewport.height,
+            Math.sqrt(MAX_CANVAS_AREA / cssPixels)
+          )
+        )
+      const baseDpr = clampDpr(chooseRenderDpr(cssPixels, window.devicePixelRatio || 1))
+
+      // Text sharpness is king: a downscaled bitmap is never quite
+      // native-crisp, so the zoom-out reuse below is a TRANSIENT state for
+      // mid-gesture smoothness only. The settle timer guarantees that once the
+      // user pauses, the page re-rasters at exactly the current scale — the
+      // resting state is always a grid-aligned native raster.
+      const settleToExact = (): void => {
+        window.clearTimeout(settleTimer)
+        settleTimer = window.setTimeout(() => {
+          void (async () => {
+            const bitmap = await renderBitmap(page, viewport, baseDpr)
+            if (bitmap && !cancelled) show(bitmap, baseDpr)
+          })().catch(onRasterError)
+        }, SETTLE_MS)
+      }
+
+      // Zoom-out fast path: if the displayed bitmap (same rotation/annots
+      // context) is at least as dense as this scale needs, show it downscaled
+      // NOW (sharp, instant, zero rasters mid-gesture) and settle to exact
+      // after the pause. Past MAX_OVERSAMPLE we re-raster immediately instead —
+      // dragging a huge bitmap through more zoom-outs wastes memory and GPU.
+      // Zoom-in falls through to an immediate exact raster: the fresh bitmap
+      // blits in as soon as it's ready (the old one stays visible meanwhile).
+      const prev = rasterInfoRef.current
+      const isZoomStep =
+        prev !== null &&
+        host.firstElementChild instanceof HTMLCanvasElement &&
+        prev.rotation === rotation &&
+        prev.hideAnnots === hideAnnots
+      if (isZoomStep) {
+        const have = prev.scale * prev.dpr
+        const need = scale * baseDpr
+        if (have >= need && have <= need * MAX_OVERSAMPLE) {
+          if (have > need * (1 + 1e-6)) settleToExact()
+          return
+        }
+      }
+      const bitmap = await renderBitmap(page, viewport, baseDpr)
+      if (bitmap && !cancelled) show(bitmap, baseDpr)
+    })().catch(onRasterError)
 
     return () => {
       cancelled = true
+      window.clearTimeout(settleTimer)
       renderTask?.cancel()
     }
   }, [pdf, docKey, pageNumber, scale, rotation, active, hideAnnots])
