@@ -49,8 +49,14 @@
 
 /* «Natt» — the softer dark mode: warm dark chrome (Claude dark), page
    inversion stops short of full so the background is near-black and the
-   text off-white — no contrast() in the filter, which is what made
-   glyphs look fuzzy before */
+   text off-white. invert(0.89) compresses the tone range to 78%, which at
+   low zoom (where glyph strokes are all anti-aliased mid-greys) costs the
+   text visible contrast vs day mode. The trailing contrast(1.02)
+   brightness(1.08) pair is calibrated so the paper tone stays pixel-
+   identical (#1c1c1c) while the text end stretches from #e2 to #f5 —
+   measured on composited pixels, small-text stroke contrast +9%. A larger
+   lone contrast() was tried before and made glyphs fuzzy (it darkens the
+   faint AA pixels below its midpoint pivot); this pair never darkens. */
 :root[data-theme='night'] {
   --bg-chrome: #262624;
   --bg-canvas: #1c1c1b;
@@ -63,7 +69,7 @@
   --hover: rgba(255, 255, 255, 0.07);
   --active: rgba(255, 255, 255, 0.12);
   --page-bg: #21211f;
-  --page-filter: invert(0.89) hue-rotate(180deg);
+  --page-filter: invert(0.89) hue-rotate(180deg) contrast(1.02) brightness(1.08);
   --bg-titlebar: #21211f;
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 16px rgba(0, 0, 0, 0.45);
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 255, 255, 0.2);
@@ -1224,16 +1230,18 @@ button {
   background: var(--hover);
 }
 
-/* Full-window modal host (AI settings from the gear menu). Portaled to <body>
-   — position:fixed would be trapped by the toolbar-wrap transform. */
-.app-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
+/* The gear menu hosts the AI settings form inline (between dividers, like
+   the other settings) — wide enough for the form, scrollable when a small
+   window can't fit the whole menu. */
+.settings-menu {
+  width: 316px;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+}
+
+.settings-menu .ai-settings {
+  padding: 8px 0 2px;
+  overflow-y: visible;
 }
 
 /* Viewer body: sidebar + pages side by side */
@@ -3992,16 +4000,20 @@ button {
   }
 }
 
-/* Anchors the invisible link overlays to the slide's exact canvas box */
+/* Anchors the invisible link overlays to the slide's exact canvas box.
+   The drop shadow lives HERE, not on the canvas: a CSS filter applies to
+   the element's whole rendering including its own box-shadow, so a shadow
+   on the filtered canvas gets inverted into a white glow in night mode. */
 .presentation-page {
   position: relative;
   line-height: 0;
+  border-radius: 2px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
 }
 
 .presentation-canvas {
   /* Match the reading view's page recolouring (night inverts, sepia warms) */
   filter: var(--page-filter, none);
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
   border-radius: 2px;
 }
 

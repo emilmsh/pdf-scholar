@@ -63,21 +63,27 @@ export function resolveCitation(
   if (citation.kind === 'quote') {
     const pageIndex = citation.pageNumber - 1
     if (pageIndex < 0 || pageIndex >= pages.length) return null
-    const pageText = pages[pageIndex].text
-    // Fast path: exact, case-insensitive
-    const exact = pageText.toLowerCase().indexOf(citation.quote.toLowerCase())
-    if (exact !== -1) {
-      return { pageNumber: citation.pageNumber, start: exact, end: exact + citation.quote.length }
+    // Models are usually right about the page but "verbatim" quotes get
+    // normalized (curly quotes, collapsed breaks, expanded ligatures),
+    // truncated with an ellipsis, or land one page off (the page-marker
+    // offset, or a passage straddling a page break). Try progressively
+    // looser anchors — cited page first, then neighbours — and give up
+    // rather than guess: every fallback match must be UNIQUE on its page,
+    // so a miss degrades to the page jump, never to a wrong highlight.
+    const candidates = [pageIndex, pageIndex - 1, pageIndex + 1].filter(
+      (i) => i >= 0 && i < pages.length
+    )
+    for (const pi of candidates) {
+      const hit = locateQuote(citation.quote, pages[pi].text, pi !== pageIndex)
+      if (hit) return { pageNumber: pi + 1, ...hit }
     }
-    // Robust path: models normalize "verbatim" quotes (curly quotes, collapsed
-    // line breaks) while the PDF text has raw whitespace and soft hyphens —
-    // match on a normalized copy and map offsets back to the original.
-    const { norm, map } = normalizeWithMap(pageText)
-    const needle = foldChars(citation.quote).replace(/\s+/g, ' ').trim().toLowerCase()
-    if (needle.length < 3) return null
-    const at = norm.indexOf(needle)
-    if (at === -1) return null
-    return { pageNumber: citation.pageNumber, start: map[at], end: map[at + needle.length - 1] + 1 }
+    for (const needle of fallbackNeedles(citation.quote)) {
+      for (const pi of candidates) {
+        const hit = locateQuote(needle, pages[pi].text, true)
+        if (hit) return { pageNumber: pi + 1, ...hit }
+      }
+    }
+    return null
   }
   // char kind: find the page whose range contains the citation start.
   // Offsets inside the leading "[Side 1]" marker clamp to the first page.
@@ -95,6 +101,80 @@ export function resolveCitation(
   return { pageNumber: pageIndex + 1, start: Math.max(0, start), end }
 }
 
+/** Locate `quote` in `pageText`: exact case-insensitive first, then on the
+ *  normalized copy with offsets mapped back to the original text. With
+ *  `requireUnique`, a needle that occurs more than once on the page is
+ *  rejected — used for every anchor except the full quote on its cited page,
+ *  so fallbacks can never highlight the wrong occurrence. */
+function locateQuote(
+  quote: string,
+  pageText: string,
+  requireUnique: boolean
+): { start: number; end: number } | null {
+  const lower = pageText.toLowerCase()
+  const q = quote.toLowerCase()
+  const exact = lower.indexOf(q)
+  if (exact !== -1 && (!requireUnique || lower.indexOf(q, exact + 1) === -1)) {
+    return { start: exact, end: exact + quote.length }
+  }
+  const { norm, map } = normalizeWithMap(pageText)
+  const needle = normalizeNeedle(quote)
+  if (needle.length < 3) return null
+  const at = norm.indexOf(needle)
+  if (at === -1) return null
+  if (requireUnique && norm.indexOf(needle, at + 1) !== -1) return null
+  return { start: map[at], end: map[at + needle.length - 1] + 1 }
+}
+
+/** Looser anchors for a quote that failed as a whole, strongest first: the
+ *  longest verbatim segment of an ellipsis-shortened quote, then a prefix or
+ *  suffix slice for quotes whose other end the model paraphrased. All of
+ *  them are matched with the uniqueness requirement. */
+function fallbackNeedles(quote: string): string[] {
+  const out: string[] = []
+  // "start … end" — the segments are still claimed verbatim by the model;
+  // try all of them, longest (most specific) first
+  const segments = quote.split(/\s*(?:\.{3,}|…|\[…\]|\[\.{3}\])\s*/)
+  if (segments.length > 1) {
+    out.push(
+      ...segments
+        .map((s) => s.trim())
+        .filter((s) => normalizeNeedle(s).length >= 12)
+        .sort((a, b) => b.length - a.length)
+    )
+  }
+  // Head/tail anchors only for quotes long enough that a 64-char slice is a
+  // genuinely partial (and plausibly unique) anchor
+  if (normalizeNeedle(quote).length >= 48) {
+    const head = quote.slice(0, 64).replace(/\S+$/, '').trim()
+    const tail = quote.slice(-64).replace(/^\S+/, '').trim()
+    if (normalizeNeedle(head).length >= 24) out.push(head)
+    if (normalizeNeedle(tail).length >= 24) out.push(tail)
+  }
+  return out
+}
+
+/** Quote-side normalization: same folds as the page text, no map needed */
+function normalizeNeedle(s: string): string {
+  let folded = foldChars(s).toLowerCase()
+  for (const [lig, expansion] of Object.entries(LIGATURES)) {
+    folded = folded.replaceAll(lig, expansion)
+  }
+  return folded.replace(/\s+/g, ' ').trim()
+}
+
+/** Single-glyph ligatures PDF text layers expose where models write the
+ *  expanded letters (LaTeX PDFs are full of ﬁ/ﬀ/ﬃ) */
+const LIGATURES: Record<string, string> = {
+  'ﬀ': 'ff',
+  'ﬁ': 'fi',
+  'ﬂ': 'fl',
+  'ﬃ': 'ffi',
+  'ﬄ': 'ffl',
+  'ﬅ': 'ft',
+  'ﬆ': 'st'
+}
+
 /** 1:1 char folds so normalized offsets map back to the original text */
 function foldChars(s: string): string {
   return s
@@ -104,8 +184,10 @@ function foldChars(s: string): string {
     .replace(/ /g, ' ')
 }
 
-/** Lowercased, soft-hyphen-stripped, whitespace-collapsed copy of `text`,
- *  plus map[i] = offset in the original text of normalized char i. */
+/** Lowercased, soft-hyphen-stripped, whitespace-collapsed copy of `text`
+ *  with ligatures expanded and end-of-line hyphenation joined, plus
+ *  map[i] = offset in the original text of normalized char i (ligature
+ *  expansions repeat the ligature's offset). */
 function normalizeWithMap(text: string): { norm: string; map: number[] } {
   const folded = foldChars(text).toLowerCase()
   let norm = ''
@@ -114,6 +196,18 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
   for (let i = 0; i < folded.length; i++) {
     const ch = folded[i]
     if (ch === '­') continue // soft hyphen
+    // End-of-line hyphenation: "effi-\ncient" → "efficient". Only join when
+    // the hyphen sits directly before a line break and the continuation
+    // starts with a lowercase letter (checked on the ORIGINAL text — folded
+    // is lowercased) — a dash before "The" is punctuation, not hyphenation.
+    if (ch === '-' && folded[i + 1] === '\n') {
+      let j = i + 1
+      while (j < folded.length && /\s/.test(folded[j])) j++
+      if (j < folded.length && /\p{Ll}/u.test(text[j])) {
+        i = j - 1 // skip the hyphen and the break; no space is inserted
+        continue
+      }
+    }
     if (/\s/.test(ch)) {
       pendingSpace = norm.length > 0
       continue
@@ -123,8 +217,16 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
       map.push(i)
       pendingSpace = false
     }
-    norm += ch
-    map.push(i)
+    const expansion = LIGATURES[ch]
+    if (expansion) {
+      for (const c of expansion) {
+        norm += c
+        map.push(i)
+      }
+    } else {
+      norm += ch
+      map.push(i)
+    }
   }
   return { norm, map }
 }

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type {
   AiConfigView,
   LanguagePreference,
@@ -240,7 +239,6 @@ export default function Toolbar({
   const [updChecking, setUpdChecking] = useState(false)
   const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
   const [aiConfig, setAiConfig] = useState<AiConfigView | null>(null)
-  const [aiModalOpen, setAiModalOpen] = useState(false)
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
@@ -321,13 +319,14 @@ export default function Toolbar({
       .finally(() => setUpdChecking(false))
   }
 
-  const openAiSettings = (): void => {
-    setSettingsMenuOpen(false)
-    void bridge.aiGetConfig().then((view) => {
-      setAiConfig(view)
-      setAiModalOpen(true)
-    })
-  }
+  // The gear menu embeds the AI settings inline — (re)fetch the config each
+  // time it opens so the form always mounts with the stored state (it may
+  // have changed from the AI panel since last time)
+  useEffect(() => {
+    if (!settingsMenuOpen) return
+    setAiConfig(null)
+    void bridge.aiGetConfig().then(setAiConfig)
+  }, [settingsMenuOpen])
 
   const commitPage = (): void => {
     const n = parseInt(pageInput, 10)
@@ -803,15 +802,26 @@ export default function Toolbar({
 
               <div className="theme-menu-sep" />
 
-              <button className="menu-action" onClick={openAiSettings}>
-                <IconSparkle size={15} />
-                {t('ai.settingsTip')} …
-              </button>
+              <div className="theme-menu-label">{t('ai.settingsTip')}</div>
+              {aiConfig && (
+                <AiSettings
+                  config={aiConfig}
+                  onSaved={(next) => {
+                    setAiConfig(next)
+                    setSettingsMenuOpen(false)
+                  }}
+                  onClose={() => setSettingsMenuOpen(false)}
+                />
+              )}
+
               {isElectron && (
-                <button className="menu-action" onClick={checkForUpdates} disabled={updChecking}>
-                  <IconReload size={15} />
-                  {updChecking ? t('update.checking') : t('update.check')}
-                </button>
+                <>
+                  <div className="theme-menu-sep" />
+                  <button className="menu-action" onClick={checkForUpdates} disabled={updChecking}>
+                    <IconReload size={15} />
+                    {updChecking ? t('update.checking') : t('update.check')}
+                  </button>
+                </>
               )}
               {updOutcome && <div className="menu-hint">{updateOutcomeText(updOutcome)}</div>}
 
@@ -842,27 +852,6 @@ export default function Toolbar({
         </button>
       </div>
 
-      {/* AI setup modal (same panel as the welcome screen); portaled to <body>
-          because .toolbar-wrap animates with a transform, which would trap a
-          position:fixed backdrop */}
-      {aiModalOpen &&
-        aiConfig &&
-        createPortal(
-          <div className="app-modal-backdrop" onMouseDown={() => setAiModalOpen(false)}>
-            <div className="welcome-ai-modal" onMouseDown={(e) => e.stopPropagation()}>
-              <header className="welcome-ai-modal-head">
-                <IconSparkle size={16} />
-                <span>{t('ai.settingsTip')}</span>
-              </header>
-              <AiSettings
-                config={aiConfig}
-                onSaved={() => setAiModalOpen(false)}
-                onClose={() => setAiModalOpen(false)}
-              />
-            </div>
-          </div>,
-          document.body
-        )}
     </div>
   )
 }

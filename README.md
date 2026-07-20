@@ -108,8 +108,6 @@ the current desktop-vs-extension parity.
   assistant
 - Table of contents, thumbnails, and back/forward navigation (Alt+← / Alt+→) after
   following internal links
-- **Read aloud** (R): sentence-by-sentence speech with the highlight following along,
-  auto-detected Norwegian/English voice and speed control
 - Remembers your reading position and recent files; a **library** home screen collects
   what you've been reading
 - Tabs for several open documents, plus multiple windows — and you can **drag a tab out
@@ -137,7 +135,8 @@ the current desktop-vs-extension parity.
 **Search & the web**
 - In-document search (Ctrl+F): match case, whole word (Norwegian æøå-safe), a results
   list with excerpts, jump-to-hit, F3 / Shift+F3
-- **Web search in a side panel** — look something up without leaving the document
+- **AI search**: describe a topic in your own words and get the passages that discuss
+  it, ranked and clickable (uses your own API key, like the assistant)
 - Selection menu: copy, search the web, dictionary, translate, and the AI actions below
 
 **AI assistant (bring your own key)**

@@ -2454,6 +2454,17 @@ export default function PdfViewer({
     }
   }, [])
 
+  // In the browser/extension the first Esc is consumed by the browser itself
+  // (it exits HTML fullscreen without delivering the keydown), which used to
+  // leave the presentation overlay behind for a second Esc. Losing fullscreen
+  // while presenting therefore exits the presentation too — one Esc does both.
+  useEffect(() => {
+    if (!presentation) return
+    return bridge.onFullScreen((fs) => {
+      if (!fs) exitPresentation()
+    })
+  }, [presentation, exitPresentation])
+
   const goToPage = useCallback(
     (page: number) => {
       const el = containerRef.current
