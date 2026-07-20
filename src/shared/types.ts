@@ -182,6 +182,23 @@ export type AiChatResult =
   | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string }
   | FileError
 
+/** Result of a manual "check for updates".
+ *  - available: newer version detected, not downloaded (offer a download)
+ *  - ready: an update is already downloaded and installs on quit/restart
+ *  - none: this is the latest version
+ *  - unsupported: this build doesn't self-update (dev run, unsigned macOS,
+ *    or Microsoft Store — the Store owns the update cycle there)
+ *  - error: the check itself failed (offline, rate-limited, …) */
+export interface UpdateCheckOutcome {
+  status: 'available' | 'ready' | 'none' | 'unsupported' | 'error'
+  /** Version on offer (available/ready) */
+  version?: string
+  /** Currently running app version */
+  current: string
+  /** Why self-update is unsupported, when status = 'unsupported' */
+  reason?: 'dev' | 'mac' | 'store'
+}
+
 export interface PdfxApi {
   openFileDialog(): Promise<FilePayload | FileError | null>
   readFile(path: string): Promise<FilePayload | FileError>
@@ -247,8 +264,18 @@ export interface PdfxApi {
   getPathForFile(file: File): string | null
   onOpenPath(cb: (path: string) => void): () => void
   // ---------- Auto-update (Electron only; no-ops elsewhere) ----------
-  /** Fires when an app update has been downloaded and will install on quit */
+  // Policy: checks are quiet and automatic, but DOWNLOADING an update is
+  // always the user's decision — nothing is fetched or installed silently.
+  /** Fires when a newer version has been detected (nothing downloaded yet) */
+  onUpdateAvailable(cb: (version: string) => void): () => void
+  /** Download progress for a user-initiated update download (0–100) */
+  onUpdateProgress(cb: (percent: number) => void): () => void
+  /** Fires when an update has been downloaded and will install on quit */
   onUpdateReady(cb: (version: string) => void): () => void
+  /** Manual "check for updates"; resolves with the outcome */
+  updateCheck(): Promise<UpdateCheckOutcome>
+  /** Start downloading the detected update (user consent) */
+  updateDownload(): void
   /** Quit and install the downloaded update now (no-op when none is ready) */
   updateRestart(): void
   // ---------- AI ----------

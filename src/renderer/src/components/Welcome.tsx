@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import type { AiConfigView, RecentFile } from '../../../shared/types'
-import { bridge } from '../bridge'
+import type { AiConfigView, RecentFile, UpdateCheckOutcome } from '../../../shared/types'
+import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
 import { AppMark, IconDocument, IconFolderOpen, IconSparkle } from './icons'
 import { AiSettings } from './AiPanel'
@@ -15,10 +15,40 @@ function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function updateOutcomeText(outcome: UpdateCheckOutcome): string {
+  switch (outcome.status) {
+    case 'none':
+      return t('update.upToDate', { current: outcome.current })
+    case 'available':
+      return t('update.checkAvailable', { version: outcome.version ?? '' })
+    case 'ready':
+      return t('update.checkReady', { version: outcome.version ?? '' })
+    case 'unsupported':
+      if (outcome.reason === 'store') return t('update.unsupportedStore')
+      if (outcome.reason === 'mac') return t('update.unsupportedMac')
+      return t('update.unsupportedDev')
+    case 'error':
+      return t('update.checkError')
+  }
+}
+
 export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props): React.JSX.Element {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showAiSetup, setShowAiSetup] = useState(false)
+  const [updateChecking, setUpdateChecking] = useState(false)
+  const [updateOutcome, setUpdateOutcome] = useState<UpdateCheckOutcome | null>(null)
+
+  const checkForUpdates = (): void => {
+    if (updateChecking) return
+    setUpdateChecking(true)
+    setUpdateOutcome(null)
+    void bridge
+      .updateCheck()
+      .then(setUpdateOutcome)
+      .catch(() => setUpdateOutcome({ status: 'error', current: '' }))
+      .finally(() => setUpdateChecking(false))
+  }
 
   // Load the AI config so we can invite first-time users to add a key. Gate the
   // invitation on "no key for the active provider" so it disappears once set up.
@@ -81,6 +111,19 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Manual update check — the app has no settings surface, so this
+            lives quietly at the bottom of the start screen. If a newer
+            version is found, the regular update toast (with its download
+            button) appears alongside the result text. */}
+        {isElectron && (
+          <div className="welcome-updates">
+            <button className="welcome-updates-btn" onClick={checkForUpdates} disabled={updateChecking}>
+              {updateChecking ? t('update.checking') : t('update.check')}
+            </button>
+            {updateOutcome && <span className="welcome-updates-result">{updateOutcomeText(updateOutcome)}</span>}
           </div>
         )}
       </div>

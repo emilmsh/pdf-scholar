@@ -548,6 +548,41 @@ button {
   border-top: 1px solid var(--border);
 }
 
+/* Manual update check — quiet footer line on the start screen */
+.welcome-updates {
+  margin-top: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.welcome-updates-btn {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.welcome-updates-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.welcome-updates-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.welcome-updates-result {
+  color: var(--text-secondary);
+}
+
 .recent-row {
   display: grid;
   grid-template-columns: auto 1fr auto;

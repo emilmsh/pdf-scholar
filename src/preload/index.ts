@@ -63,6 +63,20 @@ const api: PdfxApi = {
       ipcRenderer.removeListener('open-path', listener)
     }
   },
+  onUpdateAvailable: (cb: (version: string) => void) => {
+    const listener = (_e: unknown, version: string): void => cb(version)
+    ipcRenderer.on('update:available', listener)
+    return () => {
+      ipcRenderer.removeListener('update:available', listener)
+    }
+  },
+  onUpdateProgress: (cb: (percent: number) => void) => {
+    const listener = (_e: unknown, percent: number): void => cb(percent)
+    ipcRenderer.on('update:progress', listener)
+    return () => {
+      ipcRenderer.removeListener('update:progress', listener)
+    }
+  },
   onUpdateReady: (cb: (version: string) => void) => {
     const listener = (_e: unknown, version: string): void => cb(version)
     ipcRenderer.on('update:ready', listener)
@@ -70,6 +84,8 @@ const api: PdfxApi = {
       ipcRenderer.removeListener('update:ready', listener)
     }
   },
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateDownload: () => ipcRenderer.send('update:download'),
   updateRestart: () => ipcRenderer.send('update:restart'),
   aiGetConfig: () => ipcRenderer.invoke('ai:get-config'),
   aiSetConfig: (patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }) =>

@@ -96,11 +96,26 @@ export default function App(): React.JSX.Element {
   const [fullscreen, setFullscreen] = useState(false)
   useEffect(() => bridge.onFullScreen(setFullscreen), [])
 
-  // Auto-update (Electron only): a downloaded update installs itself on quit;
-  // the toast just says so and offers an immediate restart. Dismissing it
-  // changes nothing about the install-on-quit behavior.
-  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
-  useEffect(() => bridge.onUpdateReady(setUpdateVersion), [])
+  // Auto-update (Electron only). Checks run quietly in main, but downloading
+  // is the user's decision: available → "Last ned" button → downloading (with
+  // progress) → ready → "Start på nytt nå" (or it installs on quit).
+  // Dismissing the toast changes nothing about that flow — a completed
+  // download still announces itself, and install-on-quit still happens.
+  const [update, setUpdate] = useState<
+    | { phase: 'available'; version: string }
+    | { phase: 'downloading'; version: string; percent: number }
+    | { phase: 'ready'; version: string }
+    | null
+  >(null)
+  useEffect(() => bridge.onUpdateAvailable((version) => {
+    setUpdate((prev) => (prev && prev.phase !== 'available' ? prev : { phase: 'available', version }))
+  }), [])
+  useEffect(() => bridge.onUpdateProgress((percent) => {
+    setUpdate((prev) =>
+      prev && prev.phase !== 'ready' ? { phase: 'downloading', version: prev.version, percent } : prev
+    )
+  }), [])
+  useEffect(() => bridge.onUpdateReady((version) => setUpdate({ phase: 'ready', version })), [])
 
   // Keep the i18n store in sync with the language setting
   useEffect(() => {
@@ -411,20 +426,49 @@ export default function App(): React.JSX.Element {
       ) : (
         <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
       )}
-      {isElectron && updateVersion && (
+      {isElectron && update && (
         <div className="update-toast" role="status">
           <div className="update-toast-text">
-            <strong>{t('update.ready')}</strong>
-            <span>{t('update.body', { version: updateVersion })}</span>
+            {update.phase === 'available' && (
+              <>
+                <strong>{t('update.available')}</strong>
+                <span>{t('update.availableBody', { version: update.version })}</span>
+              </>
+            )}
+            {update.phase === 'downloading' && (
+              <>
+                <strong>{t('update.downloading')}</strong>
+                <span>{t('update.downloadingBody', { version: update.version, percent: String(update.percent) })}</span>
+              </>
+            )}
+            {update.phase === 'ready' && (
+              <>
+                <strong>{t('update.ready')}</strong>
+                <span>{t('update.body', { version: update.version })}</span>
+              </>
+            )}
           </div>
-          <button className="btn-primary" onClick={() => bridge.updateRestart()}>
-            {t('update.restartNow')}
-          </button>
+          {update.phase === 'available' && (
+            <button
+              className="btn-primary"
+              onClick={() => {
+                bridge.updateDownload()
+                setUpdate({ phase: 'downloading', version: update.version, percent: 0 })
+              }}
+            >
+              {t('update.download')}
+            </button>
+          )}
+          {update.phase === 'ready' && (
+            <button className="btn-primary" onClick={() => bridge.updateRestart()}>
+              {t('update.restartNow')}
+            </button>
+          )}
           <button
             className="update-toast-close"
             aria-label={t('update.dismissTip')}
             title={t('update.dismissTip')}
-            onClick={() => setUpdateVersion(null)}
+            onClick={() => setUpdate(null)}
           >
             ✕
           </button>
