@@ -84,6 +84,17 @@ export default function ExtensionApp(): React.JSX.Element {
     setPayload(p)
     setError(null)
     document.title = `${p.name} — PDF Scholar`
+    // Reflect the document in the address bar: a reopenable URL goes into
+    // ?file= (so a reload restores the document); a picker-opened file has no
+    // path the browser itself can reopen, so its name rides in the hash purely
+    // for display.
+    history.replaceState(
+      null,
+      '',
+      p.path.startsWith('fsa:')
+        ? `${location.pathname}#${encodeURIComponent(p.name)}`
+        : `${location.pathname}?file=${encodeURIComponent(p.path)}`
+    )
   }, [])
 
   const openPath = useCallback(
