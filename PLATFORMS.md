@@ -35,7 +35,8 @@ not as acceptable platform lag.
 
 1. **macOS is unsigned and un-notarized** (zero-cost decision): Gatekeeper shows
    the "damaged / unverified developer" flow on first launch; README documents
-   the workaround (System Settings → open anyway, or `xattr -cr`). Consequence:
+   the workaround (copy to Applications, then `xattr -cr` — the "damaged"
+   variant never offers System Settings → Open Anyway). Consequence:
    **no auto-update on macOS** — Squirrel.Mac refuses unsigned apps. Users
    update by downloading the new dmg.
 2. **Window chrome**: Windows/Linux use the native window-controls overlay

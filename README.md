@@ -38,9 +38,15 @@ Apple Developer certificate** — macOS will claim the app is "damaged" or from 
 unverified developer on first launch. It isn't; that's Gatekeeper's default for any
 app distributed outside the App Store without Apple's paid program. To open it:
 
-1. Move the app to Applications and try to open it once.
-2. Go to **System Settings → Privacy & Security**, scroll down, and click
-   **Open Anyway** — or, in Terminal: `xattr -cr "/Applications/PDF Scholar.app"`.
+1. Drag **PDF Scholar.app** from the disk image into **Applications** (don't try to
+   open it from inside the disk image).
+2. In Terminal, run: `xattr -cr "/Applications/PDF Scholar.app"` — then open the app
+   normally.
+
+If the dialog says the app is from an *unverified developer* (rather than
+"damaged"), you can instead click **Open Anyway** under **System Settings →
+Privacy & Security**. When the message says **"damaged"**, that button never
+appears — the Terminal command above is the only route.
 
 Because the app is unsigned, macOS builds also have **no auto-update** — grab new
 versions from the releases page.
