@@ -423,6 +423,9 @@ export default function PdfViewer({
     rects: PageRect[]
     /** Citation-jump flash (holds then fades); absent for persistent search hits */
     flash?: boolean
+    /** Bumped each citation jump so the flash rects remount and the CSS fade
+     *  animation replays even when a repeat/same-page click reuses the nodes */
+    flashId?: number
   } | null>(null)
   // Semantic (AI) search mode alongside exact text search
   const [searchMode, setSearchMode] = useState<'text' | 'ai'>('text')
@@ -3010,7 +3013,7 @@ export default function PdfViewer({
         scaleRef.current
       )
       if (!rects || rects.length === 0) return
-      setSearchHits({ pageNumber: resolved.pageNumber, rects, flash: true })
+      setSearchHits({ pageNumber: resolved.pageNumber, rects, flash: true, flashId: seq })
       // The citation highlight releases by itself after a moment (or on the
       // next click in the document) — it's a pointer, not a selection
       if (aiHitTimerRef.current) window.clearTimeout(aiHitTimerRef.current)
@@ -3481,6 +3484,11 @@ export default function PdfViewer({
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }
                     searchFlash={!!searchHits?.flash && searchHits.pageNumber === pageNumber}
+                    searchFlashId={
+                      searchHits?.flash && searchHits.pageNumber === pageNumber
+                        ? searchHits.flashId
+                        : undefined
+                    }
                     drawTool={drawTool}
                     onInternalLink={onInternalLink}
                     onExternalLink={onExternalLink}

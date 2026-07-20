@@ -61,6 +61,9 @@ interface Props {
   /** True when searchRects are a citation-jump flash (holds, then fades out)
    *  rather than a persistent search hit */
   searchFlash?: boolean
+  /** Nonce that changes each citation jump; folded into the flash rects' key so
+   *  they remount and replay the fade animation on repeat / same-page clicks */
+  searchFlashId?: number
   /** Active freehand tool (pen/marker/eraser), or null when not drawing */
   drawTool: DrawTool | null
   /** Stable callbacks (identity must not change with viewer state) */
@@ -99,6 +102,7 @@ function PdfPage({
   selectedId,
   searchRects,
   searchFlash,
+  searchFlashId,
   drawTool,
   onInternalLink,
   onExternalLink,
@@ -723,7 +727,7 @@ function PdfPage({
         <div className="annot-overlay">
           {searchRects.map((r, i) => (
             <div
-              key={i}
+              key={searchFlash ? `${searchFlashId}-${i}` : i}
               className={`search-hit${searchFlash ? ' cite-flash' : ''}`}
               style={{ left: r.x * scale, top: r.y * scale, width: r.w * scale, height: r.h * scale }}
             />
