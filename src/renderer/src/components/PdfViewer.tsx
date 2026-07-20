@@ -645,15 +645,21 @@ export default function PdfViewer({
     return { w: v0.w, h: v0.h }
   }, [sizes, rotation, spread, currentPage])
 
-  // Pick an initial zoom if none was restored: fit the WHOLE first page
-  // (fit-page), so a fresh document opens centered without vertical cropping
+  // Pick an initial zoom if none was restored: Acrobat-style "Automatic" —
+  // fit-width capped at 100% (actual size). Normal pages open readable at
+  // actual size; oversized pages (posters, drawings) still scale down to fit
+  // the width. At the cap the mode is 'custom' so the 100% holds exactly when
+  // panels toggle or the window resizes, same as a hand-picked zoom.
   useEffect(() => {
     if (scale > 0 || sizes.length === 0 || containerWidth === 0) return
-    const height = containerRef.current?.clientHeight || window.innerHeight - 60
-    const denom = fitDenom()
-    const fitW = (containerWidth - SIDE_PAD) / denom.w
-    const fitH = (height - PAD_TOP - PAD_BOTTOM) / denom.h
-    setScale(clamp(Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX))
+    const fitW = (containerWidth - SIDE_PAD) / fitDenom().w
+    if (fitW < 1) {
+      setFitMode('width')
+      setScale(clamp(fitW, ZOOM_MIN, ZOOM_MAX))
+    } else {
+      setFitMode('custom')
+      setScale(1)
+    }
   }, [sizes, scale, containerWidth, fitDenom])
 
   // ---------- Layout ----------
