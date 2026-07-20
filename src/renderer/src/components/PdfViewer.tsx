@@ -418,9 +418,12 @@ export default function PdfViewer({
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
   const [searchIndex, setSearchIndex] = useState(-1)
   const [searchBusy, setSearchBusy] = useState(false)
-  const [searchHits, setSearchHits] = useState<{ pageNumber: number; rects: PageRect[] } | null>(
-    null
-  )
+  const [searchHits, setSearchHits] = useState<{
+    pageNumber: number
+    rects: PageRect[]
+    /** Citation-jump flash (holds then fades); absent for persistent search hits */
+    flash?: boolean
+  } | null>(null)
   // Semantic (AI) search mode alongside exact text search
   const [searchMode, setSearchMode] = useState<'text' | 'ai'>('text')
   const [semantic, setSemantic] = useState<{
@@ -3007,13 +3010,13 @@ export default function PdfViewer({
         scaleRef.current
       )
       if (!rects || rects.length === 0) return
-      setSearchHits({ pageNumber: resolved.pageNumber, rects })
+      setSearchHits({ pageNumber: resolved.pageNumber, rects, flash: true })
       // The citation highlight releases by itself after a moment (or on the
       // next click in the document) — it's a pointer, not a selection
       if (aiHitTimerRef.current) window.clearTimeout(aiHitTimerRef.current)
       aiHitTimerRef.current = window.setTimeout(() => {
         if (!searchOpenRef.current) setSearchHits(null)
-      }, 4000)
+      }, 7000)
       const lay2 = layoutRef.current
       if (lay2) {
         el.scrollTop = Math.max(
@@ -3477,6 +3480,7 @@ export default function PdfViewer({
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }
+                    searchFlash={!!searchHits?.flash && searchHits.pageNumber === pageNumber}
                     drawTool={drawTool}
                     onInternalLink={onInternalLink}
                     onExternalLink={onExternalLink}

@@ -58,6 +58,9 @@ interface Props {
   selectedId: string | null
   /** Rects of the active search match on this page (page space) */
   searchRects: PageRect[]
+  /** True when searchRects are a citation-jump flash (holds, then fades out)
+   *  rather than a persistent search hit */
+  searchFlash?: boolean
   /** Active freehand tool (pen/marker/eraser), or null when not drawing */
   drawTool: DrawTool | null
   /** Stable callbacks (identity must not change with viewer state) */
@@ -95,6 +98,7 @@ function PdfPage({
   hideAnnots,
   selectedId,
   searchRects,
+  searchFlash,
   drawTool,
   onInternalLink,
   onExternalLink,
@@ -720,7 +724,7 @@ function PdfPage({
           {searchRects.map((r, i) => (
             <div
               key={i}
-              className="search-hit"
+              className={`search-hit${searchFlash ? ' cite-flash' : ''}`}
               style={{ left: r.x * scale, top: r.y * scale, width: r.w * scale, height: r.h * scale }}
             />
           ))}

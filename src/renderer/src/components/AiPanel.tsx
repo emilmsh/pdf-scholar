@@ -75,11 +75,15 @@ function renderInline(text: string, keyBase: string, ctx?: ChipContext): React.R
       const chip = ctx?.chips[Number(token.slice(1, -1))]
       if (chip && ctx) {
         const page = citationPage(chip, ctx.doc)
+        // Hover shows the cited excerpt so two same-page chips ("p. 6", "p. 6")
+        // are tellable apart; fall back to the generic hint when there is none.
+        const raw = (chip.kind === 'char' ? chip.citedText : chip.quote)?.trim() ?? ''
+        const excerpt = raw.length > 180 ? `${raw.slice(0, 179)}…` : raw
         out.push(
           <button
             key={`${keyBase}-${i++}`}
             className="ai-chip"
-            title={t('ai.chipTip')}
+            title={excerpt ? `“${excerpt}”\n${t('ai.chipTip')}` : t('ai.chipTip')}
             onClick={() => ctx.onCitation(chip)}
           >
             {page !== null ? `${t('app.pageAbbrev')} ${page}` : t('ai.sourceChip')}

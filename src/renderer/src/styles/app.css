@@ -1658,6 +1658,32 @@ button {
   }
 }
 
+/* Citation-jump flash: same pulse-in, then hold, then a gentle fade near the end
+   so it dissolves instead of blinking off. Duration matches the JS release timer
+   (7 s in jumpToAiCitation); `forwards` holds opacity 0 until the node unmounts. */
+.search-hit.cite-flash {
+  animation: cite-flash 7s ease forwards;
+}
+
+@keyframes cite-flash {
+  0% {
+    outline-width: 5px;
+    outline-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  6% {
+    outline-width: 2px;
+  }
+  88% {
+    opacity: 1;
+  }
+  97% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* pdf.js text layer (selection) — mirrors the rules pdf.js v6 requires:
    span positions are percentages of the layer; the layer's own inline size is
    round(var(--total-scale-factor) * pageDim px, var(--scale-round-*)); span
