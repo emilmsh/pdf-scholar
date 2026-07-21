@@ -30,7 +30,8 @@ import {
   referenceSystem,
   referenceUserMessage,
   resolveCitation,
-  summaryPrompt
+  summaryPrompt,
+  WEB_SEARCH_HINT
 } from '../ai'
 import { t, useLang, locale } from '../i18n'
 import type { MsgKey } from '../i18n'
@@ -40,6 +41,7 @@ import type { ChatMessage, StoredConversation } from '../chat-store'
 import { deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
 import {
   IconChevronDown,
+  IconGlobe,
   IconHistory,
   IconImage,
   IconPlus,
@@ -135,11 +137,30 @@ function renderInline(text: string, keyBase: string, ctx?: ChipContext): React.R
     }
     if (token.startsWith('\uE000')) {
       const chip = ctx?.chips[Number(token.slice(1, -1))]
-      if (chip && ctx) {
+      if (chip && ctx && chip.kind === 'web') {
+        // Web-search source: labelled by domain, opens in the browser
+        let host = ''
+        try {
+          host = new URL(chip.url).hostname.replace(/^www\./, '')
+        } catch {
+          /* malformed URL - fall back to the generic label */
+        }
+        out.push(
+          <button
+            key={`${keyBase}-${i++}`}
+            className="ai-chip ai-chip-web"
+            title={`${chip.title}\n${chip.url}`}
+            onClick={() => ctx.onCitation(chip)}
+          >
+            {host || t('ai.sourceChip')}
+          </button>
+        )
+      } else if (chip && ctx) {
         const page = citationPage(chip, ctx.doc)
         // Hover shows the cited excerpt so two same-page chips ("p. 6", "p. 6")
         // are tellable apart; fall back to the generic hint when there is none.
-        const raw = (chip.kind === 'char' ? chip.citedText : chip.quote)?.trim() ?? ''
+        const raw =
+          (chip.kind === 'char' ? chip.citedText : chip.kind === 'quote' ? chip.quote : '')?.trim() ?? ''
         const excerpt = raw.length > 180 ? `${raw.slice(0, 179)}…` : raw
         out.push(
           <button
@@ -813,6 +834,11 @@ export default function AiPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   /** Images staged for the next composer send (pasted or attached) */
   const [pendingImages, setPendingImages] = useState<AiImage[]>([])
+  /** Composer globe toggle: let the model search the web this conversation.
+   *  Off by default — document-derived queries leave for third parties. */
+  const [webSearch, setWebSearch] = useState(false)
+  const webSearchRef = useRef(webSearch)
+  webSearchRef.current = webSearch
 
   const addImageFiles = useCallback(async (files: Iterable<Blob>) => {
     for (const file of files) {
@@ -928,11 +954,13 @@ export default function AiPanel({
       if (ensured) setDocReady(true)
       const requestId = nextRequestId()
       currentIdRef.current = requestId
+      const useWeb = webSearchRef.current
       const result = await bridge.aiChat({
         requestId,
-        system: chatSystem(),
+        system: chatSystem() + (useWeb ? WEB_SEARCH_HINT : ''),
         messages: history,
-        document: ensured ? { title: docTitle, text: ensured.doc.text } : null
+        document: ensured ? { title: docTitle, text: ensured.doc.text } : null,
+        webSearch: useWeb || undefined
       })
       currentIdRef.current = null
       setStreamText('')
@@ -1042,6 +1070,11 @@ export default function AiPanel({
 
   const handleCitation = useCallback(
     async (citation: AiCitation): Promise<void> => {
+      // Web sources live outside the document — straight to the browser
+      if (citation.kind === 'web') {
+        bridge.openExternal(citation.url)
+        return
+      }
       let ensured = docRef.current
       if (!ensured) {
         ensured = await ensureDocument()
@@ -1150,6 +1183,17 @@ export default function AiPanel({
               e.target.value = ''
             }}
           />
+          {(config?.provider === 'anthropic' ||
+            config?.provider === 'openai' ||
+            config?.provider === 'mock') && (
+            <button
+              className={`ai-attach-add${webSearch ? ' on' : ''}`}
+              title={t(webSearch ? 'ai.webSearchOnTip' : 'ai.webSearchOffTip')}
+              onClick={() => setWebSearch((s) => !s)}
+            >
+              <IconGlobe size={16} />
+            </button>
+          )}
           <button
             className="ai-attach-add"
             title={t('tb.snipTip')}

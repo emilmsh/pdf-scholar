@@ -2980,6 +2980,7 @@ export default function PdfViewer({
     for (const part of result.parts) {
       const label = part.text.replace(/^\s*\d+[.)]\s*/, '').trim()
       for (const c of part.citations) {
+        if (c.kind === 'web') continue // semantic hits must live in the document
         const fallback = c.kind === 'char' ? c.citedText : c.quote
         hits.push({ label: label || fallback.slice(0, 80), citation: c, pageNumber: citationPage(c, doc) })
       }

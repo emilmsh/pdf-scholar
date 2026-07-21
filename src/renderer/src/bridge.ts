@@ -195,7 +195,9 @@ export const webApi: PdfxApi = {
     const answerB = doc
       ? ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
       : '.'
-    const full = answerA + answerB
+    // Web-search toggle on → fake an external source so the chip UI is testable
+    const answerC = request.webSearch ? ' Et nettsøk bekrefter dette i en ekstern kilde.' : ''
+    const full = answerA + answerB + answerC
     // Few large chunks: background-tab timer clamping (≥1s) would make
     // word-by-word streaming crawl in the automated preview
     const step = Math.ceil(full.length / 5)
@@ -228,7 +230,13 @@ export const webApi: PdfxApi = {
             ]
           }
         ]
-      : [{ text: full, citations: [] }]
+      : [{ text: answerA + answerB, citations: [] }]
+    if (answerC) {
+      parts.push({
+        text: answerC,
+        citations: [{ kind: 'web', url: 'https://example.org/kilde', title: 'Eksempelkilde (mock)' }]
+      })
+    }
     return {
       ok: true,
       parts,

@@ -60,6 +60,8 @@ export function resolveCitation(
   pages: PageText[],
   doc: AiDocument
 ): ResolvedCitation | null {
+  // Web citations point outside the document — opened externally, never resolved
+  if (citation.kind === 'web') return null
   if (citation.kind === 'quote') {
     const pageIndex = citation.pageNumber - 1
     if (pageIndex < 0 || pageIndex >= pages.length) return null
@@ -233,6 +235,7 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
 
 /** Page number a citation points at (for chip labels), best effort */
 export function citationPage(citation: AiCitation, doc: AiDocument | null): number | null {
+  if (citation.kind === 'web') return null
   if (citation.kind === 'quote') return citation.pageNumber
   if (!doc || doc.pageStarts.length === 0) return null
   for (let i = doc.pageStarts.length - 1; i >= 0; i--) {
@@ -303,6 +306,15 @@ GROUNDING
 - Explicitly separate what the document says from your own assessment or background knowledge (e.g. "The paper reports … Beyond the document: …").
 - If the document does not answer the question, say so plainly instead of guessing. Never invent quotes, numbers or references.`
 }
+
+/** Appended to the chat system prompt when the composer's web-search toggle
+ *  is on. English on purpose — model-facing instructions stay English for
+ *  both UI languages (same rule as the quote contract in ai-chat.ts). */
+export const WEB_SEARCH_HINT = `
+
+WEB SEARCH
+- You have a web_search tool. Use it when the answer needs information beyond the document — verifying or looking up a reference, finding related work, or anything recent — rather than answering from memory.
+- Keep document claims grounded in the document as before; cite web sources for external claims so the user can open them.`
 
 export function explainSystem(mode: 'explain' | 'simplify'): string {
   if (getLanguage() === 'nb') {

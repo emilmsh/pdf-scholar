@@ -170,14 +170,19 @@ export interface AiChatRequest {
   messages: AiMessage[]
   /** Page-joined document text; sent with citations enabled where supported */
   document: { title: string; text: string } | null
+  /** Let the model search the web (server-side provider tool). Only honored
+   *  by providers that support it (Anthropic, OpenAI); others ignore it. */
+  webSearch?: boolean
 }
 
 /** Normalized citation. 'char' = offsets into the document text we sent
  *  (Anthropic char_location); 'quote' = verbatim quote + page, resolved by
- *  the renderer via text search (prompt-contract providers). */
+ *  the renderer via text search (prompt-contract providers); 'web' = an
+ *  external source from the web-search tool, opened in the browser. */
 export type AiCitation =
   | { kind: 'char'; start: number; end: number; citedText: string }
   | { kind: 'quote'; pageNumber: number; quote: string }
+  | { kind: 'web'; url: string; title: string }
 
 export interface AiContentPart {
   text: string

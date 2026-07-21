@@ -3021,6 +3021,14 @@ button {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* Web-search source chips: same pill, labelled by domain; guard against
+   absurdly long hostnames in the narrow panel */
+.ai-chip-web {
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* KaTeX math in assistant text: inline stays in the sentence flow; display
    blocks get their own line and scroll sideways in the narrow panel instead
    of wrapping badly */
@@ -3135,6 +3143,13 @@ button {
 .ai-attach-add:hover {
   background: var(--hover);
   color: var(--text);
+}
+
+/* Web-search toggle lit while active */
+.ai-attach-add.on,
+.ai-attach-add.on:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
 /* Staged images above the composer textarea */

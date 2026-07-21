@@ -325,6 +325,8 @@ const nb = {
   'ai.attachTip': 'Legg ved bilde',
   'ai.removeImageTip': 'Fjern bilde',
   'ai.imageAlt': 'Vedlagt bilde',
+  'ai.webSearchOffTip': 'Nettsøk er av — klikk for å la assistenten søke på nettet',
+  'ai.webSearchOnTip': 'Nettsøk er på — assistenten kan søke på nettet ved behov',
   'ai.quickQuestion': '{title}: «{selection}» (s. {page})',
   'ai.mockOnlyWeb': 'Nettleser-forhåndsvisningen støtter kun mock-leverandøren. Bruk appen for ekte KI.',
   'ai.calloutMock':
@@ -672,6 +674,8 @@ const en: Dict = {
   'ai.attachTip': 'Attach image',
   'ai.removeImageTip': 'Remove image',
   'ai.imageAlt': 'Attached image',
+  'ai.webSearchOffTip': 'Web search is off — click to let the assistant search the web',
+  'ai.webSearchOnTip': 'Web search is on — the assistant can search the web when needed',
   'ai.quickQuestion': '{title}: «{selection}» (p. {page})',
   'ai.mockOnlyWeb': 'The browser preview only supports the mock provider. Use the app for real AI.',
   'ai.calloutMock':

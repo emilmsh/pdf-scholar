@@ -17,6 +17,7 @@
 import type {
   AiChatRequest,
   AiChatResult,
+  AiCitation,
   AiContentPart,
   AiProviderId,
   AiUsage,
@@ -63,6 +64,23 @@ function anthropicThinking(
 /** OpenAI reasoning_effort value (none maps 'off') */
 function openAiEffort(level: ThinkingLevel): string {
   return level === 'off' ? 'none' : level
+}
+
+// ---------- Web search (server-side provider tool) ----------
+
+/** Cap on searches per answer so token cost stays bounded */
+const WEB_SEARCH_MAX_USES = 5
+
+/** Anthropic web-search tool for a model. The dynamic-filtering variant
+ *  (_20260209) needs Opus 4.6+/Sonnet 4.6+/Sonnet 5/Fable; Haiku and older
+ *  models only accept the basic variant. */
+function anthropicWebSearchTool(model: string): Record<string, unknown> {
+  const modern = /fable|mythos|opus-4-[6-9]|sonnet-4-[6-9]|sonnet-[5-9]/i.test(model)
+  return {
+    type: modern ? 'web_search_20260209' : 'web_search_20250305',
+    name: 'web_search',
+    max_uses: WEB_SEARCH_MAX_USES
+  }
 }
 
 // Prompt contract for providers without native citations (mirrors the
@@ -148,6 +166,7 @@ async function chatAnthropic(
   }
   if (tuning.thinking) params.thinking = tuning.thinking
   if (tuning.outputConfig) params.output_config = tuning.outputConfig
+  if (req.webSearch) params.tools = [anthropicWebSearchTool(model)]
   // Fable: safety-classifier refusals are opt-in recoverable via server-side
   // fallback to Opus 4.8 (see docs/agent-notes/modeller-api.md)
   if (isFable) {
@@ -160,43 +179,63 @@ async function chatAnthropic(
   // detached from client.messages throws "Cannot read properties of undefined
   // (reading '_client')". The cast is only to bridge the beta/non-beta type gap.
   const streamFn = api.stream.bind(api) as unknown as (p: unknown, o: unknown) => AnthropicStream
-  const stream = streamFn(params, { signal })
-  stream.on('text', (delta: string) => emit(delta))
-  const final = await stream.finalMessage()
 
-  interface CharLoc {
+  // Server-side tools run in a server sampling loop that may pause after ~10
+  // iterations (stop_reason 'pause_turn'). Append the assistant turn and
+  // re-send; the server resumes where it left off. Each round returns only
+  // that round's new content, so blocks accumulate across rounds.
+  type FinalMessage = Awaited<ReturnType<AnthropicStream['finalMessage']>>
+  const usage: AiUsage = { ...EMPTY_USAGE }
+  const blocks: FinalMessage['content'] = []
+  let final: FinalMessage
+  for (let round = 0; ; round++) {
+    const stream = streamFn(params, { signal })
+    stream.on('text', (delta: string) => emit(delta))
+    final = await stream.finalMessage()
+    blocks.push(...final.content)
+    usage.inputTokens += final.usage.input_tokens
+    usage.outputTokens += final.usage.output_tokens
+    usage.cacheReadTokens += final.usage.cache_read_input_tokens ?? 0
+    usage.cacheWriteTokens += final.usage.cache_creation_input_tokens ?? 0
+    if (final.stop_reason !== 'pause_turn' || round >= 5) break
+    ;(params.messages as unknown[]).push({ role: 'assistant', content: final.content })
+  }
+
+  // char_location = grounded document citation; web_search_result_location =
+  // external source from the web-search tool. Other types are dropped.
+  interface Loc {
     type: string
-    start_char_index: number
-    end_char_index: number
-    cited_text: string
+    start_char_index?: number
+    end_char_index?: number
+    cited_text?: string
+    url?: string
+    title?: string | null
   }
   const parts: AiContentPart[] = []
-  for (const block of final.content) {
+  for (const block of blocks) {
     if (block.type !== 'text') continue
-    const citations = (block.citations ?? []) as CharLoc[]
+    const citations = (block.citations ?? []) as Loc[]
     parts.push({
       text: block.text,
-      citations: citations
-        .filter((c) => c.type === 'char_location')
-        .map((c) => ({
-          kind: 'char' as const,
-          start: c.start_char_index,
-          end: c.end_char_index,
-          citedText: c.cited_text
-        }))
+      citations: citations.flatMap((c): AiCitation[] => {
+        if (c.type === 'char_location') {
+          return [
+            {
+              kind: 'char',
+              start: c.start_char_index ?? 0,
+              end: c.end_char_index ?? 0,
+              citedText: c.cited_text ?? ''
+            }
+          ]
+        }
+        if (c.type === 'web_search_result_location' && c.url) {
+          return [{ kind: 'web', url: c.url, title: c.title || c.url }]
+        }
+        return []
+      })
     })
   }
-  return {
-    ok: true,
-    parts,
-    usage: {
-      inputTokens: final.usage.input_tokens,
-      outputTokens: final.usage.output_tokens,
-      cacheReadTokens: final.usage.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: final.usage.cache_creation_input_tokens ?? 0
-    },
-    model: final.model
-  }
+  return { ok: true, parts, usage, model: final.model }
 }
 
 /** Split text on [KILDE s.N: "quote"] markers into parts with quote citations */
@@ -229,6 +268,177 @@ function parseQuoteContract(text: string): AiContentPart[] {
   return parts
 }
 
+interface OpenAiAnnotation {
+  type: string
+  url?: string
+  title?: string | null
+  end_index?: number
+}
+
+/** Split an OpenAI output_text on url_citation annotations (web-search
+ *  sources), then run the quote contract on each slice so document citations
+ *  survive alongside. Each web citation attaches to the slice ending at its
+ *  end_index — the sentence it supports, mirroring Anthropic's block model. */
+function partsFromAnnotatedText(text: string, annotations: OpenAiAnnotation[]): AiContentPart[] {
+  const anns = annotations
+    .filter((a) => a.type === 'url_citation' && typeof a.url === 'string')
+    .sort((a, b) => (a.end_index ?? 0) - (b.end_index ?? 0))
+  const parts: AiContentPart[] = []
+  let last = 0
+  for (const a of anns) {
+    const end = Math.min(Math.max(a.end_index ?? 0, last), text.length)
+    const sub = parseQuoteContract(text.slice(last, end))
+    sub[sub.length - 1].citations.push({ kind: 'web', url: a.url!, title: a.title || a.url! })
+    parts.push(...sub)
+    last = end
+  }
+  const tail = text.slice(last)
+  if (tail.trim() || parts.length === 0) parts.push(...parseQuoteContract(tail))
+  return parts
+}
+
+/** OpenAI Responses API (streaming SSE). The 'openai' provider lives here —
+ *  Chat Completions has no server-side web_search tool; Azure deployments
+ *  stay on chatOpenAiCompatible below. */
+async function chatOpenAiResponses(
+  apiKey: string,
+  model: string,
+  thinking: ThinkingLevel,
+  req: AiChatRequest,
+  emit: Emit,
+  signal: AbortSignal
+): Promise<AiChatResult> {
+  type InputPart =
+    | { type: 'input_text'; text: string }
+    | { type: 'input_image'; image_url: string }
+  const input: { role: string; content: string | InputPart[] }[] = []
+  if (req.document) {
+    input.push({
+      role: 'user',
+      content: `DOKUMENT («${req.document.title}») — svar basert på dette:\n\n${req.document.text}`
+    })
+    input.push({ role: 'assistant', content: 'Jeg har lest dokumentet og er klar.' })
+  }
+  for (const m of req.messages) {
+    const images = m.images ?? []
+    input.push({
+      role: m.role,
+      content:
+        images.length > 0
+          ? [
+              ...images.map((img) => ({
+                type: 'input_image' as const,
+                image_url: `data:${img.mediaType};base64,${img.dataBase64}`
+              })),
+              { type: 'input_text' as const, text: m.text }
+            ]
+          : m.text
+    })
+  }
+
+  const body: Record<string, unknown> = {
+    model,
+    instructions: req.system + (req.document ? QUOTE_CONTRACT : ''),
+    input,
+    stream: true
+  }
+  if (req.webSearch) body.tools = [{ type: 'web_search' }]
+  if (/gpt-5|o[0-9]/i.test(model)) body.reasoning = { effort: openAiEffort(thinking) }
+
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+    signal
+  })
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => '')
+    return { error: `HTTP ${response.status}: ${detail.slice(0, 300)}` }
+  }
+
+  // Typed SSE events; each data payload carries its own `type`, so the
+  // `event:` lines can be ignored. Text arrives as output_text.delta; the
+  // completed event carries the full response (output items, usage, model).
+  interface OutputPiece {
+    type: string
+    text?: string
+    annotations?: OpenAiAnnotation[]
+  }
+  interface FinalResponse {
+    output?: { type: string; content?: OutputPiece[] }[]
+    usage?: {
+      input_tokens?: number
+      output_tokens?: number
+      input_tokens_details?: { cached_tokens?: number }
+    }
+    model?: string
+    error?: { message?: string } | null
+  }
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let finalResp: FinalResponse | null = null
+  let errorMsg: string | null = null
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() ?? ''
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed.startsWith('data:')) continue
+      const payload = trimmed.slice(5).trim()
+      if (payload === '[DONE]') continue
+      try {
+        const parsed = JSON.parse(payload)
+        switch (parsed.type) {
+          case 'response.output_text.delta':
+            if (typeof parsed.delta === 'string') emit(parsed.delta)
+            break
+          case 'response.completed':
+          case 'response.incomplete':
+            finalResp = parsed.response
+            break
+          case 'response.failed':
+            errorMsg = parsed.response?.error?.message ?? 'Ukjent feil fra OpenAI'
+            break
+          case 'error':
+            errorMsg = parsed.message ?? 'Ukjent feil fra OpenAI'
+            break
+        }
+      } catch {
+        /* ignore malformed keep-alives */
+      }
+    }
+  }
+  if (errorMsg) return { error: errorMsg }
+  if (!finalResp) return { error: 'Strømmen ble avbrutt uten fullført svar.' }
+
+  const parts: AiContentPart[] = []
+  for (const item of finalResp.output ?? []) {
+    if (item.type !== 'message') continue
+    for (const piece of item.content ?? []) {
+      if (piece.type !== 'output_text' || typeof piece.text !== 'string') continue
+      parts.push(...partsFromAnnotatedText(piece.text, piece.annotations ?? []))
+    }
+  }
+  if (parts.length === 0) parts.push({ text: '', citations: [] })
+  return {
+    ok: true,
+    parts,
+    usage: {
+      inputTokens: finalResp.usage?.input_tokens ?? 0,
+      outputTokens: finalResp.usage?.output_tokens ?? 0,
+      cacheReadTokens: finalResp.usage?.input_tokens_details?.cached_tokens ?? 0,
+      cacheWriteTokens: 0
+    },
+    model: finalResp.model ?? model
+  }
+}
+
+/** Chat Completions fallback — used by Azure deployments only (OpenAI proper
+ *  goes through chatOpenAiResponses). No server-side web search here. */
 async function chatOpenAiCompatible(
   url: string,
   headers: Record<string, string>,
@@ -236,8 +446,7 @@ async function chatOpenAiCompatible(
   thinking: ThinkingLevel,
   req: AiChatRequest,
   emit: Emit,
-  signal: AbortSignal,
-  includeUsageOption: boolean
+  signal: AbortSignal
 ): Promise<AiChatResult> {
   type OpenAiPart =
     | { type: 'text'; text: string }
@@ -273,7 +482,6 @@ async function chatOpenAiCompatible(
   if (model) body.model = model
   // gpt-5.6 reasoning control (harmless on models that ignore it)
   if (/gpt-5|o[0-9]/i.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking)
-  if (includeUsageOption) body.stream_options = { include_usage: true }
 
   const response = await fetch(url, {
     method: 'POST',
@@ -331,7 +539,9 @@ async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Pr
   const answerB = doc
     ? ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
     : '.'
-  const full = answerA + answerB
+  // Web-search toggle on → fake an external source so the chip UI is testable
+  const answerC = req.webSearch ? ' Et nettsøk bekrefter dette i en ekstern kilde.' : ''
+  const full = answerA + answerB + answerC
   for (const word of full.split(/(?<= )/)) {
     if (signal.aborted) return { error: 'Avbrutt' }
     emit(word)
@@ -357,7 +567,13 @@ async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Pr
           ]
         }
       ]
-    : [{ text: full, citations: [] }]
+    : [{ text: answerA + answerB, citations: [] }]
+  if (answerC) {
+    parts.push({
+      text: answerC,
+      citations: [{ kind: 'web', url: 'https://example.org/kilde', title: 'Eksempelkilde (mock)' }]
+    })
+  }
   return {
     ok: true,
     parts,
@@ -396,16 +612,7 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
       case 'anthropic':
         return await chatAnthropic(key, models.anthropic, thinking, req, emit, signal)
       case 'openai':
-        return await chatOpenAiCompatible(
-          'https://api.openai.com/v1/chat/completions',
-          { authorization: `Bearer ${key}` },
-          models.openai,
-          thinking,
-          req,
-          emit,
-          signal,
-          true
-        )
+        return await chatOpenAiResponses(key, models.openai, thinking, req, emit, signal)
       case 'azure': {
         const endpoint = azure.endpoint.replace(/\/+$/, '')
         if (!endpoint || !azure.deployment) {
@@ -418,8 +625,7 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
           thinking,
           req,
           emit,
-          signal,
-          false
+          signal
         )
       }
       case 'mock':
