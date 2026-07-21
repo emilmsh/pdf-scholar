@@ -3441,8 +3441,24 @@ export default function PdfViewer({
         }
       }
     }
+    // Logitech-style side buttons mirror Alt+←/→ (button 3 = back, 4 = forward).
+    // preventDefault stops Chromium from also walking its own (empty) history.
+    const onMouseNav = (e: MouseEvent): void => {
+      if (presentationRef.current) return
+      if (e.button === 3) {
+        e.preventDefault()
+        goBack()
+      } else if (e.button === 4) {
+        e.preventDefault()
+        goForward()
+      }
+    }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('mouseup', onMouseNav)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('mouseup', onMouseNav)
+    }
   }, [
     active,
     enterPresentation,
