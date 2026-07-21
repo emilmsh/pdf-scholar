@@ -2,6 +2,8 @@
 // settings, and the quick "explain selection" popover. Keys and API calls
 // live in the main process; this component only sees the PdfxApi surface.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import type {
   AiCitation,
   AiConfigView,
@@ -42,6 +44,7 @@ import {
   IconImage,
   IconPlus,
   IconSend,
+  IconSnip,
   IconSparkle,
   IconStop,
   IconSummary
@@ -96,15 +99,40 @@ interface ChipContext {
 
 const chipToken = (index: number): string => `\uE000${index}\uE001`
 
+/** KaTeX render of a TeX snippet; throwOnError:false degrades bad TeX to
+ *  red-tinted source instead of breaking the message. */
+function mathNode(tex: string, display: boolean, key: string): React.ReactNode {
+  return (
+    <span
+      key={key}
+      className={display ? 'ai-math-block' : 'ai-math'}
+      dangerouslySetInnerHTML={{
+        __html: katex.renderToString(tex, { throwOnError: false, displayMode: display })
+      }}
+    />
+  )
+}
+
 function renderInline(text: string, keyBase: string, ctx?: ChipContext): React.ReactNode[] {
   const out: React.ReactNode[] = []
-  const regex = /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\uE000\d+\uE001)/g
+  const regex =
+    /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\uE000\d+\uE001|\\\(.+?\\\)|\$\$[^$\n]+\$\$)/g
   let last = 0
   let match: RegExpExecArray | null
   let i = 0
   while ((match = regex.exec(text)) !== null) {
     if (match.index > last) out.push(text.slice(last, match.index))
     const token = match[0]
+    if (token.startsWith('\\(')) {
+      out.push(mathNode(token.slice(2, -2), false, `${keyBase}-${i++}`))
+      last = regex.lastIndex
+      continue
+    }
+    if (token.startsWith('$$')) {
+      out.push(mathNode(token.slice(2, -2), false, `${keyBase}-${i++}`))
+      last = regex.lastIndex
+      continue
+    }
     if (token.startsWith('\uE000')) {
       const chip = ctx?.chips[Number(token.slice(1, -1))]
       if (chip && ctx) {
@@ -228,6 +256,27 @@ function renderMarkdown(text: string, ctx?: ChipContext): React.ReactNode {
           <code>{buf.join('\n')}</code>
         </pre>
       )
+      continue
+    }
+    // Display math: \[ … \] or $$ … $$, single- or multi-line
+    if (trimmed.startsWith('\\[') || trimmed.startsWith('$$')) {
+      flushPara()
+      const close = trimmed.startsWith('\\[') ? '\\]' : '$$'
+      const buf: string[] = []
+      let content = trimmed.slice(2)
+      for (;;) {
+        const at = content.indexOf(close)
+        if (at !== -1) {
+          buf.push(content.slice(0, at))
+          break
+        }
+        buf.push(content)
+        i++
+        if (i >= lines.length) break
+        content = lines[i]
+      }
+      i++ // past the closing line
+      out.push(mathNode(buf.join('\n').trim(), true, `m${key++}`))
       continue
     }
     const heading = /^(#{1,6})\s+(.*)$/.exec(trimmed)
@@ -704,6 +753,11 @@ interface PanelProps {
   openSettingsAskId: number
   onCitationClick(resolved: ResolvedCitation): void
   onClose(): void
+  /** A page region snipped for the chat — staged as a composer attachment */
+  chatSnip: { id: number; image: AiImage } | null
+  onChatSnipConsumed(): void
+  /** Arm the viewer's snip overlay with the chat as destination */
+  onRequestSnip(): void
 }
 
 const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
@@ -726,7 +780,10 @@ export default function AiPanel({
   getAnnotationsText,
   openSettingsAskId,
   onCitationClick,
-  onClose
+  onClose,
+  chatSnip,
+  onChatSnipConsumed,
+  onRequestSnip
 }: PanelProps): React.JSX.Element | null {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
@@ -804,6 +861,14 @@ export default function AiPanel({
     ])
     onSeedConsumed()
   }, [open, seed, onSeedConsumed])
+
+  // A region snipped for the chat lands as a staged composer attachment
+  useEffect(() => {
+    if (!open || !chatSnip) return
+    setPendingImages((l) => (l.length >= MAX_IMAGES ? l : [...l, chatSnip.image]))
+    onChatSnipConsumed()
+    inputRef.current?.focus()
+  }, [open, chatSnip, onChatSnipConsumed])
 
   const handleScroll = useCallback((): void => {
     const el = scrollRef.current
@@ -1085,6 +1150,13 @@ export default function AiPanel({
               e.target.value = ''
             }}
           />
+          <button
+            className="ai-attach-add"
+            title={t('tb.snipTip')}
+            onClick={onRequestSnip}
+          >
+            <IconSnip size={16} />
+          </button>
           <button
             className="ai-attach-add"
             title={t('ai.attachTip')}
@@ -1446,12 +1518,83 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active])
 
-  const left = Math.max(8, Math.min(state.x, window.innerWidth - 360 - 8))
-  const top = Math.max(8, Math.min(state.y + 10, window.innerHeight - 260 - 8))
+  // Measured positioning: the popover grows while the answer streams (and
+  // when the figure image decodes), so a fixed height guess drifts offscreen.
+  // Re-clamp on every content change (deltas, image decode via sizeBump) —
+  // deliberately NOT ResizeObserver-only, whose callbacks ride the frame loop.
+  // Once the user has dragged the popover, their position wins: growth only
+  // re-clamps against the viewport edges, never back to the anchor.
+  const popRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
+  const [sizeBump, setSizeBump] = useState(0)
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null)
+  const draggedRef = useRef(false)
+  useLayoutEffect(() => {
+    const el = popRef.current
+    if (!el) return
+    const { width, height } = el.getBoundingClientRect()
+    const clampTo = (left: number, top: number): { left: number; top: number } => ({
+      left: Math.max(8, Math.min(left, window.innerWidth - width - 8)),
+      top: Math.max(8, Math.min(top, window.innerHeight - height - 8))
+    })
+    setPos((p) => {
+      const next = draggedRef.current && p ? clampTo(p.left, p.top) : clampTo(state.x, state.y + 10)
+      return p && p.left === next.left && p.top === next.top ? p : next
+    })
+  }, [state.x, state.y, text, parts, asked, error, sizeBump])
+
+  // Esc and clicks outside dismiss the popover — the Lukk button must never
+  // be the only way out (it once sat offscreen and trapped the bubble open)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    const onDown = (e: MouseEvent): void => {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onDown)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onDown)
+    }
+  }, [onClose])
 
   return (
-    <div className="ai-quick" style={{ left, top }} onMouseDown={(e) => e.stopPropagation()}>
-      <div className="ai-quick-head">
+    <div
+      className="ai-quick"
+      ref={popRef}
+      style={pos ?? { left: state.x, top: state.y, visibility: 'hidden' }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className="ai-quick-head"
+        onPointerDown={(e) => {
+          if (!pos) return
+          dragRef.current = { dx: e.clientX - pos.left, dy: e.clientY - pos.top }
+          try {
+            ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+          } catch {
+            /* synthetic events have no active pointer */
+          }
+          e.preventDefault()
+        }}
+        onPointerMove={(e) => {
+          const d = dragRef.current
+          if (!d) return
+          draggedRef.current = true
+          const el = popRef.current
+          const w = el?.offsetWidth ?? 360
+          const h = el?.offsetHeight ?? 200
+          setPos({
+            left: Math.max(8, Math.min(e.clientX - d.dx, window.innerWidth - w - 8)),
+            top: Math.max(8, Math.min(e.clientY - d.dy, window.innerHeight - h - 8))
+          })
+        }}
+        onPointerUp={() => {
+          dragRef.current = null
+        }}
+      >
         <IconSparkle size={14} />
         <span>
           {state.selection
@@ -1459,14 +1602,17 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             : `${quickTitle(state.mode)} (${t('app.pageAbbrev')} ${state.pageNumber})`}
         </span>
       </div>
+      {/* The snip stays visible outside the scrolling body, so the answer
+          can be read against the figure it describes */}
+      {isFigure && state.image && (
+        <img
+          className="ai-quick-figure"
+          src={`data:${state.image.mediaType};base64,${state.image.dataBase64}`}
+          alt={t('ai.imageAlt')}
+          onLoad={() => setSizeBump((n) => n + 1)}
+        />
+      )}
       <div className="ai-quick-body">
-        {isFigure && state.image && (
-          <img
-            className="ai-quick-figure"
-            src={`data:${state.image.mediaType};base64,${state.image.dataBase64}`}
-            alt={t('ai.imageAlt')}
-          />
-        )}
         {!active ? (
           <div className="ai-quick-ask">
             <input

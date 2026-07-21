@@ -12,6 +12,7 @@ import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import {
   IconBook,
+  IconComment,
   IconCopy,
   IconGlobe,
   IconMarkupHighlight,
@@ -203,6 +204,7 @@ export type MenuAction =
   | { kind: 'strikeout'; color: HighlightColor }
   | { kind: 'squiggly'; color: HighlightColor }
   | { kind: 'note' }
+  | { kind: 'comment' }
   | { kind: 'copy' }
   | { kind: 'search' }
   | { kind: 'dictionary' }
@@ -320,6 +322,11 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             />
           </div>
           <div className="menu-sep" />
+          {/* Comment = highlight bound to the text with the note prompt up
+              front; Notat stays the free-floating sticky */}
+          <button className="menu-item" onClick={() => onAction({ kind: 'comment' })}>
+            <span className="menu-icon"><IconComment size={15} /></span> {t('menu.comment')}
+          </button>
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
             <span className="menu-icon"><IconNote size={15} /></span> {t('menu.note')}
           </button>

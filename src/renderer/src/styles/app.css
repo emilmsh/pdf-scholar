@@ -3021,6 +3021,23 @@ button {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* KaTeX math in assistant text: inline stays in the sentence flow; display
+   blocks get their own line and scroll sideways in the narrow panel instead
+   of wrapping badly */
+.ai-math .katex,
+.ai-math-block .katex {
+  font-size: 1.06em;
+}
+
+.ai-math-block {
+  display: block;
+  margin: 4px 0 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  scrollbar-width: thin;
+}
+
 .ai-meta {
   font-size: 10.5px;
   color: var(--text-secondary);
@@ -3354,6 +3371,11 @@ button {
   box-shadow: var(--shadow-menu);
   animation: menu-in 0.12s ease;
   overflow: hidden;
+  /* Column flex + viewport cap: on small windows the body shrinks and
+     scrolls instead of the popover overflowing the screen */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 16px);
 }
 
 .ai-quick-head {
@@ -3367,6 +3389,15 @@ button {
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
   overflow: hidden;
+  flex-shrink: 0;
+  /* Drag handle: move the bubble out of the way of what it explains */
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.ai-quick-head:active {
+  cursor: grabbing;
 }
 
 .ai-quick-head span {
@@ -3381,18 +3412,23 @@ button {
   color: var(--text);
   max-height: 240px;
   overflow-y: auto;
+  /* Column-flex child: without this the body wins over the popover's
+     max-height and pushes the actions row offscreen */
+  min-height: 0;
 }
 
-/* Figure mode: the snipped region shown above the streamed explanation */
+/* Figure mode: the snipped region, pinned between head and the scrolling
+   answer body so it stays visible while reading */
 .ai-quick-figure {
   display: block;
-  max-width: 100%;
-  max-height: 180px;
+  max-width: calc(100% - 26px);
+  max-height: 170px;
   object-fit: contain;
-  margin: 0 auto 9px;
+  margin: 11px auto 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fff;
+  flex-shrink: 0;
 }
 
 /* Free-form question input inside the quick popover (ask mode) */
@@ -3431,6 +3467,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-shrink: 0;
   gap: 8px;
   padding: 9px 13px;
   border-top: 1px solid var(--border);
@@ -3675,6 +3712,16 @@ button {
   cursor: crosshair;
   touch-action: none;
   background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+/* Note placement: same interaction shell as the snip overlay, but a single
+   click instead of a drag */
+.note-place-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  cursor: crosshair;
+  touch-action: none;
 }
 
 .snip-hint {

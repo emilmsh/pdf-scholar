@@ -271,6 +271,12 @@ export const IconNote = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconComment = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-6.5L7 19.5V16H6a2 2 0 0 1 -2 -2z" />
+  </Svg>
+)
+
 export const IconCopy = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="9" y="9" width="11" height="11" rx="2" />
@@ -393,6 +399,17 @@ export const IconPause = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M8 5v14" />
     <path d="M16 5v14" />
+  </Svg>
+)
+
+/** Snip-to-explain: a scan-frame with a sparkle — "mark an area, ask AI" */
+export const IconSnip = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" />
+    <path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" />
+    <path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" />
+    <path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" />
+    <path d="M12 8.2l1 2.3 2.3 1-2.3 1-1 2.3-1-2.3-2.3-1 2.3-1 1-2.3z" />
   </Svg>
 )
 

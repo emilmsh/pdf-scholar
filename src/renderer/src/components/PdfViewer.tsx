@@ -4,6 +4,7 @@ import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist'
 import PdfWorkerCtor from 'pdfjs-dist/build/pdf.worker.mjs?worker'
 import type {
   AiCitation,
+  AiImage,
   AnnotationType,
   FilePayload,
   PageRect,
@@ -333,6 +334,8 @@ export default function PdfViewer({
     y: number
     pageNumber: number
     localId: string
+    /** Land keyboard focus in the comment field on open (comment action) */
+    focusText?: boolean
   } | null>(null)
   /** Selected annotation (accent frame). Outlives the popover — scrolling
    *  closes the popover but keeps the frame, per ux-planer.md §1. */
@@ -448,8 +451,14 @@ export default function PdfViewer({
   aiPinnedRef.current = aiPinned
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
-  /** Snip-to-explain: armed by the point menu, drag a box over a figure */
-  const [snipActive, setSnipActive] = useState(false)
+  /** Snip-to-explain: armed from toolbar/menu ('quick' → popover) or from
+   *  the chat composer ('chat' → the region lands as a chat attachment) */
+  const [snip, setSnip] = useState<null | { target: 'quick' | 'chat' }>(null)
+  /** A snipped region on its way into the chat composer (consumed by AiPanel) */
+  const [chatSnip, setChatSnip] = useState<{ id: number; image: AiImage } | null>(null)
+  const chatSnipSeqRef = useRef(0)
+  /** Note placement armed from the toolbar: next page click drops a note */
+  const [notePlacing, setNotePlacing] = useState(false)
   /** Late-bound handle to runSemanticSearch (declared below) so the menu
    *  action handler (declared above it) can fire it without a TDZ hit */
   const runSemanticSearchRef = useRef<((queryOverride?: string) => Promise<void>) | null>(null)
@@ -1644,7 +1653,7 @@ export default function PdfViewer({
   // ---------- User-facing annotation actions ----------
 
   const persistAnnotation = useCallback(
-    async (
+    (
       pageNumber: number,
       type: AnnotationType,
       quads: PageRect[],
@@ -1657,7 +1666,7 @@ export default function PdfViewer({
         fontSize?: number
         blend?: 'multiply'
       }
-    ) => {
+    ): AnnotHandle => {
       const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
       const snapshot: PageAnnotation = {
         id: handle.localId,
@@ -1675,7 +1684,11 @@ export default function PdfViewer({
         blend: extras?.blend
       }
       pushUndo({ kind: 'create', handle, snapshot })
-      await engineCreate(handle, snapshot)
+      // engineCreate puts the record in state synchronously and persists in
+      // the background — returning the handle lets callers reference the new
+      // annotation (e.g. open its popover) without waiting for the write.
+      void engineCreate(handle, snapshot)
+      return handle
     },
     [pushUndo, engineCreate]
   )
@@ -1941,6 +1954,34 @@ export default function PdfViewer({
         case 'squiggly':
           applyMarkup('squiggly', action.color?.rgb ?? UNDERLINE_COLOR)
           break
+        case 'comment': {
+          // Highlight the selection and open the regular annotation popover
+          // right away, focused on the comment field — identical to marking
+          // and then clicking the mark, minus the second click. The comment
+          // lives in the highlight itself; nothing extra floats on the page.
+          if (!menu || menu.mode !== 'selection') break
+          const { x, y } = menu
+          const perPage = collectSelectionRects()
+          setMenu(null)
+          if (perPage.length === 0) break
+          const color = markupDefaultColor('highlight')
+          let lastHandle: AnnotHandle | null = null
+          for (const { pageNumber, rects } of perPage) {
+            lastHandle = persistAnnotation(pageNumber, 'highlight', rects, color, HIGHLIGHT_FILL_ALPHA)
+          }
+          if (lastHandle) {
+            setSelected({ pageNumber: lastHandle.pageNumber, localId: lastHandle.localId })
+            setAnnotPopover({
+              x,
+              y,
+              pageNumber: lastHandle.pageNumber,
+              localId: lastHandle.localId,
+              focusText: true
+            })
+          }
+          window.getSelection()?.removeAllRanges()
+          break
+        }
         case 'note': {
           if (!menu) break
           if (menu.mode === 'selection') {
@@ -2037,7 +2078,7 @@ export default function PdfViewer({
         }
         case 'snip': {
           setMenu(null)
-          setSnipActive(true)
+          setSnip({ target: 'quick' })
           break
         }
         case 'reference':
@@ -2084,10 +2125,12 @@ export default function PdfViewer({
 
   /** Snip-to-explain: locate the page under the dragged box, re-render that
    *  region offscreen at a readable resolution (the on-screen canvas may be
-   *  low-res at fit-width), and open the quick popover in figure mode. */
+   *  low-res at fit-width), then either open the quick popover in figure
+   *  mode ('quick') or stage the region as a chat attachment ('chat'). */
   const onSnipDone = useCallback(
     (snipRect: { x: number; y: number; w: number; h: number }) => {
-      setSnipActive(false)
+      const target = snip?.target ?? 'quick'
+      setSnip(null)
       if (!pdf) return
       // Pick the page with the largest overlap; clamp the box to it
       const pages = containerRef.current?.querySelectorAll<HTMLElement>('.pdf-page') ?? []
@@ -2113,10 +2156,15 @@ export default function PdfViewer({
           const cur = scaleRef.current
           // Aim for ~900px crop width so axis labels stay legible, capped so
           // tiny boxes don't explode and the canvas stays within safe limits
-          const target = Math.min(Math.max((900 / cw) * cur, cur), 4, (4000 / cw) * cur, (4000 / ch) * cur)
-          const k = target / cur
+          const targetScale = Math.min(
+            Math.max((900 / cw) * cur, cur),
+            4,
+            (4000 / cw) * cur,
+            (4000 / ch) * cur
+          )
+          const k = targetScale / cur
           const viewport = page.getViewport({
-            scale: target,
+            scale: targetScale,
             rotation: (page.rotate + rotationRef.current) % 360
           })
           const canvas = document.createElement('canvas')
@@ -2130,6 +2178,12 @@ export default function PdfViewer({
           await task.promise
           const dataUrl = canvas.toDataURL('image/png')
           const dataBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+          const image = { mediaType: 'image/png', dataBase64 }
+          if (target === 'chat') {
+            setChatSnip({ id: ++chatSnipSeqRef.current, image })
+            setAiPinned(true)
+            return
+          }
           let pageContext = ''
           try {
             const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
@@ -2144,15 +2198,51 @@ export default function PdfViewer({
             selection: '',
             pageNumber,
             pageContext,
-            image: { mediaType: 'image/png', dataBase64 }
+            image
           })
         } catch {
           /* a cancelled/failed render just drops the snip */
         }
       })()
     },
-    [pdf]
+    [pdf, snip]
   )
+
+  /** Toolbar note tool: click a page point, open the note draft there */
+  const placeNoteAt = useCallback(
+    (clientX: number, clientY: number) => {
+      setNotePlacing(false)
+      const pages = containerRef.current?.querySelectorAll<HTMLElement>('.pdf-page') ?? []
+      for (const el of pages) {
+        const r = el.getBoundingClientRect()
+        if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+          const [px, py] = pagePointFromClientRef.current?.(clientX, clientY, el) ?? [0, 0]
+          setNoteDraft({
+            x: clientX,
+            y: clientY,
+            pageNumber: Number(el.dataset.page),
+            anchor: { x: px, y: py, w: 20, h: 20 }
+          })
+          return
+        }
+      }
+    },
+    []
+  )
+
+  // Esc disarms the note tool (capture: the keypress only cancels placement)
+  useEffect(() => {
+    if (!notePlacing) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setNotePlacing(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [notePlacing])
 
   const saveNote = useCallback(
     (text: string) => {
@@ -3520,6 +3610,10 @@ export default function PdfViewer({
           }}
           aiOpen={aiPinned}
           onToggleAi={() => setAiPinned((o) => !o)}
+          snipActive={!!snip}
+          onToggleSnip={() => setSnip((s) => (s ? null : { target: 'quick' }))}
+          noteActive={notePlacing}
+          onToggleNote={() => setNotePlacing((v) => !v)}
           onOpenAiSettings={() => {
             setAiPinned(true)
             setAiSettingsAskId((n) => n + 1)
@@ -3768,6 +3862,9 @@ export default function PdfViewer({
                   setAiPeek(false)
                   setAiPinned(false)
                 }}
+                chatSnip={chatSnip}
+                onChatSnipConsumed={() => setChatSnip(null)}
+                onRequestSnip={() => setSnip({ target: 'chat' })}
               />
             </div>
           </div>
@@ -3864,7 +3961,18 @@ export default function PdfViewer({
       )}
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
-      {snipActive && <SnipOverlay onDone={onSnipDone} onCancel={() => setSnipActive(false)} />}
+      {snip && <SnipOverlay onDone={onSnipDone} onCancel={() => setSnip(null)} />}
+      {notePlacing && (
+        <div
+          className="note-place-overlay"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            placeNoteAt(e.clientX, e.clientY)
+          }}
+        >
+          <div className="snip-hint">{t('note.hint')}</div>
+        </div>
+      )}
       {aiQuick && (
         <AiQuickPopover
           state={aiQuick}
@@ -3897,12 +4005,14 @@ export default function PdfViewer({
             <AnnotPopover
               x={annotPopover.x}
               y={annotPopover.y}
+              focusText={annotPopover.focusText}
               annotation={record}
               onColor={(color) => changeAnnotation(annotPopover.pageNumber, record, { color })}
               onContents={(contents) =>
                 changeAnnotation(annotPopover.pageNumber, record, { contents })
               }
               onDelete={() => removeAnnotation(annotPopover.pageNumber, record)}
+              onClose={() => setAnnotPopover(null)}
             />
           )
         })()}

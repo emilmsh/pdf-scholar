@@ -8,21 +8,33 @@ interface Props {
   x: number
   y: number
   annotation: PageAnnotation
+  /** Focus the comment field on open (immediate-comment flow) */
+  focusText?: boolean
   onColor(color: [number, number, number]): void
   onContents(text: string): void
   onDelete(): void
+  onClose(): void
 }
 
 export default function AnnotPopover({
   x,
   y,
   annotation,
+  focusText,
   onColor,
   onContents,
-  onDelete
+  onDelete,
+  onClose
 }: Props): React.JSX.Element {
   useLang()
   const [text, setText] = useState(annotation.contents ?? '')
+  const textRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (focusText) textRef.current?.focus()
+    // focus once on mount — not again on prop churn
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const left = Math.max(8, Math.min(x, window.innerWidth - 264))
   const top = Math.max(8, Math.min(y + 10, window.innerHeight - 240))
 
@@ -62,11 +74,22 @@ export default function AnnotPopover({
           here would just duplicate the box contents */}
       {annotation.type !== 'freetext' && (
         <textarea
+          ref={textRef}
           className="annot-popover-text"
           value={text}
           placeholder={annotation.type === 'note' ? t('popover.notePlaceholder') : t('popover.commentPlaceholder')}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            // Ctrl/Cmd+Enter and Esc both commit: closing unmounts the
+            // popover, and the unmount flush above saves the pending text
+            // exactly once. (The global Esc handler never sees keys from
+            // here — propagation stops below.)
+            if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || e.key === 'Escape') {
+              e.preventDefault()
+              onClose()
+            }
+            e.stopPropagation()
+          }}
         />
       )}
 

@@ -61,7 +61,9 @@ import {
   IconShapeSquare,
   IconShapes,
   IconSidebar,
+  IconSnip,
   IconSparkle,
+  IconNote,
   IconText,
   IconTextSettings
 } from './icons'
@@ -151,6 +153,12 @@ interface Props {
   onToggleReadAloud(): void
   aiOpen: boolean
   onToggleAi(): void
+  /** Snip-to-explain: armed = the crosshair overlay is up */
+  snipActive: boolean
+  onToggleSnip(): void
+  /** Note placement: armed = click-to-place overlay is up */
+  noteActive: boolean
+  onToggleNote(): void
   /** Open the assistant panel showing its key settings (gear-menu shortcut) */
   onOpenAiSettings(): void
   /** Toolbar auto-hide: pinned = always shown, unpinned = reveals on hover */
@@ -222,6 +230,10 @@ export default function Toolbar({
   onToggleReadAloud,
   aiOpen,
   onToggleAi,
+  snipActive,
+  onToggleSnip,
+  noteActive,
+  onToggleNote,
   onOpenAiSettings,
   toolbarPinned,
   onTogglePin,
@@ -406,6 +418,13 @@ export default function Toolbar({
             title={t('tb.textTip')}
           >
             <IconText />
+          </button>
+          <button
+            className={`tb-btn${noteActive ? ' is-active' : ''}`}
+            onClick={onToggleNote}
+            title={t('tb.noteTip')}
+          >
+            <IconNote />
           </button>
           <div className="toolbar-sep" />
           <button
@@ -829,6 +848,13 @@ export default function Toolbar({
 
         <div className="toolbar-sep" />
 
+        <button
+          className={`tb-btn${snipActive ? ' is-active' : ''}`}
+          onClick={onToggleSnip}
+          title={t('tb.snipTip')}
+        >
+          <IconSnip />
+        </button>
         <button
           className={`tb-btn tb-labeled${aiOpen ? ' is-active' : ''}`}
           onClick={onToggleAi}

@@ -31,7 +31,8 @@
     "@embedpdf/engines": "^2.14.4",
     "@embedpdf/models": "^2.14.4",
     "@embedpdf/pdfium": "^2.14.4",
-    "electron-updater": "^6.8.9"
+    "electron-updater": "^6.8.9",
+    "katex": "^0.18.1"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
