@@ -1,17 +1,17 @@
-# PDFX — PDF Expert Cloning Spec (Windows)
+# PDFX — Product Spec (Windows)
 
-Condensed from verified research on PDF Expert (Readdle, Mac + iPad, 2026). Target: the Mac version's information architecture with the iPad's toolset/reading ergonomics, adapted to Windows.
+The app's own information architecture and toolset: a desktop-first shell (tab bar, split view, task-grouped toolbar) paired with a touch-friendly, expandable toolset concept for reading ergonomics, built natively for Windows.
 
 ## 1. Shell & Window
 - **Tab bar** at top for multiple open documents. Tab context menu: Rename (renames file), Reveal (show in Explorer), Close Other Tabs. Drag to reorder.
 - **Split view**: two documents, or two views of the same document, side by side; horizontal or vertical arrangement.
 - **Left sidebar** (toggle via panel icon) with exactly four tabs: **Thumbnails, Outline, Bookmarks, Annotations**.
-- **Top toolbar** grouped into task sections (Mac model): Annotate | Edit | Fill & Sign | Export, with sidebar/layout controls on the left and search on the right. Adopt iPad's **toolset** concept: named groups that expand inline; customization with ON TOOLBAR / MORE TOOLS drag sections and user-created toolsets.
+- **Top toolbar** grouped into task sections: Annotate | Edit | Fill & Sign | Export, with sidebar/layout controls on the left and search on the right. **Toolset** concept: named groups that expand inline; customization with ON TOOLBAR / MORE TOOLS drag sections and user-created toolsets.
 - **Distraction-free**: click the page center to hide/show all chrome. A page-number pill ("N of M") stays bottom-right (toggleable) and opens go-to-page when clicked. F11 full-screen removes everything.
 - Full **dark mode** app chrome, independent of page theme.
 
 ## 2. Reading & View Settings ("aA" popover)
-- **Themes: Day (default), Sepia, Night, Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement, beyond PDF Expert).
+- **Themes: Day (default), Sepia, Night, Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement).
 - **Brightness slider** (in-app overlay).
 - **Scroll**: vertical + continuous (desktop default) or horizontal + single-page (page-flip). Two-page spread with "first page alone" toggle.
 - **Zoom**: ctrl+wheel / trackpad pinch; fit-width and fit-page snap modes.
@@ -40,7 +40,7 @@ Condensed from verified research on PDF Expert (Readdle, Mac + iPad, 2026). Targ
 
 ## 5. Text-Selection Context Menu
 - PDF actions: **Copy, Highlight, Underline, Strikeout, Note**.
-- System-style actions (owner requirement): **Search Web** (default browser), **Define/Dictionary**, **Translate selection** (improvement over PDF Expert, which only translates whole documents), optionally Speak (Windows TTS).
+- System-style actions (owner requirement): **Search Web** (default browser), **Define/Dictionary**, **Translate selection** (per-selection, not just whole-document translation), optionally Speak (Windows TTS).
 - Right-click empty page area → place Note.
 
 ## 6. Annotations Panel + Export (sidebar 4th tab)
@@ -55,13 +55,13 @@ Condensed from verified research on PDF Expert (Readdle, Mac + iPad, 2026). Targ
 - Later: cross-file content search in the file browser.
 
 ## 8. Files, Recents, Windows Integration
-- **Mac model, not iPad**: no internal library — native filesystem. Home screen with Recents (last 20, newest first, Clear) and Favorites (custom order, color tags).
+- **No internal library** — native filesystem. Home screen with Recents (last 20, newest first, Clear) and Favorites (custom order, color tags).
 - **Explorer integration**: registered .pdf handler ("Open with"; first-run hint for setting default); single-instance routing; taskbar Jump List with Recent category.
 - **Remember per file**: last read position, zoom, view settings.
-- **Cloud (deferred, Phase 8)**: PDF Expert's own Mac version ships without 2-way sync — precedent that native filesystem + sync-client folders (OneDrive/Dropbox) is acceptable.
+- **Cloud (deferred, Phase 8)**: several established desktop PDF readers ship without 2-way sync — precedent that native filesystem + sync-client folders (OneDrive/Dropbox) is acceptable.
 
 ## 9. Interop Requirement (non-negotiable)
-Every annotation is written into the PDF as a standard annotation object with a proper appearance stream, via **incremental save** (original bytes preserved). Acceptance test per annotation type: create in PDFX → open in Acrobat Reader, PDF Expert (iPad), SumatraPDF → renders identically and remains editable.
+Every annotation is written into the PDF as a standard annotation object with a proper appearance stream, via **incremental save** (original bytes preserved). Acceptance test per annotation type: create in PDFX → open in Acrobat Reader, SumatraPDF → renders identically and remains editable.
 
 ## 10. Explicitly Out of Scope (post-parity stretch)
 AI chat, whole-document translation, measurement tools, OCR/Scan, text-to-speech reading, reflow mode, page editing UI, form creation, sound notes, stickers.

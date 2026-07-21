@@ -89,7 +89,7 @@ Sjekket 2026-07-10: **Ingen produkter heter eksakt «PDF Scholar»** (kun ett d�
 
 **Alternativer som ser ledige ut:** PaperGlass, PaperPane, RefLens. Beslutningen er Emils — arbeidstittelen PDFX fungerer inntil videre.
 
-**Designretning:** PDF Expert-roen i bunn + «scholarly» egenart — f.eks. akademisk typografi i KI-panelet, sitatkort med kildechips, dempet «lærd» aksent. Konkretiseres når navnet er valgt.
+**Designretning:** rolig, dempet grunntone + «scholarly» egenart — f.eks. akademisk typografi i KI-panelet, sitatkort med kildechips, dempet «lærd» aksent. Konkretiseres når navnet er valgt.
 
 ## Åpne spørsmål til Emil
 

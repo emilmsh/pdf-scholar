@@ -1,6 +1,6 @@
-# PDFX — PDF Expert clone for Windows
+# PDFX — PDF reader and annotator for Windows
 
-A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in Norwegian — respond in Norwegian). Product spec: `docs/SPEC.md`. Phased plan + architecture decisions: `docs/ROADMAP.md`. **Platform tiers + parity contract: `docs/PLATFORMS.md`** — Windows x64 is the reference; win-arm64/macOS/Linux and the extension are held to it, and any cross-platform divergence must be listed there. CI (`.github/workflows/ci.yml`) builds all three OSes on every push.
+A polished, native-feeling Windows PDF reader and annotator. Owner: Emil (communicates in Norwegian — respond in Norwegian). Product spec: `docs/SPEC.md`. Phased plan + architecture decisions: `docs/ROADMAP.md`. **Platform tiers + parity contract: `docs/PLATFORMS.md`** — Windows x64 is the reference; win-arm64/macOS/Linux and the extension are held to it, and any cross-platform divergence must be listed there. CI (`.github/workflows/ci.yml`) builds all three OSes on every push.
 
 ## Commands
 - `npm run dev` — full Electron app with HMR
@@ -37,4 +37,4 @@ A faithful Windows clone of PDF Expert (Readdle). Owner: Emil (communicates in N
 ## Conventions
 - UI strings in Norwegian bokmål. Code, comments, commit messages in English.
 - No new dependencies without checking the maintained/ESM story; prefer hand-rolling small things (see storage.ts).
-- Design language: PDF Expert — calm, muted chrome, accent `--accent` blue, generous whitespace; every visual choice should survive comparison with the original side by side.
+- Design language: calm, muted chrome, accent `--accent` blue, generous whitespace; every visual choice should hold up under close side-by-side scrutiny.

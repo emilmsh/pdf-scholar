@@ -1,6 +1,6 @@
 # PDFX — Veikart
 
-Mål: en så tro kopi av PDF Expert (Readdle) som mulig, for Windows. Hver fase skal gi en brukbar app. Detaljert funksjonsspesifikasjon: [docs/SPEC.md](docs/SPEC.md).
+Mål: en poliert, moderne PDF-leser og -annotator for Windows, med et informasjonsarkitektur og verktøysett som holder mål mot bransjens beste lesere. Hver fase skal gi en brukbar app. Detaljert funksjonsspesifikasjon: [docs/SPEC.md](docs/SPEC.md).
 
 **Arkitektur (besluttet 2026-07-09):** Electron + electron-vite + React + TypeScript. pdf.js (pdfjs-dist v6) er **lesemotoren** (rendering, tekstlag, søk, TOC). mupdf (offisiell WASM, npm) blir **annoteringsmotoren** (skriver standard PDF-annotasjoner med appearance streams, inkrementell lagring) bak et typet `AnnotationEngine`-grensesnitt i hovedprosessen. Annotasjoner tegnes av vårt eget React-overlegg — vi bruker ikke pdf.js sitt redigeringslag (det mangler underline/strikeout/notater og har kjente feil). Dette er samme arkitektur som Zotero/Okular. Merk: mupdf er AGPL — uproblematisk for personlig bruk; beslutning om ev. distribusjon tas ved fase 8 (åpen kildekode, kommersiell lisens, eller bytte til EmbedPDF/PDFium bak grensesnittet).
 
@@ -47,7 +47,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] Angre/gjør om for annotasjoner: Ctrl+Z / Ctrl+Shift+Z (også Ctrl+Y) som inverterbare motoroperasjoner — fungerer også på tvers av dokument-gjenåpninger (levert 2026-07-09, opprinnelig fase 5-punkt)
 - [ ] «Armert verktøy»-flyt (verktøyet forblir aktivt for gjentatt bruk)
 - [ ] Egendefinert fargevelger + opasitetskontroll (5-feltspalett finnes)
-- [ ] **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF/PDF Expert (iPad) og verifiser identisk visning — Emils manuelle test gjenstår
+- [ ] **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF og verifiser identisk visning — Emils manuelle test gjenstår
 
 ## Fase 5 — Fullt annoteringsverktøysett
 - [x] Penn og gjennomskinnelig markeringstusj: frihåndstegning med coalesced pointer events, farge- og breddevalg per verktøy, skrives som standard Ink-annotasjoner (rundtur verifisert); Esc avslutter verktøyet (levert 2026-07-10)
@@ -80,7 +80,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [ ] **Tosiders visning** (Emils bestilling 2026-07-12) — motstående sider (forside alene), layoutmotoren må lære rader
 - Fanelinje for flere dokumenter; delt visning
 - Stempler, signatur, verktøylinje-tilpasning
-- Designgjennomgang mot PDF Expert: avstander, ikoner, animasjoner, mørkt app-chrome
+- Designgjennomgang: avstander, ikoner, animasjoner, mørkt app-chrome
 
 ## Fase 9 — KI-assistent («PDF Scholar»-retningen; plan i docs/AI-PLAN.md)
 Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 referanseoppslag); fleksibel multi-leverandør fra start; forklar-utvalg som popover med «Send til chat»; **PDF Scholar som arbeidsnavn** (appen er PDF-leser først, KI-appene i Scholar-rommet er KI først — forvekslingsrisikoen er mindre relevant).

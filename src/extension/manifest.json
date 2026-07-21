@@ -3,7 +3,7 @@
   "name": "PDF Scholar",
   "short_name": "PDF Scholar",
   "version": "0.11.0",
-  "description": "PDF Expert-style leser og annotator — tar over PDF-visning i nettleseren.",
+  "description": "Leser og annotator — tar over PDF-visning i nettleseren.",
   "minimum_chrome_version": "120",
   "background": {
     "service_worker": "background.js",

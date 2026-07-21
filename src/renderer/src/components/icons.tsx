@@ -1,4 +1,4 @@
-// Small stroke-based icons in the style of PDF Expert's minimal line icons.
+// Small stroke-based icons, minimal line style.
 interface IconProps {
   size?: number
   className?: string

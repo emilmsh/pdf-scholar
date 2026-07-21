@@ -2323,7 +2323,7 @@ export default function PdfViewer({
     [openMenuAt]
   )
 
-  // PDF Expert-style: the menu pops up right after finishing a text selection;
+  // The menu pops up right after finishing a text selection;
   // a plain click hit-tests annotations and opens the properties popover
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
@@ -2354,7 +2354,7 @@ export default function PdfViewer({
         const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
         const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
         if (hit) {
-          // PDF Expert model: a single click SELECTS a text box (frame +
+          // Single click SELECTS a text box (frame +
           // drag-to-move); double-click opens the text editor.
           setSelected({ pageNumber, localId: hit.id })
           setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
@@ -3376,7 +3376,7 @@ export default function PdfViewer({
         e.preventDefault()
         manualZoom(scaleRef.current / 1.15)
       } else if (primaryMod(e) && e.key === '0') {
-        // Actual size (100%), matching Acrobat/PDF Expert convention
+        // Actual size (100%), matching standard PDF-reader convention
         e.preventDefault()
         manualZoom(1)
       } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {

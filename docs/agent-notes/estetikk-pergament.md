@@ -2,7 +2,7 @@
 
 Anbefaling: Gandalf-følelsen i TEMAET, ikke logoen. Innfør Pergament-tema + dobbeltlinje-detalj.
 Av ikonene bevarer (b) «rull + gul markering» merkevaren best (samme blå bakgrunn/komposisjon som i dag).
-Night røres ikke. Ingen pergament-tekstur/serif i brødtekst — det bryter PDF Expert-roen.
+Night røres ikke. Ingen pergament-tekstur/serif i brødtekst — det bryter roen i designet.
 
 ## Pergament (erstatter sepia-verdiene i app.css)
 
