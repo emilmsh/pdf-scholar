@@ -37,6 +37,8 @@ export default function App(): React.JSX.Element {
   useLang()
   const [tabs, setTabs] = useState<OpenTab[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
+  const activeIdRef = useRef(activeId)
+  activeIdRef.current = activeId
   const [recents, setRecents] = useState<RecentFile[]>([])
   const [settings, setSettingsState] = useState<Settings>(FALLBACK_SETTINGS)
   const [systemDark, setSystemDark] = useState(
@@ -457,10 +459,10 @@ export default function App(): React.JSX.Element {
         cycleTab(e.shiftKey ? -1 : 1)
       } else if (primaryMod(e) && (e.key === 'w' || e.key === 'W')) {
         e.preventDefault()
-        setActiveId((current) => {
-          if (current) closeTab(current)
-          return current
-        })
+        // Read the active id from a ref, not a setActiveId updater: closing runs
+        // its own setActiveId to pick the neighbour, and returning `current` from
+        // an outer updater would clobber that and leave no active tab.
+        if (activeIdRef.current) closeTab(activeIdRef.current)
       } else if (primaryMod(e) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault()
         bridge.newWindow()
