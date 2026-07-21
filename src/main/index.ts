@@ -499,6 +499,16 @@ function registerIpc(): void {
     return 'discard'
   })
 
+  // Silent draft discard, no prompt. The renderer only calls this when the
+  // edits are known to be safe elsewhere: «save a copy» flushed them into the
+  // copy the tab is switching to, and the original must stay as it was.
+  ipcMain.handle('doc:discard', async (_e, path: string) => {
+    // Drop cached changes FIRST: a late debounced flush must not resurrect
+    // the draft file we are about to delete
+    await dropAnnotations(draftPathFor(path)).catch(() => {})
+    discardDraft(path)
+  })
+
   ipcMain.on('shell:open-external', (_e, url: string) => {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
   })

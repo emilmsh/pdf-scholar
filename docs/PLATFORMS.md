@@ -68,6 +68,12 @@ not as acceptable platform lag.
    GitHub-release check + dismissible notice
    (`src/renderer/src/extension-update.ts`), gated on
    `chrome.management.getSelf().installType === 'development'`.
+9. **«Save a copy» adopts the copy on desktop only**: after the save dialog,
+   the tab switches to the new file (same reading position) and the original's
+   draft is discarded — work continues in the copy. The browser/extension
+   cannot reopen a file it just downloaded (no readable path back from a
+   download, and the FS Access picker handle is not a recents-addressable
+   file), so there it stays a plain export with a «Kopi lagret» toast.
 
 ## Maintenance rules
 

@@ -185,6 +185,7 @@ export default function ExtensionApp(): React.JSX.Element {
               onSettingsChange={updateSettings}
               onPresentationChange={() => {}}
               onDirtyChange={() => {}}
+              onSavedAs={() => {}} // extension: «save a copy» is a plain export (PLATFORMS.md §9)
               onClose={closeDocument}
             />
           </div>

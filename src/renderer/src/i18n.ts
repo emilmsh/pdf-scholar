@@ -247,7 +247,7 @@ const nb = {
   'viewer.savedCopy': 'Kopi lagret',
   'viewer.recovered': 'Ulagrede endringer fra forrige økt ble gjenopprettet',
   'tb.saveTip': 'Lagre endringer i PDF-en (Ctrl+S)',
-  'tb.saveAsTip': 'Lagre en kopi … (velg hvor på PC-en)',
+  'tb.saveAsTip': 'Lagre en kopi og fortsett i den … (originalen forblir uendret)',
   'tb.saveToDiskTip': 'Lagre til disk … (velg mappe, Ctrl+S)',
 
   // Read aloud
@@ -593,7 +593,7 @@ const en: Dict = {
   'viewer.savedCopy': 'Copy saved',
   'viewer.recovered': 'Unsaved changes from the previous session were recovered',
   'tb.saveTip': 'Save changes to the PDF (Ctrl+S)',
-  'tb.saveAsTip': 'Save a copy … (choose where on your PC)',
+  'tb.saveAsTip': 'Save a copy and continue in it … (the original stays untouched)',
   'tb.saveToDiskTip': 'Save to disk … (choose a folder, Ctrl+S)',
 
   'ra.playPause': 'Play / pause',

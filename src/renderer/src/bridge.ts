@@ -110,6 +110,7 @@ export const webApi: PdfxApi = {
   docIsDirty: async () => false,
   docSave: async () => ({ ok: true }),
   docConfirmClose: async () => 'discard',
+  docDiscard: async () => {},
   // Browser preview: a new browser tab stands in for a new app window
   newWindow: (path) => {
     window.open(path ? `${location.origin}/#open=${encodeURIComponent(path)}` : location.href, '_blank')

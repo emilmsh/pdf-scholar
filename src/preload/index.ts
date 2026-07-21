@@ -31,6 +31,7 @@ const api: PdfxApi = {
   docIsDirty: (path: string) => ipcRenderer.invoke('doc:is-dirty', path),
   docSave: (path: string) => ipcRenderer.invoke('doc:save', path),
   docConfirmClose: (path: string) => ipcRenderer.invoke('doc:confirm-close', path),
+  docDiscard: (path: string) => ipcRenderer.invoke('doc:discard', path),
   printFile: (path: string) => ipcRenderer.invoke('file:print', path),
   saveTextFile: (defaultName: string, content: string) =>
     ipcRenderer.invoke('file:save-text', defaultName, content),

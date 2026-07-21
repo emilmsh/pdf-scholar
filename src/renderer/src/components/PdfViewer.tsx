@@ -244,6 +244,9 @@ interface Props {
   onPresentationChange(presenting: boolean): void
   /** Unsaved-changes state (save model) — App needs it for close prompts */
   onDirtyChange(dirty: boolean): void
+  /** «Save a copy» wrote the current document (edits included) to `path` —
+   *  App switches this tab over to the copy so work continues there */
+  onSavedAs(path: string): void
   onClose(): void
 }
 
@@ -260,6 +263,7 @@ export default function PdfViewer({
   onSettingsChange,
   onPresentationChange,
   onDirtyChange,
+  onSavedAs,
   onClose
 }: Props): React.JSX.Element {
   useLang()
@@ -1441,6 +1445,10 @@ export default function PdfViewer({
   // Save a copy to a user-chosen location. Electron pulls the current bytes
   // (draft-or-original) from `path`; the browser serializes its live document
   // so the copy carries annotation edits — parity with the desktop draft.
+  // On desktop the copy is then ADOPTED: the tab switches to the new file at
+  // the same reading position, because saving a copy almost always means
+  // "keep the original untouched, continue working in the copy". The browser
+  // cannot reopen a file it just downloaded, so it keeps the toast-only flow.
   const saveDocumentAs = useCallback(async () => {
     const bytes = isElectron ? payload.data.slice() : ((await browserCurrentBytes(payload.path)) ?? payload.data.slice())
     const result = await bridge.saveFileAs(payload.name, bytes, payload.path)
@@ -1449,8 +1457,22 @@ export default function PdfViewer({
       showToast(t('viewer.saveFailed', { error: result.error }))
       return
     }
+    if (isElectron) {
+      // Seed the copy's reading position so the swapped-in viewer opens at
+      // the exact spot the user is looking at now
+      const current = computeCurrent()
+      if (current)
+        bridge.setPosition(result.path, {
+          ...current,
+          zoom: scaleRef.current,
+          rotation: rotationRef.current,
+          spread: spreadRef.current
+        })
+      onSavedAs(result.path)
+      return
+    }
     showToast(t('viewer.savedCopy'))
-  }, [payload.name, payload.data, payload.path, showToast])
+  }, [payload.name, payload.data, payload.path, showToast, computeCurrent, onSavedAs])
 
   /** Immutably patch one page's annotation list */
   const mutatePage = useCallback(

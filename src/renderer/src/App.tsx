@@ -272,6 +272,43 @@ export default function App(): React.JSX.Element {
     [setTabDirty, confirmCloseVerdict]
   )
 
+  /** «Save a copy» semantics: continue working in the copy. The edits were
+   *  just flushed INTO the new file, so swap this tab over to it (the viewer
+   *  remounts on the fresh bytes) and silently drop the original's draft —
+   *  the whole point of saving a copy is that the original stays untouched,
+   *  and a surviving draft would resurrect the edits on its next open. */
+  const adoptSavedCopy = useCallback(
+    async (id: string, newPath: string) => {
+      const tab = tabsRef.current.find((t) => t.id === id)
+      if (!tab) return
+      const oldPath = tab.payload.path
+      // The save dialog may have overwritten a file that is open in another
+      // tab: that document was just replaced wholesale, so retire its tab
+      // (and any draft of its previous content) before this tab takes over
+      // the path — tabs must stay unique per path.
+      const other = tabsRef.current.find((t) => t.id !== id && t.payload.path === newPath)
+      if (other) {
+        await bridge.docDiscard(newPath)
+        reallyCloseTab(other.id)
+      }
+      const result = await bridge.readFile(newPath)
+      if ('error' in result) return // the copy is safely on disk; stay on the original
+      await bridge.docDiscard(oldPath)
+      if (oldPath !== newPath) {
+        bridge.docClosed(oldPath)
+        bridge.docOpened(newPath)
+      }
+      const initialPosition = await bridge.getPosition(newPath)
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
+        )
+      )
+      setTabDirty(id, false)
+    },
+    [reallyCloseTab, setTabDirty]
+  )
+
   const cycleTab = useCallback((delta: number) => {
     setActiveId((current) => {
       const list = tabsRef.current
@@ -418,6 +455,7 @@ export default function App(): React.JSX.Element {
                 onSettingsChange={updateSettings}
                 onPresentationChange={setPresenting}
                 onDirtyChange={(dirty) => setTabDirty(tab.id, dirty)}
+                onSavedAs={(path) => void adoptSavedCopy(tab.id, path)}
                 onClose={() => closeTab(tab.id)}
               />
             </div>

@@ -245,6 +245,10 @@ export interface PdfxApi {
   docSave(path: string): Promise<{ ok: true } | FileError>
   /** Native save/discard/cancel prompt; performs the chosen action */
   docConfirmClose(path: string): Promise<'save' | 'discard' | 'cancel'>
+  /** Silently drop the document's draft. Only safe when the edits are known
+   *  to live elsewhere — «save a copy» flushes them into the copy the app is
+   *  about to switch to, and the original must not resurrect them. */
+  docDiscard(path: string): Promise<void>
   /** Open the system print dialog for the PDF file */
   printFile(path: string): Promise<{ ok: true } | FileError>
   /** Save text content via a save dialog; null = user cancelled */
