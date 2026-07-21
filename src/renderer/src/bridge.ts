@@ -195,8 +195,13 @@ export const webApi: PdfxApi = {
     const answerB = doc
       ? ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
       : '.'
-    // Web-search toggle on → fake an external source so the chip UI is testable
-    const answerC = request.webSearch ? ' Et nettsøk bekrefter dette i en ekstern kilde.' : ''
+    // Fake an external source so the chip UI is testable: always in 'on' mode,
+    // in 'ask' mode only when the last user message looks like a search request
+    const lastUser = [...request.messages].reverse().find((m) => m.role === 'user')
+    const askedForWeb = /søk|search|nett|web/i.test(lastUser?.text ?? '')
+    const searching =
+      request.webSearch === 'on' || (request.webSearch === 'ask' && askedForWeb)
+    const answerC = searching ? ' Et nettsøk bekrefter dette i en ekstern kilde.' : ''
     const full = answerA + answerB + answerC
     // Few large chunks: background-tab timer clamping (≥1s) would make
     // word-by-word streaming crawl in the automated preview

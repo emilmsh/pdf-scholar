@@ -325,8 +325,10 @@ const nb = {
   'ai.attachTip': 'Legg ved bilde',
   'ai.removeImageTip': 'Fjern bilde',
   'ai.imageAlt': 'Vedlagt bilde',
-  'ai.webSearchOffTip': 'Nettsøk er av — klikk for å la assistenten søke på nettet',
-  'ai.webSearchOnTip': 'Nettsøk er på — assistenten kan søke på nettet ved behov',
+  'ai.webSearchOffTip': 'Nettsøk er stengt — klikk for å tillate søk når du ber om det',
+  'ai.webSearchAskTip':
+    'Nettsøk ved forespørsel — assistenten søker bare når du ber om det i meldingen. Klikk for alltid på.',
+  'ai.webSearchOnTip': 'Nettsøk er på — assistenten søker på nettet ved behov. Klikk for å stenge.',
   'ai.quickQuestion': '{title}: «{selection}» (s. {page})',
   'ai.mockOnlyWeb': 'Nettleser-forhåndsvisningen støtter kun mock-leverandøren. Bruk appen for ekte KI.',
   'ai.calloutMock':
@@ -674,8 +676,10 @@ const en: Dict = {
   'ai.attachTip': 'Attach image',
   'ai.removeImageTip': 'Remove image',
   'ai.imageAlt': 'Attached image',
-  'ai.webSearchOffTip': 'Web search is off — click to let the assistant search the web',
-  'ai.webSearchOnTip': 'Web search is on — the assistant can search the web when needed',
+  'ai.webSearchOffTip': 'Web search is closed — click to allow searching when you ask for it',
+  'ai.webSearchAskTip':
+    'Web search on request — the assistant only searches when your message asks for it. Click for always on.',
+  'ai.webSearchOnTip': 'Web search is on — the assistant searches the web when needed. Click to close.',
   'ai.quickQuestion': '{title}: «{selection}» (p. {page})',
   'ai.mockOnlyWeb': 'The browser preview only supports the mock provider. Use the app for real AI.',
   'ai.calloutMock':

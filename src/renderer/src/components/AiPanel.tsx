@@ -10,6 +10,7 @@ import type {
   AiContentPart,
   AiImage,
   AiProviderId,
+  AiWebSearchMode,
   ThinkingLevel
 } from '../../../shared/types'
 import { bridge } from '../bridge'
@@ -30,8 +31,7 @@ import {
   referenceSystem,
   referenceUserMessage,
   resolveCitation,
-  summaryPrompt,
-  WEB_SEARCH_HINT
+  summaryPrompt
 } from '../ai'
 import { t, useLang, locale } from '../i18n'
 import type { MsgKey } from '../i18n'
@@ -834,9 +834,10 @@ export default function AiPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   /** Images staged for the next composer send (pasted or attached) */
   const [pendingImages, setPendingImages] = useState<AiImage[]>([])
-  /** Composer globe toggle: let the model search the web this conversation.
-   *  Off by default — document-derived queries leave for third parties. */
-  const [webSearch, setWebSearch] = useState(false)
+  /** Composer globe: three web-search modes cycled by click. 'ask' is the
+   *  default — the tool is attached but nothing leaves the machine unless
+   *  the user's own message explicitly asks for a web lookup. */
+  const [webSearch, setWebSearch] = useState<AiWebSearchMode>('ask')
   const webSearchRef = useRef(webSearch)
   webSearchRef.current = webSearch
 
@@ -954,13 +955,12 @@ export default function AiPanel({
       if (ensured) setDocReady(true)
       const requestId = nextRequestId()
       currentIdRef.current = requestId
-      const useWeb = webSearchRef.current
       const result = await bridge.aiChat({
         requestId,
-        system: chatSystem() + (useWeb ? WEB_SEARCH_HINT : ''),
+        system: chatSystem(),
         messages: history,
         document: ensured ? { title: docTitle, text: ensured.doc.text } : null,
-        webSearch: useWeb || undefined
+        webSearch: webSearchRef.current
       })
       currentIdRef.current = null
       setStreamText('')
@@ -1187,9 +1187,17 @@ export default function AiPanel({
             config?.provider === 'openai' ||
             config?.provider === 'mock') && (
             <button
-              className={`ai-attach-add${webSearch ? ' on' : ''}`}
-              title={t(webSearch ? 'ai.webSearchOnTip' : 'ai.webSearchOffTip')}
-              onClick={() => setWebSearch((s) => !s)}
+              className={`ai-attach-add${webSearch === 'off' ? '' : ` ${webSearch}`}`}
+              title={t(
+                webSearch === 'on'
+                  ? 'ai.webSearchOnTip'
+                  : webSearch === 'ask'
+                    ? 'ai.webSearchAskTip'
+                    : 'ai.webSearchOffTip'
+              )}
+              onClick={() =>
+                setWebSearch((m) => (m === 'off' ? 'ask' : m === 'ask' ? 'on' : 'off'))
+              }
             >
               <IconGlobe size={16} />
             </button>
@@ -1539,7 +1547,11 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         // page-local (figure carries its snip as an image instead).
         document: usesDocument && state.document
           ? { title: state.document.title, text: state.document.text }
-          : null
+          : null,
+        // Context-menu actions have no globe toggle — always instruction-gated:
+        // «sjekk denne referansen på nettet» in a free-form question just works,
+        // but nothing is searched unless the user asked for it.
+        webSearch: 'ask'
       })
       if (stale) return
       setDone(true)

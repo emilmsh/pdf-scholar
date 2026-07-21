@@ -307,15 +307,6 @@ GROUNDING
 - If the document does not answer the question, say so plainly instead of guessing. Never invent quotes, numbers or references.`
 }
 
-/** Appended to the chat system prompt when the composer's web-search toggle
- *  is on. English on purpose — model-facing instructions stay English for
- *  both UI languages (same rule as the quote contract in ai-chat.ts). */
-export const WEB_SEARCH_HINT = `
-
-WEB SEARCH
-- You have a web_search tool. Use it when the answer needs information beyond the document — verifying or looking up a reference, finding related work, or anything recent — rather than answering from memory.
-- Keep document claims grounded in the document as before; cite web sources for external claims so the user can open them.`
-
 export function explainSystem(mode: 'explain' | 'simplify'): string {
   if (getLanguage() === 'nb') {
     const task =

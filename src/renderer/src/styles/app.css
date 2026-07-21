@@ -3145,7 +3145,17 @@ button {
   color: var(--text);
 }
 
-/* Web-search toggle lit while active */
+/* Web-search globe, three modes: off = muted (base style), ask = accent
+   outline only (tool armed, fires on request), on = filled pill (proactive) */
+.ai-attach-add.ask {
+  color: var(--accent);
+}
+
+.ai-attach-add.ask:hover {
+  background: var(--hover);
+  color: var(--accent);
+}
+
 .ai-attach-add.on,
 .ai-attach-add.on:hover {
   color: var(--accent);

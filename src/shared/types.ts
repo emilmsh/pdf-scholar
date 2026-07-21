@@ -164,15 +164,21 @@ export interface AiMessage {
   images?: AiImage[]
 }
 
+/** Web-search availability for a chat request. 'off' = tool not attached;
+ *  'ask' = tool attached but the model may only use it when the user's
+ *  message explicitly asks for a web lookup; 'on' = the model searches
+ *  whenever it judges the answer needs external information. */
+export type AiWebSearchMode = 'off' | 'ask' | 'on'
+
 export interface AiChatRequest {
   requestId: number
   system: string
   messages: AiMessage[]
   /** Page-joined document text; sent with citations enabled where supported */
   document: { title: string; text: string } | null
-  /** Let the model search the web (server-side provider tool). Only honored
-   *  by providers that support it (Anthropic, OpenAI); others ignore it. */
-  webSearch?: boolean
+  /** Web-search mode (server-side provider tool). Only honored by providers
+   *  that support it (Anthropic, OpenAI); others ignore it. Absent = 'off'. */
+  webSearch?: AiWebSearchMode
 }
 
 /** Normalized citation. 'char' = offsets into the document text we sent
