@@ -54,9 +54,17 @@ Individual account now costs nothing.
    set the privacy policy URL to
    `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`, and submit
    for certification (typically 1–3 days).
+5b. **[Emil]** In the submission's **Properties → Product declarations**, tick
+   **"This product incorporates generative AI features…"** — the app ships an AI
+   assistant that generates text, so Store policy **11.16** requires the
+   declaration. (Certification of v0.17.1 failed on this; it's a checkbox, not a
+   code change.)
 6. Notes already handled in code/config: electron-updater disables itself in
    Store installs (`process.windowsStore`); the `.pdf` file association rides
-   along in the MSIX manifest via `fileAssociations`.
+   along in the MSIX manifest via `fileAssociations`; the MSIX tile + logo
+   assets live in `build/appx/` (regenerate with `npm run icons:appx` after any
+   icon change — WITHOUT them electron-builder ships its default placeholder
+   logo, which fails Store policy **10.1.1.11**, as v0.17.1's certification did).
 
 Version bumps: run `dist:store` again and add the new packages to a new
 submission. (This can be folded into `release.yml` later once the identity

@@ -6,7 +6,9 @@
 # PFN: EmilMathiasStrmHalseth.PDFScholar_9ddn91dy4x8sa.
 # The package is deliberately left unsigned — the Store signs it on ingestion.
 # electron-updater is auto-disabled in Store installs (process.windowsStore).
-extends: ./electron-builder.yml
+# NB: `extends` resolves relative to projectDir (the repo root), NOT this file's
+# folder — so it must include the `config/` prefix (app-builder-lib load.ts:96).
+extends: config/electron-builder.yml
 win:
   target:
     - target: appx

@@ -13,6 +13,7 @@
     "build:ext": "vite build --config config/vite.extension.config.ts",
     "pack:ext": "npm run build:ext && node scripts/pack-extension.mjs",
     "icons:ext": "electron scripts/render-extension-icons.cjs",
+    "icons:appx": "electron scripts/render-appx-tiles.cjs",
     "start": "electron-vite preview --config config/electron.vite.config.ts",
     "typecheck": "tsc --noEmit -p config/tsconfig.web.json && tsc --noEmit -p config/tsconfig.node.json && tsc --noEmit -p config/tsconfig.extension.json",
     "sample": "node scripts/make-sample-pdf.mjs",
