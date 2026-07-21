@@ -51,6 +51,11 @@ const DEFAULT_SETTINGS: Settings = {
  *  handle and fall back to a save-picker (see docSave). */
 const handles = new Map<string, FileSystemFileHandle>()
 
+/** Original file's `lastModified` at the moment its handle was captured —
+ *  the baseline docWasModifiedExternally compares against before an
+ *  overwrite-via-handle save. */
+const handleBaseline = new Map<string, number>()
+
 /** The extension viewer URL for a given source path/URL. */
 function viewerUrl(path: string): string {
   const base = chrome?.runtime?.getURL('viewer.html') ?? 'viewer.html'
@@ -112,6 +117,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         const file = await handle.getFile()
         const path = `fsa:${file.name}`
         handles.set(path, handle)
+        handleBaseline.set(path, file.lastModified)
         recordRecent({ path, name: file.name })
         return { path, name: file.name, data: new Uint8Array(await file.arrayBuffer()) }
       } catch {
@@ -176,12 +182,29 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
           const writable = await handle.createWritable()
           await writable.write(data as unknown as BufferSource)
           await writable.close()
+          // This write IS the new baseline — otherwise every later save would
+          // keep flagging a "conflict" against the pre-fix mtime forever.
+          handleBaseline.set(path, (await handle.getFile()).lastModified)
           return { path }
         } catch (err) {
           return { error: err instanceof Error ? err.message : String(err) }
         }
       }
       return saveViaPicker(name, data, base)
+    },
+
+    // True when the file behind a retained handle changed since it was
+    // captured — a URL-opened PDF (no handle) has no in-place target, so
+    // there is nothing to conflict with.
+    docWasModifiedExternally: async (path): Promise<boolean> => {
+      const handle = handles.get(path)
+      const baseline = handleBaseline.get(path)
+      if (!handle || baseline == null) return false
+      try {
+        return (await handle.getFile()).lastModified > baseline
+      } catch {
+        return false
+      }
     }
   }
 }

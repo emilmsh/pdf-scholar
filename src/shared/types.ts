@@ -252,10 +252,22 @@ export interface PdfxApi {
   docClosed(path: string): void
   /** True when the document has unsaved annotation changes (a draft exists) */
   docIsDirty(path: string): Promise<boolean>
+  /** True when the original file changed outside the app since this session
+   *  started annotating it — checked before Save so an in-place write never
+   *  silently clobbers a newer external version. Always false when there is
+   *  no real overwrite-in-place target for `path` (e.g. a URL-opened PDF in
+   *  the browser/extension) — nothing to conflict with. */
+  docWasModifiedExternally(path: string): Promise<boolean>
   /** Write the draft back over the original file */
   docSave(path: string): Promise<{ ok: true } | FileError>
   /** Native save/discard/cancel prompt; performs the chosen action */
   docConfirmClose(path: string): Promise<'save' | 'discard' | 'cancel'>
+  /** Native prompt shown when re-opening a path whose tab has unsaved
+   *  annotations AND the on-disk file has changed underneath it — a plain
+   *  reload would silently drop the annotated draft. Question only, no
+   *  action performed: 'save' means the caller should still run the
+   *  save-a-copy flow (saveFileAs) before discarding/reloading. */
+  docConfirmExternalUpdate(path: string): Promise<'save' | 'discard' | 'cancel'>
   /** Silently drop the document's draft. Only safe when the edits are known
    *  to live elsewhere — «save a copy» flushes them into the copy the app is
    *  about to switch to, and the original must not resurrect them. */

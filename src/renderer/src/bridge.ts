@@ -108,8 +108,10 @@ export const webApi: PdfxApi = {
   docOpened: () => {},
   docClosed: () => {},
   docIsDirty: async () => false,
+  docWasModifiedExternally: async () => false,
   docSave: async () => ({ ok: true }),
   docConfirmClose: async () => 'discard',
+  docConfirmExternalUpdate: async () => 'discard',
   docDiscard: async () => {},
   // Browser preview: a new browser tab stands in for a new app window
   newWindow: (path) => {

@@ -133,33 +133,6 @@ export default function App(): React.JSX.Element {
 
   // ---------- Tabs ----------
 
-  const openPayload = useCallback(async (payload: FilePayload) => {
-    const existing = tabsRef.current.find((t) => t.payload.path === payload.path)
-    if (existing) {
-      setActiveId(existing.id)
-      setError(null)
-      // The file may have changed on disk since the tab loaded (opening an
-      // updated PDF from Explorer must never show stale bytes). Reload with
-      // the fresh payload — unless the tab has unsaved annotations, which the
-      // reader must not lose to an external update.
-      if (!dirtyTabsRef.current.has(existing.id)) {
-        const initialPosition = await bridge.getPosition(payload.path)
-        setTabs((prev) =>
-          prev.map((t) =>
-            t.id === existing.id ? { ...t, payload, initialPosition, epoch: t.epoch + 1 } : t
-          )
-        )
-      }
-      return
-    }
-    const initialPosition = await bridge.getPosition(payload.path)
-    const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition, epoch: 0 }
-    bridge.docOpened(payload.path)
-    setTabs((prev) => [...prev, tab])
-    setActiveId(tab.id)
-    setError(null)
-  }, [])
-
   const reallyCloseTab = useCallback((id: string) => {
     setTabs((prev) => {
       const index = prev.findIndex((t) => t.id === id)
@@ -208,6 +181,108 @@ export default function App(): React.JSX.Element {
       return 'save'
     },
     []
+  )
+
+  /** Browser stand-in for the external-update prompt below — same three
+   *  verdicts, wording tailored to "the file changed under your feet". */
+  const [externalUpdateState, setExternalUpdateState] = useState<{
+    name: string
+    resolve(verdict: 'save' | 'discard' | 'cancel'): void
+  } | null>(null)
+
+  /** Asks what to do when re-opening a path whose tab has unsaved marks AND
+   *  the file on disk has changed since — a plain reload would silently drop
+   *  the annotated draft. Unlike confirmCloseVerdict, 'save' here always
+   *  means "save a copy" (a destination picker, never overwrite `path` in
+   *  place — it now holds someone else's content). A cancelled/failed copy
+   *  save downgrades to 'cancel' so the caller keeps the old tab untouched. */
+  const confirmExternalUpdateVerdict = useCallback(
+    async (path: string, name: string): Promise<'save' | 'discard' | 'cancel'> => {
+      let verdict: 'save' | 'discard' | 'cancel'
+      if (isElectron) {
+        verdict = await bridge.docConfirmExternalUpdate(path)
+      } else {
+        verdict = await new Promise<'save' | 'discard' | 'cancel'>((resolve) =>
+          setExternalUpdateState({ name, resolve })
+        )
+        setExternalUpdateState(null)
+      }
+      if (verdict !== 'save') return verdict
+      const bytes = isElectron ? new Uint8Array() : await browserCurrentBytes(path)
+      if (!bytes) return 'cancel'
+      const result = await bridge.saveFileAs(name, bytes, path)
+      if (!result || 'error' in result) return 'cancel'
+      return 'save'
+    },
+    []
+  )
+
+  const openPayload = useCallback(
+    async (payload: FilePayload) => {
+      const existing = tabsRef.current.find((t) => t.payload.path === payload.path)
+      if (existing) {
+        setError(null)
+        // The file may have changed on disk since the tab loaded (opening an
+        // updated PDF from Explorer, or dropping a same-named file, must never
+        // show stale bytes). Reload with the fresh payload — unless the tab
+        // has unsaved annotations, which must not be lost to an external
+        // update without the user getting a chance to keep them as a copy.
+        if (dirtyTabsRef.current.has(existing.id)) {
+          const verdict = await confirmExternalUpdateVerdict(
+            existing.payload.path,
+            existing.payload.name
+          )
+          if (verdict === 'cancel') {
+            setActiveId(existing.id)
+            return
+          }
+          await bridge.docDiscard(existing.payload.path)
+          setTabDirty(existing.id, false)
+        }
+        setActiveId(existing.id)
+        const initialPosition = await bridge.getPosition(payload.path)
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === existing.id ? { ...t, payload, initialPosition, epoch: t.epoch + 1 } : t
+          )
+        )
+        return
+      }
+      const initialPosition = await bridge.getPosition(payload.path)
+      const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition, epoch: 0 }
+      bridge.docOpened(payload.path)
+      setTabs((prev) => [...prev, tab])
+      setActiveId(tab.id)
+      setError(null)
+    },
+    [confirmExternalUpdateVerdict, setTabDirty]
+  )
+
+  /** Called by the viewer when Save/Ctrl+S finds the file changed outside the
+   *  app since editing began — the same menu as re-opening a stale path, just
+   *  reached from the other direction. 'save' has already flushed the old
+   *  draft into a copy by the time this resolves; 'save' and 'discard' both
+   *  retire the draft and reload the tab with the fresh external bytes so
+   *  there is nothing stale left to (over)write. */
+  const handleSaveExternalConflict = useCallback(
+    async (path: string, name: string): Promise<'save' | 'discard' | 'cancel'> => {
+      const verdict = await confirmExternalUpdateVerdict(path, name)
+      if (verdict === 'cancel') return verdict
+      const existing = tabsRef.current.find((t) => t.payload.path === path)
+      await bridge.docDiscard(path)
+      if (existing) setTabDirty(existing.id, false)
+      const result = await bridge.readFile(path)
+      if (existing && !('error' in result)) {
+        const initialPosition = await bridge.getPosition(path)
+        setTabs((prev) =>
+          prev.map((t) =>
+            t.id === existing.id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
+          )
+        )
+      }
+      return verdict
+    },
+    [confirmExternalUpdateVerdict, setTabDirty]
   )
 
   /** Close with the unsaved-changes prompt when the tab is dirty */
@@ -322,9 +397,16 @@ export default function App(): React.JSX.Element {
     async (path: string) => {
       const existing = tabsRef.current.find((t) => t.payload.path === path)
       if (existing && dirtyTabsRef.current.has(existing.id)) {
-        // Unsaved annotations trump the external update — just focus the tab
-        setActiveId(existing.id)
-        return
+        const verdict = await confirmExternalUpdateVerdict(path, existing.payload.name)
+        if (verdict === 'cancel') {
+          // Unsaved annotations trump the external update — just focus the tab
+          setActiveId(existing.id)
+          return
+        }
+        // 'save' (copy flushed elsewhere) or 'discard': the old draft is no
+        // longer needed — drop it and fall through to load the fresh bytes.
+        await bridge.docDiscard(path)
+        setTabDirty(existing.id, false)
       }
       // Existing-but-clean tabs fall through: re-read so an externally updated
       // file shows its latest bytes (openPayload swaps them into the tab).
@@ -339,7 +421,7 @@ export default function App(): React.JSX.Element {
       }
       await openPayload(result)
     },
-    [openPayload]
+    [openPayload, confirmExternalUpdateVerdict, setTabDirty]
   )
 
   const openDialog = useCallback(async () => {
@@ -456,6 +538,7 @@ export default function App(): React.JSX.Element {
                 onPresentationChange={setPresenting}
                 onDirtyChange={(dirty) => setTabDirty(tab.id, dirty)}
                 onSavedAs={(path) => void adoptSavedCopy(tab.id, path)}
+                onExternalSaveConflict={handleSaveExternalConflict}
                 onClose={() => closeTab(tab.id)}
               />
             </div>
@@ -528,6 +611,37 @@ export default function App(): React.JSX.Element {
               </button>
               <button className="btn-primary" autoFocus onClick={() => confirmState.resolve('save')}>
                 {t('app.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {externalUpdateState && (
+        <div className="confirm-overlay" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+            <p className="confirm-message">
+              {t('app.confirmExternalUpdateMessage', { name: externalUpdateState.name })}
+            </p>
+            <p className="confirm-detail">{t('app.confirmExternalUpdateDetail')}</p>
+            <div className="confirm-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => externalUpdateState.resolve('cancel')}
+              >
+                {t('app.cancel')}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => externalUpdateState.resolve('discard')}
+              >
+                {t('app.dontSave')}
+              </button>
+              <button
+                className="btn-primary"
+                autoFocus
+                onClick={() => externalUpdateState.resolve('save')}
+              >
+                {t('app.saveCopy')}
               </button>
             </div>
           </div>

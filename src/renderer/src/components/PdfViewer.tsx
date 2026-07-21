@@ -248,6 +248,13 @@ interface Props {
   /** «Save a copy» wrote the current document (edits included) to `path` —
    *  App switches this tab over to the copy so work continues there */
   onSavedAs(path: string): void
+  /** Save/Ctrl+S found the file changed outside the app since editing began.
+   *  App runs the same save-copy/discard/cancel menu as re-opening a stale
+   *  path and, unless cancelled, reloads this tab with the fresh bytes —
+   *  the caller only needs the verdict to decide whether it still owns a
+   *  save to perform (it never does; 'cancel' means "stay dirty, do nothing"
+   *  and the other two verdicts leave nothing left to save in place). */
+  onExternalSaveConflict(path: string, name: string): Promise<'save' | 'discard' | 'cancel'>
   onClose(): void
 }
 
@@ -265,6 +272,7 @@ export default function PdfViewer({
   onPresentationChange,
   onDirtyChange,
   onSavedAs,
+  onExternalSaveConflict,
   onClose
 }: Props): React.JSX.Element {
   useLang()
@@ -1420,6 +1428,15 @@ export default function PdfViewer({
   }, [payload.path])
 
   const saveDocument = useCallback(async () => {
+    // The file may have changed outside the app since editing began — an
+    // in-place save would silently clobber that external update. Ask first;
+    // App runs the same menu as re-opening a stale path and (unless
+    // cancelled) reloads this tab with the fresh bytes, so there is nothing
+    // left for this call to save either way.
+    if (await bridge.docWasModifiedExternally(payload.path)) {
+      await onExternalSaveConflict(payload.path, payload.name)
+      return
+    }
     // Electron writes annotation changes back to the file in place via the
     // in-process engine.
     if (isElectron) {
@@ -1449,7 +1466,7 @@ export default function PdfViewer({
     }
     setDirty(false)
     showToast(t('viewer.saved'))
-  }, [payload.path, payload.name, payload.data, showToast])
+  }, [payload.path, payload.name, payload.data, showToast, onExternalSaveConflict])
 
   // Save a copy to a user-chosen location. Electron pulls the current bytes
   // (draft-or-original) from `path`; the browser serializes its live document

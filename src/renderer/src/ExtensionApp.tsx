@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FilePayload, ReadingPosition, RecentFile, Settings, ThemeName } from '../../shared/types'
 import { bridge } from './bridge'
 import { setLanguage, t } from './i18n'
+import { browserCurrentBytes } from './annotation-engine-browser'
 import {
   checkForExtensionUpdate,
   skipExtensionUpdate,
@@ -37,6 +38,10 @@ export default function ExtensionApp(): React.JSX.Element {
   )
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  /** Bumped when the open document is replaced with fresh bytes in place
+   *  (external-update conflict) — forces PdfViewer to remount, matching
+   *  App.tsx's per-tab epoch (there's only ever one "tab" here). */
+  const [epoch, setEpoch] = useState(0)
 
   const resolvedTheme: ThemeName =
     settings.theme === 'auto'
@@ -154,6 +159,39 @@ export default function ExtensionApp(): React.JSX.Element {
     window.close()
   }, [])
 
+  // ---------- External-update conflict (Save finds the file changed) ----------
+  // No native dialog here (not Electron) — same in-app modal + verdicts as
+  // App.tsx's browser-fallback flow, adapted to this shell's single document
+  // (no tab list, no separate draft file — a "discard" is just re-reading).
+  const [externalUpdateState, setExternalUpdateState] = useState<{
+    name: string
+    resolve(verdict: 'save' | 'discard' | 'cancel'): void
+  } | null>(null)
+
+  const handleSaveExternalConflict = useCallback(
+    async (path: string, name: string): Promise<'save' | 'discard' | 'cancel'> => {
+      const verdict = await new Promise<'save' | 'discard' | 'cancel'>((resolve) =>
+        setExternalUpdateState({ name, resolve })
+      )
+      setExternalUpdateState(null)
+      if (verdict === 'save') {
+        const bytes = await browserCurrentBytes(path)
+        if (!bytes) return 'cancel'
+        const result = await bridge.saveFileAs(name, bytes, path)
+        if (!result || 'error' in result) return 'cancel'
+      }
+      if (verdict !== 'cancel') {
+        const fresh = await bridge.readFile(path)
+        if ('error' in fresh) return verdict
+        setInitialPosition(await bridge.getPosition(path))
+        setPayload(fresh)
+        setEpoch((e) => e + 1)
+      }
+      return verdict
+    },
+    []
+  )
+
   // Sideloaded installs have no update channel (only store installs
   // auto-update) — surface new releases with a dismissible toast instead.
   // Store installs never see this (see extension-update.ts).
@@ -177,6 +215,7 @@ export default function ExtensionApp(): React.JSX.Element {
         <div className="tab-views">
           <div className="tab-view active">
             <PdfViewer
+              key={`${payload.path}:${epoch}`}
               payload={payload}
               initialPosition={initialPosition}
               active
@@ -186,6 +225,7 @@ export default function ExtensionApp(): React.JSX.Element {
               onPresentationChange={() => {}}
               onDirtyChange={() => {}}
               onSavedAs={() => {}} // extension: «save a copy» is a plain export (PLATFORMS.md §9)
+              onExternalSaveConflict={handleSaveExternalConflict}
               onClose={closeDocument}
             />
           </div>
@@ -215,6 +255,37 @@ export default function ExtensionApp(): React.JSX.Element {
           >
             ✕
           </button>
+        </div>
+      )}
+      {externalUpdateState && (
+        <div className="confirm-overlay" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+            <p className="confirm-message">
+              {t('app.confirmExternalUpdateMessage', { name: externalUpdateState.name })}
+            </p>
+            <p className="confirm-detail">{t('app.confirmExternalUpdateDetail')}</p>
+            <div className="confirm-actions">
+              <button
+                className="btn-secondary"
+                onClick={() => externalUpdateState.resolve('cancel')}
+              >
+                {t('app.cancel')}
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => externalUpdateState.resolve('discard')}
+              >
+                {t('app.dontSave')}
+              </button>
+              <button
+                className="btn-primary"
+                autoFocus
+                onClick={() => externalUpdateState.resolve('save')}
+              >
+                {t('app.saveCopy')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

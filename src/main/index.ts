@@ -31,7 +31,15 @@ import {
   flushAnnotations,
   updateAnnotation
 } from './annotation-engine-embedpdf'
-import { discardDraft, draftPathFor, ensureDraft, hasDraft, readPathFor, saveDraft } from './drafts'
+import {
+  discardDraft,
+  draftPathFor,
+  ensureDraft,
+  hasDraft,
+  readPathFor,
+  saveDraft,
+  wasModifiedExternally
+} from './drafts'
 import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
 import { initUpdater } from './updater'
 
@@ -87,6 +95,43 @@ function dialogStrings(): {
         messageMany: (count) => `Do you want to save the changes to ${count} documents?`,
         detail: 'Your changes will be lost if you don’t save them.'
       }
+}
+
+/** Native prompt for a path whose draft is stale relative to disk — shared by
+ *  doc:confirm-external-update (re-opening a stale path) and doc:confirm-close
+ *  (choosing "Lagre" on a tab whose file changed since editing began). Never
+ *  touches the file itself; callers act on the verdict. */
+async function askExternalUpdateVerdict(
+  parent: BrowserWindow,
+  path: string
+): Promise<'save' | 'discard' | 'cancel'> {
+  const pref = getState().settings.language
+  const nb = pref === 'nb' || (pref === 'auto' && app.getLocale().toLowerCase().startsWith('n'))
+  const s = nb
+    ? {
+        buttons: ['Lagre kopi', 'Ikke lagre', 'Avbryt'],
+        message: `«${basename(path)}» er endret utenfor appen`,
+        detail:
+          'Du har ulagrede merker i den gamle versjonen. Lagre dem som en kopi før den nye versjonen lastes inn?'
+      }
+    : {
+        buttons: ['Save a copy', "Don't save", 'Cancel'],
+        message: `"${basename(path)}" has changed outside the app`,
+        detail:
+          'You have unsaved marks in the old version. Save them as a copy before the new version loads?'
+      }
+  const { response } = await dialog.showMessageBox(parent, {
+    type: 'question',
+    buttons: s.buttons,
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+    message: s.message,
+    detail: s.detail
+  })
+  if (response === 0) return 'save'
+  if (response === 1) return 'discard'
+  return 'cancel'
 }
 
 function pathFromArgv(argv: string[]): string | null {
@@ -284,9 +329,32 @@ function createWindow(openPath?: string | null): BrowserWindow {
         if (response === 2) return // Avbryt
         for (const path of dirty) {
           if (response === 0) {
-            // Pending annotation writes may still sit in the engine cache
-            await flushDraft(path)
-            saveDraft(path)
+            // "Lagre alle" would overwrite each `path` in place. Any document
+            // whose file changed outside the app since editing began needs its
+            // own decision (save the old marks as a copy, or drop them) — a
+            // blind overwrite would clobber the newer external version. The
+            // common case (nothing changed) shows no extra dialogs.
+            if (wasModifiedExternally(path)) {
+              const nested = await askExternalUpdateVerdict(win, path)
+              if (nested === 'cancel') return // abort the whole close, keep every draft
+              if (nested === 'save') {
+                await flushDraft(path)
+                const result = await dialog.showSaveDialog(win, {
+                  defaultPath: basename(path),
+                  filters: [{ name: 'PDF', extensions: ['pdf'] }]
+                })
+                if (result.canceled || !result.filePath) return // cancelled picker aborts too
+                copyFileSync(readPathFor(path), result.filePath)
+              }
+              // 'save' (copy written elsewhere) or 'discard': the draft is
+              // spent and the original stays as the external update left it.
+              await dropAnnotations(draftPathFor(path)).catch(() => {})
+              discardDraft(path)
+            } else {
+              // Pending annotation writes may still sit in the engine cache
+              await flushDraft(path)
+              saveDraft(path)
+            }
           } else {
             // Drop cached changes FIRST so a late debounced flush can't
             // resurrect the draft file we're about to delete
@@ -457,6 +525,12 @@ function registerIpc(): void {
 
   ipcMain.handle('doc:is-dirty', (_e, path: string) => hasDraft(path))
 
+  // Checked by the renderer before Save/Ctrl+S: true when something outside
+  // the app touched the original file after this session started annotating
+  // it — proceeding with a plain in-place save would silently clobber that
+  // external update with the (now stale-based) draft.
+  ipcMain.handle('doc:was-modified-externally', (_e, path: string) => wasModifiedExternally(path))
+
   ipcMain.handle('doc:save', async (_e, path: string) => {
     try {
       // Persist pending cached annotation writes into the draft BEFORE it is
@@ -488,6 +562,30 @@ function registerIpc(): void {
     })
     if (response === 2) return 'cancel'
     if (response === 0) {
+      // "Lagre" would overwrite `path` in place — but if it changed outside
+      // the app since editing began, that write would clobber the newer
+      // external version. Ask again, this time offering to preserve the old
+      // annotated draft as a copy instead of silently losing one side or the
+      // other.
+      if (wasModifiedExternally(path)) {
+        const nested = await askExternalUpdateVerdict(parent, path)
+        if (nested === 'cancel') return 'cancel'
+        if (nested === 'save') {
+          await flushDraft(path)
+          const result = await dialog.showSaveDialog(parent, {
+            defaultPath: basename(path),
+            filters: [{ name: 'PDF', extensions: ['pdf'] }]
+          })
+          if (result.canceled || !result.filePath) return 'cancel'
+          copyFileSync(readPathFor(path), result.filePath)
+        }
+        // nested 'save' (copy safely written elsewhere) or 'discard' (user
+        // gave up the old edits): either way the draft is spent, and the
+        // original must stay untouched — the caller reloads it fresh.
+        await dropAnnotations(draftPathFor(path)).catch(() => {})
+        discardDraft(path)
+        return 'discard'
+      }
       await flushDraft(path)
       saveDraft(path)
       return 'save'
@@ -497,6 +595,18 @@ function registerIpc(): void {
     await dropAnnotations(draftPathFor(path)).catch(() => {})
     discardDraft(path)
     return 'discard'
+  })
+
+  // Shown when the renderer is about to re-open a path whose tab has an
+  // unsaved draft AND the file on disk has changed underneath it. Question
+  // only — 'save' tells the renderer to run the save-a-copy flow (which
+  // shows its own destination picker) before discarding/reloading; this
+  // handler must never touch the file itself, since path now holds someone
+  // else's content and doc:save's overwrite-in-place would clobber it.
+  ipcMain.handle('doc:confirm-external-update', async (e, path: string) => {
+    const parent = windowFor(e)
+    if (!parent) return 'discard'
+    return askExternalUpdateVerdict(parent, path)
   })
 
   // Silent draft discard, no prompt. The renderer only calls this when the
