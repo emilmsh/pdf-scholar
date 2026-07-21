@@ -293,6 +293,32 @@ export const IconGlobe = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** Crossed-out globe — web search closed ("no coverage") */
+export const IconGlobeOff = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <ellipse cx="12" cy="12" rx="4" ry="9" />
+    <path d="M3.5 9h17" />
+    <path d="M3.5 15h17" />
+    <path d="M4.2 4.2l15.6 15.6" />
+  </Svg>
+)
+
+/** The default globe with rays at the top-right — web search live/proactive.
+ *  Globe geometry is identical to IconGlobe so toggling never "shrinks" it;
+ *  the rays sit on the diagonal, the only corner with viewBox room. */
+export const IconGlobeLive = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <ellipse cx="12" cy="12" rx="4" ry="9" />
+    <path d="M3.5 9h17" />
+    <path d="M3.5 15h17" />
+    <path d="M20.9 6.9l2.2-1.3" />
+    <path d="M19.3 4.7l1.7-1.7" />
+    <path d="M17.2 3.1l1.2-2.2" />
+  </Svg>
+)
+
 export const IconBook = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M12 6.5c-1.8 -1.6 -4.2 -2 -7.5 -2v13c3.3 0 5.7 .4 7.5 2c1.8 -1.6 4.2 -2 7.5 -2v-13c-3.3 0 -5.7 .4 -7.5 2z" />

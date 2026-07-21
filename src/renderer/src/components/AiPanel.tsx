@@ -42,6 +42,8 @@ import { deleteConversation, loadConversations, newConversationId, saveConversat
 import {
   IconChevronDown,
   IconGlobe,
+  IconGlobeLive,
+  IconGlobeOff,
   IconHistory,
   IconImage,
   IconPlus,
@@ -1199,7 +1201,13 @@ export default function AiPanel({
                 setWebSearch((m) => (m === 'off' ? 'ask' : m === 'ask' ? 'on' : 'off'))
               }
             >
-              <IconGlobe size={16} />
+              {webSearch === 'off' ? (
+                <IconGlobeOff size={16} />
+              ) : webSearch === 'on' ? (
+                <IconGlobeLive size={16} />
+              ) : (
+                <IconGlobe size={16} />
+              )}
             </button>
           )}
           <button
