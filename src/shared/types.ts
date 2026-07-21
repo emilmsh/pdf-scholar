@@ -150,9 +150,18 @@ export interface AiConfigView extends AiConfig {
   keysSupported: boolean
 }
 
+/** An image attached to a user message (figure snip, pasted screenshot).
+ *  Raw base64 without the data: prefix; mediaType e.g. 'image/png'. */
+export interface AiImage {
+  mediaType: string
+  dataBase64: string
+}
+
 export interface AiMessage {
   role: 'user' | 'assistant'
   text: string
+  /** Only meaningful on user messages */
+  images?: AiImage[]
 }
 
 export interface AiChatRequest {

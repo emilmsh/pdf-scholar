@@ -12,7 +12,6 @@ import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import {
   IconBook,
-  IconCite,
   IconCopy,
   IconGlobe,
   IconMarkupHighlight,
@@ -208,8 +207,12 @@ export type MenuAction =
   | { kind: 'search' }
   | { kind: 'dictionary' }
   | { kind: 'translate' }
-  | { kind: 'ai'; mode: 'explain' | 'simplify' | 'define' }
+  | { kind: 'ai'; mode: 'explain' | 'simplify' }
   | { kind: 'reference' }
+  | { kind: 'critique' }
+  | { kind: 'ask' }
+  | { kind: 'similar' }
+  | { kind: 'snip' }
 
 interface MenuProps {
   menu: MenuState
@@ -328,38 +331,53 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
             <IconSparkle size={11} />
             {t('menu.aiSection')}
           </div>
-          {/* The three quick questions are siblings of one gesture ("ask the
-              assistant about this") — one compact row, not three menu rows */}
-          <div className="ai-chip-row">
+          {/* All assistant actions are siblings of one gesture ("ask the
+              assistant about this selection") — one uniform chip grid, where
+              «Spør …» opens the popover with a free-form question box */}
+          <div className="menu-ai-grid">
             <button
-              className="ai-chip"
+              className="menu-ai-chip"
               title={t('menu.aiExplainTip')}
               onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
             >
               {t('menu.aiExplain')}
             </button>
             <button
-              className="ai-chip"
+              className="menu-ai-chip"
               title={t('menu.aiSimplifyTip')}
               onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
             >
               {t('menu.aiSimplify')}
             </button>
             <button
-              className="ai-chip"
-              title={t('menu.aiDefineTip')}
-              onClick={() => onAction({ kind: 'ai', mode: 'define' })}
+              className="menu-ai-chip"
+              title={t('menu.aiCritiqueTip')}
+              onClick={() => onAction({ kind: 'critique' })}
             >
-              {t('menu.aiDefine')}
+              {t('menu.aiCritique')}
+            </button>
+            <button
+              className="menu-ai-chip"
+              title={t('menu.aiReferenceTip')}
+              onClick={() => onAction({ kind: 'reference' })}
+            >
+              {t('menu.aiReference')}
+            </button>
+            <button
+              className="menu-ai-chip"
+              title={t('menu.aiSimilarTip')}
+              onClick={() => onAction({ kind: 'similar' })}
+            >
+              {t('menu.aiSimilar')}
+            </button>
+            <button
+              className="menu-ai-chip"
+              title={t('menu.aiAskTip')}
+              onClick={() => onAction({ kind: 'ask' })}
+            >
+              {t('menu.aiAsk')}
             </button>
           </div>
-          <button
-            className="menu-item"
-            title={t('menu.aiReferenceTip')}
-            onClick={() => onAction({ kind: 'reference' })}
-          >
-            <span className="menu-icon"><IconCite size={15} /></span> {t('menu.aiReference')}
-          </button>
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'search' })}>
             <span className="menu-icon"><IconGlobe size={15} /></span> {t('menu.webSearch')}
@@ -377,9 +395,14 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
         </>
       )}
       {!isSelection && (
-        <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
-          <span className="menu-icon"><IconNote size={15} /></span> {t('menu.newNoteHere')}
-        </button>
+        <>
+          <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
+            <span className="menu-icon"><IconNote size={15} /></span> {t('menu.newNoteHere')}
+          </button>
+          <button className="menu-item" title={t('menu.snipTip')} onClick={() => onAction({ kind: 'snip' })}>
+            <span className="menu-icon"><IconSparkle size={15} /></span> {t('menu.snip')}
+          </button>
+        </>
       )}
     </div>
   )

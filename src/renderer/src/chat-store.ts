@@ -1,10 +1,10 @@
 // Per-document AI conversation persistence, mirroring the pdfx-custom-colors
 // localStorage pattern in annotations.ts. Renderer-only by design: works
 // identically in Electron and the dev:web fallback.
-import type { AiContentPart, AiUsage } from '../../shared/types'
+import type { AiContentPart, AiImage, AiUsage } from '../../shared/types'
 
 export type ChatMessage =
-  | { role: 'user'; text: string; display?: string }
+  | { role: 'user'; text: string; display?: string; images?: AiImage[] }
   | { role: 'assistant'; parts: AiContentPart[]; usage?: AiUsage; model?: string; error?: string }
 
 export interface StoredConversation {

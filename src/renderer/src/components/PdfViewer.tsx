@@ -81,6 +81,7 @@ import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
+import { SnipOverlay } from './SnipOverlay'
 import { getLanguage, locale, t, useLang } from '../i18n'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
@@ -443,6 +444,11 @@ export default function PdfViewer({
   aiPinnedRef.current = aiPinned
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
+  /** Snip-to-explain: armed by the point menu, drag a box over a figure */
+  const [snipActive, setSnipActive] = useState(false)
+  /** Late-bound handle to runSemanticSearch (declared below) so the menu
+   *  action handler (declared above it) can fire it without a TDZ hit */
+  const runSemanticSearchRef = useRef<((queryOverride?: string) => Promise<void>) | null>(null)
   /** Bumped to make the AI panel fire the "ask my annotations" question */
   const [annotsAskId, setAnnotsAskId] = useState(0)
   /** Bumped to open the AI panel showing its key settings (gear menu, search) */
@@ -1993,16 +1999,39 @@ export default function PdfViewer({
           })()
           break
         }
-        case 'reference': {
+        case 'similar': {
+          setMenu(null)
+          if (!selText) break
+          // Seed the AI search with the selection and fire it right away —
+          // the SAME semantic search the search bar's ✦ mode runs.
+          const q = selText.slice(0, 200)
+          setSearchMode('ai')
+          setSearchQuery(q)
+          searchJumpedRef.current = false
+          setSearchOpen(true)
+          window.getSelection()?.removeAllRanges()
+          void runSemanticSearchRef.current?.(q)
+          break
+        }
+        case 'snip': {
+          setMenu(null)
+          setSnipActive(true)
+          break
+        }
+        case 'reference':
+        case 'critique':
+        case 'ask': {
           if (!selText || !menu || !pdf) {
             setMenu(null)
             break
           }
           const { x, y, pageNumber } = menu
+          const mode = action.kind
           setMenu(null)
           window.getSelection()?.removeAllRanges()
-          // Attach the whole document so the model can find the bibliography
-          // entry itself; also grab local context around the citation.
+          // Attach the whole document so the model can draw on the full paper
+          // (bibliography entry / free-form question); also grab local
+          // context around the selection.
           void (async () => {
             let pageContext = ''
             let document: { title: string; text: string; pageStarts: number[] } | null = null
@@ -2022,13 +2051,85 @@ export default function PdfViewer({
             } catch {
               /* context is best-effort */
             }
-            setAiQuick({ x, y, mode: 'reference', selection: selText, pageNumber, pageContext, document })
+            setAiQuick({ x, y, mode, selection: selText, pageNumber, pageContext, document })
           })()
           break
         }
       }
     },
     [menu, pdf, payload.name, applyMarkup, collectSelectionRects]
+  )
+
+  /** Snip-to-explain: locate the page under the dragged box, re-render that
+   *  region offscreen at a readable resolution (the on-screen canvas may be
+   *  low-res at fit-width), and open the quick popover in figure mode. */
+  const onSnipDone = useCallback(
+    (snipRect: { x: number; y: number; w: number; h: number }) => {
+      setSnipActive(false)
+      if (!pdf) return
+      // Pick the page with the largest overlap; clamp the box to it
+      const pages = containerRef.current?.querySelectorAll<HTMLElement>('.pdf-page') ?? []
+      let best: { el: HTMLElement; area: number } | null = null
+      for (const el of pages) {
+        const r = el.getBoundingClientRect()
+        const w = Math.min(snipRect.x + snipRect.w, r.right) - Math.max(snipRect.x, r.left)
+        const h = Math.min(snipRect.y + snipRect.h, r.bottom) - Math.max(snipRect.y, r.top)
+        if (w > 0 && h > 0 && (!best || w * h > best.area)) best = { el, area: w * h }
+      }
+      if (!best) return
+      const pageEl = best.el
+      const pageNumber = Number(pageEl.dataset.page)
+      const pr = pageEl.getBoundingClientRect()
+      const cx = Math.max(snipRect.x, pr.left) - pr.left
+      const cy = Math.max(snipRect.y, pr.top) - pr.top
+      const cw = Math.min(snipRect.x + snipRect.w, pr.right) - Math.max(snipRect.x, pr.left)
+      const ch = Math.min(snipRect.y + snipRect.h, pr.bottom) - Math.max(snipRect.y, pr.top)
+      if (cw < 12 || ch < 12) return
+      void (async () => {
+        try {
+          const page = await pdf.getPage(pageNumber)
+          const cur = scaleRef.current
+          // Aim for ~900px crop width so axis labels stay legible, capped so
+          // tiny boxes don't explode and the canvas stays within safe limits
+          const target = Math.min(Math.max((900 / cw) * cur, cur), 4, (4000 / cw) * cur, (4000 / ch) * cur)
+          const k = target / cur
+          const viewport = page.getViewport({
+            scale: target,
+            rotation: (page.rotate + rotationRef.current) % 360
+          })
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.floor(cw * k)
+          canvas.height = Math.floor(ch * k)
+          const task = page.render({
+            canvas,
+            viewport,
+            transform: [1, 0, 0, 1, -cx * k, -cy * k]
+          })
+          await task.promise
+          const dataUrl = canvas.toDataURL('image/png')
+          const dataBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+          let pageContext = ''
+          try {
+            const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
+            pageContext = texts[pageNumber - 1]?.text.slice(0, 2500) ?? ''
+          } catch {
+            /* context is best-effort */
+          }
+          setAiQuick({
+            x: snipRect.x,
+            y: snipRect.y + snipRect.h,
+            mode: 'figure',
+            selection: '',
+            pageNumber,
+            pageContext,
+            image: { mediaType: 'image/png', dataBase64 }
+          })
+        } catch {
+          /* a cancelled/failed render just drops the snip */
+        }
+      })()
+    },
+    [pdf]
   )
 
   const saveNote = useCallback(
@@ -2734,9 +2835,9 @@ export default function PdfViewer({
 
   // ---------- Semantic (AI) search ----------
 
-  const runSemanticSearch = useCallback(async () => {
+  const runSemanticSearch = useCallback(async (queryOverride?: string) => {
     if (!pdf) return
-    const query = searchQuery.trim()
+    const query = (queryOverride ?? searchQuery).trim()
     if (!query) return
     const config = await bridge.aiGetConfig()
     if (!config.hasKey[config.provider]) {
@@ -2780,6 +2881,7 @@ export default function PdfViewer({
       cost: cost !== null ? formatCost(cost) : null
     })
   }, [pdf, searchQuery, payload.name])
+  runSemanticSearchRef.current = runSemanticSearch
 
   const pickSemanticHit = useCallback(
     (i: number) => {
@@ -3740,6 +3842,7 @@ export default function PdfViewer({
       )}
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
+      {snipActive && <SnipOverlay onDone={onSnipDone} onCancel={() => setSnipActive(false)} />}
       {aiQuick && (
         <AiQuickPopover
           state={aiQuick}

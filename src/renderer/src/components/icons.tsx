@@ -396,6 +396,14 @@ export const IconPause = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconImage = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+    <circle cx="9" cy="10" r="1.6" />
+    <path d="M3.5 17l4.8-4.5 3.6 3.3 3.5-3.2 5.1 4.6" />
+  </Svg>
+)
+
 export const IconSend = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M4.5 12L3 4.5 21 12 3 19.5 4.5 12z" />

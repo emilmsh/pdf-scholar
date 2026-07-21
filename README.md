@@ -153,11 +153,15 @@ sentences it drew from.
 - Structured article summaries (research question / method / data / findings /
   limitations)
 - Ask your own annotations: "summarize what I've highlighted"
-- Explain / simplify / define selected text, and look up a cited reference, from the
-  context menu
-- Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI, with
-  per-model reasoning-effort control. Keys are encrypted locally with the Windows
-  keychain, and the document leaves your machine only when you ask a question
+- Context-menu actions on any selection: explain, simplify, critique ("what would a
+  referee ask?"), look up a cited reference, find similar passages, or ask your own
+  question
+- **Explain a figure**: drag a box around a chart or table and the assistant explains
+  it — and you can paste or attach images in the chat too
+- Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
+  model list across providers with per-model reasoning-effort control. Keys are
+  encrypted locally with the Windows keychain, and the document leaves your machine
+  only when you ask a question
 - Cost transparency: every answer shows its estimated cost
 
 **Scholarly by design**

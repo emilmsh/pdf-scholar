@@ -187,10 +187,13 @@ export const webApi: PdfxApi = {
       return { error: t('ai.mockOnlyWeb') }
     }
     const doc = request.document
-    const answerA =
-      'Dette er et testsvar fra mock-leverandøren. Dokumentets innledning slår an tonen for resten av teksten'
-    const answerB =
-      ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
+    const imageCount = request.messages.reduce((n, m) => n + (m.images?.length ?? 0), 0)
+    const answerA = imageCount
+      ? `Dette er et testsvar fra mock-leverandøren. Jeg mottok ${imageCount} bilde${imageCount > 1 ? 'r' : ''} og ser innholdet`
+      : 'Dette er et testsvar fra mock-leverandøren. Dokumentets innledning slår an tonen for resten av teksten'
+    const answerB = doc
+      ? ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
+      : '.'
     const full = answerA + answerB
     // Few large chunks: background-tab timer clamping (≥1s) would make
     // word-by-word streaming crawl in the automated preview

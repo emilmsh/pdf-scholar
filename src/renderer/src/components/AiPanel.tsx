@@ -6,17 +6,23 @@ import type {
   AiCitation,
   AiConfigView,
   AiContentPart,
+  AiImage,
   AiProviderId,
   ThinkingLevel
 } from '../../../shared/types'
 import { bridge } from '../bridge'
 import {
   annotationsQuestion,
+  askSystem,
+  askUserMessage,
   chatSystem,
   citationPage,
+  critiqueSystem,
   estimateCost,
   explainSystem,
   explainUserMessage,
+  figureSystem,
+  figureUserMessage,
   formatCost,
   nextAiRequestId,
   referenceSystem,
@@ -33,6 +39,7 @@ import { deleteConversation, loadConversations, newConversationId, saveConversat
 import {
   IconChevronDown,
   IconHistory,
+  IconImage,
   IconPlus,
   IconSend,
   IconSparkle,
@@ -41,6 +48,33 @@ import {
 } from './icons'
 
 const nextRequestId = nextAiRequestId
+
+/** Max images per message and max long side before downscale — keeps request
+ *  sizes and the localStorage chat store sane. */
+const MAX_IMAGES = 4
+const MAX_IMAGE_SIDE = 1400
+
+/** Decode + downscale a pasted/picked image into an AiImage. JPEG stays JPEG
+ *  (photos would balloon as PNG); everything else becomes PNG. */
+async function fileToAiImage(file: Blob): Promise<AiImage | null> {
+  try {
+    const bmp = await createImageBitmap(file)
+    const k = Math.min(1, MAX_IMAGE_SIDE / Math.max(bmp.width, bmp.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bmp.width * k))
+    canvas.height = Math.max(1, Math.round(bmp.height * k))
+    canvas.getContext('2d')?.drawImage(bmp, 0, 0, canvas.width, canvas.height)
+    bmp.close()
+    const jpeg = file.type === 'image/jpeg'
+    const dataUrl = canvas.toDataURL(jpeg ? 'image/jpeg' : 'image/png', 0.85)
+    return {
+      mediaType: jpeg ? 'image/jpeg' : 'image/png',
+      dataBase64: dataUrl.slice(dataUrl.indexOf(',') + 1)
+    }
+  } catch {
+    return null
+  }
+}
 
 export interface EnsuredDocument {
   pages: PageText[]
@@ -319,20 +353,25 @@ const providerLabels = (): { id: AiProviderId; label: string }[] => [
 ]
 
 // Curated, verified model lists (see docs/agent-notes/modeller-api.md),
-// ordered by capability (heaviest first) with clean names only — no
-// descriptor phrases. `label` is the dropdown text; `short` is for the
-// compact header chip (never the raw hyphenated id).
-const MODELS: Record<AiProviderId, { id: string; label: string; short: string }[]> = {
+// ordered by capability (heaviest first) with clean names only — the
+// descriptor lives in `hint`, shown as the option's hover tooltip so the
+// list stays clean without leaving new users guessing. `label` is the
+// dropdown text; `short` is for the compact header chip (never the raw
+// hyphenated id).
+const MODELS: Record<
+  AiProviderId,
+  { id: string; label: string; short: string; hint?: MsgKey }[]
+> = {
   anthropic: [
-    { id: 'claude-fable-5', label: 'Claude Fable 5', short: 'Fable 5' },
-    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', short: 'Opus 4.8' },
-    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5' },
-    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5' }
+    { id: 'claude-fable-5', label: 'Claude Fable 5', short: 'Fable 5', hint: 'ai.modelHintHeaviest' },
+    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', short: 'Opus 4.8', hint: 'ai.modelHintCapable' },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'ai.modelHintRecommended' },
+    { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'ai.modelHintFast' }
   ],
   openai: [
-    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', short: 'GPT-5.6 Sol' },
-    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', short: 'GPT-5.6 Terra' },
-    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna' }
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', short: 'GPT-5.6 Sol', hint: 'ai.modelHintCapable' },
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', short: 'GPT-5.6 Terra', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
   ],
   azure: [],
   mock: [{ id: 'mock-1', label: 'Testmodell (mock)', short: 'Testmodell' }]
@@ -564,12 +603,20 @@ function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuP
   }
 
   const groups = KEY_PROVIDERS.map(({ id, name }) => {
-    const options = MODELS[id].map((m) => ({ value: `${id}:${m.id}`, label: m.label }))
+    const options = MODELS[id].map((m) => ({
+      value: `${id}:${m.id}`,
+      label: m.label,
+      hint: m.hint ? t(m.hint) : undefined
+    }))
     if (id === 'azure' && config.azure.deployment)
-      options.push({ value: `azure:${config.azure.deployment}`, label: config.azure.deployment })
+      options.push({
+        value: `azure:${config.azure.deployment}`,
+        label: config.azure.deployment,
+        hint: undefined
+      })
     // A custom model id typed in an older version still shows up
     if (id === provider && id !== 'azure' && model && !MODELS[id].some((m) => m.id === model))
-      options.push({ value: `${id}:${model}`, label: model })
+      options.push({ value: `${id}:${model}`, label: model, hint: undefined })
     return { id: id as string, name, options, enabled: config.hasKey[id] }
     // Platforms that cannot store keys (plain-web preview) hide the keyless
     // real providers instead of greying them — there is no way to enable them
@@ -578,7 +625,7 @@ function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuP
     groups.push({
       id: 'mock',
       name: t('ai.providerMock'),
-      options: MODELS.mock.map((m) => ({ value: `mock:${m.id}`, label: m.label })),
+      options: MODELS.mock.map((m) => ({ value: `mock:${m.id}`, label: m.label, hint: undefined })),
       enabled: true
     })
 
@@ -587,11 +634,19 @@ function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuP
       {anyKey || provider === 'mock' || !config.keysSupported ? (
         <label className="ai-field">
           <span>{t('ai.model')}</span>
-          <select value={value} onChange={(e) => pick(e.target.value)}>
+          {/* The closed select echoes the selected model's hint on hover */}
+          <select
+            value={value}
+            title={(() => {
+              const h = MODELS[provider]?.find((m) => m.id === model)?.hint
+              return h ? t(h) : undefined
+            })()}
+            onChange={(e) => pick(e.target.value)}
+          >
             {groups.map((g) => (
               <optgroup key={g.id} label={g.enabled ? g.name : `${g.name} — ${t('ai.keyMissing')}`}>
                 {g.options.map((o) => (
-                  <option key={o.value} value={o.value} disabled={!g.enabled}>
+                  <option key={o.value} value={o.value} disabled={!g.enabled} title={o.hint}>
                     {o.label}
                   </option>
                 ))}
@@ -698,6 +753,16 @@ export default function AiPanel({
   activeChatIdRef.current = activeChatId
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  /** Images staged for the next composer send (pasted or attached) */
+  const [pendingImages, setPendingImages] = useState<AiImage[]>([])
+
+  const addImageFiles = useCallback(async (files: Iterable<Blob>) => {
+    for (const file of files) {
+      const img = await fileToAiImage(file)
+      if (img) setPendingImages((l) => (l.length >= MAX_IMAGES ? l : [...l, img]))
+    }
+  }, [])
 
   // ChatGPT-style composer: one line at rest, grows with the text (the CSS
   // max-height caps it and hands over to scrolling)
@@ -774,7 +839,7 @@ export default function AiPanel({
   // fluid. Explicit in-panel actions (new chat) still focus the composer.
 
   const send = useCallback(
-    async (question: string, display?: string) => {
+    async (question: string, display?: string, images?: AiImage[]) => {
       const trimmed = question.trim()
       if (!trimmed || busy) return
       pinnedRef.current = true
@@ -782,14 +847,16 @@ export default function AiPanel({
       setInput('')
       setBusy(true)
       setStreamText('')
-      setMessages((m) => [...m, { role: 'user', text: trimmed, display }])
+      setMessages((m) => [...m, { role: 'user', text: trimmed, display, images }])
+      // Earlier turns' images ride along in the history — the model needs
+      // them to answer follow-ups about the picture.
       const history = [
         ...messagesRef.current.map((m) =>
           m.role === 'user'
-            ? { role: 'user' as const, text: m.text }
+            ? { role: 'user' as const, text: m.text, images: m.images }
             : { role: 'assistant' as const, text: m.parts.map((p) => p.text).join('') }
         ),
-        { role: 'user' as const, text: trimmed }
+        { role: 'user' as const, text: trimmed, images }
       ]
       const ensured = docRef.current ?? (await ensureDocument())
       docRef.current = ensured
@@ -951,6 +1018,14 @@ export default function AiPanel({
   // fetch/focus effects above stay gated on `open`.
   const providerLabel = providerLabels().find((p) => p.id === config?.provider)?.label ?? ''
 
+  /** Composer send: takes the staged images along and clears them */
+  const sendFromComposer = useCallback(() => {
+    if (!input.trim() || busy) return
+    const imgs = pendingImages
+    setPendingImages([])
+    void send(input, undefined, imgs.length > 0 ? imgs : undefined)
+  }, [input, busy, pendingImages, send])
+
   // One composer, reused in both layouts: centred on the empty "landing"
   // (ChatGPT-style) and pinned to the bottom once the chat has content.
   const composer = (
@@ -958,6 +1033,22 @@ export default function AiPanel({
       {/* ChatGPT-style field: the textarea and its controls live INSIDE one
           rounded surface — the buttons sit bottom-right, never beside it. */}
       <div className="ai-composer-field">
+        {pendingImages.length > 0 && (
+          <div className="ai-attach-row">
+            {pendingImages.map((img, i) => (
+              <div className="ai-attach" key={i}>
+                <img src={`data:${img.mediaType};base64,${img.dataBase64}`} alt={t('ai.imageAlt')} />
+                <button
+                  className="ai-attach-x"
+                  title={t('ai.removeImageTip')}
+                  onClick={() => setPendingImages((l) => l.filter((_, j) => j !== i))}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <textarea
           ref={inputRef}
           value={input}
@@ -967,12 +1058,40 @@ export default function AiPanel({
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
-              void send(input)
+              sendFromComposer()
             }
             e.stopPropagation()
           }}
+          onPaste={(e) => {
+            const files = [...e.clipboardData.items]
+              .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
+              .map((it) => it.getAsFile())
+              .filter((f): f is File => !!f)
+            if (files.length > 0) {
+              e.preventDefault()
+              void addImageFiles(files)
+            }
+          }}
         />
         <div className="ai-composer-controls">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) void addImageFiles(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <button
+            className="ai-attach-add"
+            title={t('ai.attachTip')}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <IconImage size={16} />
+          </button>
           {busy ? (
             <button className="ai-send" title={t('ai.stopTip')} onClick={stop}>
               <IconStop size={15} />
@@ -982,7 +1101,7 @@ export default function AiPanel({
               className="ai-send"
               title={t('ai.sendTip')}
               disabled={!input.trim()}
-              onClick={() => void send(input)}
+              onClick={sendFromComposer}
             >
               <IconSend size={15} />
             </button>
@@ -1149,6 +1268,17 @@ export default function AiPanel({
               {messages.map((m, i) =>
                 m.role === 'user' ? (
                   <div className="ai-msg ai-user" key={i}>
+                    {m.images && m.images.length > 0 && (
+                      <div className="ai-msg-images">
+                        {m.images.map((img, j) => (
+                          <img
+                            key={j}
+                            src={`data:${img.mediaType};base64,${img.dataBase64}`}
+                            alt={t('ai.imageAlt')}
+                          />
+                        ))}
+                      </div>
+                    )}
                     {m.display ?? m.text}
                   </div>
                 ) : (
@@ -1202,14 +1332,17 @@ export default function AiPanel({
 export interface AiQuickState {
   x: number
   y: number
-  mode: 'explain' | 'simplify' | 'define' | 'reference'
+  mode: 'explain' | 'simplify' | 'reference' | 'critique' | 'ask' | 'figure'
   selection: string
   pageNumber: number
   pageContext: string
-  /** Reference lookup needs the whole document attached so the model can find
-   *  the bibliography entry itself; explain/simplify/define do not.
-   *  pageStarts lets the citation chips resolve char offsets to page numbers. */
+  /** Reference lookup, critique and free-form questions need the whole
+   *  document attached so the model can draw on the full paper;
+   *  explain/simplify/figure stay page-local. pageStarts lets the citation
+   *  chips resolve char offsets to page numbers. */
   document?: { title: string; text: string; pageStarts: number[] } | null
+  /** Figure mode: the snipped page region, sent as an image */
+  image?: AiImage
 }
 
 const quickTitle = (mode: AiQuickState['mode']): string =>
@@ -1219,7 +1352,11 @@ const quickTitle = (mode: AiQuickState['mode']): string =>
       ? t('ai.quickSimplify')
       : mode === 'reference'
         ? t('ai.quickReference')
-        : t('ai.quickDefine')
+        : mode === 'critique'
+          ? t('ai.quickCritique')
+          : mode === 'figure'
+            ? t('ai.quickFigure')
+            : t('ai.quickAsk')
 
 interface QuickProps {
   state: AiQuickState
@@ -1238,8 +1375,18 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const requestIdRef = useRef<number | null>(null)
   const finalRef = useRef('')
   const isReference = state.mode === 'reference'
+  const isCritique = state.mode === 'critique'
+  const isAsk = state.mode === 'ask'
+  const isFigure = state.mode === 'figure'
+  /** Reference lookup, critique and ask attach the whole document */
+  const usesDocument = isReference || isCritique || isAsk
+  const [question, setQuestion] = useState('')
+  /** Ask mode waits for the user's question before firing the request */
+  const [asked, setAsked] = useState<string | null>(null)
+  const active = !isAsk || asked !== null
 
   useEffect(() => {
+    if (!active) return
     let stale = false
     const requestId = nextRequestId()
     requestIdRef.current = requestId
@@ -1249,18 +1396,32 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
     void (async () => {
       const result = await bridge.aiChat({
         requestId,
-        system: isReference ? referenceSystem() : explainSystem(state.mode as 'explain' | 'simplify' | 'define'),
+        system: isReference
+          ? referenceSystem()
+          : isCritique
+            ? critiqueSystem()
+            : isAsk
+              ? askSystem()
+              : isFigure
+                ? figureSystem()
+                : explainSystem(state.mode as 'explain' | 'simplify'),
         messages: [
           {
             role: 'user',
             text: isReference
               ? referenceUserMessage(state.selection, state.pageNumber, state.pageContext)
-              : explainUserMessage(state.selection, state.pageNumber, state.pageContext)
+              : isAsk
+                ? askUserMessage(asked ?? '', state.selection, state.pageNumber, state.pageContext)
+                : isFigure
+                  ? figureUserMessage(state.pageNumber, state.pageContext)
+                  : explainUserMessage(state.selection, state.pageNumber, state.pageContext),
+            ...(isFigure && state.image ? { images: [state.image] } : {})
           }
         ],
-        // Reference lookup attaches the whole document so the model can find
-        // the bibliography entry; the others stay page-local.
-        document: isReference && state.document
+        // Reference lookup, critique and free-form questions attach the whole
+        // document so the model can draw on the full paper; the others stay
+        // page-local (figure carries its snip as an image instead).
+        document: usesDocument && state.document
           ? { title: state.document.title, text: state.document.text }
           : null
       })
@@ -1283,7 +1444,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
       if (!finalRef.current && requestIdRef.current !== null) bridge.aiAbort(requestIdRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [active])
 
   const left = Math.max(8, Math.min(state.x, window.innerWidth - 360 - 8))
   const top = Math.max(8, Math.min(state.y + 10, window.innerHeight - 260 - 8))
@@ -1293,22 +1454,60 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
       <div className="ai-quick-head">
         <IconSparkle size={14} />
         <span>
-          {quickTitle(state.mode)}: «{state.selection.length > 42 ? `${state.selection.slice(0, 42)}…` : state.selection}»
+          {state.selection
+            ? `${quickTitle(state.mode)}: «${state.selection.length > 42 ? `${state.selection.slice(0, 42)}…` : state.selection}»`
+            : `${quickTitle(state.mode)} (${t('app.pageAbbrev')} ${state.pageNumber})`}
         </span>
       </div>
       <div className="ai-quick-body">
-        {error ? (
-          <div className="ai-error">{error}</div>
-        ) : parts && isReference ? (
-          <AssistantBody
-            parts={parts}
-            doc={state.document ? { text: state.document.text, pageStarts: state.document.pageStarts } : null}
-            onCitation={(c) => onCitation?.(c)}
+        {isFigure && state.image && (
+          <img
+            className="ai-quick-figure"
+            src={`data:${state.image.mediaType};base64,${state.image.dataBase64}`}
+            alt={t('ai.imageAlt')}
           />
-        ) : text ? (
-          renderMarkdown(text)
+        )}
+        {!active ? (
+          <div className="ai-quick-ask">
+            <input
+              type="text"
+              autoFocus
+              value={question}
+              placeholder={t('ai.askPlaceholder')}
+              spellCheck={false}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter' && question.trim()) setAsked(question.trim())
+                if (e.key === 'Escape') onClose()
+              }}
+            />
+            <button
+              className="ai-send"
+              title={t('ai.sendTip')}
+              disabled={!question.trim()}
+              onClick={() => question.trim() && setAsked(question.trim())}
+            >
+              <IconSend size={15} />
+            </button>
+          </div>
         ) : (
-          <div className="ai-thinking">{t('ai.thinking')}</div>
+          <>
+            {isAsk && <div className="ai-quick-question">{asked}</div>}
+            {error ? (
+              <div className="ai-error">{error}</div>
+            ) : parts && usesDocument ? (
+              <AssistantBody
+                parts={parts}
+                doc={state.document ? { text: state.document.text, pageStarts: state.document.pageStarts } : null}
+                onCitation={(c) => onCitation?.(c)}
+              />
+            ) : text ? (
+              renderMarkdown(text)
+            ) : (
+              <div className="ai-thinking">{t('ai.thinking')}</div>
+            )}
+          </>
         )}
       </div>
       <div className="ai-quick-actions">
@@ -1319,7 +1518,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
           onClick={() =>
             onSendToChat({
               question: t('ai.quickQuestion', {
-                title: quickTitle(state.mode),
+                title: isAsk && asked ? asked : quickTitle(state.mode),
                 selection: state.selection,
                 page: state.pageNumber
               }),

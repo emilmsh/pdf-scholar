@@ -104,6 +104,7 @@ async function chatAnthropic(
 
   type ContentBlock =
     | { type: 'text'; text: string }
+    | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
     | {
         type: 'document'
         source: { type: 'text'; media_type: 'text/plain'; data: string }
@@ -113,6 +114,10 @@ async function chatAnthropic(
       }
 
   const messages = req.messages.map((m, index) => {
+    const images: ContentBlock[] = (m.images ?? []).map((img) => ({
+      type: 'image' as const,
+      source: { type: 'base64' as const, media_type: img.mediaType, data: img.dataBase64 }
+    }))
     if (index === 0 && m.role === 'user' && req.document) {
       const content: ContentBlock[] = [
         {
@@ -122,9 +127,13 @@ async function chatAnthropic(
           citations: { enabled: true },
           cache_control: { type: 'ephemeral' }
         },
+        ...images,
         { type: 'text', text: m.text }
       ]
       return { role: 'user' as const, content }
+    }
+    if (images.length > 0) {
+      return { role: m.role, content: [...images, { type: 'text' as const, text: m.text }] }
     }
     return { role: m.role, content: m.text }
   })
@@ -230,7 +239,10 @@ async function chatOpenAiCompatible(
   signal: AbortSignal,
   includeUsageOption: boolean
 ): Promise<AiChatResult> {
-  const messages: { role: string; content: string }[] = [
+  type OpenAiPart =
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string } }
+  const messages: { role: string; content: string | OpenAiPart[] }[] = [
     { role: 'system', content: req.system + (req.document ? QUOTE_CONTRACT : '') }
   ]
   if (req.document) {
@@ -240,7 +252,22 @@ async function chatOpenAiCompatible(
     })
     messages.push({ role: 'assistant', content: 'Jeg har lest dokumentet og er klar.' })
   }
-  for (const m of req.messages) messages.push({ role: m.role, content: m.text })
+  for (const m of req.messages) {
+    const images = m.images ?? []
+    messages.push({
+      role: m.role,
+      content:
+        images.length > 0
+          ? [
+              ...images.map((img) => ({
+                type: 'image_url' as const,
+                image_url: { url: `data:${img.mediaType};base64,${img.dataBase64}` }
+              })),
+              { type: 'text' as const, text: m.text }
+            ]
+          : m.text
+    })
+  }
 
   const body: Record<string, unknown> = { messages, stream: true }
   if (model) body.model = model
@@ -297,10 +324,13 @@ async function chatOpenAiCompatible(
 
 async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Promise<AiChatResult> {
   const doc = req.document
-  const answerA =
-    'Dette er et testsvar fra mock-leverandøren. Dokumentets innledning slår an tonen for resten av teksten'
-  const answerB =
-    ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
+  const imageCount = req.messages.reduce((n, m) => n + (m.images?.length ?? 0), 0)
+  const answerA = imageCount
+    ? `Dette er et testsvar fra mock-leverandøren. Jeg mottok ${imageCount} bilde${imageCount > 1 ? 'r' : ''} og ser innholdet`
+    : 'Dette er et testsvar fra mock-leverandøren. Dokumentets innledning slår an tonen for resten av teksten'
+  const answerB = doc
+    ? ' og lenger ut i dokumentet utdypes dette med et konkret resonnement du kan hoppe rett til.'
+    : '.'
   const full = answerA + answerB
   for (const word of full.split(/(?<= )/)) {
     if (signal.aborted) return { error: 'Avbrutt' }
