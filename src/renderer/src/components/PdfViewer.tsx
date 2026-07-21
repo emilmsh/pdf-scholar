@@ -86,7 +86,7 @@ import { SnipOverlay } from './SnipOverlay'
 import { getLanguage, locale, t, useLang } from '../i18n'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
-import { collectExportRows, computeExcerpts, toHtml, toMarkdown, toPlainText } from '../annot-export'
+import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
 import type { ExportFormat } from './Sidebar'
 
 // One worker per open document (not a shared global port) so the document can
@@ -2770,12 +2770,14 @@ export default function PdfViewer({
       const meta = { fileName: payload.name, exportedAt: new Date().toLocaleString(locale()) }
       const base = payload.name.replace(/\.pdf$/i, '')
       const suffix = t('export.suffix')
-      const [content, name] =
+      const [content, name]: [string | Uint8Array, string] =
         format === 'markdown'
           ? [toMarkdown(rows, meta), `${base} - ${suffix}.md`]
           : format === 'html'
             ? [toHtml(rows, meta), `${base} - ${suffix}.html`]
-            : [toPlainText(rows, meta), `${base} - ${suffix}.txt`]
+            : format === 'docx'
+              ? [toDocx(rows, meta), `${base} - ${suffix}.docx`]
+              : [toPlainText(rows, meta), `${base} - ${suffix}.txt`]
       const result = await bridge.saveTextFile(name, content)
       if (result && 'error' in result) showToast(t('viewer.saveFailed', { error: result.error }))
       else if (result) showToast(t('viewer.exported', { path: result.path }))

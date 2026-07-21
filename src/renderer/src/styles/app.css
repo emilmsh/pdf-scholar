@@ -3184,6 +3184,20 @@ button {
   position: relative;
 }
 
+/* Staged annotations: a text pill alongside the image thumbnails */
+.ai-attach-annots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 .ai-attach img {
   display: block;
   width: 52px;
@@ -3643,14 +3657,25 @@ button {
   border-color: color-mix(in srgb, var(--accent) 40%, transparent) !important;
 }
 
-/* Ask-AI button in the annotation list header */
+/* Ask-AI row at the top of the annotation list: a labelled action that only
+   STAGES the question in the assistant composer — nothing is sent on click */
 
 .annot-ask-ai {
-  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-bottom: 7px;
   color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.annot-ask-ai-glyph {
   font-size: 13px;
-  padding: 2px 8px;
-  border-radius: 6px;
 }
 
 .annot-ask-ai:hover {

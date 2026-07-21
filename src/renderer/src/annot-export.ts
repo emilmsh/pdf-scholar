@@ -4,6 +4,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect } from '../../shared/types'
 import { annotTypeLabel } from './annotations'
+import { docxParagraph, docxRun, makeDocx } from './docx'
 import { getLanguage, t } from './i18n'
 import type { PageAnnotation } from './annotations'
 
@@ -170,6 +171,30 @@ export function toPlainText(rows: ExportRow[], meta: ExportMeta): string {
     }
   }
   return lines.join('\n') + '\n'
+}
+
+/** Same summary as the other formats, as a Word document (see docx.ts) */
+export function toDocx(rows: ExportRow[], meta: ExportMeta): Uint8Array {
+  const muted = '6E6E73'
+  const paragraphs: string[] = [
+    docxParagraph(docxRun(t('export.title', { name: meta.fileName })), 'Title'),
+    docxParagraph(docxRun(t('export.byline', { date: meta.exportedAt }), { color: muted, size: 9 }))
+  ]
+  for (const [pageNumber, pageRows] of groupByPage(rows)) {
+    paragraphs.push(docxParagraph(docxRun(t('export.page', { page: pageNumber })), 'Heading1'))
+    for (const row of pageRows) {
+      const { label, excerpt, comment, author } = rowLine(row)
+      const hex = row.record.color
+        .map((v) => Math.round(v * 255).toString(16).padStart(2, '0'))
+        .join('')
+      const runs = [docxRun('● ', { color: hex }), docxRun(label, { bold: true })]
+      if (excerpt) runs.push(docxRun(`: «${excerpt}»`))
+      if (comment) runs.push(docxRun(excerpt ? ` — ${comment}` : `: ${comment}`, { italic: true }))
+      if (author) runs.push(docxRun(` (${author})`, { color: muted, size: 9 }))
+      paragraphs.push(docxParagraph(runs.join('')))
+    }
+  }
+  return makeDocx(paragraphs)
 }
 
 function escapeHtml(s: string): string {

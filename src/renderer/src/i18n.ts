@@ -197,6 +197,7 @@ const nb = {
   'side.showOnly': 'Vis kun {color}',
   'side.noMatches': 'Ingen treff i merknadene.',
   'side.page': 'Side {page}',
+  'side.exportDocxTip': 'Eksporter sammendrag som Word-dokument',
   'side.deleteAnnot': 'Slett merknad',
   'side.collapse': 'Lukk',
   'side.expand': 'Åpne',
@@ -319,6 +320,10 @@ const nb = {
   'ai.quickSimplify': 'Forenkle',
   'ai.quickReference': 'Referanse',
   'ai.quickCritique': 'Kritisk blikk',
+  'ai.annotsChip': 'Merknadene dine',
+  'ai.removeAnnotsTip': 'Fjern merknadene fra spørsmålet',
+  'side.askAiTip':
+    'Åpner assistenten med et utkast til spørsmål om merknadene — ingenting sendes før du trykker send',
   'ai.quickFigure': 'Forklar figur',
   'ai.quickAsk': 'Spør',
   'ai.askPlaceholder': 'Spør om den markerte teksten …',
@@ -557,6 +562,7 @@ const en: Dict = {
   'side.collapse': 'Collapse',
   'side.expand': 'Expand',
 
+  'side.exportDocxTip': 'Export summary as a Word document',
   'search.placeholder': 'Search the document …',
   'search.searching': 'Searching …',
   'search.noMatches': 'No matches',
@@ -674,6 +680,10 @@ const en: Dict = {
   'ai.quickAsk': 'Ask',
   'ai.askPlaceholder': 'Ask about the selected text …',
   'ai.attachTip': 'Attach image',
+  'ai.annotsChip': 'Your annotations',
+  'ai.removeAnnotsTip': 'Remove the annotations from the question',
+  'side.askAiTip':
+    'Opens the assistant with a draft question about your annotations — nothing is sent until you press send',
   'ai.removeImageTip': 'Remove image',
   'ai.imageAlt': 'Attached image',
   'ai.webSearchOffTip': 'Web search is closed — click to allow searching when you ask for it',

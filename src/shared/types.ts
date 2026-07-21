@@ -262,8 +262,12 @@ export interface PdfxApi {
   docDiscard(path: string): Promise<void>
   /** Open the system print dialog for the PDF file */
   printFile(path: string): Promise<{ ok: true } | FileError>
-  /** Save text content via a save dialog; null = user cancelled */
-  saveTextFile(defaultName: string, content: string): Promise<{ path: string } | FileError | null>
+  /** Save exported content (text, or bytes for binary formats like .docx) via
+   *  a save dialog; null = user cancelled */
+  saveTextFile(
+    defaultName: string,
+    content: string | Uint8Array
+  ): Promise<{ path: string } | FileError | null>
   /** Save a copy of the current PDF to a user-chosen location. `data` is the
    *  renderer's bytes (used by the web/extension download path); Electron
    *  prefers `path` so unsaved annotation edits (the draft) are included.

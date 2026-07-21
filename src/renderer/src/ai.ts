@@ -470,13 +470,24 @@ export function referenceUserMessage(selection: string, pageNumber: number, page
     : `Selected citation (page ${pageNumber}):\n"${selection}"\n\nText around the citation:\n${pageContext}`
 }
 
-/** Question scaffold for "ask my annotations": the block lists the user's
- *  own highlights/notes; keeping it inside the user message means follow-up
- *  questions retain it via the chat history. */
-export function annotationsQuestion(block: string): string {
+/** Default (editable) question for the annotations flow — prefilled in the
+ *  composer so the user sees and can rephrase what will be asked. */
+export function annotationsDefaultQuestion(): string {
   return getLanguage() === 'nb'
-    ? `Nedenfor er merknadene mine i dokumentet (markeringer, understrekinger og notater, med sidetall). Oppsummer hva jeg har vært opptatt av, grupper gjerne etter tema, og pek på punkter det ser ut som jeg bør følge opp. Bruk dokumentet for kontekst der det trengs.\n\n${block}`
-    : `Below are my annotations in the document (highlights, underlines and notes, with page numbers). Summarize what I have been focusing on, group by theme where natural, and point out items I appear to need to follow up on. Use the document for context where needed.\n\n${block}`
+    ? 'Oppsummer hva jeg har vært opptatt av i merknadene mine, grupper gjerne etter tema, og pek på punkter det ser ut som jeg bør følge opp. Bruk dokumentet for kontekst der det trengs.'
+    : 'Summarize what I have been focusing on in my annotations, group by theme where natural, and point out items I appear to need to follow up on. Use the document for context where needed.'
+}
+
+/** Full user message for "ask my annotations": the (possibly user-edited)
+ *  question plus the annotations block. The block lists the user's own
+ *  highlights/notes; keeping it inside the user message means follow-up
+ *  questions retain it via the chat history. */
+export function annotationsQuestion(question: string, block: string): string {
+  const intro =
+    getLanguage() === 'nb'
+      ? 'Merknadene mine i dokumentet (markeringer, understrekinger og notater, med sidetall):'
+      : 'My annotations in the document (highlights, underlines and notes, with page numbers):'
+  return `${question.trim()}\n\n${intro}\n${block}`
 }
 
 /** The structured-article-summary request (sent through the normal chat

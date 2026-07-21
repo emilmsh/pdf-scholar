@@ -517,17 +517,18 @@ function registerIpc(): void {
     if (typeof path === 'string' && existsSync(path)) shell.showItemInFolder(path)
   })
 
-  ipcMain.handle('file:save-text', async (e, defaultName: string, content: string) => {
+  ipcMain.handle('file:save-text', async (e, defaultName: string, content: string | Uint8Array) => {
     const parent = windowFor(e)
     if (!parent) return null
     const ext = extname(defaultName).replace('.', '') || 'txt'
     const result = await dialog.showSaveDialog(parent, {
       defaultPath: defaultName,
-      filters: [{ name: ext.toUpperCase(), extensions: [ext] }]
+      filters: [{ name: ext === 'docx' ? 'Word' : ext.toUpperCase(), extensions: [ext] }]
     })
     if (result.canceled || !result.filePath) return null
     try {
-      await writeFile(result.filePath, content, 'utf-8')
+      // A string writes as UTF-8; bytes (e.g. .docx) write verbatim
+      await writeFile(result.filePath, typeof content === 'string' ? content : Buffer.from(content))
       return { path: result.filePath }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }

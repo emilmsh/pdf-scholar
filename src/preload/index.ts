@@ -33,7 +33,7 @@ const api: PdfxApi = {
   docConfirmClose: (path: string) => ipcRenderer.invoke('doc:confirm-close', path),
   docDiscard: (path: string) => ipcRenderer.invoke('doc:discard', path),
   printFile: (path: string) => ipcRenderer.invoke('file:print', path),
-  saveTextFile: (defaultName: string, content: string) =>
+  saveTextFile: (defaultName: string, content: string | Uint8Array) =>
     ipcRenderer.invoke('file:save-text', defaultName, content),
   saveFileAs: (defaultName: string, data: Uint8Array, path?: string) =>
     ipcRenderer.invoke('file:save-as', path ?? '', defaultName, data),

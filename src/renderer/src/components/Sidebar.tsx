@@ -6,7 +6,7 @@ import { t, useLang } from '../i18n'
 
 const THUMB_WIDTH = 132
 
-export type ExportFormat = 'markdown' | 'html' | 'text'
+export type ExportFormat = 'markdown' | 'html' | 'text' | 'docx'
 
 export interface OutlineNode {
   title: string
@@ -231,20 +231,28 @@ function AnnotationList({
   let lastPage = 0
   return (
     <div className="annot-list">
-      <div className="annot-export-row">
-        <span>{t('side.export')}</span>
-        <button onClick={() => onExport('markdown')} title={t('side.exportMdTip')}>
-          MD
+      <div className="annot-export">
+        <button className="annot-ask-ai" onClick={onAskAi} title={t('side.askAiTip')}>
+          <span className="annot-ask-ai-glyph">✦</span>
+          {t('ai.annotsBtn')}
         </button>
-        <button onClick={() => onExport('html')} title={t('side.exportHtmlTip')}>
-          HTML
-        </button>
-        <button onClick={() => onExport('text')} title={t('side.exportTxtTip')}>
-          TXT
-        </button>
-        <button className="annot-ask-ai" onClick={onAskAi} title={t('ai.annotsTip')}>
-          ✦
-        </button>
+        <div className="annot-export-head">
+          <span>{t('side.export')}</span>
+        </div>
+        <div className="annot-export-row">
+          <button onClick={() => onExport('markdown')} title={t('side.exportMdTip')}>
+            MD
+          </button>
+          <button onClick={() => onExport('html')} title={t('side.exportHtmlTip')}>
+            HTML
+          </button>
+          <button onClick={() => onExport('text')} title={t('side.exportTxtTip')}>
+            TXT
+          </button>
+          <button onClick={() => onExport('docx')} title={t('side.exportDocxTip')}>
+            Word
+          </button>
+        </div>
       </div>
 
       <div className="annot-filter">

@@ -124,7 +124,10 @@ export const webApi: PdfxApi = {
     return { ok: true }
   },
   saveTextFile: async (defaultName, content) => {
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+    const type = defaultName.endsWith('.docx')
+      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      : 'text/plain;charset=utf-8'
+    const blob = new Blob([content as BlobPart], { type })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

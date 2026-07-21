@@ -15,6 +15,7 @@ import type {
 } from '../../../shared/types'
 import { bridge } from '../bridge'
 import {
+  annotationsDefaultQuestion,
   annotationsQuestion,
   askSystem,
   askUserMessage,
@@ -836,6 +837,9 @@ export default function AiPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   /** Images staged for the next composer send (pasted or attached) */
   const [pendingImages, setPendingImages] = useState<AiImage[]>([])
+  /** Annotations staged for the next composer send (sidebar ✦): the block is
+   *  fetched and appended at send time, shown as a removable chip until then */
+  const [annotsStaged, setAnnotsStaged] = useState(false)
   /** Composer globe: three web-search modes cycled by click. 'ask' is the
    *  default — the tool is attached but nothing leaves the machine unless
    *  the user's own message explicitly asks for a web lookup. */
@@ -985,16 +989,21 @@ export default function AiPanel({
 
   const sendAnnots = useCallback(async () => {
     const block = await getAnnotationsText()
-    if (block) void send(annotationsQuestion(block), t('ai.annotsBtn'))
+    if (block) void send(annotationsQuestion(annotationsDefaultQuestion(), block), t('ai.annotsBtn'))
   }, [getAnnotationsText, send])
 
-  // Sidebar ✦ bumps annotsAskId to fire the annotations question from outside
+  // Sidebar ✦ bumps annotsAskId to STAGE the annotations question: the default
+  // question lands editable in the composer with the annotations as a chip —
+  // nothing is sent until the user presses send themselves.
   const lastAnnotsAskRef = useRef(annotsAskId)
   useEffect(() => {
     if (!open || annotsAskId === lastAnnotsAskRef.current) return
     lastAnnotsAskRef.current = annotsAskId
-    void sendAnnots()
-  }, [open, annotsAskId, sendAnnots])
+    setAnnotsStaged(true)
+    setInput((current) => current.trim() ? current : annotationsDefaultQuestion())
+    // The panel may be opening in this same commit — focus after layout
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }, [open, annotsAskId])
 
   // Gear menu / search bump openSettingsAskId to land in the key settings
   const lastSettingsAskRef = useRef(openSettingsAskId)
@@ -1118,13 +1127,24 @@ export default function AiPanel({
   // fetch/focus effects above stay gated on `open`.
   const providerLabel = providerLabels().find((p) => p.id === config?.provider)?.label ?? ''
 
-  /** Composer send: takes the staged images along and clears them */
+  /** Composer send: takes the staged images/annotations along and clears them.
+   *  Staged annotations append the block to the message at send time; the chat
+   *  bubble shows only the user's (editable) question. */
   const sendFromComposer = useCallback(() => {
     if (!input.trim() || busy) return
     const imgs = pendingImages
     setPendingImages([])
+    if (annotsStaged) {
+      setAnnotsStaged(false)
+      void (async () => {
+        const block = await getAnnotationsText()
+        const text = block ? annotationsQuestion(input, block) : input
+        void send(text, block ? input.trim() : undefined, imgs.length > 0 ? imgs : undefined)
+      })()
+      return
+    }
     void send(input, undefined, imgs.length > 0 ? imgs : undefined)
-  }, [input, busy, pendingImages, send])
+  }, [input, busy, pendingImages, annotsStaged, getAnnotationsText, send])
 
   // One composer, reused in both layouts: centred on the empty "landing"
   // (ChatGPT-style) and pinned to the bottom once the chat has content.
@@ -1133,8 +1153,25 @@ export default function AiPanel({
       {/* ChatGPT-style field: the textarea and its controls live INSIDE one
           rounded surface — the buttons sit bottom-right, never beside it. */}
       <div className="ai-composer-field">
-        {pendingImages.length > 0 && (
+        {(annotsStaged || pendingImages.length > 0) && (
           <div className="ai-attach-row">
+            {annotsStaged && (
+              <div className="ai-attach ai-attach-annots">
+                <IconSparkle size={12} />
+                {t('ai.annotsChip')}
+                <button
+                  className="ai-attach-x"
+                  title={t('ai.removeAnnotsTip')}
+                  onClick={() => {
+                    setAnnotsStaged(false)
+                    // A pristine default question goes with it; edits are kept
+                    setInput((i) => (i === annotationsDefaultQuestion() ? '' : i))
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             {pendingImages.map((img, i) => (
               <div className="ai-attach" key={i}>
                 <img src={`data:${img.mediaType};base64,${img.dataBase64}`} alt={t('ai.imageAlt')} />
