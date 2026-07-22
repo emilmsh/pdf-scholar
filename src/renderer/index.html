@@ -5,7 +5,11 @@
     <title>PDF Scholar</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   </head>
-  <body>
+  <!-- spellcheck is an inherited attribute: turning it off on <body> kills the
+       red squiggles in EVERY text field (composer, freetext annotations, notes,
+       search …) at once. Users write in many languages, so per-word "misspell"
+       underlines are just noise here. -->
+  <body spellcheck="false">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

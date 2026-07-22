@@ -13,7 +13,9 @@
       }
     </style>
   </head>
-  <body>
+  <!-- spellcheck off app-wide (inherited attribute) — parity with the desktop
+       index.html; users write in many languages, so per-word underlines are noise. -->
+  <body spellcheck="false">
     <div id="root"></div>
     <script type="module" src="../renderer/src/extension-main.tsx"></script>
   </body>

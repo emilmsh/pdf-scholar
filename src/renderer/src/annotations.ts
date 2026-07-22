@@ -185,6 +185,30 @@ export function strokePathData(points: [number, number][]): string {
   return d
 }
 
+/**
+ * Page-space `d` for a squiggly (zig-zag) underline over one quad. The geometry
+ * is IDENTICAL to the saved appearance stream (incremental-appender.ts, case
+ * 'squiggly') so the live overlay is a pixel-parity preview of the file: a
+ * triangular wave sitting max(2, 6%) above the quad bottom, amplitude
+ * max(1.2, 8%) of line height, one half-period every 2 page units.
+ *
+ * (Previously the overlay used a repeating-linear-gradient, which paints a
+ * DASHED line, not a wave — the "bølgestrek blir dottet strek" bug.)
+ */
+export function squigglyPathData(q: PageRect): string {
+  const base = q.y + q.h - Math.max(2, q.h * 0.06)
+  const amp = Math.max(1.2, q.h * 0.08)
+  const half = 2 // page units per half-period
+  let d = `M ${q.x.toFixed(2)} ${base.toFixed(2)}`
+  let i = 1
+  for (let x = q.x + half; x < q.x + q.w + half; x += half, i++) {
+    const px = Math.min(x, q.x + q.w)
+    const py = i % 2 ? base - amp : base
+    d += ` L ${px.toFixed(2)} ${py.toFixed(2)}`
+  }
+  return d
+}
+
 function pointToSegmentDistance(
   px: number,
   py: number,
@@ -278,16 +302,11 @@ export function annotationCss(
         background: rgbCss(a.color, 0.9)
       }
     }
-    case 'squiggly': {
-      const thick = Math.max(2 / scale, 1.6)
-      const off = Math.max(2 / scale, 0.06 * q.h)
-      const period = Math.max(3, 2 * scale)
-      // The stripe direction follows the rotated baseline
-      return {
-        ...toCss({ x: q.x, y: q.y + q.h - off, w: q.w, h: thick }),
-        background: `repeating-linear-gradient(${(90 + rotation) % 360}deg, ${rgbCss(a.color, 0.9)} 0 ${period}px, transparent ${period}px ${Math.max(6, 4 * scale)}px)`
-      }
-    }
+    case 'squiggly':
+      // Squiggly is drawn as an SVG zig-zag path in AnnotationMarks
+      // (squigglyPathData) — a CSS gradient can only make a dashed line, not a
+      // wave. This box is just its positioned bounds (unused for painting).
+      return toCss(q)
     case 'note': {
       // Fixed-size, upright marker — only its anchor point rotates
       const [vx, vy] = pagePointToView(q.x, q.y, pw, ph, rotation)

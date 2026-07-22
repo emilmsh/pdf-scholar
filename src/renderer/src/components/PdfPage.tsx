@@ -3,7 +3,7 @@ import { AnnotationMode, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
-import { annotationCss, arrowHeadPoints, arrowShaftEnd, rgbCss, strokePathData } from '../annotations'
+import { annotationCss, arrowHeadPoints, arrowShaftEnd, rgbCss, squigglyPathData, strokePathData } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
@@ -939,6 +939,28 @@ function AnnotationMarks({
         <g stroke="rgba(0,0,0,0.38)" strokeWidth="1.5" strokeLinecap="round">
           <path d="M7.5 8.7h9" />
           <path d="M7.5 12.2h6" />
+        </g>
+      </svg>
+    )
+  }
+  if (annotation.type === 'squiggly') {
+    // A real zig-zag wave (parity with the saved appearance stream), rotated
+    // with the same group transform as ink — NOT a CSS repeating-gradient,
+    // which degrades to a dashed line.
+    return (
+      <svg className="annot-ink-svg" viewBox={`0 0 ${view.w} ${view.h}`} preserveAspectRatio="none">
+        <g transform={gTransform}>
+          {annotation.quads.map((q, i) => (
+            <path
+              key={i}
+              d={squigglyPathData(q)}
+              fill="none"
+              stroke={rgbCss(annotation.color, 0.9)}
+              strokeWidth={1.1}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
         </g>
       </svg>
     )

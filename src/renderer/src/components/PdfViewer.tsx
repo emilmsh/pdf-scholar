@@ -140,7 +140,10 @@ const PAD_TOP = 28
 const PAD_BOTTOM = 28
 const SIDE_PAD = 64
 const ZOOM_MIN = 0.25
-const ZOOM_MAX = 4
+// 1600%: the ceiling is arbitrary, not a technical limit — render-quality.ts
+// caps device pixels within the frame budget (with a native floor), so heavy
+// zoom stays smooth and legible. Raise freely if a document needs finer detail.
+const ZOOM_MAX = 16
 /** Pages within this many px of the viewport get rendered */
 const RENDER_MARGIN = 800
 /** ms of wheel silence before a pinch/ctrl-wheel gesture commits a re-render */
