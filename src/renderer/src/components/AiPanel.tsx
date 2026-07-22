@@ -525,10 +525,12 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
       if (keys[id].trim()) (patch.keys ??= {})[id] = keys[id].trim()
     }
     let next = await bridge.aiSetConfig(patch)
-    // If the active provider still has no key but another one now does,
-    // switch to it (with its stored or default model) so the chat is usable
-    // right after saving the very first key
-    if (!next.hasKey[next.provider]) {
+    // If the active provider can't do real AI — it's the mock, or a real
+    // provider still without a key — switch to the first real provider that now
+    // has a key, so the chat is usable right after saving the very first key.
+    // (mock's hasKey is always true, so it must be handled explicitly here or
+    // saving a key while on the default mock provider would never switch away.)
+    if (next.provider === 'mock' || !next.hasKey[next.provider]) {
       const first = KEY_PROVIDERS.find((p) => next.hasKey[p.id])?.id
       if (first) {
         next = await bridge.aiSetConfig({
