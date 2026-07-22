@@ -39,6 +39,12 @@ export const IconChevronDown = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconHeart = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M12 21C12 21 4 13.7 4 8.5 4 6 6 4 8.5 4 10.1 4 11.4 5 12 6.1 12.6 5 13.9 4 15.5 4 18 4 20 6 20 8.5 20 13.7 12 21 12 21Z" />
+  </Svg>
+)
+
 export const IconPlus = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M12 5v14M5 12h14" />

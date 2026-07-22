@@ -35,6 +35,7 @@ import {
   IconFolderOpen,
   IconFullscreen,
   IconGear,
+  IconHeart,
   IconMarker,
   IconMarkupHighlight,
   IconMarkupSquiggly,
@@ -940,6 +941,17 @@ export default function Toolbar({
                 </button>
               )}
               {updOutcome && <div className="menu-hint">{updateOutcomeText(updOutcome)}</div>}
+
+              <div className="theme-menu-sep" />
+
+              <button
+                className="menu-action"
+                onClick={() => bridge.openExternal('https://github.com/sponsors/emilmsh')}
+                title={t('app.sponsorTip')}
+              >
+                <IconHeart size={15} />
+                {t('app.sponsor')}
+              </button>
 
               <div className="theme-menu-sep" />
 

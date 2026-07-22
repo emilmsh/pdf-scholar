@@ -119,6 +119,8 @@ const nb = {
   'tb.spread': 'To sider ved siden av hverandre',
   'tb.settingsTip': 'Innstillinger — språk, AI, oppdateringer og om appen',
   'settings.about': 'PDF Scholar {version} · MIT',
+  'app.sponsor': 'Støtt prosjektet',
+  'app.sponsorTip': 'Gratis og åpen kildekode — støtt utviklingen via GitHub Sponsors',
 
   // Shapes
   'shape.square': 'Rektangel',
@@ -498,6 +500,8 @@ const en: Dict = {
   'tb.spread': 'Two pages side by side',
   'tb.settingsTip': 'Settings — language, AI, updates and about',
   'settings.about': 'PDF Scholar {version} · MIT',
+  'app.sponsor': 'Support the project',
+  'app.sponsorTip': 'Free and open source — support development via GitHub Sponsors',
 
   'shape.square': 'Rectangle',
   'shape.circle': 'Ellipse',

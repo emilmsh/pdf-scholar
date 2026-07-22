@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { AiConfigView, RecentFile, UpdateCheckOutcome } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
-import { AppMark, IconDocument, IconFolderOpen, IconSparkle } from './icons'
+import { AppMark, IconDocument, IconFolderOpen, IconHeart, IconSparkle } from './icons'
 import { AiSettings } from './AiPanel'
 
 interface Props {
@@ -133,7 +133,18 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
           {updateOutcome && <span className="welcome-updates-result">{updateOutcomeText(updateOutcome)}</span>}
         </div>
 
-        <p className="welcome-credit">{t('welcome.logoCredit')}</p>
+        <p className="welcome-credit">
+          <span>{t('welcome.logoCredit')}</span>
+          <span className="welcome-credit-sep">·</span>
+          <button
+            className="welcome-sponsor"
+            onClick={() => bridge.openExternal('https://github.com/sponsors/emilmsh')}
+            title={t('app.sponsorTip')}
+          >
+            <IconHeart size={12} />
+            {t('app.sponsor')}
+          </button>
+        </p>
       </div>
 
       {showAiSetup && config && (
