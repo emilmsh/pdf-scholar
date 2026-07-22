@@ -347,14 +347,19 @@ export default function Toolbar({
   }
 
   // --- Responsive overflow ("…" menu) ---
-  // Secondary actions in collapse order: index 0 folds away FIRST (least
-  // important). Primary controls and the Assistant button never collapse.
+  // One priority-ordered list of EVERY collapsible button: index 0 folds away
+  // FIRST (least important), so a shrinking window keeps stacking icons into the
+  // "…" menu — down to the Assistant last — instead of clipping buttons off the
+  // edge. Only the genuinely-complex controls (the annotation-tool cluster with
+  // its option popovers, the page/zoom inputs, the view + settings menus, Save,
+  // and the sidebar toggle) stay inline as the irreducible core.
   const overflowActions: {
     key: string
     icon: React.JSX.Element
     label: string
     onClick(): void
     active?: boolean
+    disabled?: boolean
   }[] = [
     { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
     ...(READ_ALOUD
@@ -369,20 +374,34 @@ export default function Toolbar({
         ]
       : []),
     { key: 'print', icon: <IconPrint size={15} />, label: t('tb.print'), onClick: onPrint },
-    { key: 'snip', icon: <IconSnip size={15} />, label: t('tb.snip'), onClick: onToggleSnip, active: snipActive },
-    {
-      key: 'fullscreen',
-      icon: <IconFullscreen size={15} />,
-      label: t('tb.fullscreen'),
-      onClick: onToggleFullscreen
-    },
+    { key: 'fullscreen', icon: <IconFullscreen size={15} />, label: t('tb.fullscreen'), onClick: onToggleFullscreen },
     {
       key: 'pin',
       icon: toolbarPinned ? <IconPin size={15} /> : <IconPinOff size={15} />,
       label: toolbarPinned ? t('tb.unpin') : t('tb.pin'),
       onClick: onTogglePin,
       active: !toolbarPinned
-    }
+    },
+    { key: 'snip', icon: <IconSnip size={15} />, label: t('tb.snip'), onClick: onToggleSnip, active: snipActive },
+    // Annotation tools fold as single activation rows (their colour/width
+    // popovers aren't in the menu — reachable again by widening the window).
+    { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser' },
+    { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => onToolSelect('square'), active: shapeActive },
+    { key: 'note', icon: <IconNote size={15} />, label: t('tb.note'), onClick: onToggleNote, active: noteActive },
+    { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text' },
+    { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup },
+    { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker' },
+    { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen' },
+    { key: 'actualSize', icon: <IconActualSize size={15} />, label: t('tb.actualSize'), onClick: () => onZoomTo(100) },
+    { key: 'fitPage', icon: <IconFitPage size={15} />, label: t('tb.fitPage'), onClick: onFitPage, active: fitMode === 'page' },
+    { key: 'fitWidth', icon: <IconFitWidth size={15} />, label: t('tb.fitWidth'), onClick: onFitWidth, active: fitMode === 'width' },
+    { key: 'hideAnnots', icon: annotsHidden ? <IconEyeOff size={15} /> : <IconEye size={15} />, label: annotsHidden ? t('tb.showAnnots') : t('tb.hideAnnots'), onClick: onToggleAnnots, active: annotsHidden },
+    { key: 'redo', icon: <IconRedo size={15} />, label: t('tb.redo'), onClick: onRedo, disabled: !canRedo },
+    { key: 'undo', icon: <IconUndo size={15} />, label: t('tb.undo'), onClick: onUndo, disabled: !canUndo },
+    { key: 'forward', icon: <IconArrowRight size={15} />, label: t('tb.forward'), onClick: onNavForward, disabled: !canNavForward },
+    { key: 'back', icon: <IconArrowLeft size={15} />, label: t('tb.back'), onClick: onNavBack, disabled: !canNavBack },
+    { key: 'search', icon: <IconSearch size={15} />, label: t('tb.search'), onClick: onToggleSearch },
+    { key: 'ai', icon: <IconSparkle size={15} />, label: t('ai.assistant'), onClick: onToggleAi, active: aiOpen }
   ]
   const maxHidden = overflowActions.length
   const hiddenKeys = new Set(overflowActions.slice(0, Math.min(hiddenCount, maxHidden)).map((a) => a.key))
@@ -456,22 +475,28 @@ export default function Toolbar({
           <span className="tb-label">{t('side.contents')}</span>
         </button>
         <div className="toolbar-sep" />
-        <button className="tb-btn" onClick={onNavBack} disabled={!canNavBack} title={t('tb.navBackTip')}>
-          <IconArrowLeft />
-        </button>
-        <button
-          className="tb-btn"
-          onClick={onNavForward}
-          disabled={!canNavForward}
-          title={t('tb.navForwardTip')}
-        >
-          <IconArrowRight />
-        </button>
+        {inline('back') && (
+          <button className="tb-btn" onClick={onNavBack} disabled={!canNavBack} title={t('tb.navBackTip')}>
+            <IconArrowLeft />
+          </button>
+        )}
+        {inline('forward') && (
+          <button
+            className="tb-btn"
+            onClick={onNavForward}
+            disabled={!canNavForward}
+            title={t('tb.navForwardTip')}
+          >
+            <IconArrowRight />
+          </button>
+        )}
 
         <div className="toolbar-sep" />
 
         <div className="tool-group" ref={toolMenuRef}>
-          {(['pen', 'marker'] as const).map((tool) => (
+          {(['pen', 'marker'] as const)
+            .filter((tool) => inline(tool))
+            .map((tool) => (
             <span className="tb-split" key={tool}>
               <button
                 className={`tb-btn${activeTool === tool ? ' is-active' : ''}`}
@@ -492,70 +517,86 @@ export default function Toolbar({
               </button>
             </span>
           ))}
-          <span className="tb-split">
+          {inline('markup') && (
+            <span className="tb-split">
+              <button
+                className={`tb-btn${activeMarkup ? ' is-active' : ''}`}
+                onClick={() => onMarkupSelect(activeMarkup ? null : markupType)}
+                title={t('tb.markupTip')}
+              >
+                <IconTextMarkup />
+              </button>
+              <button
+                className={`tb-chevron${toolMenu === 'markup' ? ' is-active' : ''}`}
+                title={t('tb.markupOptionsTip')}
+                onClick={() => {
+                  if (!activeMarkup) onMarkupSelect(markupType)
+                  setToolMenu((m) => (m === 'markup' ? null : 'markup'))
+                }}
+              >
+                <IconChevronDown size={11} />
+              </button>
+            </span>
+          )}
+          {inline('shapes') && (
             <button
-              className={`tb-btn${activeMarkup ? ' is-active' : ''}`}
-              onClick={() => onMarkupSelect(activeMarkup ? null : markupType)}
-              title={t('tb.markupTip')}
+              className={`tb-btn${shapeActive ? ' is-active' : ''}`}
+              onClick={() => setToolMenu((m) => (m === 'shape' ? null : 'shape'))}
+              title={t('tb.shapesTip')}
             >
-              <IconTextMarkup />
+              <IconShapes />
             </button>
+          )}
+          {inline('text') && (
             <button
-              className={`tb-chevron${toolMenu === 'markup' ? ' is-active' : ''}`}
-              title={t('tb.markupOptionsTip')}
-              onClick={() => {
-                if (!activeMarkup) onMarkupSelect(markupType)
-                setToolMenu((m) => (m === 'markup' ? null : 'markup'))
-              }}
+              className={`tb-btn${activeTool === 'text' ? ' is-active' : ''}`}
+              onClick={() => onToolSelect(activeTool === 'text' ? null : 'text')}
+              title={t('tb.textTip')}
             >
-              <IconChevronDown size={11} />
+              <IconText />
             </button>
-          </span>
-          <button
-            className={`tb-btn${shapeActive ? ' is-active' : ''}`}
-            onClick={() => setToolMenu((m) => (m === 'shape' ? null : 'shape'))}
-            title={t('tb.shapesTip')}
-          >
-            <IconShapes />
-          </button>
-          <button
-            className={`tb-btn${activeTool === 'text' ? ' is-active' : ''}`}
-            onClick={() => onToolSelect(activeTool === 'text' ? null : 'text')}
-            title={t('tb.textTip')}
-          >
-            <IconText />
-          </button>
-          <button
-            className={`tb-btn${noteActive ? ' is-active' : ''}`}
-            onClick={onToggleNote}
-            title={t('tb.noteTip')}
-          >
-            <IconNote />
-          </button>
+          )}
+          {inline('note') && (
+            <button
+              className={`tb-btn${noteActive ? ' is-active' : ''}`}
+              onClick={onToggleNote}
+              title={t('tb.noteTip')}
+            >
+              <IconNote />
+            </button>
+          )}
           <div className="toolbar-sep" />
-          <button
-            className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
-            onClick={() => selectTool('eraser')}
-            title={t('tb.eraserTip')}
-          >
-            <IconEraser />
-          </button>
-          <button
-            className={`tb-btn${annotsHidden ? ' is-active' : ''}`}
-            onClick={onToggleAnnots}
-            title={annotsHidden ? t('tb.showAnnotsTip') : t('tb.hideAnnotsTip')}
-          >
-            {annotsHidden ? <IconEyeOff /> : <IconEye />}
-          </button>
+          {inline('eraser') && (
+            <button
+              className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
+              onClick={() => selectTool('eraser')}
+              title={t('tb.eraserTip')}
+            >
+              <IconEraser />
+            </button>
+          )}
+          {inline('hideAnnots') && (
+            <button
+              className={`tb-btn${annotsHidden ? ' is-active' : ''}`}
+              onClick={onToggleAnnots}
+              title={annotsHidden ? t('tb.showAnnotsTip') : t('tb.hideAnnotsTip')}
+            >
+              {annotsHidden ? <IconEyeOff /> : <IconEye />}
+            </button>
+          )}
 
           <div className="toolbar-sep" />
 
-          <button className="tb-btn" onClick={onUndo} disabled={!canUndo} title={t('tb.undoTip')}>
-            <IconUndo />
-          </button>
-          <button className="tb-btn" onClick={onRedo} disabled={!canRedo} title={t('tb.redoTip')}>
-            <IconRedo />
-          </button>
+          {inline('undo') && (
+            <button className="tb-btn" onClick={onUndo} disabled={!canUndo} title={t('tb.undoTip')}>
+              <IconUndo />
+            </button>
+          )}
+          {inline('redo') && (
+            <button className="tb-btn" onClick={onRedo} disabled={!canRedo} title={t('tb.redoTip')}>
+              <IconRedo />
+            </button>
+          )}
 
           {toolMenu === 'markup' ? (
             <div className="tool-menu">
@@ -711,35 +752,43 @@ export default function Toolbar({
           <IconPlus />
         </button>
         <div className="toolbar-sep" />
-        <button
-          className={`tb-btn${fitMode === 'custom' && zoomPercent === 100 ? ' is-active' : ''}`}
-          onClick={() => onZoomTo(100)}
-          title={t('tb.actualSizeTip')}
-        >
-          <IconActualSize />
-        </button>
-        <button
-          className={`tb-btn${fitMode === 'page' ? ' is-active' : ''}`}
-          onClick={onFitPage}
-          title={t('tb.fitPageTip')}
-        >
-          <IconFitPage />
-        </button>
-        <button
-          className={`tb-btn${fitMode === 'width' ? ' is-active' : ''}`}
-          onClick={onFitWidth}
-          title={t('tb.fitWidthTip')}
-        >
-          <IconFitWidth />
-        </button>
+        {inline('actualSize') && (
+          <button
+            className={`tb-btn${fitMode === 'custom' && zoomPercent === 100 ? ' is-active' : ''}`}
+            onClick={() => onZoomTo(100)}
+            title={t('tb.actualSizeTip')}
+          >
+            <IconActualSize />
+          </button>
+        )}
+        {inline('fitPage') && (
+          <button
+            className={`tb-btn${fitMode === 'page' ? ' is-active' : ''}`}
+            onClick={onFitPage}
+            title={t('tb.fitPageTip')}
+          >
+            <IconFitPage />
+          </button>
+        )}
+        {inline('fitWidth') && (
+          <button
+            className={`tb-btn${fitMode === 'width' ? ' is-active' : ''}`}
+            onClick={onFitWidth}
+            title={t('tb.fitWidthTip')}
+          >
+            <IconFitWidth />
+          </button>
+        )}
       </div>
 
       <div className="toolbar-spacer" />
 
       <div className="toolbar-group">
-        <button className="tb-btn" onClick={onToggleSearch} title={t('tb.searchTip')}>
-          <IconSearch />
-        </button>
+        {inline('search') && (
+          <button className="tb-btn" onClick={onToggleSearch} title={t('tb.searchTip')}>
+            <IconSearch />
+          </button>
+        )}
 
         {READ_ALOUD && inline('readaloud') && (
           <button
@@ -1007,6 +1056,7 @@ export default function Toolbar({
                   <button
                     key={a.key}
                     className={`menu-action${a.active ? ' is-active' : ''}`}
+                    disabled={a.disabled}
                     onClick={() => {
                       setOverflowMenuOpen(false)
                       a.onClick()
@@ -1021,14 +1071,16 @@ export default function Toolbar({
           </div>
         )}
 
-        <button
-          className={`tb-btn tb-labeled${aiOpen ? ' is-active' : ''}`}
-          onClick={onToggleAi}
-          title={t('tb.aiTip')}
-        >
-          <IconSparkle />
-          <span className="tb-label">{t('ai.assistant')}</span>
-        </button>
+        {inline('ai') && (
+          <button
+            className={`tb-btn tb-labeled${aiOpen ? ' is-active' : ''}`}
+            onClick={onToggleAi}
+            title={t('tb.aiTip')}
+          >
+            <IconSparkle />
+            <span className="tb-label">{t('ai.assistant')}</span>
+          </button>
+        )}
       </div>
 
     </div>

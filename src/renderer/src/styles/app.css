@@ -881,6 +881,12 @@ button {
   margin: 0 6px;
 }
 
+/* Folding buttons into the "…" menu can leave separators adjacent (a whole
+   cluster collapsed) — hide the duplicate so no empty divider shows. */
+.toolbar-sep + .toolbar-sep {
+  display: none;
+}
+
 /* Labelled bookend toggles (Innhold / Assistent) — icon + text so the two
    panel toggles read clearly at the far left and far right edges */
 .tb-labeled {
