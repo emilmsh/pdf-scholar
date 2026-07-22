@@ -3,8 +3,27 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import { t, useLang } from '../i18n'
+import { IconChevronDown, IconCopy, IconDocument, IconFolderOpen } from './icons'
 
 const THUMB_WIDTH = 132
+
+/** Render a source path/URL as something a human recognises: a Windows file://
+ *  URL becomes `C:\Users\…\paper.pdf`, a picked file shows just its name, an
+ *  http(s) URL is shown decoded. (Shared shape with the old toolbar button.) */
+function prettyPath(path: string): string {
+  if (path.startsWith('fsa:')) return path.slice(4)
+  if (path.startsWith('file://')) {
+    let p = decodeURIComponent(path.replace(/^file:\/\//, ''))
+    p = p.replace(/^\/([A-Za-z]:)/, '$1') // file:///C:/… → C:/…
+    if (/^[A-Za-z]:/.test(p)) p = p.replace(/\//g, '\\') // Windows backslashes
+    return p
+  }
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
 
 export type ExportFormat = 'markdown' | 'html' | 'text' | 'docx'
 
@@ -35,6 +54,14 @@ interface Props {
   onExport(format: ExportFormat): void
   /** Open the AI panel with the "summarize my annotations" question */
   onAskAi(): void
+  /** Browser/extension only: the open document's display name + source path,
+   *  and a callback to open another file. When onOpenFile is supplied the
+   *  sidebar shows a file-identity header above the tab switcher (name, full
+   *  path on hover, click/right-click menu). Desktop leaves onOpenFile
+   *  undefined, so the header never appears there. */
+  docName?: string
+  docPath?: string
+  onOpenFile?(): void
 }
 
 type Tab = 'thumbs' | 'outline' | 'annots'
@@ -51,7 +78,10 @@ function Sidebar({
   onJumpToAnnot,
   onDeleteAnnot,
   onExport,
-  onAskAi
+  onAskAi,
+  docName,
+  docPath,
+  onOpenFile
 }: Props): React.JSX.Element {
   useLang()
   // Contents is the scholar's default view; fall back to thumbnails when the
@@ -65,6 +95,38 @@ function Sidebar({
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
   const [visibleThumbs, setVisibleThumbs] = useState<ReadonlySet<number>>(new Set())
   const listRef = useRef<HTMLDivElement>(null)
+
+  // Document-identity header (browser/extension): filename + path menu
+  const [docMenuOpen, setDocMenuOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const docRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!docMenuOpen) {
+      setCopied(false)
+      return
+    }
+    const close = (e: Event): void => {
+      if (docRef.current && !docRef.current.contains(e.target as Node)) setDocMenuOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setDocMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', close, true)
+    window.addEventListener('keydown', onEsc, true)
+    return () => {
+      window.removeEventListener('pointerdown', close, true)
+      window.removeEventListener('keydown', onEsc, true)
+    }
+  }, [docMenuOpen])
+
+  const copyPath = (): void => {
+    if (!docPath) return
+    void navigator.clipboard?.writeText(prettyPath(docPath)).then(
+      () => setCopied(true),
+      () => {}
+    )
+  }
 
   useEffect(() => {
     if (!pdf) return
@@ -118,6 +180,52 @@ function Sidebar({
 
   return (
     <div className={`sidebar${open ? ' open' : ''}`}>
+      {docName && onOpenFile && (
+        <div className="sidebar-doc" ref={docRef}>
+          <button
+            className={`sidebar-doc-head${docMenuOpen ? ' is-open' : ''}`}
+            title={docPath ? prettyPath(docPath) : docName}
+            onClick={() => setDocMenuOpen((o) => !o)}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setDocMenuOpen(true)
+            }}
+          >
+            <IconDocument size={15} />
+            <span className="sidebar-doc-name">{docName}</span>
+            <IconChevronDown size={13} />
+          </button>
+          {docMenuOpen && (
+            <div className="sidebar-doc-menu" role="menu">
+              <div className="sidebar-doc-menu-name">{docName}</div>
+              {docPath && (
+                <div
+                  className="sidebar-doc-menu-path"
+                  title={docPath.startsWith('fsa:') ? undefined : prettyPath(docPath)}
+                >
+                  {docPath.startsWith('fsa:') ? t('doc.pickedHint') : prettyPath(docPath)}
+                </div>
+              )}
+              {docPath && !docPath.startsWith('fsa:') && (
+                <button className="sidebar-doc-menu-item" onClick={copyPath}>
+                  <IconCopy size={14} />
+                  {copied ? t('doc.copied') : t('doc.copyPath')}
+                </button>
+              )}
+              <button
+                className="sidebar-doc-menu-item"
+                onClick={() => {
+                  setDocMenuOpen(false)
+                  onOpenFile()
+                }}
+              >
+                <IconFolderOpen size={15} />
+                {t('doc.openFile')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="sidebar-tabs">
         <button className={tab === 'outline' ? 'active' : ''} onClick={() => pickTab('outline')}>
           {t('side.contents')}

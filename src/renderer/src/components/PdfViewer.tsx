@@ -3680,9 +3680,6 @@ export default function PdfViewer({
           onTogglePin={togglePin}
           onPresent={enterPresentation}
           onToggleFullscreen={toggleFullscreen}
-          docName={payload.name}
-          docPath={payload.path}
-          onOpenFile={onOpenFile}
         />
       </div>
       {/* Tucked-toolbar reveal: mouse hovers this top hot-zone; touch swipes
@@ -3748,6 +3745,9 @@ export default function PdfViewer({
           onDeleteAnnot={removeAnnotation}
           onExport={(format) => void exportAnnotations(format)}
           onAskAi={askAnnotations}
+          docName={payload.name}
+          docPath={payload.path}
+          onOpenFile={onOpenFile}
         />
         {tocPinned && (
           <div

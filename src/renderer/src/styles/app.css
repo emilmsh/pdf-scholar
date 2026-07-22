@@ -1132,64 +1132,98 @@ button {
   margin-bottom: 8px;
 }
 
-/* Document button + menu (browser/extension only — the file-identity surface
-   the single-tab shell lacks a tab bar for). Left-most in the toolbar. */
-.tb-doc {
-  max-width: 240px;
-  gap: 6px;
+/* Document-identity header at the top of the sidebar (browser/extension): the
+   open file's name, with a click/right-click menu for its full path,
+   copy-path and open-another-file. Replaces the old left-most toolbar button
+   so the toolbar keeps its width for tools. */
+.sidebar-doc {
+  position: relative;
+  padding: 8px 8px 0;
 }
 
-.tb-doc-name {
+.sidebar-doc-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: 8px;
+  color: var(--text);
+  text-align: left;
+}
+
+.sidebar-doc-head:hover,
+.sidebar-doc-head.is-open {
+  background: var(--hover);
+}
+
+.sidebar-doc-head > svg:first-child,
+.sidebar-doc-head > svg:last-child {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.sidebar-doc-head > svg:last-child {
+  opacity: 0.7;
+}
+
+.sidebar-doc-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
-.doc-menu {
-  left: 0;
-  right: auto;
-  min-width: 300px;
-  max-width: 380px;
+.sidebar-doc-menu {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 8px;
+  right: 8px;
+  z-index: 40;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+  padding: 10px;
 }
 
-.doc-current-name {
-  font-size: 13px;
+.sidebar-doc-menu-name {
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text);
   word-break: break-word;
   margin-bottom: 4px;
 }
 
-.doc-current-path {
-  font-size: 11.5px;
+.sidebar-doc-menu-path {
+  font-size: 11px;
   color: var(--text-secondary);
   word-break: break-all;
   line-height: 1.45;
   margin-bottom: 8px;
 }
 
-.doc-copy,
-.doc-open {
+.sidebar-doc-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 7px 9px;
+  padding: 7px 8px;
   border-radius: 7px;
   font-size: 12.5px;
   color: var(--text);
   text-align: left;
 }
 
-.doc-copy {
-  width: auto;
-  color: var(--accent);
-  padding: 5px 8px;
-  font-size: 12px;
+.sidebar-doc-menu-item svg {
+  flex-shrink: 0;
+  color: var(--text-secondary);
 }
 
-.doc-copy:hover,
-.doc-open:hover {
+.sidebar-doc-menu-item:hover {
   background: var(--hover);
 }
 
