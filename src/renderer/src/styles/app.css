@@ -382,10 +382,13 @@ button {
 }
 
 .welcome-mark {
-  /* Circular badge that floats on the page — no box, no square radius. */
+  /* Circular badge that floats on the page — no box, no square radius.
+     drop-shadow (not box-shadow) follows the disc's alpha, so the lift is
+     round, not a square halo. */
   width: 64px;
   height: 64px;
   flex: none;
+  filter: drop-shadow(0 5px 13px rgba(14, 58, 63, 0.28));
 }
 
 .welcome-logo {
