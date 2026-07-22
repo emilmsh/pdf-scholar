@@ -1378,6 +1378,21 @@ button {
   cursor: default;
 }
 
+.menu-action.is-active {
+  color: var(--accent);
+}
+
+.menu-action.is-active svg {
+  color: var(--accent);
+}
+
+/* The toolbar's "…" overflow dropdown (narrow screens): a compact action list,
+   narrower than the settings/theme menus. */
+.overflow-menu {
+  min-width: 184px;
+  padding: 6px;
+}
+
 .menu-hint {
   font-size: 11.5px;
   color: var(--text-secondary);

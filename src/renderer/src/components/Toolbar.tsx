@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
   LanguagePreference,
   Settings,
@@ -39,6 +39,7 @@ import {
   IconMarkupStrikeout,
   IconMarkupUnderline,
   IconMinus,
+  IconMore,
   IconPen,
   IconPin,
   IconPinOff,
@@ -262,6 +263,13 @@ export default function Toolbar({
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
+  // Responsive overflow: secondary buttons fold into a "…" menu (left of the
+  // protected Assistant button) when the toolbar is too narrow for them all.
+  const toolbarRef = useRef<HTMLDivElement>(null)
+  const spacerRef = useRef<HTMLDivElement>(null)
+  const overflowMenuRef = useRef<HTMLDivElement>(null)
+  const [hiddenCount, setHiddenCount] = useState(0)
+  const [overflowMenuOpen, setOverflowMenuOpen] = useState(false)
 
   useEffect(() => {
     if (!toolMenu) return
@@ -338,8 +346,92 @@ export default function Toolbar({
     else setPageInput(String(page))
   }
 
+  // --- Responsive overflow ("…" menu) ---
+  // Secondary actions in collapse order: index 0 folds away FIRST (least
+  // important). Primary controls and the Assistant button never collapse.
+  const overflowActions: {
+    key: string
+    icon: React.JSX.Element
+    label: string
+    onClick(): void
+    active?: boolean
+  }[] = [
+    { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
+    ...(READ_ALOUD
+      ? [
+          {
+            key: 'readaloud',
+            icon: <IconSpeaker size={15} />,
+            label: t('tb.readAloud'),
+            onClick: onToggleReadAloud,
+            active: readAloudOpen
+          }
+        ]
+      : []),
+    { key: 'print', icon: <IconPrint size={15} />, label: t('tb.print'), onClick: onPrint },
+    { key: 'snip', icon: <IconSnip size={15} />, label: t('tb.snip'), onClick: onToggleSnip, active: snipActive },
+    {
+      key: 'fullscreen',
+      icon: <IconFullscreen size={15} />,
+      label: t('tb.fullscreen'),
+      onClick: onToggleFullscreen
+    },
+    {
+      key: 'pin',
+      icon: toolbarPinned ? <IconPin size={15} /> : <IconPinOff size={15} />,
+      label: toolbarPinned ? t('tb.unpin') : t('tb.pin'),
+      onClick: onTogglePin,
+      active: !toolbarPinned
+    }
+  ]
+  const maxHidden = overflowActions.length
+  const hiddenKeys = new Set(overflowActions.slice(0, Math.min(hiddenCount, maxHidden)).map((a) => a.key))
+  const inline = (key: string): boolean => !hiddenKeys.has(key)
+  const hiddenActions = overflowActions.filter((a) => hiddenKeys.has(a.key))
+
+  // Measure the toolbar; fold one more secondary button away when it overflows,
+  // bring one back when the flex spacer has grown enough that it would fit (the
+  // >46px slack is hysteresis so it can't oscillate). Chromium-only app, so
+  // scrollWidth vs clientWidth is a reliable overflow signal.
+  useLayoutEffect(() => {
+    const el = toolbarRef.current
+    if (!el) return
+    const measure = (): void => {
+      if (el.scrollWidth > el.clientWidth + 1) {
+        setHiddenCount((h) => Math.min(h + 1, maxHidden))
+      } else if ((spacerRef.current?.offsetWidth ?? 0) > 46) {
+        setHiddenCount((h) => Math.max(h - 1, 0))
+      }
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [hiddenCount, maxHidden, canSaveInPlace])
+
+  useEffect(() => {
+    if (hiddenActions.length === 0) setOverflowMenuOpen(false)
+  }, [hiddenActions.length])
+
+  useEffect(() => {
+    if (!overflowMenuOpen) return
+    const close = (e: Event): void => {
+      if (overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node))
+        setOverflowMenuOpen(false)
+    }
+    const onEsc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOverflowMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', close, true)
+    window.addEventListener('keydown', onEsc, true)
+    return () => {
+      window.removeEventListener('pointerdown', close, true)
+      window.removeEventListener('keydown', onEsc, true)
+    }
+  }, [overflowMenuOpen])
+
   return (
-    <div className="toolbar">
+    <div className="toolbar" ref={toolbarRef}>
       <div className="toolbar-group">
         <button
           className={`tb-btn tb-labeled${sidebarOpen ? ' is-active' : ''}`}
@@ -548,7 +640,7 @@ export default function Toolbar({
 
       {/* Centre (freed by moving the file name to the tab strip) holds the
           reading controls: page number + zoom, flanked by flex spacers */}
-      <div className="toolbar-spacer" />
+      <div className="toolbar-spacer" ref={spacerRef} />
 
       <div className="toolbar-group toolbar-center">
         <div className="page-indicator">
@@ -635,7 +727,7 @@ export default function Toolbar({
           <IconSearch />
         </button>
 
-        {READ_ALOUD && (
+        {READ_ALOUD && inline('readaloud') && (
           <button
             className={`tb-btn${readAloudOpen ? ' is-active' : ''}`}
             onClick={onToggleReadAloud}
@@ -647,9 +739,11 @@ export default function Toolbar({
 
         <div className="toolbar-sep" />
 
-        <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
-          <IconPrint />
-        </button>
+        {inline('print') && (
+          <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
+            <IconPrint />
+          </button>
+        )}
 
         {canSaveInPlace ? (
           <>
@@ -767,19 +861,25 @@ export default function Toolbar({
           )}
         </div>
 
-        <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
-          <IconPresent />
-        </button>
-        <button
-          className={`tb-btn${toolbarPinned ? '' : ' is-active'}`}
-          onClick={onTogglePin}
-          title={toolbarPinned ? t('tb.unpinTip') : t('tb.pinTip')}
-        >
-          {toolbarPinned ? <IconPin /> : <IconPinOff />}
-        </button>
-        <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
-          <IconFullscreen />
-        </button>
+        {inline('present') && (
+          <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
+            <IconPresent />
+          </button>
+        )}
+        {inline('pin') && (
+          <button
+            className={`tb-btn${toolbarPinned ? '' : ' is-active'}`}
+            onClick={onTogglePin}
+            title={toolbarPinned ? t('tb.unpinTip') : t('tb.pinTip')}
+          >
+            {toolbarPinned ? <IconPin /> : <IconPinOff />}
+          </button>
+        )}
+        {inline('fullscreen') && (
+          <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
+            <IconFullscreen />
+          </button>
+        )}
 
         <div className="toolbar-sep" />
 
@@ -865,13 +965,48 @@ export default function Toolbar({
 
         <div className="toolbar-sep" />
 
-        <button
-          className={`tb-btn${snipActive ? ' is-active' : ''}`}
-          onClick={onToggleSnip}
-          title={t('tb.snipTip')}
-        >
-          <IconSnip />
-        </button>
+        {inline('snip') && (
+          <button
+            className={`tb-btn${snipActive ? ' is-active' : ''}`}
+            onClick={onToggleSnip}
+            title={t('tb.snipTip')}
+          >
+            <IconSnip />
+          </button>
+        )}
+
+        {/* Overflow: secondary buttons that didn't fit, folded to the LEFT of
+            the (protected) Assistant button. */}
+        {hiddenActions.length > 0 && (
+          <div className="theme-menu-anchor" ref={overflowMenuRef}>
+            <button
+              className={`tb-btn${overflowMenuOpen ? ' is-active' : ''}`}
+              onClick={() => setOverflowMenuOpen((o) => !o)}
+              title={t('tb.more')}
+              aria-label={t('tb.more')}
+            >
+              <IconMore />
+            </button>
+            {overflowMenuOpen && (
+              <div className="theme-menu overflow-menu">
+                {hiddenActions.map((a) => (
+                  <button
+                    key={a.key}
+                    className={`menu-action${a.active ? ' is-active' : ''}`}
+                    onClick={() => {
+                      setOverflowMenuOpen(false)
+                      a.onClick()
+                    }}
+                  >
+                    {a.icon}
+                    {a.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           className={`tb-btn tb-labeled${aiOpen ? ' is-active' : ''}`}
           onClick={onToggleAi}
