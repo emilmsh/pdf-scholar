@@ -1,6 +1,10 @@
-# PDF Scholar
+<p align="center">
+  <img src="docs/logo.png" alt="PDF Scholar" width="112" height="112">
+</p>
 
-**A calm, reading-first PDF app for Windows — built for people who work with texts.**
+<h1 align="center">PDF Scholar</h1>
+
+<p align="center"><strong>A calm, reading-first PDF app for Windows — built for people who work with texts.</strong></p>
 
 PDF Scholar is a PDF reader and annotator for Windows — with beta builds for macOS
 and Linux — made for people who *read to work*: research articles, reports, books.
