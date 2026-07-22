@@ -1344,6 +1344,14 @@ export default function PdfViewer({
 
   const toggleSpread = useCallback(() => {
     const next = !spreadRef.current
+    // Entering two-page view from a custom (manual) zoom: switch to fit-page so
+    // BOTH pages become visible. Without this the single-page zoom is kept and
+    // the spread overflows the viewport, showing only part of it. (An existing
+    // fit-width/fit-page mode already re-fits itself for the pair below.)
+    if (next && fitModeRef.current === 'custom') {
+      fitModeRef.current = 'page'
+      setFitMode('page')
+    }
     reanchorFor(rotationRef.current, next)
     setSpread(next)
     schedulePositionSave()
