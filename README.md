@@ -168,6 +168,8 @@ sentences it drew from.
   only when you ask a question
 - Cost transparency: every answer shows its estimated cost
 
+![Explain a figure — drag a box around a chart or table and the assistant explains it](docs/screenshots/assistant_figure.png)
+
 **Scholarly by design**
 
 ![Sepia theme](docs/screenshots/parchment.png)
@@ -178,6 +180,8 @@ terracotta accent, calm on the eyes for long sessions — and the two night mode
 late reading easy on the eyes.
 
 ![Night theme](docs/screenshots/night.png)
+
+![Night+ — the higher-contrast night mode](docs/screenshots/night+.png)
 
 ## Development
 
