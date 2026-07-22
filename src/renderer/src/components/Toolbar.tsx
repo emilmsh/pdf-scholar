@@ -389,25 +389,39 @@ export default function Toolbar({
   const inline = (key: string): boolean => !hiddenKeys.has(key)
   const hiddenActions = overflowActions.filter((a) => hiddenKeys.has(a.key))
 
-  // Measure the toolbar; fold one more secondary button away when it overflows,
-  // bring one back when the flex spacer has grown enough that it would fit (the
-  // >46px slack is hysteresis so it can't oscillate). Chromium-only app, so
-  // scrollWidth vs clientWidth is a reliable overflow signal.
-  useLayoutEffect(() => {
+  // Fold one more secondary button away when the toolbar overflows; bring one
+  // back when the flex spacer has grown enough that it would fit (>46px slack =
+  // hysteresis so it can't oscillate). Chromium-only app, so scrollWidth vs
+  // clientWidth is a reliable overflow signal.
+  const measureOverflow = (): void => {
     const el = toolbarRef.current
     if (!el) return
-    const measure = (): void => {
-      if (el.scrollWidth > el.clientWidth + 1) {
-        setHiddenCount((h) => Math.min(h + 1, maxHidden))
-      } else if ((spacerRef.current?.offsetWidth ?? 0) > 46) {
-        setHiddenCount((h) => Math.max(h - 1, 0))
-      }
+    if (el.scrollWidth > el.clientWidth + 1) {
+      setHiddenCount((h) => Math.min(h + 1, maxHidden))
+    } else if ((spacerRef.current?.offsetWidth ?? 0) > 46) {
+      setHiddenCount((h) => Math.max(h - 1, 0))
     }
-    measure()
-    const ro = new ResizeObserver(measure)
+  }
+  const measureRef = useRef(measureOverflow)
+  measureRef.current = measureOverflow
+
+  // Runs after EVERY render: the toolbar's own width doesn't change when its
+  // CONTENT does (document loads → page count appears, zoom text, tool state),
+  // so a ResizeObserver alone never fires for those — this catches them and
+  // converges (each pass folds/unfolds at most one button, then no-ops).
+  useLayoutEffect(() => {
+    measureRef.current()
+  })
+
+  // Available-width changes (window resize, side panels opening/closing) don't
+  // necessarily re-render the toolbar, so observe its box directly too.
+  useEffect(() => {
+    const el = toolbarRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => measureRef.current())
     ro.observe(el)
     return () => ro.disconnect()
-  }, [hiddenCount, maxHidden, canSaveInPlace])
+  }, [])
 
   useEffect(() => {
     if (hiddenActions.length === 0) setOverflowMenuOpen(false)
