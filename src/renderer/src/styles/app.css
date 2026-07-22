@@ -382,11 +382,10 @@ button {
 }
 
 .welcome-mark {
-  width: 60px;
-  height: 60px;
-  border-radius: 15px;
+  /* Circular badge that floats on the page — no box, no square radius. */
+  width: 64px;
+  height: 64px;
   flex: none;
-  box-shadow: 0 6px 18px rgba(14, 58, 63, 0.3);
 }
 
 .welcome-logo {

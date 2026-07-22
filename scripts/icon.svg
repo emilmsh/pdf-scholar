@@ -1,37 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 53.51 53.53">
+  <!-- PDF Scholar "S" badge: dark-teal disc, cream serif S. Self-contained
+       circular logo (includes its own disc background) — render full-bleed,
+       do NOT place on another tile. Source of truth for every shipped icon:
+       build/icon.png, src/extension/icons/*, build/appx/*. -->
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
-      <stop offset="0" stop-color="#0e3a3f"/>
-      <stop offset="1" stop-color="#18696a"/>
-    </linearGradient>
-    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#faf4e8"/>
-      <stop offset="1" stop-color="#ece0c8"/>
-    </linearGradient>
-    <linearGradient id="roll" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f2e6cd"/>
-      <stop offset="1" stop-color="#d6c096"/>
-    </linearGradient>
-    <filter id="softShadow" x="-25%" y="-25%" width="150%" height="150%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.30"/>
-    </filter>
+    <style>
+      .cls-1 { fill: #59767f; }
+      .cls-2 { fill: #1b3844; }
+      .cls-3 { fill: #f7f1e3; }
+    </style>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <!-- scroll: rolled top & bottom, reading highlight over one line -->
-  <g filter="url(#softShadow)">
-    <rect x="154" y="134" width="204" height="244" rx="11" fill="url(#paper)"/>
-    <g fill="#a99c82" opacity="0.85">
-      <rect x="184" y="181" width="140" height="13" rx="6.5"/>
-      <rect x="184" y="300" width="142" height="13" rx="6.5"/>
-      <rect x="184" y="332" width="100" height="13" rx="6.5"/>
-    </g>
-    <rect x="178" y="217" width="156" height="28" rx="8" fill="#f4c56a" opacity="0.55"/>
-    <rect x="184" y="224" width="140" height="13" rx="6.5" fill="#a99c82" opacity="0.9"/>
-    <rect x="131" y="107" width="250" height="54" rx="27" fill="url(#roll)"/>
-    <ellipse cx="148" cy="134" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
-    <ellipse cx="364" cy="134" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
-    <rect x="131" y="351" width="250" height="54" rx="27" fill="url(#roll)"/>
-    <ellipse cx="148" cy="378" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
-    <ellipse cx="364" cy="378" rx="8" ry="18" fill="#b89f6f" opacity="0.55"/>
+  <path class="cls-2" d="M7.86,42.75s.06.07.08.09v-.02s-.06-.05-.08-.07Z"/>
+  <g>
+    <path class="cls-1" d="M2.03,27.69c-.03-.66-.03-1.32,0-1.97-.05.66-.05,1.31,0,1.97Z"/>
+    <path class="cls-1" d="M8.7,43.67l-.03-.03s-.04-.02-.05-.03c.03.03.06.07.09.08t-.01-.02Z"/>
+    <path class="cls-2" d="M53.49,25.53c-.19-4.08-1.29-7.91-3.09-11.29-.01-.02-.02-.03-.03-.04C45.66,5.37,36.17-.46,25.52.03,17.15.42,9.84,4.64,5.21,10.92,1.71,15.69-.26,21.63.03,28c.68,14.73,13.22,26.18,27.96,25.5,1.72-.08,3.38-.32,4.99-.7,8.83-2.11,15.9-8.58,18.93-16.92,1.17-3.22,1.74-6.71,1.58-10.35ZM36.24,40.15c-3.58,15.65-28.52,8.6-24.51-5.74,1.62-5.79,4.9,4.62,9.69,3.47,4.91-1.17,5.41-6.52,1.62-10.43-4.73-4.88-20.41-2.03-14.34,16.22l-.03-.03-.18-.18c-3.77-4.12-6.18-9.55-6.46-15.56v-.21c-.05-.66-.05-1.31,0-1.97h0C2.48,15.44,9.27,6.6,18.7,3.35c-8.47,6.99-4.45,15.8,3.44,20.01,6.53,3.49,16.44,6.59,14.1,16.79ZM45.82,42.54c.92-2.23,3.29-8.39-1.35-15.03-4.92-7.04-20.52-9.63-23.46-13.44-4.78-6.19,1.37-11.76,6.48-11.45,7.14.43,8.55,6.65,3.22,7.37-3.98.55-1.86,7.09,3.55,5.66,3.71-.98,4.41-4.34,4.51-5.16.21-1.8.18-4.08-2.28-6.48.01,0,.02.01.02.01,8.43,3.63,14.53,11.84,14.98,21.61.29,6.38-1.87,12.34-5.67,16.91Z"/>
+    <path class="cls-3" d="M45.82,42.54c.92-2.23,3.29-8.39-1.35-15.03-4.92-7.04-20.52-9.63-23.46-13.44-4.78-6.19,1.37-11.76,6.48-11.45,7.14.43,8.55,6.65,3.22,7.37-3.98.55-1.86,7.09,3.55,5.66,3.71-.98,4.41-4.34,4.51-5.16.21-1.8.18-4.08-2.28-6.48.01,0,.02.01.02.01,8.43,3.63,14.53,11.84,14.98,21.61.29,6.38-1.87,12.34-5.67,16.91Z"/>
+    <path class="cls-3" d="M36.24,40.15c-3.58,15.65-28.52,8.6-24.51-5.74,1.62-5.79,4.9,4.62,9.69,3.47,4.91-1.17,5.41-6.52,1.62-10.43-4.73-4.88-20.41-2.03-14.34,16.22l-.03-.03-.18-.18c-3.77-4.12-6.18-9.55-6.46-15.56v-.21c-.03-.66-.03-1.32,0-1.97h0C2.48,15.44,9.27,6.6,18.7,3.35c-8.47,6.99-4.45,15.8,3.44,20.01,6.53,3.49,16.44,6.59,14.1,16.79Z"/>
   </g>
 </svg>
