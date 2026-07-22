@@ -3,6 +3,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import { t, useLang } from '../i18n'
+import { bridge } from '../bridge'
 import { IconChevronDown, IconCopy, IconDocument, IconFolderOpen } from './icons'
 
 const THUMB_WIDTH = 132
@@ -481,11 +482,15 @@ function OutlineRow({
         )}
         <button
           className="outline-title"
-          title={node.title}
+          title={node.url ? node.url : node.title}
           onClick={() => {
             // Clicking a parent heading reveals its subheadings (and navigates)
             if (hasChildren) setExpanded(true)
-            onJump(node.dest)
+            // Some PDFs (e.g. journal front-matter) build the outline out of
+            // EXTERNAL LINKS rather than internal destinations — open those in
+            // the browser instead of silently doing nothing.
+            if (node.dest) onJump(node.dest)
+            else if (node.url) bridge.openExternal(node.url)
           }}
         >
           {node.title}
