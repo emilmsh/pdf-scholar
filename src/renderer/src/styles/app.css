@@ -330,7 +330,9 @@ button {
 .welcome {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  /* The library page itself never scrolls — the recents box absorbs any
+     overflow (see .recents-scroll). Keeps the whole start screen on one view. */
+  overflow: hidden;
   display: flex;
   justify-content: center;
   background: var(--bg-chrome);
@@ -353,11 +355,24 @@ button {
 
 .welcome-inner {
   width: min(640px, 90vw);
-  padding: 96px 0 64px;
+  height: 100%;
+  min-height: 0;
+  /* Top padding relaxes on shorter screens so the whole page fits one view. */
+  padding: clamp(28px, 7vh, 88px) 0 clamp(18px, 3vh, 40px);
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+}
+
+/* Header + footer keep their natural height; only the recents box flexes and
+   shrinks, so the library fits one screen without the page itself scrolling. */
+.welcome-inner > * {
+  flex: none;
+}
+.welcome-inner > .recents {
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .welcome-lockup {
@@ -529,9 +544,12 @@ button {
 }
 
 .recents {
-  margin-top: 56px;
+  margin-top: clamp(20px, 3.5vh, 56px);
   width: 100%;
   text-align: left;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .recents h2 {
@@ -549,10 +567,11 @@ button {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 12px;
-  /* When the list outgrows the viewport, scroll inside the box rather than the
-     whole library page — a calmer entry. Caps to a portion of the viewport so a
-     short list still hugs its rows and a long one stays comfortably in view. */
-  max-height: min(52vh, 560px);
+  /* Flex-sized within .recents: grows to fit its rows on a tall screen and,
+     when the list outgrows the space, scrolls inside the box rather than
+     scrolling the whole library page. */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
