@@ -3,6 +3,17 @@
    Themes are driven by CSS variables on <html data-theme="...">
    ============================================================ */
 
+/* Libertinus Serif (SIL OFL 1.1) — the "PDF Scholar" wordmark only, so it
+   echoes the serif "S" in the logo. Subset to Latin letters + space (~10 KB);
+   licence text ships alongside the file. */
+@font-face {
+  font-family: 'Libertinus Serif';
+  src: url('../assets/fonts/LibertinusSerif-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root,
 :root[data-theme='day'] {
   --bg-chrome: #f7f7f9;
@@ -11,7 +22,9 @@
   --border: rgba(0, 0, 0, 0.08);
   --text: #1d1d1f;
   --text-secondary: #6e6e73;
-  --accent: #327cf6;
+  /* Brand accent = the logo's teal, one hue across every theme (dark teal on
+     light grounds, light teal on dark). Tuned per theme for AA contrast. */
+  --accent: #2f6f7b;
   --accent-text: #ffffff;
   --hover: rgba(0, 0, 0, 0.055);
   --active: rgba(0, 0, 0, 0.09);
@@ -42,7 +55,7 @@
   --border: rgba(61, 57, 41, 0.14);
   --text: #3d3929;
   --text-secondary: #838072;
-  --accent: #c96442;
+  --accent: #2f6f7b;
   --accent-text: #ffffff;
   --hover: rgba(61, 57, 41, 0.06);
   --active: rgba(61, 57, 41, 0.11);
@@ -71,8 +84,8 @@
   --border: rgba(255, 255, 255, 0.1);
   --text: #eeece2;
   --text-secondary: #a4a29a;
-  --accent: #d97757;
-  --accent-text: #ffffff;
+  --accent: #8aa6ae;
+  --accent-text: #14262b;
   --hover: rgba(255, 255, 255, 0.07);
   --active: rgba(255, 255, 255, 0.12);
   --page-bg: #21211f;
@@ -91,8 +104,8 @@
   --border: rgba(255, 255, 255, 0.14);
   --text: #f5f5f7;
   --text-secondary: #a0a0a8;
-  --accent: #5a95f5;
-  --accent-text: #ffffff;
+  --accent: #8aa6ae;
+  --accent-text: #14262b;
   --hover: rgba(255, 255, 255, 0.08);
   --active: rgba(255, 255, 255, 0.14);
   --page-bg: #0a0a0b;
@@ -336,21 +349,20 @@ button {
   display: flex;
   justify-content: center;
   background: var(--bg-chrome);
-  /* Library palette lifted from the app icon (deep teal + warm amber). */
-  --wc-teal: #147a76;
-  --wc-amber: #d99f34;
-  --wc-logo-from: #1a8a83;
-  --wc-logo-to: #0e4a4d;
-  --wc-btn-from: #1a807b;
-  --wc-btn-to: #0e565a;
+  /* Library palette lifted from the "S" badge. --wc-logo is the wordmark's
+     flat colour = the logo's exact deep teal, so the two read as one mark.
+     The "Åpne PDF" button keeps its teal gradient (--wc-btn-*). */
+  --wc-teal: #4a6b74;
+  --wc-logo: #1b3844;
+  --wc-btn-from: #4a6b74;
+  --wc-btn-to: #1b3844;
 }
 
 /* Icon reads too dark on the night grounds — brighten the tokens that sit on the page. */
 :root[data-theme='night'] .welcome,
 :root[data-theme='nightHc'] .welcome {
-  --wc-teal: #3fb0a6;
-  --wc-logo-from: #55c6bb;
-  --wc-logo-to: #2f938c;
+  --wc-teal: #86a3ac;
+  --wc-logo: #8aa6ae;
 }
 
 .welcome-inner {
@@ -383,22 +395,30 @@ button {
 
 .welcome-mark {
   /* Circular badge that floats on the page — no box, no square radius.
-     drop-shadow (not box-shadow) follows the disc's alpha, so the lift is
-     round, not a square halo. */
+     The disc is `color` (--logo-disc); the "S" is a hole, so the page ground
+     shows through. drop-shadow (not box-shadow) follows the disc's alpha, so
+     the lift is round, not a square halo. */
   width: 64px;
   height: 64px;
   flex: none;
+  color: #1b3844;
   filter: drop-shadow(0 5px 13px rgba(14, 58, 63, 0.28));
 }
 
+/* On dark grounds the deep-teal disc would vanish — lift it to the light teal
+   the wordmark uses, and drop the (now invisible) shadow. */
+:root[data-theme='night'] .welcome-mark,
+:root[data-theme='nightHc'] .welcome-mark {
+  color: #8aa6ae;
+  filter: none;
+}
+
 .welcome-logo {
-  font-size: 44px;
-  font-weight: 700;
-  letter-spacing: 1px;
-  background: linear-gradient(135deg, var(--wc-logo-from), var(--wc-logo-to));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-family: 'Libertinus Serif', 'Palatino Linotype', Cambria, Georgia, serif;
+  font-size: 50px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--wc-logo);
 }
 
 .welcome-tagline {
@@ -437,7 +457,7 @@ button {
 .welcome .btn-primary {
   background: linear-gradient(135deg, var(--wc-btn-from), var(--wc-btn-to));
   color: #fff;
-  box-shadow: 0 4px 14px rgba(14, 58, 63, 0.28);
+  box-shadow: 0 4px 14px rgba(27, 56, 68, 0.28);
 }
 
 .btn-secondary {
@@ -619,6 +639,15 @@ button {
 
 .welcome-version {
   color: var(--text-secondary);
+}
+
+/* Quiet logo credit — sits below the version line, deliberately faint. */
+.welcome-credit {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.65;
 }
 
 .welcome-version + .welcome-updates-btn::before {
@@ -1077,6 +1106,67 @@ button {
   letter-spacing: 0.06em;
   color: var(--text-secondary);
   margin-bottom: 8px;
+}
+
+/* Document button + menu (browser/extension only — the file-identity surface
+   the single-tab shell lacks a tab bar for). Left-most in the toolbar. */
+.tb-doc {
+  max-width: 240px;
+  gap: 6px;
+}
+
+.tb-doc-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-menu {
+  left: 0;
+  right: auto;
+  min-width: 300px;
+  max-width: 380px;
+}
+
+.doc-current-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+  margin-bottom: 4px;
+}
+
+.doc-current-path {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  word-break: break-all;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.doc-copy,
+.doc-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--text);
+  text-align: left;
+}
+
+.doc-copy {
+  width: auto;
+  color: var(--accent);
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.doc-copy:hover,
+.doc-open:hover {
+  background: var(--hover);
 }
 
 .theme-options {
@@ -2273,6 +2363,15 @@ button {
   letter-spacing: 0.06em;
   color: var(--text-secondary);
   padding: 0 2px 6px;
+  /* Drag handle: pull the bubble off the text it annotates. touch-action:none
+     lets a touch-drag move it instead of scrolling the page (Surface). */
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.annot-popover-head:active {
+  cursor: grabbing;
 }
 
 .annot-popover-author {
@@ -2517,6 +2616,15 @@ button {
   border-radius: 12px;
   box-shadow: var(--shadow-menu);
   animation: menu-in 0.12s ease;
+  /* Draggable from the chrome (padding); the textarea keeps its own cursor and
+     touch behaviour so typing/selecting still works. */
+  cursor: grab;
+  touch-action: none;
+}
+
+.note-popover textarea {
+  cursor: auto;
+  touch-action: auto;
 }
 
 .note-popover textarea {
@@ -4117,7 +4225,7 @@ button {
 /* Pen and marker get tool-shaped cursors (hotspot at the tip) */
 
 .draw-layer.pen-mode {
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><g transform="translate(1 1)"><path d="M3 21l3.5-1 13-13-2.5-2.5-13 13z" fill="white" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 4.5l2.5 2.5 2-2a1.8 1.8 0 0 0 0-2.5A1.8 1.8 0 0 0 18 4z" fill="%23327cf6" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 21l1-3.5 2.5 2.5z" fill="black"/></g></svg>') 3 22, crosshair;
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><g transform="translate(1 1)"><path d="M3 21l3.5-1 13-13-2.5-2.5-13 13z" fill="white" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 4.5l2.5 2.5 2-2a1.8 1.8 0 0 0 0-2.5A1.8 1.8 0 0 0 18 4z" fill="%232f6f7b" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 21l1-3.5 2.5 2.5z" fill="black"/></g></svg>') 3 22, crosshair;
 }
 
 .draw-layer.marker-mode {
@@ -4239,11 +4347,9 @@ button {
 }
 
 :root[data-theme='sepia'] .welcome-logo {
-  font-family: 'Palatino Linotype', Cambria, Georgia, serif;
-  letter-spacing: 1px;
-  background: linear-gradient(135deg, var(--wc-logo-from), var(--wc-logo-to));
-  -webkit-background-clip: text;
-  background-clip: text;
+  /* Libertinus (set on .welcome-logo) already carries the serif in every
+     theme; sepia needs no separate face now. */
+  letter-spacing: 0.5px;
 }
 
 :root[data-theme='sepia'] .welcome-tagline::after {

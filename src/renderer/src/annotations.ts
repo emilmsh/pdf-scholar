@@ -106,11 +106,15 @@ export const UNDERLINE_COLORS: HighlightColor[] = [
   { key: 'purple', hex: '#8f52d6', rgb: [0.561, 0.322, 0.839] }
 ]
 
-/* Defaults match the palette's red exactly so the "selected" swatch ring
-   recognizes them (compared componentwise in the toolbar menu) */
+/* Underline/strikeout defaults match the palette's red exactly so the
+   "selected" swatch ring recognizes them (compared componentwise in the
+   toolbar menu). NOTE_COLOR is deliberately a softer, warmer amber than the
+   palette's neon `yellow` — note markers are opaque (highlights are 50%), so
+   the neon read too aggressively on the page. It therefore won't ring-match a
+   swatch on a fresh note; that's fine. */
 export const UNDERLINE_COLOR: [number, number, number] = [0.886, 0.286, 0.29]
 export const STRIKEOUT_COLOR: [number, number, number] = [0.886, 0.286, 0.29]
-export const NOTE_COLOR: [number, number, number] = [1, 0.835, 0.29]
+export const NOTE_COLOR: [number, number, number] = [0.933, 0.796, 0.4]
 
 /** Localized display name for an annotation type */
 export function annotTypeLabel(type: AnnotationType): string {

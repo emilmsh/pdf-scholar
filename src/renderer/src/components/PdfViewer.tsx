@@ -13,7 +13,7 @@ import type {
   ThemeName,
   ViewRotation
 } from '../../../shared/types'
-import { bridge, isElectron } from '../bridge'
+import { bridge, isElectron, isExtension } from '../bridge'
 import { primaryMod } from '../platform'
 import { READ_ALOUD } from '../flags'
 import {
@@ -227,6 +227,8 @@ interface NavPosition {
 interface NoteDraft {
   x: number
   y: number
+  /** Markup rect (viewport coords) to open clear of, so it stays readable */
+  avoid?: { top: number; bottom: number; left: number } | null
   pageNumber: number
   anchor: PageRect
 }
@@ -256,6 +258,11 @@ interface Props {
    *  and the other two verdicts leave nothing left to save in place). */
   onExternalSaveConflict(path: string, name: string): Promise<'save' | 'discard' | 'cancel'>
   onClose(): void
+  /** Browser/extension only: open another file (the shell handles the picker).
+   *  When supplied, the toolbar shows a left-most file button that surfaces the
+   *  current file's path and this action. Desktop leaves it undefined — the tab
+   *  bar already carries the file identity. */
+  onOpenFile?(): void
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -273,7 +280,8 @@ export default function PdfViewer({
   onDirtyChange,
   onSavedAs,
   onExternalSaveConflict,
-  onClose
+  onClose,
+  onOpenFile
 }: Props): React.JSX.Element {
   useLang()
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -340,6 +348,8 @@ export default function PdfViewer({
   const [annotPopover, setAnnotPopover] = useState<{
     x: number
     y: number
+    /** Markup rect (viewport coords) to open clear of, so it stays readable */
+    avoid?: { top: number; bottom: number; left: number } | null
     pageNumber: number
     localId: string
     /** Land keyboard focus in the comment field on open (comment action) */
@@ -1978,6 +1988,12 @@ export default function PdfViewer({
           // lives in the highlight itself; nothing extra floats on the page.
           if (!menu || menu.mode !== 'selection') break
           const { x, y } = menu
+          // Capture the selection's on-screen box BEFORE clearing it, so the
+          // comment bubble can open clear of the marked text (still readable
+          // while composing).
+          const domSel = window.getSelection()
+          const selRect = domSel && domSel.rangeCount ? domSel.getRangeAt(0).getBoundingClientRect() : null
+          const avoid = selRect ? { top: selRect.top, bottom: selRect.bottom, left: selRect.left } : null
           const perPage = collectSelectionRects()
           setMenu(null)
           if (perPage.length === 0) break
@@ -1991,6 +2007,7 @@ export default function PdfViewer({
             setAnnotPopover({
               x,
               y,
+              avoid,
               pageNumber: lastHandle.pageNumber,
               localId: lastHandle.localId,
               focusText: true
@@ -2002,6 +2019,9 @@ export default function PdfViewer({
         case 'note': {
           if (!menu) break
           if (menu.mode === 'selection') {
+            const domSel = window.getSelection()
+            const selRect = domSel && domSel.rangeCount ? domSel.getRangeAt(0).getBoundingClientRect() : null
+            const avoid = selRect ? { top: selRect.top, bottom: selRect.bottom, left: selRect.left } : null
             const perPage = collectSelectionRects()
             const last = perPage.at(-1)
             if (last) {
@@ -2009,6 +2029,7 @@ export default function PdfViewer({
               setNoteDraft({
                 x: menu.x,
                 y: menu.y,
+                avoid,
                 pageNumber: last.pageNumber,
                 anchor: { x: r.x + r.w + 4, y: r.y, w: 20, h: 20 }
               })
@@ -3354,13 +3375,11 @@ export default function PdfViewer({
         goForward()
       } else if (primaryMod(e) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
         e.preventDefault()
-        // Electron writes changes back in place (only when there are changes);
-        // web/extension bakes annotations and saves to disk (overwrite/download).
-        if (isElectron) {
-          if (dirty) void saveDocument()
-        } else {
-          void saveDocument()
-        }
+        // Save over the current file when there is something to save. Desktop
+        // and the extension both write in place (the extension via a retained
+        // File System Access handle — its first save may prompt once for write
+        // access); the plain-web fallback bakes annotations and downloads.
+        if (dirty || (!isElectron && !isExtension)) void saveDocument()
       } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && (selected ?? annotPopover)) {
         e.preventDefault()
         const target = selected ?? annotPopover!
@@ -3614,7 +3633,7 @@ export default function PdfViewer({
           dirty={dirty}
           onSave={() => void saveDocument()}
           onSaveAs={() => void saveDocumentAs()}
-          canSaveInPlace={isElectron}
+          canSaveInPlace={isElectron || isExtension}
           annotsHidden={annotsHidden}
           onToggleAnnots={() => setAnnotsHidden((h) => !h)}
           canUndo={undoDepths.undo > 0}
@@ -3658,6 +3677,9 @@ export default function PdfViewer({
           onTogglePin={togglePin}
           onPresent={enterPresentation}
           onToggleFullscreen={toggleFullscreen}
+          docName={payload.name}
+          docPath={payload.path}
+          onOpenFile={onOpenFile}
         />
       </div>
       {/* Tucked-toolbar reveal: mouse hovers this top hot-zone; touch swipes
@@ -4041,6 +4063,7 @@ export default function PdfViewer({
             <AnnotPopover
               x={annotPopover.x}
               y={annotPopover.y}
+              avoid={annotPopover.avoid}
               focusText={annotPopover.focusText}
               annotation={record}
               onColor={(color) => changeAnnotation(annotPopover.pageNumber, record, { color })}
@@ -4056,6 +4079,7 @@ export default function PdfViewer({
         <NotePopover
           x={noteDraft.x}
           y={noteDraft.y}
+          avoid={noteDraft.avoid}
           onSave={saveNote}
           onCancel={() => setNoteDraft(null)}
         />

@@ -20,6 +20,11 @@ import {
 
 export const isElectron = typeof window !== 'undefined' && !!window.api
 
+/** True in the WebExtension viewer (has a runtime id and no window.api). Unlike
+ *  the plain-web dev fallback, the extension can write back to local files via
+ *  a retained File System Access handle, so it supports in-place save. */
+export const isExtension = !isElectron && isExtensionContext()
+
 interface WebState {
   positions: Record<string, ReadingPosition>
   settings: Settings

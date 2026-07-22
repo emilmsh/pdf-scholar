@@ -132,6 +132,8 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
           )}
           {updateOutcome && <span className="welcome-updates-result">{updateOutcomeText(updateOutcome)}</span>}
         </div>
+
+        <p className="welcome-credit">{t('welcome.logoCredit')}</p>
       </div>
 
       {showAiSetup && config && (

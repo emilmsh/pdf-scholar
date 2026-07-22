@@ -27,7 +27,10 @@ function copyManifest(): Plugin {
       const iconsSrc = resolve(extensionDir, 'icons')
       const iconsOut = resolve(outDir, 'icons')
       mkdirSync(iconsOut, { recursive: true })
+      // Ship ONLY the manifest-referenced PNGs — never brand/design sources
+      // (svg/pdf) that may sit alongside them in the source folder.
       for (const file of readdirSync(iconsSrc)) {
+        if (!/^icon-\d+\.png$/.test(file)) continue
         copyFileSync(resolve(iconsSrc, file), resolve(iconsOut, file))
       }
     }

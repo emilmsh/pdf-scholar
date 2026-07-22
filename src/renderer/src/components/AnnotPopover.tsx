@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { annotTypeLabel, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import { t, useLang } from '../i18n'
+import { useDraggable } from '../useDraggable'
 import { MarkupColorRow } from './SelectionMenu'
 
 interface Props {
   x: number
   y: number
+  /** Markup rect (viewport coords) to open clear of, so it stays readable */
+  avoid?: { top: number; bottom: number; left: number } | null
   annotation: PageAnnotation
   /** Focus the comment field on open (immediate-comment flow) */
   focusText?: boolean
@@ -19,6 +22,7 @@ interface Props {
 export default function AnnotPopover({
   x,
   y,
+  avoid,
   annotation,
   focusText,
   onColor,
@@ -30,13 +34,20 @@ export default function AnnotPopover({
   const [text, setText] = useState(annotation.contents ?? '')
   const textRef = useRef<HTMLTextAreaElement>(null)
 
+  // Opens clear of the markup (below/above it) so the marked text stays
+  // readable, and is draggable by its header for further nudging.
+  const { ref, style, positioned, handleProps } = useDraggable(x, y + 10, [], avoid)
+
+  // Focus the comment field once the bubble is measured and visible. Focusing
+  // it while still `visibility: hidden` (pre-measure) is a no-op — that left the
+  // caret out until you clicked in. Guard so it only lands once.
+  const focusedRef = useRef(false)
   useEffect(() => {
-    if (focusText) textRef.current?.focus()
-    // focus once on mount — not again on prop churn
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-  const left = Math.max(8, Math.min(x, window.innerWidth - 264))
-  const top = Math.max(8, Math.min(y + 10, window.innerHeight - 240))
+    if (focusText && positioned && !focusedRef.current) {
+      focusedRef.current = true
+      textRef.current?.focus()
+    }
+  }, [focusText, positioned])
 
   // Closing the popover must never lose a typed comment: click-outside
   // unmounts before the textarea's blur fires, and Esc bypasses it entirely —
@@ -54,11 +65,12 @@ export default function AnnotPopover({
   return (
     <div
       className="annot-popover"
-      style={{ left, top }}
+      ref={ref}
+      style={style}
       onMouseDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <div className="annot-popover-head">
+      <div className="annot-popover-head" {...handleProps}>
         <span>{annotTypeLabel(annotation.type)}</span>
         {annotation.author && <span className="annot-popover-author">{annotation.author}</span>}
       </div>

@@ -59,8 +59,27 @@ not as acceptable platform lag.
    install on Ubuntu/Debian** and README says so. AI-key encryption
    (`safeStorage`) needs a keyring daemon (gnome-keyring/kwallet); without one
    the app already degrades to "key not set" rather than storing plaintext.
-7. **Extension vs desktop**: see `docs/BROWSER-EXTENSION.md` — URL PDFs and the
-   File System Access save path replace local-file in-place save. (Standing
+7. **Extension in-place save needs one write-access grant for read-only-opened
+   PDFs**: the extension DOES save annotations back to the current file in place
+   (desktop parity — `Toolbar.tsx` shows the same «Lagre» + «Lagre kopi» split,
+   `canSaveInPlace = isElectron || isExtension`). When the file was opened via
+   the app's picker it already holds a writable File System Access handle and
+   saves silently from the first click. When it was opened by navigating to a
+   `file://`/URL PDF (fetched read-only, no handle), the browser's security
+   model forbids silent writes to a local file, so the FIRST save opens a Save
+   picker to grant write access. That handle is retained for the session AND
+   persisted across sessions in IndexedDB (`extension-fs-grants.ts`, keyed by the
+   file URL — chrome.storage's JSON store can't hold a FileSystemHandle), so the
+   same file is granted AT MOST ONCE EVER: a later session pre-warms the handle
+   on open (`docOpened`, silent `queryPermission`) and saves silently, or asks
+   once to resume permission on the Save click. Grants are deliberately
+   **per-file, not folder-wide** — the extension never requests broader access
+   than the user reached for (keeps the store-review permission story simple). A
+   stale handle (file moved/deleted) is dropped so the next save re-grants. Edge's
+   built-in viewer skips even the one grant only because it is privileged
+   first-party browser code, not sandboxed web content. The plain-web dev
+   fallback (`dev:web`, no `chrome.runtime`) has no writable path at all and keeps
+   the single download-export button. See `docs/BROWSER-EXTENSION.md`. (Standing
    rule: extension and desktop otherwise stay at feature parity.)
 8. **Extension update mechanism**: store installs auto-update (that is the whole
    point of publishing — see `docs/STORE.md`); Chromium gives sideloaded
@@ -74,6 +93,17 @@ not as acceptable platform lag.
    cannot reopen a file it just downloaded (no readable path back from a
    download, and the FS Access picker handle is not a recents-addressable
    file), so there it stays a plain export with a «Kopi lagret» toast.
+10. **Document button (browser/extension only)**: the single-tab extension shell
+    has no tab bar, so the file's identity (name + source path) and the
+    "open another file" action have no home. A left-most toolbar button
+    (`Toolbar.tsx`, gated on the `onOpenFile` prop, which only `ExtensionApp`
+    passes) surfaces both: it shows the open file's name, reveals the full path
+    on click (`prettyPath` renders a `file://` URL as `C:\…`, a picked file as
+    just its name, an http(s) URL decoded) with copy-to-clipboard, and opens
+    another file. Desktop leaves `onOpenFile` undefined — the tab bar already
+    carries the file name (+ path tooltip, «Vis i mappe»), so the button never
+    appears there. Rationale: an `extension://…/viewer.html?file=…` page cannot
+    make the browser address bar show a clean path, so the app must.
 
 ## Maintenance rules
 

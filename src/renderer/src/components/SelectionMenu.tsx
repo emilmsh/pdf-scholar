@@ -10,6 +10,7 @@ import {
 import type { HighlightColor } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
+import { useDraggable } from '../useDraggable'
 import {
   IconBook,
   IconComment,
@@ -221,13 +222,6 @@ interface MenuProps {
   onAction(action: MenuAction): void
 }
 
-function clampToViewport(x: number, y: number, w: number, h: number): { left: number; top: number } {
-  return {
-    left: Math.max(8, Math.min(x, window.innerWidth - w - 8)),
-    top: Math.max(8, Math.min(y + 10, window.innerHeight - h - 8))
-  }
-}
-
 /** Position a fixed popup at its anchor, measured after render: clamp
  *  horizontally, flip above the anchor when it would overflow the bottom. */
 function useMeasuredPosition(
@@ -418,26 +412,43 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
 interface NoteProps {
   x: number
   y: number
+  /** Markup rect (viewport coords) to open clear of, so it stays readable */
+  avoid?: { top: number; bottom: number; left: number } | null
   onSave(text: string): void
   onCancel(): void
 }
 
-export function NotePopover({ x, y, onSave, onCancel }: NoteProps): React.JSX.Element {
+export function NotePopover({ x, y, avoid, onSave, onCancel }: NoteProps): React.JSX.Element {
   useLang()
   const [text, setText] = useState('')
-  const ref = useRef<HTMLTextAreaElement>(null)
-  const { left, top } = clampToViewport(x, y, 280, 160)
+  const taRef = useRef<HTMLTextAreaElement>(null)
+  // Opens clear of the markup (below/above it) so the marked text stays
+  // readable; draggable from its chrome (the textarea keeps its own pointer).
+  const { ref, style, positioned, handleProps } = useDraggable(x, y + 10, [], avoid)
 
+  // Focus once the box is measured and visible — focusing while still
+  // `visibility: hidden` (pre-measure) is a no-op.
+  const focusedRef = useRef(false)
   useEffect(() => {
-    ref.current?.focus()
-  }, [])
+    if (positioned && !focusedRef.current) {
+      focusedRef.current = true
+      taRef.current?.focus()
+    }
+  }, [positioned])
 
   return (
-    <div className="note-popover" style={{ left, top }} onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="note-popover"
+      ref={ref}
+      style={style}
+      onMouseDown={(e) => e.stopPropagation()}
+      {...handleProps}
+    >
       <textarea
-        ref={ref}
+        ref={taRef}
         value={text}
         placeholder={t('menu.notePlaceholder')}
+        onPointerDown={(e) => e.stopPropagation()}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && text.trim()) onSave(text.trim())
@@ -445,7 +456,7 @@ export function NotePopover({ x, y, onSave, onCancel }: NoteProps): React.JSX.El
           e.stopPropagation()
         }}
       />
-      <div className="note-actions">
+      <div className="note-actions" onPointerDown={(e) => e.stopPropagation()}>
         <button className="btn-secondary" onClick={onCancel}>
           {t('app.cancel')}
         </button>

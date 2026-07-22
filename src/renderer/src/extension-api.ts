@@ -28,6 +28,12 @@ import type {
 } from '../../shared/types'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
+import {
+  ensureWritePermission,
+  forgetFileHandle,
+  loadFileHandle,
+  saveFileHandle
+} from './extension-fs-grants'
 
 /** True when running inside a WebExtension page (has a runtime id). */
 export function isExtensionContext(): boolean {
@@ -158,6 +164,15 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       // via openFileDialog. Keep this cheap and best-effort.
       const name = decodeURIComponent(path.split(/[/\\]/).pop() ?? path)
       if (path) recordRecent({ path, name })
+      // Pre-warm a write grant saved in a previous session so the FIRST save can
+      // be silent when the browser still holds the permission. queryPermission
+      // never prompts (interactive:false); a grant that needs re-confirming just
+      // waits for the Save click, where requestPermission is allowed to prompt.
+      if (path && !path.startsWith('fsa:') && !handles.has(path)) {
+        void loadFileHandle(path).then(async (stored) => {
+          if (stored && (await ensureWritePermission(stored, false))) handles.set(path, stored)
+        })
+      }
     },
 
     // ---------- Save model ----------
@@ -172,25 +187,63 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // when it is unavailable.
     saveFileAs: (defaultName, data) => saveViaPicker(defaultName, data, base),
 
-    // Browser save: overwrite the original local file silently when it was
-    // opened via a retained file handle (the "save over" case); otherwise a
-    // URL-opened PDF has no such target, so prompt for a location.
+    // In-place "save over the current file". When the document was opened via
+    // the app's picker we already hold a writable handle and overwrite it
+    // silently — same feel as the desktop app. A URL/file://-opened PDF was
+    // fetched read-only (no handle): the browser's security model forbids a web
+    // page from writing to a local file until the user points at it once, so
+    // the FIRST save opens a Save picker to establish write access. That handle
+    // is then RETAINED for the session AND persisted across sessions
+    // (extension-fs-grants.ts), so the same file is granted at most once ever —
+    // every later save (and Ctrl+S), this session or a future one, overwrites
+    // silently. (Edge's built-in PDF viewer skips even that one grant because it
+    // is privileged first-party browser code, not sandboxed web content.)
     saveDocumentBytes: async (path, name, data): Promise<{ path: string } | FileError | null> => {
-      const handle = handles.get(path)
-      if (handle) {
-        try {
-          const writable = await handle.createWritable()
-          await writable.write(data as unknown as BufferSource)
-          await writable.close()
-          // This write IS the new baseline — otherwise every later save would
-          // keep flagging a "conflict" against the pre-fix mtime forever.
-          handleBaseline.set(path, (await handle.getFile()).lastModified)
-          return { path }
-        } catch (err) {
-          return { error: err instanceof Error ? err.message : String(err) }
+      // Per-file only (not folder-wide) — never asks for broader access than the
+      // user reached for. Keyed by the file URL, which is stable across sessions;
+      // an fsa: picked-file path is not, so those keep their session handle only.
+      const persistable = !path.startsWith('fsa:')
+      let handle = handles.get(path)
+      // Restore a grant from a previous session before asking again.
+      if (!handle && persistable) {
+        const stored = await loadFileHandle(path)
+        if (stored && (await ensureWritePermission(stored))) {
+          handle = stored
+          handles.set(path, handle)
         }
       }
-      return saveViaPicker(name, data, base)
+      if (!handle) {
+        const picker = (window as unknown as {
+          showSaveFilePicker?: (opts: unknown) => Promise<FileSystemFileHandle>
+        }).showSaveFilePicker
+        if (!picker) return saveViaPicker(name, data, base) // very old browser
+        try {
+          handle = await picker({
+            suggestedName: name,
+            types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }]
+          })
+        } catch (err) {
+          if (err instanceof DOMException && err.name === 'AbortError') return null // cancelled
+          return { error: err instanceof Error ? err.message : String(err) }
+        }
+        handles.set(path, handle)
+        if (persistable) saveFileHandle(path, handle)
+      }
+      try {
+        const writable = await handle.createWritable()
+        await writable.write(data as unknown as BufferSource)
+        await writable.close()
+        // This write IS the new baseline — otherwise every later save would
+        // keep flagging a "conflict" against the pre-fix mtime forever.
+        handleBaseline.set(path, (await handle.getFile()).lastModified)
+        return { path }
+      } catch (err) {
+        // The handle is stale (file moved/deleted, or permission lost): drop it
+        // so the next save re-establishes access instead of failing forever.
+        handles.delete(path)
+        if (persistable) forgetFileHandle(path)
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
     },
 
     // True when the file behind a retained handle changed since it was

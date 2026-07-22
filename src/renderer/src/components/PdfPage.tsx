@@ -930,15 +930,15 @@ function AnnotationMarks({
         viewBox="0 0 24 24"
       >
         <path
-          d="M3.5 6a2.5 2.5 0 0 1 2.5 -2.5h12a2.5 2.5 0 0 1 2.5 2.5v8a2.5 2.5 0 0 1 -2.5 2.5H11l-4.5 4v-4H6a2.5 2.5 0 0 1 -2.5 -2.5z"
+          d="M3.5 7a3 3 0 0 1 3 -3h11a3 3 0 0 1 3 3v7a3 3 0 0 1 -3 3H10.5l-4 3.5V17H6.5a3 3 0 0 1 -3 -3z"
           fill={rgbCss(annotation.color, 1)}
-          stroke="rgba(0,0,0,0.35)"
-          strokeWidth="1.2"
+          stroke="rgba(0,0,0,0.22)"
+          strokeWidth="1"
           strokeLinejoin="round"
         />
-        <g stroke="rgba(0,0,0,0.45)" strokeWidth="1.6" strokeLinecap="round">
-          <path d="M7.5 8.5h9" />
-          <path d="M7.5 12h6" />
+        <g stroke="rgba(0,0,0,0.38)" strokeWidth="1.5" strokeLinecap="round">
+          <path d="M7.5 8.7h9" />
+          <path d="M7.5 12.2h6" />
         </g>
       </svg>
     )

@@ -35,6 +35,7 @@ const nb = {
   'welcome.aiGuide':
     'Lim inn nøkkelen for leverandørene du har — resten lar du stå tomt. Du finner nøkler i leverandørens konsoll — vi anbefaler å sette en utgiftsgrense samme sted. Nøkkelen lagres kryptert lokalt og sendes aldri til andre enn leverandøren.',
   'welcome.recents': 'Nylig lest',
+  'welcome.logoCredit': 'Logo av Elisabeth Walle',
 
   // Tabs
   'tabs.close': 'Lukk fane',
@@ -49,6 +50,14 @@ const nb = {
   // Toolbar
   'tb.library': 'Bibliotek',
   'tb.libraryTip': 'Tilbake til biblioteket',
+  // Document button (browser/extension only — replaces the desktop tab bar's
+  // file identity: shows the open file's path and opens another file)
+  'tb.docTip': 'Åpen fil – vis sti og åpne en annen',
+  'doc.heading': 'Åpen fil',
+  'doc.copyPath': 'Kopier sti',
+  'doc.copied': 'Kopiert',
+  'doc.openFile': 'Åpne en annen fil …',
+  'doc.pickedHint': 'Valgt via filvelger – ingen mappebane',
   'tb.sidebarTip': 'Sidepanel (T) — miniatyrer og innhold',
   'tb.navBackTip': 'Tilbake (Alt+←)',
   'tb.navForwardTip': 'Frem (Alt+→)',
@@ -257,6 +266,7 @@ const nb = {
   'viewer.recovered': 'Ulagrede endringer fra forrige økt ble gjenopprettet',
   'tb.saveTip': 'Lagre endringer i PDF-en (Ctrl+S)',
   'tb.saveAsTip': 'Lagre en kopi og fortsett i den … (originalen forblir uendret)',
+  'tb.saveCopyTip': 'Lagre en kopi til disk … (originalen forblir uendret)',
   'tb.saveToDiskTip': 'Lagre til disk … (velg mappe, Ctrl+S)',
 
   // Read aloud
@@ -408,6 +418,7 @@ const en: Dict = {
   'welcome.aiGuide':
     'Paste the key for the providers you have — leave the rest empty. You get keys from the provider console — we recommend setting a spending cap there too. The key is stored encrypted locally and only ever sent to the provider.',
   'welcome.recents': 'Recently read',
+  'welcome.logoCredit': 'Logo by Elisabeth Walle',
 
   'tabs.close': 'Close tab',
   'tabs.closeTab': 'Close tab',
@@ -420,6 +431,12 @@ const en: Dict = {
 
   'tb.library': 'Library',
   'tb.libraryTip': 'Back to the library',
+  'tb.docTip': 'Open file – show its path and open another',
+  'doc.heading': 'Open file',
+  'doc.copyPath': 'Copy path',
+  'doc.copied': 'Copied',
+  'doc.openFile': 'Open another file …',
+  'doc.pickedHint': 'Chosen via file picker – no folder path',
   'tb.sidebarTip': 'Sidebar (T) — thumbnails and contents',
   'tb.navBackTip': 'Back (Alt+←)',
   'tb.navForwardTip': 'Forward (Alt+→)',
@@ -620,6 +637,7 @@ const en: Dict = {
   'viewer.recovered': 'Unsaved changes from the previous session were recovered',
   'tb.saveTip': 'Save changes to the PDF (Ctrl+S)',
   'tb.saveAsTip': 'Save a copy and continue in it … (the original stays untouched)',
+  'tb.saveCopyTip': 'Save a copy to disk … (the original stays untouched)',
   'tb.saveToDiskTip': 'Save to disk … (choose a folder, Ctrl+S)',
 
   'ra.playPause': 'Play / pause',

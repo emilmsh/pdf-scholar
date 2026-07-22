@@ -227,6 +227,7 @@ export default function ExtensionApp(): React.JSX.Element {
               onSavedAs={() => {}} // extension: «save a copy» is a plain export (PLATFORMS.md §9)
               onExternalSaveConflict={handleSaveExternalConflict}
               onClose={closeDocument}
+              onOpenFile={openDialog}
             />
           </div>
         </div>

@@ -24,12 +24,15 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconChevronDown,
+  IconCopy,
+  IconDocument,
   IconEraser,
   IconEye,
   IconEyeOff,
   IconActualSize,
   IconFitPage,
   IconFitWidth,
+  IconFolderOpen,
   IconFullscreen,
   IconGear,
   IconMarker,
@@ -166,6 +169,32 @@ interface Props {
   onTogglePin(): void
   onPresent(): void
   onToggleFullscreen(): void
+  /** Browser/extension only: the open document's display name + source path,
+   *  and a callback to open another file. When onOpenFile is supplied the
+   *  toolbar shows a left-most "file" button (the desktop tab bar's file
+   *  identity has no equivalent in the single-tab extension shell). Desktop
+   *  leaves onOpenFile undefined, so the button never appears there. */
+  docName?: string
+  docPath?: string
+  onOpenFile?(): void
+}
+
+/** Render a source path/URL as something a human recognises: a Windows file://
+ *  URL becomes `C:\Users\…\paper.pdf`, a picked file shows just its name, an
+ *  http(s) URL is shown decoded. */
+function prettyPath(path: string): string {
+  if (path.startsWith('fsa:')) return path.slice(4)
+  if (path.startsWith('file://')) {
+    let p = decodeURIComponent(path.replace(/^file:\/\//, ''))
+    p = p.replace(/^\/([A-Za-z]:)/, '$1') // file:///C:/… → C:/…
+    if (/^[A-Za-z]:/.test(p)) p = p.replace(/\//g, '\\') // Windows backslashes
+    return p
+  }
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
 }
 
 const THEMES: { id: ThemePreference; labelKey: MsgKey }[] = [
@@ -238,7 +267,10 @@ export default function Toolbar({
   toolbarPinned,
   onTogglePin,
   onPresent,
-  onToggleFullscreen
+  onToggleFullscreen,
+  docName,
+  docPath,
+  onOpenFile
 }: Props): React.JSX.Element {
   useLang()
   const [pageInput, setPageInput] = useState(String(page))
@@ -261,6 +293,10 @@ export default function Toolbar({
   const menuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
+  // Document button (browser/extension only)
+  const [docMenuOpen, setDocMenuOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const docMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!toolMenu) return
@@ -332,6 +368,28 @@ export default function Toolbar({
   }
 
 
+  useEffect(() => {
+    if (!docMenuOpen) return
+    const close = (e: Event): void => {
+      if (docMenuRef.current && !docMenuRef.current.contains(e.target as Node)) setDocMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
+  }, [docMenuOpen])
+
+  // Reset the "Copied" confirmation whenever the menu reopens
+  useEffect(() => {
+    if (!docMenuOpen) setCopied(false)
+  }, [docMenuOpen])
+
+  const copyPath = (): void => {
+    if (!docPath) return
+    void navigator.clipboard?.writeText(prettyPath(docPath)).then(
+      () => setCopied(true),
+      () => {}
+    )
+  }
+
   const commitPage = (): void => {
     const n = parseInt(pageInput, 10)
     if (!Number.isNaN(n)) onGoToPage(n)
@@ -341,6 +399,52 @@ export default function Toolbar({
   return (
     <div className="toolbar">
       <div className="toolbar-group">
+        {onOpenFile && (
+          <>
+            <div className="theme-menu-anchor" ref={docMenuRef}>
+              <button
+                className={`tb-btn tb-labeled tb-doc${docMenuOpen ? ' is-active' : ''}`}
+                onClick={() => setDocMenuOpen((o) => !o)}
+                title={t('tb.docTip')}
+              >
+                <IconDocument />
+                <span className="tb-label tb-doc-name">{docName ?? t('doc.heading')}</span>
+                <IconChevronDown size={13} />
+              </button>
+              {docMenuOpen && (
+                <div className="theme-menu doc-menu">
+                  <div className="theme-menu-label">{t('doc.heading')}</div>
+                  {docPath && (
+                    <div className="doc-current">
+                      <div className="doc-current-name">{docName}</div>
+                      <div className="doc-current-path" title={prettyPath(docPath)}>
+                        {docPath.startsWith('fsa:') ? t('doc.pickedHint') : prettyPath(docPath)}
+                      </div>
+                      {!docPath.startsWith('fsa:') && (
+                        <button className="doc-copy" onClick={copyPath}>
+                          <IconCopy size={14} />
+                          {copied ? t('doc.copied') : t('doc.copyPath')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <div className="theme-menu-sep" />
+                  <button
+                    className="doc-open"
+                    onClick={() => {
+                      setDocMenuOpen(false)
+                      onOpenFile()
+                    }}
+                  >
+                    <IconFolderOpen size={16} />
+                    {t('doc.openFile')}
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="toolbar-sep" />
+          </>
+        )}
         <button
           className={`tb-btn tb-labeled${sidebarOpen ? ' is-active' : ''}`}
           onClick={onToggleSidebar}
@@ -653,7 +757,9 @@ export default function Toolbar({
 
         {canSaveInPlace ? (
           <>
-            {/* Desktop: write changes back to the file in place, plus save-a-copy */}
+            {/* Desktop + extension: write changes back to the file in place, plus
+                save-a-copy. The extension's first in-place save may prompt once
+                for write access, then stays silent (see extension-api.ts). */}
             <button
               className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
               onClick={onSave}
@@ -662,7 +768,11 @@ export default function Toolbar({
             >
               <IconSave />
             </button>
-            <button className="tb-btn" onClick={onSaveAs} title={t('tb.saveAsTip')}>
+            <button
+              className="tb-btn"
+              onClick={onSaveAs}
+              title={isElectron ? t('tb.saveAsTip') : t('tb.saveCopyTip')}
+            >
               <IconSaveAs />
             </button>
           </>

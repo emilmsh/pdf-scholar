@@ -21,7 +21,7 @@ assistant, so you can pick whichever fits how you already open documents.
 
 ### Desktop app (Windows)
 
-[![Latest release](https://img.shields.io/github/v/release/emilmsh/pdf-scholar?label=Windows%20installer&color=327cf6)](https://github.com/emilmsh/pdf-scholar/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/emilmsh/pdf-scholar?label=Windows%20installer&color=2f6f7b)](https://github.com/emilmsh/pdf-scholar/releases/latest)
 
 **[⬇ Get PDF Scholar for Windows](https://github.com/emilmsh/pdf-scholar/releases/latest)** —
 download `PDF-Scholar-Setup-*.exe` from the latest release and run it. It's a per-user
@@ -78,7 +78,7 @@ The same viewer, but each PDF opens as an ordinary browser tab instead of the
 browser's built-in reader. Make your browser the default PDF app and double-clicking a
 PDF in Explorer opens it in PDF Scholar too.
 
-[![Extension download](https://img.shields.io/badge/Edge%20%2F%20Chrome-download%20extension-327cf6?logo=googlechrome&logoColor=white)](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)
+[![Extension download](https://img.shields.io/badge/Edge%20%2F%20Chrome-download%20extension-2f6f7b?logo=googlechrome&logoColor=white)](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)
 
 **[⬇ Download the extension](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)** —
 no build step needed:
@@ -214,7 +214,12 @@ PDF Scholar is licensed under the **[MIT License](LICENSE)**. Every bundled
 component is permissively licensed: annotations are written by
 [EmbedPDF](https://www.embedpdf.com/)'s PDFium build (MIT / BSD-3-Clause),
 rendering by [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0), plus
-[Electron](https://www.electronjs.org/) (MIT), [React](https://react.dev/) (MIT) and the
-[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (MIT).
+[Electron](https://www.electronjs.org/) (MIT), [React](https://react.dev/) (MIT), the
+[Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (MIT) and the
+[Libertinus](https://github.com/alerque/libertinus) wordmark font (SIL OFL 1.1).
 ([mupdf](https://mupdf.com/), AGPL, is used only as a development-time test
 verifier and ships with no release build.)
+
+---
+
+<sub>Logo by Elisabeth Walle.</sub>
