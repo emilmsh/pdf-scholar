@@ -1,0 +1,54 @@
+# Manually publish the current version's MSIX packages to the Microsoft Store.
+#
+# PREREQUISITE (one-time, done by the account owner — see docs/STORE.md
+# "Automated Store publishing"): an Azure AD app associated with the Partner
+# Center account, with the Manager role, and its three values stored as repo
+# secrets STORE_TENANT_ID / STORE_CLIENT_ID / STORE_CLIENT_SECRET.
+#
+# Until those secrets exist this workflow will fail fast at the publish step.
+# The FIRST successful run is a validation run — the API field names in
+# scripts/store-publish.ps1 may need adjusting against the live responses.
+#
+# Manual trigger only (not on tag push): a Store submission is a deliberate,
+# human-reviewed act, and once created via API a submission must not be touched
+# in the Partner Center UI.
+name: Store publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      whats_new:
+        description: "What's new in this version (max 1500 chars). Blank = 'PDF Scholar <version>'."
+        required: false
+        default: ''
+      replace_pending:
+        description: 'Delete an existing uncommitted submission first'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run dist:store
+      - name: Publish to Microsoft Store
+        shell: pwsh
+        env:
+          STORE_TENANT_ID: ${{ secrets.STORE_TENANT_ID }}
+          STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
+          STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
+        run: |
+          $args = @{}
+          if ('${{ inputs.whats_new }}' -ne '') { $args.WhatsNew = '${{ inputs.whats_new }}' }
+          if ('${{ inputs.replace_pending }}' -eq 'true') { $args.ReplacePending = $true }
+          ./scripts/store-publish.ps1 @args

@@ -66,9 +66,41 @@ Individual account now costs nothing.
    icon change — WITHOUT them electron-builder ships its default placeholder
    logo, which fails Store policy **10.1.1.11**, as v0.17.1's certification did).
 
-Version bumps: run `dist:store` again and add the new packages to a new
-submission. (This can be folded into `release.yml` later once the identity
-values are in the repo.)
+Version bumps (manual): run `dist:store` again and add the new packages to a
+new submission in Partner Center. Listing copy to paste lives in
+`docs/STORE-LISTING-DESKTOP.md` (keep its "What's new" block current).
+
+### Automated Store publishing (optional)
+
+Publishing can be automated with the **`.github/workflows/store-publish.yml`**
+workflow (manual trigger), which builds the MSIX and runs
+`scripts/store-publish.ps1` against the **legacy** Microsoft Store submission
+API — the only one that accepts MSIX/appx (the newer "Store submission API" is
+MSI/EXE only). It works with this **Individual** account; the account just needs
+an associated Azure AD directory (free) and an Azure AD app with the Manager
+role.
+
+> **API rule:** once a submission is created/edited via the API, do **not** edit
+> it in the Partner Center UI — that severs API control of it. It's API **or**
+> UI per submission, never both.
+
+**[Emil] One-time setup** (produces three values, then never again):
+
+1. Partner Center → **Account settings → Tenants**: associate an Azure AD
+   directory. If you have none, "Create new Azure AD" there — free.
+   (<https://learn.microsoft.com/windows/apps/publish/partner-center/associate-azure-ad-with-partner-center>)
+2. **Account settings → User management → Azure AD applications** → **Add Azure
+   AD application** → create one, assign it the **Manager** role.
+3. Open the app, copy the **Tenant ID** and **Client ID**, then **Add new key**
+   and copy the **key** (shown once).
+4. In the GitHub repo → **Settings → Secrets and variables → Actions**, add:
+   `STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET`.
+
+Then run the **Store publish** workflow from the Actions tab (optionally paste a
+"What's new" note). The **first run is a validation run** — the legacy API's
+field names may need a tweak in `store-publish.ps1` against the live responses,
+which it logs on failure. Age-ratings must have been answered once in the UI
+before the API can commit (already done, since the app is live).
 
 ## Track B — Edge Add-ons (extension)
 
