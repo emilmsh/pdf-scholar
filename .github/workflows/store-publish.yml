@@ -17,6 +17,11 @@ name: Store publish
 on:
   workflow_dispatch:
     inputs:
+      check_only:
+        description: 'Dry run: verify the secrets by reading the app; create NO submission (safe while a version is in certification)'
+        type: boolean
+        required: false
+        default: false
       whats_new:
         description: "What's new in this version (max 1500 chars). Blank = 'PDF Scholar <version>'."
         required: false
@@ -40,7 +45,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Skip the (slow) MSIX build on a dry run - the check reads the app only.
       - run: npm run dist:store
+        if: ${{ inputs.check_only != true }}
       - name: Publish to Microsoft Store
         shell: pwsh
         env:
@@ -48,7 +55,8 @@ jobs:
           STORE_CLIENT_ID: ${{ secrets.STORE_CLIENT_ID }}
           STORE_CLIENT_SECRET: ${{ secrets.STORE_CLIENT_SECRET }}
         run: |
-          $args = @{}
-          if ('${{ inputs.whats_new }}' -ne '') { $args.WhatsNew = '${{ inputs.whats_new }}' }
-          if ('${{ inputs.replace_pending }}' -eq 'true') { $args.ReplacePending = $true }
-          ./scripts/store-publish.ps1 @args
+          $splat = @{}
+          if ('${{ inputs.check_only }}' -eq 'true') { $splat.CheckOnly = $true }
+          if ('${{ inputs.whats_new }}' -ne '') { $splat.WhatsNew = '${{ inputs.whats_new }}' }
+          if ('${{ inputs.replace_pending }}' -eq 'true') { $splat.ReplacePending = $true }
+          ./scripts/store-publish.ps1 @splat

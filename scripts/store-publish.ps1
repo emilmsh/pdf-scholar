@@ -43,7 +43,12 @@ param(
   [string] $WhatsNew = '',
 
   # Delete an existing pending (uncommitted) submission instead of aborting.
-  [switch] $ReplacePending
+  [switch] $ReplacePending,
+
+  # Dry run: authenticate and read the app, then exit WITHOUT creating or
+  # touching any submission. Use this to validate the three secrets without
+  # disturbing a submission that is already in certification.
+  [switch] $CheckOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,12 +68,14 @@ $apiBase = 'https://manage.devcenter.microsoft.com/v1.0/my'
 $version = (Get-Content (Join-Path $PSScriptRoot '..' 'package.json') -Raw | ConvertFrom-Json).version
 if (-not $WhatsNew) { $WhatsNew = "PDF Scholar $version" }
 
-# Locate the two appx files for this version.
-$appxFiles = Get-ChildItem -Path $ReleaseDir -Filter "PDF-Scholar-$version-*.appx" -ErrorAction SilentlyContinue
-if ($appxFiles.Count -lt 1) {
-  throw "No PDF-Scholar-$version-*.appx found in $ReleaseDir. Run 'npm run dist:store' first."
+# Locate the two appx files for this version (not needed for a -CheckOnly run).
+if (-not $CheckOnly) {
+  $appxFiles = Get-ChildItem -Path $ReleaseDir -Filter "PDF-Scholar-$version-*.appx" -ErrorAction SilentlyContinue
+  if ($appxFiles.Count -lt 1) {
+    throw "No PDF-Scholar-$version-*.appx found in $ReleaseDir. Run 'npm run dist:store' first."
+  }
+  Write-Host "Found $($appxFiles.Count) package(s) for v${version}: $($appxFiles.Name -join ', ')"
 }
-Write-Host "Found $($appxFiles.Count) package(s) for v${version}: $($appxFiles.Name -join ', ')"
 
 # --- 1. access token ------------------------------------------------------
 Write-Host 'Requesting Azure AD access token...'
@@ -86,6 +93,21 @@ $headers = @{ Authorization = "Bearer $token" }
 # --- 2. read the app ------------------------------------------------------
 Write-Host "Reading application $AppId..."
 $app = Invoke-RestMethod -Method Get -Uri "$apiBase/applications/$AppId" -Headers $headers
+
+if ($CheckOnly) {
+  $hasPending = ($app.PSObject.Properties.Name -contains 'pendingApplicationSubmission' -and $app.pendingApplicationSubmission)
+  Write-Host ''
+  Write-Host '=== Auth + app check (dry run - no submission created) ==='
+  Write-Host "  App name:  $($app.primaryName)"
+  Write-Host "  App id:    $($app.id)"
+  Write-Host "  Pending submission: $(if ($hasPending) { $app.pendingApplicationSubmission.id } else { 'none' })"
+  if ($app.PSObject.Properties.Name -contains 'lastPublishedApplicationSubmission' -and $app.lastPublishedApplicationSubmission) {
+    Write-Host "  Last published submission: $($app.lastPublishedApplicationSubmission.id)"
+  }
+  Write-Host ''
+  Write-Host 'Credentials work end-to-end. Exiting without any changes.'
+  return
+}
 
 # --- 3. clear any stale pending submission --------------------------------
 if ($app.PSObject.Properties.Name -contains 'pendingApplicationSubmission' -and $app.pendingApplicationSubmission) {
