@@ -90,6 +90,7 @@ const api: PdfxApi = {
       ipcRenderer.removeListener('update:ready', listener)
     }
   },
+  updateSupport: () => ipcRenderer.invoke('update:support'),
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateDownload: () => ipcRenderer.send('update:download'),
   updateRestart: () => ipcRenderer.send('update:restart'),

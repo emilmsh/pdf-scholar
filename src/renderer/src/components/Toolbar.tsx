@@ -4,7 +4,8 @@ import type {
   Settings,
   ThemeName,
   ThemePreference,
-  UpdateCheckOutcome
+  UpdateCheckOutcome,
+  UpdateUnsupportedReason
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
 import {
@@ -253,6 +254,8 @@ export default function Toolbar({
   const [appVersion, setAppVersion] = useState('')
   const [updChecking, setUpdChecking] = useState(false)
   const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
+  // undefined until probed; 'store' hides the check (Store owns updates there)
+  const [updSupport, setUpdSupport] = useState<UpdateUnsupportedReason | null | undefined>(undefined)
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
@@ -324,10 +327,12 @@ export default function Toolbar({
     return () => window.removeEventListener('pointerdown', close, true)
   }, [settingsMenuOpen])
 
-  // Version is static — fetch once, the first time the gear menu opens
+  // Version + update capability are static — fetch once, the first time the
+  // gear menu opens.
   useEffect(() => {
     if (settingsMenuOpen && !appVersion) void bridge.getVersion().then(setAppVersion)
-  }, [settingsMenuOpen, appVersion])
+    if (settingsMenuOpen && updSupport === undefined) void bridge.updateSupport().then(setUpdSupport)
+  }, [settingsMenuOpen, appVersion, updSupport])
 
   const checkForUpdates = (): void => {
     if (updChecking) return
@@ -992,7 +997,7 @@ export default function Toolbar({
                 <IconSparkle size={15} />
                 {t('ai.keysTitle')}
               </button>
-              {isElectron && (
+              {isElectron && updSupport !== undefined && updSupport !== 'store' && (
                 <button className="menu-action" onClick={checkForUpdates} disabled={updChecking}>
                   <IconReload size={15} />
                   {updChecking ? t('update.checking') : t('update.check')}

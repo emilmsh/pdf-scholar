@@ -43,6 +43,11 @@ function unsupportedReason(): 'dev' | 'mac' | 'store' | null {
 export function initUpdater(): void {
   const unsupported = unsupportedReason()
 
+  // Local, network-free capability probe so the renderer can hide the manual
+  // check on builds where it's moot (notably Store/MSIX). Registered in EVERY
+  // flavour, before the early return below.
+  ipcMain.handle('update:support', () => unsupported)
+
   // The manual check must answer in EVERY build flavour, so it is registered
   // before (and regardless of) the early return below.
   ipcMain.handle('update:check', async (): Promise<UpdateCheckOutcome> => {

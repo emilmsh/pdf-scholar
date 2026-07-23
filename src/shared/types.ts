@@ -213,6 +213,11 @@ export type AiChatResult =
  *  - unsupported: this build doesn't self-update (dev run, unsigned macOS,
  *    or Microsoft Store — the Store owns the update cycle there)
  *  - error: the check itself failed (offline, rate-limited, …) */
+/** Why a build can't self-update: developer run, unsigned macOS, or a
+ *  Microsoft Store/MSIX package (the Store owns the update cycle). `null`
+ *  means self-update is supported. */
+export type UpdateUnsupportedReason = 'dev' | 'mac' | 'store'
+
 export interface UpdateCheckOutcome {
   status: 'available' | 'ready' | 'none' | 'unsupported' | 'error'
   /** Version on offer (available/ready) */
@@ -220,7 +225,7 @@ export interface UpdateCheckOutcome {
   /** Currently running app version */
   current: string
   /** Why self-update is unsupported, when status = 'unsupported' */
-  reason?: 'dev' | 'mac' | 'store'
+  reason?: UpdateUnsupportedReason
 }
 
 export interface PdfxApi {
@@ -318,6 +323,10 @@ export interface PdfxApi {
   onUpdateProgress(cb: (percent: number) => void): () => void
   /** Fires when an update has been downloaded and will install on quit */
   onUpdateReady(cb: (version: string) => void): () => void
+  /** Whether this build can self-update, resolved locally (no network). Lets
+   *  the UI hide the "check for updates" control on builds where it's moot —
+   *  notably Store/MSIX. `null` = self-update supported. */
+  updateSupport(): Promise<UpdateUnsupportedReason | null>
   /** Manual "check for updates"; resolves with the outcome */
   updateCheck(): Promise<UpdateCheckOutcome>
   /** Start downloading the detected update (user consent) */

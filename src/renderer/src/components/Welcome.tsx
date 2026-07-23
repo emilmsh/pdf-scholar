@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { AiConfigView, RecentFile, UpdateCheckOutcome } from '../../../shared/types'
+import type {
+  AiConfigView,
+  RecentFile,
+  UpdateCheckOutcome,
+  UpdateUnsupportedReason
+} from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
 import { AppMark, IconDocument, IconFolderOpen, IconHeart, IconSparkle } from './icons'
@@ -39,10 +44,16 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
   const [updateChecking, setUpdateChecking] = useState(false)
   const [updateOutcome, setUpdateOutcome] = useState<UpdateCheckOutcome | null>(null)
   const [version, setVersion] = useState('')
+  // undefined while probing; 'store' hides the manual check (the Store owns
+  // updates there, so the control would only ever say "nothing to do").
+  const [updSupport, setUpdSupport] = useState<UpdateUnsupportedReason | null | undefined>(undefined)
 
   useEffect(() => {
     void bridge.getVersion().then(setVersion)
+    void bridge.updateSupport().then(setUpdSupport)
   }, [])
+
+  const showUpdateCheck = isElectron && updSupport !== undefined && updSupport !== 'store'
 
   const checkForUpdates = (): void => {
     if (updateChecking) return
@@ -125,7 +136,7 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
             update toast (with its download button) appears alongside. */}
         <div className="welcome-updates">
           {version && <span className="welcome-version">PDF Scholar {version}</span>}
-          {isElectron && (
+          {showUpdateCheck && (
             <button className="welcome-updates-btn" onClick={checkForUpdates} disabled={updateChecking}>
               {updateChecking ? t('update.checking') : t('update.check')}
             </button>
