@@ -4,33 +4,32 @@
 
 <h1 align="center">PDF Scholar</h1>
 
-<p align="center"><strong>A calm, reading-first PDF app for Windows — built for people who work with texts.</strong></p>
+<p align="center"><strong>A PDF reader and annotator for Windows, for people who read long documents for work.</strong></p>
 
-PDF Scholar is a PDF reader and annotator for Windows — with beta builds for macOS
-and Linux — made for people who *read to work*: research articles, reports, books.
-Reading comes first — the annotation tools stay within reach, the AI help stays
-grounded in the document, and nothing gets between you and the page.
+PDF Scholar is a PDF reader and annotator for Windows, with beta builds for macOS and
+Linux. It is aimed at the documents you have to work through rather than skim: research
+articles, reports, books. The annotation tools are one click away, the optional AI
+assistant answers from the document and shows which passage it used, and the toolbar can
+be hidden when you want the whole window showing the page.
 
 ![Reading view](docs/screenshots/reading.png)
 
 ## Download
 
-There are two ways to run PDF Scholar — a native desktop app, or a browser extension
-that takes over PDFs inside Edge/Chrome. They share the same reader, annotator and
-assistant, so you can pick whichever fits how you already open documents.
+There are two ways to run PDF Scholar: a native desktop app, or a browser extension that
+takes over PDFs inside Edge/Chrome. Both use the same reader, annotator and assistant.
 
 ### Desktop app (Windows)
 
 [![Latest release](https://img.shields.io/github/v/release/emilmsh/pdf-scholar?label=Windows%20installer&color=2f6f7b)](https://github.com/emilmsh/pdf-scholar/releases/latest)
 
 **[⬇ Get PDF Scholar for Windows](https://github.com/emilmsh/pdf-scholar/releases/latest)** —
-download `PDF-Scholar-Setup-*.exe` from the latest release and run it. It's a per-user
-install (no admin rights), sets up in seconds, opens PDFs straight from Explorer and
-adds a "Recent" Jump List to the taskbar. The installer carries both **x64 and native
-arm64** builds and picks the right one for your machine (Surface and other
-Windows-on-ARM devices get the native version — no emulation). Everything works
-offline; add your own Anthropic or OpenAI key in the assistant settings if you want
-the AI features.
+download `PDF-Scholar-Setup-*.exe` from the latest release and run it. It is a per-user
+install, so it needs no admin rights. It registers as a PDF handler in Explorer and adds
+a "Recent" Jump List to the taskbar. The installer contains both **x64 and native arm64**
+builds and picks the right one, so Windows-on-ARM machines (Surface and similar) run the
+arm64 build rather than x64 under emulation. Everything works offline. The AI features
+need your own Anthropic or OpenAI key, entered in the assistant settings.
 
 ### Desktop app (macOS) — beta
 
@@ -74,9 +73,9 @@ Both auto-update in place when a new release is published.
 
 ### Browser extension (Edge / Chrome) — beta
 
-The same viewer, but each PDF opens as an ordinary browser tab instead of the
+The same viewer, but each PDF opens as an ordinary browser tab instead of in the
 browser's built-in reader. Make your browser the default PDF app and double-clicking a
-PDF in Explorer opens it in PDF Scholar too.
+PDF in Explorer opens it here too.
 
 [![Extension download](https://img.shields.io/badge/Edge%20%2F%20Chrome-download%20extension-2f6f7b?logo=googlechrome&logoColor=white)](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)
 
@@ -90,10 +89,10 @@ no build step needed:
 4. For local files (the Explorer double-click case): open the extension's **Details**
    and enable **Allow access to file URLs** — a one-time toggle only you can grant.
 
-The extension is **not on the Chrome Web Store / Edge Add-ons yet** — publishing
-there takes a developer account and a review pass per store, and browsers
-deliberately block one-click installs from anywhere else. Until the store
-listings land, the four steps above are as easy as it gets.
+The extension is **not on the Chrome Web Store / Edge Add-ons yet**: publishing there
+takes a developer account and a review pass per store, and browsers block one-click
+installs from anywhere else. Until the listings are live, the four steps above are the
+only route.
 
 See [`docs/BROWSER-EXTENSION.md`](docs/BROWSER-EXTENSION.md) for the architecture and
 the current desktop-vs-extension parity.
@@ -101,83 +100,116 @@ the current desktop-vs-extension parity.
 ## Features
 
 **Reading**
-- Buttery-smooth scrolling, pinch zoom that never jumps on release, fit width/page (F)
-- Day / Sepia / Night / Night+ themes — a warm ivory reading mode and two dark modes
-  (soft and high-contrast) — plus **Auto**, which follows Windows' light/dark setting
-- Per-theme contrast and brightness so any mode reads comfortably for long sessions
+- Smooth scrolling, pinch zoom that stays where you release it, one fit button that
+  toggles width ⇄ whole page (W), and zoom presets from 50 % to 400 %
+- Four themes — Day, Sepia (ivory paper), Night and Night+ (higher contrast) — plus
+  **Auto**, which follows Windows' light/dark setting
+- Contrast and brightness are adjustable per theme
 - **Rotate pages** (Shift+R or `]` / `[`) and a **two-page spread** for wide layouts
 - **Presentation mode** (P): one page at a time, full screen
-- Clean-reading layout: unpin the toolbar (V) and it tucks away; hover the top edge to
-  bring it back, the left edge for the table of contents, the right edge for the
-  assistant
+- Unpin the toolbar (V) and it hides. Hover the top edge to bring it back, the left edge
+  for the table of contents, the right edge for the assistant
 - Table of contents, thumbnails, and back/forward navigation (Alt+← / Alt+→) after
   following internal links
-- Remembers your reading position and recent files; a **library** home screen collects
-  what you've been reading
-- Tabs for several open documents, plus multiple windows — and you can **drag a tab out
-  into its own window** to put two documents side by side
+- Remembers your reading position and recent files; a **library** home screen lists what
+  you have been reading
+- Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
+  window** to put two documents side by side
+
+**Split view**
+
+![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)
+
+- **Two columns of the same document**, each with its own page and its own zoom. Keep a
+  figure or a table in view while you read the passage that discusses it
+- Both columns are equals. The toolbar's centre splits into a page + zoom cluster per
+  column, and the column you are working in is outlined. You can annotate, erase and undo
+  in either one; it is a single document, so a mark shows up in both columns as you make
+  it
+- **Rotation is per column**, so a landscape-printed table can sit upright beside
+  portrait text
+- **Ctrl+click an internal link to open the target in the other column**, keeping the
+  page you are on. It opens the split first if it is closed. A plain click follows the
+  link in place. External links always go to your browser, where the modifier does
+  nothing — there is no in-document target for a second column to show
+- Search, the outline, the notes list and the assistant's citation chips all move the
+  active column — the outlined one — and leave the other alone. Back/forward history is
+  per column as well
+- Drag the divider to rebalance (double-click it for an even split); both columns re-fit
+  as you drag. Each column has its own ✕ in the toolbar, and closing one keeps the
+  other's content
+- **Two windows on the same file also work**: they share one draft and sync as you
+  annotate, and a Save from either window writes each mark exactly once
 
 **Annotation**
 
 ![Annotation tools](docs/screenshots/annotations.png)
 
-- Highlight, underline, strikeout, squiggly — with labeled color rows and custom hex
-  colors
-- Pen and marker with hold-to-straighten (hold still mid-stroke to snap a straight line)
-- Eraser that removes whole strokes, shapes (rectangle, ellipse, line, arrow), draggable
-  sticky notes, and free text typed directly on the page
-- Click any annotation to select it and drag to move; full undo/redo (Ctrl+Z /
-  Ctrl+Shift+Z); add a comment to any annotation
-- **Real PDF annotations** written with appearance streams — they open correctly in
-  Acrobat, SumatraPDF and other viewers
-- **You decide when to save**: edits go to a draft, and the file is only touched when
-  you hit Save (Ctrl+S). Closing prompts you, and unsaved work survives a crash
-- **Notes tab**: every annotation grouped by page with search and a color filter;
-  export a summary — including the highlighted text itself — to Markdown, HTML or plain
-  text
+- Highlight, underline, strikeout and squiggly, with labeled colour rows and custom hex
+  colours
+- Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
+  straight
+- **Colour, thickness and opacity per tool**, remembered between sessions. A «Standard»
+  link appears next to any tool you have changed from its default
+- Shapes (rectangle, ellipse, line, arrow), draggable sticky notes, and free text typed
+  directly on the page
+- An eraser that removes whole strokes, and can be set to remove every kind of
+  annotation instead
+- Click any annotation to select it, drag to move it, and add a comment to it. Full
+  undo/redo (Ctrl+Z / Ctrl+Shift+Z)
+- Comment and note bubbles can be dragged **and resized** — pull the corner for a long
+  note, double-click the grip to restore the default size
+- **Real PDF annotations** with appearance streams, so they open correctly in Acrobat,
+  SumatraPDF and other viewers
+- **The file is only written when you save it.** Edits go to a draft until you press
+  Save (Ctrl+S); closing prompts you, and unsaved work survives a crash
+- **Notes tab**: every annotation grouped by page, with search and a colour filter.
+  Export a summary — including the highlighted text itself — to Word, Markdown, HTML or
+  plain text
+- Preferences reset to their defaults, per tool or all at once from the settings menu
+  (with a confirmation; API keys, library and annotations are left untouched)
 
 **Search & the web**
 - In-document search (Ctrl+F): match case, whole word (Norwegian æøå-safe), a results
   list with excerpts, jump-to-hit, F3 / Shift+F3
-- **AI search**: describe a topic in your own words and get the passages that discuss
-  it, ranked and clickable (uses your own API key, like the assistant)
+- **AI search**: describe a topic in your own words and get the passages that discuss it,
+  ranked and clickable (uses your own API key, like the assistant)
 - Selection menu: copy, search the web, dictionary, translate, and the AI actions below
 
 **AI assistant (bring your own key)**
 
 ![AI assistant](docs/screenshots/assistant.png)
 
-Stuck on a dense passage? Ask the assistant to explain it in plain terms — the answer
-is grounded in the document, with clickable source chips that take you straight to the
-sentences it drew from.
+The assistant answers from the document you have open, and every claim it makes carries a
+source chip you can click to see where it came from.
 
-- Understand hard passages in plain language — ask "explain this simply" or "what does
-  this term mean here?" and every claim comes with a clickable source chip ("s. 12")
-  that jumps to and highlights the exact passage, down to sentence level
+- Ask about a dense passage ("explain this simply", "what does this term mean here?").
+  Each claim gets a source chip ("s. 12") that jumps to the passage and highlights it,
+  down to sentence level
 - Structured article summaries (research question / method / data / findings /
   limitations)
-- Ask your own annotations: "summarize what I've highlighted"
+- Ask about your own annotations: "summarize what I've highlighted"
 - Context-menu actions on any selection: explain, simplify, critique ("what would a
   referee ask?"), look up a cited reference, find similar passages, or ask your own
   question
-- **Explain a figure**: drag a box around a chart or table and the assistant explains
-  it — and you can paste or attach images in the chat too
+- **Explain a figure**: drag a box around a chart or table and the assistant explains it.
+  You can also paste or attach images in the chat
 - Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
-  model list across providers with per-model reasoning-effort control. Keys are
-  encrypted locally with the Windows keychain, and the document leaves your machine
-  only when you ask a question
-- Cost transparency: every answer shows its estimated cost
+  model list across all three, with per-model reasoning-effort control. Keys are
+  encrypted locally with the Windows keychain, and the document leaves your machine only
+  when you ask a question
+- Every answer shows its estimated cost
 
 ![Explain a figure — drag a box around a chart or table and the assistant explains it](docs/screenshots/assistant_figure.png)
 
-**Scholarly by design**
+**Language and themes**
 
 ![Sepia theme](docs/screenshots/parchment.png)
 
-Norwegian and English UI throughout — the language also drives the AI prompts, export
-documents and date formats. The Sepia theme brings a warm ivory reading mood with a
-terracotta accent, calm on the eyes for long sessions — and the two night modes keep
-late reading easy on the eyes.
+The interface is available in Norwegian and English, and the setting also controls the AI
+prompts, exported documents and date formats. Sepia puts the page on warm ivory with a
+terracotta accent; Night and Night+ are the two dark modes, the second with higher
+contrast for bright text on very dark grey.
 
 ![Night theme](docs/screenshots/night.png)
 
@@ -192,15 +224,33 @@ npm run dev:web    # renderer only, in a plain browser on :5199
 npm run typecheck  # tsc for renderer + main/preload
 npm run dist       # NSIS installer (Windows)
 npm run build:ext  # browser-extension bundle → dist-extension/
+npm run shoot      # re-shoot every README screenshot (needs npm run build first)
+npm run test:windows  # two windows on one file, end to end (needs npm run build first)
 ```
 
-Architecture in short: **pdf.js v6 renders, EmbedPDF (PDFium WASM) writes.** The React renderer
-draws annotations in its own overlay (never pdf.js's editor layer); the Electron main
-process owns the annotation engine, the AI providers and the draft-based save model.
-The renderer is platform-agnostic — every platform call goes through one interface
-(`PdfxApi`), so the same UI powers the desktop app, the browser extension and the
-plain-browser dev preview. See `CLAUDE.md` and `docs/ROADMAP.md` for the details and the
-road ahead.
+`npm run shoot` and `npm run test:windows` drive the real desktop app over Chromium's
+DevTools protocol, which Electron already ships, so neither needs a browser-automation
+dependency. Both run in a throwaway profile: they never touch your recents, reading
+positions or theme, and every run starts from factory defaults.
+
+The screenshots are therefore reproducible and identical in size from run to run. The
+script asserts the state it is about to photograph, so a renamed tooltip or a jump that
+failed fails the run instead of saving a wrong picture. `npm run shoot -- --list` shows the
+shot names; pass names to re-shoot only some. The two assistant screenshots stay manual,
+since a useful one needs a real answer from a real API key.
+
+`npm run test:windows` opens a second window on the same file, annotates in both, saves
+from one, and verifies the result with mupdf — a different PDF implementation, so it
+cannot share a bug with our writer. It covers the one claim no unit test can reach, since
+that claim spans the overlay, the IPC, main's shared draft, the reload in the other
+window, and the bytes on disk.
+
+Architecture in short: **pdf.js v6 renders, EmbedPDF (PDFium WASM) writes.** The React
+renderer draws annotations in its own overlay, never pdf.js's editor layer. The Electron
+main process owns the annotation engine, the AI providers and the draft-based save model.
+Every platform call goes through one interface (`PdfxApi`), so the same renderer powers the
+desktop app, the browser extension and the plain-browser dev preview. See `CLAUDE.md` and
+`docs/ROADMAP.md` for the details and the road ahead.
 
 ## Status
 

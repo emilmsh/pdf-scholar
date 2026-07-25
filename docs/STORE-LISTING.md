@@ -16,9 +16,9 @@ store supports a localized listing.
 PDF Scholar
 
 ## Short description (≤132 chars — Chrome limit)
-**EN:** Read and annotate PDFs in a calm, distraction-free viewer — highlights, notes, drawing, and an optional AI assistant.
+**EN:** Read and annotate PDFs in the browser: highlights, notes, drawing, split view and an optional AI assistant.
 
-**NO:** Les og annoter PDF-er i en rolig, distraksjonsfri leser — utheving, notater, tegning og en valgfri AI-assistent.
+**NO:** Les og annoter PDF-er i nettleseren: utheving, notater, tegning, delt visning og en valgfri AI-assistent.
 
 ## Single purpose (Chrome requires this)
 PDF Scholar replaces the browser's built-in PDF viewer with a full-featured reader and annotator, so PDFs opened in the browser can be read and marked up in one place.
@@ -29,54 +29,58 @@ PDF Scholar replaces the browser's built-in PDF viewer with a full-featured read
 
 **EN:**
 ```
-PDF Scholar turns your browser into a calm, reading-first PDF workspace — built for people who read to work: research articles, reports, books.
+PDF Scholar replaces the browser's built-in PDF viewer with a reader and annotator meant for the documents you have to work through: research articles, reports, books.
 
 Open a PDF and it becomes an ordinary browser tab in the PDF Scholar viewer instead of the browser's basic reader. Make your browser your default PDF app and local PDFs open here too.
 
 READING
-• Smooth scrolling and pinch-zoom that never jumps on release; fit width/page
-• Day, Sepia and two Night themes, with per-theme contrast for long sessions
+• Smooth scrolling and pinch zoom that stays where you release it; fit width or page
+• Day, Sepia and two Night themes, with contrast adjustable per theme
 • Rotate pages, two-page spread, and a full-screen presentation mode
-• Table of contents, thumbnails, search (match case / whole word), and read-aloud
+• Split view: two columns of the same document, each with its own page, zoom and rotation
+• Table of contents, thumbnails and search (match case / whole word)
 • Remembers your reading position and recent files
 
 ANNOTATION
-• Highlight, underline, strikeout, squiggly — with custom colours
+• Highlight, underline, strikeout and squiggly, with custom colours
 • Pen and marker with hold-to-straighten, shapes, sticky notes, free text
-• Real PDF annotations that open correctly in Acrobat and other viewers
-• A Notes panel that collects every mark by page, with export to Markdown/HTML/text
+• Colour, thickness and opacity per tool, remembered between sessions
+• Standard PDF annotations that open correctly in Acrobat and other viewers
+• A Notes panel that collects every mark by page, with export to Markdown, HTML or text
 
 AI ASSISTANT (optional, bring your own key)
-• Chat with the document — every answer links back to the exact passage
+• Ask questions about the open document; every answer links to the passage it came from
 • Structured article summaries; explain, simplify or define selected text
-• Works with your own Anthropic, OpenAI or Azure OpenAI key; the document leaves your device only when you ask a question, sent straight to your chosen provider
+• Works with your own Anthropic, OpenAI or Azure OpenAI key. The document leaves your device only when you ask a question, and goes straight to the provider you chose
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
 ```
 
 **NO:**
 ```
-PDF Scholar gjør nettleseren til en rolig, lesevennlig PDF-arbeidsflate — laget for folk som leser for å jobbe: forskningsartikler, rapporter, bøker.
+PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotator laget for dokumentene du må jobbe deg gjennom: forskningsartikler, rapporter, bøker.
 
 Åpne en PDF, og den blir en vanlig nettleserfane i PDF Scholar-leseren i stedet for nettleserens enkle visning. Gjør nettleseren til standard PDF-app, så åpnes lokale PDF-er også her.
 
 LESING
-• Jevn rulling og knip-zoom som aldri hopper; tilpass bredde/side
-• Dag-, Sepia- og to Natt-temaer, med kontrast per tema for lange økter
+• Jevn rulling og knip-zoom som blir stående der du slipper; tilpass bredde eller side
+• Dag-, Sepia- og to Natt-temaer, med kontrast som kan justeres per tema
 • Roter sider, tosiders oppslag og en fullskjerms presentasjonsmodus
-• Innholdsfortegnelse, miniatyrer, søk (skill store/små, helord) og opplesning
+• Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
+• Innholdsfortegnelse, miniatyrer og søk (skill store/små, helord)
 • Husker leseposisjon og nylige filer
 
 ANNOTERING
-• Utheving, understreking, gjennomstreking, bølget — med egne farger
+• Utheving, understreking, gjennomstreking og bølget strek, med egne farger
 • Penn og tusj med hold-for-å-rette, former, gule lapper, fritekst
-• Ekte PDF-annoteringer som åpnes riktig i Acrobat og andre lesere
-• Et Notater-panel som samler alle merker per side, med eksport til Markdown/HTML/tekst
+• Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
+• Standard PDF-annoteringer som åpnes riktig i Acrobat og andre lesere
+• Et Notater-panel som samler alle merker per side, med eksport til Markdown, HTML eller tekst
 
 AI-ASSISTENT (valgfri, egen nøkkel)
-• Snakk med dokumentet — hvert svar lenker til det nøyaktige avsnittet
+• Still spørsmål om dokumentet du har åpent; hvert svar lenker til avsnittet det kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle eller definer merket tekst
-• Bruker din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel; dokumentet forlater maskinen bare når du stiller et spørsmål, sendt rett til din valgte leverandør
+• Bruker din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel. Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
 ```

@@ -104,6 +104,21 @@ not as acceptable platform lag.
     carries the file name (+ path tooltip, «Vis i mappe»), so the button never
     appears there. Rationale: an `extension://…/viewer.html?file=…` page cannot
     make the browser address bar show a clean path, so the app must.
+11. **Cross-WINDOW annotation sync is Electron-only.** Two desktop windows on the
+    same file write into the ONE draft main keeps per path, so a save from either
+    window writes every mark exactly once; main broadcasts
+    `annots:changed-elsewhere` to the other windows holding that path (tracked in
+    `openDocs`) and they re-read the draft — the file, not a replayed patch, is
+    the source of truth, so the two views cannot drift. The browser/extension has
+    no equivalent: a second browser tab holds its own in-memory copy of the
+    document with no shared draft to re-read, so
+    `onAnnotationsChangedElsewhere` is a no-op there (`bridge.ts`), as is its
+    counterpart `onDraftEndedElsewhere` (which clears the other windows'
+    unsaved-changes flag when one of them saves or discards the shared draft).
+    The SPLIT VIEW (two columns in one window) is renderer-only and therefore
+    identical on every platform — both columns share one annotation map in one
+    component tree, with no IPC involved. `npm run test:windows` covers the
+    Electron behaviour end to end (two real windows, verified with mupdf).
 
 ## Maintenance rules
 
