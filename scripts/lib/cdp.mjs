@@ -1,0 +1,130 @@
+// Minimal Chromium DevTools Protocol client, shared by the scripts that drive
+// the REAL desktop app (shoot-screenshots.mjs, test-multiwindow.mjs).
+//
+// Electron ships Chromium's DevTools protocol and Node has had a global
+// WebSocket since v22, so driving the built app needs no browser-automation
+// dependency at all: spawn `electron out/main/index.js <pdf>
+// --remote-debugging-port`, list the page targets over HTTP, talk CDP over the
+// socket, and drive the UI with Runtime.evaluate.
+import { spawn } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+let nextId = 1
+
+/** Wrap an open socket in a `send(method, params) -> Promise<result>` function */
+export function cdp(ws) {
+  const pending = new Map()
+  ws.addEventListener('message', (ev) => {
+    const msg = JSON.parse(ev.data)
+    const entry = pending.get(msg.id)
+    if (!entry) return
+    pending.delete(msg.id)
+    if (msg.error) entry.reject(new Error(msg.error.message))
+    else entry.resolve(msg.result)
+  })
+  return (method, params = {}) =>
+    new Promise((resolve, reject) => {
+      const id = nextId++
+      pending.set(id, { resolve, reject })
+      ws.send(JSON.stringify({ id, method, params }))
+    })
+}
+
+export function openSocket(url) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(url)
+    ws.addEventListener('open', () => resolve(ws))
+    ws.addEventListener('error', () => reject(new Error('CDP socket failed')))
+  })
+}
+
+/** Every attachable page target, in the order Chromium reports them */
+export async function listPageTargets(port) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/json/list`)
+    const targets = await res.json()
+    return targets.filter((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+  } catch {
+    return [] // port not up yet
+  }
+}
+
+/**
+ * Wait until at least `count` page targets exist (one per app window) and
+ * return them. The app needs a moment to open its debugging port and its
+ * window, and a second window takes a moment more to appear.
+ */
+export async function waitForPageTargets(port, count = 1, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const targets = await listPageTargets(port)
+    if (targets.length >= count) return targets
+    if (Date.now() > deadline) {
+      throw new Error(`only ${targets.length}/${count} CDP page targets after ${timeoutMs / 1000} s`)
+    }
+    await sleep(400)
+  }
+}
+
+/**
+ * Spawn the built app in a THROWAWAY profile, so a run never touches the real
+ * recents / reading positions / theme, always starts from factory defaults, and
+ * gets its own single-instance lock (it works while the real app is open).
+ * Returns the child plus a `log()` of everything it printed and a `cleanup()`.
+ */
+export function launchApp({ root, mainJs, args = [], port }) {
+  const profile = mkdtempSync(join(tmpdir(), 'pdfx-cdp-'))
+  const bin = join(
+    root,
+    'node_modules',
+    'electron',
+    'dist',
+    process.platform === 'win32' ? 'electron.exe' : 'electron'
+  )
+  const child = spawn(
+    bin,
+    [mainJs, ...args, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`],
+    { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] }
+  )
+  let out = ''
+  child.stdout.on('data', (d) => (out += d))
+  child.stderr.on('data', (d) => (out += d))
+  return {
+    child,
+    profile,
+    log: () => out,
+    async cleanup() {
+      child.kill()
+      await sleep(400)
+      try {
+        rmSync(profile, { recursive: true, force: true })
+      } catch {
+        /* a leftover temp profile is harmless */
+      }
+    }
+  }
+}
+
+/**
+ * Run an async body in a page and return its value. `prelude` is prepended, so
+ * in-page helpers can be shared across calls without re-sending them by hand.
+ */
+export async function evaluate(send, body, prelude = '') {
+  const result = await send('Runtime.evaluate', {
+    expression: `(async () => { ${prelude}\n${body}\n })()`,
+    awaitPromise: true,
+    returnByValue: true
+  })
+  if (result.exceptionDetails) {
+    throw new Error(
+      result.exceptionDetails.exception?.description ??
+        result.exceptionDetails.text ??
+        'evaluate failed'
+    )
+  }
+  return result.result?.value
+}
