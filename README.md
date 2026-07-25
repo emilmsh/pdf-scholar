@@ -4,13 +4,18 @@
 
 <h1 align="center">PDF Scholar</h1>
 
-<p align="center"><strong>A PDF reader and annotator for Windows, for people who read long documents for work.</strong></p>
+<p align="center"><strong>A PDF reader and annotator for Windows — built for the documents you work through, not the ones you skim.</strong></p>
 
-PDF Scholar is a PDF reader and annotator for Windows, with beta builds for macOS and
-Linux. It is aimed at the documents you have to work through rather than skim: research
-articles, reports, books. The annotation tools are one click away, the optional AI
-assistant answers from the document and shows which passage it used, and the toolbar can
-be hidden when you want the whole window showing the page.
+Most PDF readers are built to *show* you a page. That is plenty for a boarding pass, and
+not nearly enough for the forty-page paper you will be arguing with all week. PDF Scholar
+is for the second kind of document: the annotation tools sit one click away, a figure can
+be parked in its own column beside the passage that discusses it, and the optional AI
+assistant has to point at the sentence it used before you believe a word of it. Your
+document stays on your machine unless you ask a question, and the file on disk is not
+touched until you press Save.
+
+Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
+the same reader inside Edge and Chrome.
 
 ![Reading view](docs/screenshots/reading.png)
 
@@ -101,7 +106,8 @@ the current desktop-vs-extension parity.
 
 **Reading**
 - Smooth scrolling, pinch zoom that stays where you release it, one fit button that
-  toggles width ⇄ whole page (W), and zoom presets from 50 % to 400 %
+  toggles width ⇄ whole page (W), and zoom presets from 50 % to 400 %. Fit means fit —
+  the page goes edge to edge, with a hair of margin rather than a wasted inch
 - Four themes — Day, Sepia (ivory paper), Night and Night+ (higher contrast) — plus
   **Auto**, which follows Windows' light/dark setting
 - Contrast and brightness are adjustable per theme
@@ -120,12 +126,16 @@ the current desktop-vs-extension parity.
 
 ![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)
 
+Every paper eventually asks you to hold two pages in your head at once — the argument on
+one, the table it rests on somewhere else. Press **S** and you get both.
+
 - **Two columns of the same document**, each with its own page and its own zoom. Keep a
   figure or a table in view while you read the passage that discusses it
-- Both columns are equals. The toolbar's centre splits into a page + zoom cluster per
-  column, and the column you are working in is outlined. You can annotate, erase and undo
-  in either one; it is a single document, so a mark shows up in both columns as you make
-  it
+- Both columns are equals. The toolbar's centre gains a column switcher showing both
+  columns' page numbers — the active one solid — and its page + zoom controls drive that
+  column; click the other number (or the column itself) to move over. You can annotate,
+  erase and undo in either one; it is a single document, so a mark shows up in both
+  columns as you make it
 - **Rotation is per column**, so a landscape-printed table can sit upright beside
   portrait text
 - **Ctrl+click an internal link to open the target in the other column**, keeping the
@@ -133,11 +143,16 @@ the current desktop-vs-extension parity.
   link in place. External links always go to your browser, where the modifier does
   nothing — there is no in-document target for a second column to show
 - Search, the outline, the notes list and the assistant's citation chips all move the
-  active column — the outlined one — and leave the other alone. Back/forward history is
-  per column as well
+  active column and leave the other alone. Back/forward history is per column as well
 - Drag the divider to rebalance (double-click it for an even split); both columns re-fit
-  as you drag. Each column has its own ✕ in the toolbar, and closing one keeps the
-  other's content
+  as you drag. The divider holds a *ratio*, not a width, so opening the contents or
+  assistant panel takes the same share out of both columns instead of making the left one
+  pay for all of it. The ✕ beside the zoom closes the active column and keeps the other's
+  content
+- **S remembers the column you closed** — its page, the exact spot on it, its zoom, its
+  rotation and the width you gave it. Park a figure on the right, toggle it away to read
+  in peace, toggle it back: it returns framed exactly as you left it. Closing the *left*
+  column instead moves the right one's view over, and starts the next split fresh
 - **Two windows on the same file also work**: they share one draft and sync as you
   annotate, and a Save from either window writes each mark exactly once
 
@@ -181,7 +196,8 @@ the current desktop-vs-extension parity.
 ![AI assistant](docs/screenshots/assistant.png)
 
 The assistant answers from the document you have open, and every claim it makes carries a
-source chip you can click to see where it came from.
+source chip you can click. An answer you cannot check is worth very little in academic
+work, so the chips are the feature — the prose around them is just delivery.
 
 - Ask about a dense passage ("explain this simply", "what does this term mean here?").
   Each claim gets a source chip ("s. 12") that jumps to the passage and highlights it,
@@ -240,10 +256,11 @@ much as a camera. It is what caught a split view that opened lopsided and a page
 that silently did nothing. `--list` shows the shot names; pass names to run some;
 `--with-ai` adds the two assistant shots, which use the key already in your own profile.
 
-**The screenshots in this README are taken by hand.** Framing and what is worth showing
-are judgement calls, so `shoot` writes to the gitignored `docs/screenshots/_auto/` and
-cannot overwrite them. `npm run check:shots` reports which shipped images predate the
-visual changes since — see [`docs/RELEASE.md`](docs/RELEASE.md).
+**`shoot` cannot overwrite the shipped set.** It writes to the gitignored
+`docs/screenshots/_auto/`, because framing and what is worth showing are judgement calls:
+the images in this README are chosen deliberately, not whatever the script produced last.
+`npm run check:shots` reports which shipped images predate the visual changes since — see
+[`docs/RELEASE.md`](docs/RELEASE.md).
 
 `npm run test:windows` opens a second window on the same file, annotates in both, saves
 from one, and verifies the result with mupdf — a different PDF implementation, so it
@@ -260,7 +277,8 @@ desktop app, the browser extension and the plain-browser dev preview. See `CLAUD
 
 ## Status
 
-Personal project under active development. Installers are attached to the
+A personal project, actively developed, written by someone who reads PDFs for a living and
+fixes whatever annoys him that week. Installers are attached to the
 [GitHub releases](https://github.com/emilmsh/pdf-scholar/releases).
 
 ## Citing

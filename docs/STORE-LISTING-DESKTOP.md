@@ -109,31 +109,31 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.27.x
+## What's new in this version (≤ 1 500 chars) — v0.28.x
 
 **EN:**
 ```
-• Split view: two columns of the same document, each with its own page, zoom and rotation
+• Split view opens and closes with S, and remembers the column you closed — page, zoom, rotation and width
+• Opening the contents or assistant panel now takes the same share out of both columns
+• One page + zoom cluster in the toolbar, driving the column the switcher points at
+• Fit width and fit page reach the edges of the column instead of stopping short
+• Two columns of the same document, each with its own page, zoom and rotation
 • Annotate in either column, and Ctrl+click an internal link to open it in the other one
 • Two windows on the same file share one draft and sync as you annotate
 • Colour, thickness and opacity per tool, remembered between sessions
-• The eraser can be set to remove every kind of annotation, not just pen and marker
-• Comment and note bubbles can be resized; double-click the grip for the default size
-• One fit button toggles width and whole page; zoom presets from 50 % to 400 %
-• Reset every preference to its default from the settings menu
 • Export your notes to Word, alongside Markdown, HTML and plain text
 ```
 
 **NO:**
 ```
-• Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
+• Delt visning åpnes og lukkes med S, og husker kolonnen du lukket — side, zoom, rotasjon og bredde
+• Å åpne innholds- eller assistentpanelet tar nå like stor andel fra begge kolonner
+• Én side- og zoomklynge i verktøylinja, som styrer kolonnen velgeren peker på
+• Tilpass bredde og hel side går helt ut til kanten av kolonnen
+• To kolonner av samme dokument, hver med egen side, zoom og rotasjon
 • Annoter i begge kolonner, og Ctrl+klikk en intern lenke for å åpne den i den andre
 • To vinduer på samme fil deler ett utkast og synkroniseres mens du annoterer
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
-• Viskelæret kan settes til å fjerne alle typer annoteringer, ikke bare penn og tusj
-• Kommentar- og notatbobler kan endre størrelse; dobbeltklikk grepet for standardstørrelsen
-• Én knapp veksler mellom tilpass bredde og hel side; zoom-forvalg fra 50 % til 400 %
-• Nullstill alle innstillinger til standard fra innstillingsmenyen
 • Eksporter notatene dine til Word, i tillegg til Markdown, HTML og ren tekst
 ```
 
