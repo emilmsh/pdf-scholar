@@ -5,7 +5,7 @@ A polished, native-feeling Windows PDF reader and annotator. Owner: Emil (commun
 ## Commands
 - `npm run dev` — full Electron app with HMR
 - `npm run dev:web` — renderer only in a plain browser on port 5199 (for UI preview/automation; Electron APIs are shimmed via `src/renderer/src/bridge.ts`)
-- `npm run build:ext` / `npm run dev:ext` — build the browser-extension target to `dist-extension/` (a third `PdfxApi` platform alongside Electron; see `docs/BROWSER-EXTENSION.md`). Load unpacked in `edge://extensions`.
+- `npm run build:ext` / `npm run dev:ext` — build the browser-extension target to `dist-extension/` (a third `PdfxApi` platform alongside Electron; see `docs/BROWSER-EXTENSION.md`). Load unpacked in `edge://extensions`. `pack:ext` zips it for Load-unpacked, `pack:ext:store` for store upload (manifest at zip root); `test:ext-publish` dry-runs the Edge/Chrome publish APIs (`docs/STORE.md`)
 - `npm run typecheck` — tsc for renderer (`config/tsconfig.web.json`) and main/preload (`config/tsconfig.node.json`)
 - `npm run build` — electron-vite production build to `out/`
 - `npm run sample` — regenerate `src/renderer/public/sample.pdf` (test document)

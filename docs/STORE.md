@@ -162,6 +162,71 @@ separate, free enrollment).
 4. Broad host permissions (`<all_urls>`) usually route the review to the slower
    queue — expect days to a few weeks on first submission.
 
+> **Never declare a permission the code does not call.** v0.17.1 was rejected
+> (violation ref "Purple Potassium") for declaring `tabs`, which
+> `chrome.tabs.create` does not need. A rejection also disqualifies the item from
+> expedited review for a while. Permission changes re-trigger deep review — see
+> the note in `docs/STORE-LISTING.md`.
+
+## Automated extension publishing (Edge + Chrome)
+
+`scripts/ext-publish.ps1` + the **Extension publish** workflow
+(`.github/workflows/ext-publish.yml`) are the extension half of the pipeline;
+Track A's "Automated Store publishing" is the MSIX half. Same idioms: env-var
+secrets, `-CheckOnly` dry run, manual dispatch only.
+
+Both stores take the same artifact — `release/pdf-scholar-extension-store.zip`
+(`npm run pack:ext:store`, manifest at the zip root). Before touching the
+network the script checks the zip shape, rejects the folder-wrapped variant and
+backslash entry names, and refuses a manifest version that does not match
+`package.json`. Local dry run: `npm run test:ext-publish`.
+
+**Neither API can change listing copy, screenshots or permission
+justifications.** Those stay manual in the dashboards — the APIs upload a
+package and submit it, nothing more.
+
+### Edge (free, ~5 minutes of setup)
+
+1. **[Emil]** Partner Center → **Microsoft Edge** → **Publish API** → click
+   **Enable** next to "enable the new experience" (that is the v1.1, API-key
+   UI), then **Create API credentials**.
+2. Copy the **Client ID** and the **API key**. The key has an **expiry date** —
+   a 401 later means "renew it", not "the script broke".
+3. Product ID: **Microsoft Edge → Overview →** the extension **→ Extension
+   identity** (it is also the GUID in the dashboard URL).
+4. Repo secrets: `EDGE_PRODUCT_ID`, `EDGE_CLIENT_ID`, `EDGE_API_KEY`.
+
+The dry run has no "read the product" endpoint to lean on (the API has none), so
+it probes a nil operation ID: **404 means the credentials work**, 401/403 means
+they do not.
+
+### Chrome (one-time Google Cloud setup)
+
+1. Google Cloud Console → new (or existing) project → enable the **Chrome Web
+   Store API**.
+2. Configure the OAuth consent screen (**External**), then create an OAuth
+   client of type **Web application** with
+   `https://developers.google.com/oauthplayground` as an authorised redirect URI.
+3. Mint a refresh token in the OAuth Playground with scope
+   `https://www.googleapis.com/auth/chromewebstore`. Set the consent screen to
+   **In production** first — a token issued in Testing mode expires after 7 days.
+4. Publisher ID: Developer Dashboard → **Publisher settings**.
+5. Repo secrets: `CWS_PUBLISHER_ID`, `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`,
+   `CWS_REFRESH_TOKEN` (item ID defaults to
+   `jhhlaaiegmdmjeeiopmdmoiidnbbhbmd`; override with `CWS_ITEM_ID`).
+
+**The Chrome API cannot make the first submission.** It always publishes with
+the item's existing visibility settings and refuses until the item has been
+published manually once with those settings — so `-Target chrome` only works
+with `-CheckOnly` until PDF Scholar is live in the Chrome Web Store. Set the
+secrets up when it is; the workflow is ready.
+
+Two more Chrome rules the script surfaces as errors rather than guesses:
+`skipReview` covers only eligible changes (and never an item that has been
+warned), and the manifest version must increase on every upload. To pull a
+pending submission back, `:cancelSubmission` is the endpoint — the dashboard's
+own cancel does the same thing.
+
 ---
 
 ## Listing assets checklist (shared)

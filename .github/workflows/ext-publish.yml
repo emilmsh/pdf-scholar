@@ -1,0 +1,86 @@
+# Manually publish the current version's extension package to Edge Add-ons
+# and/or the Chrome Web Store. The extension half of the store pipeline —
+# "Store publish" (store-publish.yml) is the MSIX/desktop half.
+#
+# PREREQUISITE (one-time, done by the account owner — see docs/STORE.md
+# "Automated extension publishing"): repo secrets
+#   EDGE_PRODUCT_ID / EDGE_CLIENT_ID / EDGE_API_KEY          (Partner Center)
+#   CWS_PUBLISHER_ID / CWS_CLIENT_ID / CWS_CLIENT_SECRET /
+#   CWS_REFRESH_TOKEN                                        (Google Cloud)
+# The script fails fast, before the network, when the ones it needs are missing.
+#
+# CHROME: the Web Store API refuses to publish an item that has never been
+# published manually with its current visibility settings, so until PDF Scholar
+# is live in the Chrome Web Store the chrome target only works with check_only.
+#
+# The Edge API key EXPIRES (Partner Center shows the date). A 401 on the Edge
+# step means "renew the key", not "the script broke".
+#
+# Manual trigger only, like the Store workflow: a submission is a deliberate act,
+# and a package cannot be replaced while a version is in review.
+name: Extension publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which store(s) to publish to'
+        type: choice
+        options: [edge, chrome, all]
+        default: edge
+      check_only:
+        description: 'Dry run: verify credentials + the zip, submit NOTHING (safe while a version is in review)'
+        type: boolean
+        required: false
+        default: true
+      notes:
+        description: 'Notes for the Edge certification team. Blank = "PDF Scholar <version>".'
+        required: false
+        default: ''
+      skip_review:
+        description: 'Chrome only: attempt to skip review (eligible changes only — not available after a policy warning)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Build the same artifact the release workflow ships, from this commit —
+      # never upload a zip that was lying around from an older build.
+      - run: npm run build:ext
+      - run: npm run pack:ext:store
+      - name: Publish extension
+        shell: pwsh
+        env:
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+        run: |
+          $splat = @{ Target = '${{ inputs.target }}' }
+          if ('${{ inputs.check_only }}' -eq 'true') { $splat.CheckOnly = $true }
+          if ('${{ inputs.skip_review }}' -eq 'true') { $splat.SkipReview = $true }
+          if ('${{ inputs.notes }}' -ne '') { $splat.Notes = '${{ inputs.notes }}' }
+          ./scripts/ext-publish.ps1 @splat
+      # Keep the exact bytes that were submitted, so a rejection can be
+      # reproduced against the artifact the reviewer actually saw.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extension-store-zip
+          path: release/pdf-scholar-extension-store.zip
+          if-no-files-found: warn

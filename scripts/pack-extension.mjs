@@ -1,40 +1,54 @@
-// Pack dist-extension/ into release/pdf-scholar-extension.zip with a single
-// top-level folder, so "unzip anywhere" leaves exactly one directory to point
-// Load unpacked at (bare files at the zip root spilled assets/, icons/ etc.
-// into whatever folder the user extracted to).
+// Pack dist-extension/ into a zip. Two shapes, because the two consumers want
+// opposite things:
 //
-// Windows-only (shells out to PowerShell's Compress-Archive) — matches the
-// rest of the tooling, which already targets Windows (electron-builder --win).
-import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+//   (default)  release/pdf-scholar-extension.zip
+//              ONE top-level folder, so "unzip anywhere" leaves exactly one
+//              directory to point Load unpacked at (bare files at the zip root
+//              spilled assets/, icons/ etc. into whatever folder the user
+//              extracted to). This is the README download button's asset.
+//
+//   --store    release/pdf-scholar-extension-store.zip
+//              manifest.json at the zip ROOT, as the Chrome Web Store and Edge
+//              Add-ons uploaders require. A folder-wrapped zip is REJECTED
+//              there ("manifest not found").
+//
+// Entry names always use forward slashes (see scripts/lib/zip.mjs — the Windows
+// built-ins write backslashes, which store uploaders mis-parse). Mirrors what
+// release.yml builds on Linux with `zip`.
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
+import { writeZip } from './lib/zip.mjs'
 
+const store = process.argv.includes('--store')
 const root = resolve(import.meta.dirname, '..')
 const dist = join(root, 'dist-extension')
-const out = join(root, 'release', 'pdf-scholar-extension.zip')
+const out = join(root, 'release', store ? 'pdf-scholar-extension-store.zip' : 'pdf-scholar-extension.zip')
 
 if (!existsSync(dist)) {
   console.error('dist-extension/ not found — run `npm run build:ext` first')
   process.exit(1)
 }
 
-const stage = join(tmpdir(), 'pdf-scholar-pack')
-const folder = join(stage, 'pdf-scholar-extension')
-rmSync(stage, { recursive: true, force: true })
-mkdirSync(folder, { recursive: true })
-cpSync(dist, folder, { recursive: true })
-mkdirSync(join(root, 'release'), { recursive: true })
+/** Every file under `dir`, as zip entries rooted at `prefix`. */
+function collect(dir, prefix) {
+  const entries = []
+  for (const name of readdirSync(dir).sort()) {
+    const full = join(dir, name)
+    const stat = statSync(full)
+    const zipName = prefix ? `${prefix}/${relative(dir, full).replace(/\\/g, '/')}` : name
+    if (stat.isDirectory()) entries.push(...collect(full, zipName))
+    else entries.push({ name: zipName, data: readFileSync(full), mtime: stat.mtime })
+  }
+  return entries
+}
 
-const ps = spawnSync(
-  'powershell',
-  [
-    '-NoProfile',
-    '-Command',
-    `Compress-Archive -Path '${folder}' -DestinationPath '${out}' -Force`
-  ],
-  { stdio: 'inherit' }
+mkdirSync(join(root, 'release'), { recursive: true })
+const entries = collect(dist, store ? '' : 'pdf-scholar-extension')
+writeZip(out, entries)
+
+const version = JSON.parse(readFileSync(join(dist, 'manifest.json'), 'utf8')).version
+const size = (statSync(out).size / 1024 / 1024).toFixed(2)
+console.log(
+  `Wrote ${out} — v${version}, ${entries.length} files, ${size} MB ` +
+    `(${store ? 'manifest at zip root: store upload' : 'top-level folder: Load unpacked'})`
 )
-rmSync(stage, { recursive: true, force: true })
-if (ps.status !== 0) process.exit(ps.status ?? 1)
-console.log(`Wrote ${out} (top-level folder: pdf-scholar-extension/)`)
