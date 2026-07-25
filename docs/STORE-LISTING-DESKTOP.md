@@ -143,8 +143,11 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ## Partner Center listing fields
 
-The MS Store listing is English-only for now (the Norwegian variant was removed).
-Norwegian copy is kept here anyway, ready if a `nb-NO` listing is added back.
+The live listing has **two** languages, `en-us` and `no` — confirmed by reading
+the published submission (`store-publish.ps1 -CheckOnly` prints them). An earlier
+note here claimed it was English-only; it is not, and both blocks below are live
+copy. The publish script routes NO copy to `nb`/`nn`/`no` listings and EN to
+everything else, so each gets its own description, features and release notes.
 
 ### Product features (≤ 20 items, ≤ 200 chars each)
 

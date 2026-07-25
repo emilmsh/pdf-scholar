@@ -96,10 +96,17 @@ $version = (Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-
 # checks this same code with no credentials at all.
 . (Join-Path $PSScriptRoot 'lib' 'store-listing.ps1')
 
+# Did the caller hand us one explicit note? Then it applies to every language,
+# because that is what they asked for. Otherwise each listing gets the release
+# notes in ITS OWN language from the doc - the live listing has both en-us and
+# no, and sending the English block to both would silently replace the
+# Norwegian notes with English ones.
+$whatsNewExplicit = [bool]$WhatsNew
+
 $listingCopy = $null
 if (-not $SkipListingSync) {
   $listingCopy = Get-StoreListingCopy -ListingDoc $ListingDoc -Version $version `
-    -AllowStaleNotes:([bool]$WhatsNew)
+    -AllowStaleNotes:$whatsNewExplicit
   if (-not $WhatsNew) { $WhatsNew = $listingCopy['EN'].releaseNotes }
 }
 if (-not $WhatsNew) { $WhatsNew = "PDF Scholar $version" }
@@ -195,10 +202,12 @@ if ($CheckOnly) {
       # endings (the doc is checked out with CRLF on Windows, LF in CI).
       if ($listingCopy) {
         $c = $listingCopy[(Get-CopyLang $listing.Name)]
+        $notes = $c.releaseNotes
+        if ($whatsNewExplicit) { $notes = $WhatsNew }
         foreach ($pair in @(
           @{ name = 'description';      new = $c.description },
           @{ name = 'shortDescription'; new = $c.shortDescription },
-          @{ name = 'releaseNotes';     new = $WhatsNew }
+          @{ name = 'releaseNotes';     new = $notes }
         )) {
           if ($base.PSObject.Properties.Name -notcontains $pair.name) {
             Write-Host "    $($pair.name): NOT MODELLED by the API here"
@@ -263,9 +272,11 @@ foreach ($listing in $submission.listings.PSObject.Properties) {
   $fields = @{ releaseNotes = $WhatsNew }
   if ($listingCopy) {
     $c = $listingCopy[(Get-CopyLang $listing.Name)]
+    $notes = $c.releaseNotes
+    if ($whatsNewExplicit) { $notes = $WhatsNew }
     $fields = @{
       description      = $c.description
-      releaseNotes     = $WhatsNew
+      releaseNotes     = $notes
       shortDescription = $c.shortDescription
       features         = $c.features
     }
