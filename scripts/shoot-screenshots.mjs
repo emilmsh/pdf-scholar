@@ -80,6 +80,7 @@ const SHOTS = [
       await ui.closePanels()
       await ui.goToPage(1)
       await ui.fitWidth()
+      await ui.cover()
     `
   },
   {
@@ -95,6 +96,7 @@ const SHOTS = [
       await ui.goToPage(3)
       await ui.fitWidth()
       ui.expectPage(0, 3)
+      await ui.settle(3400)   // let the nav pills fade, as in the cover shots
     `
   },
   {
@@ -117,7 +119,14 @@ const SHOTS = [
       ui.expectPage(1, 6)
       // Both columns must be the SAME width and land on the SAME zoom — the
       // split is symmetric by construction, and this is where that is checked.
-      ui.expectSymmetric()
+      await ui.expectSymmetric()
+      // Photograph it with the toolbar pointing at the right-hand column, so
+      // the switcher in the shot reads "3 | 6" with the figure's column live —
+      // the state the split exists for. The long settle outlasts the nav pills'
+      // 2.6 s idle fade: jumping pages leaves a "back to p. 1" pill in the
+      // corner, and it has no business in a marketing frame.
+      await ui.activatePane(1)
+      await ui.settle(3400)
     `
   },
   {
@@ -141,6 +150,7 @@ const SHOTS = [
       await ui.goToPage(1)
       await ui.fitWidth()
       await ui.setTheme('sepia')
+      await ui.cover()
     `
   },
   {
@@ -151,6 +161,7 @@ const SHOTS = [
       await ui.goToPage(1)
       await ui.fitWidth()
       await ui.setTheme('night')
+      await ui.cover()
     `
   },
   {
@@ -192,6 +203,7 @@ const SHOTS = [
       await ui.goToPage(1)
       await ui.fitWidth()
       await ui.setTheme('nightHc')
+      await ui.cover()
     `
   }
 ]
@@ -226,14 +238,20 @@ const ui = {
     }
     return best ? Number(best.dataset.page) : null;
   },
-  /** The two columns must be equal in width and therefore in fit-zoom */
-  expectSymmetric() {
+  /** The two columns must be equal in width and therefore in fit-zoom. The
+   *  zooms are read one at a time through the switcher, since the toolbar now
+   *  shows the ACTIVE column's — which is also a check that switching works. */
+  async expectSymmetric() {
     const w = [...document.querySelectorAll('.viewer-body > .pages-host')]
       .map((h) => Math.round(h.getBoundingClientRect().width));
     if (w.length !== 2) throw new Error('expected two columns, saw ' + w.length);
     if (Math.abs(w[0] - w[1]) > 2) throw new Error('columns not symmetric: ' + w.join(' vs '));
-    const z = [...document.querySelectorAll('.center-cluster .zoom-label')].map((e) => e.textContent);
-    if (z.length === 2 && z[0] !== z[1]) throw new Error('zooms differ: ' + z.join(' vs '));
+    const z = [];
+    for (const i of [0, 1]) {
+      await this.activatePane(i);
+      z.push(document.querySelector('.center-cluster .zoom-label').textContent);
+    }
+    if (z[0] !== z[1]) throw new Error('zooms differ: ' + z.join(' vs '));
   },
   /** Fail the shot rather than save a screenshot of the wrong thing */
   expectPage(paneIndex, page) {
@@ -257,16 +275,96 @@ const ui = {
     }
     const split = btn('Delt visning');
     if (split && split.classList.contains('is-active')) { click(split); await settle(500); }
+    // Disarm any tool a previous shot armed — the shots share one app session,
+    // so the annotations shot's highlighter was still lit (and its button
+    // outlined) in every theme shot that followed it.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     await settle(200);
   },
-  /** Page for a column via its own toolbar cluster (0 = left, 1 = right).
+  /** Frame a cover shot and prove it: what a reader should meet is the paper's
+   *  title, its authors and the first lines of the abstract — not page 1's
+   *  opening act, which on an arXiv paper is a reproduction notice ("Provided
+   *  proper attribution is provided, Google hereby grants…"). Legal boilerplate
+   *  is the worst possible first impression of a reading app.
+   *
+   *  Scrolls by the TITLE's own position rather than by a fraction of the page:
+   *  a fraction depends on the zoom the shot happens to be at, and got this
+   *  wrong by 400 px on the very first shot of a run. Ends by outlasting the nav
+   *  pills' 2.6 s idle fade, which otherwise leaves a "back to p. 1" bubble in
+   *  the corner of a marketing image. */
+  async cover() {
+    const host = document.querySelector('.pages');
+    const title = [...host.querySelectorAll('.textLayer span')]
+      .find((s) => (s.textContent || '').includes('Attention Is All You Need'));
+    if (!title) throw new Error('title not rendered — is this the house demo paper?');
+    const box = host.getBoundingClientRect();
+    host.scrollTop += title.getBoundingClientRect().top - box.top - 90;
+    host.dispatchEvent(new Event('scroll'));
+    await settle(400);
+    // The notice is three lines and only the first names itself, so clearing
+    // "Provided proper attribution" can still leave a red sliver of the last
+    // one under the toolbar. Push past whatever of it is left.
+    const overlap = this.noticeOverlap();
+    if (overlap > 0) {
+      host.scrollTop += overlap + 6;
+      host.dispatchEvent(new Event('scroll'));
+      await settle(400);
+    }
+    this.expectCoverFraming();
+    await settle(3400);
+  },
+  /** How far the reproduction notice still reaches into the frame, in px */
+  noticeOverlap() {
+    const host = document.querySelector('.pages');
+    const box = host.getBoundingClientRect();
+    const parts = ['Provided proper attribution', 'reproduce the tables', 'scholarly works'];
+    let worst = 0;
+    for (const s of host.querySelectorAll('.textLayer span')) {
+      const txt = s.textContent || '';
+      if (!parts.some((p) => txt.includes(p))) continue;
+      worst = Math.max(worst, s.getBoundingClientRect().bottom - box.top);
+    }
+    return worst;
+  },
+  /** The cover framing, asserted rather than hoped for: the title near the top
+   *  of the viewport, and the notice above it out of frame. */
+  expectCoverFraming() {
+    const host = document.querySelector('.pages');
+    const box = host.getBoundingClientRect();
+    const spans = [...host.querySelectorAll('.textLayer span')];
+    const hit = (needle) => spans.find((s) => (s.textContent || '').includes(needle));
+    const title = hit('Attention Is All You Need');
+    if (!title) throw new Error('title not rendered — is this the house demo paper?');
+    const t = title.getBoundingClientRect();
+    if (t.top < box.top || t.top > box.top + box.height * 0.35) {
+      throw new Error('title is not in the top third of the frame (' + Math.round(t.top - box.top) + 'px)');
+    }
+    if (this.noticeOverlap() > 0) throw new Error('the reproduction notice is still in frame');
+    const abstract = hit('The dominant sequence transduction models');
+    if (!abstract || abstract.getBoundingClientRect().top > box.bottom) {
+      throw new Error('the abstract does not start inside the frame');
+    }
+  },
+  /** Point the toolbar at a column (0 = left, 1 = right) through the switcher.
+   *  A no-op with one column, so callers can stay pane-agnostic. */
+  async activatePane(paneIndex) {
+    const seg = document.querySelectorAll('.pane-switch button')[paneIndex];
+    if (!seg) {
+      if (paneIndex === 0) return;
+      throw new Error('no column switcher segment ' + paneIndex + ' (is the split open?)');
+    }
+    if (!seg.classList.contains('is-active')) { click(seg); await settle(350); }
+  },
+  /** Page for a column (0 = left, 1 = right). The toolbar has ONE cluster and
+   *  it drives the active column, so this points the switcher first.
    *  The app commits the typed page on BLUR, so the field must genuinely be
    *  focused first — blur() on an unfocused input fires nothing, which silently
    *  did nothing at all until ui.expectPage caught it. */
-  async paneGoToPage(clusterIndex, n) {
-    const cluster = document.querySelectorAll('.center-cluster')[clusterIndex];
-    if (!cluster) throw new Error('no centre cluster ' + clusterIndex + ' (is the split open?)');
+  async paneGoToPage(paneIndex, n) {
+    await this.activatePane(paneIndex);
+    const cluster = document.querySelector('.center-cluster');
+    if (!cluster) throw new Error('no centre cluster');
     const input = cluster.querySelector('.page-indicator input');
     input.focus();
     await settle(60);
