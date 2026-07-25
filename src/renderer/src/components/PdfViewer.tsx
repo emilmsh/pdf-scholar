@@ -19,24 +19,31 @@ import { READ_ALOUD } from '../flags'
 import {
   FREETEXT_COLOR,
   FREETEXT_SIZE,
-  HIGHLIGHT_FILL_ALPHA,
-  MARKER_DEFAULT,
-  MARKER_OPACITY,
   NOTE_COLOR,
-  PEN_DEFAULT,
-  SHAPE_DEFAULT,
   STRIKEOUT_COLOR,
   UNDERLINE_COLOR,
   annotTypeLabel,
   annotationAtPoint,
   annotationHitTest,
+  clearCustomColors,
   fromPdfJsAnnotation,
   inkHitTest,
   isMovableAnnotation,
-  markupDefaultColor,
   nextAnnotationId,
   selectionRectsForPage
 } from '../annotations'
+import {
+  clearToolPrefs,
+  DEFAULT_TOOL_PREFS,
+  loadToolPrefs,
+  saveToolPrefs
+} from '../tool-prefs'
+import type { DrawPrefKey, EraserScope, MarkupPref, ToolPref } from '../tool-prefs'
+import type { BoxSize } from '../useResizable'
+import { makePaneHandle } from '../pane-handle'
+import type { PaneHandle } from '../pane-handle'
+import { ZOOM_MAX, ZOOM_MIN } from '../zoom'
+import PagesPane from './PagesPane'
 import type {
   DrawTool,
   DrawToolType,
@@ -53,6 +60,7 @@ import {
   viewRectToPage,
   viewSize
 } from '../rotation'
+import type { RowLayout } from '../rotation'
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
 import {
@@ -139,11 +147,6 @@ const SPREAD_GAP = 24
 const PAD_TOP = 28
 const PAD_BOTTOM = 28
 const SIDE_PAD = 64
-const ZOOM_MIN = 0.25
-// 1600%: the ceiling is arbitrary, not a technical limit — render-quality.ts
-// caps device pixels within the frame budget (with a native floor), so heavy
-// zoom stays smooth and legible. Raise freely if a document needs finer detail.
-const ZOOM_MAX = 16
 /** Pages within this many px of the viewport get rendered */
 const RENDER_MARGIN = 800
 /** ms of wheel silence before a pinch/ctrl-wheel gesture commits a re-render */
@@ -152,12 +155,31 @@ const GESTURE_SETTLE = 160
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
 
+/** What the eraser removes in its default 'draw' scope: marks the user drew by
+ *  hand. Ink is hit-tested against the stroke path before this set is consulted
+ *  (see eraseAt), so it is only about the bbox pass. */
+const ERASER_DRAWN_TYPES = new Set<AnnotationType>(['ink', 'square', 'circle', 'line', 'arrow'])
+
+/** Which pages column something happened in. 'a' is the always-present one;
+ *  'b' only exists while the split view is open. Both are equal citizens for
+ *  every annotation action — the id only says WHERE to draw pane-local chrome
+ *  (the text-box editor, the drag ghost) and which zoom the toolbar edits. */
+export type PaneId = 'a' | 'b'
+
+/** The pane a DOM node sits in (each `.pages` column carries data-pane) */
+function paneOfEl(el: Element | null | undefined): PaneId {
+  const host = el?.closest?.('.pages') as HTMLElement | null
+  return host?.dataset.pane === 'b' ? 'b' : 'a'
+}
+
 /** Drag-resizable panel widths: defaults, clamps and persistence. Left (TOC)
  *  and right (assistant/search) share identical defaults and clamps so the two
- *  sides look and behave the same — the owner wants them symmetric. */
-const PANEL_DEFAULTS = { sidebar: 340, ai: 340, web: 340 }
-const PANEL_MIN = { sidebar: 264, ai: 264, web: 264 }
-const PANEL_MAX = { sidebar: 600, ai: 600, web: 600 }
+ *  sides look and behave the same — the owner wants them symmetric. `pane` is
+ *  the reference pane (the split view); it gets a wider range because it holds a
+ *  whole page, not a list. */
+const PANEL_DEFAULTS = { sidebar: 340, ai: 340, web: 340, pane: 520 }
+const PANEL_MIN = { sidebar: 264, ai: 264, web: 264, pane: 260 }
+const PANEL_MAX = { sidebar: 600, ai: 600, web: 600, pane: 1400 }
 type PanelKey = keyof typeof PANEL_DEFAULTS
 const PANEL_LS_KEY = 'pdfx-panel-widths'
 
@@ -186,7 +208,8 @@ function loadPanelWidths(): Record<PanelKey, number> {
     return {
       sidebar: clamp(Number(parsed.sidebar) || PANEL_DEFAULTS.sidebar, PANEL_MIN.sidebar, PANEL_MAX.sidebar),
       ai: clamp(Number(parsed.ai) || PANEL_DEFAULTS.ai, PANEL_MIN.ai, PANEL_MAX.ai),
-      web: clamp(Number(parsed.web) || PANEL_DEFAULTS.web, PANEL_MIN.web, PANEL_MAX.web)
+      web: clamp(Number(parsed.web) || PANEL_DEFAULTS.web, PANEL_MIN.web, PANEL_MAX.web),
+      pane: clamp(Number(parsed.pane) || PANEL_DEFAULTS.pane, PANEL_MIN.pane, PANEL_MAX.pane)
     }
   } catch {
     return { ...PANEL_DEFAULTS }
@@ -358,6 +381,20 @@ export default function PdfViewer({
     /** Land keyboard focus in the comment field on open (comment action) */
     focusText?: boolean
   } | null>(null)
+  /** Drag-resized size of a specific annotation's comment bubble, keyed by its
+   *  local id. Per document session and deliberately NOT persisted: a brand-new
+   *  note or text bubble must always open at the default shape (so the default
+   *  is never lost), while re-opening THIS comment brings back the size it was
+   *  last read at. */
+  const [bubbleSizes, setBubbleSizes] = useState<ReadonlyMap<string, BoxSize>>(new Map())
+  const setBubbleSize = useCallback((localId: string, size: BoxSize | null) => {
+    setBubbleSizes((prev) => {
+      const next = new Map(prev)
+      if (size) next.set(localId, size)
+      else next.delete(localId)
+      return next
+    })
+  }, [])
   /** Selected annotation (accent frame). Outlives the popover — scrolling
    *  closes the popover but keeps the frame, per ux-planer.md §1. */
   const [selected, setSelected] = useState<{ pageNumber: number; localId: string } | null>(null)
@@ -373,10 +410,169 @@ export default function PdfViewer({
   const panelWRef = useRef(panelW)
   panelWRef.current = panelW
   const [resizingPanel, setResizingPanel] = useState<PanelKey | null>(null)
-  const [navStacks, setNavStacks] = useState<{ back: NavPosition[]; forward: NavPosition[] }>({
-    back: [],
-    forward: []
-  })
+  /** Split view: a second pages column beside the first — same document, same
+   *  tools, own page and own zoom. See PagesPane.tsx for why it is not a second
+   *  PdfViewer (one pdf.js document, one annotation map, one save model). */
+  const [splitOpen, setSplitOpen] = useState(false)
+  const splitOpenRef = useRef(splitOpen)
+  splitOpenRef.current = splitOpen
+  /** Each column's scroll API (see pane-handle.ts). Declared here so every
+   *  go-to action below can address a column without knowing which one it is;
+   *  filled in further down once both columns exist. */
+  const paneBHandleRef = useRef<PaneHandle | null>(null)
+  const handleForRef = useRef<(pane: PaneId) => PaneHandle | null>(() => null)
+  const followLinkFromRef = useRef<(from: PaneId, dest: unknown, toOther: boolean) => void>(
+    () => {}
+  )
+  const toggleSplitRef = useRef<() => void>(() => {})
+  const whenPaneReadyRef = useRef<(pane: PaneId, fn: () => void) => void>(() => {})
+  const schedulePositionSaveRef = useRef<() => void>(() => {})
+  /** The pane the user last touched. Two jobs: the toolbar's page/zoom controls
+   *  edit THIS pane (and outline it so that is visible), and any annotation
+   *  action started without an element to inspect — a stroke completing, a text
+   *  box opening — lands here. Every such action is preceded by a pointerdown in
+   *  a pane, so "last pointer" is exactly "the pane being worked in". */
+  const [activePane, setActivePane] = useState<PaneId>('a')
+  const activePaneRef = useRef(activePane)
+  activePaneRef.current = activePane
+  /**
+   * Which column to pulse, briefly. The persistent "this is the active column"
+   * signal lives in the TOOLBAR (the outlined page+zoom cluster) — chrome, where
+   * it can't intrude on the page. On the page itself a permanent frame around
+   * whichever half you are reading is exactly the kind of thing that wears you
+   * down over an hour, so the page only ever gets a ~700 ms pulse: when focus
+   * moves between the columns, and when a followed link lands in the other one.
+   */
+  const [paneFlash, setPaneFlash] = useState<PaneId | null>(null)
+  const flashTimerRef = useRef<number | null>(null)
+  const flashPane = useCallback((pane: PaneId) => {
+    if (!splitOpenRef.current) return
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+    // Clear first so a repeat pulse on the same column restarts the animation
+    setPaneFlash(null)
+    window.requestAnimationFrame(() => setPaneFlash(pane))
+    flashTimerRef.current = window.setTimeout(() => {
+      flashTimerRef.current = null
+      setPaneFlash(null)
+    }, 700)
+  }, [])
+  const flashPaneRef = useRef(flashPane)
+  flashPaneRef.current = flashPane
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+    },
+    []
+  )
+  /** Pane B's page + zoom. Held HERE, not inside PagesPane, because the
+   *  toolbar's second centre cluster drives them — exactly the same controls
+   *  pane A gets, which is the whole point of the symmetry. */
+  const [paneBScale, setPaneBScale] = useState(0)
+  const [paneBFit, setPaneBFit] = useState<'width' | 'page' | 'custom'>('width')
+  const [paneBPage, setPaneBPage] = useState(1)
+  /** …and its own orientation. Rotation per column has a concrete research use:
+   *  holding a landscape-printed table upright in one column while reading the
+   *  prose that discusses it in the other. Spread is per column for the same
+   *  reason — if the option exists at all it has to mean "this column". */
+  const [paneBRotation, setPaneBRotation] = useState<ViewRotation>(0)
+  const [paneBSpread, setPaneBSpread] = useState(false)
+  const paneBRotationRef = useRef(paneBRotation)
+  paneBRotationRef.current = paneBRotation
+  const paneBSpreadRef = useRef(paneBSpread)
+  paneBSpreadRef.current = paneBSpread
+  const paneBFitRef = useRef(paneBFit)
+  paneBFitRef.current = paneBFit
+  const paneBScaleRef = useRef(paneBScale)
+  paneBScaleRef.current = paneBScale
+  const paneBZoom = useCallback((next: number, mode: 'width' | 'page' | 'custom') => {
+    setPaneBScale(next)
+    setPaneBFit(mode)
+  }, [])
+  /** Pane B's page field. Goes through the same PaneHandle every other go-to
+   *  action uses — there is exactly one way to scroll a column. */
+  const goToPaneBPage = useCallback((page: number) => {
+    goToPaneBPageRef.current(page)
+  }, [])
+  const goToPaneBPageRef = useRef<(page: number) => void>(() => {})
+  /** Which fit the second column's toggle offers next. Derived from the mode
+   *  rather than by comparing scales (as pane A does): PdfViewer does not know
+   *  the pane's width, and a mode-derived target is the more predictable of the
+   *  two anyway. */
+  const paneBFitTarget: 'width' | 'page' = paneBFit === 'width' ? 'page' : 'width'
+  /** halfPagesWidth is declared further down (it needs the pages container) —
+   *  reached through a ref so this callback's dependency array does not touch it
+   *  during render, which would be a temporal-dead-zone reference. */
+  const halfPagesWidthRef = useRef<() => number>(() => PANEL_DEFAULTS.pane)
+
+  /** Opening the split starts the second column on the page you are reading and
+   *  at a fresh fit (scale 0 makes PagesPane pick fit-width for its width);
+   *  closing it hands focus back to the remaining column so the toolbar's centre
+   *  never points at a pane that is gone. */
+  // Everything here runs at the TOP LEVEL, never inside a setState updater:
+  // React may call an updater more than once and does not support nested state
+  // updates from inside one. Doing that dropped the symmetric-width update, so
+  // the split opened lopsided (398/1199 instead of 799/799).
+  const toggleSplit = useCallback(() => {
+    if (splitOpenRef.current) {
+      setSplitOpen(false)
+      setActivePane('a')
+      return
+    }
+    // Open symmetrically: an even split of the space the one column had, both
+    // columns on the page you are reading, both at a fresh fit for their new
+    // width (scale 0 makes each pick fit-width). Nothing distinguishes them.
+    const half = halfPagesWidthRef.current()
+    setPanelW((p) => ({ ...p, pane: half }))
+    window.setTimeout(persistPanelWidths, 0)
+    setPaneBPage(currentPage)
+    setPaneBScale(0)
+    setPaneBFit('width')
+    // Mirror the orientation you were already reading in, so the two columns
+    // are indistinguishable at the moment the split opens
+    setPaneBRotation(rotationRef.current)
+    setPaneBSpread(spreadRef.current)
+    setFitMode('width')
+    setSplitOpen(true)
+    // The new column opens on the page you are reading, once it can be scrolled
+    whenPaneReadyRef.current('b', () => handleForRef.current('b')?.scrollToPage(currentPage))
+  }, [currentPage])
+  toggleSplitRef.current = toggleSplit
+
+  /**
+   * Close ONE named column and keep the other's content — "lukk det panelet man
+   * vil". Closing the right one is trivial. Closing the LEFT one has to be a
+   * trick: the first column is the architecturally permanent one (it owns the
+   * persisted reading position), so instead of removing it we move the right
+   * column's view INTO it — page, orientation, spread, and a hand-set zoom —
+   * and then close the right one. What the reader sees is the half they wanted
+   * to keep, now filling the window.
+   */
+  const closePane = useCallback((pane: PaneId) => {
+    if (pane === 'b') {
+      setSplitOpen(false)
+      setActivePane('a')
+      return
+    }
+    const bPage = handleForRef.current('b')?.position()?.page ?? paneBPage
+    setRotation(paneBRotationRef.current)
+    setSpread(paneBSpreadRef.current)
+    // A fit mode is better recomputed for the full width than copied; an exact
+    // hand-set zoom is the reader's number and is carried over verbatim.
+    const bFit = paneBFitRef.current
+    fitModeRef.current = bFit
+    setFitMode(bFit)
+    if (bFit === 'custom' && paneBScaleRef.current > 0) setScale(paneBScaleRef.current)
+    setSplitOpen(false)
+    setActivePane('a')
+    whenPaneReadyRef.current('a', () => {
+      handleForRef.current('a')?.scrollToPage(bPage)
+      schedulePositionSaveRef.current()
+    })
+  }, [paneBPage])
+  /** Navigation history PER COLUMN — see the pushBack/navStep block below */
+  const [navStacks, setNavStacks] = useState<
+    Record<PaneId, { back: NavPosition[]; forward: NavPosition[] }>
+  >({ a: { back: [], forward: [] }, b: { back: [], forward: [] } })
   const [pillsFaded, setPillsFaded] = useState(false)
   const pillsTimerRef = useRef<number | null>(null)
   /** Distraction-free: scrollbar + page pill fade after idle, wake on activity */
@@ -389,19 +585,39 @@ export default function PdfViewer({
   const [markupTool, setMarkupTool] = useState<MarkupToolType | null>(null)
   const markupToolRef = useRef(markupTool)
   markupToolRef.current = markupTool
-  const [markupColors, setMarkupColors] = useState<Record<MarkupToolType, [number, number, number]>>({
-    highlight: markupDefaultColor('highlight'),
-    underline: markupDefaultColor('underline'),
-    strikeout: markupDefaultColor('strikeout'),
-    squiggly: markupDefaultColor('squiggly')
-  })
-  const markupColorsRef = useRef(markupColors)
-  markupColorsRef.current = markupColors
-  const [toolPrefs, setToolPrefs] = useState({
-    pen: PEN_DEFAULT,
-    marker: MARKER_DEFAULT,
-    shape: SHAPE_DEFAULT
-  })
+  // Tool look-and-feel (colour, width, opacity per drawing tool; colour +
+  // opacity per markup type; eraser scope) — loaded from and written back to
+  // localStorage so a dialled-in tusj survives a restart. See tool-prefs.ts.
+  const [prefs, setPrefs] = useState(loadToolPrefs)
+  const prefsRef = useRef(prefs)
+  prefsRef.current = prefs
+  useEffect(() => {
+    saveToolPrefs(prefs)
+  }, [prefs])
+  const toolPrefs = prefs.tools
+  const markupPrefs = prefs.markup
+
+  const patchToolPref = useCallback((tool: DrawPrefKey, patch: Partial<ToolPref>) => {
+    setPrefs((p) => ({ ...p, tools: { ...p.tools, [tool]: { ...p.tools[tool], ...patch } } }))
+  }, [])
+  const resetToolPref = useCallback((tool: DrawPrefKey) => {
+    setPrefs((p) => ({
+      ...p,
+      tools: { ...p.tools, [tool]: { ...DEFAULT_TOOL_PREFS.tools[tool] } }
+    }))
+  }, [])
+  const patchMarkupPref = useCallback((type: MarkupToolType, patch: Partial<MarkupPref>) => {
+    setPrefs((p) => ({ ...p, markup: { ...p.markup, [type]: { ...p.markup[type], ...patch } } }))
+  }, [])
+  const resetMarkupPref = useCallback((type: MarkupToolType) => {
+    setPrefs((p) => ({
+      ...p,
+      markup: { ...p.markup, [type]: { ...DEFAULT_TOOL_PREFS.markup[type] } }
+    }))
+  }, [])
+  const setEraserScope = useCallback((eraserScope: EraserScope) => {
+    setPrefs((p) => ({ ...p, eraserScope }))
+  }, [])
   /** The floating text-box editor. Carries its own box size (page points) so it
    *  is drag-resizable before commit; `editingId` is set when re-opening an
    *  existing FreeText annotation (double-click) so commit resizes/edits it in
@@ -416,6 +632,8 @@ export default function PdfViewer({
     h: number
     editingId?: string
     text?: string
+    /** The editor is positioned inside this pane's page layout, at its zoom */
+    pane: PaneId
   } | null>(null)
 
   const drawTool = useMemo<DrawTool | null>(() => {
@@ -425,15 +643,15 @@ export default function PdfViewer({
       return { type: 'text', color: FREETEXT_COLOR, width: 0, opacity: 1 }
     }
     if (activeTool === 'pen' || activeTool === 'marker') {
-      const prefs = toolPrefs[activeTool]
-      return {
-        type: activeTool,
-        color: prefs.color,
-        width: prefs.width,
-        opacity: activeTool === 'marker' ? MARKER_OPACITY : 1
-      }
+      const p = toolPrefs[activeTool]
+      return { type: activeTool, color: p.color, width: p.width, opacity: p.opacity }
     }
-    return { type: activeTool, color: toolPrefs.shape.color, width: toolPrefs.shape.width, opacity: 1 }
+    return {
+      type: activeTool,
+      color: toolPrefs.shape.color,
+      width: toolPrefs.shape.width,
+      opacity: toolPrefs.shape.opacity
+    }
   }, [activeTool, toolPrefs])
   const drawToolRef = useRef(drawTool)
   drawToolRef.current = drawTool
@@ -495,6 +713,67 @@ export default function PdfViewer({
   const viewerRootRef = useRef<HTMLDivElement>(null)
   const scaleRef = useRef(scale)
   scaleRef.current = scale
+
+  // ---------- Pane-agnostic geometry ----------
+  // Split view puts a SECOND pages column on screen at its own zoom. Every
+  // pointer handler below (markup, hit-testing, drag-move, snip, note
+  // placement) used to read the one `scaleRef`, which silently gave wrong page
+  // coordinates in the other pane. Instead of threading a pane identity through
+  // ~15 handlers, derive the scale from the page element itself: its rendered
+  // width IS the page's view width × that pane's scale. No registry to keep in
+  // sync, and it cannot go stale — the DOM is the source of truth.
+  //
+  // The columns can also be ROTATED independently (a landscape table held beside
+  // the prose that discusses it), so the rotation used to map a pointer into page
+  // space has to come from the same place: each `.pages` column publishes its own
+  // on `data-rotation`.
+  const rotationOfPageEl = (pageEl: HTMLElement): ViewRotation => {
+    const host = pageEl.closest('.pages') as HTMLElement | null
+    const raw = Number(host?.dataset.rotation)
+    return raw === 90 || raw === 180 || raw === 270 ? raw : raw === 0 ? 0 : rotationRef.current
+  }
+  const rotationOfPageElRef = useRef(rotationOfPageEl)
+  rotationOfPageElRef.current = rotationOfPageEl
+
+  const scaleOfPageEl = (pageEl: HTMLElement): number => {
+    const size = sizesRef.current[Number(pageEl.dataset.page) - 1]
+    if (!size) return scaleRef.current
+    const v = viewSize(size.w, size.h, rotationOfPageElRef.current(pageEl))
+    const w = pageEl.getBoundingClientRect().width
+    return v.w > 0 && w > 0 ? w / v.w : scaleRef.current
+  }
+  const scaleOfPageElRef = useRef(scaleOfPageEl)
+  scaleOfPageElRef.current = scaleOfPageEl
+
+  /** Every mounted page element, in BOTH panes. Handlers that hit-test a client
+   *  point against the pages must see the whole viewer, not one column. */
+  const allPageEls = (): HTMLElement[] => [
+    ...(viewerRootRef.current?.querySelectorAll<HTMLElement>('.pages .pdf-page') ?? [])
+  ]
+  const allPageElsRef = useRef(allPageEls)
+  allPageElsRef.current = allPageEls
+
+  // Follow the pointer into whichever pane it lands in. Capture phase so it is
+  // recorded before any handler that needs it, and pointerdown rather than
+  // click/focus so it is set before a drag or a stroke begins.
+  useEffect(() => {
+    const root = viewerRootRef.current
+    if (!root) return
+    const onDown = (e: PointerEvent): void => {
+      const host = (e.target as Element | null)?.closest?.('.pages') as HTMLElement | null
+      if (!host) return
+      const next = host.dataset.pane === 'b' ? 'b' : 'a'
+      setActivePane((prev) => {
+        // Pulse only on an actual switch — a pulse on every click in the column
+        // you are already working in would be noise
+        if (prev !== next) flashPaneRef.current(next)
+        return next
+      })
+    }
+    root.addEventListener('pointerdown', onDown, true)
+    return () => root.removeEventListener('pointerdown', onDown, true)
+  }, [])
+
   const restoreRef = useRef<ReadingPosition | null>(initialPosition)
   /** Page-anchored focal point consumed by the post-zoom commit effect */
   const pendingAnchorRef = useRef<{
@@ -666,7 +945,13 @@ export default function PdfViewer({
       setContainerWidth(newW)
       refitRef.current()
     }
-  }, [tocPinned, aiPinned])
+    // `splitOpen` belongs here for the same reason as the two panels: opening
+    // the second column takes half the width out of this one in a single
+    // commit. `panelW.pane` is here too — unlike the side panels, dragging the
+    // split divider must re-fit BOTH columns continuously, because the other
+    // column re-fits from its own per-render measurement and a one-frame lag on
+    // only this side would read as the two halves disagreeing.
+  }, [tocPinned, aiPinned, splitOpen, panelW.pane])
 
   // View-space reference dimensions (page units) that fit-width/fit-page zoom
   // against: the first page under the current rotation, widened to a pair when
@@ -752,6 +1037,25 @@ export default function PdfViewer({
     const current = computeCurrent()
     if (current) setCurrentPage(current.page)
   }, [layout, computeCurrent])
+  const updateRangeRef = useRef(updateRange)
+  updateRangeRef.current = updateRange
+
+  // The first column's scroll API, built from the same refs its own code uses.
+  // Both columns hand out an identical interface, so `handleFor` below is the
+  // only place that has to know there are two of them at all.
+  const paneAHandle = useMemo(
+    () =>
+      makePaneHandle({
+        el: () => containerRef.current,
+        layout: () => layoutRef.current,
+        scale: () => scaleRef.current,
+        rotation: () => rotationRef.current,
+        sizes: () => sizesRef.current,
+        afterScroll: () => updateRangeRef.current()
+      }),
+    []
+  )
+  handleForRef.current = (pane: PaneId) => (pane === 'b' ? paneBHandleRef.current : paneAHandle)
 
   const schedulePositionSave = useCallback(() => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
@@ -767,6 +1071,7 @@ export default function PdfViewer({
       }
     }, 600)
   }, [computeCurrent, payload.path])
+  schedulePositionSaveRef.current = schedulePositionSave
 
   // Restore reading position once the layout is known
   useLayoutEffect(() => {
@@ -883,6 +1188,16 @@ export default function PdfViewer({
     setAnnotPopover((p) => (p ? null : p))
     if (immersiveRef.current) wakeHudRef.current()
   }, [updateRange, schedulePositionSave])
+
+  /** Pane B scrolling: the same floating-bubble hygiene as pane A (a popover
+   *  anchored to a screen point must not stay behind while the page moves under
+   *  it), minus the reading-position save — the position persisted per file is
+   *  the main column's, which is what re-opening the document restores. */
+  const onPaneBScroll = useCallback(() => {
+    setMenu((m) => (m ? null : m))
+    setAnnotPopover((p) => (p ? null : p))
+    if (immersiveRef.current) wakeHudRef.current()
+  }, [])
 
   const wakeHudRef = useRef<() => void>(() => {})
 
@@ -1185,7 +1500,10 @@ export default function PdfViewer({
               record: hit,
               startClientX: t.clientX,
               startClientY: t.clientY,
-              moved: false
+              moved: false,
+              scale: scaleOfPageElRef.current(pageEl),
+              rotation: rotationOfPageElRef.current(pageEl),
+              pane: paneOfEl(pageEl)
             }
             return
           }
@@ -1326,15 +1644,30 @@ export default function PdfViewer({
     [computeCurrent, computeFitScale]
   )
 
+  /** Rotate the column being worked in. Per column, because the point of the
+   *  split is often exactly this: hold a landscape-printed table upright on one
+   *  side while the prose stays readable on the other. The second column keeps
+   *  its own orientation in session state; the first column's is the one
+   *  persisted with the reading position. */
   const rotateView = useCallback(
     (dir: 1 | -1) => {
-      const next = ((((rotationRef.current + dir * 90) % 360) + 360) % 360) as ViewRotation
-      // Draw tools assume an un-rotated page — deactivate on rotate
-      setActiveTool((tool) => {
-        if (tool) showToast(t('viewer.rotatedToolsOff'))
-        return null
-      })
-      setFreeTextDraft(null)
+      const pane = activePaneRef.current
+      const from = pane === 'b' ? paneBRotationRef.current : rotationRef.current
+      const next = ((((from + dir * 90) % 360) + 360) % 360) as ViewRotation
+      // Draw tools assume an un-rotated page. PdfPage refuses to mount a draw
+      // layer on a rotated column anyway, so only disarm when the column you are
+      // actually drawing in is the one going crooked.
+      if (next !== 0 && pane === activePaneRef.current) {
+        setActiveTool((tool) => {
+          if (tool) showToast(t('viewer.rotatedToolsOff'))
+          return null
+        })
+        setFreeTextDraft(null)
+      }
+      if (pane === 'b') {
+        setPaneBRotation(next)
+        return
+      }
       reanchorFor(next, spreadRef.current)
       setRotation(next)
       schedulePositionSave()
@@ -1343,6 +1676,16 @@ export default function PdfViewer({
   )
 
   const toggleSpread = useCallback(() => {
+    const pane = activePaneRef.current
+    if (pane === 'b') {
+      setPaneBSpread((s) => {
+        // Same rule as the first column: coming from a hand-set zoom, switch to
+        // fit-page so BOTH pages of the pair actually become visible.
+        if (!s) setPaneBFit((f) => (f === 'custom' ? 'page' : f))
+        return !s
+      })
+      return
+    }
     const next = !spreadRef.current
     // Entering two-page view from a custom (manual) zoom: switch to fit-page so
     // BOTH pages become visible. Without this the single-page zoom is kept and
@@ -1357,10 +1700,13 @@ export default function PdfViewer({
     schedulePositionSave()
   }, [reanchorFor, schedulePositionSave])
 
-  /** Tool selection guarded by rotation — draw tools are off while rotated */
+  /** Tool selection guarded by rotation — draw tools are off while the column
+   *  you would draw in is rotated (each column has its own orientation). */
   const selectTool = useCallback(
     (tool: DrawToolType | null) => {
-      if (tool && rotationRef.current !== 0) {
+      const rot =
+        activePaneRef.current === 'b' ? paneBRotationRef.current : rotationRef.current
+      if (tool && rot !== 0) {
         showToast(t('viewer.rotatedToolsOff'))
         return
       }
@@ -1399,7 +1745,8 @@ export default function PdfViewer({
     const startW = panelWRef.current[panel]
     setResizingPanel(panel)
     const onMove = (ev: PointerEvent): void => {
-      // The sidebar grows rightwards, the AI panel leftwards
+      // The sidebar grows rightwards; the AI panel and the reference pane both
+      // sit to the right of what they resize, so they grow leftwards
       const raw = panel === 'sidebar' ? startW + (ev.clientX - startX) : startW - (ev.clientX - startX)
       const w = clamp(Math.round(raw), PANEL_MIN[panel], PANEL_MAX[panel])
       setPanelW((p) => (p[panel] === w ? p : { ...p, [panel]: w }))
@@ -1414,10 +1761,29 @@ export default function PdfViewer({
     window.addEventListener('pointerup', onUp)
   }, [])
 
-  const resetPanelWidth = useCallback((panel: PanelKey) => {
-    setPanelW((p) => ({ ...p, [panel]: PANEL_DEFAULTS[panel] }))
-    window.setTimeout(persistPanelWidths, 0)
-  }, [])
+  /** Half of the space the two pages columns share right now — the split's
+   *  natural resting state. A fixed pixel default cannot be symmetric: it would
+   *  be half a 1040 px area and a third of a 1560 px one. */
+  const halfPagesWidth = useCallback((): number => {
+    const el = containerRef.current
+    const own = el?.clientWidth ?? 0
+    const other = splitOpen ? panelWRef.current.pane : 0
+    const total = own + other
+    return total > 0
+      ? clamp(Math.round(total / 2), PANEL_MIN.pane, PANEL_MAX.pane)
+      : PANEL_DEFAULTS.pane
+  }, [splitOpen])
+  halfPagesWidthRef.current = halfPagesWidth
+
+  const resetPanelWidth = useCallback(
+    (panel: PanelKey) => {
+      // The pane's "default" is symmetry, not a stored number
+      const next = panel === 'pane' ? halfPagesWidth() : PANEL_DEFAULTS[panel]
+      setPanelW((p) => ({ ...p, [panel]: next }))
+      window.setTimeout(persistPanelWidths, 0)
+    },
+    [halfPagesWidth]
+  )
 
   // ---------- Save model (dirty = unsaved draft exists) ----------
 
@@ -1521,6 +1887,10 @@ export default function PdfViewer({
     showToast(t('viewer.savedCopy'))
   }, [payload.name, payload.data, payload.path, showToast, computeCurrent, onSavedAs])
 
+  /** Annotation writes awaiting their IPC round trip. A cross-window reload
+   *  must not land while one is open — see the sync effect below. */
+  const pendingWritesRef = useRef(0)
+
   /** Immutably patch one page's annotation list */
   const mutatePage = useCallback(
     (pageNumber: number, fn: (list: PageAnnotation[]) => PageAnnotation[]) => {
@@ -1561,20 +1931,25 @@ export default function PdfViewer({
         source: 'session'
       }
       mutatePage(handle.pageNumber, (list) => [...list, record])
-      const result = await bridge.annotate({
-        path: payload.path,
-        pageIndex: handle.pageNumber - 1,
-        type: snapshot.type,
-        quads: snapshot.quads,
-        color: snapshot.color,
-        opacity: snapshot.opacity,
-        contents: snapshot.contents,
-        author: snapshot.author,
-        strokes: snapshot.strokes,
-        width: snapshot.width,
-        fontSize: snapshot.fontSize,
-        blend: snapshot.blend
-      })
+      pendingWritesRef.current += 1
+      const result = await bridge
+        .annotate({
+          path: payload.path,
+          pageIndex: handle.pageNumber - 1,
+          type: snapshot.type,
+          quads: snapshot.quads,
+          color: snapshot.color,
+          opacity: snapshot.opacity,
+          contents: snapshot.contents,
+          author: snapshot.author,
+          strokes: snapshot.strokes,
+          width: snapshot.width,
+          fontSize: snapshot.fontSize,
+          blend: snapshot.blend
+        })
+        .finally(() => {
+          pendingWritesRef.current -= 1
+        })
       if ('error' in result) {
         showToast(t('viewer.annotSaveFailed', { error: result.error }))
         mutatePage(handle.pageNumber, (list) => list.filter((r) => r.id !== handle.localId))
@@ -1594,11 +1969,16 @@ export default function PdfViewer({
       const wasFilePainted = findRecord(handle)?.source === 'file'
       mutatePage(handle.pageNumber, (list) => list.filter((r) => !matchesHandle(r, handle)))
       if (handle.fileId === null) return
-      const result = await bridge.deleteAnnotation({
-        path: payload.path,
-        pageIndex: handle.pageNumber - 1,
-        id: handle.fileId
-      })
+      pendingWritesRef.current += 1
+      const result = await bridge
+        .deleteAnnotation({
+          path: payload.path,
+          pageIndex: handle.pageNumber - 1,
+          id: handle.fileId
+        })
+        .finally(() => {
+          pendingWritesRef.current -= 1
+        })
       if ('error' in result) showToast(t('viewer.annotDeleteFailed', { error: result.error }))
       else {
         markDirtyRef.current()
@@ -1618,15 +1998,20 @@ export default function PdfViewer({
         showToast(t('viewer.annotStillSaving'))
         return
       }
-      const result = await bridge.updateAnnotation({
-        path: payload.path,
-        pageIndex: handle.pageNumber - 1,
-        id: handle.fileId,
-        color: patch.color,
-        contents: patch.contents,
-        rect: patch.translate ? undefined : patch.quads?.[0],
-        translate: patch.translate
-      })
+      pendingWritesRef.current += 1
+      const result = await bridge
+        .updateAnnotation({
+          path: payload.path,
+          pageIndex: handle.pageNumber - 1,
+          id: handle.fileId,
+          color: patch.color,
+          contents: patch.contents,
+          rect: patch.translate ? undefined : patch.quads?.[0],
+          translate: patch.translate
+        })
+        .finally(() => {
+          pendingWritesRef.current -= 1
+        })
       if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: result.error }))
       else {
         markDirtyRef.current()
@@ -1637,6 +2022,59 @@ export default function PdfViewer({
       }
     },
     [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
+  )
+
+  // Another window annotated the same file. Both windows write into the ONE
+  // draft main keeps per path, so the draft — not a replayed patch — is the
+  // truth: re-open the document from it and the two views converge exactly on
+  // what a Save from either window would produce. reloadDocument keeps the old
+  // canvases up until the new ones are ready, so this is visually quiet.
+  //
+  // Debounced because a burst of strokes in the other window would otherwise
+  // ask for a reload per stroke. The window also becomes dirty: a draft now
+  // exists, and closing must offer to save it whichever window you close.
+  const remoteReloadRef = useRef<number | null>(null)
+  useEffect(() => {
+    const arm = (): void => {
+      if (remoteReloadRef.current) window.clearTimeout(remoteReloadRef.current)
+      remoteReloadRef.current = window.setTimeout(() => {
+        remoteReloadRef.current = null
+        // Never reload on top of our OWN in-flight write: engineCreate adds the
+        // record to state first and patches its file id in after the round trip,
+        // so a reload landing in between would drop a mark the user just made
+        // (it may not be in the file yet either). Wait for the write to settle.
+        if (pendingWritesRef.current > 0) {
+          arm()
+          return
+        }
+        void reloadDocument()
+      }, 250)
+    }
+    const offChanged = bridge.onAnnotationsChangedElsewhere((path) => {
+      if (path !== payload.path) return
+      setDirty(true)
+      arm()
+    })
+    // The other window ended the shared draft. On a Save the work is on disk, on
+    // a discard it is gone — either way THIS window has nothing left to save, and
+    // saying otherwise would offer to save nothing (and, after a discard, keep
+    // showing marks the document no longer has). Re-read the file for both: it
+    // is the same bytes after a save and the reverted original after a discard.
+    const offEnded = bridge.onDraftEndedElsewhere((path) => {
+      if (path !== payload.path) return
+      setDirty(false)
+      arm()
+    })
+    return () => {
+      offChanged()
+      offEnded()
+    }
+  }, [payload.path, reloadDocument])
+  useEffect(
+    () => () => {
+      if (remoteReloadRef.current) window.clearTimeout(remoteReloadRef.current)
+    },
+    []
   )
 
   // ---------- Undo / redo ----------
@@ -1791,7 +2229,11 @@ export default function PdfViewer({
   const eraseAt = useCallback(
     (pageNumber: number, x: number, y: number) => {
       const list = annotsRef.current.get(pageNumber) ?? []
-      // Ink strokes first (path-precise hit), then any other annotation type
+      // Ink strokes first (path-precise hit), then the wider bbox pass. Scope
+      // decides what the second pass may touch: 'draw' keeps the eraser to
+      // marks made by hand (ink + shapes), which is what its tooltip has always
+      // promised; 'all' extends it to highlights, notes and text boxes so a
+      // wrongly-placed markup can be wiped instead of clicked and deleted.
       for (let i = list.length - 1; i >= 0; i--) {
         const record = list[i]
         if (record.type !== 'ink') continue
@@ -1800,7 +2242,11 @@ export default function PdfViewer({
           return
         }
       }
-      const hit = annotationAtPoint(list, x, y)
+      const erasable =
+        prefsRef.current.eraserScope === 'all'
+          ? list
+          : list.filter((a) => ERASER_DRAWN_TYPES.has(a.type))
+      const hit = annotationAtPoint(erasable, x, y)
       if (hit) removeAnnotation(pageNumber, hit)
     },
     [removeAnnotation]
@@ -1844,7 +2290,8 @@ export default function PdfViewer({
       w: q.w,
       h: q.h,
       editingId: record.id,
-      text: record.contents ?? ''
+      text: record.contents ?? '',
+      pane: activePaneRef.current
     })
   }, [])
 
@@ -1868,7 +2315,16 @@ export default function PdfViewer({
         openFreeTextEditor(pageNumber, existing)
         return
       }
-      setFreeTextDraft({ pageNumber, x, y, clientX, clientY, w: 200, h: 48 })
+      setFreeTextDraft({
+        pageNumber,
+        x,
+        y,
+        clientX,
+        clientY,
+        w: 200,
+        h: 48,
+        pane: activePaneRef.current
+      })
     },
     [openFreeTextEditor]
   )
@@ -1934,25 +2390,31 @@ export default function PdfViewer({
     []
   )
 
-  /** Selection rects per page, for every rendered page the selection touches */
+  /** Selection rects per page, for every rendered page the selection touches.
+   *  Walks BOTH panes — a selection lives in whichever pane the user dragged in,
+   *  and each pane divides by its own scale. */
   const collectSelectionRects = useCallback((): { pageNumber: number; rects: PageRect[] }[] => {
-    const el = containerRef.current
     const sel = window.getSelection()
     const out: { pageNumber: number; rects: PageRect[] }[] = []
-    if (!el || !sel || sel.isCollapsed) return out
-    for (const pageEl of el.querySelectorAll<HTMLElement>('.pdf-page')) {
+    if (!sel || sel.isCollapsed) return out
+    for (const pageEl of allPageElsRef.current()) {
       // selectionRectsForPage divides client offsets by scale → VIEW-space
       // rects (the on-screen rotated frame). Convert to PAGE space before they
       // become annotation quads written to the file.
-      const viewRects = selectionRectsForPage(sel, pageEl, scaleRef.current)
+      const viewRects = selectionRectsForPage(sel, pageEl, scaleOfPageElRef.current(pageEl))
       if (!viewRects) continue
       const pageNumber = Number(pageEl.dataset.page)
       const size = sizesRef.current[pageNumber - 1]
-      const rot = rotationRef.current
+      const rot = rotationOfPageElRef.current(pageEl)
       const rects =
         size && rot !== 0
           ? viewRects.map((r) => viewRectToPage(r, size.w, size.h, rot))
           : viewRects
+      // Safety net for the two-pane case: a DOM selection lives in exactly one
+      // pane, and the panes never overlap on screen, so clipping against the
+      // other pane's copy of the same page yields nothing. If that ever stops
+      // holding, one page must still produce ONE markup, not two.
+      if (out.some((o) => o.pageNumber === pageNumber)) continue
       out.push({ pageNumber, rects })
     }
     return out
@@ -1966,7 +2428,10 @@ export default function PdfViewer({
       const perPage = collectSelectionRects()
       setMenu(null)
       if (perPage.length === 0) return
-      const opacity = type === 'highlight' ? HIGHLIGHT_FILL_ALPHA : 1
+      // The user's opacity for this markup type — so a mark made from the
+      // right-click menu and one made with the armed toolbar tool are the same
+      // annotation, not two different-looking ones.
+      const opacity = prefsRef.current.markup[type].opacity
       for (const { pageNumber, rects } of perPage) {
         void persistAnnotation(pageNumber, type, rects, color, opacity)
       }
@@ -2008,10 +2473,10 @@ export default function PdfViewer({
           const perPage = collectSelectionRects()
           setMenu(null)
           if (perPage.length === 0) break
-          const color = markupDefaultColor('highlight')
+          const { color, opacity } = prefsRef.current.markup.highlight
           let lastHandle: AnnotHandle | null = null
           for (const { pageNumber, rects } of perPage) {
-            lastHandle = persistAnnotation(pageNumber, 'highlight', rects, color, HIGHLIGHT_FILL_ALPHA)
+            lastHandle = persistAnnotation(pageNumber, 'highlight', rects, color, opacity)
           }
           if (lastHandle) {
             setSelected({ pageNumber: lastHandle.pageNumber, localId: lastHandle.localId })
@@ -2181,8 +2646,9 @@ export default function PdfViewer({
       const target = snip?.target ?? 'quick'
       setSnip(null)
       if (!pdf) return
-      // Pick the page with the largest overlap; clamp the box to it
-      const pages = containerRef.current?.querySelectorAll<HTMLElement>('.pdf-page') ?? []
+      // Pick the page with the largest overlap; clamp the box to it. Both panes
+      // are candidates — a figure is snipped wherever it is on screen.
+      const pages = allPageElsRef.current()
       let best: { el: HTMLElement; area: number } | null = null
       for (const el of pages) {
         const r = el.getBoundingClientRect()
@@ -2202,7 +2668,8 @@ export default function PdfViewer({
       void (async () => {
         try {
           const page = await pdf.getPage(pageNumber)
-          const cur = scaleRef.current
+          // The scale of the pane the box was drawn in, not the main pane's
+          const cur = scaleOfPageElRef.current(pageEl)
           // Aim for ~900px crop width so axis labels stay legible, capped so
           // tiny boxes don't explode and the canvas stays within safe limits
           const targetScale = Math.min(
@@ -2214,7 +2681,8 @@ export default function PdfViewer({
           const k = targetScale / cur
           const viewport = page.getViewport({
             scale: targetScale,
-            rotation: (page.rotate + rotationRef.current) % 360
+            // The rotation of the column the box was drawn in
+            rotation: (page.rotate + rotationOfPageElRef.current(pageEl)) % 360
           })
           const canvas = document.createElement('canvas')
           canvas.width = Math.floor(cw * k)
@@ -2261,7 +2729,7 @@ export default function PdfViewer({
   const placeNoteAt = useCallback(
     (clientX: number, clientY: number) => {
       setNotePlacing(false)
-      const pages = containerRef.current?.querySelectorAll<HTMLElement>('.pdf-page') ?? []
+      const pages = allPageElsRef.current()
       for (const el of pages) {
         const r = el.getBoundingClientRect()
         if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
@@ -2311,12 +2779,13 @@ export default function PdfViewer({
   const pagePointFromClient = useCallback(
     (clientX: number, clientY: number, pageEl: HTMLElement): [number, number] => {
       const rect = pageEl.getBoundingClientRect()
-      const vx = (clientX - rect.left) / scaleRef.current
-      const vy = (clientY - rect.top) / scaleRef.current
+      const s = scaleOfPageElRef.current(pageEl)
+      const vx = (clientX - rect.left) / s
+      const vy = (clientY - rect.top) / s
       const pageNumber = Number(pageEl.dataset.page)
       const size = sizesRef.current[pageNumber - 1]
       if (!size) return [vx, vy]
-      return viewPointToPage(vx, vy, size.w, size.h, rotationRef.current)
+      return viewPointToPage(vx, vy, size.w, size.h, rotationOfPageElRef.current(pageEl))
     },
     []
   )
@@ -2387,7 +2856,7 @@ export default function PdfViewer({
           // armed for the next one) instead of opening the selection menu.
           const mt = markupToolRef.current
           if (mt) {
-            applyMarkup(mt, markupColorsRef.current[mt])
+            applyMarkup(mt, prefsRef.current.markup[mt].color)
             return
           }
           openMenuAt(clientX, clientY, target)
@@ -2453,7 +2922,10 @@ export default function PdfViewer({
         record: hit,
         startClientX: e.clientX,
         startClientY: e.clientY,
-        moved: false
+        moved: false,
+        scale: scaleOfPageElRef.current(pageEl),
+        rotation: rotationOfPageElRef.current(pageEl),
+        pane: paneOfEl(pageEl)
       }
       e.preventDefault()
     }
@@ -2506,6 +2978,13 @@ export default function PdfViewer({
     startClientX: number
     startClientY: number
     moved: boolean
+    /** Scale and rotation of the pane the drag STARTED in, captured once: the
+     *  cursor delta is divided by the scale and rotated into page space, and the
+     *  two columns zoom AND rotate independently. */
+    scale: number
+    rotation: ViewRotation
+    /** Which pane draws the drag ghost (it lives inside that pane's layout) */
+    pane: PaneId
   } | null>(null)
   const dragEndAtRef = useRef(0)
   const [dragGhost, setDragGhost] = useState<{
@@ -2516,6 +2995,8 @@ export default function PdfViewer({
     h: number
     color: [number, number, number]
     kind: 'bubble' | 'outline'
+    /** Drawn inside this pane's page layout */
+    pane: PaneId
   } | null>(null)
 
   /** Where the dragged annotation lands for a given cursor position (page space, clamped) */
@@ -2523,13 +3004,13 @@ export default function PdfViewer({
     (drag: NonNullable<typeof annotDragRef.current>, clientX: number, clientY: number) => {
       const q = drag.record.quads[0]
       const size = sizes[drag.pageNumber - 1]
-      const scale = scaleRef.current
+      const scale = drag.scale
       // The cursor delta is a VIEW-space vector; rotate it into page space so
       // the annotation follows the pointer under any rotation.
       const view = viewDeltaToPage(
         (clientX - drag.startClientX) / scale,
         (clientY - drag.startClientY) / scale,
-        rotationRef.current
+        drag.rotation
       )
       const x = q.x + view.dx
       const y = q.y + view.dy
@@ -2565,7 +3046,8 @@ export default function PdfViewer({
         w: q.w,
         h: q.h,
         color: drag.record.color,
-        kind: drag.record.type === 'note' ? 'bubble' : 'outline'
+        kind: drag.record.type === 'note' ? 'bubble' : 'outline',
+        pane: drag.pane
       })
     }
     const onUp = (e: PointerEvent): void => {
@@ -2685,6 +3167,51 @@ export default function PdfViewer({
     })
   }, [showToast])
 
+  /** Gear menu → "Nullstill til standard" (behind a confirmation).
+   *
+   *  Scope: every PREFERENCE the app remembers — theme, language, keep-awake,
+   *  tool colours/widths/opacities, eraser scope, remembered custom colours,
+   *  panel widths, toolbar auto-hide — plus this document's view state.
+   *
+   *  Deliberately NOT touched: stored API keys (losing those is a real cost and
+   *  has nothing to do with "the UI looks wrong"), the recents library, reading
+   *  positions, and — obviously — any annotation in any file. The confirm
+   *  dialog's detail line says so, so the user knows before pressing it. */
+  const resetPreferences = useCallback(() => {
+    onSettingsChange({
+      theme: 'day',
+      autoLight: 'day',
+      autoDark: 'night',
+      keepAwake: false,
+      language: 'auto'
+    })
+    clearToolPrefs()
+    setPrefs(structuredClone(DEFAULT_TOOL_PREFS))
+    clearCustomColors()
+    setPanelW({ ...PANEL_DEFAULTS })
+    try {
+      localStorage.removeItem(PANEL_LS_KEY)
+    } catch {
+      /* best-effort */
+    }
+    saveToolbarPinned(true)
+    setToolbarPinned(true)
+    setToolbarPeek(false)
+    // Document view state too: a reader who resets because "everything looks
+    // wrong" means the rotated, spread-out, oddly-zoomed page as well.
+    setAnnotsHidden(false)
+    setActiveTool(null)
+    setMarkupTool(null)
+    reanchorFor(0, false)
+    setRotation(0)
+    setSpread(false)
+    setBubbleSizes(new Map())
+    fitModeRef.current = 'page'
+    setFitMode('page')
+    refitRef.current()
+    showToast(t('reset.done'))
+  }, [onSettingsChange, reanchorFor, showToast])
+
   // Fullscreen is just OS fullscreen — the pin state and presentation mode are
   // independent, and the user combines them as they like
   const toggleFullscreen = useCallback(() => {
@@ -2729,66 +3256,67 @@ export default function PdfViewer({
     })
   }, [presentation, exitPresentation])
 
-  const goToPage = useCallback(
-    (page: number) => {
-      const el = containerRef.current
-      if (!el || !layout) return
-      page = clamp(Math.round(page), 1, layout.tops.length)
-      el.scrollTop = layout.tops[page - 1] - 8
-    },
-    [layout]
-  )
-
   // ---------- Navigation history ----------
+  //
+  // One stack PER COLUMN. Once a link followed in one column lands in the other,
+  // a single shared history would be incoherent: "back" has to mean "back in the
+  // column that moved". The pills and Alt+←/→ act on the active column.
 
-  const scrollToNavPosition = useCallback(
-    (pos: NavPosition) => {
-      const el = containerRef.current
-      if (!el || !layout) return
-      const page = clamp(pos.page, 1, layout.tops.length)
-      el.scrollTop = layout.tops[page - 1] + pos.offset * sizes[page - 1].h * scale - 8
-    },
-    [layout, sizes, scale]
-  )
-
-  /** A NEW jump clears the forward stack (like browser history) */
-  const pushBack = useCallback(() => {
-    const current = computeCurrent()
-    if (current) {
-      setNavStacks(({ back }) => ({ back: [...back.slice(-49), current], forward: [] }))
-    }
-  }, [computeCurrent])
+  /** A NEW jump clears that column's forward stack (like browser history) */
+  const pushBack = useCallback((pane: PaneId) => {
+    const current = handleForRef.current(pane)?.position()
+    if (!current) return
+    setNavStacks((prev) => ({
+      ...prev,
+      [pane]: { back: [...prev[pane].back.slice(-49), current], forward: [] }
+    }))
+  }, [])
 
   /** Jump with a breadcrumb so the reader can return (sidebar, links, go-to) */
-  const jumpToPage = useCallback(
-    (page: number) => {
-      pushBack()
-      goToPage(page)
+  const jumpToPageIn = useCallback(
+    (pane: PaneId, page: number) => {
+      const handle = handleForRef.current(pane)
+      if (!handle?.ready()) return
+      pushBack(pane)
+      handle.scrollToPage(page)
     },
-    [pushBack, goToPage]
+    [pushBack]
   )
+  /** Sidebar/thumbnail jumps go to the column being worked in */
+  const jumpToPage = useCallback(
+    (page: number) => jumpToPageIn(activePaneRef.current, page),
+    [jumpToPageIn]
+  )
+  goToPaneBPageRef.current = (page: number) => jumpToPageIn('b', page)
 
-  const goBack = useCallback(() => {
-    const target = navStacks.back[navStacks.back.length - 1]
-    if (!target) return
-    const current = computeCurrent()
-    scrollToNavPosition(target)
-    setNavStacks(({ back, forward }) => ({
-      back: back.slice(0, -1),
-      forward: current ? [...forward, current] : forward
-    }))
-  }, [navStacks.back, computeCurrent, scrollToNavPosition])
-
-  const goForward = useCallback(() => {
-    const target = navStacks.forward[navStacks.forward.length - 1]
-    if (!target) return
-    const current = computeCurrent()
-    scrollToNavPosition(target)
-    setNavStacks(({ back, forward }) => ({
-      back: current ? [...back, current] : back,
-      forward: forward.slice(0, -1)
-    }))
-  }, [navStacks.forward, computeCurrent, scrollToNavPosition])
+  const navStep = useCallback((direction: 'back' | 'forward') => {
+    const pane = activePaneRef.current
+    const handle = handleForRef.current(pane)
+    if (!handle?.ready()) return
+    setNavStacks((prev) => {
+      const stack = prev[pane]
+      const from = direction === 'back' ? stack.back : stack.forward
+      const target = from[from.length - 1]
+      if (!target) return prev
+      const current = handle.position()
+      handle.scrollToPage(target.page, target.offset)
+      return {
+        ...prev,
+        [pane]:
+          direction === 'back'
+            ? {
+                back: stack.back.slice(0, -1),
+                forward: current ? [...stack.forward, current] : stack.forward
+              }
+            : {
+                back: current ? [...stack.back, current] : stack.back,
+                forward: stack.forward.slice(0, -1)
+              }
+      }
+    })
+  }, [])
+  const goBack = useCallback(() => navStep('back'), [navStep])
+  const goForward = useCallback(() => navStep('forward'), [navStep])
 
   // The nav pills fade out after idle time; navigation or hovering their
   // corner brings them back
@@ -2802,11 +3330,14 @@ export default function PdfViewer({
     pillsTimerRef.current = window.setTimeout(() => setPillsFaded(true), delay)
   }, [])
 
+  /** The active column's history — what the pills and Alt+←/→ act on */
+  const activeNav = navStacks[activePane]
+
   useEffect(() => {
-    if (navStacks.back.length === 0 && navStacks.forward.length === 0) return
+    if (activeNav.back.length === 0 && activeNav.forward.length === 0) return
     revealPills()
     schedulePillsFade()
-  }, [navStacks, revealPills, schedulePillsFade])
+  }, [activeNav, revealPills, schedulePillsFade])
 
   const exportAnnotations = useCallback(
     async (format: ExportFormat) => {
@@ -2834,72 +3365,145 @@ export default function PdfViewer({
     [pdf, payload.name, showToast]
   )
 
+  const jumpToAnnotIn = useCallback((pane: PaneId, pageNumber: number, record: PageAnnotation) => {
+    const handle = handleForRef.current(pane)
+    const el = handle?.el()
+    if (!handle?.ready() || !el) return
+    pushBack(pane)
+    const q = record.quads[0]
+    // A third of the way down, so the mark has its context above it
+    handle.scrollToPageY(pageNumber, q?.y ?? 0, el.clientHeight * 0.3)
+  }, [pushBack])
   const jumpToAnnot = useCallback(
-    (pageNumber: number, record: PageAnnotation) => {
-      const el = containerRef.current
-      if (!el || !layout) return
-      pushBack()
-      const q = record.quads[0]
-      const size = sizes[pageNumber - 1]
-      // Scroll to the annotation's VIEW-space top so it lands correctly under
-      // rotation (identity at rotation 0)
-      const vy = q && size ? pageRectToView(q, size.w, size.h, rotation).y : (q?.y ?? 0)
-      el.scrollTop = Math.max(0, layout.tops[pageNumber - 1] + vy * scale - el.clientHeight * 0.3)
-    },
-    [layout, scale, sizes, rotation, pushBack]
+    (pageNumber: number, record: PageAnnotation) =>
+      jumpToAnnotIn(activePaneRef.current, pageNumber, record),
+    [jumpToAnnotIn]
   )
 
-  const jumpToDest = useCallback(
-    async (dest: unknown) => {
-      const el = containerRef.current
-      if (!pdf || !el || !layout) return
+  /** Resolve a pdf.js destination and scroll the given column to it. */
+  const jumpToDestIn = useCallback(
+    async (pane: PaneId, dest: unknown) => {
+      const handle = handleForRef.current(pane)
+      if (!pdf || !handle?.ready()) return
       try {
         const explicit =
           typeof dest === 'string' ? await pdf.getDestination(dest) : (dest as unknown[] | null)
         if (!Array.isArray(explicit) || explicit.length === 0) return
         const ref = explicit[0]
         const pageIndex = typeof ref === 'number' ? ref : await pdf.getPageIndex(ref as never)
-        if (pageIndex < 0 || pageIndex >= sizes.length) return
-        pushBack()
+        if (pageIndex < 0 || pageIndex >= sizesRef.current.length) return
+        pushBack(pane)
         // XYZ destinations carry a precise y in PDF user space (bottom-up)
         const destName = (explicit[1] as { name?: string } | undefined)?.name
-        let top = layout.tops[pageIndex] - 8
         if (destName === 'XYZ' && typeof explicit[3] === 'number') {
-          const size = sizes[pageIndex]
-          const pageY = clamp(size.h - explicit[3], 0, size.h)
-          // Map the page-space y to view space so the link lands under rotation
-          const vy = pageRectToView({ x: 0, y: pageY, w: 0, h: 0 }, size.w, size.h, rotation).y
-          top = layout.tops[pageIndex] + vy * scale - 8
+          const size = sizesRef.current[pageIndex]
+          handle.scrollToPageY(pageIndex + 1, clamp(size.h - explicit[3], 0, size.h), 8)
+        } else {
+          handle.scrollToPage(pageIndex + 1)
         }
-        el.scrollTop = Math.max(0, top)
       } catch (err) {
         console.error('pdfx: klarte ikke å følge lenken', err)
       }
     },
-    [pdf, layout, sizes, scale, rotation, pushBack]
+    [pdf, pushBack]
   )
+  /** Outline entries in the sidebar move the column being worked in */
+  const jumpToDest = useCallback(
+    (dest: unknown) => jumpToDestIn(activePaneRef.current, dest),
+    [jumpToDestIn]
+  )
+
+  /**
+   * A hyperlink followed in `from`. With the split open it lands in the OTHER
+   * column and leaves `from` exactly where it is — following a cross-reference
+   * should never cost you the sentence you were reading. The column that moved
+   * gets the breadcrumb, so "back" there returns from the excursion. With one
+   * column there is nowhere else to go, so it navigates in place as always.
+   */
+  /** Run `fn` once a column can actually be scrolled. A column that has just
+   *  been mounted has no layout for a beat, and "open the split, then jump the
+   *  new column" has to survive that gap. */
+  const whenPaneReady = useCallback((pane: PaneId, fn: () => void) => {
+    const t0 = Date.now()
+    const tick = (): void => {
+      if (handleForRef.current(pane)?.ready()) {
+        fn()
+        return
+      }
+      if (Date.now() - t0 > 2500) return // the column never came up; drop it
+      window.setTimeout(tick, 60)
+    }
+    tick()
+  }, [])
+  whenPaneReadyRef.current = whenPaneReady
+
+  /**
+   * A hyperlink followed in column `from`.
+   *
+   * Plain click navigates in place, as it always has. Ctrl/Cmd+click means "show
+   * it over there": it lands in the OTHER column and leaves `from` exactly where
+   * it is, so a cross-reference never costs you the sentence you were reading —
+   * and it OPENS the split if it is not open yet, which makes the gesture a
+   * one-step "open this reference beside what I'm reading".
+   *
+   * Only in-document destinations get here. An external URL always hands off to
+   * the system browser (see the link handler in PdfPage): there is nothing in
+   * this document for a second column to show, so the modifier is a no-op there
+   * and the browser applies its own new-tab conventions.
+   */
+  const followLinkFrom = useCallback(
+    (from: PaneId, dest: unknown, toOtherPane: boolean) => {
+      if (!toOtherPane) {
+        void jumpToDestIn(from, dest)
+        return
+      }
+      const target: PaneId = from === 'a' ? 'b' : 'a'
+      if (!splitOpenRef.current) {
+        // Opening the split re-fits both columns; jump once the new one exists.
+        toggleSplitRef.current()
+        whenPaneReady(target, () => {
+          void jumpToDestIn(target, dest)
+          flashPaneRef.current(target)
+        })
+        return
+      }
+      void jumpToDestIn(target, dest)
+      // A brief pulse on the column that moved, rather than a toast: you need to
+      // know WHERE the reference landed, and you need to know it once.
+      flashPaneRef.current(target)
+    },
+    [jumpToDestIn, whenPaneReady]
+  )
+  followLinkFromRef.current = followLinkFrom
 
   // Stable identities for PdfPage — new callbacks would re-render page canvases
   const linkActionsRef = useRef({
-    internal: (_d: unknown): void => {},
+    internal: (_d: unknown, _toOther: boolean): void => {},
     external: (_u: string): void => {}
   })
   linkActionsRef.current = {
-    internal: (d: unknown) => void jumpToDest(d),
+    internal: (d: unknown, toOther: boolean) => followLinkFrom('a', d, toOther),
     external: (u: string) => bridge.openExternal(u)
   }
-  const onInternalLink = useCallback((d: unknown) => linkActionsRef.current.internal(d), [])
+  const onInternalLink = useCallback(
+    (d: unknown, toOther: boolean) => linkActionsRef.current.internal(d, toOther),
+    []
+  )
   const onExternalLink = useCallback((u: string) => linkActionsRef.current.external(u), [])
+  const onPaneBInternalLink = useCallback(
+    (d: unknown, toOther: boolean) => followLinkFromRef.current('b', d, toOther),
+    []
+  )
 
   // ---------- Search ----------
 
   /** Poll until the page's text layer exists (it renders asynchronously) */
   const waitForTextLayer = useCallback(
-    (pageNumber: number, timeoutMs = 4000): Promise<HTMLElement | null> =>
+    (pane: PaneId, pageNumber: number, timeoutMs = 4000): Promise<HTMLElement | null> =>
       new Promise((resolve) => {
         const t0 = Date.now()
         const tick = (): void => {
-          const pageEl = containerRef.current?.querySelector<HTMLElement>(
+          const pageEl = handleForRef.current(pane)?.el()?.querySelector<HTMLElement>(
             `.pdf-page[data-page="${pageNumber}"]`
           )
           if (pageEl?.querySelector('.text-host .textLayer > span')) return resolve(pageEl)
@@ -2913,36 +3517,32 @@ export default function PdfViewer({
 
   const gotoMatch = useCallback(
     async (matches: SearchMatch[], i: number, recordBack: boolean) => {
-      const el = containerRef.current
-      const lay = layoutRef.current
       const texts = pageTextsRef.current
-      if (!el || !lay || !texts || matches.length === 0) return
+      if (!texts || matches.length === 0) return
+      // Search moves the column being worked in — the outlined one — so a hit
+      // never yanks the column you were using as a reference.
+      const pane = activePaneRef.current
+      const handle = handleForRef.current(pane)
+      const el = handle?.el()
+      if (!handle?.ready() || !el) return
       const match = matches[i]
       setSearchIndex(i)
-      if (recordBack) pushBack()
+      if (recordBack) pushBack(pane)
       const seq = ++gotoSeqRef.current
       // Bring the page into view so its text layer renders, then refine
-      el.scrollTop = Math.max(0, lay.tops[match.pageNumber - 1] - 8)
-      updateRange()
-      const pageEl = await waitForTextLayer(match.pageNumber)
+      handle.scrollToPage(match.pageNumber)
+      const pageEl = await waitForTextLayer(pane, match.pageNumber)
       if (seq !== gotoSeqRef.current || !pageEl) return
-      const rects = resolveMatchRects(pageEl, texts[match.pageNumber - 1], match, scaleRef.current)
+      const rects = resolveMatchRects(pageEl, texts[match.pageNumber - 1], match, handle.scale())
       if (!rects) {
         setSearchHits(null)
         return
       }
       setSearchHits({ pageNumber: match.pageNumber, rects })
-      const lay2 = layoutRef.current
-      if (lay2) {
-        el.scrollTop = Math.max(
-          0,
-          lay2.tops[match.pageNumber - 1] + rects[0].y * scaleRef.current - el.clientHeight * 0.35
-        )
-        updateRange()
-        schedulePositionSave()
-      }
+      handle.scrollToPageY(match.pageNumber, rects[0].y, el.clientHeight * 0.35)
+      if (pane === 'a') schedulePositionSave()
     },
-    [pushBack, updateRange, waitForTextLayer, schedulePositionSave]
+    [pushBack, waitForTextLayer, schedulePositionSave]
   )
 
   // Debounced live search whenever the query/options change (exact-text mode
@@ -3156,7 +3756,7 @@ export default function PdfViewer({
         el.scrollTop = Math.max(0, pageTop - 8)
         updateRange()
       }
-      const pageEl = await waitForTextLayer(s.pageNumber)
+      const pageEl = await waitForTextLayer('a', s.pageNumber)
       if (!pageEl || readSessionRef.current?.stopped !== false) return
       const rects = resolveMatchRects(
         pageEl,
@@ -3293,21 +3893,23 @@ export default function PdfViewer({
    *  reusing the search-hit overlay and the text-layer rect machinery */
   const jumpToAiCitation = useCallback(
     async (resolved: ResolvedCitation) => {
-      const el = containerRef.current
-      const lay = layoutRef.current
       const texts = pageTextsRef.current
-      if (!el || !lay || !texts) return
-      pushBack()
+      if (!texts) return
+      // Like search: the cited passage opens in the column being worked in
+      const pane = activePaneRef.current
+      const handle = handleForRef.current(pane)
+      const el = handle?.el()
+      if (!handle?.ready() || !el) return
+      pushBack(pane)
       const seq = ++gotoSeqRef.current
-      el.scrollTop = Math.max(0, lay.tops[resolved.pageNumber - 1] - 8)
-      updateRange()
-      const pageEl = await waitForTextLayer(resolved.pageNumber)
+      handle.scrollToPage(resolved.pageNumber)
+      const pageEl = await waitForTextLayer(pane, resolved.pageNumber)
       if (seq !== gotoSeqRef.current || !pageEl) return
       const rects = resolveMatchRects(
         pageEl,
         texts[resolved.pageNumber - 1],
         { ...resolved, snippet: '', snippetOffset: 0 },
-        scaleRef.current
+        handle.scale()
       )
       if (!rects || rects.length === 0) return
       setSearchHits({ pageNumber: resolved.pageNumber, rects, flash: true, flashId: seq })
@@ -3317,17 +3919,10 @@ export default function PdfViewer({
       aiHitTimerRef.current = window.setTimeout(() => {
         if (!searchOpenRef.current) setSearchHits(null)
       }, 7000)
-      const lay2 = layoutRef.current
-      if (lay2) {
-        el.scrollTop = Math.max(
-          0,
-          lay2.tops[resolved.pageNumber - 1] + rects[0].y * scaleRef.current - el.clientHeight * 0.35
-        )
-        updateRange()
-        schedulePositionSave()
-      }
+      handle.scrollToPageY(resolved.pageNumber, rects[0].y, el.clientHeight * 0.35)
+      if (pane === 'a') schedulePositionSave()
     },
-    [pushBack, updateRange, waitForTextLayer, schedulePositionSave]
+    [pushBack, waitForTextLayer, schedulePositionSave]
   )
 
   const consumeAiSeed = useCallback(() => setAiSeed(null), [])
@@ -3594,6 +4189,83 @@ export default function PdfViewer({
   const toolbarVisible = toolbarPinned || toolbarPeek
   const tocVisible = tocPinned || tocPeek
   const aiVisible = aiPinned || aiPeek
+
+  /** Pane-local chrome: the floating text-box editor and the drag ghost. Both
+   *  are positioned in PAGE-LAYOUT coordinates, which differ per column (each
+   *  has its own zoom), so the same JSX is rendered inside whichever column the
+   *  interaction belongs to — identical behaviour in both, one implementation. */
+  const paneOverlay = (
+    pane: PaneId,
+    lay: RowLayout,
+    paneScale: number,
+    paneRotation: ViewRotation
+  ): React.JSX.Element | null => (
+    <>
+      {freeTextDraft && freeTextDraft.pane === pane && (
+        <textarea
+          className="freetext-editor"
+          autoFocus
+          spellCheck={false}
+          defaultValue={freeTextDraft.text ?? ''}
+          style={{
+            left: lay.lefts[freeTextDraft.pageNumber - 1] + freeTextDraft.x * paneScale,
+            top: lay.tops[freeTextDraft.pageNumber - 1] + freeTextDraft.y * paneScale,
+            width: freeTextDraft.w * paneScale,
+            height: freeTextDraft.h * paneScale,
+            fontSize: FREETEXT_SIZE * paneScale,
+            ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === 'Escape') setFreeTextDraft(null)
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              const el = e.target as HTMLTextAreaElement
+              const value = el.value.trim()
+              if (value) saveFreeText(value, el.offsetWidth / paneScale, el.offsetHeight / paneScale)
+              else setFreeTextDraft(null)
+            }
+          }}
+          onBlur={(e) => {
+            const el = e.target
+            const value = el.value.trim()
+            if (value) saveFreeText(value, el.offsetWidth / paneScale, el.offsetHeight / paneScale)
+            else setFreeTextDraft(null)
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+        />
+      )}
+      {dragGhost &&
+        dragGhost.pane === pane &&
+        (() => {
+          // The ghost is stored in page space; rotate it to view space so it
+          // tracks the pointer under rotation.
+          const size = sizes[dragGhost.pageNumber - 1]
+          const gv = size
+            ? pageRectToView(
+                { x: dragGhost.x, y: dragGhost.y, w: dragGhost.w, h: dragGhost.h },
+                size.w,
+                size.h,
+                paneRotation
+              )
+            : { x: dragGhost.x, y: dragGhost.y, w: dragGhost.w, h: dragGhost.h }
+          const style = {
+            left: lay.lefts[dragGhost.pageNumber - 1] + gv.x * paneScale,
+            top: lay.tops[dragGhost.pageNumber - 1] + gv.y * paneScale,
+            width: gv.w * paneScale,
+            height: gv.h * paneScale,
+            ...(dragGhost.kind === 'bubble'
+              ? { background: `rgb(${dragGhost.color.map((v) => Math.round(v * 255)).join(',')})` }
+              : {})
+          }
+          return (
+            <div
+              className={dragGhost.kind === 'bubble' ? 'note-drag-ghost' : 'annot-drag-ghost'}
+              style={style}
+            />
+          )
+        })()}
+    </>
+  )
   // The native web view only ever shows for the active tab (a background tab's
   // placeholder rect would float it over another document)
   return (
@@ -3612,25 +4284,25 @@ export default function PdfViewer({
           settings={settings}
           resolvedTheme={resolvedTheme}
           sidebarOpen={tocPinned}
-          canNavBack={navStacks.back.length > 0}
-          canNavForward={navStacks.forward.length > 0}
+          canNavBack={activeNav.back.length > 0}
+          canNavForward={activeNav.forward.length > 0}
           onNavBack={goBack}
           onNavForward={goForward}
           activeTool={activeTool}
           toolPrefs={toolPrefs}
           onToolSelect={selectTool}
           activeMarkup={markupTool}
-          markupColor={markupColors[markupTool ?? 'highlight']}
+          markupPrefs={markupPrefs}
           onMarkupSelect={selectMarkupTool}
-          onMarkupColorChange={(color) =>
-            setMarkupColors((prev) => ({ ...prev, [markupTool ?? 'highlight']: color }))
-          }
-          spread={spread}
+          onMarkupPrefChange={patchMarkupPref}
+          onMarkupPrefReset={resetMarkupPref}
+          eraserScope={prefs.eraserScope}
+          onEraserScopeChange={setEraserScope}
+          spread={splitOpen && activePane === 'b' ? paneBSpread : spread}
           onRotate={rotateView}
           onToggleSpread={toggleSpread}
-          onToolPrefChange={(tool, patch) =>
-            setToolPrefs((prev) => ({ ...prev, [tool]: { ...prev[tool], ...patch } }))
-          }
+          onToolPrefChange={patchToolPref}
+          onToolPrefReset={resetToolPref}
           onToggleSidebar={() => setTocPinned((o) => !o)}
           onGoToPage={jumpToPage}
           onZoomIn={() => manualZoom(scaleRef.current * 1.15)}
@@ -3639,6 +4311,7 @@ export default function PdfViewer({
           onFitWidth={fitWidth}
           onFitPage={fitPage}
           fitMode={fitMode}
+          fitTarget={fitTarget}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
           dirty={dirty}
@@ -3688,6 +4361,22 @@ export default function PdfViewer({
           onTogglePin={togglePin}
           onPresent={enterPresentation}
           onToggleFullscreen={toggleFullscreen}
+          splitOpen={splitOpen}
+          onToggleSplit={toggleSplit}
+          onClosePane={closePane}
+          activePane={activePane}
+          onActivatePane={setActivePane}
+          panePage={paneBPage}
+          paneZoomPercent={paneBScale > 0 ? Math.round(paneBScale * 100) : 100}
+          paneFitMode={paneBFit}
+          paneFitTarget={paneBFitTarget}
+          onPaneGoToPage={goToPaneBPage}
+          onPaneZoomTo={(percent) => paneBZoom(clamp(percent / 100, ZOOM_MIN, ZOOM_MAX), 'custom')}
+          onPaneZoomIn={() => paneBZoom(clamp(paneBScale * 1.15, ZOOM_MIN, ZOOM_MAX), 'custom')}
+          onPaneZoomOut={() => paneBZoom(clamp(paneBScale / 1.15, ZOOM_MIN, ZOOM_MAX), 'custom')}
+          onPaneFitWidth={() => setPaneBFit('width')}
+          onPaneFitPage={() => setPaneBFit('page')}
+          onResetApp={resetPreferences}
         />
       </div>
       {/* Tucked-toolbar reveal: mouse hovers this top hot-zone; touch swipes
@@ -3738,7 +4427,13 @@ export default function PdfViewer({
         className={`viewer-body${resizingPanel ? ' panel-resizing' : ''}${
           tocPeek && !tocPinned ? ' toc-peek' : ''
         }${aiPeek && !aiPinned ? ' ai-peek' : ''}`}
-        style={{ '--sidebar-w': `${panelW.sidebar}px`, '--ai-w': `${panelW.ai}px` } as React.CSSProperties}
+        style={
+          {
+            '--sidebar-w': `${panelW.sidebar}px`,
+            '--ai-w': `${panelW.ai}px`,
+            '--pane-w': `${panelW.pane}px`
+          } as React.CSSProperties
+        }
       >
         <Sidebar
           open={tocVisible}
@@ -3766,9 +4461,11 @@ export default function PdfViewer({
           />
         )}
 
-        <div className="pages-host">
+        <div className={`pages-host${paneFlash === 'a' ? ' pane-flash' : ''}`}>
         <div
           className={`pages${drawTool ? ' drawing' : ''}`}
+          data-pane="a"
+          data-rotation={rotation}
           ref={containerRef}
           tabIndex={-1}
           onScroll={onScroll}
@@ -3825,68 +4522,7 @@ export default function PdfViewer({
                   />
                 )
               })}
-              {freeTextDraft && (
-                <textarea
-                  className="freetext-editor"
-                  autoFocus
-                  spellCheck={false}
-                  defaultValue={freeTextDraft.text ?? ''}
-                  style={{
-                    left: layout.lefts[freeTextDraft.pageNumber - 1] + freeTextDraft.x * scale,
-                    top: layout.tops[freeTextDraft.pageNumber - 1] + freeTextDraft.y * scale,
-                    width: freeTextDraft.w * scale,
-                    height: freeTextDraft.h * scale,
-                    fontSize: FREETEXT_SIZE * scale,
-                    ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
-                  }}
-                  onKeyDown={(e) => {
-                    e.stopPropagation()
-                    if (e.key === 'Escape') setFreeTextDraft(null)
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                      const el = e.target as HTMLTextAreaElement
-                      const value = el.value.trim()
-                      if (value) saveFreeText(value, el.offsetWidth / scale, el.offsetHeight / scale)
-                      else setFreeTextDraft(null)
-                    }
-                  }}
-                  onBlur={(e) => {
-                    const el = e.target
-                    const value = el.value.trim()
-                    if (value) saveFreeText(value, el.offsetWidth / scale, el.offsetHeight / scale)
-                    else setFreeTextDraft(null)
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                />
-              )}
-              {dragGhost &&
-                (() => {
-                  // The ghost is stored in page space; rotate it to view space
-                  // so it tracks the pointer under rotation.
-                  const size = sizes[dragGhost.pageNumber - 1]
-                  const gv = size
-                    ? pageRectToView(
-                        { x: dragGhost.x, y: dragGhost.y, w: dragGhost.w, h: dragGhost.h },
-                        size.w,
-                        size.h,
-                        rotation
-                      )
-                    : { x: dragGhost.x, y: dragGhost.y, w: dragGhost.w, h: dragGhost.h }
-                  const style = {
-                    left: layout.lefts[dragGhost.pageNumber - 1] + gv.x * scale,
-                    top: layout.tops[dragGhost.pageNumber - 1] + gv.y * scale,
-                    width: gv.w * scale,
-                    height: gv.h * scale,
-                    ...(dragGhost.kind === 'bubble'
-                      ? { background: `rgb(${dragGhost.color.map((v) => Math.round(v * 255)).join(',')})` }
-                      : {})
-                  }
-                  return (
-                    <div
-                      className={dragGhost.kind === 'bubble' ? 'note-drag-ghost' : 'annot-drag-ghost'}
-                      style={style}
-                    />
-                  )
-                })()}
+              {paneOverlay('a', layout, scale, rotation)}
             </div>
           ) : (
             <div className="viewer-loading">
@@ -3900,6 +4536,54 @@ export default function PdfViewer({
           layoutKey={layout ? `${layout.total}:${layout.contentWidth}` : 'none'}
         />
         </div>
+
+        {/* Split view: a full second column, mounted only while open so closing
+            it frees every page canvas. Same tools, same annotation map, same
+            save — only page and zoom are its own. */}
+        {splitOpen && pdf && (
+          <>
+            <div
+              className={`panel-resizer${resizingPanel === 'pane' ? ' active' : ''}`}
+              title={t('viewer.resizerTip')}
+              onPointerDown={(e) => beginPanelResize('pane', e)}
+              onDoubleClick={() => resetPanelWidth('pane')}
+            />
+            <PagesPane
+              pdf={pdf}
+              docKey={payload.path}
+              sizes={sizes}
+              annots={annots}
+              annotsHidden={annotsHidden}
+              rotation={paneBRotation}
+              spread={paneBSpread}
+              scale={paneBScale}
+              fitMode={paneBFit}
+              onZoom={paneBZoom}
+              onPageChange={setPaneBPage}
+              flash={paneFlash === 'b'}
+              drawTool={drawTool}
+              selected={selected}
+              searchHits={searchHits}
+              onContextMenu={onContextMenu}
+              onMouseUp={onMouseUp}
+              onMouseDown={onMouseDown}
+              onDoubleClick={onPagesDoubleClick}
+              onMouseMove={onPagesMouseMove}
+              onMouseLeave={() => setHoverTip(null)}
+              onScroll={onPaneBScroll}
+              onStrokeComplete={onStrokeComplete}
+              onErase={onEraseAt}
+              onShapeComplete={onShapeComplete}
+              onPlaceText={onPlaceText}
+              onExternalLink={onExternalLink}
+              onInternalLink={onPaneBInternalLink}
+              onHandle={(h) => {
+                paneBHandleRef.current = h
+              }}
+              overlay={({ layout: lay, scale: s }) => paneOverlay('b', lay, s, paneBRotation)}
+            />
+          </>
+        )}
 
         {aiPinned && (
           <div
@@ -3940,20 +4624,20 @@ export default function PdfViewer({
         </div>
       </div>
 
-      {(navStacks.back.length > 0 || navStacks.forward.length > 0) && layout && (
+      {(activeNav.back.length > 0 || activeNav.forward.length > 0) && layout && (
         <div
           className={`nav-pills${pillsFaded ? ' faded' : ''}`}
           onMouseEnter={revealPills}
           onMouseLeave={() => schedulePillsFade(1400)}
         >
-          {navStacks.back.length > 0 && (
+          {activeNav.back.length > 0 && (
             <button className="back-pill" onClick={goBack} title="Alt+←">
-              {t('viewer.backToPage', { page: navStacks.back[navStacks.back.length - 1].page })}
+              {t('viewer.backToPage', { page: activeNav.back[activeNav.back.length - 1].page })}
             </button>
           )}
-          {navStacks.forward.length > 0 && (
+          {activeNav.forward.length > 0 && (
             <button className="back-pill" onClick={goForward} title="Alt+→">
-              {t('viewer.forwardToPage', { page: navStacks.forward[navStacks.forward.length - 1].page })}
+              {t('viewer.forwardToPage', { page: activeNav.forward[activeNav.forward.length - 1].page })}
             </button>
           )}
         </div>
@@ -4083,6 +4767,8 @@ export default function PdfViewer({
               }
               onDelete={() => removeAnnotation(annotPopover.pageNumber, record)}
               onClose={() => setAnnotPopover(null)}
+              size={bubbleSizes.get(annotPopover.localId) ?? null}
+              onResize={(size) => setBubbleSize(annotPopover.localId, size)}
             />
           )
         })()}
@@ -4152,7 +4838,7 @@ export default function PdfViewer({
           resolvedTheme={resolvedTheme}
           onPageChange={(page) => {
             setCurrentPage(page)
-            goToPage(page)
+            paneAHandle.scrollToPage(page)
           }}
           onExit={exitPresentation}
         />

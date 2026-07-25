@@ -277,6 +277,18 @@ export interface PdfxApi {
    *  to live elsewhere — «save a copy» flushes them into the copy the app is
    *  about to switch to, and the original must not resurrect them. */
   docDiscard(path: string): Promise<void>
+  /** Fires in every OTHER window that has `path` open when this window's
+   *  annotation write lands. There is exactly one draft per path (main owns it),
+   *  so the receiver re-reads that draft rather than replaying a patch: the file
+   *  is the single source of truth, which is the only way two windows editing
+   *  the same document cannot drift apart. Never fires in the window that made
+   *  the change. */
+  onAnnotationsChangedElsewhere(cb: (path: string) => void): () => void
+  /** Fires in every OTHER window that has `path` open when this window ends the
+   *  shared draft — a Save (the work is now on disk) or a discard (it is gone).
+   *  Without it those windows would keep offering to save nothing, and after a
+   *  discard would keep showing marks the document no longer has. */
+  onDraftEndedElsewhere(cb: (path: string) => void): () => void
   /** Open the system print dialog for the PDF file */
   printFile(path: string): Promise<{ ok: true } | FileError>
   /** Save exported content (text, or bytes for binary formats like .docx) via

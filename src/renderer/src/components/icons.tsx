@@ -546,6 +546,39 @@ export const IconSpread = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** The «Visning» menu: a page inside a frame — how the document is laid out in
+ *  the window, as opposed to the gear's technical settings. */
+export const IconView = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="2.5" y="4" width="19" height="16" rx="2" />
+    <rect x="8.5" y="7.5" width="7" height="9" rx="0.8" />
+  </Svg>
+)
+
+/** Split view: one frame divided into two reading columns */
+export const IconSplit = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="2.5" y="4" width="19" height="16" rx="2" />
+    <path d="M13.5 4v16" />
+  </Svg>
+)
+
+/** Two overlapping frames — a second app window */
+export const IconWindows = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="3" y="6" width="12" height="12" rx="2" />
+    <path d="M8 6V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1" />
+  </Svg>
+)
+
+/** Counter-clockwise arrow with a tick start — "back to how it shipped" */
+export const IconReset = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M3.5 12a8.5 8.5 0 1 0 2.49-6.01M3.5 4.5V10h5.5" />
+    <path d="M12 8.5V12l2.5 1.6" />
+  </Svg>
+)
+
 // The full-colour app mark: the scroll from scripts/icon.svg. This is a fixed
 // brand icon (same in every theme), not a line icon — it does not use currentColor.
 export const AppMark = ({

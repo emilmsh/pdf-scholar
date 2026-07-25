@@ -258,17 +258,43 @@ if (!gotLock) {
   })
 }
 
+/** Where an additional window should open: cascaded off the window it was
+ *  opened FROM (not off the saved bounds from a previous session, which may sit
+ *  behind a maximized window or on a display that is no longer attached), then
+ *  clamped into that display's work area so it can never land off-screen.
+ *  Returns null for the first window, which uses the remembered bounds. */
+function cascadeBounds(
+  source: BrowserWindow | null
+): { x: number; y: number; width: number; height: number } | null {
+  if (!source || source.isDestroyed()) return null
+  const CASCADE = 34
+  const at = source.getBounds()
+  // Size from the NORMAL bounds: cascading a maximized window at full screen
+  // size would cover the original completely and read as "nothing happened".
+  const size = source.getNormalBounds()
+  const width = Math.max(640, size.width)
+  const height = Math.max(480, size.height)
+  const area = screen.getDisplayNearestPoint({ x: at.x, y: at.y }).workArea
+  const fit = (v: number, min: number, span: number, extent: number): number =>
+    Math.max(min, Math.min(v, min + span - extent))
+  return {
+    x: fit(at.x + CASCADE, area.x, area.width, width),
+    y: fit(at.y + CASCADE, area.y, area.height, height),
+    width,
+    height
+  }
+}
+
 function createWindow(openPath?: string | null): BrowserWindow {
   const state = getState()
-  // Cascade extra windows so they don't land exactly on top of each other
-  const offset = BrowserWindow.getAllWindows().length * 34
-  const baseX = state.window?.x
-  const baseY = state.window?.y
+  const cascade = cascadeBounds(
+    BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
+  )
   const win = new BrowserWindow({
-    width: state.window?.width ?? 1280,
-    height: state.window?.height ?? 860,
-    x: baseX === undefined ? undefined : baseX + offset,
-    y: baseY === undefined ? undefined : baseY + offset,
+    width: cascade?.width ?? state.window?.width ?? 1280,
+    height: cascade?.height ?? state.window?.height ?? 860,
+    x: cascade ? cascade.x : state.window?.x,
+    y: cascade ? cascade.y : state.window?.y,
     minWidth: 640,
     minHeight: 480,
     show: false,
@@ -290,7 +316,7 @@ function createWindow(openPath?: string | null): BrowserWindow {
   })
 
   // Only the first window restores the maximized state
-  if (state.window?.maximized && offset === 0) win.maximize()
+  if (state.window?.maximized && !cascade) win.maximize()
   // Capture the id now: win.webContents throws "Object has been destroyed"
   // when read inside the 'closed' handler
   const wcId = win.webContents.id
@@ -298,7 +324,15 @@ function createWindow(openPath?: string | null): BrowserWindow {
 
   // Guard: the window can be closed before ready-to-show ever fires
   win.once('ready-to-show', () => {
-    if (!win.isDestroyed()) win.show()
+    if (win.isDestroyed()) return
+    win.show()
+    // show() alone left the new window BEHIND the one it was opened from (the
+    // owner's "visningen hopper ikke til det nye vinduet", and no obvious way
+    // to reach it afterwards). Raise it above the others and hand it the
+    // keyboard explicitly — the app is already the foreground process here, so
+    // this is not a focus steal.
+    win.moveTop()
+    win.focus()
   })
 
   // Persist this window's bounds as the default for the next launch, and
@@ -462,6 +496,8 @@ function registerIpc(): void {
     )
     if (target) {
       if (!target.webContents.isDestroyed()) target.webContents.send('open-path', path)
+      if (target.isMinimized()) target.restore()
+      target.moveTop()
       target.focus()
       return 'window'
     }
@@ -498,18 +534,52 @@ function registerIpc(): void {
     applyKeepAwake(state.settings.keepAwake)
   })
 
-  // Annotation writes go to the draft copy, never the original (save model)
-  ipcMain.handle('annotate', (_e, req: AnnotateRequest) =>
-    applyAnnotation({ ...req, path: ensureDraft(req.path) })
-  )
+  // Annotation writes go to the draft copy, never the original (save model).
+  //
+  // There is exactly ONE draft per path, shared by every window that has the
+  // document open, so the file side of "two windows editing the same PDF" is
+  // already single-instance: both write into the same draft and either window's
+  // Save flushes all of it. What the other windows lack is the knowledge that
+  // it happened — hence the broadcast. They re-read the draft rather than
+  // replaying a patch, so their view can never drift from what will be saved.
+  const notifyOtherWindows = (
+    senderId: number,
+    path: string,
+    channel: 'annots:changed-elsewhere' | 'doc:draft-ended-elsewhere' = 'annots:changed-elsewhere'
+  ): void => {
+    for (const [wcId, paths] of openDocs) {
+      if (wcId === senderId || !paths.has(path)) continue
+      const win = BrowserWindow.getAllWindows().find(
+        (w) => !w.isDestroyed() && !w.webContents.isDestroyed() && w.webContents.id === wcId
+      )
+      win?.webContents.send(channel, path)
+    }
+  }
 
-  ipcMain.handle('annotation:update', (_e, req: ModifyAnnotationRequest) =>
-    updateAnnotation({ ...req, path: ensureDraft(req.path) })
-  )
+  /** The shared draft is gone (saved, or discarded): every other window holding
+   *  this path still shows "unsaved changes" for work that is now either on disk
+   *  or thrown away. Tell them, or they keep offering to save nothing — and on a
+   *  discard they would go on showing marks the document no longer has. */
+  const notifyDraftEnded = (senderId: number, path: string): void =>
+    notifyOtherWindows(senderId, path, 'doc:draft-ended-elsewhere')
 
-  ipcMain.handle('annotation:delete', (_e, req: DeleteAnnotationRequest) =>
-    deleteAnnotation({ ...req, path: ensureDraft(req.path) })
-  )
+  ipcMain.handle('annotate', async (e, req: AnnotateRequest) => {
+    const result = await applyAnnotation({ ...req, path: ensureDraft(req.path) })
+    if ('ok' in result) notifyOtherWindows(e.sender.id, req.path)
+    return result
+  })
+
+  ipcMain.handle('annotation:update', async (e, req: ModifyAnnotationRequest) => {
+    const result = await updateAnnotation({ ...req, path: ensureDraft(req.path) })
+    if ('ok' in result) notifyOtherWindows(e.sender.id, req.path)
+    return result
+  })
+
+  ipcMain.handle('annotation:delete', async (e, req: DeleteAnnotationRequest) => {
+    const result = await deleteAnnotation({ ...req, path: ensureDraft(req.path) })
+    if ('ok' in result) notifyOtherWindows(e.sender.id, req.path)
+    return result
+  })
 
   // ---------- Document lifecycle (save model) ----------
 
@@ -531,13 +601,14 @@ function registerIpc(): void {
   // external update with the (now stale-based) draft.
   ipcMain.handle('doc:was-modified-externally', (_e, path: string) => wasModifiedExternally(path))
 
-  ipcMain.handle('doc:save', async (_e, path: string) => {
+  ipcMain.handle('doc:save', async (e, path: string) => {
     try {
       // Persist pending cached annotation writes into the draft BEFORE it is
       // copied over the original. Throwing (not flushDraft) is deliberate:
       // silently saving a stale draft would lose the user's latest marks.
       await flushAnnotations(draftPathFor(path))
       saveDraft(path)
+      notifyDraftEnded(e.sender.id, path)
       return { ok: true }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
@@ -584,16 +655,19 @@ function registerIpc(): void {
         // original must stay untouched — the caller reloads it fresh.
         await dropAnnotations(draftPathFor(path)).catch(() => {})
         discardDraft(path)
+        notifyDraftEnded(e.sender.id, path)
         return 'discard'
       }
       await flushDraft(path)
       saveDraft(path)
+      notifyDraftEnded(e.sender.id, path)
       return 'save'
     }
     // Drop cached changes FIRST: a late debounced flush must not resurrect
     // the draft file we are about to delete
     await dropAnnotations(draftPathFor(path)).catch(() => {})
     discardDraft(path)
+    notifyDraftEnded(e.sender.id, path)
     return 'discard'
   })
 
@@ -612,7 +686,8 @@ function registerIpc(): void {
   // Silent draft discard, no prompt. The renderer only calls this when the
   // edits are known to be safe elsewhere: «save a copy» flushed them into the
   // copy the tab is switching to, and the original must stay as it was.
-  ipcMain.handle('doc:discard', async (_e, path: string) => {
+  ipcMain.handle('doc:discard', async (e, path: string) => {
+    notifyDraftEnded(e.sender.id, path)
     // Drop cached changes FIRST: a late debounced flush must not resurrect
     // the draft file we are about to delete
     await dropAnnotations(draftPathFor(path)).catch(() => {})

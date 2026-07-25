@@ -17,6 +17,17 @@ import {
   UNDERLINE_COLORS
 } from '../annotations'
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
+import {
+  markupPrefIsDefault,
+  OPACITY_MAX,
+  OPACITY_MIN,
+  OPACITY_STEP,
+  TOOL_WIDTH_MAX,
+  TOOL_WIDTH_MIN,
+  TOOL_WIDTH_STEP,
+  toolPrefIsDefault
+} from '../tool-prefs'
+import type { DrawPrefKey, EraserScope, MarkupPref, ToolPref } from '../tool-prefs'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import { READ_ALOUD } from '../flags'
@@ -28,11 +39,11 @@ import {
   IconEraser,
   IconEye,
   IconEyeOff,
-  IconActualSize,
   IconFitPage,
   IconFitWidth,
   IconFullscreen,
   IconGear,
+  IconComment,
   IconHeart,
   IconMarker,
   IconMarkupHighlight,
@@ -49,6 +60,7 @@ import {
   IconPrint,
   IconRedo,
   IconReload,
+  IconReset,
   IconSaveAs,
   IconRotateCcw,
   IconRotateCw,
@@ -66,17 +78,14 @@ import {
   IconSidebar,
   IconSnip,
   IconSparkle,
+  IconSplit,
   IconNote,
   IconText,
-  IconTextSettings
+  IconTextSettings,
+  IconView
 } from './icons'
 
 export type ToolName = DrawToolType
-
-export interface ToolPref {
-  color: [number, number, number]
-  width: number
-}
 
 const SHAPE_ICONS: Record<ShapeToolType, (p: { size?: number }) => React.JSX.Element> = {
   square: IconShapeSquare,
@@ -99,6 +108,11 @@ const SHAPE_LABEL_KEYS: Record<ShapeToolType, MsgKey> = {
   arrow: 'shape.arrow'
 }
 
+/** Zoom steps offered in the Visning menu. 100 % is in the row rather than
+ *  only as a separate "actual size" action — the two are the same thing, and
+ *  Ctrl+0 plus the typed zoom field already cover it. */
+const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200, 400] as const
+
 interface Props {
   page: number
   pageCount: number
@@ -109,19 +123,24 @@ interface Props {
   canNavBack: boolean
   canNavForward: boolean
   activeTool: ToolName | null
-  toolPrefs: Record<'pen' | 'marker' | 'shape', ToolPref>
+  toolPrefs: Record<DrawPrefKey, ToolPref>
   onToolSelect(tool: ToolName | null): void
   /** Text-anchored markup tool (highlight/underline/strikeout/squiggly) — a
    *  persistent tool that marks up the text selection, distinct from freehand */
   activeMarkup: MarkupToolType | null
-  markupColor: [number, number, number]
+  markupPrefs: Record<MarkupToolType, MarkupPref>
   onMarkupSelect(type: MarkupToolType | null): void
-  onMarkupColorChange(color: [number, number, number]): void
-  /** View rotation + two-page spread (reading controls next to zoom) */
+  onMarkupPrefChange(type: MarkupToolType, patch: Partial<MarkupPref>): void
+  onMarkupPrefReset(type: MarkupToolType): void
+  /** What the eraser removes: hand-drawn marks only, or every annotation */
+  eraserScope: EraserScope
+  onEraserScopeChange(scope: EraserScope): void
+  /** View rotation + two-page spread (live in the Visning menu) */
   spread: boolean
   onRotate(dir: 1 | -1): void
   onToggleSpread(): void
-  onToolPrefChange(tool: 'pen' | 'marker' | 'shape', patch: Partial<ToolPref>): void
+  onToolPrefChange(tool: DrawPrefKey, patch: Partial<ToolPref>): void
+  onToolPrefReset(tool: DrawPrefKey): void
   onNavBack(): void
   onNavForward(): void
   onToggleSidebar(): void
@@ -131,8 +150,11 @@ interface Props {
   onZoomTo(percent: number): void
   onFitWidth(): void
   onFitPage(): void
-  /** Current fit mode, so the active fit button can be highlighted */
+  /** Current fit mode, so the fit control can be highlighted */
   fitMode: 'width' | 'page' | 'custom'
+  /** Which fit the single inline fit button switches to next (mirrors the W
+   *  shortcut) — the toolbar shows ONE fit toggle instead of two buttons */
+  fitTarget: 'width' | 'page'
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
   /** Unsaved annotation changes exist (enables the save button) */
@@ -169,6 +191,27 @@ interface Props {
   onTogglePin(): void
   onPresent(): void
   onToggleFullscreen(): void
+  /** Split view: a second pages column, equal in every way except that page and
+   *  zoom are its own — so the toolbar's centre splits into two clusters, one
+   *  per column, and the active one is outlined. */
+  splitOpen: boolean
+  onToggleSplit(): void
+  activePane: 'a' | 'b'
+  onActivatePane(pane: 'a' | 'b'): void
+  /** Close one named column, keeping the other's content */
+  onClosePane(pane: 'a' | 'b'): void
+  panePage: number
+  paneZoomPercent: number
+  paneFitMode: 'width' | 'page' | 'custom'
+  paneFitTarget: 'width' | 'page'
+  onPaneGoToPage(page: number): void
+  onPaneZoomTo(percent: number): void
+  onPaneZoomIn(): void
+  onPaneZoomOut(): void
+  onPaneFitWidth(): void
+  onPaneFitPage(): void
+  /** Restore every preference to its shipped default (gear menu, confirmed) */
+  onResetApp(): void
 }
 
 const THEMES: { id: ThemePreference; labelKey: MsgKey }[] = [
@@ -186,6 +229,22 @@ const LANGUAGES: { id: LanguagePreference; label: string }[] = [
   { id: 'auto', label: 'Auto' }
 ]
 
+/** Percent readout for the opacity sliders (0.45 → «45 %») */
+const pct = (v: number): string => `${Math.round(v * 100)} %`
+
+/** The one shared shape of an option popover's reset affordance: a quiet text
+ *  link that only exists while there is something to undo, so an untouched tool
+ *  shows no extra chrome at all. */
+function ResetLink({ hidden, onClick }: { hidden: boolean; onClick(): void }): React.JSX.Element | null {
+  if (hidden) return null
+  return (
+    <button className="tool-reset" onClick={onClick} title={t('tb.resetToolTip')}>
+      <IconReset size={12} />
+      {t('tb.resetTool')}
+    </button>
+  )
+}
+
 export default function Toolbar({
   page,
   pageCount,
@@ -199,13 +258,17 @@ export default function Toolbar({
   toolPrefs,
   onToolSelect,
   activeMarkup,
-  markupColor,
+  markupPrefs,
   onMarkupSelect,
-  onMarkupColorChange,
+  onMarkupPrefChange,
+  onMarkupPrefReset,
+  eraserScope,
+  onEraserScopeChange,
   spread,
   onRotate,
   onToggleSpread,
   onToolPrefChange,
+  onToolPrefReset,
   onNavBack,
   onNavForward,
   onToggleSidebar,
@@ -216,6 +279,7 @@ export default function Toolbar({
   onFitWidth,
   onFitPage,
   fitMode,
+  fitTarget,
   onSettingsChange,
   onToggleSearch,
   dirty,
@@ -241,16 +305,39 @@ export default function Toolbar({
   toolbarPinned,
   onTogglePin,
   onPresent,
-  onToggleFullscreen
+  onToggleFullscreen,
+  splitOpen,
+  onToggleSplit,
+  activePane,
+  onActivatePane,
+  onClosePane,
+  panePage,
+  paneZoomPercent,
+  paneFitMode,
+  paneFitTarget,
+  onPaneGoToPage,
+  onPaneZoomTo,
+  onPaneZoomIn,
+  onPaneZoomOut,
+  onPaneFitWidth,
+  onPaneFitPage,
+  onResetApp
 }: Props): React.JSX.Element {
   useLang()
   const [pageInput, setPageInput] = useState(String(page))
-  const [zoomEditing, setZoomEditing] = useState(false)
+  const [panePageInput, setPanePageInput] = useState(String(panePage))
+  /** Which column's zoom readout is being typed into (null = neither) */
+  const [zoomEditing, setZoomEditing] = useState<'a' | 'b' | null>(null)
   const [zoomInput, setZoomInput] = useState('')
+  // Reading-mode menu (themes) and the Visning menu (zoom, page layout,
+  // screen, windows) are separate surfaces: one is about how the PAPER looks,
+  // the other about how it is laid out in the window.
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
-  // The gear menu: the app's one settings surface (language, keep-awake,
-  // AI setup, update check, version/about)
+  // The gear menu: the app's technical surface (language, annotation
+  // visibility, AI setup, update check, reset, version/about)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
+  const [resetAsk, setResetAsk] = useState(false)
   const [appVersion, setAppVersion] = useState('')
   const [updChecking, setUpdChecking] = useState(false)
   const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
@@ -259,11 +346,12 @@ export default function Toolbar({
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
-  const [toolMenu, setToolMenu] = useState<'pen' | 'marker' | 'shape' | 'markup' | null>(null)
+  const [toolMenu, setToolMenu] = useState<DrawPrefKey | 'markup' | 'eraser' | null>(null)
   // Last markup type the user activated, so the split button's main click
   // re-arms that type rather than always defaulting to highlight
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
-  const menuRef = useRef<HTMLDivElement>(null)
+  const themeMenuRef = useRef<HTMLDivElement>(null)
+  const viewMenuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
   // Responsive overflow: secondary buttons fold into a "…" menu (left of the
@@ -283,9 +371,13 @@ export default function Toolbar({
     return () => window.removeEventListener('pointerdown', close, true)
   }, [toolMenu])
 
+  // 'shape' is not a draw tool of its own (the four shapes are) — its options
+  // popover is opened straight from the Former button, not through here.
   const selectTool = (tool: 'pen' | 'marker' | 'eraser'): void => {
     if (activeTool === tool) {
       if (tool === 'eraser') {
+        // The eraser is toggled off far more often than it is reconfigured —
+        // its options live behind the chevron, not behind a second click.
         onToolSelect(null)
       } else {
         // Second click on the active tool opens its options; third closes tool
@@ -309,9 +401,24 @@ export default function Toolbar({
   }, [page])
 
   useEffect(() => {
+    setPanePageInput(String(panePage))
+  }, [panePage])
+
+  useEffect(() => {
+    if (!themeMenuOpen) return
+    const close = (e: Event): void => {
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node))
+        setThemeMenuOpen(false)
+    }
+    window.addEventListener('pointerdown', close, true)
+    return () => window.removeEventListener('pointerdown', close, true)
+  }, [themeMenuOpen])
+
+  useEffect(() => {
     if (!viewMenuOpen) return
     const close = (e: Event): void => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setViewMenuOpen(false)
+      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target as Node))
+        setViewMenuOpen(false)
     }
     window.addEventListener('pointerdown', close, true)
     return () => window.removeEventListener('pointerdown', close, true)
@@ -326,6 +433,26 @@ export default function Toolbar({
     window.addEventListener('pointerdown', close, true)
     return () => window.removeEventListener('pointerdown', close, true)
   }, [settingsMenuOpen])
+
+  // Esc closes any open toolbar menu (and the reset confirmation) before the
+  // viewer's own Esc chain gets a look in — a menu must never trap the user.
+  useEffect(() => {
+    if (!themeMenuOpen && !viewMenuOpen && !settingsMenuOpen && !toolMenu && !resetAsk) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      if (resetAsk) {
+        setResetAsk(false)
+        return
+      }
+      setThemeMenuOpen(false)
+      setViewMenuOpen(false)
+      setSettingsMenuOpen(false)
+      setToolMenu(null)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [themeMenuOpen, viewMenuOpen, settingsMenuOpen, toolMenu, resetAsk])
 
   // Version + update capability are static — fetch once, the first time the
   // gear menu opens.
@@ -351,13 +478,150 @@ export default function Toolbar({
     else setPageInput(String(page))
   }
 
+  const commitPanePage = (): void => {
+    const n = parseInt(panePageInput, 10)
+    if (!Number.isNaN(n)) onPaneGoToPage(n)
+    else setPanePageInput(String(panePage))
+  }
+
+  /** Zoom actions reachable from OUTSIDE a cluster (the Vis menu, the "…"
+   *  overflow, the W shortcut's twin) act on the column the user is working
+   *  in — which the outlined cluster makes visible. */
+  const inPaneB = splitOpen && activePane === 'b'
+  const activeZoom = {
+    percent: inPaneB ? paneZoomPercent : zoomPercent,
+    fitMode: inPaneB ? paneFitMode : fitMode,
+    fitTarget: inPaneB ? paneFitTarget : fitTarget,
+    zoomTo: inPaneB ? onPaneZoomTo : onZoomTo,
+    fitWidth: inPaneB ? onPaneFitWidth : onFitWidth,
+    fitPage: inPaneB ? onPaneFitPage : onFitPage
+  }
+
+  const toggleFit = (): void => {
+    if (activeZoom.fitTarget === 'page') activeZoom.fitPage()
+    else activeZoom.fitWidth()
+  }
+
+  /** One page+zoom cluster. Rendered once normally, twice in split view — the
+   *  two are identical controls over their own column, which is what makes it
+   *  arbitrary which column you work in. */
+  const centerCluster = (pane: 'a' | 'b'): React.JSX.Element => {
+    const isB = pane === 'b'
+    const value = isB ? panePageInput : pageInput
+    const setValue = isB ? setPanePageInput : setPageInput
+    const commit = isB ? commitPanePage : commitPage
+    const percent = isB ? paneZoomPercent : zoomPercent
+    const mode = isB ? paneFitMode : fitMode
+    const target = isB ? paneFitTarget : fitTarget
+    return (
+      <div
+        className={`center-cluster${splitOpen ? ' is-split' : ''}${
+          splitOpen && activePane === pane ? ' is-active' : ''
+        }`}
+        title={splitOpen ? t(isB ? 'tb.paneRight' : 'tb.paneLeft') : undefined}
+        onPointerDown={() => splitOpen && onActivatePane(pane)}
+      >
+        <div className="page-indicator">
+          <input
+            value={value}
+            onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, ''))}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+            aria-label={t('tb.goToPage')}
+          />
+          <span>/ {pageCount || '–'}</span>
+        </div>
+
+        <div className="toolbar-sep" />
+
+        <button
+          className="tb-btn"
+          onClick={() => (isB ? onPaneZoomOut() : onZoomOut())}
+          title={t('tb.zoomOutTip')}
+        >
+          <IconMinus />
+        </button>
+        {zoomEditing === pane ? (
+          <input
+            className="zoom-input"
+            autoFocus
+            value={zoomInput}
+            onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
+            onFocus={(e) => e.currentTarget.select()}
+            onBlur={() => setZoomEditing(null)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') {
+                const n = parseInt(zoomInput, 10)
+                if (!Number.isNaN(n)) (isB ? onPaneZoomTo : onZoomTo)(n)
+                setZoomEditing(null)
+              }
+              if (e.key === 'Escape') setZoomEditing(null)
+            }}
+            aria-label={t('tb.zoomExactTip')}
+          />
+        ) : (
+          <button
+            className="zoom-label"
+            title={t('tb.zoomExactTip')}
+            onClick={() => {
+              setZoomInput(String(percent))
+              setZoomEditing(pane)
+            }}
+          >
+            {percent}%
+          </button>
+        )}
+        <button
+          className="tb-btn"
+          onClick={() => (isB ? onPaneZoomIn() : onZoomIn())}
+          title={t('tb.zoomInTip')}
+        >
+          <IconPlus />
+        </button>
+        {inline('fit') && (
+          <>
+            <div className="toolbar-sep" />
+            {/* ONE fit control instead of two: it shows (and does) whichever
+                fit this column is not already in, like the W shortcut. */}
+            <button
+              className={`tb-btn${mode !== 'custom' ? ' is-active' : ''}`}
+              onClick={() => (isB ? (target === 'page' ? onPaneFitPage() : onPaneFitWidth()) : target === 'page' ? onFitPage() : onFitWidth())}
+              title={target === 'page' ? t('tb.fitPageTip') : t('tb.fitWidthTip')}
+            >
+              {target === 'page' ? <IconFitPage /> : <IconFitWidth />}
+            </button>
+          </>
+        )}
+        {/* Closing lives with the column's own controls, so "close THIS one" is
+            unambiguous — and it keeps the other column's content. */}
+        {splitOpen && (
+          <button
+            className="cluster-close"
+            title={t(isB ? 'tb.closePaneRight' : 'tb.closePaneLeft')}
+            aria-label={t(isB ? 'tb.closePaneRight' : 'tb.closePaneLeft')}
+            onClick={() => onClosePane(pane)}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    )
+  }
+
   // --- Responsive overflow ("…" menu) ---
   // One priority-ordered list of EVERY collapsible button: index 0 folds away
   // FIRST (least important), so a shrinking window keeps stacking icons into the
   // "…" menu — down to the Assistant last — instead of clipping buttons off the
   // edge. Only the genuinely-complex controls (the annotation-tool cluster with
-  // its option popovers, the page/zoom inputs, the view + settings menus, Save,
-  // and the sidebar toggle) stay inline as the irreducible core.
+  // its option popovers, the page/zoom inputs, the three menus, Save, and the
+  // sidebar toggle) stay inline as the irreducible core. Anything that has a
+  // permanent home in the zoom/layout or gear menu is NOT listed here — folding
+  // a duplicate into "…" would only pad the menu.
   const overflowActions: {
     key: string
     icon: React.JSX.Element
@@ -387,6 +651,7 @@ export default function Toolbar({
       onClick: onTogglePin,
       active: !toolbarPinned
     },
+    { key: 'split', icon: <IconSplit size={15} />, label: t('tb.split'), onClick: onToggleSplit, active: splitOpen },
     { key: 'snip', icon: <IconSnip size={15} />, label: t('tb.snip'), onClick: onToggleSnip, active: snipActive },
     // Annotation tools fold as single activation rows (their colour/width
     // popovers aren't in the menu — reachable again by widening the window).
@@ -397,10 +662,13 @@ export default function Toolbar({
     { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup },
     { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker' },
     { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen' },
-    { key: 'actualSize', icon: <IconActualSize size={15} />, label: t('tb.actualSize'), onClick: () => onZoomTo(100) },
-    { key: 'fitPage', icon: <IconFitPage size={15} />, label: t('tb.fitPage'), onClick: onFitPage, active: fitMode === 'page' },
-    { key: 'fitWidth', icon: <IconFitWidth size={15} />, label: t('tb.fitWidth'), onClick: onFitWidth, active: fitMode === 'width' },
-    { key: 'hideAnnots', icon: annotsHidden ? <IconEyeOff size={15} /> : <IconEye size={15} />, label: annotsHidden ? t('tb.showAnnots') : t('tb.hideAnnots'), onClick: onToggleAnnots, active: annotsHidden },
+    {
+      key: 'fit',
+      icon: activeZoom.fitTarget === 'page' ? <IconFitPage size={15} /> : <IconFitWidth size={15} />,
+      label: activeZoom.fitTarget === 'page' ? t('tb.fitPage') : t('tb.fitWidth'),
+      onClick: toggleFit,
+      active: activeZoom.fitMode !== 'custom'
+    },
     { key: 'redo', icon: <IconRedo size={15} />, label: t('tb.redo'), onClick: onRedo, disabled: !canRedo },
     { key: 'undo', icon: <IconUndo size={15} />, label: t('tb.undo'), onClick: onUndo, disabled: !canUndo },
     { key: 'forward', icon: <IconArrowRight size={15} />, label: t('tb.forward'), onClick: onNavForward, disabled: !canNavForward },
@@ -467,6 +735,76 @@ export default function Toolbar({
       window.removeEventListener('keydown', onEsc, true)
     }
   }, [overflowMenuOpen])
+
+  /** Colour + width + opacity for pen/marker/shape, with a quiet reset */
+  const drawToolMenu = (tool: DrawPrefKey): React.JSX.Element => {
+    const pref = toolPrefs[tool]
+    return (
+      <div className="tool-menu">
+        <div className="theme-menu-label">
+          {tool === 'pen' ? t('tb.pen') : tool === 'marker' ? t('tb.marker') : t('tb.shapes')}
+        </div>
+        {tool === 'shape' && (
+          <div className="shape-row">
+            {SHAPE_TOOL_TYPES.map((shape) => {
+              const Icon = SHAPE_ICONS[shape]
+              return (
+                <button
+                  key={shape}
+                  className={`tb-btn shape-pick${activeTool === shape ? ' is-active' : ''}`}
+                  title={t(SHAPE_LABEL_KEYS[shape])}
+                  onClick={() => onToolSelect(activeTool === shape ? null : shape)}
+                >
+                  <Icon />
+                </button>
+              )
+            })}
+          </div>
+        )}
+        <div className="color-row">
+          {HIGHLIGHT_COLORS.map((c) => (
+            <button
+              key={c.hex}
+              className={`color-dot${pref.color.join() === c.rgb.join() ? ' selected' : ''}`}
+              style={{ background: c.hex }}
+              title={colorLabel(c)}
+              onClick={() => onToolPrefChange(tool, { color: c.rgb })}
+            />
+          ))}
+        </div>
+        <div className="theme-menu-label slider-label">
+          {t('tb.width')}
+          <output>{pref.width.toFixed(1)} pt</output>
+        </div>
+        <input
+          type="range"
+          min={TOOL_WIDTH_MIN}
+          max={TOOL_WIDTH_MAX[tool]}
+          step={TOOL_WIDTH_STEP}
+          value={pref.width}
+          onChange={(e) => onToolPrefChange(tool, { width: Number(e.target.value) })}
+          aria-label={t('tb.strokeWidth')}
+        />
+        <div className="theme-menu-label slider-label">
+          {t('tb.opacity')}
+          <output>{pct(pref.opacity)}</output>
+        </div>
+        <input
+          type="range"
+          min={OPACITY_MIN}
+          max={OPACITY_MAX}
+          step={OPACITY_STEP}
+          value={pref.opacity}
+          onChange={(e) => onToolPrefChange(tool, { opacity: Number(e.target.value) })}
+          aria-label={t('tb.opacity')}
+        />
+        <ResetLink
+          hidden={toolPrefIsDefault(tool, pref)}
+          onClick={() => onToolPrefReset(tool)}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="toolbar" ref={toolbarRef}>
@@ -570,28 +908,29 @@ export default function Toolbar({
               <IconNote />
             </button>
           )}
+
+          {/* Eraser + undo/redo share one section: all three are "take that
+              mark back again", so they belong between the same dividers. */}
           <div className="toolbar-sep" />
+
           {inline('eraser') && (
-            <button
-              className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
-              onClick={() => selectTool('eraser')}
-              title={t('tb.eraserTip')}
-            >
-              <IconEraser />
-            </button>
+            <span className="tb-split">
+              <button
+                className={`tb-btn${activeTool === 'eraser' ? ' is-active' : ''}`}
+                onClick={() => selectTool('eraser')}
+                title={eraserScope === 'all' ? t('tb.eraserAllTip') : t('tb.eraserTip')}
+              >
+                <IconEraser />
+              </button>
+              <button
+                className={`tb-chevron${toolMenu === 'eraser' ? ' is-active' : ''}`}
+                title={t('tb.eraserOptionsTip')}
+                onClick={() => setToolMenu((m) => (m === 'eraser' ? null : 'eraser'))}
+              >
+                <IconChevronDown size={11} />
+              </button>
+            </span>
           )}
-          {inline('hideAnnots') && (
-            <button
-              className={`tb-btn${annotsHidden ? ' is-active' : ''}`}
-              onClick={onToggleAnnots}
-              title={annotsHidden ? t('tb.showAnnotsTip') : t('tb.hideAnnotsTip')}
-            >
-              {annotsHidden ? <IconEyeOff /> : <IconEye />}
-            </button>
-          )}
-
-          <div className="toolbar-sep" />
-
           {inline('undo') && (
             <button className="tb-btn" onClick={onUndo} disabled={!canUndo} title={t('tb.undoTip')}>
               <IconUndo />
@@ -629,71 +968,65 @@ export default function Toolbar({
                   markupType === 'highlight' ? (
                     <button
                       key={c.hex}
-                      className={`color-dot${markupColor.join() === c.rgb.join() ? ' selected' : ''}`}
+                      className={`color-dot${markupPrefs[markupType].color.join() === c.rgb.join() ? ' selected' : ''}`}
                       style={{ background: c.hex }}
                       title={colorLabel(c)}
-                      onClick={() => onMarkupColorChange(c.rgb)}
+                      onClick={() => onMarkupPrefChange(markupType, { color: c.rgb })}
                     />
                   ) : (
                     <button
                       key={c.hex}
-                      className={`color-bar${markupColor.join() === c.rgb.join() ? ' selected' : ''}`}
+                      className={`color-bar${markupPrefs[markupType].color.join() === c.rgb.join() ? ' selected' : ''}`}
                       title={colorLabel(c)}
-                      onClick={() => onMarkupColorChange(c.rgb)}
+                      onClick={() => onMarkupPrefChange(markupType, { color: c.rgb })}
                     >
                       <span style={{ background: c.hex }} />
                     </button>
                   )
                 )}
               </div>
-            </div>
-          ) : toolMenu ? (
-            <div className="tool-menu">
-              <div className="theme-menu-label">
-                {toolMenu === 'pen' ? t('tb.pen') : toolMenu === 'marker' ? t('tb.marker') : t('tb.shapes')}
-              </div>
-              {toolMenu === 'shape' && (
-                <div className="shape-row">
-                  {SHAPE_TOOL_TYPES.map((shape) => {
-                    const Icon = SHAPE_ICONS[shape]
-                    return (
-                      <button
-                        key={shape}
-                        className={`tb-btn shape-pick${activeTool === shape ? ' is-active' : ''}`}
-                        title={t(SHAPE_LABEL_KEYS[shape])}
-                        onClick={() => onToolSelect(activeTool === shape ? null : shape)}
-                      >
-                        <Icon />
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-              <div className="color-row">
-                {HIGHLIGHT_COLORS.map((c) => (
-                  <button
-                    key={c.hex}
-                    className="color-dot"
-                    style={{ background: c.hex }}
-                    title={colorLabel(c)}
-                    onClick={() => onToolPrefChange(toolMenu, { color: c.rgb })}
-                  />
-                ))}
-              </div>
               <div className="theme-menu-label slider-label">
-                {t('tb.width')}
-                <output>{toolPrefs[toolMenu].width.toFixed(1)} pt</output>
+                {t('tb.opacity')}
+                <output>{pct(markupPrefs[markupType].opacity)}</output>
               </div>
               <input
                 type="range"
-                min="1"
-                max="16"
-                step="0.5"
-                value={toolPrefs[toolMenu].width}
-                onChange={(e) => onToolPrefChange(toolMenu, { width: Number(e.target.value) })}
-                aria-label={t('tb.strokeWidth')}
+                min={OPACITY_MIN}
+                max={OPACITY_MAX}
+                step={OPACITY_STEP}
+                value={markupPrefs[markupType].opacity}
+                onChange={(e) => onMarkupPrefChange(markupType, { opacity: Number(e.target.value) })}
+                aria-label={t('tb.opacity')}
+              />
+              <ResetLink
+                hidden={markupPrefIsDefault(markupType, markupPrefs[markupType])}
+                onClick={() => onMarkupPrefReset(markupType)}
               />
             </div>
+          ) : toolMenu === 'eraser' ? (
+            <div className="tool-menu">
+              <div className="theme-menu-label">{t('tb.eraser')}</div>
+              <div className="scope-options">
+                {(['draw', 'all'] as const).map((scope) => (
+                  <button
+                    key={scope}
+                    className={`scope-option${eraserScope === scope ? ' selected' : ''}`}
+                    onClick={() => onEraserScopeChange(scope)}
+                  >
+                    <strong>{t(scope === 'draw' ? 'tb.eraserScopeDraw' : 'tb.eraserScopeAll')}</strong>
+                    <span>
+                      {t(scope === 'draw' ? 'tb.eraserScopeDrawHint' : 'tb.eraserScopeAllHint')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <ResetLink
+                hidden={eraserScope === 'draw'}
+                onClick={() => onEraserScopeChange('draw')}
+              />
+            </div>
+          ) : toolMenu ? (
+            drawToolMenu(toolMenu)
           ) : null}
         </div>
       </div>
@@ -702,88 +1035,82 @@ export default function Toolbar({
           reading controls: page number + zoom, flanked by flex spacers */}
       <div className="toolbar-spacer" ref={spacerRef} />
 
-      <div className="toolbar-group toolbar-center">
-        <div className="page-indicator">
-          <input
-            value={pageInput}
-            onChange={(e) => setPageInput(e.target.value.replace(/[^0-9]/g, ''))}
-            onFocus={(e) => e.currentTarget.select()}
-            onBlur={commitPage}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-            }}
-            aria-label={t('tb.goToPage')}
-          />
-          <span>/ {pageCount || '–'}</span>
+      <div className={`toolbar-group toolbar-center${splitOpen ? ' is-split' : ''}`}>
+        {centerCluster('a')}
+        {splitOpen && centerCluster('b')}
+
+        {/* Zoom steps + page layout, docked right beside the zoom controls they
+            belong to. Zoom applies to the outlined column; rotation and spread
+            are document-wide (they are persisted with the reading position). */}
+        <div className="theme-menu-anchor" ref={viewMenuRef}>
+          <button
+            className={`tb-btn${viewMenuOpen ? ' is-active' : ''}`}
+            onClick={() => setViewMenuOpen((o) => !o)}
+            title={t('tb.viewTip')}
+          >
+            <IconView />
+          </button>
+          {viewMenuOpen && (
+            <div className="theme-menu view-menu">
+              {/* Everything in this menu — zoom, rotation, spread — applies to
+                  the outlined column, so the scope is stated once, up top. */}
+              {splitOpen && (
+                <div className="menu-hint menu-hint-top">
+                  {t(activePane === 'b' ? 'tb.zoomAppliesRight' : 'tb.zoomAppliesLeft')}
+                </div>
+              )}
+              <div className="theme-menu-label">{t('tb.zoom')}</div>
+              {/* 100 % IS "actual size" — one chip, not a chip plus a
+                  separate row saying the same thing in words. */}
+              <div className="zoom-preset-row">
+                {ZOOM_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    className={`zoom-preset${activeZoom.fitMode === 'custom' && activeZoom.percent === preset ? ' selected' : ''}`}
+                    title={preset === 100 ? t('tb.actualSizeTip') : undefined}
+                    onClick={() => activeZoom.zoomTo(preset)}
+                  >
+                    {preset} %
+                  </button>
+                ))}
+              </div>
+              <button
+                className={`menu-action${activeZoom.fitMode === 'width' ? ' is-active' : ''}`}
+                onClick={activeZoom.fitWidth}
+              >
+                <IconFitWidth size={15} />
+                {t('tb.fitWidth')}
+              </button>
+              <button
+                className={`menu-action${activeZoom.fitMode === 'page' ? ' is-active' : ''}`}
+                onClick={activeZoom.fitPage}
+              >
+                <IconFitPage size={15} />
+                {t('tb.fitPage')}
+              </button>
+
+              <div className="theme-menu-sep" />
+
+              <div className="theme-menu-label">{t('tb.pageLayout')}</div>
+              <div className="theme-auto-row">
+                <span className="view-row-label">{t('tb.rotate')}</span>
+                <span className="view-row-controls">
+                  <button className="tb-btn" onClick={() => onRotate(-1)} title={t('tb.rotateCcwTip')}>
+                    <IconRotateCcw />
+                  </button>
+                  <button className="tb-btn" onClick={() => onRotate(1)} title={t('tb.rotateCwTip')}>
+                    <IconRotateCw />
+                  </button>
+                </span>
+              </div>
+              <label className="theme-menu-toggle view-row-toggle">
+                <input type="checkbox" checked={spread} onChange={onToggleSpread} />
+                <IconSpread size={15} />
+                {t('tb.spread')}
+              </label>
+            </div>
+          )}
         </div>
-
-        <div className="toolbar-sep" />
-
-        <button className="tb-btn" onClick={onZoomOut} title={t('tb.zoomOutTip')}>
-          <IconMinus />
-        </button>
-        {zoomEditing ? (
-          <input
-            className="zoom-input"
-            autoFocus
-            value={zoomInput}
-            onChange={(e) => setZoomInput(e.target.value.replace(/[^0-9]/g, ''))}
-            onFocus={(e) => e.currentTarget.select()}
-            onBlur={() => setZoomEditing(false)}
-            onKeyDown={(e) => {
-              e.stopPropagation()
-              if (e.key === 'Enter') {
-                const n = parseInt(zoomInput, 10)
-                if (!Number.isNaN(n)) onZoomTo(n)
-                setZoomEditing(false)
-              }
-              if (e.key === 'Escape') setZoomEditing(false)
-            }}
-            aria-label={t('tb.zoomExactTip')}
-          />
-        ) : (
-          <button
-            className="zoom-label"
-            title={t('tb.zoomExactTip')}
-            onClick={() => {
-              setZoomInput(String(zoomPercent))
-              setZoomEditing(true)
-            }}
-          >
-            {zoomPercent}%
-          </button>
-        )}
-        <button className="tb-btn" onClick={onZoomIn} title={t('tb.zoomInTip')}>
-          <IconPlus />
-        </button>
-        <div className="toolbar-sep" />
-        {inline('actualSize') && (
-          <button
-            className={`tb-btn${fitMode === 'custom' && zoomPercent === 100 ? ' is-active' : ''}`}
-            onClick={() => onZoomTo(100)}
-            title={t('tb.actualSizeTip')}
-          >
-            <IconActualSize />
-          </button>
-        )}
-        {inline('fitPage') && (
-          <button
-            className={`tb-btn${fitMode === 'page' ? ' is-active' : ''}`}
-            onClick={onFitPage}
-            title={t('tb.fitPageTip')}
-          >
-            <IconFitPage />
-          </button>
-        )}
-        {inline('fitWidth') && (
-          <button
-            className={`tb-btn${fitMode === 'width' ? ' is-active' : ''}`}
-            onClick={onFitWidth}
-            title={t('tb.fitWidthTip')}
-          >
-            <IconFitWidth />
-          </button>
-        )}
       </div>
 
       <div className="toolbar-spacer" />
@@ -848,15 +1175,16 @@ export default function Toolbar({
 
         <div className="toolbar-sep" />
 
-        <div className="theme-menu-anchor" ref={menuRef}>
+        {/* Reading mode: how the PAPER looks (theme + page recolouring) */}
+        <div className="theme-menu-anchor" ref={themeMenuRef}>
           <button
-            className={`tb-btn${viewMenuOpen ? ' is-active' : ''}`}
-            onClick={() => setViewMenuOpen((o) => !o)}
-            title={t('tb.viewTip')}
+            className={`tb-btn${themeMenuOpen ? ' is-active' : ''}`}
+            onClick={() => setThemeMenuOpen((o) => !o)}
+            title={t('tb.readingModeTip')}
           >
             <IconTextSettings />
           </button>
-          {viewMenuOpen && (
+          {themeMenuOpen && (
             <div className="theme-menu">
               <div className="theme-menu-label">{t('tb.readingMode')}</div>
               <div className="theme-options">
@@ -908,27 +1236,38 @@ export default function Toolbar({
 
               <div className="theme-menu-sep" />
 
-              <div className="theme-menu-label">{t('tb.view')}</div>
-              <div className="theme-auto-row">
-                <span className="view-row-label">{t('tb.rotate')}</span>
-                <span className="view-row-controls">
-                  <button className="tb-btn" onClick={() => onRotate(-1)} title={t('tb.rotateCcwTip')}>
-                    <IconRotateCcw />
-                  </button>
-                  <button className="tb-btn" onClick={() => onRotate(1)} title={t('tb.rotateCwTip')}>
-                    <IconRotateCw />
-                  </button>
-                </span>
-              </div>
-              <label className="theme-menu-toggle view-row-toggle">
-                <input type="checkbox" checked={spread} onChange={onToggleSpread} />
-                <IconSpread size={15} />
-                {t('tb.spread')}
+              {/* Both of these shape the READING experience rather than the
+                  app's plumbing, so they sit with the themes and leave the gear
+                  menu to the technical things. */}
+              <label
+                className="theme-menu-toggle"
+                title={annotsHidden ? t('tb.showAnnotsTip') : t('tb.hideAnnotsTip')}
+              >
+                <input type="checkbox" checked={annotsHidden} onChange={onToggleAnnots} />
+                {annotsHidden ? <IconEyeOff size={15} /> : <IconEye size={15} />}
+                {t('tb.hideAnnots')}
+              </label>
+              <label className="theme-menu-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.keepAwake}
+                  onChange={(e) => onSettingsChange({ keepAwake: e.target.checked })}
+                />
+                {t('tb.keepAwake')}
               </label>
             </div>
           )}
         </div>
 
+        {inline('split') && (
+          <button
+            className={`tb-btn${splitOpen ? ' is-active' : ''}`}
+            onClick={onToggleSplit}
+            title={t('tb.splitTip')}
+          >
+            <IconSplit />
+          </button>
+        )}
         {inline('present') && (
           <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
             <IconPresent />
@@ -976,17 +1315,6 @@ export default function Toolbar({
 
               <div className="theme-menu-sep" />
 
-              <label className="theme-menu-toggle">
-                <input
-                  type="checkbox"
-                  checked={settings.keepAwake}
-                  onChange={(e) => onSettingsChange({ keepAwake: e.target.checked })}
-                />
-                {t('tb.keepAwake')}
-              </label>
-
-              <div className="theme-menu-sep" />
-
               <button
                 className="menu-action"
                 onClick={() => {
@@ -1006,6 +1334,39 @@ export default function Toolbar({
               {updOutcome && <div className="menu-hint">{updateOutcomeText(updOutcome)}</div>}
 
               <div className="theme-menu-sep" />
+
+              <button
+                className="menu-action"
+                onClick={() => {
+                  setSettingsMenuOpen(false)
+                  setResetAsk(true)
+                }}
+                title={t('reset.tip')}
+              >
+                <IconReset size={15} />
+                {t('reset.action')}
+              </button>
+
+              <div className="theme-menu-sep" />
+
+              {/* Bug reports and feature requests: GitHub Issues is the only
+                  place they can be answered, so link straight there rather than
+                  inventing an in-app form with nowhere to send it. The body is
+                  prefilled with the version, which is the one thing a report
+                  needs and the one thing users never think to include. */}
+              <button
+                className="menu-action"
+                onClick={() =>
+                  bridge.openExternal(
+                    'https://github.com/emilmsh/pdf-scholar/issues/new?body=' +
+                      encodeURIComponent(`\n\n---\nPDF Scholar ${appVersion}`)
+                  )
+                }
+                title={t('app.feedbackTip')}
+              >
+                <IconComment size={15} />
+                {t('app.feedback')}
+              </button>
 
               <button
                 className="menu-action"
@@ -1088,6 +1449,32 @@ export default function Toolbar({
         )}
       </div>
 
+      {/* Reset-to-defaults is destructive enough to deserve the same modal
+          treatment as an unsaved-changes prompt — and the detail line spells
+          out exactly what survives it (API keys, library, annotations). */}
+      {resetAsk && (
+        <div className="confirm-overlay" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="confirm-dialog" role="alertdialog" aria-modal="true">
+            <p className="confirm-message">{t('reset.confirmMessage')}</p>
+            <p className="confirm-detail">{t('reset.confirmDetail')}</p>
+            <div className="confirm-actions">
+              <button className="btn-secondary" onClick={() => setResetAsk(false)}>
+                {t('app.cancel')}
+              </button>
+              <button
+                className="btn-primary"
+                autoFocus
+                onClick={() => {
+                  setResetAsk(false)
+                  onResetApp()
+                }}
+              >
+                {t('reset.confirmAction')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

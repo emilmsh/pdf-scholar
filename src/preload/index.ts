@@ -36,6 +36,20 @@ const api: PdfxApi = {
   docConfirmExternalUpdate: (path: string) =>
     ipcRenderer.invoke('doc:confirm-external-update', path),
   docDiscard: (path: string) => ipcRenderer.invoke('doc:discard', path),
+  onAnnotationsChangedElsewhere: (cb: (path: string) => void) => {
+    const listener = (_e: unknown, path: string): void => cb(path)
+    ipcRenderer.on('annots:changed-elsewhere', listener)
+    return () => {
+      ipcRenderer.removeListener('annots:changed-elsewhere', listener)
+    }
+  },
+  onDraftEndedElsewhere: (cb: (path: string) => void) => {
+    const listener = (_e: unknown, path: string): void => cb(path)
+    ipcRenderer.on('doc:draft-ended-elsewhere', listener)
+    return () => {
+      ipcRenderer.removeListener('doc:draft-ended-elsewhere', listener)
+    }
+  },
   printFile: (path: string) => ipcRenderer.invoke('file:print', path),
   saveTextFile: (defaultName: string, content: string | Uint8Array) =>
     ipcRenderer.invoke('file:save-text', defaultName, content),

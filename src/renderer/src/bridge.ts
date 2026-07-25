@@ -118,6 +118,11 @@ export const webApi: PdfxApi = {
   docConfirmClose: async () => 'discard',
   docConfirmExternalUpdate: async () => 'discard',
   docDiscard: async () => {},
+  // No cross-window annotation sync outside Electron: a second browser tab has
+  // its own in-memory copy of the document with no shared draft to re-read, so
+  // there is nothing to notify about. See docs/PLATFORMS.md.
+  onAnnotationsChangedElsewhere: () => () => {},
+  onDraftEndedElsewhere: () => () => {},
   // Browser preview: a new browser tab stands in for a new app window
   newWindow: (path) => {
     window.open(path ? `${location.origin}/#open=${encodeURIComponent(path)}` : location.href, '_blank')

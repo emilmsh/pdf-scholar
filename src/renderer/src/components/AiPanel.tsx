@@ -40,6 +40,8 @@ import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
 import type { ChatMessage, StoredConversation } from '../chat-store'
 import { deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
+import { useResizable } from '../useResizable'
+import type { BoxSize } from '../useResizable'
 import {
   IconChevronDown,
   IconGlobe,
@@ -856,14 +858,34 @@ export default function AiPanel({
     }
   }, [])
 
+  /** Composer height the user dragged to (null = the auto-growing default).
+   *  Height only — the panel's own width is already drag-resizable from its
+   *  inner edge, so a width grip here would fight it. */
+  const [composerSize, setComposerSize] = useState<BoxSize | null>(null)
+  const { gripProps: composerGrip } = useResizable(inputRef, composerSize, setComposerSize, {
+    axis: 'height',
+    // The grip sits on the composer's TOP edge: dragging UP must grow it.
+    invert: true,
+    minH: 38
+  })
+
   // ChatGPT-style composer: one line at rest, grows with the text (the CSS
-  // max-height caps it and hands over to scrolling)
+  // max-height caps it and hands over to scrolling). Written imperatively
+  // rather than via a style prop because the height is measured from
+  // scrollHeight — so an explicitly dragged height has to be applied the same
+  // way, here, instead of through useResizable's style.
   useLayoutEffect(() => {
     const el = inputRef.current
     if (!el) return
+    if (composerSize?.h != null) {
+      el.style.maxHeight = 'none'
+      el.style.height = `${composerSize.h}px`
+      return
+    }
+    el.style.maxHeight = ''
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
-  }, [input])
+  }, [input, composerSize])
 
   useEffect(() => {
     if (!open) return
@@ -1152,6 +1174,11 @@ export default function AiPanel({
   // (ChatGPT-style) and pinned to the bottom once the chat has content.
   const composer = (
     <footer className="ai-composer">
+      {/* Pull this to give a long prompt more room; double-click it to go back
+          to the one-line-that-grows default. */}
+      <div className="ai-composer-grip" title={t('bubble.resizeHeightTip')} {...composerGrip}>
+        <i />
+      </div>
       {/* ChatGPT-style field: the textarea and its controls live INSIDE one
           rounded surface — the buttons sit bottom-right, never beside it. */}
       <div className="ai-composer-field">
@@ -1630,6 +1657,16 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const popRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
   const [sizeBump, setSizeBump] = useState(0)
+  // Corner grip: a long answer about a figure is easier to read wide and tall.
+  // Local state — a fresh popover always opens at the default shape; a
+  // double-click on the grip goes back to it.
+  const [quickSize, setQuickSize] = useState<BoxSize | null>(null)
+  const { gripProps: quickGrip, style: quickSizeStyle } = useResizable(
+    popRef,
+    quickSize,
+    setQuickSize,
+    { axis: 'both', minW: 300, minH: 200 }
+  )
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
   const draggedRef = useRef(false)
   useLayoutEffect(() => {
@@ -1667,7 +1704,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
     <div
       className="ai-quick"
       ref={popRef}
-      style={pos ?? { left: state.x, top: state.y, visibility: 'hidden' }}
+      style={{ ...(pos ?? { left: state.x, top: state.y, visibility: 'hidden' }), ...quickSizeStyle }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div
@@ -1781,6 +1818,8 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
           {t('app.close')}
         </button>
       </div>
+
+      <span className="box-grip" title={t('bubble.resizeTip')} {...quickGrip} />
     </div>
   )
 }

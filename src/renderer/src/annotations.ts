@@ -79,6 +79,15 @@ export function addCustomColor(hex: string): void {
   }
 }
 
+/** Forget every remembered color-wheel pick (app-wide reset to defaults) */
+export function clearCustomColors(): void {
+  try {
+    localStorage.removeItem(CUSTOM_COLORS_KEY)
+  } catch {
+    /* nothing to forget */
+  }
+}
+
 /** Fill opacity for text highlights — the SINGLE source for both the live
  *  overlay and the value persisted into the PDF (see applyMarkup), so a
  *  highlight looks identical before and after a save+reload. 0.5 is the tone
@@ -185,18 +194,36 @@ export function strokePathData(points: [number, number][]): string {
   return d
 }
 
+/** The squiggly wave's LOW points, as a page-space y inside the quad. Kept
+ *  right at the quad's bottom edge (a hair above, so the stroke's round cap
+ *  stays inside the annotation /Rect) — the wave's peaks then land roughly
+ *  where a plain underline's band sits, i.e. clear of the glyphs instead of
+ *  running through them. Was max(2, 6% of h), which floated the whole wave
+ *  ~1.6 pt too high and crossed the text.
+ *
+ *  This ALSO closes a live-vs-saved gap. Only huge files get their squiggly AP
+ *  from us (incremental-appender.ts, case 'squiggly' — keep the two in
+ *  lockstep); for normal saves PDFium synthesises it, and measured on a 14 pt
+ *  quad at y 135 its wave occupies page-space y 147→149 — flush against the
+ *  quad bottom. The old overlay drew 145.8→147.0, i.e. entirely ABOVE what the
+ *  file would show after a reload; the current formula gives 147.3→148.5, which
+ *  sits inside PDFium's band. Verify with a probe over an /AP content stream if
+ *  this ever needs re-tuning — the overlay must show what the file will. */
+export const squigglyBaseline = (q: PageRect): number =>
+  q.y + q.h - Math.max(0.5, q.h * 0.015)
+
 /**
  * Page-space `d` for a squiggly (zig-zag) underline over one quad. The geometry
  * is IDENTICAL to the saved appearance stream (incremental-appender.ts, case
  * 'squiggly') so the live overlay is a pixel-parity preview of the file: a
- * triangular wave sitting max(2, 6%) above the quad bottom, amplitude
+ * triangular wave whose troughs sit on squigglyBaseline(q), amplitude
  * max(1.2, 8%) of line height, one half-period every 2 page units.
  *
  * (Previously the overlay used a repeating-linear-gradient, which paints a
  * DASHED line, not a wave — the "bølgestrek blir dottet strek" bug.)
  */
 export function squigglyPathData(q: PageRect): string {
-  const base = q.y + q.h - Math.max(2, q.h * 0.06)
+  const base = squigglyBaseline(q)
   const amp = Math.max(1.2, q.h * 0.08)
   const half = 2 // page units per half-period
   let d = `M ${q.x.toFixed(2)} ${base.toFixed(2)}`
@@ -292,14 +319,19 @@ export function annotationCss(
       const off = Math.max(1.5 / scale, 0.045 * q.h)
       return {
         ...toCss({ x: q.x, y: q.y + q.h - off, w: q.w, h: thick }),
-        background: rgbCss(a.color, 0.9)
+        // 0.9 is the line markups' inherent softening (a hairline at full
+        // opacity reads harsher than the same colour as a fill); the RECORD's
+        // opacity rides on top of it so a user-dialled opacity shows live
+        // exactly as the engine bakes it. opacity 1 (every pre-existing line
+        // markup) is unchanged.
+        background: rgbCss(a.color, 0.9 * a.opacity)
       }
     }
     case 'strikeout': {
       const thick = Math.max(1.5 / scale, 1.2)
       return {
         ...toCss({ x: q.x, y: q.y + q.h * 0.52, w: q.w, h: thick }),
-        background: rgbCss(a.color, 0.9)
+        background: rgbCss(a.color, 0.9 * a.opacity)
       }
     }
     case 'squiggly':

@@ -978,6 +978,9 @@ button {
   box-shadow: var(--shadow-menu);
   z-index: 40;
   animation: menu-in 0.12s ease;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .tool-menu input[type='range'] {
@@ -1071,6 +1074,11 @@ button {
   padding: 12px;
   min-width: 264px;
   z-index: 40;
+  /* Grouped menus (Visning, gear) are tall enough to run past the bottom of a
+     short window — cap them and scroll inside instead of pushing rows off. */
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .theme-menu input[type='range'] {
@@ -4572,11 +4580,380 @@ button {
 
 
 /* ============================================================
+   Tool-option popovers: per-tool reset + eraser scope
+   ============================================================ */
+
+/* Quiet "back to default" link, right-aligned under the sliders. Only rendered
+   when the tool actually differs from its default (see ResetLink in
+   Toolbar.tsx), so an untouched popover carries no extra chrome at all. */
+.tool-reset {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px -4px -2px auto;
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.tool-reset:hover {
+  background: var(--hover);
+  color: var(--accent);
+}
+
+/* Two mutually exclusive scopes for the eraser, as labelled cards rather than
+   bare radios — the difference between them needs a line of explanation. */
+.scope-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scope-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: left;
+  line-height: 1.3;
+}
+
+.scope-option strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.scope-option span {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.scope-option:hover {
+  background: var(--hover);
+}
+
+.scope-option.selected {
+  border-color: var(--accent);
+  background: var(--active);
+}
+
+.scope-option.selected strong {
+  color: var(--accent);
+}
+
+/* ============================================================
+   Split view: two symmetric pages columns (see PagesPane.tsx)
+   ============================================================ */
+
+/* The second column. `--pane-w` is its dragged width; both columns keep a floor
+   so neither can be squeezed away by the other or by the side panels. */
+.pages-host.pane-b {
+  flex: 0 0 var(--pane-w, 520px);
+  border-left: 1px solid var(--border);
+}
+
+.viewer-body > .pages-host {
+  min-width: 220px;
+}
+
+/* A column pulses when focus moves to it, or when a followed link lands in it.
+   Deliberately TRANSIENT: the persistent "this column is active" signal lives in
+   the toolbar (the outlined page+zoom cluster), where it cannot intrude on the
+   page. A permanent frame around whichever half you are reading is exactly the
+   kind of thing that wears you down over an hour.
+
+   An INSET line, not a border: a border would shift the page layout by a pixel
+   each time it appeared. `forwards` holds it at opacity 0 until the class goes,
+   so it never flickers back in. */
+.pages-host.pane-flash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 60%, transparent);
+  animation: pane-pulse 0.7s ease forwards;
+}
+
+@keyframes pane-pulse {
+  0% {
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Respect a reduced-motion preference: no pulse at all, the toolbar cluster
+   still says which column is active. */
+@media (prefers-reduced-motion: reduce) {
+  .pages-host.pane-flash::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* ============================================================
+   Toolbar centre in split view: one page+zoom cluster per column
+   ============================================================ */
+
+.center-cluster {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Split mode has to fit two clusters where one used to sit, so the controls
+   tighten up: smaller buttons, no gaps, narrower readouts. Nothing is removed —
+   both columns keep the identical set of controls. */
+.toolbar-center.is-split {
+  gap: 4px;
+}
+
+.center-cluster.is-split {
+  gap: 0;
+  padding: 2px 4px;
+  border-radius: 8px;
+  /* Reserve the outline's space in BOTH states so activating a cluster never
+     nudges its neighbours sideways. */
+  box-shadow: inset 0 0 0 1.5px transparent;
+  transition: box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.center-cluster.is-split.is-active {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.center-cluster.is-split .tb-btn {
+  min-width: 26px;
+  height: 28px;
+}
+
+.center-cluster.is-split .page-indicator {
+  font-size: 12px;
+  padding: 0 2px;
+}
+
+.center-cluster.is-split .page-indicator input {
+  width: 26px;
+}
+
+.center-cluster.is-split .zoom-label,
+.center-cluster.is-split .zoom-input {
+  min-width: 44px;
+  font-size: 12px;
+}
+
+.center-cluster.is-split .toolbar-sep {
+  margin: 0 3px;
+}
+
+/* Close THIS column. Lives with the column's own controls so there is no doubt
+   which one it closes; faint until the cluster is hovered so it does not read as
+   a fourth button competing with page and zoom. */
+.cluster-close {
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.4;
+  transition: opacity 0.12s ease, background-color 0.12s ease;
+}
+
+.center-cluster:hover .cluster-close,
+.cluster-close:focus-visible {
+  opacity: 1;
+}
+
+.cluster-close:hover {
+  background: var(--hover);
+  color: var(--text);
+  opacity: 1;
+}
+
+/* Hint above the zoom steps naming the column they will affect */
+.menu-hint-top {
+  margin: -2px 0 8px;
+}
+
+/* ============================================================
+   Zoom + page-layout menu: fixed zoom steps
+   ============================================================ */
+
+.view-menu {
+  min-width: 278px;
+}
+
+.zoom-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.zoom-preset {
+  flex: 1 0 auto;
+  min-width: 52px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.zoom-preset:hover {
+  background: var(--hover);
+}
+
+.zoom-preset.selected {
+  border-color: var(--accent);
+  background: var(--active);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Resizable bubbles (see useResizable.ts)
+   ============================================================ */
+
+/* Column layout so a bubble dragged taller hands the slack to its text field
+   rather than leaving a gap under the buttons. Basis stays the shipped height,
+   so an untouched (auto-height) bubble looks exactly as before. */
+.annot-popover,
+.note-popover {
+  display: flex;
+  flex-direction: column;
+}
+
+.annot-popover-text,
+.note-popover textarea {
+  flex: 1 1 auto;
+  min-height: 56px;
+}
+
+/* Only the text field takes (or gives up) the slack — the header, swatches and
+   buttons keep their intrinsic height however the bubble is dragged. */
+.annot-popover > .annot-popover-head,
+.annot-popover > .color-row,
+.annot-popover > .annot-popover-actions,
+.note-popover > .note-actions {
+  flex-shrink: 0;
+}
+
+/* The ONE affordance: a small corner glyph. No `resize: both` on the textareas
+   and no scrollbars appear to advertise it — the owner wants the hint subtle
+   and nothing else moving. */
+.box-grip {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 15px;
+  height: 15px;
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0.22;
+  transition: opacity 0.12s ease;
+  /* Two short diagonals, drawn in the text colour so it works in every theme */
+  background-image: linear-gradient(
+      135deg,
+      transparent 45%,
+      currentColor 45%,
+      currentColor 57%,
+      transparent 57%
+    ),
+    linear-gradient(135deg, transparent 70%, currentColor 70%, currentColor 82%, transparent 82%);
+  color: var(--text-secondary);
+}
+
+.annot-popover:hover .box-grip,
+.note-popover:hover .box-grip,
+.ai-quick:hover .box-grip,
+.box-grip:hover {
+  opacity: 0.55;
+}
+
+/* The quick popover clips its children (rounded corners + overflow: hidden);
+   the grip has to sit inside the padding of the actions row to stay visible. */
+.ai-quick .box-grip {
+  right: 3px;
+  bottom: 3px;
+}
+
+/* Composer: a pull-strip on the top edge. Invisible at rest — the pill only
+   surfaces when the pointer is in the composer, so the chat stays calm. */
+.ai-composer-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 9px;
+  margin: -4px 0 1px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.ai-composer-grip i {
+  width: 26px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.14s ease;
+}
+
+.ai-composer:hover .ai-composer-grip i,
+.ai-composer-grip:hover i {
+  opacity: 0.3;
+}
+
+.ai-composer-grip:active i {
+  opacity: 0.55;
+}
+
+/* ============================================================
    Touch (coarse pointer): finger-sized targets + always-visible
    affordances for everything hover normally gates. The tight
    mouse aesthetics are untouched on fine pointers.
    ============================================================ */
 @media (pointer: coarse) {
+  /* Resize grips: no hover to reveal them, and a fingertip needs more than
+     15 px — keep them faintly visible and give them a real target. */
+  .box-grip {
+    width: 26px;
+    height: 26px;
+    opacity: 0.45;
+    background-size: 15px 15px;
+    background-position: bottom right;
+    background-repeat: no-repeat;
+  }
+
+  .ai-composer-grip {
+    height: 18px;
+    margin: -2px 0 1px;
+  }
+
+  .ai-composer-grip i {
+    width: 40px;
+    height: 4px;
+    opacity: 0.3;
+  }
+
   .tb-btn,
   .tb-chevron {
     min-width: 38px;

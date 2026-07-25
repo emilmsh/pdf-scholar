@@ -7,6 +7,11 @@ import { annotationCss, arrowHeadPoints, arrowShaftEnd, rgbCss, squigglyPathData
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
+import { t } from '../i18n'
+
+/** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
+ *  only place that gesture is advertised. */
+const linkTitle = (): string => t('viewer.linkTip')
 
 const SHAPE_TYPES = new Set(['square', 'circle', 'line', 'arrow'])
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -67,7 +72,10 @@ interface Props {
   /** Active freehand tool (pen/marker/eraser), or null when not drawing */
   drawTool: DrawTool | null
   /** Stable callbacks (identity must not change with viewer state) */
-  onInternalLink(dest: unknown): void
+  /** In-document destination. `toOtherPane` is true when the reader held
+   *  Ctrl/Cmd, i.e. "show this over there" — the viewer decides what that means
+   *  (and opens the split if it is not open yet). */
+  onInternalLink(dest: unknown, toOtherPane: boolean): void
   onExternalLink(url: string): void
   onStrokeComplete(pageNumber: number, points: [number, number][]): void
   onErase(pageNumber: number, x: number, y: number): void
@@ -453,11 +461,17 @@ function PdfPage({
         anchor.style.width = `${(100 * Math.abs(px2 - px1)) / viewport.width}%`
         anchor.style.height = `${(100 * Math.abs(py2 - py1)) / viewport.height}%`
         if (link.url) anchor.title = link.url
+        else anchor.title = linkTitle()
         anchor.addEventListener('click', (e) => {
           e.preventDefault()
           e.stopPropagation()
+          // An EXTERNAL link always hands off to the system browser, modifier or
+          // not: there is nothing in this document for a second column to show,
+          // and the browser applies its own new-tab conventions from there.
           if (link.url) onExternalLink(link.url)
-          else if (link.dest) onInternalLink(link.dest)
+          // An IN-DOCUMENT destination can go either way, so Ctrl/Cmd means
+          // "over there" (see followLinkFrom in PdfViewer).
+          else if (link.dest) onInternalLink(link.dest, e.ctrlKey || e.metaKey)
         })
         frag.append(anchor)
       }
@@ -955,7 +969,7 @@ function AnnotationMarks({
               key={i}
               d={squigglyPathData(q)}
               fill="none"
-              stroke={rgbCss(annotation.color, 0.9)}
+              stroke={rgbCss(annotation.color, 0.9 * annotation.opacity)}
               strokeWidth={1.1}
               strokeLinecap="round"
               strokeLinejoin="round"

@@ -3,6 +3,8 @@ import { annotTypeLabel, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotatio
 import type { PageAnnotation } from '../annotations'
 import { t, useLang } from '../i18n'
 import { useDraggable } from '../useDraggable'
+import { useResizable } from '../useResizable'
+import type { BoxSize } from '../useResizable'
 import { MarkupColorRow } from './SelectionMenu'
 
 interface Props {
@@ -17,6 +19,11 @@ interface Props {
   onContents(text: string): void
   onDelete(): void
   onClose(): void
+  /** Drag-resized size for THIS annotation (the viewer remembers it per
+   *  annotation, so re-opening a long comment comes back roomy); null = the
+   *  default shape from the stylesheet */
+  size: BoxSize | null
+  onResize(size: BoxSize | null): void
 }
 
 export default function AnnotPopover({
@@ -28,7 +35,9 @@ export default function AnnotPopover({
   onColor,
   onContents,
   onDelete,
-  onClose
+  onClose,
+  size,
+  onResize
 }: Props): React.JSX.Element {
   useLang()
   const [text, setText] = useState(annotation.contents ?? '')
@@ -37,6 +46,15 @@ export default function AnnotPopover({
   // Opens clear of the markup (below/above it) so the marked text stays
   // readable, and is draggable by its header for further nudging.
   const { ref, style, positioned, handleProps } = useDraggable(x, y + 10, [], avoid)
+  // Corner grip resizes the whole bubble (the comment field takes the slack);
+  // double-clicking the grip restores the default shape.
+  const { gripProps, style: sizeStyle } = useResizable(ref, size, onResize, {
+    axis: 'both',
+    minW: 224,
+    // Floor = the bubble's natural height (header + swatches + a usable comment
+    // field + the delete row); below that the fixed rows would have to squeeze.
+    minH: 178
+  })
 
   // Focus the comment field once the bubble is measured and visible. Focusing
   // it while still `visibility: hidden` (pre-measure) is a no-op — that left the
@@ -66,7 +84,7 @@ export default function AnnotPopover({
     <div
       className="annot-popover"
       ref={ref}
-      style={style}
+      style={{ ...style, ...sizeStyle }}
       onMouseDown={(e) => e.stopPropagation()}
       onContextMenu={(e) => e.preventDefault()}
     >
@@ -110,6 +128,8 @@ export default function AnnotPopover({
           {t('app.delete')}
         </button>
       </div>
+
+      <span className="box-grip" title={t('bubble.resizeTip')} {...gripProps} />
     </div>
   )
 }

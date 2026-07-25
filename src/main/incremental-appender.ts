@@ -1156,7 +1156,10 @@ function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
     case 'squiggly': {
       ops.push(`${fmtRgb(s.color)} RG`, '1 w', '1 J 1 j')
       for (const q of s.quads) {
-        const base = q.y + q.h - Math.max(2, q.h * 0.06)
+        // Troughs at the quad's bottom edge so the peaks land at underline
+        // height, clear of the glyphs — mirrors squigglyBaseline() in
+        // renderer/annotations.ts. Keep the two in lockstep.
+        const base = q.y + q.h - Math.max(0.5, q.h * 0.015)
         const amp = Math.max(1.2, q.h * 0.08)
         const half = 2 // display points per half-period (≈ renderer stripe pitch)
         ops.push(`${up(g, q.x, base)} m`)

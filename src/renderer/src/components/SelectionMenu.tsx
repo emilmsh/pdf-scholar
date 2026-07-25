@@ -11,6 +11,8 @@ import type { HighlightColor } from '../annotations'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import { useDraggable } from '../useDraggable'
+import { useResizable } from '../useResizable'
+import type { BoxSize } from '../useResizable'
 import {
   IconBook,
   IconComment,
@@ -425,6 +427,17 @@ export function NotePopover({ x, y, avoid, onSave, onCancel }: NoteProps): React
   // Opens clear of the markup (below/above it) so the marked text stays
   // readable; draggable from its chrome (the textarea keeps its own pointer).
   const { ref, style, positioned, handleProps } = useDraggable(x, y + 10, [], avoid)
+  // A NEW note always opens at the default shape, so the default never gets
+  // lost behind a drag — hence local state, which dies with the draft. (The
+  // comment popover on an EXISTING annotation remembers its size; see
+  // AnnotPopover + bubbleSizes in PdfViewer.)
+  const [size, setSize] = useState<BoxSize | null>(null)
+  const { gripProps, style: sizeStyle } = useResizable(ref, size, setSize, {
+    axis: 'both',
+    minW: 224,
+    // Floor = a usable text field plus the Avbryt/Lagre row
+    minH: 152
+  })
 
   // Focus once the box is measured and visible — focusing while still
   // `visibility: hidden` (pre-measure) is a no-op.
@@ -440,7 +453,7 @@ export function NotePopover({ x, y, avoid, onSave, onCancel }: NoteProps): React
     <div
       className="note-popover"
       ref={ref}
-      style={style}
+      style={{ ...style, ...sizeStyle }}
       onMouseDown={(e) => e.stopPropagation()}
       {...handleProps}
     >
@@ -464,6 +477,8 @@ export function NotePopover({ x, y, avoid, onSave, onCancel }: NoteProps): React
           {t('app.save')}
         </button>
       </div>
+
+      <span className="box-grip" title={t('bubble.resizeTip')} {...gripProps} />
     </div>
   )
 }
