@@ -64,7 +64,11 @@ function Get-StoreListingCopy {
     [switch] $AllowStaleNotes
   )
   if (-not (Test-Path $ListingDoc)) { throw "Listing doc not found: $ListingDoc" }
-  $md = Get-Content $ListingDoc -Raw
+  # -Encoding UTF8 explicitly: PowerShell 7 defaults to it, Windows PowerShell
+  # defaults to ANSI. Without this the offline test (which runs under Windows
+  # PowerShell) validated a mis-decoded copy, counting every aa/oe/ae and dash as
+  # two characters - conservative, but not the text the API would receive.
+  $md = Get-Content $ListingDoc -Raw -Encoding UTF8
 
   $notesHeading = [regex]::Match($md, '(?m)^## What''s new in this version[^\r\n]*?v(?<ver>\d+\.\d+)')
   if (-not $notesHeading.Success) {
