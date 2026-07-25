@@ -192,9 +192,10 @@ package and submit it, nothing more.
    UI), then **Create API credentials**.
 2. Copy the **Client ID** and the **API key**. The key has an **expiry date** —
    a 401 later means "renew it", not "the script broke".
-3. Product ID: **Microsoft Edge → Overview →** the extension **→ Extension
-   identity** (it is also the GUID in the dashboard URL).
-4. Repo secrets: `EDGE_PRODUCT_ID`, `EDGE_CLIENT_ID`, `EDGE_API_KEY`.
+3. Repo secrets: `EDGE_CLIENT_ID`, `EDGE_API_KEY`. The product ID
+   (`2d23581d-291e-4953-aaf1-0db8715d42ad`, from **Microsoft Edge → Overview →**
+   the extension **→ Extension identity**) is an identifier, not a credential —
+   it is the script's default, overridable with `EDGE_PRODUCT_ID`.
 
 The dry run has no "read the product" endpoint to lean on (the API has none), so
 it probes a nil operation ID: **404 means the credentials work**, 401/403 means

@@ -35,10 +35,10 @@
   -CheckOnly.
 
   Secrets, as env vars (repo secrets of the same name in CI):
-    Edge    EDGE_PRODUCT_ID, EDGE_CLIENT_ID, EDGE_API_KEY
+    Edge    EDGE_CLIENT_ID, EDGE_API_KEY
             Partner Center -> Microsoft Edge -> Publish API -> Create API
-            credentials (the key EXPIRES - the page shows the date). Product ID:
-            Microsoft Edge -> Overview -> the extension -> Extension identity.
+            credentials (the key EXPIRES - the page shows the date). The product
+            ID is not a secret and is defaulted below (EDGE_PRODUCT_ID overrides).
     Chrome  CWS_PUBLISHER_ID, CWS_CLIENT_ID, CWS_CLIENT_SECRET, CWS_REFRESH_TOKEN
             Publisher ID: Developer Dashboard -> Publisher settings. The OAuth
             client + refresh token come from a Google Cloud project with the
@@ -172,11 +172,14 @@ $summary = [ordered]@{}
 
 # --- 1. Edge Add-ons ------------------------------------------------------
 if ($doEdge) {
-  $productId = $env:EDGE_PRODUCT_ID
+  # The product ID is an identifier, not a credential (Partner Center shows it in
+  # the dashboard URL), so it lives here rather than in a secret - same call as
+  # the Chrome item ID below. EDGE_PRODUCT_ID overrides it.
+  $productId = if ($env:EDGE_PRODUCT_ID) { $env:EDGE_PRODUCT_ID } else { '2d23581d-291e-4953-aaf1-0db8715d42ad' }
   $clientId = $env:EDGE_CLIENT_ID
   $apiKey = $env:EDGE_API_KEY
-  if (-not $productId -or -not $clientId -or -not $apiKey) {
-    throw 'Missing EDGE_PRODUCT_ID / EDGE_CLIENT_ID / EDGE_API_KEY env vars. See docs/STORE.md -> "Automated extension publishing".'
+  if (-not $clientId -or -not $apiKey) {
+    throw 'Missing EDGE_CLIENT_ID / EDGE_API_KEY env vars (Partner Center -> Microsoft Edge -> Publish API). See docs/STORE.md -> "Automated extension publishing".'
   }
 
   $edgeHeaders = @{ Authorization = "ApiKey $apiKey"; 'X-ClientID' = $clientId }
