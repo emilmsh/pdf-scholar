@@ -156,6 +156,67 @@ if ($CheckOnly) {
     Write-Host '  Listing sync: SKIPPED (-SkipListingSync)'
     Write-Host ''
   }
+
+  # Read the LAST PUBLISHED submission (a GET - it creates nothing) to see the
+  # live listing as the API models it. Two things this answers that guessing
+  # cannot: the exact shape of the images array (screenshots are not synced yet,
+  # and the schema for doing so is right here rather than in the docs), and
+  # whether the copy we would send actually DIFFERS from what is live - i.e.
+  # whether a submission would change anything at all.
+  if ($app.PSObject.Properties.Name -contains 'lastPublishedApplicationSubmission' -and $app.lastPublishedApplicationSubmission) {
+    $lastId = $app.lastPublishedApplicationSubmission.id
+    Write-Host "=== Live listing, read from published submission $lastId ==="
+    $live = Invoke-RestMethod -Method Get -Headers $headers `
+      -Uri "$apiBase/applications/$AppId/submissions/$lastId"
+
+    $norm = { param($s) if ($null -eq $s) { '' } else { ($s -replace "`r", '').Trim() } }
+    foreach ($listing in $live.listings.PSObject.Properties) {
+      $base = $listing.Value.baseListing
+      if (-not $base) { continue }
+      Write-Host "  listing '$($listing.Name)'"
+      Write-Host "    baseListing fields: $(($base.PSObject.Properties.Name | Sort-Object) -join ', ')"
+
+      # Screenshots: what is live, and the property names we would have to set
+      $images = @()
+      if ($base.PSObject.Properties.Name -contains 'images' -and $base.images) { $images = @($base.images) }
+      Write-Host "    images: $($images.Count)"
+      if ($images.Count -gt 0) {
+        Write-Host "    image fields: $(($images[0].PSObject.Properties.Name | Sort-Object) -join ', ')"
+        foreach ($img in $images) {
+          $type = '?'; $file = '?'; $desc = ''
+          if ($img.PSObject.Properties.Name -contains 'imageType') { $type = $img.imageType }
+          if ($img.PSObject.Properties.Name -contains 'fileName') { $file = $img.fileName }
+          if ($img.PSObject.Properties.Name -contains 'description') { $desc = $img.description }
+          Write-Host "      - $type  $file  $desc"
+        }
+      }
+
+      # Would a sync change anything? Compare field by field, ignoring line
+      # endings (the doc is checked out with CRLF on Windows, LF in CI).
+      if ($listingCopy) {
+        $c = $listingCopy[(Get-CopyLang $listing.Name)]
+        foreach ($pair in @(
+          @{ name = 'description';      new = $c.description },
+          @{ name = 'shortDescription'; new = $c.shortDescription },
+          @{ name = 'releaseNotes';     new = $WhatsNew }
+        )) {
+          if ($base.PSObject.Properties.Name -notcontains $pair.name) {
+            Write-Host "    $($pair.name): NOT MODELLED by the API here"
+            continue
+          }
+          $before = & $norm $base.($pair.name)
+          $after  = & $norm $pair.new
+          if ($before -eq $after) { Write-Host "    $($pair.name): unchanged" }
+          else { Write-Host "    $($pair.name): WOULD CHANGE ($($before.Length) -> $($after.Length) chars)" }
+        }
+        $liveFeat = @()
+        if ($base.PSObject.Properties.Name -contains 'features' -and $base.features) { $liveFeat = @($base.features) }
+        if (($liveFeat -join "`n") -eq ($c.features -join "`n")) { Write-Host '    features: unchanged' }
+        else { Write-Host "    features: WOULD CHANGE ($($liveFeat.Count) -> $($c.features.Count) items)" }
+      }
+    }
+    Write-Host ''
+  }
   Write-Host 'Credentials work end-to-end. Exiting without any changes.'
   return
 }
