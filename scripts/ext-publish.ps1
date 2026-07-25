@@ -253,7 +253,16 @@ if ($doEdge) {
     # A publish can legitimately fail for reasons worth reading rather than
     # retrying: InProgressSubmission (something is already in review),
     # NoModulesUpdated (nothing changed), SubmissionValidationError.
-    if ($status -ne 'Succeeded') { throw "Edge publish $status : $(Format-OperationError $state)" }
+    if ($status -ne 'Succeeded') {
+      # The package upload above already succeeded, so the draft holds this
+      # version either way - say so, or the red run reads as "nothing happened"
+      # and the next attempt looks like it has to start over. Confirmed against
+      # the live API 2026-07-25: 0.27.2 staged fine while 0.17.1 was in review.
+      $staged = if ((Get-Prop $state 'errorCode') -eq 'InProgressSubmission') {
+        " The v$appVersion package IS staged in the draft submission - rerun this workflow (or press Publish in Partner Center) once the in-review submission clears."
+      } else { '' }
+      throw "Edge publish $status : $(Format-OperationError $state).$staged"
+    }
     $summary['Edge'] = "submitted for certification - $(Get-Prop $state 'message')"
   }
 }
