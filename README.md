@@ -224,8 +224,9 @@ npm run dev:web    # renderer only, in a plain browser on :5199
 npm run typecheck  # tsc for renderer + main/preload
 npm run dist       # NSIS installer (Windows)
 npm run build:ext  # browser-extension bundle → dist-extension/
-npm run shoot      # re-shoot every README screenshot (needs npm run build first)
 npm run test:windows  # two windows on one file, end to end (needs npm run build first)
+npm run shoot         # drive the app into each documented state and photograph it
+npm run check:shots   # which shipped screenshots predate the visual changes
 ```
 
 `npm run shoot` and `npm run test:windows` drive the real desktop app over Chromium's
@@ -233,17 +234,16 @@ DevTools protocol, which Electron already ships, so neither needs a browser-auto
 dependency. Both run in a throwaway profile: they never touch your recents, reading
 positions or theme, and every run starts from factory defaults.
 
-The screenshots are therefore reproducible and identical in size from run to run. The
-script asserts the state it is about to photograph, so a renamed tooltip or a jump that
-failed fails the run instead of saving a wrong picture. `npm run shoot -- --list` shows the
-shot names; pass names to re-shoot only some.
+Every shot asserts the state before capturing, so a renamed tooltip or a jump that failed
+fails the run instead of saving a wrong picture — which makes `shoot` a UI smoke test as
+much as a camera. It is what caught a split view that opened lopsided and a page field
+that silently did nothing. `--list` shows the shot names; pass names to run some;
+`--with-ai` adds the two assistant shots, which use the key already in your own profile.
 
-The two assistant shots need a real answer from a real model, so they are opt-in behind
-`npm run shoot -- --with-ai` and skipped otherwise. They ask nobody for an API key: the
-key already lives in your own profile, encrypted, and the script carries the encrypted
-blob into its throwaway profile so the app there decrypts it itself. Because the answer is
-generated, those two are not byte-reproducible — which is why they assert a real answer
-with citation chips and no error, rather than saving whatever was on screen.
+**The screenshots in this README are taken by hand.** Framing and what is worth showing
+are judgement calls, so `shoot` writes to the gitignored `docs/screenshots/_auto/` and
+cannot overwrite them. `npm run check:shots` reports which shipped images predate the
+visual changes since — see [`docs/RELEASE.md`](docs/RELEASE.md).
 
 `npm run test:windows` opens a second window on the same file, annotates in both, saves
 from one, and verifies the result with mupdf — a different PDF implementation, so it

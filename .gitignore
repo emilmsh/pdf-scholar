@@ -6,6 +6,9 @@ dist-extension-firefox/
 release/
 # House demo doc for README screenshots (arXiv 1706.03762) — never ship it
 docs/screenshots/attention.pdf
+# `npm run shoot` output. The screenshots that SHIP are taken by hand (see
+# docs/RELEASE.md) — the script writes here so it can never overwrite them.
+docs/screenshots/_auto/
 *.log
 .DS_Store
 *.local

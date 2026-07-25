@@ -1,9 +1,22 @@
-// Re-shoot every README screenshot, automatically.
+// Drive the real app into each documented state and photograph it.
 //
 //   npm run shoot                           all shots except the AI ones
 //   npm run shoot -- dual-pane reading      just these
 //   npm run shoot -- --list                 show the shot names
 //   npm run shoot -- --with-ai              also the two assistant shots
+//   npm run shoot -- --out docs/screenshots overwrite the shipped set (rare)
+//
+// WHERE THE OUTPUT GOES, AND WHY: docs/screenshots/_auto/ (gitignored), NOT the
+// screenshots the README and the stores use. Those are taken BY HAND — framing,
+// what is on screen and which answer is worth showing are judgement calls this
+// script kept getting slightly wrong, and a slightly-wrong marketing image is
+// worse than no new image. See docs/RELEASE.md: re-shooting them is a step Emil
+// does before a release. This script cannot overwrite them without --out.
+//
+// It is still worth running: every shot ASSERTS the state before capturing, so
+// it doubles as a UI smoke test (it is what caught the lopsided split, the page
+// field that silently did nothing, and the markup that landed off-screen), and
+// the images are a fast way to eyeball a change across themes.
 //
 // Why it drives the REAL desktop app rather than the dev-web preview: the
 // screenshots are of the Windows app, so they should be the Windows app —
@@ -33,7 +46,7 @@
 // the answer is generated. That makes their assertions the important part — a
 // real answer with at least one citation chip and no error — or the run would
 // happily photograph a spinner or an error toast and save it as marketing.
-import { existsSync, writeFileSync, readFileSync } from 'node:fs'
+import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -41,9 +54,9 @@ import { cdp, openSocket, waitForPageTargets, launchApp, evaluate, sleep } from 
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
-const OUT_DIR = join(ROOT, 'docs', 'screenshots')
+const SHOT_DIR = join(ROOT, 'docs', 'screenshots')
 /** The house demo doc (arXiv 1706.03762). Gitignored — see .gitignore. */
-const DEMO_PDF = join(OUT_DIR, 'attention.pdf')
+const DEMO_PDF = join(SHOT_DIR, 'attention.pdf')
 const FALLBACK_PDF = join(ROOT, 'src', 'renderer', 'public', 'sample.pdf')
 const PORT = 9333
 const WIDTH = 1440
@@ -518,7 +531,14 @@ if (args.includes('--list')) {
   process.exit(0)
 }
 const withAi = args.includes('--with-ai')
-const wanted = args.filter((a) => !a.startsWith('-'))
+// Default output is the gitignored _auto/ folder, so a run can never clobber the
+// hand-taken set the README and the stores ship. --out is the explicit override.
+const outFlag = args.indexOf('--out')
+const OUT_DIR = outFlag !== -1 && args[outFlag + 1] ? resolve(ROOT, args[outFlag + 1]) : join(SHOT_DIR, '_auto')
+// Guard the -1 case: without --out, `outFlag + 1` is 0 and would swallow the
+// first shot name, silently running the whole set instead of the one asked for.
+const outValueAt = outFlag === -1 ? -1 : outFlag + 1
+const wanted = args.filter((a, i) => !a.startsWith('-') && i !== outValueAt)
 let shots = wanted.length ? SHOTS.filter((s) => wanted.includes(s.name)) : SHOTS
 // AI shots cost a real model call on the user's own key, so they never run by
 // accident — not even when named explicitly.
@@ -599,7 +619,12 @@ if (pdf === FALLBACK_PDF) {
   )
 }
 
+mkdirSync(OUT_DIR, { recursive: true })
 console.log(`Shooting ${shots.length} screenshot(s) at ${WIDTH}×${HEIGHT} @${DPR}x`)
+console.log(`  → ${OUT_DIR}`)
+if (OUT_DIR === SHOT_DIR) {
+  console.log('  ! writing over the SHIPPED screenshots (docs/RELEASE.md: these are taken by hand)')
+}
 const needsAi = shots.some((s) => s.needsAi)
 const app = launchApp({
   root: ROOT,
@@ -667,4 +692,7 @@ if (failed) {
   console.error(`\n${failed} shot(s) failed.`)
   process.exit(1)
 }
-console.log('\nDone. Check the PNGs, then commit them.')
+console.log(`\nDone — ${OUT_DIR}`)
+if (OUT_DIR !== SHOT_DIR) {
+  console.log('These are for eyeballing, not for shipping. The README/store set is shot by hand.')
+}

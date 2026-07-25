@@ -19,6 +19,7 @@
     "typecheck": "tsc --noEmit -p config/tsconfig.web.json && tsc --noEmit -p config/tsconfig.node.json && tsc --noEmit -p config/tsconfig.extension.json",
     "sample": "node scripts/make-sample-pdf.mjs",
     "shoot": "node scripts/shoot-screenshots.mjs",
+    "check:shots": "node scripts/check-screenshots.mjs",
     "test:engine": "esbuild src/main/annotation-engine-embedpdf.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.engine-test-bundle.mjs && node scripts/test-engine-embedpdf.mjs",
     "test:appender": "node scripts/test-appender.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
