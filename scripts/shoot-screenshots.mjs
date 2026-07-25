@@ -1,8 +1,9 @@
 // Re-shoot every README screenshot, automatically.
 //
-//   npm run shoot            all shots
+//   npm run shoot                           all shots except the AI ones
 //   npm run shoot -- dual-pane reading      just these
 //   npm run shoot -- --list                 show the shot names
+//   npm run shoot -- --with-ai              also the two assistant shots
 //
 // Why it drives the REAL desktop app rather than the dev-web preview: the
 // screenshots are of the Windows app, so they should be the Windows app —
@@ -20,11 +21,21 @@
 //   * device metrics are pinned (size + deviceScaleFactor 2), so the PNGs are
 //     the same dimensions every time and crisp on a HiDPI README.
 //
-// The two assistant screenshots are NOT here: a useful one needs a real answer
-// from a real API key, which is neither reproducible nor something to bake into
-// a script. Shoot those two by hand when the assistant UI changes.
-import { existsSync, writeFileSync } from 'node:fs'
+// The two assistant shots need a real answer from a real model, so they are
+// OPT-IN behind --with-ai and skipped otherwise. They do not ask anyone for an
+// API key: keys already live in the real profile's pdfx-state.json, encrypted
+// with Electron safeStorage, which on Windows is DPAPI — scoped to the Windows
+// USER, not to the profile directory. So the encrypted blob can be copied into
+// the throwaway profile and the app there decrypts it itself. The key is never
+// decrypted by this script, never printed, and dies with the temp profile.
+//
+// Consequence worth knowing: those two shots are NOT byte-reproducible, since
+// the answer is generated. That makes their assertions the important part — a
+// real answer with at least one citation chip and no error — or the run would
+// happily photograph a spinner or an error toast and save it as marketing.
+import { existsSync, writeFileSync, readFileSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { cdp, openSocket, waitForPageTargets, launchApp, evaluate, sleep } from './lib/cdp.mjs'
 
@@ -127,6 +138,37 @@ const SHOTS = [
       await ui.goToPage(1)
       await ui.fitWidth()
       await ui.setTheme('night')
+    `
+  },
+  {
+    name: 'assistant',
+    caption: 'Assistant answering from the document, with citation chips',
+    needsAi: true,
+    setup: `
+      await ui.closePanels()
+      await ui.fitWidth()
+      await ui.goToPage(1)
+      await ui.openAssistant()
+      // The house question (docs/agent-notes): its answer cites p. 6, so the
+      // chips in the shot point somewhere a reader can verify.
+      await ui.ask('Hvordan fungerer positional encoding i denne artikkelen?')
+      ui.expectAnswer()
+    `
+  },
+  {
+    name: 'assistant_figure',
+    caption: 'Explain a figure: a snipped region and the answer about it',
+    needsAi: true,
+    setup: `
+      // Panels closed: the bubble is the subject of this shot, and it is the
+      // toolbar flow a reader would actually use.
+      await ui.closePanels()
+      await ui.fitWidth()
+      await ui.goToPage(6)
+      await ui.snipRegion()
+      ui.expectSnippedFigure()
+      await ui.waitForQuick()
+      ui.expectQuickAnswer()
     `
   },
   {
@@ -247,6 +289,176 @@ const ui = {
     click(chev);
     await settle(400);
   },
+  /** Open the assistant panel (idempotent) */
+  async openAssistant() {
+    const b = btn('Assistent');
+    if (!b) throw new Error('no assistant button');
+    if (!b.classList.contains('is-active')) { click(b); await settle(700); }
+    if (!document.querySelector('.ai-panel')) throw new Error('assistant panel did not open');
+    // With no usable key the panel opens on its key-settings form instead of the
+    // chat, and every later selector misses for a reason that has nothing to do
+    // with the shot. Name that here.
+    if (document.querySelector('.ai-settings') && !document.querySelector('.ai-composer')) {
+      throw new Error('assistant opened its API-key settings — the carried AI config did not decrypt');
+    }
+  },
+  /** Type into the composer without faking React's value plumbing */
+  async compose(text) {
+    const ta = document.querySelector('.ai-composer textarea');
+    if (!ta) throw new Error('no composer textarea');
+    ta.focus();
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(ta, text);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(150);
+  },
+  /** Send whatever is composed and wait for the answer to finish streaming */
+  async send(text) {
+    if (text) await this.compose(text);
+    const send = document.querySelector('.ai-send');
+    if (!send) throw new Error('no send button');
+    click(send);
+    await settle(500);
+    // Done = no thinking indicator AND the answer stopped growing. A generated
+    // answer has no fixed length, so settle on stability rather than a timeout.
+    const deadline = Date.now() + 180000;
+    let lastLen = -1, stableFor = 0;
+    while (Date.now() < deadline) {
+      if (document.querySelector('.ai-error')) return;   // expectAnswer reports it
+      const msgs = document.querySelectorAll('.ai-msg.ai-assistant');
+      const len = msgs.length ? (msgs[msgs.length - 1].textContent || '').length : 0;
+      const busy = !!document.querySelector('.ai-thinking');
+      if (!busy && len > 0 && len === lastLen) {
+        stableFor += 1;
+        if (stableFor >= 3) return;   // ~1.5 s unchanged
+      } else {
+        stableFor = 0;
+      }
+      lastLen = len;
+      await settle(500);
+    }
+    throw new Error('the assistant did not finish within 180 s');
+  },
+  ask(text) { return this.send(text); },
+  /** Fail rather than photograph a spinner, an error, or an uncited answer */
+  expectAnswer(opts) {
+    const err = document.querySelector('.ai-error');
+    if (err) throw new Error('assistant errored: ' + (err.textContent || '').trim().slice(0, 200));
+    if (document.querySelector('.ai-thinking')) throw new Error('still thinking');
+    const msgs = document.querySelectorAll('.ai-msg.ai-assistant');
+    if (msgs.length === 0) throw new Error('no assistant message');
+    const last = msgs[msgs.length - 1];
+    const text = (last.textContent || '').trim();
+    if (text.length < 120) throw new Error('answer suspiciously short: ' + JSON.stringify(text.slice(0, 80)));
+    // Document chips, not web chips: the claim is that answers link back to the
+    // PDF, and that is exactly what the screenshot is evidence for.
+    const chips = last.querySelectorAll('.ai-chip:not(.ai-chip-web)');
+    if (chips.length === 0) throw new Error('answer has no document citation chips');
+    if (opts && opts.image) {
+      const shown = document.querySelectorAll('.ai-msg.ai-user .ai-msg-images img, .ai-msg-images img');
+      if (shown.length === 0) throw new Error('no snipped image in the conversation');
+    }
+  },
+  /** Drag a box over the visible part of the page.
+   *
+   *  Coordinates come from the INTERSECTION of the page and its scroll
+   *  container, not from the page alone: a page taller than the viewport starts
+   *  above it (negative top), so a box measured off the page rect lands partly
+   *  off-screen and the snip comes back empty. */
+  async snipRegion() {
+    const b = btn('Forklar område');
+    if (!b) throw new Error('no snip button');
+    click(b);
+    await settle(500);
+    const overlay = document.querySelector('.snip-overlay');
+    if (!overlay) throw new Error('snip overlay did not appear');
+    const host = document.querySelector('.pages[data-pane="a"]');
+    if (!host) throw new Error('no pages column');
+    const h = host.getBoundingClientRect();
+    // The page under the READER, not the first one in the DOM: after scrolling
+    // to page 6 the first .pdf-page is thousands of pixels above the viewport.
+    let page = null, bestOverlap = 0;
+    for (const el of host.querySelectorAll('.pdf-page')) {
+      const r = el.getBoundingClientRect();
+      const overlap = Math.min(r.bottom, h.bottom) - Math.max(r.top, h.top);
+      if (overlap > bestOverlap) { bestOverlap = overlap; page = el; }
+    }
+    if (!page) throw new Error('no page overlaps the viewport');
+    const p = page.getBoundingClientRect();
+    const box = {
+      left: Math.max(p.left, h.left),
+      right: Math.min(p.right, h.right),
+      top: Math.max(p.top, h.top),
+      bottom: Math.min(p.bottom, h.bottom)
+    };
+    const w = box.right - box.left, ht = box.bottom - box.top;
+    if (w < 200 || ht < 150) throw new Error('too little of the page is visible to snip: ' + Math.round(w) + 'x' + Math.round(ht));
+    const x1 = Math.round(box.left + w * 0.10);
+    const y1 = Math.round(box.top + ht * 0.10);
+    const x2 = Math.round(box.left + w * 0.90);
+    const y2 = Math.round(box.top + ht * 0.62);
+    const opts = (x, y) => ({
+      bubbles: true, cancelable: true, clientX: x, clientY: y,
+      button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true
+    });
+    overlay.dispatchEvent(new PointerEvent('pointerdown', opts(x1, y1)));
+    await settle(120);
+    overlay.dispatchEvent(new PointerEvent('pointermove', opts(Math.round((x1 + x2) / 2), Math.round((y1 + y2) / 2))));
+    await settle(120);
+    overlay.dispatchEvent(new PointerEvent('pointermove', opts(x2, y2)));
+    await settle(150);
+    if (!document.querySelector('.snip-marquee')) throw new Error('the drag drew no marquee');
+    overlay.dispatchEvent(new PointerEvent('pointerup', opts(x2, y2)));
+    // The TOOLBAR snip arms target 'quick' (PdfViewer: setSnip({target:'quick'})),
+    // so the result is the floating bubble, not the side panel's composer -
+    // asserting on .ai-attach here was asserting the panel's flow instead.
+    // Rasterising is async, so poll rather than guess a delay.
+    for (let i = 0; i < 20; i++) {
+      await settle(400);
+      if (document.querySelector('.ai-quick')) return;
+    }
+    throw new Error('snip produced no quick bubble');
+  },
+  /** The bubble must actually show the snipped region, not an empty frame */
+  expectSnippedFigure() {
+    const img = document.querySelector('.ai-quick img.ai-quick-figure');
+    if (!img) throw new Error('no snipped figure in the bubble');
+    if (!img.complete || img.naturalWidth < 100) {
+      throw new Error('snipped figure is empty or tiny: ' + img.naturalWidth + 'x' + img.naturalHeight);
+    }
+  },
+  /** Wait for the bubble's answer to finish.
+   *
+   *  Figure mode has no question field: AiPanel computes active as
+   *  "not ask-mode, or already asked", so only the free-form «Spør …» mode
+   *  stages a prompt - there, drawing a box is not itself the question. For a
+   *  figure the drag IS the deliberate act, so the request runs on open.
+   *  (No backticks in this PRELUDE: it is a template literal.) */
+  async waitForQuick() {
+    const deadline = Date.now() + 180000;
+    let lastLen = -1, stable = 0;
+    while (Date.now() < deadline) {
+      if (document.querySelector('.ai-quick .ai-error')) return;
+      const body = document.querySelector('.ai-quick-body');
+      const len = body ? (body.textContent || '').length : 0;
+      const busy = !!document.querySelector('.ai-quick .ai-thinking');
+      if (!busy && len > 0 && len === lastLen) { stable += 1; if (stable >= 3) return; }
+      else stable = 0;
+      lastLen = len;
+      await settle(500);
+    }
+    throw new Error('the bubble did not finish within 180 s');
+  },
+  /** A figure answer need not cite the text, so chips are not required here -
+   *  but an error, a spinner or an empty body still fails the shot. */
+  expectQuickAnswer() {
+    const err = document.querySelector('.ai-quick .ai-error');
+    if (err) throw new Error('assistant errored: ' + (err.textContent || '').trim().slice(0, 200));
+    if (document.querySelector('.ai-quick .ai-thinking')) throw new Error('still thinking');
+    const body = document.querySelector('.ai-quick-body');
+    const text = body ? (body.textContent || '').trim() : '';
+    if (text.length < 120) throw new Error('figure answer suspiciously short: ' + JSON.stringify(text.slice(0, 80)));
+  },
   /** A couple of real marks on the page, so the tools shot has something to
    *  show. Restricted to text that is ACTUALLY ON SCREEN — marking a span on a
    *  scrolled-away page produced a screenshot with no visible marks at all. */
@@ -300,14 +512,78 @@ const runSetup = (send, body) => evaluate(send, `${body}\nreturn 'ok'`, PRELUDE)
 
 const args = process.argv.slice(2)
 if (args.includes('--list')) {
-  for (const s of SHOTS) console.log(`${s.name.padEnd(14)} ${s.caption}`)
+  for (const s of SHOTS) {
+    console.log(`${s.name.padEnd(16)}${s.needsAi ? '[--with-ai] ' : ''}${s.caption}`)
+  }
   process.exit(0)
 }
+const withAi = args.includes('--with-ai')
 const wanted = args.filter((a) => !a.startsWith('-'))
-const shots = wanted.length ? SHOTS.filter((s) => wanted.includes(s.name)) : SHOTS
+let shots = wanted.length ? SHOTS.filter((s) => wanted.includes(s.name)) : SHOTS
+// AI shots cost a real model call on the user's own key, so they never run by
+// accident — not even when named explicitly.
+const gated = shots.filter((s) => s.needsAi && !withAi)
+shots = shots.filter((s) => !s.needsAi || withAi)
+if (gated.length) {
+  console.log(`Skipping ${gated.map((s) => s.name).join(', ')} — pass --with-ai (uses your own API key).`)
+}
 if (shots.length === 0) {
   console.error(`No shot matched. Known: ${SHOTS.map((s) => s.name).join(', ')}`)
   process.exit(1)
+}
+
+/**
+ * Carry the app's own AI configuration into the throwaway profile, so the AI
+ * shots can ask a real question without anyone typing a key.
+ *
+ * TWO files are needed, and the reason is worth writing down. Electron's
+ * safeStorage on Windows is Chromium's os_crypt, which does NOT DPAPI-encrypt
+ * each string: it encrypts them with a random AES key, and only THAT key is
+ * DPAPI-protected — stored as os_crypt.encrypted_key in <userData>/Local State.
+ * A fresh profile generates a fresh AES key, so the copied blob decrypts to ''
+ * and the app opens the assistant in its key-settings state instead of the chat
+ * (which is exactly how the first run of this failed). The encrypted keys and
+ * the wrapped AES key have to travel together.
+ *
+ * What this does NOT do: decrypt anything, print anything, or persist anything
+ * outside the temp profile, which is deleted when the run ends. DPAPI still
+ * binds the copy to this Windows user, so it is useless anywhere else.
+ *
+ * Nothing else is copied: no recents, no reading positions, no theme. The shots
+ * still start from factory defaults in every other respect.
+ */
+function carryAiConfig(profileDir) {
+  const appData = process.env.APPDATA || join(homedir(), 'AppData', 'Roaming')
+  const realDir = join(appData, 'PDF Scholar')
+  const realState = join(realDir, 'pdfx-state.json')
+  const realCrypt = join(realDir, 'Local State')
+  if (!existsSync(realState)) {
+    throw new Error(
+      `--with-ai needs the app's own settings, but ${realState} does not exist.\n` +
+        '  Open PDF Scholar normally once and add an API key in the assistant settings.'
+    )
+  }
+  const ai = JSON.parse(readFileSync(realState, 'utf8')).ai
+  const providers = Object.entries(ai?.keys ?? {})
+    .filter(([id, v]) => v && id !== 'mock')
+    .map(([id]) => id)
+  if (providers.length === 0) {
+    throw new Error('--with-ai found no API key in the app settings. Add one in the assistant settings.')
+  }
+  if (!existsSync(realCrypt)) {
+    throw new Error(
+      `--with-ai found keys but no ${realCrypt}, which holds the wrapped key that decrypts them.`
+    )
+  }
+  const osCrypt = JSON.parse(readFileSync(realCrypt, 'utf8')).os_crypt
+  if (!osCrypt?.encrypted_key) {
+    throw new Error('--with-ai: Local State has no os_crypt.encrypted_key — cannot decrypt the stored keys.')
+  }
+  // Only the ai block. main/storage.ts merges a partial state over its defaults.
+  writeFileSync(join(profileDir, 'pdfx-state.json'), JSON.stringify({ ai }), 'utf8')
+  // Only os_crypt, not the rest of Chromium's Local State.
+  writeFileSync(join(profileDir, 'Local State'), JSON.stringify({ os_crypt: osCrypt }), 'utf8')
+  console.log(`  AI config carried into the temp profile (provider: ${ai.provider}, keys for: ${providers.join(', ')})`)
 }
 
 const mainJs = join(ROOT, 'out', 'main', 'index.js')
@@ -324,7 +600,14 @@ if (pdf === FALLBACK_PDF) {
 }
 
 console.log(`Shooting ${shots.length} screenshot(s) at ${WIDTH}×${HEIGHT} @${DPR}x`)
-const app = launchApp({ root: ROOT, mainJs, args: [pdf], port: PORT })
+const needsAi = shots.some((s) => s.needsAi)
+const app = launchApp({
+  root: ROOT,
+  mainJs,
+  args: [pdf],
+  port: PORT,
+  prepareProfile: needsAi ? carryAiConfig : undefined
+})
 
 let failed = 0
 try {

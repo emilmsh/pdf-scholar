@@ -75,9 +75,14 @@ export async function waitForPageTargets(port, count = 1, timeoutMs = 30_000) {
  * recents / reading positions / theme, always starts from factory defaults, and
  * gets its own single-instance lock (it works while the real app is open).
  * Returns the child plus a `log()` of everything it printed and a `cleanup()`.
+ *
+ * `prepareProfile(dir)` runs after the profile directory exists and BEFORE the
+ * app starts, for the rare case where factory defaults are not enough (see the
+ * AI shots in shoot-screenshots.mjs). Anything it writes dies with the profile.
  */
-export function launchApp({ root, mainJs, args = [], port }) {
+export function launchApp({ root, mainJs, args = [], port, prepareProfile }) {
   const profile = mkdtempSync(join(tmpdir(), 'pdfx-cdp-'))
+  if (prepareProfile) prepareProfile(profile)
   const bin = join(
     root,
     'node_modules',

@@ -236,8 +236,14 @@ positions or theme, and every run starts from factory defaults.
 The screenshots are therefore reproducible and identical in size from run to run. The
 script asserts the state it is about to photograph, so a renamed tooltip or a jump that
 failed fails the run instead of saving a wrong picture. `npm run shoot -- --list` shows the
-shot names; pass names to re-shoot only some. The two assistant screenshots stay manual,
-since a useful one needs a real answer from a real API key.
+shot names; pass names to re-shoot only some.
+
+The two assistant shots need a real answer from a real model, so they are opt-in behind
+`npm run shoot -- --with-ai` and skipped otherwise. They ask nobody for an API key: the
+key already lives in your own profile, encrypted, and the script carries the encrypted
+blob into its throwaway profile so the app there decrypts it itself. Because the answer is
+generated, those two are not byte-reproducible — which is why they assert a real answer
+with citation chips and no error, rather than saving whatever was on screen.
 
 `npm run test:windows` opens a second window on the same file, annotates in both, saves
 from one, and verifies the result with mupdf — a different PDF implementation, so it
