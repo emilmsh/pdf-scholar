@@ -29,11 +29,13 @@ import type {
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
 import {
+  ensureReadPermission,
   ensureWritePermission,
   forgetFileHandle,
   loadFileHandle,
   saveFileHandle
 } from './extension-fs-grants'
+import { t } from './i18n'
 
 /** True when running inside a WebExtension page (has a runtime id). */
 export function isExtensionContext(): boolean {
@@ -61,6 +63,20 @@ const handles = new Map<string, FileSystemFileHandle>()
  *  the baseline docWasModifiedExternally compares against before an
  *  overwrite-via-handle save. */
 const handleBaseline = new Map<string, number>()
+
+/** `fsa:` marks a file the user picked in the File System Access dialog: there is
+ *  no URL the browser could re-fetch, so the FILE HANDLE is the identity and the
+ *  path is just a stable key (its basename). Handles are persisted, so such a
+ *  file stays reopenable from the recents list across sessions — two files with
+ *  the same basename share the key, and the most recently opened one wins. */
+const FSA = 'fsa:'
+
+/** Display name for a path: picked files carry the pseudo-prefix, real paths
+ *  their last segment. */
+function fileNameOf(path: string): string {
+  if (path.startsWith(FSA)) return path.slice(FSA.length)
+  return decodeURIComponent(path.split(/[/\\]/).pop() ?? path)
+}
 
 /** The extension viewer URL for a given source path/URL. */
 function viewerUrl(path: string): string {
@@ -99,12 +115,14 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
 
     // file:// requires the "Allow access to file URLs" toggle in the extension
     // details page; http(s) requires the host in manifest host_permissions.
+    // A picked (fsa:) file is NOT fetchable — it is read back through its stored
+    // handle instead, which is what makes it reopenable from the recents list.
     readFile: async (path): Promise<FilePayload | FileError> => {
+      if (path.startsWith(FSA)) return readViaHandle(path)
       try {
         const res = await fetch(path)
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const name = decodeURIComponent(path.split(/[/\\]/).pop() ?? path)
-        return { path, name, data: new Uint8Array(await res.arrayBuffer()) }
+        return { path, name: fileNameOf(path), data: new Uint8Array(await res.arrayBuffer()) }
       } catch (err) {
         return { error: err instanceof Error ? err.message : String(err) }
       }
@@ -121,9 +139,12 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
           multiple: false
         })
         const file = await handle.getFile()
-        const path = `fsa:${file.name}`
+        const path = `${FSA}${file.name}`
         handles.set(path, handle)
         handleBaseline.set(path, file.lastModified)
+        // Persist the handle so the recents entry we are about to write stays
+        // openable in a later session (readFile reads it back via readViaHandle).
+        saveFileHandle(path, handle)
         recordRecent({ path, name: file.name })
         return { path, name: file.name, data: new Uint8Array(await file.arrayBuffer()) }
       } catch {
@@ -158,18 +179,22 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         .get<Record<string, ReadingPosition>>(K_POSITIONS, {})
         .then((all) => store.set(K_POSITIONS, { ...all, [path]: pos }))
     },
-    getRecents: () => store.get<RecentFile[]>(K_RECENTS, []),
+    // Heal names written before fileNameOf existed (picked files were stored as
+    // "fsa:<name>" because the name was derived from the pseudo-path).
+    getRecents: async () =>
+      (await store.get<RecentFile[]>(K_RECENTS, [])).map((r) =>
+        r.name.startsWith(FSA) ? { ...r, name: fileNameOf(r.name) } : r
+      ),
 
     docOpened: (path: string) => {
       // The name is derived from the path tail; the shell also records recents
       // via openFileDialog. Keep this cheap and best-effort.
-      const name = decodeURIComponent(path.split(/[/\\]/).pop() ?? path)
-      if (path) recordRecent({ path, name })
+      if (path) recordRecent({ path, name: fileNameOf(path) })
       // Pre-warm a write grant saved in a previous session so the FIRST save can
       // be silent when the browser still holds the permission. queryPermission
       // never prompts (interactive:false); a grant that needs re-confirming just
       // waits for the Save click, where requestPermission is allowed to prompt.
-      if (path && !path.startsWith('fsa:') && !handles.has(path)) {
+      if (path && !handles.has(path)) {
         void loadFileHandle(path).then(async (stored) => {
           if (stored && (await ensureWritePermission(stored, false))) handles.set(path, stored)
         })
@@ -201,12 +226,11 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // is privileged first-party browser code, not sandboxed web content.)
     saveDocumentBytes: async (path, name, data): Promise<{ path: string } | FileError | null> => {
       // Per-file only (not folder-wide) — never asks for broader access than the
-      // user reached for. Keyed by the file URL, which is stable across sessions;
-      // an fsa: picked-file path is not, so those keep their session handle only.
-      const persistable = !path.startsWith('fsa:')
+      // user reached for. Keyed by the file URL, or by the fsa: basename for a
+      // picked file (see FSA above).
       let handle = handles.get(path)
       // Restore a grant from a previous session before asking again.
-      if (!handle && persistable) {
+      if (!handle) {
         const stored = await loadFileHandle(path)
         if (stored && (await ensureWritePermission(stored))) {
           handle = stored
@@ -228,7 +252,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
           return { error: err instanceof Error ? err.message : String(err) }
         }
         handles.set(path, handle)
-        if (persistable) saveFileHandle(path, handle)
+        saveFileHandle(path, handle)
       }
       try {
         const writable = await handle.createWritable()
@@ -242,7 +266,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         // The handle is stale (file moved/deleted, or permission lost): drop it
         // so the next save re-establishes access instead of failing forever.
         handles.delete(path)
-        if (persistable) forgetFileHandle(path)
+        forgetFileHandle(path)
         return { error: err instanceof Error ? err.message : String(err) }
       }
     },
@@ -260,6 +284,36 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         return false
       }
     }
+  }
+}
+
+/** Read a picked (fsa:) file back through its File System Access handle — the
+ *  session handle if we still hold one, otherwise the one persisted when the
+ *  user picked it. After a browser restart the stored handle usually needs its
+ *  permission re-confirmed, which is a prompt: this runs from the click on the
+ *  recents row, so the gesture is there to spend. If the handle is gone (grants
+ *  cleared, file moved, private window) say so in words the user can act on —
+ *  "Failed to fetch" was the old, useless failure. */
+async function readViaHandle(path: string): Promise<FilePayload | FileError> {
+  let handle = handles.get(path)
+  if (!handle) {
+    const stored = await loadFileHandle(path)
+    if (stored && (await ensureReadPermission(stored))) {
+      handle = stored
+      handles.set(path, handle)
+    }
+  }
+  if (!handle) return { error: t('doc.pickedUnavailable') }
+  try {
+    const file = await handle.getFile()
+    handleBaseline.set(path, file.lastModified)
+    return { path, name: file.name, data: new Uint8Array(await file.arrayBuffer()) }
+  } catch {
+    // Moved, renamed or deleted since we stored it — drop the dead handle so the
+    // entry stops pretending it can be reopened.
+    handles.delete(path)
+    forgetFileHandle(path)
+    return { error: t('doc.pickedUnavailable') }
   }
 }
 

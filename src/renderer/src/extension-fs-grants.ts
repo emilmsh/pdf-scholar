@@ -67,16 +67,18 @@ export function forgetFileHandle(path: string): void {
   void tx('readwrite', (s) => s.delete(path))
 }
 
-/** Ensure we hold read/write permission for a restored handle. queryPermission
+/** Ensure we hold `mode` permission for a restored handle. queryPermission
  *  never prompts (use it to pre-warm silently); requestPermission needs a user
- *  gesture, so only call this from a click handler (e.g. the Save button).
- *  `interactive: false` skips the prompt — returns false if a grant is needed. */
-export async function ensureWritePermission(
+ *  gesture, so only call this from a click handler (e.g. the Save button, or the
+ *  click on a recent file). `interactive: false` skips the prompt — returns false
+ *  if a grant is needed. A readwrite grant satisfies a 'read' query too. */
+export async function ensurePermission(
   handle: FileSystemFileHandle,
+  mode: 'read' | 'readwrite',
   interactive = true
 ): Promise<boolean> {
   const h = handle as PermalinkHandle
-  const opts = { mode: 'readwrite' as const }
+  const opts = { mode }
   try {
     if ((await h.queryPermission?.(opts)) === 'granted') return true
     if (!interactive) return false
@@ -84,4 +86,18 @@ export async function ensureWritePermission(
   } catch {
     return false
   }
+}
+
+export function ensureWritePermission(
+  handle: FileSystemFileHandle,
+  interactive = true
+): Promise<boolean> {
+  return ensurePermission(handle, 'readwrite', interactive)
+}
+
+export function ensureReadPermission(
+  handle: FileSystemFileHandle,
+  interactive = true
+): Promise<boolean> {
+  return ensurePermission(handle, 'read', interactive)
 }

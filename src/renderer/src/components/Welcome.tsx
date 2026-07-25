@@ -118,10 +118,18 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
             <ul>
               {recents.map((r) => (
                 <li key={r.path}>
-                  <button className="recent-row" onClick={() => onOpenRecent(r.path)} title={r.path}>
+                  {/* A picked file has no folder path — the `fsa:` pseudo-path is
+                      an internal key, so show the same hint the sidebar uses. */}
+                  <button
+                    className="recent-row"
+                    onClick={() => onOpenRecent(r.path)}
+                    title={r.path.startsWith('fsa:') ? undefined : r.path}
+                  >
                     <IconDocument />
                     <span className="recent-name">{r.name}</span>
-                    <span className="recent-path">{r.path}</span>
+                    <span className="recent-path">
+                      {r.path.startsWith('fsa:') ? t('doc.pickedHint') : r.path}
+                    </span>
                     <span className="recent-date">{formatDate(r.lastOpened)}</span>
                   </button>
                 </li>
