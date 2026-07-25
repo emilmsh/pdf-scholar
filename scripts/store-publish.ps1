@@ -11,9 +11,16 @@
   publishing" for the one-time setup that produces the three secrets below.
 
   Flow: token -> read app -> (delete stale pending submission) -> create
-  submission -> mark old packages PendingDelete + add the new ones + set release
-  notes -> zip the appx files -> upload zip to the SAS URL -> PUT submission ->
-  commit -> poll status.
+  submission -> mark old packages PendingDelete + add the new ones + sync the
+  listing copy (description, features, short description, release notes) from
+  docs/STORE-LISTING-DESKTOP.md -> zip the appx files -> upload zip to the SAS
+  URL -> PUT submission -> commit -> poll status.
+
+  The listing doc is the single source of truth for the copy: a new submission
+  clones the LAST PUBLISHED one, so without this sync every API submission
+  would silently re-publish whatever text was live when it was created, and
+  editing it afterwards in the UI is forbidden (see below). Screenshots are NOT
+  synced - they carry over from the cloned submission untouched.
 
   IMPORTANT (API rule): once a submission is created/edited through this API, do
   NOT edit it in the Partner Center UI - that severs API control of it. It's API
@@ -35,19 +42,28 @@ param(
   [string] $AppId = '9N75CPC0G9M2',
 
   # Folder holding the freshly built appx files (npm run dist:store output).
-  [string] $ReleaseDir = (Join-Path $PSScriptRoot '..' 'release'),
+  # Blank = <repo>/release (resolved in the body - see the note there).
+  [string] $ReleaseDir,
 
-  # "What's new in this version" text. Defaults to the current version string;
-  # pass the release-notes block from docs/STORE-LISTING-DESKTOP.md for a proper
-  # note. Max 1500 chars per the Store.
+  # "What's new in this version" text. Blank = the release-notes block for this
+  # version from the listing doc. Max 1500 chars per the Store.
   [string] $WhatsNew = '',
+
+  # Paste-ready listing copy. Parsed, not mirrored into JSON, so there is one
+  # place to edit and no second copy to drift. Blank = the desktop listing doc.
+  [string] $ListingDoc,
+
+  # Push packages and release notes only, leaving the live description, features
+  # and short description exactly as the cloned submission had them.
+  [switch] $SkipListingSync,
 
   # Delete an existing pending (uncommitted) submission instead of aborting.
   [switch] $ReplacePending,
 
-  # Dry run: authenticate and read the app, then exit WITHOUT creating or
-  # touching any submission. Use this to validate the three secrets without
-  # disturbing a submission that is already in certification.
+  # Dry run: authenticate, read the app and parse the listing doc, then exit
+  # WITHOUT creating or touching any submission. Validates both the three
+  # secrets and the copy that would be sent, without disturbing a submission
+  # that is already in certification.
   [switch] $CheckOnly
 )
 
@@ -64,8 +80,28 @@ if (-not $tenantId -or -not $clientId -or -not $clientSecret) {
 
 $apiBase = 'https://manage.devcenter.microsoft.com/v1.0/my'
 
+# Paths are resolved here rather than as param defaults: PowerShell evaluates
+# defaults before $PSScriptRoot is set, so a default built from it comes out
+# empty (silently, in the case of Join-Path with a real second component).
+$repoRoot = Split-Path $PSScriptRoot -Parent
+if (-not $ReleaseDir)  { $ReleaseDir  = Join-Path $repoRoot 'release' }
+if (-not $ListingDoc)  { $ListingDoc  = Join-Path $repoRoot 'docs/STORE-LISTING-DESKTOP.md' }
+
 # Read the app version so we can name the packages and default the release note.
-$version = (Get-Content (Join-Path $PSScriptRoot '..' 'package.json') -Raw | ConvertFrom-Json).version
+$version = (Get-Content (Join-Path $repoRoot 'package.json') -Raw | ConvertFrom-Json).version
+
+# --- 0. listing copy from docs/STORE-LISTING-DESKTOP.md -------------------
+# Parsed FIRST, before secrets and before the network: bad copy should fail
+# instantly and locally, not after authenticating. scripts/test-store-listing.ps1
+# checks this same code with no credentials at all.
+. (Join-Path $PSScriptRoot 'lib' 'store-listing.ps1')
+
+$listingCopy = $null
+if (-not $SkipListingSync) {
+  $listingCopy = Get-StoreListingCopy -ListingDoc $ListingDoc -Version $version `
+    -AllowStaleNotes:([bool]$WhatsNew)
+  if (-not $WhatsNew) { $WhatsNew = $listingCopy['EN'].releaseNotes }
+}
 if (-not $WhatsNew) { $WhatsNew = "PDF Scholar $version" }
 
 # Locate the two appx files for this version (not needed for a -CheckOnly run).
@@ -105,6 +141,21 @@ if ($CheckOnly) {
     Write-Host "  Last published submission: $($app.lastPublishedApplicationSubmission.id)"
   }
   Write-Host ''
+  if ($listingCopy) {
+    Write-Host '=== Listing copy that WOULD be sent (parsed, not sent) ==='
+    foreach ($lang in ($listingCopy.Keys | Sort-Object)) {
+      $c = $listingCopy[$lang]
+      Write-Host "  [$lang] description $($c.description.Length) chars, first line:"
+      Write-Host "        $(($c.description -split '\r?\n')[0])"
+      Write-Host "  [$lang] short ($($c.shortDescription.Length) chars): $($c.shortDescription)"
+      Write-Host "  [$lang] release notes $($c.releaseNotes.Length) chars, $(($c.releaseNotes -split '\r?\n').Count) bullets"
+      Write-Host "  [$lang] $($c.features.Count) product features, longest $(($c.features | Measure-Object -Property Length -Maximum).Maximum) chars"
+    }
+    Write-Host ''
+  } else {
+    Write-Host '  Listing sync: SKIPPED (-SkipListingSync)'
+    Write-Host ''
+  }
   Write-Host 'Credentials work end-to-end. Exiting without any changes.'
   return
 }
@@ -137,16 +188,36 @@ $submission.applicationPackages = @($submission.applicationPackages) + @(
   }
 )
 
-# Set "what's new" on every existing listing language.
+# Sync the copy onto every existing listing language. Only fields the cloned
+# submission already carries are written: the legacy API silently ignores
+# unknown members, so assigning a field it does not model would look like it
+# worked and change nothing. A missing one is reported instead.
+#
+# NOTE: screenshots (.images) are deliberately NOT synced - they carry over from
+# the cloned submission, and Partner Center is a better place to judge them than
+# a script. docs/store-screenshots/ holds the 1280x800 files to upload by hand.
 foreach ($listing in $submission.listings.PSObject.Properties) {
-  if ($listing.Value.baseListing) {
-    $listing.Value.baseListing.releaseNotes = $WhatsNew
+  $base = $listing.Value.baseListing
+  if (-not $base) { continue }
+  $fields = @{ releaseNotes = $WhatsNew }
+  if ($listingCopy) {
+    $c = $listingCopy[(Get-CopyLang $listing.Name)]
+    $fields = @{
+      description      = $c.description
+      releaseNotes     = $WhatsNew
+      shortDescription = $c.shortDescription
+      features         = $c.features
+    }
   }
+  foreach ($name in $fields.Keys) {
+    if ($base.PSObject.Properties.Name -contains $name) {
+      $base.$name = $fields[$name]
+    } else {
+      Write-Warning "Listing '$($listing.Name)' has no '$name' field - left unset (API model differs from expectation)."
+    }
+  }
+  Write-Host "  listing $($listing.Name): synced $($fields.Keys.Count) field(s) from $(Split-Path $ListingDoc -Leaf)"
 }
-# NOTE: full description/screenshot sync is intentionally left to the Partner
-# Center UI for now. To automate it later, set
-# $submission.listings.<lang>.baseListing.description (and .images) here from a
-# structured source (e.g. a JSON mirror of docs/STORE-LISTING-DESKTOP.md).
 
 # --- 6. zip the appx files (flat, names must match fileName above) --------
 $zipPath = Join-Path $ReleaseDir 'store-upload.zip'

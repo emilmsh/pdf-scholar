@@ -96,11 +96,35 @@ role.
 4. In the GitHub repo → **Settings → Secrets and variables → Actions**, add:
    `STORE_TENANT_ID`, `STORE_CLIENT_ID`, `STORE_CLIENT_SECRET`.
 
-Then run the **Store publish** workflow from the Actions tab (optionally paste a
-"What's new" note). The **first run is a validation run** — the legacy API's
-field names may need a tweak in `store-publish.ps1` against the live responses,
-which it logs on failure. Age-ratings must have been answered once in the UI
-before the API can commit (already done, since the app is live).
+Then run the **Store publish** workflow from the Actions tab. The **first real
+run is a validation run** — the legacy API's field names may need a tweak in
+`store-publish.ps1` against the live responses, which it logs on failure.
+Age-ratings must have been answered once in the UI before the API can commit
+(already done, since the app is live).
+
+**The listing copy is pushed too, from the doc.** A new submission is a *clone of
+the last published one*, so anything not overwritten silently re-publishes the
+text that was live when it was created — and the API rule above means it cannot
+be corrected in the UI afterwards. So `store-publish.ps1` parses
+`docs/STORE-LISTING-DESKTOP.md` and sets, per listing language, the
+**description**, **short description**, **product features** and **release
+notes** (`scripts/lib/store-listing.ps1` does the parsing; EN copy goes to every
+language except `nb`/`nn`/`no`, which get the NO copy). Consequences worth
+knowing:
+
+- **Edit the doc, not Partner Center.** The doc is the source of truth for those
+  four fields; a UI edit to them is overwritten by the next API run.
+- **Screenshots are not synced** — they carry over from the cloned submission.
+  Upload new ones by hand from `docs/store-screenshots/` when they change.
+- **The "What's new" heading is version-stamped** (`— v0.27.x`). If it does not
+  match the version being published the run **fails**, rather than shipping last
+  version's notes with this version's packages. Update the section, or pass a
+  `whats_new` input to override.
+- `npm run test:listing` checks the parse offline, with no credentials — it also
+  runs in the workflow before the MSIX build. `check_only: true` prints the exact
+  copy it would send, and creates nothing.
+- `skip_listing_sync: true` falls back to the old behaviour: packages and release
+  notes only, live description untouched.
 
 ## Track B — Edge Add-ons (extension)
 

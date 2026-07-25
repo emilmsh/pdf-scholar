@@ -23,9 +23,14 @@ on:
         required: false
         default: false
       whats_new:
-        description: "What's new in this version (max 1500 chars). Blank = 'PDF Scholar <version>'."
+        description: "What's new (max 1500 chars). Blank = this version's release-notes block from docs/STORE-LISTING-DESKTOP.md."
         required: false
         default: ''
+      skip_listing_sync:
+        description: 'Push packages + release notes only, leaving the live description and features untouched'
+        type: boolean
+        required: false
+        default: false
       replace_pending:
         description: 'Delete an existing uncommitted submission first'
         type: boolean
@@ -45,6 +50,12 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # The copy that will be pushed to the live listing is parsed out of
+      # docs/STORE-LISTING-DESKTOP.md. Check it BEFORE the slow MSIX build: a
+      # bad parse should cost seconds, not a full build, and must never reach
+      # a submission (which cannot be corrected in the UI afterwards).
+      - run: npm run test:listing
+        if: ${{ inputs.skip_listing_sync != true }}
       # Skip the (slow) MSIX build on a dry run - the check reads the app only.
       - run: npm run dist:store
         if: ${{ inputs.check_only != true }}
@@ -58,5 +69,6 @@ jobs:
           $splat = @{}
           if ('${{ inputs.check_only }}' -eq 'true') { $splat.CheckOnly = $true }
           if ('${{ inputs.whats_new }}' -ne '') { $splat.WhatsNew = '${{ inputs.whats_new }}' }
+          if ('${{ inputs.skip_listing_sync }}' -eq 'true') { $splat.SkipListingSync = $true }
           if ('${{ inputs.replace_pending }}' -eq 'true') { $splat.ReplacePending = $true }
           ./scripts/store-publish.ps1 @splat

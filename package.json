@@ -21,6 +21,7 @@
     "test:engine": "esbuild src/main/annotation-engine-embedpdf.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.engine-test-bundle.mjs && node scripts/test-engine-embedpdf.mjs",
     "test:appender": "node scripts/test-appender.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
+    "test:listing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-store-listing.ps1",
     "bench:engine": "node scripts/engine-bench.mjs",
     "dist": "npm run build && electron-builder --win --config config/electron-builder.yml",
     "dist:linux": "npm run build && electron-builder --linux --config config/electron-builder.yml",
