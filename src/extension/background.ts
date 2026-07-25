@@ -51,6 +51,10 @@ chrome?.runtime.onInstalled.addListener(() => {
 void installRedirectRule()
 
 // Clicking the toolbar icon opens an empty viewer tab (welcome screen).
+// NB: chrome.tabs.create needs NO "tabs" permission — that permission only gates
+// the sensitive tab fields (url/pendingUrl/title/favIconUrl), which we never
+// read. Chrome Web Store review rejected the extension for declaring it
+// ("Purple Potassium", 2026-07-24); do not add it back.
 chrome?.action?.onClicked.addListener(() => {
   if (chrome?.tabs) void chrome.tabs.create({ url: chrome.runtime.getURL('viewer.html'), active: true })
 })

@@ -134,6 +134,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // ---------- Tabs / windows ----------
 
     // A "new window" in the native app is a new browser tab here.
+    // tabs.create is permission-free (see the note in src/extension/background.ts).
     newWindow: (path?: string) => {
       const url = path ? viewerUrl(path) : viewerUrl('')
       if (chrome?.tabs) void chrome.tabs.create({ url, active: true })

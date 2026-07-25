@@ -27,7 +27,7 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
-  "permissions": ["declarativeNetRequest", "storage", "tabs"],
+  "permissions": ["declarativeNetRequest", "storage"],
   "host_permissions": ["http://*/*", "https://*/*", "file:///*"],
   "web_accessible_resources": [
     {

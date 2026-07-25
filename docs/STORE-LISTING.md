@@ -92,8 +92,13 @@ Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt 
 - **declarativeNetRequest** — "A single dynamic rule redirects main-frame navigations to `*.pdf` URLs to the extension's own viewer page, so PDFs open in PDF Scholar instead of the browser's built-in reader. It does not block, read, or modify any other request."
 - **host access `<all_urls>` (http://*/*, https://*/*)** — "The PDF-open redirect must be able to fire on a PDF hosted at any address. The extension never reads, injects into, or alters the content of non-PDF web pages; it only acts on navigations that end in a PDF."
 - **`file:///*`** — "Lets users open local PDF files (e.g. double-clicking a PDF in File Explorer) in the viewer. It only takes effect if the user additionally turns on 'Allow access to file URLs' on the extension's details page — a toggle only the user can grant."
-- **tabs** — "Opens the viewer in a new tab when the toolbar icon is clicked and manages that viewer tab. It is not used to read the user's browsing history."
 - **storage** — "Saves the user's own settings (theme, language) and recent-file list locally on the device. Nothing is transmitted."
+
+> **Do not declare `tabs`.** We only call `chrome.tabs.create` (toolbar click →
+> viewer tab), which needs no permission; `tabs` only gates the sensitive tab
+> fields we never read. Chrome Web Store rejected v0.17.1 for declaring it
+> (violation ref "Purple Potassium", 2026-07-24) and removing it changed no
+> behaviour.
 
 ## Data-use / privacy declarations
 
