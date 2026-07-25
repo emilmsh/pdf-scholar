@@ -12,6 +12,12 @@ import type { PageRect, ViewRotation } from '../../shared/types'
 import { pageRectToView } from './rotation'
 import type { RowLayout } from './rotation'
 
+/** Air left above a page landed on by scrollToPage, so it is not flush with the
+ *  viewport's top edge. position() adds it back, which makes the two exact
+ *  inverses — without that, every save/restore round trip (reading position,
+ *  reopening the split on the spot you left) creeps 8 px up the document. */
+const LAND_NUDGE = 8
+
 export interface PaneHandle {
   /** Scroll so `page` sits at the top of the viewport; `offset` (0–1) nudges
    *  that far into the page, which is how a reading position is restored. */
@@ -65,7 +71,11 @@ export function makePaneHandle(deps: Deps): PaneHandle {
         else break
       }
       const index = row?.pages[0]?.index ?? 0
-      const offset = clamp((el.scrollTop - lay.tops[index]) / lay.heights[index], 0, 1)
+      const offset = clamp(
+        (el.scrollTop + LAND_NUDGE - lay.tops[index]) / lay.heights[index],
+        0,
+        1
+      )
       return { page: index + 1, offset }
     },
     scrollToPage(page, offset = 0) {
@@ -73,7 +83,7 @@ export function makePaneHandle(deps: Deps): PaneHandle {
       const lay = deps.layout()
       if (!el || !lay) return
       const i = clamp(Math.round(page), 1, lay.tops.length) - 1
-      el.scrollTop = Math.max(0, lay.tops[i] + offset * lay.heights[i] - 8)
+      el.scrollTop = Math.max(0, lay.tops[i] + offset * lay.heights[i] - LAND_NUDGE)
       deps.afterScroll()
     },
     scrollToPageY(page, pageY, fromTop) {

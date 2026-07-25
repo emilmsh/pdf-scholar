@@ -38,9 +38,9 @@ import { OverlayScrollbars } from './OverlayScrollbars'
  *  is visibly lopsided even though both halves are the same size. */
 const PAGE_GAP = 16
 const SPREAD_GAP = 24
-const PAD_TOP = 28
-const PAD_BOTTOM = 28
-const SIDE_PAD = 64
+const PAD_TOP = 10
+const PAD_BOTTOM = 10
+const SIDE_PAD = 8
 const RENDER_MARGIN = 700
 /** ms of wheel silence before a pinch commits a crisp re-render */
 const GESTURE_SETTLE = 160
@@ -67,7 +67,7 @@ interface Props {
   onZoom(scale: number, fitMode: FitMode): void
   onPageChange(page: number): void
   /** Pulse this column briefly (focus moved here, or a link landed here). The
-   *  persistent active-column signal is the toolbar's outlined cluster. */
+   *  persistent active-column signal is the toolbar's column switcher. */
   flash: boolean
   drawTool: DrawTool | null
   selected: { pageNumber: number; localId: string } | null

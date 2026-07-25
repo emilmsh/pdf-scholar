@@ -144,9 +144,16 @@ async function collectAnnotations(
 const PAGE_GAP = 16
 /** Horizontal gap between the two pages of a spread */
 const SPREAD_GAP = 24
-const PAD_TOP = 28
-const PAD_BOTTOM = 28
-const SIDE_PAD = 64
+/** The margin a fitted page leaves against its column. These are NOT decoration:
+ *  fit-width divides by `clientWidth - SIDE_PAD` and buildRows adds the same
+ *  SIDE_PAD to the content column, so the two must stay equal or a fitted page
+ *  gets a horizontal scrollbar. Kept deliberately small — "fit width" should
+ *  mean the page reaches the edges of its column (and, in split view, that the
+ *  two pages are separated by the divider and nothing else), not that it stops
+ *  a finger's width short. */
+const PAD_TOP = 10
+const PAD_BOTTOM = 10
+const SIDE_PAD = 8
 /** Pages within this many px of the viewport get rendered */
 const RENDER_MARGIN = 800
 /** ms of wheel silence before a pinch/ctrl-wheel gesture commits a re-render */
@@ -174,12 +181,19 @@ function paneOfEl(el: Element | null | undefined): PaneId {
 
 /** Drag-resizable panel widths: defaults, clamps and persistence. Left (TOC)
  *  and right (assistant/search) share identical defaults and clamps so the two
- *  sides look and behave the same — the owner wants them symmetric. `pane` is
- *  the reference pane (the split view); it gets a wider range because it holds a
- *  whole page, not a list. */
-const PANEL_DEFAULTS = { sidebar: 340, ai: 340, web: 340, pane: 520 }
+ *  sides look and behave the same — the owner wants them symmetric.
+ *
+ *  `pane` is the odd one out: it is the split view's divider, and it stores the
+ *  second column's SHARE of the pages area (0–1), not a pixel width. A stored
+ *  width can only ever be paid for by the first column — open a side panel and
+ *  the left half shrinks alone — whereas a share makes both columns give up the
+ *  same proportion. `PANEL_MIN.pane` stays a px floor per column, converted to a
+ *  share against the live width whenever the divider is dragged; the ceiling
+ *  falls out of it (one column's floor is the other's limit), so PANEL_MAX.pane
+ *  is only there to keep the three records the same shape. */
+const PANEL_DEFAULTS = { sidebar: 340, ai: 340, web: 340, pane: 0.5 }
 const PANEL_MIN = { sidebar: 264, ai: 264, web: 264, pane: 260 }
-const PANEL_MAX = { sidebar: 600, ai: 600, web: 600, pane: 1400 }
+const PANEL_MAX = { sidebar: 600, ai: 600, web: 600, pane: 1 }
 type PanelKey = keyof typeof PANEL_DEFAULTS
 const PANEL_LS_KEY = 'pdfx-panel-widths'
 
@@ -205,11 +219,14 @@ function saveToolbarPinned(pinned: boolean): void {
 function loadPanelWidths(): Record<PanelKey, number> {
   try {
     const parsed = JSON.parse(localStorage.getItem(PANEL_LS_KEY) ?? '{}')
+    const paneShare = Number(parsed.pane)
     return {
       sidebar: clamp(Number(parsed.sidebar) || PANEL_DEFAULTS.sidebar, PANEL_MIN.sidebar, PANEL_MAX.sidebar),
       ai: clamp(Number(parsed.ai) || PANEL_DEFAULTS.ai, PANEL_MIN.ai, PANEL_MAX.ai),
       web: clamp(Number(parsed.web) || PANEL_DEFAULTS.web, PANEL_MIN.web, PANEL_MAX.web),
-      pane: clamp(Number(parsed.pane) || PANEL_DEFAULTS.pane, PANEL_MIN.pane, PANEL_MAX.pane)
+      // A share, so anything outside (0, 1) is a pixel width written by an older
+      // build — fall back to an even split rather than clamping nonsense
+      pane: paneShare > 0 && paneShare < 1 ? paneShare : PANEL_DEFAULTS.pane
     }
   } catch {
     return { ...PANEL_DEFAULTS }
@@ -428,17 +445,18 @@ export default function PdfViewer({
   const whenPaneReadyRef = useRef<(pane: PaneId, fn: () => void) => void>(() => {})
   const schedulePositionSaveRef = useRef<() => void>(() => {})
   /** The pane the user last touched. Two jobs: the toolbar's page/zoom controls
-   *  edit THIS pane (and outline it so that is visible), and any annotation
-   *  action started without an element to inspect — a stroke completing, a text
-   *  box opening — lands here. Every such action is preceded by a pointerdown in
-   *  a pane, so "last pointer" is exactly "the pane being worked in". */
+   *  edit THIS pane (and the switcher in the toolbar's centre names it), and any
+   *  annotation action started without an element to inspect — a stroke
+   *  completing, a text box opening — lands here. Every such action is preceded
+   *  by a pointerdown in a pane, so "last pointer" is exactly "the pane being
+   *  worked in"; the switcher is the same state, reachable without one. */
   const [activePane, setActivePane] = useState<PaneId>('a')
   const activePaneRef = useRef(activePane)
   activePaneRef.current = activePane
   /**
    * Which column to pulse, briefly. The persistent "this is the active column"
-   * signal lives in the TOOLBAR (the outlined page+zoom cluster) — chrome, where
-   * it can't intrude on the page. On the page itself a permanent frame around
+   * signal lives in the TOOLBAR (the column switcher) — chrome, where it can't
+   * intrude on the page. On the page itself a permanent frame around
    * whichever half you are reading is exactly the kind of thing that wears you
    * down over an hour, so the page only ever gets a ~700 ms pulse: when focus
    * moves between the columns, and when a followed link lands in the other one.
@@ -464,6 +482,17 @@ export default function PdfViewer({
     },
     []
   )
+  /** Move the toolbar to a column from the toolbar itself (the switcher), with
+   *  the same pulse a pointer-down in the column gives — clicking a number in
+   *  chrome has to be answered on the page, or nothing tells you which half you
+   *  just took control of. Compared at the top level, never inside a setState
+   *  updater: React may run an updater twice, and flashPane sets state itself. */
+  const activatePane = useCallback((pane: PaneId) => {
+    if (activePaneRef.current === pane) return
+    setActivePane(pane)
+    flashPaneRef.current(pane)
+  }, [])
+
   /** Pane B's page + zoom. Held HERE, not inside PagesPane, because the
    *  toolbar's second centre cluster drives them — exactly the same controls
    *  pane A gets, which is the whole point of the symmetry. */
@@ -499,14 +528,49 @@ export default function PdfViewer({
    *  the pane's width, and a mode-derived target is the more predictable of the
    *  two anyway. */
   const paneBFitTarget: 'width' | 'page' = paneBFit === 'width' ? 'page' : 'width'
-  /** halfPagesWidth is declared further down (it needs the pages container) —
+  /** pagesAreaWidth is declared further down (it needs the pages container) —
    *  reached through a ref so this callback's dependency array does not touch it
    *  during render, which would be a temporal-dead-zone reference. */
-  const halfPagesWidthRef = useRef<() => number>(() => PANEL_DEFAULTS.pane)
+  const pagesAreaWidthRef = useRef<() => number>(() => 0)
 
-  /** Opening the split starts the second column on the page you are reading and
-   *  at a fresh fit (scale 0 makes PagesPane pick fit-width for its width);
-   *  closing it hands focus back to the remaining column so the toolbar's centre
+  /** What the second column was showing when it was last closed, so S brings it
+   *  back rather than a fresh copy of the left column. The case this exists for:
+   *  a figure parked on the right that you glance at, close, and want again —
+   *  reopening on "the page you are reading" would throw it away every time.
+   *  Session-scoped and per document (this component is one tab's viewer), and
+   *  deliberately not persisted: reopening a file tomorrow should start on the
+   *  reading position, not resurrect half a split you have forgotten about. */
+  const paneBMemoryRef = useRef<{
+    page: number
+    /** fraction into the page, so it survives a different zoom on reopen */
+    offset: number
+    scale: number
+    fit: 'width' | 'page' | 'custom'
+    rotation: ViewRotation
+    spread: boolean
+    /** the divider's share too — a figure you gave 60 % of the width to comes
+     *  back at 60 %, not squeezed back to half */
+    share: number
+  } | null>(null)
+
+  const rememberPaneB = useCallback(() => {
+    const pos = handleForRef.current('b')?.position()
+    if (!pos) return
+    paneBMemoryRef.current = {
+      page: pos.page,
+      offset: pos.offset,
+      scale: paneBScaleRef.current,
+      fit: paneBFitRef.current,
+      rotation: paneBRotationRef.current,
+      spread: paneBSpreadRef.current,
+      share: panelWRef.current.pane
+    }
+  }, [])
+
+  /** Opening the split restores the second column where you left it, or — the
+   *  first time — starts it on the page you are reading at a fresh fit (scale 0
+   *  makes PagesPane pick fit-width for its width). Closing it remembers that
+   *  column and hands focus back to the remaining one, so the toolbar's centre
    *  never points at a pane that is gone. */
   // Everything here runs at the TOP LEVEL, never inside a setState updater:
   // React may call an updater more than once and does not support nested state
@@ -514,28 +578,37 @@ export default function PdfViewer({
   // the split opened lopsided (398/1199 instead of 799/799).
   const toggleSplit = useCallback(() => {
     if (splitOpenRef.current) {
+      rememberPaneB()
       setSplitOpen(false)
       setActivePane('a')
       return
     }
-    // Open symmetrically: an even split of the space the one column had, both
-    // columns on the page you are reading, both at a fresh fit for their new
-    // width (scale 0 makes each pick fit-width). Nothing distinguishes them.
-    const half = halfPagesWidthRef.current()
-    setPanelW((p) => ({ ...p, pane: half }))
+    const memory = paneBMemoryRef.current
+    const page = memory?.page ?? currentPage
+    // Reopening: back to the share the divider had. First time: an even split of
+    // the space the one column had, both columns on the page you are reading,
+    // both at a fresh fit for their new width. Nothing distinguishes them.
+    const share = memory?.share ?? 0.5
+    setPanelW((p) => (p.pane === share ? p : { ...p, pane: share }))
     window.setTimeout(persistPanelWidths, 0)
-    setPaneBPage(currentPage)
-    setPaneBScale(0)
-    setPaneBFit('width')
+    setPaneBPage(page)
+    // Restore the exact scale even for a fit mode: PagesPane only auto-fits a
+    // column whose scale is still 0, and re-fits any fit mode for its actual
+    // width anyway — so this lands right whether or not the width changed.
+    setPaneBScale(memory && memory.scale > 0 ? memory.scale : 0)
+    setPaneBFit(memory?.fit ?? 'width')
     // Mirror the orientation you were already reading in, so the two columns
-    // are indistinguishable at the moment the split opens
-    setPaneBRotation(rotationRef.current)
-    setPaneBSpread(spreadRef.current)
+    // are indistinguishable at the moment a FRESH split opens
+    setPaneBRotation(memory?.rotation ?? rotationRef.current)
+    setPaneBSpread(memory?.spread ?? spreadRef.current)
     setFitMode('width')
     setSplitOpen(true)
-    // The new column opens on the page you are reading, once it can be scrolled
-    whenPaneReadyRef.current('b', () => handleForRef.current('b')?.scrollToPage(currentPage))
-  }, [currentPage])
+    // Land the column once it can be scrolled — on the remembered spot within
+    // the page, not just its top, so a figure comes back framed as you left it
+    whenPaneReadyRef.current('b', () =>
+      handleForRef.current('b')?.scrollToPage(page, memory?.offset ?? 0)
+    )
+  }, [currentPage, rememberPaneB])
   toggleSplitRef.current = toggleSplit
 
   /**
@@ -549,11 +622,16 @@ export default function PdfViewer({
    */
   const closePane = useCallback((pane: PaneId) => {
     if (pane === 'b') {
+      // Same gesture as toggling the split off, so it remembers the same way
+      rememberPaneB()
       setSplitOpen(false)
       setActivePane('a')
       return
     }
     const bPage = handleForRef.current('b')?.position()?.page ?? paneBPage
+    // The right column's view is about to BECOME the left one — remembering it
+    // would reopen a duplicate of what you are already looking at.
+    paneBMemoryRef.current = null
     setRotation(paneBRotationRef.current)
     setSpread(paneBSpreadRef.current)
     // A fit mode is better recomputed for the full width than copied; an exact
@@ -568,7 +646,7 @@ export default function PdfViewer({
       handleForRef.current('a')?.scrollToPage(bPage)
       schedulePositionSaveRef.current()
     })
-  }, [paneBPage])
+  }, [paneBPage, rememberPaneB])
   /** Navigation history PER COLUMN — see the pushBack/navStep block below */
   const [navStacks, setNavStacks] = useState<
     Record<PaneId, { back: NavPosition[]; forward: NavPosition[] }>
@@ -708,6 +786,9 @@ export default function PdfViewer({
 
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
+  /** The first column's host (the flex child, not its scroller) — the split
+   *  divider measures the pages area from it. */
+  const pagesHostRef = useRef<HTMLDivElement>(null)
   /** The viewer root — used to reveal the unpinned toolbar from the whole top
    *  strip (tab bar included), so the pointer only has to reach the top edge. */
   const viewerRootRef = useRef<HTMLDivElement>(null)
@@ -1743,12 +1824,23 @@ export default function PdfViewer({
     e.preventDefault()
     const startX = e.clientX
     const startW = panelWRef.current[panel]
+    // The split divider moves a share, so it needs the width it is dividing —
+    // measured once at grab time, since nothing but the drag changes it.
+    const total = panel === 'pane' ? pagesAreaWidthRef.current() : 0
     setResizingPanel(panel)
     const onMove = (ev: PointerEvent): void => {
-      // The sidebar grows rightwards; the AI panel and the reference pane both
-      // sit to the right of what they resize, so they grow leftwards
-      const raw = panel === 'sidebar' ? startW + (ev.clientX - startX) : startW - (ev.clientX - startX)
-      const w = clamp(Math.round(raw), PANEL_MIN[panel], PANEL_MAX[panel])
+      const dx = ev.clientX - startX
+      if (panel === 'pane') {
+        if (total <= 0) return
+        // Both columns keep the same px floor, expressed as a share of the area
+        const floor = Math.min(PANEL_MIN.pane / total, 0.5)
+        const share = clamp((startW * total - dx) / total, floor, 1 - floor)
+        setPanelW((p) => (Math.abs(p.pane - share) < 0.0005 ? p : { ...p, pane: share }))
+        return
+      }
+      // The sidebar grows rightwards; the AI panel sits to the right of what it
+      // resizes, so it grows leftwards
+      const w = clamp(Math.round(panel === 'sidebar' ? startW + dx : startW - dx), PANEL_MIN[panel], PANEL_MAX[panel])
       setPanelW((p) => (p[panel] === w ? p : { ...p, [panel]: w }))
     }
     const onUp = (): void => {
@@ -1761,29 +1853,20 @@ export default function PdfViewer({
     window.addEventListener('pointerup', onUp)
   }, [])
 
-  /** Half of the space the two pages columns share right now — the split's
-   *  natural resting state. A fixed pixel default cannot be symmetric: it would
-   *  be half a 1040 px area and a third of a 1560 px one. */
-  const halfPagesWidth = useCallback((): number => {
-    const el = containerRef.current
-    const own = el?.clientWidth ?? 0
-    const other = splitOpen ? panelWRef.current.pane : 0
-    const total = own + other
-    return total > 0
-      ? clamp(Math.round(total / 2), PANEL_MIN.pane, PANEL_MAX.pane)
-      : PANEL_DEFAULTS.pane
-  }, [splitOpen])
-  halfPagesWidthRef.current = halfPagesWidth
+  /** The width the two pages columns share right now (both columns, no panels) —
+   *  what the divider's share is a share OF. */
+  const pagesAreaWidth = useCallback((): number => {
+    const a = pagesHostRef.current
+    if (!a) return 0
+    const b = a.parentElement?.querySelector<HTMLElement>('.pages-host.pane-b')
+    return a.clientWidth + (b?.clientWidth ?? 0)
+  }, [])
+  pagesAreaWidthRef.current = pagesAreaWidth
 
-  const resetPanelWidth = useCallback(
-    (panel: PanelKey) => {
-      // The pane's "default" is symmetry, not a stored number
-      const next = panel === 'pane' ? halfPagesWidth() : PANEL_DEFAULTS[panel]
-      setPanelW((p) => ({ ...p, [panel]: next }))
-      window.setTimeout(persistPanelWidths, 0)
-    },
-    [halfPagesWidth]
-  )
+  const resetPanelWidth = useCallback((panel: PanelKey) => {
+    setPanelW((p) => ({ ...p, [panel]: PANEL_DEFAULTS[panel] }))
+    window.setTimeout(persistPanelWidths, 0)
+  }, [])
 
   // ---------- Save model (dirty = unsaved draft exists) ----------
 
@@ -3519,7 +3602,7 @@ export default function PdfViewer({
     async (matches: SearchMatch[], i: number, recordBack: boolean) => {
       const texts = pageTextsRef.current
       if (!texts || matches.length === 0) return
-      // Search moves the column being worked in — the outlined one — so a hit
+      // Search moves the column being worked in — the active one — so a hit
       // never yanks the column you were using as a reference.
       const pane = activePaneRef.current
       const handle = handleForRef.current(pane)
@@ -4046,6 +4129,11 @@ export default function PdfViewer({
         } else if (k === 'a') {
           e.preventDefault()
           setAiPinned((o) => !o)
+        } else if (k === 's') {
+          // Splitt / split — the plain letter, like the other view toggles.
+          // Ctrl+S is save and stays save; this never fires while typing.
+          e.preventDefault()
+          toggleSplit()
         } else if (k === 'v') {
           e.preventDefault()
           togglePin()
@@ -4118,7 +4206,8 @@ export default function PdfViewer({
     goBack,
     goForward,
     rotateView,
-    togglePin
+    togglePin,
+    toggleSplit
   ])
 
   // Hiding annotations (H) or activating a draw tool pauses hit-testing —
@@ -4365,7 +4454,7 @@ export default function PdfViewer({
           onToggleSplit={toggleSplit}
           onClosePane={closePane}
           activePane={activePane}
-          onActivatePane={setActivePane}
+          onActivatePane={activatePane}
           panePage={paneBPage}
           paneZoomPercent={paneBScale > 0 ? Math.round(paneBScale * 100) : 100}
           paneFitMode={paneBFit}
@@ -4431,7 +4520,13 @@ export default function PdfViewer({
           {
             '--sidebar-w': `${panelW.sidebar}px`,
             '--ai-w': `${panelW.ai}px`,
-            '--pane-w': `${panelW.pane}px`
+            // Grow factors, not widths: the two columns divide whatever the side
+            // panels leave over in this ratio, so both shrink together. The two
+            // sum to exactly 1, which is what makes flexbox hand out ALL the
+            // free space — a lone column must therefore be a full 1, or it
+            // would grow to only its share of the width and leave the rest bare.
+            '--pane-a-grow': `${splitOpen && pdf ? 1 - panelW.pane : 1}`,
+            '--pane-b-grow': `${panelW.pane}`
           } as React.CSSProperties
         }
       >
@@ -4461,7 +4556,10 @@ export default function PdfViewer({
           />
         )}
 
-        <div className={`pages-host${paneFlash === 'a' ? ' pane-flash' : ''}`}>
+        <div
+          className={`pages-host${paneFlash === 'a' ? ' pane-flash' : ''}`}
+          ref={pagesHostRef}
+        >
         <div
           className={`pages${drawTool ? ' drawing' : ''}`}
           data-pane="a"

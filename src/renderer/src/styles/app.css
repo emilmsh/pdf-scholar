@@ -4649,20 +4649,26 @@ button {
    Split view: two symmetric pages columns (see PagesPane.tsx)
    ============================================================ */
 
-/* The second column. `--pane-w` is its dragged width; both columns keep a floor
-   so neither can be squeezed away by the other or by the side panels. */
-.pages-host.pane-b {
-  flex: 0 0 var(--pane-w, 520px);
-  border-left: 1px solid var(--border);
+/* The divider stores a SHARE of the pages area, not a pixel width: both columns
+   get flex-basis 0 and a grow factor, so they always divide whatever width is
+   left over in the dragged ratio. That is what makes the side panels symmetric —
+   opening «Innhold» or «Assistent» takes the same proportion out of BOTH
+   columns, instead of the left one paying for all of it (a fixed-width second
+   column could only shrink after the first hit its floor). Both keep a floor so
+   neither can be squeezed away by the other or by the panels. */
+.viewer-body > .pages-host {
+  flex: var(--pane-a-grow, 1) 1 0;
+  min-width: 220px;
 }
 
-.viewer-body > .pages-host {
-  min-width: 220px;
+.pages-host.pane-b {
+  flex-grow: var(--pane-b-grow, 1);
+  border-left: 1px solid var(--border);
 }
 
 /* A column pulses when focus moves to it, or when a followed link lands in it.
    Deliberately TRANSIENT: the persistent "this column is active" signal lives in
-   the toolbar (the outlined page+zoom cluster), where it cannot intrude on the
+   the toolbar (the column switcher), where it cannot intrude on the
    page. A permanent frame around whichever half you are reading is exactly the
    kind of thing that wears you down over an hour.
 
@@ -4704,7 +4710,7 @@ button {
 }
 
 /* ============================================================
-   Toolbar centre in split view: one page+zoom cluster per column
+   Toolbar centre in split view: one cluster + a column switcher
    ============================================================ */
 
 .center-cluster {
@@ -4713,55 +4719,55 @@ button {
   gap: 2px;
 }
 
-/* Split mode has to fit two clusters where one used to sit, so the controls
-   tighten up: smaller buttons, no gaps, narrower readouts. Nothing is removed —
-   both columns keep the identical set of controls. */
+/* Split mode keeps ONE cluster, driving the active column (see Toolbar.tsx).
+   Two clusters cost ~127 px of centre — two toolbar buttons folded into "…" on
+   a 14" laptop — to duplicate controls that everything else in the toolbar
+   already routes through the active column. The switcher below replaces them
+   for a third of the width. */
 .toolbar-center.is-split {
   gap: 4px;
 }
 
-.center-cluster.is-split {
-  gap: 0;
-  padding: 2px 4px;
+/* ---- Column switcher: which column the cluster drives, and the other one's
+   page. Two page numbers side by side, the active one solid — so you still see
+   at a glance that the left half is on p. 6 while the right is on p. 12, and a
+   single click (or tap — no hover anywhere in this control) moves the toolbar
+   to the other column. ---- */
+.pane-switch {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
   border-radius: 8px;
-  /* Reserve the outline's space in BOTH states so activating a cluster never
-     nudges its neighbours sideways. */
-  box-shadow: inset 0 0 0 1.5px transparent;
-  transition: box-shadow 0.12s ease, background-color 0.12s ease;
+  background: var(--bg-elevated);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
-.center-cluster.is-split.is-active {
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--accent) 45%, transparent);
-}
-
-.center-cluster.is-split .tb-btn {
-  min-width: 26px;
-  height: 28px;
-}
-
-.center-cluster.is-split .page-indicator {
+.pane-switch-btn {
+  min-width: 22px;
+  height: 24px;
+  padding: 0 4px;
+  border-radius: 6px;
   font-size: 12px;
-  padding: 0 2px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
-.center-cluster.is-split .page-indicator input {
-  width: 26px;
+.pane-switch-btn:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 
-.center-cluster.is-split .zoom-label,
-.center-cluster.is-split .zoom-input {
-  min-width: 44px;
-  font-size: 12px;
+.pane-switch-btn.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+  font-weight: 600;
 }
 
-.center-cluster.is-split .toolbar-sep {
-  margin: 0 3px;
-}
-
-/* Close THIS column. Lives with the column's own controls so there is no doubt
-   which one it closes; faint until the cluster is hovered so it does not read as
-   a fourth button competing with page and zoom. */
+/* Close the column the cluster is driving; faint until the cluster is hovered
+   so it does not read as a fourth button competing with page and zoom. */
 .cluster-close {
   width: 20px;
   height: 20px;
@@ -4958,6 +4964,21 @@ button {
   .tb-chevron {
     min-width: 38px;
     height: 38px;
+  }
+
+  /* Finger-sized column switcher: it is the touch route between the two
+     columns (tapping the page itself works too, but not when the half you
+     want is showing a figure you would rather not poke). */
+  .pane-switch-btn {
+    min-width: 34px;
+    height: 32px;
+  }
+
+  .cluster-close {
+    width: 28px;
+    height: 28px;
+    /* No hover on glass — the close would otherwise be invisible until tapped */
+    opacity: 0.75;
   }
 
   .toolbar {

@@ -192,8 +192,8 @@ interface Props {
   onPresent(): void
   onToggleFullscreen(): void
   /** Split view: a second pages column, equal in every way except that page and
-   *  zoom are its own — so the toolbar's centre splits into two clusters, one
-   *  per column, and the active one is outlined. */
+   *  zoom are its own — so the toolbar's centre gains a column switcher, and its
+   *  one cluster drives whichever column that switcher points at. */
   splitOpen: boolean
   onToggleSplit(): void
   activePane: 'a' | 'b'
@@ -486,7 +486,7 @@ export default function Toolbar({
 
   /** Zoom actions reachable from OUTSIDE a cluster (the Vis menu, the "…"
    *  overflow, the W shortcut's twin) act on the column the user is working
-   *  in — which the outlined cluster makes visible. */
+   *  in — which the column switcher makes visible. */
   const inPaneB = splitOpen && activePane === 'b'
   const activeZoom = {
     percent: inPaneB ? paneZoomPercent : zoomPercent,
@@ -502,9 +502,35 @@ export default function Toolbar({
     else activeZoom.fitWidth()
   }
 
-  /** One page+zoom cluster. Rendered once normally, twice in split view — the
-   *  two are identical controls over their own column, which is what makes it
-   *  arbitrary which column you work in. */
+  /** The column switcher, left of the cluster in split view. It does three jobs
+   *  in the width one icon used to take: it says which column the cluster is
+   *  driving, it shows the OTHER column's page (the one thing a single cluster
+   *  would otherwise hide), and it is the only pointer-free way to change
+   *  columns — until now you had to click into the page itself, which is no
+   *  help on a touch screen when the column you want is scrolled to a figure. */
+  const paneSwitch = (
+    <div className="pane-switch">
+      {(['a', 'b'] as const).map((p) => (
+        <button
+          key={p}
+          className={`pane-switch-btn${activePane === p ? ' is-active' : ''}`}
+          title={t(p === 'b' ? 'tb.paneRight' : 'tb.paneLeft')}
+          aria-label={t(p === 'b' ? 'tb.paneRight' : 'tb.paneLeft')}
+          aria-pressed={activePane === p}
+          onClick={() => onActivatePane(p)}
+        >
+          {p === 'b' ? panePage : page}
+        </button>
+      ))}
+    </div>
+  )
+
+  /** One page+zoom cluster. In split view it drives the ACTIVE column, exactly
+   *  like everything else in the toolbar already does (the Vis menu's zoom
+   *  steps, the "…" overflow's fit, the keyboard shortcuts) — two clusters were
+   *  the odd one out, and they cost ~127 px of centre, which on a 14" laptop is
+   *  two buttons folded into "…". Which column it is driving is said by the
+   *  switcher above and, on the page itself, by the pulse when focus moves. */
   const centerCluster = (pane: 'a' | 'b'): React.JSX.Element => {
     const isB = pane === 'b'
     const value = isB ? panePageInput : pageInput
@@ -514,13 +540,7 @@ export default function Toolbar({
     const mode = isB ? paneFitMode : fitMode
     const target = isB ? paneFitTarget : fitTarget
     return (
-      <div
-        className={`center-cluster${splitOpen ? ' is-split' : ''}${
-          splitOpen && activePane === pane ? ' is-active' : ''
-        }`}
-        title={splitOpen ? t(isB ? 'tb.paneRight' : 'tb.paneLeft') : undefined}
-        onPointerDown={() => splitOpen && onActivatePane(pane)}
-      >
+      <div className={`center-cluster${splitOpen ? ' is-split' : ''}`}>
         <div className="page-indicator">
           <input
             value={value}
@@ -597,8 +617,9 @@ export default function Toolbar({
             </button>
           </>
         )}
-        {/* Closing lives with the column's own controls, so "close THIS one" is
-            unambiguous — and it keeps the other column's content. */}
+        {/* Closes the column the cluster is driving — the same rule as every
+            other control here, and the tooltip names it outright. The other
+            column keeps its content and takes the full width. */}
         {splitOpen && (
           <button
             className="cluster-close"
@@ -1036,12 +1057,13 @@ export default function Toolbar({
       <div className="toolbar-spacer" ref={spacerRef} />
 
       <div className={`toolbar-group toolbar-center${splitOpen ? ' is-split' : ''}`}>
-        {centerCluster('a')}
-        {splitOpen && centerCluster('b')}
+        {splitOpen && paneSwitch}
+        {centerCluster(splitOpen ? activePane : 'a')}
 
         {/* Zoom steps + page layout, docked right beside the zoom controls they
-            belong to. Zoom applies to the outlined column; rotation and spread
-            are document-wide (they are persisted with the reading position). */}
+            belong to. Zoom applies to the active column, like the cluster;
+            rotation and spread are document-wide (they are persisted with the
+            reading position). */}
         <div className="theme-menu-anchor" ref={viewMenuRef}>
           <button
             className={`tb-btn${viewMenuOpen ? ' is-active' : ''}`}
@@ -1053,7 +1075,7 @@ export default function Toolbar({
           {viewMenuOpen && (
             <div className="theme-menu view-menu">
               {/* Everything in this menu — zoom, rotation, spread — applies to
-                  the outlined column, so the scope is stated once, up top. */}
+                  the active column, so the scope is stated once, up top. */}
               {splitOpen && (
                 <div className="menu-hint menu-hint-top">
                   {t(activePane === 'b' ? 'tb.zoomAppliesRight' : 'tb.zoomAppliesLeft')}
