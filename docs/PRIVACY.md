@@ -21,11 +21,12 @@ The AI features only work if you enter **your own API key** for a provider
 (Anthropic, OpenAI or Azure OpenAI). When — and only when — you explicitly ask
 the assistant a question, the relevant document text is sent **directly from
 your machine to that provider** under your key and their privacy terms. There is
-no intermediary server operated by PDF Scholar. Your API keys never leave your
-device.
+no intermediary server operated by PDF Scholar. Your key is sent to that one
+provider, as the credential on your own request, and to no one else — never to
+us.
 
-How they are protected depends on what the platform actually offers, and the app
-uses the strongest option available on each. The assistant's key settings always
+How the key is protected where it is stored depends on what the platform actually
+offers, and the app uses the strongest option available on each. The assistant's key settings always
 state which of these applies on your machine — we would rather tell you exactly
 what is true than promise "encrypted" everywhere:
 
@@ -37,9 +38,7 @@ what is true than promise "encrypted" everywhere:
 - **Desktop app on Linux with no keyring daemon.** There is no key store to
   encrypt with, and no safe place to keep an encryption key either — so the app
   keeps the API key in memory for that session only and writes nothing to disk.
-  You re-enter it next launch. Earlier versions stored it unencrypted in a file
-  instead; if yours did, the app now takes that plaintext off disk on first
-  launch.
+  You re-enter it next launch.
 - **Browser extension.** An extension has no access to the operating system's key
   store. The key is therefore encrypted with AES-GCM under a key that no script
   can read out (a non-extractable WebCrypto key). That protects it from anything
@@ -48,9 +47,21 @@ what is true than promise "encrypted" everywhere:
   browser profile, which can use the key without ever seeing it, and the browser
   makes no guarantee that the encryption key itself is encrypted where it is
   stored. This is a meaningful extra layer, not the equivalent of a keychain.
+  Where that encryption is unavailable altogether (a hardened profile, some
+  private modes), the extension does the same as Linux without a keyring: the key
+  stays in memory for the session and nothing is written.
+- **Keys stored by an older version.** Earlier versions wrote the key to a file
+  unencrypted where no key store was available. The app now takes any such
+  plaintext off disk on first launch — re-encrypting it in the key store, or
+  moving it into memory for the session where there is none. If that rewrite
+  cannot be saved (a read-only profile, a full disk), the settings panel reports
+  the key as unencrypted rather than claiming a protection it did not achieve.
 
-Whichever applies, a key with a spending cap set in the provider's console is the
-protection that does not depend on any of this.
+No mechanism above stops a program already running as you: it can ask for the key
+to be decrypted, exactly as the app does. That is the ceiling for anything that
+remembers a credential without asking you for a master password every time. The
+protection that does not depend on any of this is a spending cap set in the
+provider's console, which is why the app's key settings link straight to it.
 
 ## Automatic updates (desktop app)
 

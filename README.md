@@ -41,7 +41,8 @@ install, so it needs no admin rights. It registers as a PDF handler in Explorer 
 a "Recent" Jump List to the taskbar. The installer contains both **x64 and native arm64**
 builds and picks the right one, so Windows-on-ARM machines (Surface and similar) run the
 arm64 build rather than x64 under emulation. Everything works offline. The AI features
-need your own Anthropic or OpenAI key, entered in the assistant settings.
+need your own API key (Anthropic, OpenAI or Azure OpenAI), entered in the assistant
+settings.
 
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-PDF%20Scholar-2f6f7b?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9N75CPC0G9M2)
 
@@ -232,8 +233,9 @@ work, so the chips are the feature — the prose around them is just delivery.
   The answer describes what is actually in the crop, and cites the pages it draws on. You
   can paste or attach images the same way
 - Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
-  model list across all three, with per-model reasoning-effort control. Your key never
-  leaves your machine, and the document leaves it only when you ask a question
+  model list across all three, with per-model reasoning-effort control. Your key goes to
+  the provider you picked and nowhere else — there is no server of ours in between — and
+  the document leaves your machine only when you ask a question
 - **No price estimates, on purpose.** Each answer shows the tokens the provider
   counted, and the key settings link straight to the page where you set a spending cap
   and watch your usage. List prices change after an app ships; a number in here would
@@ -241,20 +243,14 @@ work, so the chips are the feature — the prose around them is just delivery.
 
 **Where your key is kept**
 
-You paste the key once, in the assistant's settings. What protects it there depends on
-where you are running the app, so the settings panel names the row that applies to you:
-
-| Where you run it | How the key is stored | Who can get at it |
-| --- | --- | --- |
-| **Windows / macOS desktop** | Encrypted by the operating system's own key store: DPAPI on Windows, Keychain on macOS | Only your user account on that machine. Copy the file to another PC and it is useless |
-| **Linux desktop** | The same, through the system keyring (gnome-keyring or kwallet) | Same as above. With no keyring running, the app keeps the key in memory for the session and writes nothing to disk — you re-enter it next launch |
-| **Browser extension** | Encrypted with AES-GCM, under a key the browser will not hand out to any script | Anything that only *reads* the browser profile — a backup, a synced copy, another program — finds ciphertext rather than your key. The browser does not promise the encryption key itself is encrypted where it stores it, so treat this as a layer rather than a keychain: an extension cannot reach the OS key store at all |
-
-What none of them stop is a program already running as you: it can ask for the key to be
-decrypted, exactly as the app does. That is the ceiling for anything that remembers a
-credential for you without asking for a master password every time. The protection that
-holds regardless is a spending cap in the provider's console — which is why the key
-settings link straight to it. [docs/PRIVACY.md](docs/PRIVACY.md) goes into more detail.
+You paste the key once, in the assistant's settings. Where the platform has a key store
+the key goes into it — DPAPI on Windows, Keychain on macOS, the system keyring on Linux;
+the browser extension, which can reach none of them, encrypts it under a key no script can
+read out. The settings panel names the case that actually applies on your machine instead
+of claiming "encrypted" everywhere, and [docs/PRIVACY.md](docs/PRIVACY.md) sets out what
+each one does and does not protect against. What none of them stop is a program already
+running as you, so the protection that holds regardless is a spending cap in the provider's
+console — which is why the key settings link straight to it.
 
 ![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
 
