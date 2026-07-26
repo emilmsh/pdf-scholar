@@ -7,8 +7,9 @@
 <p align="center"><strong>A Windows PDF reader built for reading.</strong></p>
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
-reports, books. The page gets the window, the tools you use every hour are one click from
-it, and the toolbar hides when you want the whole screen showing the page.
+reports, books. The window is nearly all page: one slim toolbar carries the tools you use
+every hour, the contents and assistant panels stay out of the way until you call them, and
+V hides the toolbar as well, leaving the page and nothing else.
 
 Everything a long document asks of you is here. A page you can stand to look at all day, in
 light, sepia or dark. Highlight, pen, shapes and notes, each with its own colour, thickness
