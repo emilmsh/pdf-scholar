@@ -16,14 +16,19 @@ One-time fees (Microsoft Partner Center, Chrome Web Store) are acceptable.
 | --- | --- | --- | --- |
 | Windows x64 | 1 | `PDF-Scholar-Setup-<v>.exe` (universal NSIS) | electron-updater |
 | Windows arm64 | 1 | same universal installer (arch picked at install) | electron-updater |
+| Microsoft Store (x64 + arm64) | 1 | `PDF-Scholar-<v>-x64.appx` + `-arm64.appx` (MSIX, signed by the Store on ingestion) | the Store; electron-updater self-disables via `process.windowsStore` (`src/main/updater.ts`) |
 | Extension (Edge/Chrome) | 1 | `pdf-scholar-extension.zip` | store auto-update; sideload = in-app notice |
 | macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | none (see below) |
 | Linux x64 | 2 | `PDF-Scholar-<v>.AppImage` + `.deb` | electron-updater |
 
+The Microsoft Store is a live release channel, not a plan: the same Windows build
+ships there as MSIX, which removes the SmartScreen "unknown publisher" warning the
+GitHub exe cannot escape. Build it with `npm run dist:store`; publishing is
+`docs/STORE.md` and step 4 of `docs/RELEASE.md`.
+
 Deferred (revisit deliberately, don't drift into them): Linux arm64 (free GitHub
 arm runners exist when wanted), Firefox port of the extension (≈days of work,
-unlocks Firefox for Android too), Microsoft Store MSIX (`docs/STORE.md`),
-PWA/iPad/Android.
+unlocks Firefox for Android too), PWA/iPad/Android.
 
 **Tier 1** — full feature parity, manually verified, release-blocking.
 **Tier 2** — same renderer and features *by construction* (shared code, `PdfxApi`
@@ -58,7 +63,9 @@ not as acceptable platform lag.
    blocks the Chromium sandbox inside AppImages — the **deb is the recommended
    install on Ubuntu/Debian** and README says so. AI-key encryption
    (`safeStorage`) needs a keyring daemon (gnome-keyring/kwallet); without one
-   the app already degrades to "key not set" rather than storing plaintext.
+   `encryptKey` falls back to `plain:<base64>` (`src/main/ai.ts`) — the key IS
+   stored, unencrypted, and the key settings say so via `ai.encryptionWarn`. It
+   does not degrade to "key not set".
 7. **Extension in-place save needs one write-access grant for read-only-opened
    PDFs**: the extension DOES save annotations back to the current file in place
    (desktop parity — `Toolbar.tsx` shows the same «Lagre» + «Lagre kopi» split,

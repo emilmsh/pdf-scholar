@@ -43,6 +43,14 @@ builds and picks the right one, so Windows-on-ARM machines (Surface and similar)
 arm64 build rather than x64 under emulation. Everything works offline. The AI features
 need your own Anthropic or OpenAI key, entered in the assistant settings.
 
+[![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-PDF%20Scholar-2f6f7b?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9N75CPC0G9M2)
+
+**[⬇ Get PDF Scholar from the Microsoft Store](https://apps.microsoft.com/detail/9N75CPC0G9M2)** —
+the same app as an MSIX package, x64 and arm64. Because the Store signs the package on
+ingestion, there is no SmartScreen "unknown publisher" warning on first run, and Windows
+handles updates. The installer above instead updates itself from GitHub releases; either
+route gives you the same app.
+
 ### Desktop app (macOS) — beta
 
 Download the `.dmg` from the
@@ -255,7 +263,7 @@ contrast for bright text on very dark grey.
 npm install
 npm run dev        # full Electron app with HMR
 npm run dev:web    # renderer only, in a plain browser on :5199
-npm run typecheck  # tsc for renderer + main/preload
+npm run typecheck  # tsc for renderer, main/preload and the extension
 npm run dist       # NSIS installer (Windows)
 npm run build:ext  # browser-extension bundle → dist-extension/
 npm run test:windows  # two windows on one file, end to end (needs npm run build first)
@@ -273,9 +281,9 @@ fails the run instead of saving a wrong picture — which makes `shoot` a UI smo
 much as a camera. It is what caught a split view that opened lopsided and a page field
 that silently did nothing. `--list` shows the shot names; pass names to run some.
 
-The two assistant shots need a model answer, and it is always the same feature on the same
+The assistant shots need a model answer, and it is always the same feature on the same
 paper — so the answers are **recorded once** into `docs/ai-fixtures/` and replayed after
-that. An ordinary run refreshes all nine shots with no API key and no cost. Only the
+that. An ordinary run refreshes every shot with no API key and no cost. Only the
 provider call is served from disk: the chips, the jump to the cited sentence, the
 highlight and the snipped region all still run live, so the shots keep proving what they
 claim when that code changes. `--with-ai` calls the real provider (your own key, from your

@@ -11,8 +11,8 @@ showing and which page tells the story are judgement calls, so `npm run shoot`
 writes to the gitignored `docs/screenshots/_auto/` and cannot touch the shipped
 set without `--out`. Review the frames, then copy over the ones that are right.
 
-The run needs no API key: it takes all nine shots, including the two assistant
-ones, replaying recorded answers from `docs/ai-fixtures/`. Re-record with
+The run needs no API key: it takes every shot, including the assistant ones,
+replaying recorded answers from `docs/ai-fixtures/`. Re-record with
 `npm run shoot -- --with-ai --record` when the *answer* should change — a change
 to the assistant's UI needs nothing, since only the provider call is replayed.
 Every shot is taken with the app in English, seeded into the throwaway profile.

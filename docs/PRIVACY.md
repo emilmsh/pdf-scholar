@@ -1,6 +1,6 @@
 # PDF Scholar — Privacy Policy
 
-_Last updated: 2026-07-19_
+_Last updated: 2026-07-26_
 
 PDF Scholar (the desktop app and the browser extension) is a local-first PDF
 reader and annotator. **It collects no data about you.**
@@ -21,9 +21,18 @@ The AI features only work if you enter **your own API key** for a provider
 (Anthropic, OpenAI or Azure OpenAI). When — and only when — you explicitly ask
 the assistant a question, the relevant document text is sent **directly from
 your machine to that provider** under your key and their privacy terms. There is
-no intermediary server operated by PDF Scholar. Your API keys are stored
-encrypted on your device (Windows DPAPI / macOS Keychain / Linux Secret
-Service) and never leave it.
+no intermediary server operated by PDF Scholar. Your API keys never leave your
+device, but how they are stored differs by platform: the **desktop app** encrypts
+them at rest with the operating system's own key store (Windows DPAPI / macOS
+Keychain / Linux Secret Service), while the **browser extension** keeps them in
+`chrome.storage.local`, which the browser isolates to this extension but does not
+encrypt.
+
+On a Linux desktop with no keyring daemon running (gnome-keyring or kwallet), the
+operating system offers nothing to encrypt with, and the desktop app stores the
+key unencrypted rather than refusing to remember it. Wherever a key is held
+unencrypted the app says so, in the settings panel at the field where you enter
+it, and recommends using a key with a spending cap.
 
 ## Automatic updates (desktop app)
 

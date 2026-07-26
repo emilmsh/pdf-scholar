@@ -11,7 +11,7 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 - Full **dark mode** app chrome, independent of page theme.
 
 ## 2. Reading & View Settings ("aA" popover)
-- **Themes: Day (default), Sepia, Night, Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement).
+- **Themes: Day (default), Sepia, Night, Night+ (higher contrast), Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement).
 - **Brightness slider** (in-app overlay).
 - **Scroll**: vertical + continuous (desktop default) or horizontal + single-page (page-flip). Two-page spread with "first page alone" toggle.
 - **Zoom**: ctrl+wheel / trackpad pinch; fit-width and fit-page snap modes.
@@ -61,7 +61,9 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 - **Cloud (deferred, Phase 8)**: several established desktop PDF readers ship without 2-way sync — precedent that native filesystem + sync-client folders (OneDrive/Dropbox) is acceptable.
 
 ## 9. Interop Requirement (non-negotiable)
-Every annotation is written into the PDF as a standard annotation object with a proper appearance stream, via **incremental save** (original bytes preserved). Acceptance test per annotation type: create in PDFX → open in Acrobat Reader, SumatraPDF → renders identically and remains editable.
+Every annotation is written into the PDF as a standard annotation object with a proper appearance stream. Two write paths, chosen by file size: **below 150 MB the file is rewritten in full** from a cached document behind a debounced flush (`src/main/doc-cache.ts`), and **at or above 150 MB an incremental appender** (`src/main/incremental-appender.ts`) appends the new objects and an xref section to the original bytes. Acceptance test per annotation type: create in PDFX → open in Acrobat Reader, SumatraPDF → renders identically and remains editable.
 
 ## 10. Explicitly Out of Scope (post-parity stretch)
-AI chat, whole-document translation, measurement tools, OCR/Scan, text-to-speech reading, reflow mode, page editing UI, form creation, sound notes, stickers.
+Whole-document translation, measurement tools, OCR/Scan, reflow mode, page editing UI, form creation, sound notes, stickers.
+
+Two items have left this list since it was written. **AI chat** became its own phase and shipped — see Phase 9 in `docs/ROADMAP.md`. **Text-to-speech reading** was built as well, but is hidden on every platform behind the `READ_ALOUD` flag (`src/renderer/src/flags.ts`) until a local neural voice replaces the robotic SAPI ones.
