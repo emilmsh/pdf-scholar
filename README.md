@@ -6,20 +6,18 @@
 
 <p align="center"><strong>A Windows PDF reader built for reading.</strong></p>
 
-Windows is not short of PDF apps. What it lacks is one that behaves as though reading the
-document were the point. Most bury the page under ribbons for form filling, signing,
-conversion and OCR, while the things you do every hour sit two menus deep. PDF Scholar is
-reading, learning and annotating first: the page gets the window, the tools you actually
-use are one click from it, and everything else stays out of the way until you ask.
+PDF Scholar is for the documents you work through rather than skim: research articles,
+reports, books. The page gets the window, the tools you use every hour are one click from
+it, and the toolbar hides when you want the whole screen showing the page.
 
-That leaves room for what a long document asks of you. A page you can stand to look at all
-day, in light, sepia or dark. Highlight, pen, shapes and notes, each with its own colour,
-thickness and opacity, remembered between sessions. A second column, so a figure can sit
-beside the passage that discusses it. Cross-references you can follow and step back from,
-which is the difference between reading a paper and losing your place in one. And an
-optional assistant that answers from the document, cites the sentence it used, explains a
-figure you drag a box around, and finds the passage you half-remember. Free,
-MIT-licensed, and offline unless you ask a question.
+Everything a long document asks of you is here. A page you can stand to look at all day, in
+light, sepia or dark. Highlight, pen, shapes and notes, each with its own colour, thickness
+and opacity, remembered between sessions. A second column, so a figure can sit beside the
+passage that discusses it. Cross-references you can follow and step back from, which is the
+difference between reading a paper and losing your place in one. And an optional assistant
+that answers from the document, cites the sentence it used, explains a figure you drag a box
+around, and finds the passage you half-remember. Free, MIT-licensed, and offline unless you
+ask a question.
 
 Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
 the same reader inside your browser.
@@ -57,28 +55,26 @@ route gives you the same app.
 Download the `.dmg` from the
 [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest) — the
 **`-arm64`** build for Apple Silicon (M1 and later), the **`-x64`** build for older
-Intel Macs. PDF Scholar is free and open source, and **not signed with an
-Apple Developer certificate** — macOS will claim the app is "damaged" or from an
-unverified developer on first launch. It isn't; that's Gatekeeper's default for any
-app distributed outside the App Store without Apple's paid program. To open it:
+Intel Macs. The build is **not signed with an Apple Developer certificate**, so
+Gatekeeper reports it as "damaged" or from an unverified developer on first launch.
+To open it:
 
 1. Drag **PDF Scholar.app** from the disk image into **Applications** (don't try to
    open it from inside the disk image).
 2. In Terminal, run: `xattr -cr "/Applications/PDF Scholar.app"` — then open the app
    normally.
 
-If the dialog says the app is from an *unverified developer* (rather than
-"damaged"), you can instead click **Open Anyway** under **System Settings →
-Privacy & Security**. When the message says **"damaged"**, that button never
-appears — the Terminal command above is the only route.
+If the dialog says *unverified developer* rather than "damaged", **Open Anyway**
+under **System Settings → Privacy & Security** works as well. The "damaged"
+message never offers that button, so use the Terminal command above.
 
-Because the app is unsigned, macOS builds also have **no auto-update** — grab new
-versions from the releases page.
+Unsigned builds cannot auto-update, so new macOS versions come from the releases
+page.
 
-> **The macOS build hasn't yet been tested on real Apple hardware.** It builds
-> cleanly in CI, but the developer works on Windows — so if you run it on a Mac,
-> feedback (what works, what looks off, what breaks) is genuinely appreciated:
-> please [open an issue](https://github.com/emilmsh/pdf-scholar/issues).
+> **The macOS build has not been tested on Apple hardware yet** — it is built in
+> CI. If you run it on a Mac, [open an
+> issue](https://github.com/emilmsh/pdf-scholar/issues) with what works and what
+> breaks.
 
 ### Desktop app (Linux) — beta
 
@@ -110,10 +106,9 @@ no build step needed:
 4. For local files (the Explorer double-click case): open the extension's **Details**
    and enable **Allow access to file URLs** — a one-time toggle only you can grant.
 
-The extension is **not on the Chrome Web Store / Edge Add-ons yet**: publishing there
-takes a developer account and a review pass per store, and browsers block one-click
-installs from anywhere else. Until the listings are live, the four steps above are the
-only route.
+The extension is **not on the Chrome Web Store / Edge Add-ons yet**, and browsers only
+allow one-click installs from those stores — so the four steps above are the way in until
+the listings are live.
 
 See [`docs/BROWSER-EXTENSION.md`](docs/BROWSER-EXTENSION.md) for the architecture and
 the current desktop-vs-extension parity.
@@ -122,8 +117,8 @@ the current desktop-vs-extension parity.
 
 **Reading**
 - Smooth scrolling, pinch zoom that stays where you release it, one fit button that
-  toggles width ⇄ whole page (W), and zoom presets from 50 % to 400 %. Fit means fit —
-  the page goes edge to edge, with a hair of margin rather than a wasted inch
+  toggles width ⇄ whole page (W), and zoom presets from 50 % to 400 %. Fit uses the whole
+  window: the page goes edge to edge, with a hair of margin
 - Four themes — Day, Sepia (ivory paper), Night and Night+ (higher contrast) — plus
   **Auto**, which follows Windows' light/dark setting
 - Contrast and brightness are adjustable per theme
@@ -156,15 +151,14 @@ one, the table it rests on somewhere else. Press **S** and you get both.
   portrait text
 - **Ctrl+click an internal link to open the target in the other column**, keeping the
   page you are on. It opens the split first if it is closed. A plain click follows the
-  link in place. External links always go to your browser, where the modifier does
-  nothing — there is no in-document target for a second column to show
+  link in place. External links always open in your browser, where the modifier does
+  nothing
 - Search, the outline, the notes list and the assistant's citation chips all move the
   active column and leave the other alone. Back/forward history is per column as well
 - Drag the divider to rebalance (double-click it for an even split); both columns re-fit
-  as you drag. The divider holds a *ratio*, not a width, so opening the contents or
-  assistant panel takes the same share out of both columns instead of making the left one
-  pay for all of it. The ✕ beside the zoom closes the active column and keeps the other's
-  content
+  as you drag. Opening the contents or assistant panel narrows both columns in proportion,
+  so the balance you set survives it. The ✕ beside the zoom closes the active column and
+  keeps the other's content
 - **S remembers the column you closed** — its page, the exact spot on it, its zoom, its
   rotation and the width you gave it. Park a figure on the right, toggle it away to read
   in peace, toggle it back: it returns framed exactly as you left it. Closing the *left*
@@ -178,8 +172,8 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 
 - **Select text and the menu comes to you**: highlight, underline, strikeout and squiggly
   in one row each, a comment or a note, copy, dictionary, translate — and the assistant's
-  actions on exactly what you selected. The toolbar has the same tools for when you want
-  to mark several passages in a row; the selection menu is for the one in front of you
+  actions on exactly what you selected. The toolbar carries the same tools for when you
+  want to mark several passages in a row
 - Labeled colour rows and custom hex colours
 - Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
   straight
@@ -215,13 +209,12 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 ![The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip](docs/screenshots/assistant.png)
 
 The assistant answers from the document you have open, and every claim it makes carries a
-source chip you can click. An answer you cannot check is worth very little in academic
-work, so the chips are the feature — the prose around them is just delivery.
+source chip. Click one and you land on the sentence the claim came from, so you can check
+the answer rather than take it on trust.
 
 - Ask about a dense passage ("explain this simply", "what does this term mean here?").
-  Each claim gets a source chip ("s. 12"); click it and the document jumps to that page
-  and highlights the sentence the claim came from, as in the picture above. Getting back
-  is one click on the pill in the corner
+  The chip reads as a page number ("s. 12"), the jump highlights the sentence itself, as
+  in the picture above, and getting back is one click on the pill in the corner
 - Structured article summaries (research question / method / data / findings /
   limitations)
 - Ask about your own annotations: "summarize what I've highlighted"
@@ -236,21 +229,19 @@ work, so the chips are the feature — the prose around them is just delivery.
   model list across all three, with per-model reasoning-effort control. Your key goes to
   the provider you picked and nowhere else — there is no server of ours in between — and
   the document leaves your machine only when you ask a question
-- **No price estimates, on purpose.** Each answer shows the tokens the provider
-  counted, and the key settings link straight to the page where you set a spending cap
-  and watch your usage. List prices change after an app ships; a number in here would
-  quietly stop matching your bill, and only your provider knows the real one
+- **Cost stays visible**: each answer shows the tokens the provider counted, and the key
+  settings link straight to your provider's console, where you set a spending cap and see
+  what you have spent
 
 **Where your key is kept**
 
-You paste the key once, in the assistant's settings. Where the platform has a key store
-the key goes into it — DPAPI on Windows, Keychain on macOS, the system keyring on Linux;
-the browser extension, which can reach none of them, encrypts it under a key no script can
-read out. The settings panel names the case that actually applies on your machine instead
-of claiming "encrypted" everywhere, and [docs/PRIVACY.md](docs/PRIVACY.md) sets out what
-each one does and does not protect against. What none of them stop is a program already
-running as you, so the protection that holds regardless is a spending cap in the provider's
-console — which is why the key settings link straight to it.
+You paste the key once, in the assistant's settings, and it goes into the platform's key
+store: DPAPI on Windows, Keychain on macOS, the system keyring on Linux. The browser
+extension has no key store to reach, and encrypts the key under a key no script can read
+out instead. The settings panel names the case that applies on your machine, and
+[docs/PRIVACY.md](docs/PRIVACY.md) has the per-platform detail. A spending cap in the
+provider's console is worth setting either way: no local storage can stop a program that
+is already running as you from asking for the key to be decrypted.
 
 ![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
 
@@ -285,33 +276,25 @@ npm run check:shots   # which shipped screenshots predate the visual changes
 
 `npm run shoot` and `npm run test:windows` drive the real desktop app over Chromium's
 DevTools protocol, which Electron already ships, so neither needs a browser-automation
-dependency. Both run in a throwaway profile: they never touch your recents, reading
-positions or theme, and every run starts from factory defaults.
+dependency. Both run in a throwaway profile that starts from factory defaults and leaves
+your recents, reading positions and theme alone.
 
-Every shot asserts the state before capturing, so a renamed tooltip or a jump that failed
-fails the run instead of saving a wrong picture — which makes `shoot` a UI smoke test as
-much as a camera. It is what caught a split view that opened lopsided and a page field
-that silently did nothing. `--list` shows the shot names; pass names to run some.
+Every shot asserts the state before capturing, so a renamed tooltip or a jump that never
+happened fails the run instead of saving a wrong picture — `shoot` is a UI smoke test as
+much as a camera. `--list` shows the shot names; pass names to run a subset. The assistant
+shots replay an answer recorded once into `docs/ai-fixtures/`, so an ordinary run needs no
+API key and costs nothing; only the provider call comes from disk, while the chips, the jump
+to the cited sentence, the highlight and the snipped region all run live. `--with-ai` calls
+the real provider with your own key, and `--record` refreshes the recording.
 
-The assistant shots need a model answer, and it is always the same feature on the same
-paper — so the answers are **recorded once** into `docs/ai-fixtures/` and replayed after
-that. An ordinary run refreshes every shot with no API key and no cost. Only the
-provider call is served from disk: the chips, the jump to the cited sentence, the
-highlight and the snipped region all still run live, so the shots keep proving what they
-claim when that code changes. `--with-ai` calls the real provider (your own key, from your
-own profile); add `--record` to refresh what gets replayed.
-
-**`shoot` cannot overwrite the shipped set.** It writes to the gitignored
-`docs/screenshots/_auto/`, because framing and what is worth showing are judgement calls:
-the images in this README are chosen deliberately, not whatever the script produced last.
-`npm run check:shots` reports which shipped images predate the visual changes since — see
-[`docs/RELEASE.md`](docs/RELEASE.md).
+Shots land in the gitignored `docs/screenshots/_auto/`; the images in this README are
+picked by hand. `npm run check:shots` reports which shipped images predate the visual
+changes since — see [`docs/RELEASE.md`](docs/RELEASE.md).
 
 `npm run test:windows` opens a second window on the same file, annotates in both, saves
-from one, and verifies the result with mupdf — a different PDF implementation, so it
-cannot share a bug with our writer. It covers the one claim no unit test can reach, since
-that claim spans the overlay, the IPC, main's shared draft, the reload in the other
-window, and the bytes on disk.
+from one, and verifies the result with mupdf — a different PDF implementation, so it cannot
+share a bug with our writer. It covers the whole path at once: the overlay, the IPC, main's
+shared draft, the reload in the other window, and the bytes on disk.
 
 Architecture in short: **pdf.js v6 renders, EmbedPDF (PDFium WASM) writes.** The React
 renderer draws annotations in its own overlay, never pdf.js's editor layer. The Electron
@@ -322,9 +305,9 @@ desktop app, the browser extension and the plain-browser dev preview. See `CLAUD
 
 ## Status
 
-A personal project, actively developed, written by someone who reads PDFs for a living and
-fixes whatever annoys him that week. Installers are attached to the
-[GitHub releases](https://github.com/emilmsh/pdf-scholar/releases).
+Actively developed, by someone who reads PDFs for a living. Installers are attached to the
+[GitHub releases](https://github.com/emilmsh/pdf-scholar/releases), and
+[`docs/PLATFORMS.md`](docs/PLATFORMS.md) lists what each platform supports today.
 
 ## Citing
 

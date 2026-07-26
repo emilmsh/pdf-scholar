@@ -2,8 +2,8 @@
 
 Everything needed to submit the **PDF Scholar** browser extension to **Edge
 Add-ons** (free) and the **Chrome Web Store** ($5 one-time). Upload
-`pdf-scholar-extension-store.zip` (manifest at the zip root — from the v0.15.0
-release, or run `npm run build:ext` and zip the contents of `dist-extension/`).
+`pdf-scholar-extension-store.zip` (manifest at the zip root — attached to each
+release, or run `npm run pack:ext:store` to build it).
 See `docs/STORE.md` for the account setup. Privacy policy URL (both stores):
 `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`
 
@@ -113,9 +113,8 @@ Answer the stores' data questions as follows (all true — see `docs/PRIVACY.md`
 
 > Note on the broad host permissions: `<all_urls>` + `file:///*` +
 > `declarativeNetRequest` routinely send a listing to the slower review queue.
-> The justifications above are written to pre-empt the reviewer's questions —
-> the honest single purpose (PDF interception, no page-content access) is the
-> whole answer.
+> Expect a longer wait, and keep the answers to the single purpose above: PDF
+> interception, no page-content access.
 
 ---
 
@@ -139,6 +138,6 @@ package; the stores pull it automatically.
 ---
 
 ## Version note
-The zip's `manifest.json` version is stamped from `package.json` at build time
-(currently **0.15.0**) — never edit it by hand. Each store update = upload a new
-zip built from a bumped `package.json`.
+The zip's `manifest.json` version is stamped from `package.json` at build time —
+never edit it by hand. Each store update = upload a new zip built from a bumped
+`package.json`.

@@ -114,25 +114,25 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 **EN:**
 ```
 • Half the download: 197 MB instead of 409, with nothing removed from the app
-• A save that fails now says so. Three paths could previously report success while the newest marks never reached the file
-• The assistant's key settings state exactly what protects your API key on your machine, instead of promising "encrypted" everywhere
+• A save that fails now says so, instead of reporting success while your newest marks never reached the file
+• The assistant's key settings name exactly what protects your API key on this machine
 • On Linux without a keyring, the key is kept for the session only rather than written to disk unencrypted
 • Every menu and bubble closes with Esc and with a click outside, on touch as well as mouse
 • Error messages are no longer part Norwegian when the app is set to English
 • Free text you drag smaller now scrolls instead of clipping
-• Smoother while reading: the sidebar and the keyboard stop redoing work on every scroll
+• Smoother scrolling, especially with the sidebar open
 ```
 
 **NO:**
 ```
 • Halvparten så stor nedlasting: 197 MB i stedet for 409, uten at noe er fjernet fra appen
-• En lagring som feiler sier det nå. Tre veier kunne før melde suksess mens de nyeste merkene aldri nådde fila
-• Nøkkelinnstillingene i assistenten sier nøyaktig hva som beskytter API-nøkkelen din på din maskin, i stedet for å love «kryptert» overalt
+• En lagring som feiler sier det nå, i stedet for å melde suksess mens de nyeste merkene aldri nådde fila
+• Nøkkelinnstillingene i assistenten sier nøyaktig hva som beskytter API-nøkkelen din på denne maskinen
 • På Linux uten nøkkelring beholdes nøkkelen bare for økta, framfor å skrives ukryptert til disk
 • Alle menyer og bobler lukkes med Esc og med klikk utenfor, på berøring like godt som med mus
 • Feilmeldinger er ikke lenger delvis norske når appen står på engelsk
 • Fritekst du drar mindre kan nå rulles i stedet for å bli klippet
-• Jevnere lesing: sidepanelet og tastaturet slutter å gjøre arbeidet om på hver rulling
+• Jevnere rulling, særlig med sidepanelet åpent
 ```
 
 ---
@@ -141,11 +141,10 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ## Partner Center listing fields
 
-The live listing has **two** languages, `en-us` and `no` — confirmed by reading
-the published submission (`store-publish.ps1 -CheckOnly` prints them). An earlier
-note here claimed it was English-only; it is not, and both blocks below are live
-copy. The publish script routes NO copy to `nb`/`nn`/`no` listings and EN to
-everything else, so each gets its own description, features and release notes.
+The live listing has **two** languages, `en-us` and `no` (`store-publish.ps1
+-CheckOnly` prints what is published), and both blocks below are live copy. The
+publish script routes NO copy to `nb`/`nn`/`no` listings and EN to everything
+else, so each gets its own description, features and release notes.
 
 ### Product features (≤ 20 items, ≤ 200 chars each)
 

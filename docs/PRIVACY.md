@@ -25,10 +25,9 @@ no intermediary server operated by PDF Scholar. Your key is sent to that one
 provider, as the credential on your own request, and to no one else — never to
 us.
 
-How the key is protected where it is stored depends on what the platform actually
-offers, and the app uses the strongest option available on each. The assistant's key settings always
-state which of these applies on your machine — we would rather tell you exactly
-what is true than promise "encrypted" everywhere:
+How the key is protected where it is stored depends on what the platform offers,
+and the app uses the strongest option available on each. The assistant's key
+settings state which of the cases below applies on your machine:
 
 - **Desktop app (Windows, macOS, and Linux with a keyring).** The key is
   encrypted at rest by the operating system's own key store — Windows DPAPI,
@@ -46,22 +45,22 @@ what is true than promise "encrypted" everywhere:
   program on disk. It does **not** protect it from code running inside that
   browser profile, which can use the key without ever seeing it, and the browser
   makes no guarantee that the encryption key itself is encrypted where it is
-  stored. This is a meaningful extra layer, not the equivalent of a keychain.
-  Where that encryption is unavailable altogether (a hardened profile, some
-  private modes), the extension does the same as Linux without a keyring: the key
-  stays in memory for the session and nothing is written.
+  stored. It is a layer against copies of the profile rather than the equivalent
+  of an OS keychain. Where the encryption is unavailable altogether (a hardened
+  profile, some private modes), the extension behaves as Linux without a keyring
+  does: the key stays in memory for the session and nothing is written.
 - **Keys stored by an older version.** Earlier versions wrote the key to a file
   unencrypted where no key store was available. The app now takes any such
   plaintext off disk on first launch — re-encrypting it in the key store, or
   moving it into memory for the session where there is none. If that rewrite
   cannot be saved (a read-only profile, a full disk), the settings panel reports
-  the key as unencrypted rather than claiming a protection it did not achieve.
+  the key as unencrypted, so you can re-enter it and move it to safe storage.
 
-No mechanism above stops a program already running as you: it can ask for the key
+None of these stop a program already running as your user: it can ask for the key
 to be decrypted, exactly as the app does. That is the ceiling for anything that
-remembers a credential without asking you for a master password every time. The
-protection that does not depend on any of this is a spending cap set in the
-provider's console, which is why the app's key settings link straight to it.
+remembers a credential without asking you for a master password every time, so
+set a spending cap in the provider's console as well — the app's key settings link
+straight to it.
 
 ## Automatic updates (desktop app)
 
