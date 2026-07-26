@@ -26,24 +26,23 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
 import type { RowLayout } from '../rotation'
-import { buildRows, viewSize } from '../rotation'
+import {
+  buildRows,
+  GESTURE_SETTLE,
+  PAD_BOTTOM,
+  PAD_TOP,
+  PAGE_GAP,
+  RENDER_MARGIN,
+  SIDE_PAD,
+  SPREAD_GAP,
+  viewSize
+} from '../rotation'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
 import { clampZoom } from '../zoom'
 import PdfPage from './PdfPage'
 import { OverlayScrollbars } from './OverlayScrollbars'
 
-/** IDENTICAL to the main column's (PdfViewer). They must match exactly: two
- *  columns of equal width have to land on the same fit-width zoom, or the split
- *  is visibly lopsided even though both halves are the same size. */
-const PAGE_GAP = 16
-const SPREAD_GAP = 24
-const PAD_TOP = 10
-const PAD_BOTTOM = 10
-const SIDE_PAD = 8
-const RENDER_MARGIN = 700
-/** ms of wheel silence before a pinch commits a crisp re-render */
-const GESTURE_SETTLE = 160
 
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
@@ -454,7 +453,10 @@ export default function PagesPane({
       else g.timer = window.setTimeout(() => commitGestureRef.current(), GESTURE_SETTLE)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      if (gestureRef.current) window.clearTimeout(gestureRef.current.timer)
+    }
   }, [beginGesture])
 
   // Touch pinch (Surface Pro): fingers on glass arrive as touch events, not as

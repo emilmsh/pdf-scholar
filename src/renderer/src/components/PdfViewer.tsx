@@ -55,7 +55,14 @@ import type {
 } from '../annotations'
 import {
   buildRows,
+  GESTURE_SETTLE,
+  PAD_BOTTOM,
+  PAD_TOP,
+  PAGE_GAP,
   pageRectToView,
+  RENDER_MARGIN,
+  SIDE_PAD,
+  SPREAD_GAP,
   viewDeltaToPage,
   viewPointToPage,
   viewRectToPage,
@@ -140,23 +147,6 @@ async function collectAnnotations(
   return map
 }
 
-const PAGE_GAP = 16
-/** Horizontal gap between the two pages of a spread */
-const SPREAD_GAP = 24
-/** The margin a fitted page leaves against its column. These are NOT decoration:
- *  fit-width divides by `clientWidth - SIDE_PAD` and buildRows adds the same
- *  SIDE_PAD to the content column, so the two must stay equal or a fitted page
- *  gets a horizontal scrollbar. Kept deliberately small — "fit width" should
- *  mean the page reaches the edges of its column (and, in split view, that the
- *  two pages are separated by the divider and nothing else), not that it stops
- *  a finger's width short. */
-const PAD_TOP = 10
-const PAD_BOTTOM = 10
-const SIDE_PAD = 8
-/** Pages within this many px of the viewport get rendered */
-const RENDER_MARGIN = 800
-/** ms of wheel silence before a pinch/ctrl-wheel gesture commits a re-render */
-const GESTURE_SETTLE = 160
 
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
@@ -4045,179 +4035,157 @@ export default function PdfViewer({
     setAnnotsAskId((n) => n + 1)
   }, [])
 
-  useEffect(() => {
-    if (!active) return
-    const onKeyDown = (e: KeyboardEvent): void => {
-      const tag = (e.target as HTMLElement | null)?.tagName
-      const isTyping = tag === 'INPUT' || tag === 'TEXTAREA'
-      // The presentation overlay owns the keyboard while it is open
-      if (presentationRef.current) return
-      if (e.key === 'F11') {
+  // The two window-level input handlers below read ~35 pieces of state
+  // between them. As a dependency array that meant detaching and re-attaching
+  // both listeners on every search step, annotation click and first mark. They
+  // are mirrored in refs instead — reassigned each render, called through a
+  // stable wrapper — which is the pattern the rest of this file already uses
+  // for state that event handlers must see fresh. The listeners now attach
+  // once per tab activation.
+  const onKeyDownRef = useRef<(e: KeyboardEvent) => void>(() => {})
+  const onMouseNavRef = useRef<(e: MouseEvent) => void>(() => {})
+
+  onKeyDownRef.current = (e: KeyboardEvent): void => {
+    const tag = (e.target as HTMLElement | null)?.tagName
+    const isTyping = tag === 'INPUT' || tag === 'TEXTAREA'
+    // The presentation overlay owns the keyboard while it is open
+    if (presentationRef.current) return
+    if (e.key === 'F11') {
+      e.preventDefault()
+      toggleFullscreen()
+    } else if (!isTyping && primaryMod(e) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault()
+      void performUndoRedo('undo')
+    } else if (
+      !isTyping &&
+      primaryMod(e) &&
+      ((e.shiftKey && (e.key === 'z' || e.key === 'Z')) || e.key === 'y' || e.key === 'Y')
+    ) {
+      e.preventDefault()
+      void performUndoRedo('redo')
+    } else if (!isTyping && e.altKey && e.key === 'ArrowLeft') {
+      e.preventDefault()
+      goBack()
+    } else if (!isTyping && e.altKey && e.key === 'ArrowRight') {
+      e.preventDefault()
+      goForward()
+    } else if (primaryMod(e) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
+      e.preventDefault()
+      // Save over the current file when there is something to save. Desktop
+      // and the extension both write in place (the extension via a retained
+      // File System Access handle — its first save may prompt once for write
+      // access); the plain-web fallback bakes annotations and downloads.
+      if (dirty || (!isElectron && !isExtension)) void saveDocument()
+    } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && (selected ?? annotPopover)) {
+      e.preventDefault()
+      const target = selected ?? annotPopover!
+      const record = (annotsRef.current.get(target.pageNumber) ?? []).find(
+        (r) => r.id === target.localId
+      )
+      if (record) removeAnnotation(target.pageNumber, record)
+    } else if (e.key === 'Escape') {
+      if (freeTextDraft) setFreeTextDraft(null)
+      else if (noteDraft) setNoteDraft(null)
+      else if (menu) setMenu(null)
+      else if (aiQuick) setAiQuick(null)
+      else if (annotPopover) setAnnotPopover(null)
+      else if (selected) setSelected(null)
+      else if (activeTool) setActiveTool(null)
+      else if (markupTool) setMarkupTool(null)
+      else if (readAloud !== 'closed') stopReadAloud()
+      else if (searchOpen) closeSearch()
+      else if (searchHits) setSearchHits(null)
+      else if (aiPinned) setAiPinned(false)
+      else if (fullscreen) toggleFullscreen()
+    } else if (primaryMod(e) && (e.key === 'f' || e.key === 'F')) {
+      e.preventDefault()
+      openSearch()
+    } else if (e.key === 'F3') {
+      e.preventDefault()
+      searchStep(e.shiftKey ? -1 : 1)
+    } else if (primaryMod(e) && (e.key === '+' || e.key === '=')) {
+      e.preventDefault()
+      manualZoom(scaleRef.current * 1.15)
+    } else if (primaryMod(e) && e.key === '-') {
+      e.preventDefault()
+      manualZoom(scaleRef.current / 1.15)
+    } else if (primaryMod(e) && e.key === '0') {
+      // Actual size (100%), matching standard PDF-reader convention
+      e.preventDefault()
+      manualZoom(1)
+    } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      // Single-key reading shortcuts (never fire while typing)
+      const k = e.key.toLowerCase()
+      // Rotation MUST be checked before the k==='r' read-aloud branch below
+      // (Shift+R rotates; bracket keys rotate too)
+      if (e.shiftKey && k === 'r') {
+        e.preventDefault()
+        rotateView(1)
+      } else if (k === ']') {
+        e.preventDefault()
+        rotateView(1)
+      } else if (k === '[') {
+        e.preventDefault()
+        rotateView(-1)
+      } else if (k === 'p') {
+        e.preventDefault()
+        enterPresentation()
+      } else if (k === 't') {
+        e.preventDefault()
+        setTocPinned((o) => !o)
+      } else if (k === 'a') {
+        e.preventDefault()
+        setAiPinned((o) => !o)
+      } else if (k === 's') {
+        // Splitt / split — the plain letter, like the other view toggles.
+        // Ctrl+S is save and stays save; this never fires while typing.
+        e.preventDefault()
+        toggleSplit()
+      } else if (k === 'v') {
+        e.preventDefault()
+        togglePin()
+      } else if (k === 'h') {
+        e.preventDefault()
+        setAnnotsHidden((h) => !h)
+      } else if (k === 'r' && READ_ALOUD) {
+        e.preventDefault()
+        if (readAloud === 'closed') void startReadAloud()
+        else stopReadAloud()
+      } else if (k === 'f') {
         e.preventDefault()
         toggleFullscreen()
-      } else if (!isTyping && primaryMod(e) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      } else if (k === 'w') {
         e.preventDefault()
-        void performUndoRedo('undo')
-      } else if (
-        !isTyping &&
-        primaryMod(e) &&
-        ((e.shiftKey && (e.key === 'z' || e.key === 'Z')) || e.key === 'y' || e.key === 'Y')
-      ) {
-        e.preventDefault()
-        void performUndoRedo('redo')
-      } else if (!isTyping && e.altKey && e.key === 'ArrowLeft') {
-        e.preventDefault()
-        goBack()
-      } else if (!isTyping && e.altKey && e.key === 'ArrowRight') {
-        e.preventDefault()
-        goForward()
-      } else if (primaryMod(e) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
-        e.preventDefault()
-        // Save over the current file when there is something to save. Desktop
-        // and the extension both write in place (the extension via a retained
-        // File System Access handle — its first save may prompt once for write
-        // access); the plain-web fallback bakes annotations and downloads.
-        if (dirty || (!isElectron && !isExtension)) void saveDocument()
-      } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && (selected ?? annotPopover)) {
-        e.preventDefault()
-        const target = selected ?? annotPopover!
-        const record = (annotsRef.current.get(target.pageNumber) ?? []).find(
-          (r) => r.id === target.localId
-        )
-        if (record) removeAnnotation(target.pageNumber, record)
-      } else if (e.key === 'Escape') {
-        if (freeTextDraft) setFreeTextDraft(null)
-        else if (noteDraft) setNoteDraft(null)
-        else if (menu) setMenu(null)
-        else if (aiQuick) setAiQuick(null)
-        else if (annotPopover) setAnnotPopover(null)
-        else if (selected) setSelected(null)
-        else if (activeTool) setActiveTool(null)
-        else if (markupTool) setMarkupTool(null)
-        else if (readAloud !== 'closed') stopReadAloud()
-        else if (searchOpen) closeSearch()
-        else if (searchHits) setSearchHits(null)
-        else if (aiPinned) setAiPinned(false)
-        else if (fullscreen) toggleFullscreen()
-      } else if (primaryMod(e) && (e.key === 'f' || e.key === 'F')) {
-        e.preventDefault()
-        openSearch()
-      } else if (e.key === 'F3') {
-        e.preventDefault()
-        searchStep(e.shiftKey ? -1 : 1)
-      } else if (primaryMod(e) && (e.key === '+' || e.key === '=')) {
-        e.preventDefault()
-        manualZoom(scaleRef.current * 1.15)
-      } else if (primaryMod(e) && e.key === '-') {
-        e.preventDefault()
-        manualZoom(scaleRef.current / 1.15)
-      } else if (primaryMod(e) && e.key === '0') {
-        // Actual size (100%), matching standard PDF-reader convention
-        e.preventDefault()
-        manualZoom(1)
-      } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        // Single-key reading shortcuts (never fire while typing)
-        const k = e.key.toLowerCase()
-        // Rotation MUST be checked before the k==='r' read-aloud branch below
-        // (Shift+R rotates; bracket keys rotate too)
-        if (e.shiftKey && k === 'r') {
-          e.preventDefault()
-          rotateView(1)
-        } else if (k === ']') {
-          e.preventDefault()
-          rotateView(1)
-        } else if (k === '[') {
-          e.preventDefault()
-          rotateView(-1)
-        } else if (k === 'p') {
-          e.preventDefault()
-          enterPresentation()
-        } else if (k === 't') {
-          e.preventDefault()
-          setTocPinned((o) => !o)
-        } else if (k === 'a') {
-          e.preventDefault()
-          setAiPinned((o) => !o)
-        } else if (k === 's') {
-          // Splitt / split — the plain letter, like the other view toggles.
-          // Ctrl+S is save and stays save; this never fires while typing.
-          e.preventDefault()
-          toggleSplit()
-        } else if (k === 'v') {
-          e.preventDefault()
-          togglePin()
-        } else if (k === 'h') {
-          e.preventDefault()
-          setAnnotsHidden((h) => !h)
-        } else if (k === 'r' && READ_ALOUD) {
-          e.preventDefault()
-          if (readAloud === 'closed') void startReadAloud()
-          else stopReadAloud()
-        } else if (k === 'f') {
-          e.preventDefault()
-          toggleFullscreen()
-        } else if (k === 'w') {
-          e.preventDefault()
-          if (fitTarget === 'page') fitPage()
-          else fitWidth()
-        }
+        if (fitTarget === 'page') fitPage()
+        else fitWidth()
       }
     }
-    // Logitech-style side buttons mirror Alt+←/→ (button 3 = back, 4 = forward).
-    // preventDefault stops Chromium from also walking its own (empty) history.
-    const onMouseNav = (e: MouseEvent): void => {
-      if (presentationRef.current) return
-      if (e.button === 3) {
-        e.preventDefault()
-        goBack()
-      } else if (e.button === 4) {
-        e.preventDefault()
-        goForward()
-      }
+  }
+
+  // Logitech-style side buttons mirror Alt+←/→ (button 3 = back, 4 = forward).
+  // preventDefault stops Chromium from also walking its own (empty) history.
+  onMouseNavRef.current = (e: MouseEvent): void => {
+    if (presentationRef.current) return
+    if (e.button === 3) {
+      e.preventDefault()
+      goBack()
+    } else if (e.button === 4) {
+      e.preventDefault()
+      goForward()
     }
+  }
+
+  useEffect(() => {
+    if (!active) return
+    const onKeyDown = (e: KeyboardEvent): void => onKeyDownRef.current(e)
+    const onMouseNav = (e: MouseEvent): void => onMouseNavRef.current(e)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('mouseup', onMouseNav)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('mouseup', onMouseNav)
     }
-  }, [
-    active,
-    enterPresentation,
-    startReadAloud,
-    fitTarget,
-    fitPage,
-    freeTextDraft,
-    noteDraft,
-    menu,
-    aiQuick,
-    aiPinned,
-    annotPopover,
-    selected,
-    activeTool,
-    markupTool,
-    readAloud,
-    stopReadAloud,
-    dirty,
-    saveDocument,
-    saveDocumentAs,
-    searchOpen,
-    searchHits,
-    fullscreen,
-    toggleFullscreen,
-    closeSearch,
-    openSearch,
-    searchStep,
-    manualZoom,
-    fitWidth,
-    performUndoRedo,
-    removeAnnotation,
-    goBack,
-    goForward,
-    rotateView,
-    togglePin,
-    toggleSplit
-  ])
+  }, [active])
 
   // Hiding annotations (H) or activating a draw tool pauses hit-testing —
   // clear the selection frame so it never floats over a mode where it can't
@@ -4264,6 +4232,7 @@ export default function PdfViewer({
       if (pillsTimerRef.current) window.clearTimeout(pillsTimerRef.current)
       if (aiHitTimerRef.current) window.clearTimeout(aiHitTimerRef.current)
       if (hudTimerRef.current) window.clearTimeout(hudTimerRef.current)
+      if (touchToolbarTimerRef.current) window.clearTimeout(touchToolbarTimerRef.current)
       if (fullscreen) bridge.setFullscreen(false)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4547,10 +4516,10 @@ export default function PdfViewer({
           annotations={annots}
           excerpts={excerpts}
           onJumpToPage={jumpToPage}
-          onJumpToDest={(d) => void jumpToDest(d)}
+          onJumpToDest={jumpToDest}
           onJumpToAnnot={jumpToAnnot}
           onDeleteAnnot={removeAnnotation}
-          onExport={(format) => void exportAnnotations(format)}
+          onExport={exportAnnotations}
           onAskAi={askAnnotations}
           docName={payload.name}
           docPath={payload.path}

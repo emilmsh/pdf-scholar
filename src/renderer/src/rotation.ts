@@ -126,6 +126,30 @@ export function svgRotationTransform(pw: number, ph: number, rotation: ViewRotat
 
 // ---------- Layout (rows for single-page and two-page spread) ----------
 
+// The page-column metrics. They live here, next to buildRows which consumes
+// them, because BOTH columns of a split view must use the same numbers: two
+// columns of equal width have to land on the same fit-width zoom or the split
+// looks lopsided even though the halves are identical. PagesPane used to keep
+// its own copies, and RENDER_MARGIN had already diverged (700 vs 800).
+
+export const PAGE_GAP = 16
+/** Horizontal gap between the two pages of a spread */
+export const SPREAD_GAP = 24
+/** The margin a fitted page leaves against its column. These are NOT decoration:
+ *  fit-width divides by `clientWidth - SIDE_PAD` and buildRows adds the same
+ *  SIDE_PAD to the content column, so the two must stay equal or a fitted page
+ *  gets a horizontal scrollbar. Kept deliberately small — "fit width" should
+ *  mean the page reaches the edges of its column (and, in split view, that the
+ *  two pages are separated by the divider and nothing else), not that it stops
+ *  a finger's width short. */
+export const PAD_TOP = 10
+export const PAD_BOTTOM = 10
+export const SIDE_PAD = 8
+/** Pages within this many px of the viewport get rendered */
+export const RENDER_MARGIN = 800
+/** ms of wheel silence before a pinch/ctrl-wheel gesture commits a re-render */
+export const GESTURE_SETTLE = 160
+
 export interface PageBox {
   /** 0-based page index */
   index: number
