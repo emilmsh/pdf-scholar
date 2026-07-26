@@ -79,20 +79,6 @@ export const IconFitPage = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
-export const IconActualSize = (p: IconProps): React.JSX.Element => (
-  <Svg {...p}>
-    <path d="M5.5 9l2.5-2v10" />
-    <path d="M16 9l2.5-2v10" />
-    <path d="M12 10.4v.01M12 14.6v.01" />
-  </Svg>
-)
-
-export const IconExpand = (p: IconProps): React.JSX.Element => (
-  <Svg {...p}>
-    <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
-  </Svg>
-)
-
 export const IconDocument = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
@@ -347,13 +333,6 @@ export const IconTally = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
-export const IconCite = (p: IconProps): React.JSX.Element => (
-  <Svg {...p}>
-    <path d="M6 7.5h8M6 12h8M6 16.5h5" />
-    <path d="M17.5 14.5l2.5 2.5-2.5 2.5" />
-  </Svg>
-)
-
 export const IconTranslate = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M3.5 6h9" />
@@ -562,14 +541,6 @@ export const IconSplit = (p: IconProps): React.JSX.Element => (
     {/* Dead centre of the frame (2.5 + 19/2), not off to one side: the two
         columns are equals, and the icon is the first place that is claimed. */}
     <path d="M12 4v16" />
-  </Svg>
-)
-
-/** Two overlapping frames — a second app window */
-export const IconWindows = (p: IconProps): React.JSX.Element => (
-  <Svg {...p}>
-    <rect x="3" y="6" width="12" height="12" rx="2" />
-    <path d="M8 6V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1" />
   </Svg>
 )
 

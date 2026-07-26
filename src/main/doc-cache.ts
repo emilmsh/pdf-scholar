@@ -1,10 +1,10 @@
 // DocCache: per-path cache of open PDF document handles with debounced
-// flushing, shared by both annotation write-engines (mupdf + EmbedPDF).
+// flushing, used by the EmbedPDF annotation write-engine.
 //
-// Why: the engines used to run a full open -> parse -> mutate -> serialize ->
-// write -> close cycle for EVERY annotation. On a 150 MB file that is ~0.8 s
-// (mupdf) / ~4 s (EmbedPDF) per annotation, and on ~400 MB files the repeated
-// cycles exhaust/fragment the 2 GB wasm32 heap. With the cache, a burst of
+// Why: the engine used to run a full open -> parse -> mutate -> serialize ->
+// write -> close cycle for EVERY annotation. On a 150 MB file that is ~4 s per
+// annotation, and on ~400 MB files the repeated cycles exhaust/fragment the
+// 2 GB wasm32 heap. With the cache, a burst of
 // writes costs ONE open and ONE serialize: mutations hit the cached in-memory
 // doc, the file on disk catches up via a debounced flush. Writes always target
 // a DRAFT copy (src/main/drafts.ts), so a briefly-stale on-disk draft is fine —
@@ -29,11 +29,6 @@ export interface DocCacheOptions<D> {
   /** Called once per fatal error, after dropping (e.g. reset the engine
    *  singleton so the next write re-initializes a fresh wasm instance). */
   onFatal?(): void
-  /** Close + evict after every flush instead of keeping the doc open. mupdf
-   *  needs this: repeated incremental saves from a kept-open doc corrupt the
-   *  xref chain (proven in scripts/spike-mupdf-cached-save.mjs). Flushes are
-   *  debounced, so a burst of writes still amortizes to one open + one save. */
-  evictAfterFlush?: boolean
   /** Debounce between the last write and the flush to disk (default 1200 ms). */
   flushDelayMs?: number
   /** Evict (flush + close) after this much inactivity (default 30 s). */
@@ -162,11 +157,6 @@ export class DocCache<D> {
         try {
           await this.opts.flush(e.doc, path)
           e.dirty = false
-          if (this.opts.evictAfterFlush) {
-            this.clearTimers(e)
-            this.entries.delete(path)
-            await this.safeClose(e.doc)
-          }
         } catch (err) {
           // Background flush — nothing to report the error to. Keep the doc
           // dirty so the next write, idle eviction or explicit flush retries

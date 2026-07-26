@@ -12,8 +12,9 @@ docs/screenshots/_auto/
 *.log
 .DS_Store
 *.local
+# Throwaway esbuild output from the engine tests
 scripts/.engine-test-bundle.mjs
-scripts/spike-*output*.pdf
+scripts/.engine-cache-test-embed.mjs
 # Local Claude config stays untracked, but shared skills ship with the repo
 .claude/*
 !.claude/skills/

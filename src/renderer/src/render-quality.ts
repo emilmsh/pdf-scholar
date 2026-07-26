@@ -70,11 +70,6 @@ export function endRender(pixels: number, ms: number): void {
   }
 }
 
-/** Current learned throughput (device px/ms). Exposed for diagnostics. */
-export function currentThroughput(): number {
-  return throughput
-}
-
 // Dev-only handle so the mechanism can be inspected/driven from the console or
 // automated preview (raster timing is unreliable in a hidden preview tab).
 if (import.meta.env.DEV) {

@@ -31,6 +31,11 @@ jobs:
       # The >150 MB path takes the incremental appender instead of the engine —
       # a separate write implementation, so it needs its own gate
       - run: npm run test:appender
+      # The debounced document cache that sits under both write paths
+      - run: npm run test:cache
+      # Pure-function rotation/spread transforms: a wrong one writes corrupted
+      # coordinates into the file, so it is cheap insurance
+      - run: npm run test:rotation
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

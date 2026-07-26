@@ -54,22 +54,18 @@ async function corpus() {
   return file
 }
 
-// --- bundle both adapters with the test:engine esbuild settings -------------
+// --- bundle the adapter with the test:engine esbuild settings ---------------
 const { build } = await import('esbuild')
-const BUNDLES = {
-  embedpdf: { entry: 'src/main/annotation-engine-embedpdf.ts', out: path.join(__dirname, '.engine-cache-test-embed.mjs') }
-}
-for (const { entry, out } of Object.values(BUNDLES)) {
-  await build({
-    entryPoints: [path.join(ROOT, entry)],
-    bundle: true,
-    platform: 'node',
-    format: 'esm',
-    packages: 'external',
-    outfile: out,
-    logLevel: 'silent'
-  })
-}
+const BUNDLE = path.join(__dirname, '.engine-cache-test-embed.mjs')
+await build({
+  entryPoints: [path.join(ROOT, 'src/main/annotation-engine-embedpdf.ts')],
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  packages: 'external',
+  outfile: BUNDLE,
+  logLevel: 'silent'
+})
 
 function mupdfObjNums(file, pageIndex) {
   const pdf = mupdf.Document.openDocument(fs.readFileSync(file), 'application/pdf').asPDF()
@@ -81,70 +77,67 @@ function mupdfObjNums(file, pageIndex) {
 const srcFile = await corpus()
 
 try {
-  for (const [name, { out }] of Object.entries(BUNDLES)) {
-    console.log(`\n===== ${name} adapter =====`)
-    const { applyAnnotation, flushAnnotations } = await import(`file://${out}`)
-    const FILE = path.join(TMP, `run-${name}.pdf`)
-    fs.copyFileSync(srcFile, FILE)
+  const { applyAnnotation, flushAnnotations } = await import(`file://${BUNDLE}`)
+  const FILE = path.join(TMP, 'run-embedpdf.pdf')
+  fs.copyFileSync(srcFile, FILE)
 
-    const req = (y) => ({
-      path: FILE,
-      pageIndex: 0,
-      type: 'highlight',
-      quads: [{ x: 60, y, w: 400, h: 14 }],
-      color: [1, 0.84, 0.29],
-      opacity: 0.5,
-      author: 'cache-test'
-    })
-    const ids = []
+  const req = (y) => ({
+    path: FILE,
+    pageIndex: 0,
+    type: 'highlight',
+    quads: [{ x: 60, y, w: 400, h: 14 }],
+    color: [1, 0.84, 0.29],
+    opacity: 0.5,
+    author: 'cache-test'
+  })
+  const ids = []
 
-    // 1. baseline: one full cycle (open -> write -> flush+evict) — this is
-    // what EVERY annotation used to cost before the cache
-    const t0 = performance.now()
-    const r0 = await applyAnnotation(req(80))
-    await flushAnnotations(FILE)
-    const baseline = performance.now() - t0
-    check('baseline write+flush ok', 'ok' in r0, 'ok' in r0 ? ms(baseline) : r0.error)
-    if ('ok' in r0) ids.push(r0.id)
+  // 1. baseline: one full cycle (open -> write -> flush) — this is what EVERY
+  // annotation used to cost before the cache
+  const t0 = performance.now()
+  const r0 = await applyAnnotation(req(80))
+  await flushAnnotations(FILE)
+  const baseline = performance.now() - t0
+  check('baseline write+flush ok', 'ok' in r0, 'ok' in r0 ? ms(baseline) : r0.error)
+  if ('ok' in r0) ids.push(r0.id)
 
-    // 2. burst: 5 consecutive writes, no flush between (one reopen, then
-    // pure in-memory mutations) — must be far below 5x the baseline
-    const t1 = performance.now()
-    for (let i = 0; i < 5; i++) {
-      const r = await applyAnnotation(req(110 + i * 24))
-      check(`burst write #${i + 1} ok`, 'ok' in r, 'ok' in r ? `obj#${r.id}` : r.error)
-      if ('ok' in r) ids.push(r.id)
-    }
-    const burst = performance.now() - t1
-    check(
-      'burst of 5 far below 5x single cycle',
-      burst < baseline * 5 * 0.6,
-      `burst ${ms(burst)} vs 5x baseline ${ms(baseline * 5)}`
-    )
-
-    // 3. the debounced flush (1200 ms) lands on disk without an explicit flush
-    await sleep(2000)
-    const afterDebounce = mupdfObjNums(FILE, 0)
-    check('debounced flush wrote all 6 to disk', afterDebounce.length === 6, `${afterDebounce.length} annots`)
-
-    // 4. write AFTER a flush: EmbedPDF continues on the kept-open doc (the
-    // save-then-keep-editing case), mupdf transparently reopens
-    const r6 = await applyAnnotation(req(260))
-    check('write after flush ok', 'ok' in r6, 'ok' in r6 ? `obj#${r6.id}` : r6.error)
-    if ('ok' in r6) ids.push(r6.id)
-
-    // 5. explicit flush + independent mupdf reopen: every annotation present
-    // under the exact object number the adapter reported
-    await flushAnnotations(FILE)
-    const final = mupdfObjNums(FILE, 0)
-    const finalSet = new Set(final)
-    check('all 7 annotations on disk', final.length === 7, `${final.length} annots`)
-    check('every reported id present after reopen', ids.length === 7 && ids.every((id) => finalSet.has(id)),
-      `ids ${ids.join(',')} vs file ${final.join(',')}`)
-    check('no leftover tmp file', !fs.existsSync(`${FILE}.pdfx-tmp`))
+  // 2. burst: 5 consecutive writes, no flush between (one reopen, then pure
+  // in-memory mutations) — must be far below 5x the baseline
+  const t1 = performance.now()
+  for (let i = 0; i < 5; i++) {
+    const r = await applyAnnotation(req(110 + i * 24))
+    check(`burst write #${i + 1} ok`, 'ok' in r, 'ok' in r ? `obj#${r.id}` : r.error)
+    if ('ok' in r) ids.push(r.id)
   }
+  const burst = performance.now() - t1
+  check(
+    'burst of 5 far below 5x single cycle',
+    burst < baseline * 5 * 0.6,
+    `burst ${ms(burst)} vs 5x baseline ${ms(baseline * 5)}`
+  )
+
+  // 3. the debounced flush (1200 ms) lands on disk without an explicit flush
+  await sleep(2000)
+  const afterDebounce = mupdfObjNums(FILE, 0)
+  check('debounced flush wrote all 6 to disk', afterDebounce.length === 6, `${afterDebounce.length} annots`)
+
+  // 4. write AFTER a flush: the doc stays open across saveAsCopy (the
+  // save-then-keep-editing case)
+  const r6 = await applyAnnotation(req(260))
+  check('write after flush ok', 'ok' in r6, 'ok' in r6 ? `obj#${r6.id}` : r6.error)
+  if ('ok' in r6) ids.push(r6.id)
+
+  // 5. explicit flush + independent mupdf reopen: every annotation present
+  // under the exact object number the adapter reported
+  await flushAnnotations(FILE)
+  const final = mupdfObjNums(FILE, 0)
+  const finalSet = new Set(final)
+  check('all 7 annotations on disk', final.length === 7, `${final.length} annots`)
+  check('every reported id present after reopen', ids.length === 7 && ids.every((id) => finalSet.has(id)),
+    `ids ${ids.join(',')} vs file ${final.join(',')}`)
+  check('no leftover tmp file', !fs.existsSync(`${FILE}.pdfx-tmp`))
 } finally {
-  for (const { out } of Object.values(BUNDLES)) fs.rmSync(out, { force: true })
+  fs.rmSync(BUNDLE, { force: true })
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)

@@ -181,6 +181,3 @@ export function markupPrefIsDefault(type: MarkupToolType, pref: MarkupPref): boo
   return sameRgb(pref.color, d.color) && pref.opacity === d.opacity
 }
 
-export function allMarkupIsDefault(markup: Record<MarkupToolType, MarkupPref>): boolean {
-  return MARKUP_TOOL_TYPES.every((type) => markupPrefIsDefault(type, markup[type]))
-}

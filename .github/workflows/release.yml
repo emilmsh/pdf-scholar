@@ -40,6 +40,8 @@ jobs:
       # it has to run the engine write tests itself, not assume a green CI run.
       - run: npm run test:engine
       - run: npm run test:appender
+      - run: npm run test:cache
+      - run: npm run test:rotation
       - run: npm run build
       - run: npx electron-builder --publish never --config config/electron-builder.yml
       # pack:ext / pack:ext:store already build the extension. Both zip shapes

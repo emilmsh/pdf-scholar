@@ -76,8 +76,9 @@ export type AnnotationType =
   | 'arrow'
   | 'freetext'
 
-/** Rect in PDF points, origin at the page's top-left, y growing downward
- *  (MuPDF page space — same direction as pdf.js viewport space). */
+/** Rect in PDF points, origin at the page's top-left, y growing downward —
+ *  the same direction as pdf.js viewport space and as what the write engine
+ *  expects, so no flip happens anywhere. */
 export interface PageRect {
   x: number
   y: number
@@ -122,9 +123,9 @@ export interface ModifyAnnotationRequest {
   /** Move/resize (note drag) — page space, top-left origin */
   rect?: PageRect
   /** Move: translate all geometry by (dx, dy) in page space (top-left origin,
-   *  y down). The engine reads the annotation's own geometry and writes it
-   *  back shifted — Line via setLine (getRect/setRect throw on Line in mupdf
-   *  1.28), Ink via setInkList, everything else via setRect. */
+   *  y down). The engine reads the annotation's own geometry and writes it back
+   *  shifted — per-subtype, because a Line's endpoints and an Ink's stroke list
+   *  do not follow a plain rect move. */
   translate?: { dx: number; dy: number }
 }
 
@@ -247,7 +248,8 @@ export interface PdfxApi {
   getPendingPath(): Promise<string | null>
   setPosition(path: string, pos: ReadingPosition): void
   setSettings(patch: Partial<Settings>): void
-  /** Write an annotation into the PDF file (mupdf, incremental save) */
+  /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
+   *  goes through src/main/incremental-appender.ts instead) */
   annotate(req: AnnotateRequest): Promise<AnnotateResult>
   /** Change color/opacity/contents of an existing annotation */
   updateAnnotation(req: ModifyAnnotationRequest): Promise<AnnotateResult>

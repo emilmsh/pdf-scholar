@@ -4,7 +4,9 @@
 // distributed under MIT. mupdf remains a devDependency purely as an
 // independent verifier in scripts/test-engine-*.mjs and engine-bench.mjs.
 //
-// Facts proven in scripts/spike-embedpdf-annot.mjs / spike-embedpdf-objnum.mjs:
+// Facts held true by scripts/test-engine-embedpdf.mjs (`npm run test:engine`,
+// run on all three OSes in CI) — it exercises each of these through the
+// production entry points below and verifies the result with mupdf:
 // - Model space is top-left, y-down — identical to our PageRect space (no flip).
 // - All 11 PDFX types create with appearance streams (/AP verified by mupdf).
 // - PDF object numbers are exposed via the fork's EPDF extensions and are
@@ -160,10 +162,11 @@ interface CachedDoc {
 
 // Document-open cache: consecutive annotation writes mutate ONE in-memory doc
 // and the draft file catches up via a debounced flush — instead of a full
-// open/saveAsCopy cycle per annotation. Unlike mupdf, the doc handle stays
-// open across flushes: saveAsCopy does not mutate the document, and object
-// numbers are stable through it (spike-embedpdf-objnum.mjs), so the ids the
-// renderer holds keep matching both the cached doc and the file on disk.
+// open/saveAsCopy cycle per annotation. The doc handle stays open across
+// flushes: saveAsCopy does not mutate the document, and object numbers are
+// stable through it, so the ids the renderer holds keep matching both the
+// cached doc and the file on disk. (The retired mupdf engine could not do
+// this — see DocCache's evictAfterFlush note.)
 const cache = new DocCache<CachedDoc>({
   open: async (path) => {
     const engine = await getEngine()
@@ -267,8 +270,8 @@ export async function applyAnnotation(req: AnnotateRequest): Promise<AnnotateRes
       if ('error' in spec) return spec
       const page = doc.pages[req.pageIndex]
       await engine.createPageAnnotation(doc, page, spec).toPromise()
-      // The new annotation is last in /Annots order; its object number is stable
-      // through saveAsCopy (proven in spike-embedpdf-objnum.mjs).
+      // The new annotation is last in /Annots order; its object number is
+      // stable through saveAsCopy (covered by test:engine's recolor-by-id case).
       const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
       const id = objNums[objNums.length - 1]
       if (!id) return { error: 'Fikk ikke objektnummer for annotasjonen' }

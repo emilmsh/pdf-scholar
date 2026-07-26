@@ -17,18 +17,6 @@ export interface AiDocument {
 let aiRequestCounter = 1
 export const nextAiRequestId = (): number => aiRequestCounter++
 
-/** A semantic-search result: a passage the model says discusses the query.
- *  start===end===0 means only a page-level jump is possible. */
-export interface SemanticHit {
-  pageNumber: number
-  start: number
-  end: number
-  /** The model's short description of what the passage says */
-  label: string
-  /** Verbatim excerpt used to locate + highlight the passage */
-  quote: string
-}
-
 /** Page markers let prompt-contract providers (OpenAI/Azure) name page
  *  numbers; Anthropic citations use raw char offsets which we map ourselves.
  *  Offsets are derived from the marker as written, so the localized label is

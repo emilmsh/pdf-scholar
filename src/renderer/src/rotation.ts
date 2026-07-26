@@ -1,9 +1,9 @@
 // The single home for every rotation/spread coordinate transform. A missed
 // view↔page conversion at a pointer or selection boundary would write
-// corrupted coordinates into the PDF via mupdf (permanent file damage), so
-// ALL of it lives here as pure functions and every boundary routes through
-// this module. Proven to round-trip for all four rotations by
-// scripts/spike-rotation.mjs (run before any UI was wired).
+// corrupted coordinates into the PDF (permanent file damage), so ALL of it
+// lives here as pure functions and every boundary routes through this module.
+// Round-trip for all four rotations is covered by scripts/test-rotation.mjs
+// (`npm run test:rotation`, also run in CI).
 //
 // Spaces:
 //  - PAGE space: PDF points, origin top-left, y down (the page's default

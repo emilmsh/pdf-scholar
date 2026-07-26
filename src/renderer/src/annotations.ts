@@ -1,7 +1,9 @@
 // Geometry + styling for annotations created in this session. Coordinates are
 // stored in "page space": PDF points with origin at the page's TOP-LEFT and y
-// growing downward — which is also MuPDF's convention, so the engine uses
-// these rects as-is (verified in scripts/spike-mupdf-annot.mjs).
+// growing downward — which is also PDFium's and MuPDF's convention, so the
+// engine writes these rects as-is. Held true by scripts/test-engine-embedpdf.mjs
+// (`npm run test:engine`), which creates every type through the production
+// engine and reads the geometry back with an independent library.
 import type { CSSProperties } from 'react'
 import type { AnnotationType, PageRect, ViewRotation } from '../../shared/types'
 import { pagePointToView, pageRectToView } from './rotation'
@@ -171,13 +173,6 @@ export type ShapeToolType = (typeof SHAPE_TOOL_TYPES)[number]
  *  they attach to the current text selection (like the context-menu markup). */
 export const MARKUP_TOOL_TYPES = ['highlight', 'underline', 'strikeout', 'squiggly'] as const
 export type MarkupToolType = (typeof MARKUP_TOOL_TYPES)[number]
-
-/** Default colour for each markup tool (pastel fill for highlight, saturated
- *  line colour for the others so a thin stroke stays visible). */
-export function markupDefaultColor(type: MarkupToolType): [number, number, number] {
-  if (type === 'highlight') return HIGHLIGHT_COLORS[0].rgb
-  return UNDERLINE_COLOR
-}
 
 export function rgbCss(rgb: [number, number, number], alpha: number): string {
   const [r, g, b] = rgb.map((v) => Math.round(v * 255))
