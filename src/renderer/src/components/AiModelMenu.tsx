@@ -1,0 +1,132 @@
+// The popover under the chat header's model chip: pick a model (across all
+// providers at once) and the reasoning effort. Split out of AiPanel.tsx because
+// it is a self-contained popover with a four-prop interface and one job —
+// building the cross-provider option list is fiddly enough to deserve reading
+// on its own, and none of it touches the conversation.
+//
+// It writes config straight through to the main process and hands the result
+// back via onSaved; it holds no config state of its own, so the panel header
+// and this menu can never disagree about the active model.
+import { useRef } from 'react'
+import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/types'
+import { bridge } from '../bridge'
+import { t, useLang } from '../i18n'
+import { useDismissable } from '../useDismissable'
+import { KEY_PROVIDERS, MODELS, THINKING_LEVELS } from './ai-models'
+
+interface ModelMenuProps {
+  config: AiConfigView
+  onSaved(next: AiConfigView): void
+  onClose(): void
+  onOpenSettings(): void
+}
+
+/** Popover under the header model chip: EVERY provider's models in one flat
+ *  list (keyless providers greyed out) plus reasoning effort. Selecting a
+ *  model from another provider switches provider too — the chat history is
+ *  resent in full on the next question, so mid-chat switches are safe.
+ *  Keys/providers are managed in the key settings (button at the bottom). */
+export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuProps): React.JSX.Element {
+  useLang()
+  const ref = useRef<HTMLDivElement>(null)
+  // Was the one surface in the app with no Escape path at all; the shared hook
+  // gives it one, and switches mousedown -> pointerdown so touch works too.
+  useDismissable(ref, true, onClose)
+
+  const provider = config.provider
+  const model = config.models[provider] ?? ''
+  const anyKey = KEY_PROVIDERS.some((p) => config.hasKey[p.id])
+  // Haiku ignores reasoning effort; mock has none — mirror AiSettings
+  const thinkingApplies = !/haiku/i.test(model) && provider !== 'mock'
+
+  const patch = (p: Parameters<typeof bridge.aiSetConfig>[0]): void => {
+    void bridge.aiSetConfig(p).then(onSaved)
+  }
+
+  // One flat <select> across providers; option values are "<provider>:<id>".
+  // Azure has no curated list — its configured deployment is the entry.
+  const value = provider === 'azure' ? `azure:${config.azure.deployment}` : `${provider}:${model}`
+  const pick = (v: string): void => {
+    const sep = v.indexOf(':')
+    const p = v.slice(0, sep) as AiProviderId
+    const id = v.slice(sep + 1)
+    patch(p === 'azure' ? { provider: p } : { provider: p, models: { ...config.models, [p]: id } })
+  }
+
+  const groups = KEY_PROVIDERS.map(({ id, name }) => {
+    const options = MODELS[id].map((m) => ({
+      value: `${id}:${m.id}`,
+      label: m.label,
+      hint: m.hint ? t(m.hint) : undefined
+    }))
+    if (id === 'azure' && config.azure.deployment)
+      options.push({
+        value: `azure:${config.azure.deployment}`,
+        label: config.azure.deployment,
+        hint: undefined
+      })
+    // A custom model id typed in an older version still shows up
+    if (id === provider && id !== 'azure' && model && !MODELS[id].some((m) => m.id === model))
+      options.push({ value: `${id}:${model}`, label: model, hint: undefined })
+    return { id: id as string, name, options, enabled: config.hasKey[id] }
+    // Platforms that cannot store keys (plain-web preview) hide the keyless
+    // real providers instead of greying them — there is no way to enable them
+  }).filter((g) => g.options.length > 0 && (config.keysSupported || g.enabled))
+  if (provider === 'mock' || !config.keysSupported)
+    groups.push({
+      id: 'mock',
+      name: t('ai.providerMock'),
+      options: MODELS.mock.map((m) => ({ value: `mock:${m.id}`, label: m.label, hint: undefined })),
+      enabled: true
+    })
+
+  return (
+    <div className="ai-model-menu" ref={ref}>
+      {anyKey || provider === 'mock' || !config.keysSupported ? (
+        <label className="ai-field">
+          <span>{t('ai.model')}</span>
+          {/* The closed select echoes the selected model's hint on hover */}
+          <select
+            value={value}
+            title={(() => {
+              const h = MODELS[provider]?.find((m) => m.id === model)?.hint
+              return h ? t(h) : undefined
+            })()}
+            onChange={(e) => pick(e.target.value)}
+          >
+            {groups.map((g) => (
+              <optgroup key={g.id} label={g.enabled ? g.name : `${g.name} — ${t('ai.keyMissing')}`}>
+                {g.options.map((o) => (
+                  <option key={o.value} value={o.value} disabled={!g.enabled} title={o.hint}>
+                    {o.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+      ) : (
+        // No key anywhere: nothing to pick yet — send them to the key manager
+        <p className="ai-model-menu-note">{t('ai.noKeysYet')}</p>
+      )}
+      {thinkingApplies && (
+        <label className="ai-field">
+          <span>{t('ai.reasoning')}</span>
+          <select
+            value={config.thinking}
+            onChange={(e) => patch({ thinking: e.target.value as ThinkingLevel })}
+          >
+            {THINKING_LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {t(l.key)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <button className="ai-model-more" onClick={onOpenSettings}>
+        {anyKey ? t('ai.keysTitle') : t('ai.calloutCta')}
+      </button>
+    </div>
+  )
+}
