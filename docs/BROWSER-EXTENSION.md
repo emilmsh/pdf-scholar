@@ -162,12 +162,21 @@ moot inside an extension: the manifest `host_permissions` let the page fetch the
 provider origins directly, and the Anthropic SDK runs with
 `dangerouslyAllowBrowser`.
 
-The remaining gap is **key-at-rest safety**: keys sit in `chrome.storage.local`,
-which is isolated per-extension but not encrypted (the UI surfaces this via
-`encryptionAvailable:false`). The Electron app encrypts keys with the OS
-keychain. Full parity routes AI through the **same native messaging host** as
-the annotation write-back above, which would own the encrypted keys and make the
-calls — mirroring how keys never leave the Electron main process today.
+**Key-at-rest safety** is a genuine divergence, not a gap that was left open.
+Keys are encrypted with AES-GCM under a non-extractable WebCrypto key held in
+IndexedDB (`src/renderer/src/extension-key-crypto.ts`) before they go into
+`chrome.storage.local`; the UI reports this as `KeyStorageMode`
+`'browser-nonextractable'` and states its limits verbatim. Be precise about those
+limits: it defeats anything that merely READS the browser profile, but not code
+running inside that profile — which can ask the browser to decrypt exactly as we
+do — and Chrome makes no promise the AES key material is itself encrypted where
+it is stored. An extension has no path to an OS key store, so this is the ceiling
+here.
+
+Full parity with the desktop's DPAPI/Keychain would route AI through the **same
+native messaging host** as the annotation write-back above, which would own the
+keys and make the calls — mirroring how keys never leave the Electron main
+process today.
 
 ## Known limitations / watch-list
 
