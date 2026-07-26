@@ -1910,7 +1910,7 @@ export default function PdfViewer({
     // opened from disk, or save-picker/download for a URL-opened PDF.
     const bytes = await browserCurrentBytes(payload.path)
     if (!bytes) {
-      showToast(t('viewer.saveFailed', { error: 'dokumentet er ikke åpent' }))
+      showToast(t('viewer.saveFailed', { error: t('viewer.docNotOpen') }))
       return
     }
     const result = await bridge.saveDocumentBytes(payload.path, payload.name, bytes)

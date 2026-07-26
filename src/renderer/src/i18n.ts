@@ -322,6 +322,8 @@ const nb = {
   'present.exit': 'Avslutt presentasjon (Esc)',
   'viewer.nothingToExport': 'Ingen merknader å eksportere',
   'viewer.saveFailed': 'Kunne ikke lagre: {error}',
+  // Rides inside viewer.saveFailed as {error} — hence lowercase, no full stop.
+  'viewer.docNotOpen': 'dokumentet er ikke åpent',
   'viewer.exported': 'Merknader eksportert: {path}',
   'viewer.printFailed': 'Kunne ikke skrive ut: {error}',
   'viewer.saved': 'Endringene er lagret i PDF-en',
@@ -749,6 +751,7 @@ const en: Dict = {
   'present.exit': 'Exit presentation (Esc)',
   'viewer.nothingToExport': 'No annotations to export',
   'viewer.saveFailed': 'Could not save: {error}',
+  'viewer.docNotOpen': 'the document is not open',
   'viewer.exported': 'Annotations exported: {path}',
   'viewer.printFailed': 'Could not print: {error}',
   'viewer.saved': 'Changes saved to the PDF',
