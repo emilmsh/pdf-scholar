@@ -151,10 +151,42 @@ export interface AiConfig {
   thinking: ThinkingLevel
 }
 
+/** What is actually protecting a stored API key right now.
+ *
+ *  This is deliberately NOT a boolean. "Encrypted or not" cannot describe the
+ *  three real situations, and a UI that promises encryption generically is
+ *  lying on at least one platform. Each variant below states what it protects
+ *  against AND what it does not, because that is what the user needs to decide
+ *  whether to paste a key with billing attached to it. */
+export type KeyStorageMode =
+  /** Encrypted at rest by the operating system's own key store — Windows DPAPI,
+   *  macOS Keychain, or Linux Secret Service (gnome-keyring/kwallet). The blob
+   *  is decryptable only by this OS user on this machine, so copying the file
+   *  elsewhere yields nothing. Does not protect against code already running as
+   *  this user, which can ask the OS to decrypt just as the app does. */
+  | 'os-keystore'
+  /** Encrypted with AES-GCM under a key that no script can read: a
+   *  non-extractable WebCrypto key kept in IndexedDB, where `exportKey` throws.
+   *  Protects the stored bytes against anything that merely READS the browser
+   *  profile (a backup, a sync copy, another program on disk). It does NOT
+   *  protect against code running inside this browser profile, which can use
+   *  the key without ever seeing it — and Chrome makes no promise that the key
+   *  material itself is encrypted at rest, so a determined attacker with raw
+   *  file access could still reassemble it. Defence in depth, not a keychain. */
+  | 'browser-nonextractable'
+  /** Held in memory for this session only, never written to disk. Chosen when
+   *  no key store is available at all: forgetting the key on quit is strictly
+   *  better than leaving it in a file in the clear. */
+  | 'session-only'
+  /** On disk with nothing protecting it. Only reachable via a legacy stored
+   *  value; the app does not write this any more. */
+  | 'plaintext'
+
 /** Config as exposed to the renderer — keys never leave the main process */
 export interface AiConfigView extends AiConfig {
   hasKey: Record<AiProviderId, boolean>
-  encryptionAvailable: boolean
+  /** How keys are held on this platform, so the settings UI can say so exactly */
+  keyStorage: KeyStorageMode
   /** Whether this platform can store provider API keys at all (desktop and
    *  extension can; the plain-web preview is mock-only). Drives the
    *  "add your API key" callout in the assistant. */

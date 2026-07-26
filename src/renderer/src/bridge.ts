@@ -179,7 +179,8 @@ export const webApi: PdfxApi = {
   aiGetConfig: async () => ({
     ...loadWebAiConfig(),
     hasKey: { anthropic: false, openai: false, azure: false, mock: true },
-    encryptionAvailable: false,
+    // Mock-only preview: no key is ever stored, so there is nothing to protect
+    keyStorage: 'session-only' as const,
     keysSupported: false
   }),
   aiSetConfig: async (patch) => {
@@ -194,7 +195,7 @@ export const webApi: PdfxApi = {
     return {
       ...next,
       hasKey: { anthropic: false, openai: false, azure: false, mock: true },
-      encryptionAvailable: false,
+      keyStorage: 'session-only' as const,
       keysSupported: false
     }
   },

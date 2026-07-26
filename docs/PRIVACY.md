@@ -22,17 +22,35 @@ The AI features only work if you enter **your own API key** for a provider
 the assistant a question, the relevant document text is sent **directly from
 your machine to that provider** under your key and their privacy terms. There is
 no intermediary server operated by PDF Scholar. Your API keys never leave your
-device, but how they are stored differs by platform: the **desktop app** encrypts
-them at rest with the operating system's own key store (Windows DPAPI / macOS
-Keychain / Linux Secret Service), while the **browser extension** keeps them in
-`chrome.storage.local`, which the browser isolates to this extension but does not
-encrypt.
+device.
 
-On a Linux desktop with no keyring daemon running (gnome-keyring or kwallet), the
-operating system offers nothing to encrypt with, and the desktop app stores the
-key unencrypted rather than refusing to remember it. Wherever a key is held
-unencrypted the app says so, in the settings panel at the field where you enter
-it, and recommends using a key with a spending cap.
+How they are protected depends on what the platform actually offers, and the app
+uses the strongest option available on each. The assistant's key settings always
+state which of these applies on your machine — we would rather tell you exactly
+what is true than promise "encrypted" everywhere:
+
+- **Desktop app (Windows, macOS, and Linux with a keyring).** The key is
+  encrypted at rest by the operating system's own key store — Windows DPAPI,
+  macOS Keychain, or Linux Secret Service via gnome-keyring or kwallet. Only your
+  user account on that machine can decrypt it, so copying the file elsewhere
+  yields nothing useful.
+- **Desktop app on Linux with no keyring daemon.** There is no key store to
+  encrypt with, and no safe place to keep an encryption key either — so the app
+  keeps the API key in memory for that session only and writes nothing to disk.
+  You re-enter it next launch. Earlier versions stored it unencrypted in a file
+  instead; if yours did, the app now takes that plaintext off disk on first
+  launch.
+- **Browser extension.** An extension has no access to the operating system's key
+  store. The key is therefore encrypted with AES-GCM under a key that no script
+  can read out (a non-extractable WebCrypto key). That protects it from anything
+  which merely *reads* the browser profile — a backup, a synced copy, another
+  program on disk. It does **not** protect it from code running inside that
+  browser profile, which can use the key without ever seeing it, and the browser
+  makes no guarantee that the encryption key itself is encrypted where it is
+  stored. This is a meaningful extra layer, not the equivalent of a keychain.
+
+Whichever applies, a key with a spending cap set in the provider's console is the
+protection that does not depend on any of this.
 
 ## Automatic updates (desktop app)
 

@@ -14,7 +14,8 @@ import type {
   AiChatResult,
   AiConfig,
   AiConfigView,
-  AiProviderId
+  AiProviderId,
+  KeyStorageMode
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
 import { getState, mergeAiConfig, saveState } from './storage'
@@ -79,18 +80,44 @@ async function replay(result: AiChatResult, emit: (t: string) => void): Promise<
   return result
 }
 
-// ---------- Key encryption ----------
+// ---------- Key storage ----------
+//
+// Windows and macOS always have a key store, so the normal path is DPAPI /
+// Keychain via safeStorage. Linux needs a keyring daemon (gnome-keyring or
+// kwallet) and may not have one; `safeStorage.isEncryptionAvailable()` reports
+// false there.
+//
+// In that case we keep the key in memory for the session instead of writing it
+// to userData/pdfx-state.json. The app used to store `plain:<base64>` — which is
+// not encryption, only an encoding — so a readable file held a live billable
+// credential for as long as the user kept it. Forgetting the key on quit is
+// worse UX and better security, and it is the most protection the platform
+// actually offers: with no OS key store there is nowhere safe to keep a
+// key-encryption key either, so anything we derived locally would be
+// obfuscation dressed up as encryption.
 
-function encryptKey(plain: string): string {
+/** Provider → plaintext key, for the session-only path. Never persisted. */
+const sessionKeys = new Map<AiProviderId, string>()
+
+const canUseKeystore = (): boolean => safeStorage.isEncryptionAvailable()
+
+function keyStorageMode(): KeyStorageMode {
+  if (canUseKeystore()) return 'os-keystore'
+  return 'session-only'
+}
+
+/** Encrypt for persistence, or null when this platform must not persist. */
+function encryptKey(plain: string): string | null {
   if (!plain) return ''
-  if (safeStorage.isEncryptionAvailable()) {
-    return safeStorage.encryptString(plain).toString('base64')
-  }
-  return `plain:${Buffer.from(plain, 'utf-8').toString('base64')}`
+  if (!canUseKeystore()) return null
+  return safeStorage.encryptString(plain).toString('base64')
 }
 
 function decryptKey(stored: string): string {
   if (!stored) return ''
+  // Legacy: written by versions that fell back to plaintext when no keyring was
+  // present. Still read so an upgrade does not silently lose the key, but
+  // migrateLegacyPlaintextKeys() clears it from disk on the next launch.
   if (stored.startsWith('plain:')) {
     return Buffer.from(stored.slice(6), 'base64').toString('utf-8')
   }
@@ -101,20 +128,57 @@ function decryptKey(stored: string): string {
   }
 }
 
+/** The usable key for a provider: the session one when we are not persisting,
+ *  otherwise whatever is on disk. */
+function keyFor(provider: AiProviderId): string {
+  const session = sessionKeys.get(provider)
+  if (session !== undefined) return session
+  return decryptKey(getState().ai.keys[provider] ?? '')
+}
+
+/** Take any `plain:` key off disk at startup. Where a key store exists we
+ *  re-encrypt it properly; where none does we move it into memory for this
+ *  session. Either way the plaintext stops sitting in a readable file — a
+ *  security fix that applies to keys stored by older versions. */
+function migrateLegacyPlaintextKeys(): void {
+  const ai = getState().ai
+  const rewritten: Partial<Record<AiProviderId, string>> = {}
+  let changed = false
+  for (const p of PROVIDERS) {
+    const stored = ai.keys[p] ?? ''
+    if (!stored.startsWith('plain:')) continue
+    const plain = Buffer.from(stored.slice(6), 'base64').toString('utf-8')
+    if (canUseKeystore()) {
+      rewritten[p] = safeStorage.encryptString(plain).toString('base64')
+    } else {
+      sessionKeys.set(p, plain)
+      rewritten[p] = ''
+    }
+    changed = true
+  }
+  if (!changed) return
+  const state = getState()
+  state.ai = mergeAiConfig(state.ai, { keys: rewritten })
+  saveState()
+  console.log(
+    `[pdfx] migrated ${Object.keys(rewritten).length} plaintext API key(s) off disk (${keyStorageMode()})`
+  )
+}
+
 function configView(): AiConfigView {
   const ai = getState().ai
   const hasKey = {} as Record<AiProviderId, boolean>
-  // "Has a key" means the stored blob actually decrypts — a blob that fails
-  // DPAPI decryption must show as not-set so the user re-enters it, instead
-  // of the settings claiming a key exists while every request fails.
-  for (const p of PROVIDERS) hasKey[p] = p === 'mock' ? true : decryptKey(ai.keys[p]) !== ''
+  // "Has a key" means the key is actually usable — a blob that fails DPAPI
+  // decryption must show as not-set so the user re-enters it, instead of the
+  // settings claiming a key exists while every request fails.
+  for (const p of PROVIDERS) hasKey[p] = p === 'mock' ? true : keyFor(p) !== ''
   return {
     provider: ai.provider,
     models: { ...ai.models },
     azure: { ...ai.azure },
     thinking: ai.thinking,
     hasKey,
-    encryptionAvailable: safeStorage.isEncryptionAvailable(),
+    keyStorage: keyStorageMode(),
     keysSupported: true
   }
 }
@@ -124,6 +188,9 @@ function configView(): AiConfigView {
 const activeRequests = new Map<number, AbortController>()
 
 export function registerAiIpc(): void {
+  // Before anything can read a key: get any legacy plaintext off disk.
+  migrateLegacyPlaintextKeys()
+
   ipcMain.handle('ai:get-config', () => configView())
 
   ipcMain.handle(
@@ -136,7 +203,17 @@ export function registerAiIpc(): void {
           const value = patch.keys[p]
           // Empty/blank means "no change" — there is no remove-key UI, and
           // treating '' as a wipe is how stored keys get lost by accident
-          if (value !== undefined && value.trim() !== '') encryptedKeys[p] = encryptKey(value.trim())
+          if (value === undefined || value.trim() === '') continue
+          const trimmed = value.trim()
+          const sealed = encryptKey(trimmed)
+          if (sealed === null) {
+            // No key store on this platform: hold it for the session and make
+            // sure nothing lands on disk for this provider.
+            sessionKeys.set(p, trimmed)
+            encryptedKeys[p] = ''
+          } else {
+            encryptedKeys[p] = sealed
+          }
         }
       }
       state.ai = mergeAiConfig(state.ai, {
@@ -162,13 +239,17 @@ export function registerAiIpc(): void {
       const recorded = readFixture(req)
       if (recorded) return await replay(recorded, emit)
       const ai = getState().ai
-      const key = decryptKey(ai.keys[ai.provider])
+      const key = keyFor(ai.provider)
       if (ai.provider !== 'mock' && !key) {
-        // Distinguish "never entered" from "stored but undecryptable"
-        // (DPAPI ties encryption to the Windows user — credential changes
-        // or a copied profile can invalidate the blob)
-        return ai.keys[ai.provider] !== ''
-          ? { error: 'API-nøkkelen kunne ikke dekrypteres (Windows-kontoen kan ha endret seg). Legg den inn på nytt i KI-innstillingene.' }
+        // Three different reasons, three different remedies: a stored blob that
+        // will not decrypt (DPAPI ties encryption to the OS user, so credential
+        // changes or a copied profile invalidate it), a session-only key that
+        // this launch has not been given yet, or simply never entered.
+        if (ai.keys[ai.provider] !== '') {
+          return { error: 'API-nøkkelen kunne ikke dekrypteres (brukerkontoen kan ha endret seg). Legg den inn på nytt i KI-innstillingene.' }
+        }
+        return keyStorageMode() === 'session-only'
+          ? { error: 'Nøkkelen lagres bare for denne økta på denne maskinen (ingen nøkkelring tilgjengelig). Legg den inn på nytt i KI-innstillingene.' }
           : { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
       }
       const result = await runProviderChat({

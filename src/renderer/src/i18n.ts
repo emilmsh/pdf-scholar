@@ -42,7 +42,7 @@ const nb = {
     'Bruk din egen API-nøkkel (Claude eller OpenAI). Da holdes dokumentet privat, svarene får sidehenvisninger, og du styrer kostnaden selv.',
   'welcome.aiSetup': 'Legg til API-nøkkel',
   'welcome.aiGuide':
-    'Lim inn nøkkelen for leverandørene du har — resten lar du stå tomt. Nøkler lages i leverandørens konsoll; sett et utgiftstak med det samme, og følg med på forbruket på samme sted. Nøkkelen lagres kryptert lokalt og sendes aldri til andre enn leverandøren.',
+    'Lim inn nøkkelen for leverandørene du har — resten lar du stå tomt. Nøkler lages i leverandørens konsoll; sett et utgiftstak med det samme, og følg med på forbruket på samme sted. Nøkkelen blir liggende på din egen maskin og sendes aldri til andre enn leverandøren; innstillingene forteller nøyaktig hva som beskytter den her.',
   'welcome.recents': 'Nylig lest',
   'welcome.logoCredit': 'Logo av Elisabeth Walle',
 
@@ -384,9 +384,16 @@ const nb = {
   'ai.deployment': 'Deployment',
   'ai.settingsNote':
     'Nøkkelen brukes kun direkte mot leverandørens API. Dokumentteksten sendes til leverandøren først når du stiller et spørsmål.',
-  'ai.settingsNoteEncrypted': ' Nøkkelen lagres kryptert på denne maskinen.',
-  'ai.encryptionWarn':
-    ' Nøkkelen lagres uten kryptering på denne maskinen (isolert til utvidelsen). Bruk en nøkkel med utgiftstak.',
+  // One per KeyStorageMode. Each says what protects the key AND what does not —
+  // a blanket «lagres kryptert» was wrong on two of the three platforms.
+  'ai.keyStoreOs':
+    ' Nøkkelen lagres kryptert av operativsystemets egen nøkkelhvelv (Windows DPAPI, macOS Keychain eller Linux Secret Service), og kan bare dekrypteres av denne brukeren på denne maskinen.',
+  'ai.keyStoreBrowser':
+    ' Nøkkelen lagres kryptert (AES-GCM) med en nøkkel ingen skript kan lese ut. Det beskytter mot noe som bare leser nettleserprofilen — en sikkerhetskopi, en synkronisert kopi, et annet program på disken — men ikke mot kode som kjører i denne nettleserprofilen, som kan bruke nøkkelen uten å se den. En utvidelse har ikke tilgang til operativsystemets nøkkelhvelv, så dette er så langt nettleseren rekker.',
+  'ai.keyStoreSession':
+    ' Nøkkelen lagres bare i minnet for denne økta og skrives ikke til disk — ingen nøkkelring er tilgjengelig her, og da finnes det ikke noe trygt sted å lagre den. Du må legge den inn på nytt neste gang du starter appen. Start gnome-keyring eller kwallet for å få varig, kryptert lagring.',
+  'ai.keyStorePlain':
+    ' Nøkkelen ligger ukryptert på disken (lagret av en eldre versjon). Legg den inn på nytt for å flytte den til trygg lagring.',
   'ai.sendToChat': 'Send til chat',
   'ai.summaryBtn': 'Strukturert sammendrag',
   'ai.summaryTip': 'Strukturert artikkelsammendrag med kildehenvisninger',
@@ -485,7 +492,7 @@ const en: Dict = {
     'Use your own API key (Claude or OpenAI). Your document stays private, answers carry page citations, and you control the cost.',
   'welcome.aiSetup': 'Add API key',
   'welcome.aiGuide':
-    'Paste the key for the providers you have — leave the rest empty. Keys are created in the provider console; set a spending cap while you are there, and watch your usage in the same place. The key is stored encrypted locally and only ever sent to the provider.',
+    'Paste the key for the providers you have — leave the rest empty. Keys are created in the provider console; set a spending cap while you are there, and watch your usage in the same place. The key stays on your own machine and is only ever sent to the provider; the settings state exactly what protects it here.',
   'welcome.recents': 'Recently read',
   'welcome.logoCredit': 'Logo by Elisabeth Walle',
 
@@ -809,9 +816,14 @@ const en: Dict = {
   'ai.deployment': 'Deployment',
   'ai.settingsNote':
     'The key is used only directly against the provider’s API. The document text is sent to the provider only when you ask a question.',
-  'ai.settingsNoteEncrypted': ' The key is stored encrypted on this machine.',
-  'ai.encryptionWarn':
-    ' The key is stored unencrypted on this machine (isolated to this extension). Use a key with a spending cap.',
+  'ai.keyStoreOs':
+    ' The key is encrypted at rest by the operating system’s own key store (Windows DPAPI, macOS Keychain or Linux Secret Service), and can only be decrypted by this user on this machine.',
+  'ai.keyStoreBrowser':
+    ' The key is encrypted (AES-GCM) under a key no script can read out. That protects it from anything which merely reads the browser profile — a backup, a synced copy, another program on disk — but not from code running inside this browser profile, which can use the key without seeing it. An extension has no access to the operating system’s key store, so this is as far as the browser goes.',
+  'ai.keyStoreSession':
+    ' The key is held in memory for this session only and is not written to disk — no keyring is available here, so there is nowhere safe to put it. You will need to enter it again next time you start the app. Start gnome-keyring or kwallet for persistent, encrypted storage.',
+  'ai.keyStorePlain':
+    ' The key is sitting unencrypted on disk (stored by an older version). Enter it again to move it into safe storage.',
   'ai.sendToChat': 'Send to chat',
   'ai.summaryBtn': 'Structured summary',
   'ai.summaryTip': 'Structured article summary with source references',

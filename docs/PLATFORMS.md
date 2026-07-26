@@ -62,10 +62,13 @@ not as acceptable platform lag.
    association without AppImageLauncher, and Ubuntu 24.04+'s AppArmor default
    blocks the Chromium sandbox inside AppImages — the **deb is the recommended
    install on Ubuntu/Debian** and README says so. AI-key encryption
-   (`safeStorage`) needs a keyring daemon (gnome-keyring/kwallet); without one
-   `encryptKey` falls back to `plain:<base64>` (`src/main/ai.ts`) — the key IS
-   stored, unencrypted, and the key settings say so via `ai.encryptionWarn`. It
-   does not degrade to "key not set".
+   (`safeStorage`) needs a keyring daemon (gnome-keyring/kwallet); without one the
+   app keeps the key in memory for that session and writes nothing to disk
+   (`src/main/ai.ts`, `KeyStorageMode` = `session-only`), because with no key
+   store there is nowhere safe to keep a key-encryption key either. The user
+   re-enters it each launch and the settings panel says why. Versions before
+   2026-07-26 wrote `plain:<base64>` instead; `migrateLegacyPlaintextKeys()`
+   clears that on first launch.
 7. **Extension in-place save needs one write-access grant for read-only-opened
    PDFs**: the extension DOES save annotations back to the current file in place
    (desktop parity — `Toolbar.tsx` shows the same «Lagre» + «Lagre kopi» split,
@@ -126,6 +129,18 @@ not as acceptable platform lag.
     identical on every platform — both columns share one annotation map in one
     component tree, with no IPC involved. `npm run test:windows` covers the
     Electron behaviour end to end (two real windows, verified with mupdf).
+12. **API-key protection is per-platform, because the platforms genuinely differ.**
+    `KeyStorageMode` (`src/shared/types.ts`) names each case and the settings panel
+    states the active one verbatim; do NOT collapse this back into a boolean or
+    write copy that promises "encrypted" generically. Desktop with a key store →
+    `os-keystore` (DPAPI/Keychain/Secret Service). Desktop without one →
+    `session-only`, in memory, nothing on disk. Extension → `browser-nonextractable`:
+    AES-GCM under a non-extractable WebCrypto key in IndexedDB
+    (`src/renderer/src/extension-key-crypto.ts`), which defeats reading the profile
+    but not code running inside it. An extension cannot reach an OS key store at
+    all; full parity would need a native-messaging host. If a new platform is added,
+    it must map to one of these modes and say so — a platform whose protection is
+    not describable here does not ship the AI features.
 
 ## Maintenance rules
 

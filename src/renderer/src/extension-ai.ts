@@ -10,11 +10,12 @@
 // the browser-side seams: config + key storage in chrome.storage.local, and
 // the delta/abort plumbing the renderer subscribes to via onAiDelta.
 //
-// Key safety note (surfaced in the UI via encryptionAvailable:false): unlike
-// the Electron app, which encrypts keys at rest with the OS keychain, keys here
-// sit in chrome.storage.local. That store is isolated per-extension but not
-// encrypted; the full-parity path is a native-messaging host (see
-// docs/BROWSER-EXTENSION.md). This is the pragmatic first step.
+// Key safety: an extension has no access to an OS key store, so it cannot match
+// the desktop's DPAPI/Keychain. Keys are therefore encrypted at rest with
+// AES-GCM under a non-extractable WebCrypto key (extension-key-crypto.ts) before
+// they go into chrome.storage.local — and the settings panel states exactly what
+// that protects against and what it does not, rather than claiming parity. Full
+// parity would need a native-messaging host (see docs/BROWSER-EXTENSION.md).
 import type {
   AiChatRequest,
   AiChatResult,
@@ -25,6 +26,7 @@ import type {
 } from '../../shared/types'
 import { runProviderChat } from '../../shared/ai-chat'
 import { store } from './extension-store'
+import { isSealed, seal, sealingAvailable, unseal } from './extension-key-crypto'
 
 const K_AI_CONFIG = 'pdfx-ai-config'
 const K_AI_KEYS = 'pdfx-ai-keys'
@@ -38,6 +40,8 @@ const DEFAULT_CONFIG: AiConfig = {
 
 type Keys = Partial<Record<AiProviderId, string>>
 
+const PROVIDER_IDS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'mock']
+
 async function loadConfig(): Promise<AiConfig> {
   const stored = await store.get<Partial<AiConfig>>(K_AI_CONFIG, {})
   return {
@@ -48,10 +52,30 @@ async function loadConfig(): Promise<AiConfig> {
   }
 }
 
-function toView(config: AiConfig, keys: Keys): AiConfigView {
+/** Keys held only for this session, used when this profile has no working
+ *  crypto store. Never written to chrome.storage.local — a browser that cannot
+ *  encrypt must not be handed plaintext instead. */
+const sessionKeys: Keys = {}
+
+/** Stored (sealed) keys → usable plaintext, session keys taking precedence. */
+async function usableKeys(stored: Keys): Promise<Keys> {
+  const out: Keys = {}
+  for (const p of PROVIDER_IDS) {
+    if (sessionKeys[p] !== undefined) {
+      out[p] = sessionKeys[p]
+      continue
+    }
+    const raw = stored[p]
+    if (raw) out[p] = await unseal(raw)
+  }
+  return out
+}
+
+async function toView(config: AiConfig, keys: Keys): Promise<AiConfigView> {
+  const usable = await usableKeys(keys)
   const hasKey = {} as Record<AiProviderId, boolean>
-  for (const p of ['anthropic', 'openai', 'azure', 'mock'] as AiProviderId[]) {
-    hasKey[p] = p === 'mock' ? true : (keys[p]?.trim() ?? '') !== ''
+  for (const p of PROVIDER_IDS) {
+    hasKey[p] = p === 'mock' ? true : (usable[p]?.trim() ?? '') !== ''
   }
   return {
     provider: config.provider,
@@ -59,10 +83,31 @@ function toView(config: AiConfig, keys: Keys): AiConfigView {
     azure: { ...config.azure },
     thinking: config.thinking,
     hasKey,
-    // chrome.storage.local is not an encrypted store; the UI shows a warning.
-    encryptionAvailable: false,
+    keyStorage: (await sealingAvailable()) ? 'browser-nonextractable' : 'session-only',
     keysSupported: true
   }
+}
+
+/** Re-seal any key an older version stored as plaintext. Runs on the first
+ *  config read, so an upgrade takes the plaintext out of chrome.storage.local
+ *  without the user doing anything. */
+async function migrateUnsealedKeys(keys: Keys): Promise<Keys> {
+  const legacy = PROVIDER_IDS.filter((p) => keys[p] && !isSealed(keys[p]))
+  if (legacy.length === 0) return keys
+  const next: Keys = { ...keys }
+  for (const p of legacy) {
+    const plain = next[p]
+    if (!plain) continue
+    const sealed = await seal(plain)
+    if (sealed) next[p] = sealed
+    else {
+      // Cannot encrypt here: keep it for the session and stop storing it.
+      sessionKeys[p] = plain
+      delete next[p]
+    }
+  }
+  store.set(K_AI_KEYS, next)
+  return next
 }
 
 // Delta streaming + abort plumbing. The renderer subscribes with onAiDelta and
@@ -78,8 +123,8 @@ export function createExtensionAi(): Pick<
 > {
   return {
     aiGetConfig: async () => {
-      const [config, keys] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
-      return toView(config, keys)
+      const [config, stored] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
+      return toView(config, await migrateUnsealedKeys(stored))
     },
 
     aiSetConfig: async (patch) => {
@@ -96,7 +141,17 @@ export function createExtensionAi(): Pick<
         // field never wipes a stored key by accident.
         for (const p of Object.keys(patch.keys) as AiProviderId[]) {
           const value = patch.keys[p]
-          if (value !== undefined && value.trim() !== '') keys[p] = value.trim()
+          if (value === undefined || value.trim() === '') continue
+          const trimmed = value.trim()
+          const sealed = await seal(trimmed)
+          if (sealed) {
+            keys[p] = sealed
+            delete sessionKeys[p]
+          } else {
+            // No usable crypto store: hold it in memory rather than writing it
+            sessionKeys[p] = trimmed
+            delete keys[p]
+          }
         }
         store.set(K_AI_KEYS, keys)
       }
@@ -104,10 +159,15 @@ export function createExtensionAi(): Pick<
     },
 
     aiChat: async (request: AiChatRequest): Promise<AiChatResult> => {
-      const [config, keys] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
-      const key = keys[config.provider]?.trim() ?? ''
+      const [config, stored] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
+      const usable = await usableKeys(stored)
+      const key = usable[config.provider]?.trim() ?? ''
       if (config.provider !== 'mock' && !key) {
-        return { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
+        // A sealed value that will not open reads as no key at all, so say what
+        // to do about it rather than only that it is missing.
+        return stored[config.provider]
+          ? { error: 'Den lagrede API-nøkkelen kunne ikke dekrypteres i denne nettleserprofilen. Legg den inn på nytt i KI-innstillingene.' }
+          : { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
       }
       const controller = new AbortController()
       activeControllers.set(request.requestId, controller)

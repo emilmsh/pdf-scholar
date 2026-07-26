@@ -132,11 +132,14 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
       ))}
       <p className="ai-settings-note">
         {t('ai.settingsNote')}
-        {config.encryptionAvailable ? (
-          t('ai.settingsNoteEncrypted')
-        ) : (
-          <strong>{t('ai.encryptionWarn')}</strong>
-        )}
+        {/* One sentence per storage mode, saying what actually protects the key
+            here. Only the two modes that leave it unprotected on disk, or forget
+            it on quit, are emphasised — the OS-keystore case is the quiet
+            default and does not need to shout. */}
+        {config.keyStorage === 'os-keystore' && t('ai.keyStoreOs')}
+        {config.keyStorage === 'browser-nonextractable' && t('ai.keyStoreBrowser')}
+        {config.keyStorage === 'session-only' && <strong>{t('ai.keyStoreSession')}</strong>}
+        {config.keyStorage === 'plaintext' && <strong>{t('ai.keyStorePlain')}</strong>}
       </p>
       <div className="ai-settings-actions">
         <button className="btn-secondary" onClick={onClose}>
