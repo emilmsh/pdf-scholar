@@ -202,8 +202,14 @@ export interface AnnotPatch {
   contents?: string
   /** Note drag: replacement quads (engine gets quads[0] as the new rect) */
   quads?: PageRect[]
-  /** Drag-move of an ink/line/arrow: replacement strokes */
-  strokes?: [number, number][][]
+  /** Drag-move of an ink/line/arrow: replacement strokes.
+   *
+   *  `| undefined` is load-bearing, unlike the other fields here. An undo patch
+   *  records the record's PREVIOUS strokes, and when the forward patch added
+   *  strokes to a record that had none, the previous value IS undefined —
+   *  spreading that back is what erases them again. Omitting the key instead
+   *  would leave the added strokes in place on undo. */
+  strokes?: [number, number][][] | undefined
   /** Drag-move: relative shift in page space — the engine reads its own
    *  current geometry and writes it back shifted (see ModifyAnnotationRequest) */
   translate?: { dx: number; dy: number }
@@ -2092,11 +2098,13 @@ export default function PdfViewer({
       color: [number, number, number],
       opacity: number,
       contents?: string,
+      // Spread into a FRESH snapshot below, so present-and-undefined is
+      // indistinguishable from absent — see the note on PageAnnotation.
       extras?: {
-        strokes?: [number, number][][]
-        width?: number
-        fontSize?: number
-        blend?: 'multiply'
+        strokes?: [number, number][][] | undefined
+        width?: number | undefined
+        fontSize?: number | undefined
+        blend?: 'multiply' | undefined
       }
     ): AnnotHandle => {
       const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }

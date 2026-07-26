@@ -12,6 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "strict": true,
+    "exactOptionalPropertyTypes": true,
     // On top of strict, and all free at the time they were turned on — they are
     // here to keep it that way. noUnusedParameters is deliberate: an unused prop
     // is usually a prop that stopped being threaded through.

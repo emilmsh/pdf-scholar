@@ -50,6 +50,17 @@ export interface FileError {
   error: string
 }
 
+/** A partial update where "not changing this field" may be written as an explicit
+ *  `undefined` rather than by omitting the key.
+ *
+ *  `Partial<T>` is not enough under exactOptionalPropertyTypes: it permits the key
+ *  to be absent but rejects `{ provider: undefined }`, which is exactly what a
+ *  caller produces when it forwards optional values out of another object. Every
+ *  consumer of a patch in this codebase merges with `??` or a spread, so the two
+ *  forms mean the same thing — this type says so instead of each call site
+ *  working around it. */
+export type Patch<T> = { [K in keyof T]?: T[K] | undefined }
+
 /** Outcome of dropping a dragged tab (see PdfxApi.tabDropAtCursor) */
 export type TabDropResult = 'window' | 'new' | 'same'
 
@@ -95,17 +106,22 @@ export interface AnnotateRequest {
   /** rgb 0–1 */
   color: [number, number, number]
   opacity: number
-  contents?: string
-  author?: string
+  // `| undefined` alongside `?`: the renderer builds these requests as plain
+  // object literals, so an unused field is PRESENT and undefined rather than
+  // absent, which exactOptionalPropertyTypes treats as distinct. Both are
+  // accepted because both are what the engine already handles — it checks
+  // `!== undefined` on every one of them.
+  contents?: string | undefined
+  author?: string | undefined
   /** ink: freehand strokes; line/arrow: [[start, end]] — in page space */
-  strokes?: [number, number][][]
+  strokes?: [number, number][][] | undefined
   /** ink/shapes: stroke width in PDF points */
-  width?: number
+  width?: number | undefined
   /** freetext only */
-  fontSize?: number
+  fontSize?: number | undefined
   /** ink (marker): bake the appearance with /BM Multiply so text under the
    *  stroke stays legible — the freehand twin of a text highlight */
-  blend?: 'multiply'
+  blend?: 'multiply' | undefined
 }
 
 /** On success carries the PDF object number of the (new) annotation */
@@ -117,16 +133,19 @@ export interface ModifyAnnotationRequest {
   pageIndex: number
   /** PDF object number identifying the annotation */
   id: number
-  color?: [number, number, number]
-  opacity?: number
-  contents?: string
+  // Present-and-undefined is fine here for the same reason as AnnotateRequest:
+  // updateOn guards each field with `!== undefined` before touching the model,
+  // so an undefined field is a no-op rather than a write of nothing.
+  color?: [number, number, number] | undefined
+  opacity?: number | undefined
+  contents?: string | undefined
   /** Move/resize (note drag) — page space, top-left origin */
-  rect?: PageRect
+  rect?: PageRect | undefined
   /** Move: translate all geometry by (dx, dy) in page space (top-left origin,
    *  y down). The engine reads the annotation's own geometry and writes it back
    *  shifted — per-subtype, because a Line's endpoints and an Ink's stroke list
    *  do not follow a plain rect move. */
-  translate?: { dx: number; dy: number }
+  translate?: { dx: number; dy: number } | undefined
 }
 
 export interface DeleteAnnotationRequest {
@@ -203,8 +222,10 @@ export interface AiImage {
 export interface AiMessage {
   role: 'user' | 'assistant'
   text: string
-  /** Only meaningful on user messages */
-  images?: AiImage[]
+  /** Only meaningful on user messages, and built present-and-undefined when the
+   *  turn has no attachments — the provider adapters all check for a non-empty
+   *  array, so absent and undefined are the same request on the wire. */
+  images?: AiImage[] | undefined
 }
 
 /** Web-search availability for a chat request. 'off' = tool not attached;

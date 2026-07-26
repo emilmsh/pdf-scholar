@@ -17,7 +17,9 @@ interface SlideLink {
   top: number
   width: number
   height: number
-  url?: string
+  // Copied straight off pdf.js's annotation objects, where a link carries EITHER
+  // a url or a dest — so each is built present-and-undefined rather than absent.
+  url?: string | undefined
   dest?: unknown
 }
 

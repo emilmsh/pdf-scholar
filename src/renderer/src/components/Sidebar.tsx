@@ -61,9 +61,11 @@ interface Props {
    *  sidebar shows a file-identity header above the tab switcher (name, full
    *  path on hover, click/right-click menu). Desktop leaves onOpenFile
    *  undefined, so the header never appears there. */
-  docName?: string
-  docPath?: string
-  onOpenFile?(): void
+  docName?: string | undefined
+  docPath?: string | undefined
+  /** Desktop passes undefined here explicitly (the file identity lives in the
+   *  tab bar there), so the prop must accept it rather than requiring absence. */
+  onOpenFile?: (() => void) | undefined
 }
 
 type Tab = 'thumbs' | 'outline' | 'annots'

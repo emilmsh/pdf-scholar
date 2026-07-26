@@ -409,8 +409,9 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
 interface NoteProps {
   x: number
   y: number
-  /** Markup rect (viewport coords) to open clear of, so it stays readable */
-  avoid?: { top: number; bottom: number; left: number } | null
+  /** Markup rect (viewport coords) to open clear of, so it stays readable.
+   *  Forwarded from an optional field on the note draft — see AnnotPopover. */
+  avoid?: { top: number; bottom: number; left: number } | null | undefined
   onSave(text: string): void
   onCancel(): void
 }

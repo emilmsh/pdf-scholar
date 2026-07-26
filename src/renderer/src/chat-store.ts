@@ -3,9 +3,26 @@
 // identically in Electron and the dev:web fallback.
 import type { AiContentPart, AiImage, AiUsage } from '../../shared/types'
 
+// `| undefined` on every optional field: messages are built as object literals
+// where the unused ones are present and undefined (a user turn with no images
+// still writes `images: pendingImages.length ? … : undefined`). These are append-
+// only records — never spread over an existing message — so present-and-undefined
+// and absent mean the same thing to every reader, including the JSON round-trip
+// through localStorage, which drops undefined values anyway.
 export type ChatMessage =
-  | { role: 'user'; text: string; display?: string; images?: AiImage[] }
-  | { role: 'assistant'; parts: AiContentPart[]; usage?: AiUsage; model?: string; error?: string }
+  | {
+      role: 'user'
+      text: string
+      display?: string | undefined
+      images?: AiImage[] | undefined
+    }
+  | {
+      role: 'assistant'
+      parts: AiContentPart[]
+      usage?: AiUsage | undefined
+      model?: string | undefined
+      error?: string | undefined
+    }
 
 export interface StoredConversation {
   id: string

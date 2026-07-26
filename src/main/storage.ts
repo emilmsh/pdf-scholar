@@ -1,7 +1,7 @@
 import { app } from 'electron'
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { AiConfig, AiProviderId, ReadingPosition, RecentFile, Settings } from '../shared/types'
+import type { AiConfig, AiProviderId, Patch, ReadingPosition, RecentFile, Settings } from '../shared/types'
 import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
 export type { Settings }
 
@@ -43,7 +43,7 @@ const DEFAULTS: AppState = {
 
 export function mergeAiConfig(
   base: StoredAiConfig,
-  patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }
+  patch: Patch<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> | undefined }
 ): StoredAiConfig {
   return {
     ...base,

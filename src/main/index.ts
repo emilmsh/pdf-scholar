@@ -314,11 +314,23 @@ function createWindow(openPath?: string | null): BrowserWindow {
   const cascade = cascadeBounds(
     BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
   )
+  // The only fix here that is a code change rather than a type one: Electron's
+  // option type declares `x?: number` without `| undefined`, and "no saved
+  // position" genuinely has to be expressed by LEAVING THE KEYS OUT — that is
+  // what makes Electron centre a first window on the primary display. Passing
+  // `x: undefined` did the same thing in practice, but the type is right to
+  // insist, so the absence is now explicit.
+  const position =
+    cascade
+      ? { x: cascade.x, y: cascade.y }
+      : state.window?.x !== undefined && state.window?.y !== undefined
+        ? { x: state.window.x, y: state.window.y }
+        : {}
+
   const win = new BrowserWindow({
     width: cascade?.width ?? state.window?.width ?? 1280,
     height: cascade?.height ?? state.window?.height ?? 860,
-    x: cascade ? cascade.x : state.window?.x,
-    y: cascade ? cascade.y : state.window?.y,
+    ...position,
     minWidth: 640,
     minHeight: 480,
     show: false,

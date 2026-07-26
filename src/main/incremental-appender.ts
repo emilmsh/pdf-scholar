@@ -1115,10 +1115,14 @@ interface ShapeSpec {
   quads: PageRect[]
   color: Rgb
   opacity: number
-  strokes?: [number, number][][]
-  width?: number
-  contents?: string
-  fontSize?: number
+  // An AnnotateRequest is passed straight in as a ShapeSpec, and its optional
+  // fields arrive present-and-undefined off the renderer's object literal — so
+  // these have to accept that too. Every reader below uses `??` or a truthiness
+  // check, so undefined and absent take the same branch.
+  strokes?: [number, number][][] | undefined
+  width?: number | undefined
+  contents?: string | undefined
+  fontSize?: number | undefined
 }
 
 function buildAppearance(g: Geom, s: ShapeSpec): Appearance {

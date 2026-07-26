@@ -65,10 +65,15 @@ interface Props {
   searchRects: PageRect[]
   /** True when searchRects are a citation-jump flash (holds, then fades out)
    *  rather than a persistent search hit */
-  searchFlash?: boolean
+  searchFlash?: boolean | undefined
   /** Nonce that changes each citation jump; folded into the flash rects' key so
-   *  they remount and replay the fade animation on repeat / same-page clicks */
-  searchFlashId?: number
+   *  they remount and replay the fade animation on repeat / same-page clicks.
+   *
+   *  `| undefined` because both callers pass it unconditionally from state that
+   *  is undefined when no citation jump is active — a JSX attribute is always
+   *  present, so under exactOptionalPropertyTypes optional props that are
+   *  forwarded rather than conditionally spread have to say so. */
+  searchFlashId?: number | undefined
   /** Active freehand tool (pen/marker/eraser), or null when not drawing */
   drawTool: DrawTool | null
   /** Stable callbacks (identity must not change with viewer state) */

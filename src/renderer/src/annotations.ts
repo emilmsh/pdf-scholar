@@ -23,16 +23,23 @@ export interface PageAnnotation {
   /** rgb 0–1 */
   color: [number, number, number]
   opacity: number
-  contents?: string
-  author?: string
+  // `| undefined` on top of `?` is deliberate under exactOptionalPropertyTypes.
+  // These records are built as fresh object literals where the field is PRESENT
+  // and undefined (`contents: maybeString`), which the flag distinguishes from
+  // absent — and for a newly built snapshot the two are the same thing to every
+  // consumer. AnnotPatch deliberately does NOT do this: a patch is spread onto an
+  // existing record, where an explicit undefined would clobber a set value, and
+  // that is the case the flag is actually here to catch.
+  contents?: string | undefined
+  author?: string | undefined
   /** ink: strokes; line/arrow: [[start, end]] — page space */
-  strokes?: [number, number][][]
+  strokes?: [number, number][][] | undefined
   /** ink/shapes: stroke width in points */
-  width?: number
+  width?: number | undefined
   /** freetext only */
-  fontSize?: number
+  fontSize?: number | undefined
   /** ink (marker): drawn AND baked with multiply so text stays legible */
-  blend?: 'multiply'
+  blend?: 'multiply' | undefined
 }
 
 export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange' | 'custom'

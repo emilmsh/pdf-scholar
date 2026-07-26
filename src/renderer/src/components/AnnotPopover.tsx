@@ -10,11 +10,14 @@ import { MarkupColorRow } from './SelectionMenu'
 interface Props {
   x: number
   y: number
-  /** Markup rect (viewport coords) to open clear of, so it stays readable */
-  avoid?: { top: number; bottom: number; left: number } | null
+  /** Markup rect (viewport coords) to open clear of, so it stays readable.
+   *  `| undefined` because the viewer forwards it straight off a draft object
+   *  where it is optional — a JSX attribute is always present, so an optional
+   *  prop that is forwarded rather than conditionally spread has to accept it. */
+  avoid?: { top: number; bottom: number; left: number } | null | undefined
   annotation: PageAnnotation
   /** Focus the comment field on open (immediate-comment flow) */
-  focusText?: boolean
+  focusText?: boolean | undefined
   onColor(color: [number, number, number]): void
   onContents(text: string): void
   onDelete(): void
