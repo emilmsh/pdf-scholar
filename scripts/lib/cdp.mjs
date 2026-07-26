@@ -80,7 +80,7 @@ export async function waitForPageTargets(port, count = 1, timeoutMs = 30_000) {
  * app starts, for the rare case where factory defaults are not enough (see the
  * AI shots in shoot-screenshots.mjs). Anything it writes dies with the profile.
  */
-export function launchApp({ root, mainJs, args = [], port, prepareProfile }) {
+export function launchApp({ root, mainJs, args = [], port, prepareProfile, env }) {
   const profile = mkdtempSync(join(tmpdir(), 'pdfx-cdp-'))
   if (prepareProfile) prepareProfile(profile)
   const bin = join(
@@ -93,7 +93,7 @@ export function launchApp({ root, mainJs, args = [], port, prepareProfile }) {
   const child = spawn(
     bin,
     [mainJs, ...args, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`],
-    { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] }
+    { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(env ?? {}) } }
   )
   let out = ''
   child.stdout.on('data', (d) => (out += d))

@@ -2,7 +2,7 @@
 
 A polished, native-feeling Windows PDF reader and annotator. Owner: Emil (communicates in Norwegian — respond in Norwegian). Product spec: `docs/SPEC.md`. Phased plan + architecture decisions: `docs/ROADMAP.md`. **Platform tiers + parity contract: `docs/PLATFORMS.md`** — Windows x64 is the reference; win-arm64/macOS/Linux and the extension are held to it, and any cross-platform divergence must be listed there. **Release checklist: `docs/RELEASE.md`** — follow it for any release or large push. CI (`.github/workflows/ci.yml`) builds all three OSes on every push.
 
-**Screenshots that ship are taken by hand, by Emil.** Before a release or a big push, run `npm run check:shots` and ask him to re-shoot what the visual changes affected — never generate the README/store images yourself. `npm run shoot` writes to the gitignored `docs/screenshots/_auto/` and is a UI smoke test + reference frames, not the source of shipped images.
+**What ships is Emil's call.** Before a release or a big push, run `npm run check:shots`, then `npm run shoot` (keyless, English, all nine shots) and ask him which frames to ship — `shoot` writes to the gitignored `docs/screenshots/_auto/` and cannot overwrite the shipped set without `--out`. Cover shots must show the paper's title, authors and abstract, never the arXiv reproduction notice.
 
 ## Commands
 - `npm run dev` — full Electron app with HMR
@@ -11,7 +11,7 @@ A polished, native-feeling Windows PDF reader and annotator. Owner: Emil (commun
 - `npm run typecheck` — tsc for renderer (`config/tsconfig.web.json`) and main/preload (`config/tsconfig.node.json`)
 - `npm run build` — electron-vite production build to `out/`
 - `npm run sample` — regenerate `src/renderer/public/sample.pdf` (test document)
-- `npm run test:windows` — two real windows on one file, end to end (needs `build` first). `npm run test:listing` — the MS Store copy still parses out of `docs/STORE-LISTING-DESKTOP.md`. `npm run check:shots` — which shipped screenshots predate the visual changes. `npm run shoot` — drive the app into each documented state and photograph it (`--with-ai` adds the two assistant shots, using the key already in your own profile; `--out` to write somewhere other than `_auto/`)
+- `npm run test:windows` — two real windows on one file, end to end (needs `build` first). `npm run test:listing` — the MS Store copy still parses out of `docs/STORE-LISTING-DESKTOP.md`. `npm run check:shots` — which shipped screenshots predate the visual changes. `npm run shoot` — drive the app into each documented state and photograph it, in English, no API key needed: the two assistant shots replay recorded answers from `docs/ai-fixtures/` (`--with-ai` calls the real provider with your own key, `--record` refreshes the recording, `--out` writes somewhere other than `_auto/`)
 - `npm run dist` / `dist:mac` / `dist:linux` — local installer builds (host-OS-bound: mac/linux targets only build on those OSes; release artifacts come from CI). `dist:store` — MSIX for Microsoft Store (needs identity env vars, see `docs/STORE.md`)
 
 ## Architecture

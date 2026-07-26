@@ -1,0 +1,56 @@
+{
+  "ok": true,
+  "parts": [
+    {
+      "text": "The figure shows the **Transformer’s encoder–decoder architecture**. The encoder (left) consists of \\(N=6\\) repeated layers, each combining multi-head self-attention with a position-wise feed-forward network",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 3,
+          "quote": "The encoder is composed of a stack of N = 6 identical layers. Each layer has two sub-layers."
+        }
+      ]
+    },
+    {
+      "text": ". The decoder (right) adds masked self-attention—preventing access to future tokens—and attention over the encoder’s output",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 3,
+          "quote": "the decoder inserts a third sub-layer, which performs multi-head attention over the output of the encoder stack."
+        }
+      ]
+    },
+    {
+      "text": ".\n\nInput and shifted-output embeddings are combined with positional encodings to represent token order",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "we add \"positional encodings\" to the input embeddings at the bottoms of the encoder and decoder stacks."
+        }
+      ]
+    },
+    {
+      "text": ". Residual “Add & Norm” connections surround each sublayer, while the final linear layer and softmax produce next-token probabilities",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 5,
+          "quote": "softmax function to convert the decoder output to predicted next-token probabilities."
+        }
+      ]
+    },
+    {
+      "text": ".",
+      "citations": []
+    }
+  ],
+  "usage": {
+    "inputTokens": 15896,
+    "outputTokens": 297,
+    "cacheReadTokens": 4808,
+    "cacheWriteTokens": 0
+  },
+  "model": "gpt-5.6-sol"
+}

@@ -5,7 +5,9 @@
 // src/shared/ai-chat.ts, shared verbatim with the browser-extension target so
 // citation + thinking rules can never drift. This module owns only what is
 // genuinely Electron-specific: key encryption, persistence, and the IPC surface.
-import { ipcMain, safeStorage } from 'electron'
+import { app, ipcMain, safeStorage } from 'electron'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { IpcMainInvokeEvent } from 'electron'
 import type {
   AiChatRequest,
@@ -18,6 +20,64 @@ import { runProviderChat } from '../shared/ai-chat'
 import { getState, mergeAiConfig, saveState } from './storage'
 
 const PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'mock']
+
+// ---------- Recorded answers, for the screenshot run ----------
+//
+// The README's two assistant shots are of the same feature on the same paper,
+// so the answer behind them only has to be produced ONCE. `PDFX_AI_RECORD=<dir>`
+// saves each real answer; `PDFX_AI_FIXTURE=<dir>` replays it. Everything the
+// screenshot is actually evidence for still runs live — the chips, the jump to
+// the cited sentence, the highlight, the snipped image in the chat — because
+// only the provider call is served from disk. So the shots keep working when
+// that UI changes, and re-record only when the answer itself should change.
+//
+// Never available in a shipped app: both are opt-in environment variables AND
+// gated on an unpackaged build.
+const devOnlyDir = (name: string): string | null => {
+  const dir = process.env[name]
+  return dir && !app.isPackaged ? dir : null
+}
+
+/** One fixture per kind of request the shoot makes. Keyed by shape, not by the
+ *  prompt text, so re-wording a question does not orphan the recording. */
+const fixtureFile = (dir: string, req: AiChatRequest): string =>
+  join(dir, req.messages.some((m) => (m.images?.length ?? 0) > 0) ? 'figure.json' : 'answer.json')
+
+function readFixture(req: AiChatRequest): AiChatResult | null {
+  const dir = devOnlyDir('PDFX_AI_FIXTURE')
+  if (!dir) return null
+  const file = fixtureFile(dir, req)
+  if (!existsSync(file)) return null
+  try {
+    return JSON.parse(readFileSync(file, 'utf8')) as AiChatResult
+  } catch {
+    return null
+  }
+}
+
+function writeFixture(req: AiChatRequest, result: AiChatResult): void {
+  const dir = devOnlyDir('PDFX_AI_RECORD')
+  if (!dir || !('ok' in result) || !result.ok) return
+  try {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(fixtureFile(dir, req), JSON.stringify(result, null, 2), 'utf8')
+  } catch {
+    /* recording is best-effort; the shot itself already has its answer */
+  }
+}
+
+/** Replay an answer the way the UI met it the first time: streamed. The panel
+ *  renders deltas as they arrive and only settles when they stop, so handing it
+ *  the whole text at once would photograph a state no reader ever sees. */
+async function replay(result: AiChatResult, emit: (t: string) => void): Promise<AiChatResult> {
+  const full = 'parts' in result ? result.parts.map((p) => p.text).join('') : ''
+  const step = Math.max(1, Math.ceil(full.length / 8))
+  for (let i = 0; i < full.length; i += step) {
+    emit(full.slice(i, i + step))
+    await new Promise((r) => setTimeout(r, 60))
+  }
+  return result
+}
 
 // ---------- Key encryption ----------
 
@@ -99,6 +159,8 @@ export function registerAiIpc(): void {
       if (!sender.isDestroyed()) sender.send('ai:delta', req.requestId, text)
     }
     try {
+      const recorded = readFixture(req)
+      if (recorded) return await replay(recorded, emit)
       const ai = getState().ai
       const key = decryptKey(ai.keys[ai.provider])
       if (ai.provider !== 'mock' && !key) {
@@ -109,7 +171,7 @@ export function registerAiIpc(): void {
           ? { error: 'API-nøkkelen kunne ikke dekrypteres (Windows-kontoen kan ha endret seg). Legg den inn på nytt i KI-innstillingene.' }
           : { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
       }
-      return await runProviderChat({
+      const result = await runProviderChat({
         provider: ai.provider,
         key,
         models: ai.models,
@@ -119,6 +181,8 @@ export function registerAiIpc(): void {
         emit,
         signal: controller.signal
       })
+      writeFixture(req, result)
+      return result
     } finally {
       activeRequests.delete(req.requestId)
     }

@@ -1,0 +1,46 @@
+{
+  "ok": true,
+  "parts": [
+    {
+      "text": "Because the Transformer has neither recurrence nor convolution, it adds **positional encodings** to token embeddings at the bottom of both encoder and decoder stacks, giving the model information about token order",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "we add \"positional encodings\" to the input embeddings at the bottoms of the encoder and decoder stacks"
+        }
+      ]
+    },
+    {
+      "text": ". The encoding has the same dimension as the embeddings (\\(d_{\\text{model}}\\)) and uses alternating sine and cosine functions:\n\n\\[\nPE_{(pos,2i)}=\\sin(pos/10000^{2i/d_{\\text{model}}}),\\quad\nPE_{(pos,2i+1)}=\\cos(pos/10000^{2i/d_{\\text{model}}})\n\\]\n\nEach dimension therefore represents a sinusoid at a different frequency, with wavelengths forming a geometric progression",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "each dimension of the positional encoding corresponds to a sinusoid. The wavelengths form a geometric progression"
+        }
+      ]
+    },
+    {
+      "text": ". The authors expected this structure to make relative positions easy to learn and chose it over learned positional embeddings—despite nearly identical results—because it might extrapolate to sequences longer than those seen during training",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "it may allow the model to extrapolate to sequence lengths longer than the ones encountered during training"
+        }
+      ]
+    },
+    {
+      "text": ".",
+      "citations": []
+    }
+  ],
+  "usage": {
+    "inputTokens": 15098,
+    "outputTokens": 327,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0
+  },
+  "model": "gpt-5.6-sol"
+}

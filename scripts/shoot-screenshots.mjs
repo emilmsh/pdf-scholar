@@ -3,7 +3,8 @@
 //   npm run shoot                           all shots except the AI ones
 //   npm run shoot -- dual-pane reading      just these
 //   npm run shoot -- --list                 show the shot names
-//   npm run shoot -- --with-ai              also the two assistant shots
+//   npm run shoot -- --with-ai              call the real model for the AI shots
+//   npm run shoot -- --with-ai --record     …and save those answers for replay
 //   npm run shoot -- --out docs/screenshots overwrite the shipped set (rare)
 //
 // WHERE THE OUTPUT GOES, AND WHY: docs/screenshots/_auto/ (gitignored), NOT the
@@ -34,18 +35,28 @@
 //   * device metrics are pinned (size + deviceScaleFactor 2), so the PNGs are
 //     the same dimensions every time and crisp on a HiDPI README.
 //
-// The two assistant shots need a real answer from a real model, so they are
-// OPT-IN behind --with-ai and skipped otherwise. They do not ask anyone for an
+// The two assistant shots show the same feature on the same paper every time,
+// so their answers are RECORDED once into docs/ai-fixtures/ and replayed after
+// that: an ordinary keyless run refreshes them like any other shot, and only
+// `--with-ai --record` spends anything. Everything the shots are evidence for
+// still runs live — the chips, the jump to the cited sentence, the highlight,
+// the snipped region in the chat — since only the provider call comes from
+// disk. Recording does not ask anyone for an
 // API key: keys already live in the real profile's pdfx-state.json, encrypted
 // with Electron safeStorage, which on Windows is DPAPI — scoped to the Windows
 // USER, not to the profile directory. So the encrypted blob can be copied into
 // the throwaway profile and the app there decrypts it itself. The key is never
 // decrypted by this script, never printed, and dies with the temp profile.
 //
-// Consequence worth knowing: those two shots are NOT byte-reproducible, since
-// the answer is generated. That makes their assertions the important part — a
-// real answer with at least one citation chip and no error — or the run would
-// happily photograph a spinner or an error toast and save it as marketing.
+// Re-record when the answer itself should change; a UI change to the assistant
+// needs nothing. Either way the assertions are what keep a run honest — a real
+// answer with at least one citation chip, the cited passage highlighted on
+// screen — or it would happily photograph a spinner or an error toast and save
+// it as marketing.
+//
+// Every shot is taken with the app in ENGLISH (seeded into the throwaway
+// profile), because the README is in English. Tooltips are therefore matched
+// against both languages; see the L map in the PRELUDE.
 import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { homedir } from 'node:os'
@@ -91,7 +102,7 @@ const SHOTS = [
     caption: 'Outline sidebar open beside the page',
     setup: `
       await ui.closePanels()
-      await ui.toggle('Sidepanel')
+      await ui.toggle(L.sidebar)
       await ui.settle(600)
       await ui.goToPage(3)
       await ui.fitWidth()
@@ -107,7 +118,7 @@ const SHOTS = [
       // Open the split FIRST, then navigate: opening it re-fits both columns,
       // which re-anchors the scroll — so a jump made before the toggle does not
       // survive it. Layout, then position, then capture.
-      await ui.toggle('Delt visning')
+      await ui.toggle(L.split)
       await ui.settle(900)
       await ui.paneGoToPage(0, 3)
       // Right column onto the figure page: the shot should show the actual
@@ -173,9 +184,10 @@ const SHOTS = [
       await ui.fitWidth()
       await ui.goToPage(1)
       await ui.openAssistant()
+      await ui.widenAssistant()
       // The house question (docs/agent-notes): its answer cites p. 6, so the
       // chips in the shot point somewhere a reader can verify.
-      await ui.ask('Hvordan fungerer positional encoding i denne artikkelen?')
+      await ui.ask('How does positional encoding work in this paper?')
       ui.expectAnswer()
       // Then TAKE the chip's word for it. A picture of an answer proves the
       // assistant can write; a picture of the cited sentence highlighted on the
@@ -197,13 +209,14 @@ const SHOTS = [
       await ui.fitWidth()
       await ui.goToPage(3)
       await ui.openAssistant()
+      await ui.widenAssistant()
       await ui.newConversation()
       // Bring the whole figure and its caption into view first: the marked
       // region shows up as a thumbnail in the chat, and a thumbnail of
       // something half off-screen is no evidence of anything.
       await ui.centreOn('Figure 1')
       await ui.snipIntoChat()
-      await ui.send('Hva viser denne figuren?')
+      await ui.send('What does this figure show?')
       ui.expectAnswer({ image: true, chips: false })
     `
   },
@@ -229,8 +242,24 @@ const SHOTS = [
  */
 const PRELUDE = `
 const settle = (ms = 300) => new Promise((r) => setTimeout(r, ms));
-const btn = (prefix, root = document) =>
-  [...root.querySelectorAll('.tb-btn')].find((b) => (b.title || '').startsWith(prefix));
+/** Tooltips are UI strings, and the shots are taken in English while the app's
+ *  own language is Norwegian — so every control is addressed by BOTH labels.
+ *  A selector that silently stops matching would not fail the run, it would
+ *  photograph the wrong state, so this stays exhaustive. */
+const L = {
+  sidebar: ['Sidepanel', 'Sidebar'],
+  split: ['Delt visning', 'Split view'],
+  assistant: ['Assistent', 'Assistant'],
+  snip: ['Forklar område', 'Explain area'],
+  fitWidth: ['Tilpass bredde', 'Fit width'],
+  fitToggle: ['veksler', 'toggles'],
+  newChat: ['Ny samtale', 'New conversation'],
+  theme: ['Lesemodus', 'Reading mode']
+};
+const titleOf = (el) => el.title || '';
+const startsAny = (el, names) => names.some((n) => titleOf(el).startsWith(n));
+const btn = (names, root = document) =>
+  [...root.querySelectorAll('.tb-btn')].find((b) => startsAny(b, names));
 const click = (el) => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); };
 const ui = {
   settle,
@@ -273,19 +302,19 @@ const ui = {
     }
   },
   /** Click a toolbar button by the start of its tooltip; throws if it is gone */
-  async toggle(prefix) {
-    const b = btn(prefix);
-    if (!b) throw new Error('no toolbar button starting with: ' + prefix);
+  async toggle(names) {
+    const b = btn(names);
+    if (!b) throw new Error('no toolbar button starting with: ' + names.join(' / '));
     click(b);
     await settle(450);
   },
   /** Leave only the pages visible (idempotent) */
   async closePanels() {
-    for (const p of ['Sidepanel', 'Assistent']) {
+    for (const p of [L.sidebar, L.assistant]) {
       const b = btn(p);
       if (b && b.classList.contains('is-active')) { click(b); await settle(400); }
     }
-    const split = btn('Delt visning');
+    const split = btn(L.split);
     if (split && split.classList.contains('is-active')) { click(split); await settle(500); }
     // Disarm any tool a previous shot armed — the shots share one app session,
     // so the annotations shot's highlighter was still lit (and its button
@@ -393,11 +422,11 @@ const ui = {
   async fitWidth() {
     // The fit control offers the mode you are NOT in, so click only if needed
     const fit = [...document.querySelectorAll('.toolbar-center .tb-btn')]
-      .find((b) => (b.title || '').includes('veksler'));
-    if (fit && (fit.title || '').startsWith('Tilpass bredde')) { click(fit); await settle(600); }
+      .find((b) => L.fitToggle.some((w) => titleOf(b).includes(w)));
+    if (fit && startsAny(fit, L.fitWidth)) { click(fit); await settle(600); }
   },
   async setTheme(id) {
-    await this.toggle('Lesemodus');
+    await this.toggle(L.theme);
     const opt = document.querySelector('.theme-menu .theme-option.theme-' + id);
     if (!opt) throw new Error('no theme option: ' + id);
     click(opt);
@@ -414,7 +443,7 @@ const ui = {
   },
   /** Open the assistant panel (idempotent) */
   async openAssistant() {
-    const b = btn('Assistent');
+    const b = btn(L.assistant);
     if (!b) throw new Error('no assistant button');
     if (!b.classList.contains('is-active')) { click(b); await settle(700); }
     if (!document.querySelector('.ai-panel')) throw new Error('assistant panel did not open');
@@ -520,11 +549,32 @@ const ui = {
     });
     if (seen.length === 0) throw new Error('the cited passage is highlighted off-screen');
   },
+  /** Give the assistant panel a little more width for the shot. Answers about a
+   *  paper contain display maths, and a formula wider than the panel gets its
+   *  own sideways scrollbar — correct behaviour, and a poor advertisement. The
+   *  panel is drag-resizable precisely so a reader can do this. */
+  async widenAssistant(px = 110) {
+    const panel = document.querySelector('.right-panel');
+    if (!panel) throw new Error('no assistant panel to widen');
+    const edge = panel.getBoundingClientRect().left;
+    const grip = [...document.querySelectorAll('.panel-resizer')]
+      .find((r) => Math.abs(r.getBoundingClientRect().right - edge) < 12);
+    if (!grip) throw new Error('no resizer beside the assistant panel');
+    const y = 400;
+    const x = grip.getBoundingClientRect().left + 3;
+    const opt = (cx) => ({ bubbles: true, clientX: cx, clientY: y, button: 0, buttons: 1, pointerId: 7, pointerType: 'mouse', isPrimary: true });
+    grip.dispatchEvent(new PointerEvent('pointerdown', opt(x)));
+    await settle(60);
+    window.dispatchEvent(new PointerEvent('pointermove', opt(x - px)));
+    await settle(120);
+    window.dispatchEvent(new PointerEvent('pointerup', opt(x - px)));
+    await settle(400);
+  },
   /** Start a fresh conversation, so a shot is not framed around the tail of the
    *  previous shot's chat — every shot shares one app session. */
   async newConversation() {
     const b = [...document.querySelectorAll('.ai-panel .tb-btn')]
-      .find((x) => /ny samtale|new conversation/i.test(x.title || ''));
+      .find((x) => startsAny(x, L.newChat));
     if (!b) throw new Error('no new-conversation button');
     click(b);
     await settle(500);
@@ -550,7 +600,7 @@ const ui = {
    *  story in one frame. */
   async snipIntoChat() {
     const b = [...document.querySelectorAll('.ai-composer .ai-attach-add')]
-      .find((x) => /område/i.test(x.title || ''));
+      .find((x) => startsAny(x, L.snip));
     if (!b) throw new Error('no snip button in the composer');
     click(b);
     await settle(500);
@@ -572,7 +622,7 @@ const ui = {
    *  above it (negative top), so a box measured off the page rect lands partly
    *  off-screen and the snip comes back empty. */
   async snipRegion() {
-    const b = btn('Forklar område');
+    const b = btn(L.snip);
     if (!b) throw new Error('no snip button');
     click(b);
     await settle(500);
@@ -736,6 +786,13 @@ if (args.includes('--list')) {
   process.exit(0)
 }
 const withAi = args.includes('--with-ai')
+const record = args.includes('--record')
+/** Recorded answers for the two assistant shots. With these present the shots
+ *  run in an ordinary keyless run; --with-ai calls the real provider instead,
+ *  and --with-ai --record refreshes what is replayed. */
+const FIXTURE_DIR = join(ROOT, 'docs', 'ai-fixtures')
+const haveFixtures =
+  existsSync(join(FIXTURE_DIR, 'answer.json')) && existsSync(join(FIXTURE_DIR, 'figure.json'))
 // Default output is the gitignored _auto/ folder, so a run can never clobber the
 // hand-taken set the README and the stores ship. --out is the explicit override.
 const outFlag = args.indexOf('--out')
@@ -745,12 +802,14 @@ const OUT_DIR = outFlag !== -1 && args[outFlag + 1] ? resolve(ROOT, args[outFlag
 const outValueAt = outFlag === -1 ? -1 : outFlag + 1
 const wanted = args.filter((a, i) => !a.startsWith('-') && i !== outValueAt)
 let shots = wanted.length ? SHOTS.filter((s) => wanted.includes(s.name)) : SHOTS
-// AI shots cost a real model call on the user's own key, so they never run by
-// accident — not even when named explicitly.
-const gated = shots.filter((s) => s.needsAi && !withAi)
-shots = shots.filter((s) => !s.needsAi || withAi)
+// A real model call costs the user's own key, so it never happens by accident.
+// A RECORDED answer costs nothing, so the AI shots are ordinary shots whenever
+// docs/ai-fixtures/ is populated — the whole set refreshes with one keyless
+// command, and only a deliberate --with-ai spends anything.
+const gated = shots.filter((s) => s.needsAi && !withAi && !haveFixtures)
+shots = shots.filter((s) => !s.needsAi || withAi || haveFixtures)
 if (gated.length) {
-  console.log(`Skipping ${gated.map((s) => s.name).join(', ')} — pass --with-ai (uses your own API key).`)
+  console.log(`Skipping ${gated.map((s) => s.name).join(', ')} — no recorded answer yet; pass --with-ai --record (uses your own API key).`)
 }
 if (shots.length === 0) {
   console.error(`No shot matched. Known: ${SHOTS.map((s) => s.name).join(', ')}`)
@@ -777,6 +836,36 @@ if (shots.length === 0) {
  * Nothing else is copied: no recents, no reading positions, no theme. The shots
  * still start from factory defaults in every other respect.
  */
+/** Every shot is taken with the app in ENGLISH. The README is in English, and a
+ *  Norwegian toolbar in it asks the reader to decode the interface before they
+ *  can see the feature. The app's own default is unchanged; this is one line in
+ *  the throwaway profile, which main/storage.ts merges over its defaults. */
+function seedProfile(profileDir, withAi, replaying) {
+  const state = { settings: { language: 'en' } }
+  if (withAi) state.ai = carryAiConfig(profileDir)
+  else if (replaying) state.ai = replayAiConfig()
+  writeFileSync(join(profileDir, 'pdfx-state.json'), JSON.stringify(state), 'utf8')
+}
+
+/** The assistant panel opens on its key form when no provider has a key, so a
+ *  replay run still needs the app to believe one is configured. The placeholder
+ *  below is never sent anywhere: the fixture short-circuits the request before
+ *  any provider client is built. The model NAME is read back out of the
+ *  recording, so the header in the screenshot names the model that actually
+ *  produced the answer underneath it. */
+function replayAiConfig() {
+  const recorded = JSON.parse(readFileSync(join(FIXTURE_DIR, 'answer.json'), 'utf8'))
+  const model = recorded.model || ''
+  const provider = /^claude|opus|sonnet|haiku|fable/i.test(model) ? 'anthropic' : 'openai'
+  return {
+    provider,
+    models: { [provider]: model },
+    // storage.ts decrypts 'plain:'-prefixed values without safeStorage, which is
+    // how the app reports "a key exists" here without a key existing.
+    keys: { [provider]: 'plain:' + Buffer.from('screenshot-replay', 'utf8').toString('base64') }
+  }
+}
+
 function carryAiConfig(profileDir) {
   const appData = process.env.APPDATA || join(homedir(), 'AppData', 'Roaming')
   const realDir = join(appData, 'PDF Scholar')
@@ -804,11 +893,10 @@ function carryAiConfig(profileDir) {
   if (!osCrypt?.encrypted_key) {
     throw new Error('--with-ai: Local State has no os_crypt.encrypted_key — cannot decrypt the stored keys.')
   }
-  // Only the ai block. main/storage.ts merges a partial state over its defaults.
-  writeFileSync(join(profileDir, 'pdfx-state.json'), JSON.stringify({ ai }), 'utf8')
   // Only os_crypt, not the rest of Chromium's Local State.
   writeFileSync(join(profileDir, 'Local State'), JSON.stringify({ os_crypt: osCrypt }), 'utf8')
   console.log(`  AI config carried into the temp profile (provider: ${ai.provider}, keys for: ${providers.join(', ')})`)
+  return ai
 }
 
 const mainJs = join(ROOT, 'out', 'main', 'index.js')
@@ -830,13 +918,21 @@ console.log(`  → ${OUT_DIR}`)
 if (OUT_DIR === SHOT_DIR) {
   console.log('  ! writing over the SHIPPED screenshots (docs/RELEASE.md: these are taken by hand)')
 }
-const needsAi = shots.some((s) => s.needsAi)
+const hasAiShot = shots.some((s) => s.needsAi)
+/** Real provider calls only when asked for; otherwise replay */
+const needsAi = hasAiShot && withAi
+const aiEnv = {}
+if (hasAiShot && !withAi) aiEnv.PDFX_AI_FIXTURE = FIXTURE_DIR
+if (hasAiShot && withAi && record) aiEnv.PDFX_AI_RECORD = FIXTURE_DIR
+if (aiEnv.PDFX_AI_FIXTURE) console.log('  Assistant answers replayed from docs/ai-fixtures/ (no API call)')
+if (aiEnv.PDFX_AI_RECORD) console.log('  Recording the assistant answers into docs/ai-fixtures/')
 const app = launchApp({
   root: ROOT,
   mainJs,
   args: [pdf],
   port: PORT,
-  prepareProfile: needsAi ? carryAiConfig : undefined
+  prepareProfile: (dir) => seedProfile(dir, needsAi, !!aiEnv.PDFX_AI_FIXTURE),
+  env: aiEnv
 })
 
 let failed = 0

@@ -263,8 +263,15 @@ positions or theme, and every run starts from factory defaults.
 Every shot asserts the state before capturing, so a renamed tooltip or a jump that failed
 fails the run instead of saving a wrong picture — which makes `shoot` a UI smoke test as
 much as a camera. It is what caught a split view that opened lopsided and a page field
-that silently did nothing. `--list` shows the shot names; pass names to run some;
-`--with-ai` adds the two assistant shots, which use the key already in your own profile.
+that silently did nothing. `--list` shows the shot names; pass names to run some.
+
+The two assistant shots need a model answer, and it is always the same feature on the same
+paper — so the answers are **recorded once** into `docs/ai-fixtures/` and replayed after
+that. An ordinary run refreshes all nine shots with no API key and no cost. Only the
+provider call is served from disk: the chips, the jump to the cited sentence, the
+highlight and the snipped region all still run live, so the shots keep proving what they
+claim when that code changes. `--with-ai` calls the real provider (your own key, from your
+own profile); add `--record` to refresh what gets replayed.
 
 **`shoot` cannot overwrite the shipped set.** It writes to the gitignored
 `docs/screenshots/_auto/`, because framing and what is worth showing are judgement calls:
