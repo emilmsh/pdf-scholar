@@ -559,7 +559,9 @@ export const IconView = (p: IconProps): React.JSX.Element => (
 export const IconSplit = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="2.5" y="4" width="19" height="16" rx="2" />
-    <path d="M13.5 4v16" />
+    {/* Dead centre of the frame (2.5 + 19/2), not off to one side: the two
+        columns are equals, and the icon is the first place that is claimed. */}
+    <path d="M12 4v16" />
   </Svg>
 )
 

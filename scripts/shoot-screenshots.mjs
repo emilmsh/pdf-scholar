@@ -142,14 +142,17 @@ const SHOTS = [
   },
   {
     name: 'annotations',
-    caption: 'Annotation tools with a tool-options popover open',
+    caption: 'Selecting text brings up the markup menu, right where the text is',
     setup: `
       await ui.closePanels()
+      await ui.showAnnots(true)
       await ui.fitWidth()
       await ui.goToPage(2)
       ui.expectPage(0, 2)
+      // Mark a passage first, so the shot shows the RESULT as well as the way
+      // to get it, then select another sentence and leave the menu standing.
       await ui.highlightSomeText()
-      await ui.openToolOptions(1)   // the tusj (highlighter) chevron
+      await ui.openSelectionMenu()
       await ui.settle(400)
     `
   },
@@ -184,16 +187,34 @@ const SHOTS = [
       await ui.fitWidth()
       await ui.goToPage(1)
       await ui.openAssistant()
-      await ui.widenAssistant()
       // The house question (docs/agent-notes): its answer cites p. 6, so the
       // chips in the shot point somewhere a reader can verify.
       await ui.ask('How does positional encoding work in this paper?')
       ui.expectAnswer()
+      // Give the formulas room to sit unbroken — see widenUntilMathFits
+      await ui.widenUntilMathFits()
       // Then TAKE the chip's word for it. A picture of an answer proves the
       // assistant can write; a picture of the cited sentence highlighted on the
       // page, next to the answer that claimed it, proves the part that matters.
       await ui.followFirstCitation()
       ui.expectCitationVisible()
+    `
+  },
+  {
+    name: 'assistant_snip',
+    caption: 'Dragging a box around a figure to send it to the assistant',
+    needsAi: true,
+    setup: `
+      await ui.closePanels()
+      await ui.fitWidth()
+      await ui.goToPage(3)
+      await ui.openAssistant()
+      await ui.newConversation()
+      await ui.centreOn('Figure 1')
+      // Caught mid-drag, before the mouse comes up: the crop tool is only
+      // visible while you are using it.
+      await ui.holdSnipBox('Figure 1')
+      await ui.settle(300)
     `
   },
   {
@@ -209,7 +230,10 @@ const SHOTS = [
       await ui.fitWidth()
       await ui.goToPage(3)
       await ui.openAssistant()
-      await ui.widenAssistant()
+      // Default panel width here, unlike the citation shot: there is no maths in
+      // a figure answer to make room for, and this is what the assistant looks
+      // like out of the box.
+      await ui.resetAssistantWidth()
       await ui.newConversation()
       // Bring the whole figure and its caption into view first: the marked
       // region shows up as a thumbnail in the chat, and a thumbnail of
@@ -321,7 +345,22 @@ const ui = {
     // outlined) in every theme shot that followed it.
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    // The house demo PDF carries the owner's own old marks — a stray highlight,
+    // a note icon, a red box. They belong in the annotation shot and nowhere
+    // else, so every shot starts with them hidden and the ones that are ABOUT
+    // annotating turn them back on.
+    await this.showAnnots(false);
     await settle(200);
+  },
+  /** H toggles annotation visibility. Nothing in the DOM reports the state — the
+   *  toggle is a checkbox inside the reading-mode menu, and an unannotated page
+   *  looks the same either way — so the flag is tracked here. Safe because the
+   *  shots share one page context and nothing else presses H. */
+  async showAnnots(visible) {
+    if (!!window.__pdfxAnnotsHidden === !visible) return;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }));
+    window.__pdfxAnnotsHidden = !visible;
+    await settle(350);
   },
   /** Frame a cover shot and prove it: what a reader should meet is the paper's
    *  title, its authors and the first lines of the abstract — not page 1's
@@ -570,6 +609,77 @@ const ui = {
     window.dispatchEvent(new PointerEvent('pointerup', opt(x - px)));
     await settle(400);
   },
+  /** Put the assistant panel back to the width a new user gets. Double-clicking
+   *  the divider is the app's own "reset this" gesture. */
+  async resetAssistantWidth() {
+    const panel = document.querySelector('.right-panel');
+    if (!panel) throw new Error('no assistant panel');
+    const edge = panel.getBoundingClientRect().left;
+    const grip = [...document.querySelectorAll('.panel-resizer')]
+      .find((r) => Math.abs(r.getBoundingClientRect().right - edge) < 12);
+    if (!grip) throw new Error('no resizer beside the assistant panel');
+    grip.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    await settle(400);
+  },
+  /** Select a sentence and leave the markup menu open over it. This is the
+   *  gesture the annotation tools are actually reached by — the toolbar is the
+   *  second way, not the first. */
+  async openSelectionMenu() {
+    const pages = document.querySelector('.pages[data-pane="a"]');
+    const box = pages.getBoundingClientRect();
+    // Well below the top edge so the menu opens over the page, not off it, and
+    // clear of the marks the previous step just made.
+    // The menu is tall. Anchored to a selection low on the page it flips upward
+    // and lands on top of the toolbar — true to the app, useless as a picture —
+    // so the sentence is chosen in the upper third, where the menu opens
+    // downward with room to spare.
+    const span = [...pages.querySelectorAll('.pdf-page .text-host .textLayer > span')]
+      .filter((x) => (x.textContent || '').trim().length > 40)
+      .find((x) => {
+        const r = x.getBoundingClientRect();
+        return r.bottom > box.top + box.height * 0.22 && r.bottom < box.top + box.height * 0.40 && r.width > 200;
+      });
+    if (!span) throw new Error('no suitable sentence to select');
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    await settle(200);
+    const r = span.getBoundingClientRect();
+    pages.dispatchEvent(new MouseEvent('mouseup', {
+      bubbles: true, button: 0, clientX: Math.round(r.left + r.width * 0.6), clientY: Math.round(r.bottom)
+    }));
+    await settle(500);
+    const menu = document.querySelector('.selection-menu');
+    if (!menu) throw new Error('the selection menu did not open');
+    const m = menu.getBoundingClientRect();
+    const toolbar = document.querySelector('.toolbar').getBoundingClientRect();
+    if (m.bottom > window.innerHeight || m.right > window.innerWidth) {
+      throw new Error('the selection menu is partly off-screen');
+    }
+    if (m.top < toolbar.bottom) throw new Error('the selection menu covers the toolbar');
+  },
+  /** Widest overflow of any maths block in the answer, in px (0 = all fit) */
+  mathOverflow() {
+    let worst = 0;
+    for (const b of document.querySelectorAll('.ai-math-block')) {
+      worst = Math.max(worst, b.scrollWidth - b.clientWidth);
+    }
+    return worst;
+  },
+  /** Widen until the formulas fit outright. A sideways scrollbar under an
+   *  equation is the app working as designed, but as an advertisement it says
+   *  "your maths will not fit here" — and the panel is resizable precisely so a
+   *  reader would do this themselves. Give up rather than eat the page. */
+  async widenUntilMathFits() {
+    for (let i = 0; i < 6 && this.mathOverflow() > 0; i++) {
+      await this.widenAssistant(Math.max(40, Math.min(140, this.mathOverflow() + 24)));
+    }
+    if (this.mathOverflow() > 0) {
+      throw new Error('maths still overflows by ' + Math.round(this.mathOverflow()) + 'px at the widest tried');
+    }
+  },
   /** Start a fresh conversation, so a shot is not framed around the tail of the
    *  previous shot's chat — every shot shares one app session. */
   async newConversation() {
@@ -640,7 +750,7 @@ const ui = {
   /** The drag itself, shared by both snip entry points. Pass the start of a
    *  caption ("Figure 1") to end the box just under it, so the frame is the
    *  figure and its caption rather than an arbitrary slice of the page. */
-  async dragSnipBox(captionStart) {
+  async dragSnipBox(captionStart, hold) {
     const overlay = document.querySelector('.snip-overlay');
     if (!overlay) throw new Error('snip overlay did not appear');
     const host = document.querySelector('.pages[data-pane="a"]');
@@ -685,7 +795,22 @@ const ui = {
     overlay.dispatchEvent(new PointerEvent('pointermove', opts(x2, y2)));
     await settle(150);
     if (!document.querySelector('.snip-marquee')) throw new Error('the drag drew no marquee');
+    // A held drag stops here, marquee on screen: that is the only moment the
+    // crop tool itself is visible, and it is worth a frame.
+    if (hold) return;
     overlay.dispatchEvent(new PointerEvent('pointerup', opts(x2, y2)));
+  },
+  /** Arm the composer's snip and draw the box, but do not release it */
+  async holdSnipBox(captionStart) {
+    const b = [...document.querySelectorAll('.ai-composer .ai-attach-add')]
+      .find((x) => startsAny(x, L.snip));
+    if (!b) throw new Error('no snip button in the composer');
+    click(b);
+    await settle(500);
+    await this.dragSnipBox(captionStart, true);
+    const m = document.querySelector('.snip-marquee');
+    const r = m && m.getBoundingClientRect();
+    if (!r || r.width < 200 || r.height < 150) throw new Error('the marquee is too small to read');
   },
   /** The bubble must actually show the snipped region, not an empty frame */
   expectSnippedFigure() {

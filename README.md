@@ -165,10 +165,13 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 
 **Annotation**
 
-![Annotation tools](docs/screenshots/annotations.png)
+![Selecting text brings up the markup menu — colours, comment, note, and the assistant's actions on the selection](docs/screenshots/annotations.png)
 
-- Highlight, underline, strikeout and squiggly, with labeled colour rows and custom hex
-  colours
+- **Select text and the menu comes to you**: highlight, underline, strikeout and squiggly
+  in one row each, a comment or a note, copy, dictionary, translate — and the assistant's
+  actions on exactly what you selected. The toolbar has the same tools for when you want
+  to mark several passages in a row; the selection menu is for the one in front of you
+- Labeled colour rows and custom hex colours
 - Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
   straight
 - **Colour, thickness and opacity per tool**, remembered between sessions. A «Standard»
@@ -229,7 +232,9 @@ work, so the chips are the feature — the prose around them is just delivery.
   and watch your usage. List prices change after an app ships; a number in here would
   quietly stop matching your bill, and only your provider knows the real one
 
-![Explain a figure — the region dragged out of the page sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
+![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
+
+![Explain a figure — the region you marked sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
 
 **Language and themes**
 
