@@ -1,4 +1,5 @@
-// Report class selectors in app.css that nothing in the source references.
+// Report two kinds of app.css rot: class selectors nothing references, and
+// selectors declared more than once at top level.
 // Run: npm run check:css
 //
 // A 5000-line stylesheet accumulates rules whose markup was removed years of
@@ -105,5 +106,39 @@ if (dead.length === 0 && maybe.length === 0) {
   console.log(
     `\nDynamic class prefixes found: ${dynamicPrefixes.join(', ') || '(none)'}` +
       `\nRead each rule before deleting — a class may be planned markup rather than dead markup.`
+  )
+}
+
+// ---------- Selectors declared twice at top level ----------
+//
+// The file grew append-only, so a selector's real computed style is often split
+// between a base block near its feature and an add-on thousands of lines later.
+// Sometimes the later block shadows the earlier one outright (a silent bug);
+// more often it is only unreadable. Either way, one selector should have one
+// home. Only column-0 openings count — an indented one is inside @media, where
+// re-declaring is the whole point.
+const declaredAt = new Map()
+for (const [i, raw] of cssLines.entries()) {
+  const m = /^([.#:\w][^{]*?)\s*\{\s*$/.exec(raw)
+  if (!m) continue
+  const sel = m[1].trim()
+  if (sel.startsWith('@') || sel.startsWith('from') || sel.startsWith('to')) continue
+  // Skip the last line of a multi-selector list (`.a,\n.b {`): sharing
+  // declarations across a list and then overriding one of them in its own block
+  // is a deliberate pattern, not a duplicate.
+  if (i > 0 && /,\s*$/.test(cssLines[i - 1])) continue
+  if (!declaredAt.has(sel)) declaredAt.set(sel, [])
+  declaredAt.get(sel).push(i + 1)
+}
+
+const repeated = [...declaredAt].filter(([, ls]) => ls.length > 1)
+if (repeated.length > 0) {
+  console.log(`\n${repeated.length} selector(s) declared more than once at top level:`)
+  for (const [sel, ls] of repeated.sort((a, b) => a[1][0] - b[1][0])) {
+    console.log(`  ${sel}  —  lines ${ls.join(', ')}`)
+  }
+  console.log(
+    '\nMerge them, or (when the split is deliberate, e.g. a block grouped with\n' +
+      'the pdf.js variables it belongs to) say so in a comment at both sites.'
   )
 }

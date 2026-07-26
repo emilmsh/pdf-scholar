@@ -26,6 +26,13 @@
      light grounds, light teal on dark). Tuned per theme for AA contrast. */
   --accent: #2f6f7b;
   --accent-text: #ffffff;
+  /* Destructive actions (delete, error). Retuned per theme for AA contrast the
+     same way --accent is: hsl(0 64% 55%) on light grounds, the identical hue
+     lightened to 72% on dark ones, where the darker red only reaches 3.8:1.
+     --danger-rgb carries the same colour as channels, for the translucent
+     washes — one token cannot hold four different alphas. */
+  --danger: #d64545;
+  --danger-rgb: 214 69 69;
   --hover: rgba(0, 0, 0, 0.055);
   --active: rgba(0, 0, 0, 0.09);
   --page-bg: #ffffff;
@@ -57,6 +64,8 @@
   --text-secondary: #838072;
   --accent: #2f6f7b;
   --accent-text: #ffffff;
+  --danger: #d64545;
+  --danger-rgb: 214 69 69;
   --hover: rgba(61, 57, 41, 0.06);
   --active: rgba(61, 57, 41, 0.11);
   --page-bg: #f5efe3;
@@ -86,6 +95,8 @@
   --text-secondary: #a4a29a;
   --accent: #8aa6ae;
   --accent-text: #14262b;
+  --danger: #e58a8a;
+  --danger-rgb: 229 138 138;
   --hover: rgba(255, 255, 255, 0.07);
   --active: rgba(255, 255, 255, 0.12);
   --page-bg: #21211f;
@@ -106,6 +117,8 @@
   --text-secondary: #a0a0a8;
   --accent: #8aa6ae;
   --accent-text: #14262b;
+  --danger: #e58a8a;
+  --danger-rgb: 229 138 138;
   --hover: rgba(255, 255, 255, 0.08);
   --active: rgba(255, 255, 255, 0.14);
   --page-bg: #0a0a0b;
@@ -113,6 +126,24 @@
   --bg-titlebar: #111113;
   --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.7), 0 4px 16px rgba(0, 0, 0, 0.6);
   --shadow-menu: 0 8px 30px rgba(0, 0, 0, 0.7), 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+/* The theme picker's preview swatches. These deliberately do NOT read
+   var(--page-bg)/var(--text): a swatch has to show a theme OTHER than the
+   active one, so every theme's pair must be readable no matter which theme is
+   applied. That means duplicating four colour pairs — so they live here, in one
+   table right below the blocks they mirror, with the source token named on each
+   line. Retune a theme above and the copy to update is one screenful away
+   instead of 1200 lines down. */
+:root {
+  --swatch-day-bg: #ffffff; /* day --page-bg */
+  --swatch-day-fg: #1d1d1f; /* day --text */
+  --swatch-sepia-bg: #faf9f5; /* sepia --bg-elevated */
+  --swatch-sepia-fg: #3d3929; /* sepia --text */
+  --swatch-night-bg: #21211f; /* night --page-bg */
+  --swatch-night-fg: #eeece2; /* night --text */
+  --swatch-nighthc-bg: #0a0a0b; /* nightHc --page-bg */
+  --swatch-nighthc-fg: #f5f5f7; /* nightHc --text */
 }
 
 * {
@@ -160,6 +191,7 @@ button {
    --bg-titlebar MUST stay in sync with TITLEBAR_COLORS (main) and the
    overlay map in App.tsx. */
 
+/* Also declared in the distraction-free section: the tuck transition. */
 .tab-bar {
   position: relative;
   height: 36px;
@@ -395,21 +427,21 @@ button {
 
 .welcome-mark {
   /* Circular badge that floats on the page — no box, no square radius.
-     The disc is `color` (--logo-disc); the "S" is a hole, so the page ground
+     The disc is `color` (--wc-logo); the "S" is a hole, so the page ground
      shows through. drop-shadow (not box-shadow) follows the disc's alpha, so
      the lift is round, not a square halo. */
   width: 64px;
   height: 64px;
   flex: none;
-  color: #1b3844;
+  color: var(--wc-logo);
   filter: drop-shadow(0 5px 13px rgba(14, 58, 63, 0.28));
 }
 
-/* On dark grounds the deep-teal disc would vanish — lift it to the light teal
-   the wordmark uses, and drop the (now invisible) shadow. */
+/* On dark grounds --wc-logo has already lifted the disc to the light teal the
+   wordmark uses (see the .welcome dark branch); only the shadow, now invisible
+   against the dark ground, still needs dropping. */
 :root[data-theme='night'] .welcome-mark,
 :root[data-theme='nightHc'] .welcome-mark {
-  color: #8aa6ae;
   filter: none;
 }
 
@@ -830,6 +862,7 @@ button {
 
 /* A peeked panel overlays the pages (no layout shift). A pinned panel stays
    in normal flow and re-fits the page instead (handled in the viewer). */
+/* Also declared below: the slide-in transition. */
 .viewer-body.toc-peek .sidebar {
   position: absolute;
   left: 0;
@@ -944,13 +977,6 @@ button {
   border-color: var(--accent);
 }
 
-.zoom-label {
-  min-width: 42px;
-  text-align: center;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
 /* Drawing tools */
 
 .tool-group {
@@ -1018,16 +1044,13 @@ button {
    highlights (see .annot-highlights). The layer's own blend composites the
    whole group against the page beneath, which in marker mode contains only
    the active stroke. */
+/* Also declared in the tool-cursor section: the marker cursor. */
 .draw-layer.marker-mode {
   mix-blend-mode: multiply;
 }
 
 .draw-layer.text-mode {
   cursor: text;
-}
-
-.draw-layer.erasing {
-  cursor: cell;
 }
 
 .draw-layer svg,
@@ -1247,28 +1270,34 @@ button {
   border-color: var(--accent);
 }
 
+/* Swatch colours come from the --swatch-* table beside the :root theme blocks */
 .theme-option.theme-day {
-  background: #ffffff;
-  color: #1d1d1f;
+  background: var(--swatch-day-bg);
+  color: var(--swatch-day-fg);
 }
 
 .theme-option.theme-sepia {
-  background: #faf9f5;
-  color: #3d3929;
+  background: var(--swatch-sepia-bg);
+  color: var(--swatch-sepia-fg);
 }
 
 .theme-option.theme-night {
-  background: #21211f;
-  color: #eeece2;
+  background: var(--swatch-night-bg);
+  color: var(--swatch-night-fg);
 }
 
 .theme-option.theme-nightHc {
-  background: #0a0a0b;
-  color: #ffffff;
+  background: var(--swatch-nighthc-bg);
+  color: var(--swatch-nighthc-fg);
 }
 
+/* «Auto» splits the day and night swatches down a diagonal */
 .theme-option.theme-auto {
-  background: linear-gradient(105deg, #ffffff 49.5%, #21211f 50.5%);
+  background: linear-gradient(
+    105deg,
+    var(--swatch-day-bg) 49.5%,
+    var(--swatch-night-bg) 50.5%
+  );
   color: #8a8a92;
 }
 
@@ -1434,6 +1463,7 @@ button {
 
 /* A peeked (overlay) sidebar slides in; a pinned one appears instantly so the
    page re-fits in a single step rather than janking across the transition. */
+/* Second .viewer-body.toc-peek .sidebar block: overlay geometry is above. */
 .viewer-body.toc-peek .sidebar {
   transition: transform 0.16s ease;
 }
@@ -1707,7 +1737,14 @@ button {
 .page-pill {
   position: absolute;
   bottom: 22px;
+  right: 22px;
   z-index: 45;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Fades out with the rest of the reading HUD (see .viewer.hud-faded) */
+  transition: opacity 0.35s ease;
 }
 
 .back-pill {
@@ -1717,14 +1754,6 @@ button {
 .back-pill:hover,
 .page-pill:hover {
   filter: brightness(1.04);
-}
-
-.page-pill {
-  right: 22px;
-  color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .page-pill.editing input {
@@ -1838,6 +1867,7 @@ button {
   position: relative;
 }
 
+/* Also declared with the pdf.js text-layer variables below. */
 .pdf-page {
   position: absolute;
   background: var(--page-bg);
@@ -1965,6 +1995,7 @@ button {
    round(var(--total-scale-factor) * pageDim px, var(--scale-round-*)); span
    font-size/transform come from --font-height/--scale-x set by TextLayer. */
 
+/* Second .pdf-page block, deliberately kept here: these are the pdf.js text-layer variables, which belong with the rules that consume them, not with the page box above. */
 .pdf-page {
   --user-unit: 1;
   --total-scale-factor: calc(var(--scale-factor) * var(--user-unit));
@@ -2286,6 +2317,7 @@ button {
 
 /* Selection / context menu */
 
+/* Also declared below: the viewport clamp. */
 .selection-menu {
   position: fixed;
   z-index: 60;
@@ -2449,7 +2481,7 @@ button {
 }
 
 .annot-delete {
-  color: #d64545;
+  color: var(--danger);
   font-weight: 600;
   font-size: 12.5px;
   padding: 5px 12px;
@@ -2457,7 +2489,7 @@ button {
 }
 
 .annot-delete:hover {
-  background: rgba(214, 69, 69, 0.1);
+  background: rgb(var(--danger-rgb) / 0.1);
 }
 
 /* Annotation list (sidebar tab) */
@@ -2636,8 +2668,8 @@ button {
 }
 
 .annot-list-delete:hover {
-  background: rgba(214, 69, 69, 0.12);
-  color: #d64545;
+  background: rgb(var(--danger-rgb) / 0.12);
+  color: var(--danger);
 }
 
 /* Note popover */
@@ -2659,11 +2691,10 @@ button {
 }
 
 .note-popover textarea {
+  /* The bubble itself is draggable from its chrome; the field opts back out so
+     typing and selecting still work. */
   cursor: auto;
   touch-action: auto;
-}
-
-.note-popover textarea {
   width: 100%;
   height: 84px;
   resize: none;
@@ -3229,9 +3260,9 @@ button {
 
 .ai-error {
   font-size: 12.5px;
-  color: #d64545;
-  background: rgba(214, 69, 69, 0.08);
-  border: 1px solid rgba(214, 69, 69, 0.25);
+  color: var(--danger);
+  background: rgb(var(--danger-rgb) / 0.08);
+  border: 1px solid rgb(var(--danger-rgb) / 0.25);
   border-radius: 9px;
   padding: 8px 11px;
 }
@@ -3851,6 +3882,7 @@ button {
    min-height: 0 is required — as a column-flex child its implicit
    min-height: auto would otherwise beat max-height: 0. */
 
+/* Second .tab-bar block: base metrics are at the top of the file. */
 .tab-bar {
   max-height: 36px;
   min-height: 0;
@@ -3868,6 +3900,7 @@ button {
 /* The selection menu must never leave the viewport (it has grown tall);
    never show a horizontal bar — the vertical scrollbar may steal a few px */
 
+/* Second .selection-menu block: base appearance is with the menu rules. */
 .selection-menu {
   /* max-content: shrink-to-fit against the anchor position must never
      squeeze the rows (that caused clipped color rows) */
@@ -4107,7 +4140,6 @@ button {
   border: 1.5px dashed var(--accent);
   border-radius: 3px;
   outline: none;
-  overflow: hidden;
   white-space: pre-wrap;
 }
 
@@ -4116,10 +4148,6 @@ button {
 .viewer.hud-faded .osb-pill {
   opacity: 0;
   pointer-events: none;
-}
-
-.page-pill {
-  transition: opacity 0.35s ease;
 }
 
 .viewer.hud-faded .page-pill {
@@ -4257,6 +4285,7 @@ button {
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 26 26"><g transform="translate(1 1)"><path d="M3 21l3.5-1 13-13-2.5-2.5-13 13z" fill="white" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M16 4.5l2.5 2.5 2-2a1.8 1.8 0 0 0 0-2.5A1.8 1.8 0 0 0 18 4z" fill="%232f6f7b" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 21l1-3.5 2.5 2.5z" fill="black"/></g></svg>') 3 22, crosshair;
 }
 
+/* Second .draw-layer.marker-mode block: the blend mode is with the other layer rules. */
 .draw-layer.marker-mode {
   cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28"><g transform="translate(1 1)"><rect x="12" y="1.5" width="9" height="7" rx="1.4" transform="rotate(45 16 5)" fill="%23ffd54a" stroke="black" stroke-width="1.4"/><path d="M5.5 16.5l4 4-2.5 2.5-4-1 -0.5-3z" fill="white" stroke="black" stroke-width="1.4" stroke-linejoin="round"/><path d="M9.5 20.5l6.5-6.5-4-4-6.5 6.5z" fill="%23ffe89a" stroke="black" stroke-width="1.4" stroke-linejoin="round"/></g></svg>') 4 22, crosshair;
 }

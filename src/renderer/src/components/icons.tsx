@@ -573,7 +573,7 @@ export const AppMark = ({
     {/* Transparent-"S" badge: the disc is currentColor; the "S" is a hole, so
         the page background shows through and the mark matches any theme without
         a cream fill fighting the grey UI. Colour comes from CSS `color`
-        (.welcome-mark → --logo-disc). Mirrors s-logo-ubakgrunn-*.svg. The full
+        (.welcome-mark → --wc-logo). Mirrors s-logo-ubakgrunn-*.svg. The full
         solid badge (dark disc + cream S) lives in scripts/icon.svg and drives
         every shipped raster icon. */}
     <path d="M7.86,42.75s.06.07.08.09v-.02s-.06-.05-.08-.07Z" />
