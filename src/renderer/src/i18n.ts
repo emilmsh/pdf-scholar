@@ -164,7 +164,7 @@ const nb = {
   'tb.rotateCcwTip': 'Mot klokken ([)',
   'tb.spread': 'To sider ved siden av hverandre',
   'tb.settingsTip': 'Innstillinger — språk, merknader, AI, oppdateringer og om appen',
-  'reset.action': 'Nullstill til standard …',
+  'reset.action': 'Nullstill til standardinnstillinger',
   'reset.tip': 'Sett alle innstillinger tilbake slik de var da appen var ny',
   'reset.confirmMessage': 'Nullstille alle innstillinger?',
   'reset.confirmDetail':
@@ -600,7 +600,7 @@ const en: Dict = {
   'tb.rotateCcwTip': 'Counter-clockwise ([)',
   'tb.spread': 'Two pages side by side',
   'tb.settingsTip': 'Settings — language, annotations, AI, updates and about',
-  'reset.action': 'Reset to defaults …',
+  'reset.action': 'Reset to default settings',
   'reset.tip': 'Put every setting back the way it was when the app was new',
   'reset.confirmMessage': 'Reset all settings?',
   'reset.confirmDetail':
