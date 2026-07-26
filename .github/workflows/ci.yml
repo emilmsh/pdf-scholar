@@ -36,6 +36,9 @@ jobs:
       # Pure-function rotation/spread transforms: a wrong one writes corrupted
       # coordinates into the file, so it is cheap insurance
       - run: npm run test:rotation
+      # The extension's redirect-rule → viewer-page URL handoff: a regression is
+      # invisible until one specific kind of link (signed, tracker-tagged) breaks
+      - run: npm run test:viewer-url
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

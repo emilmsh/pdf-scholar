@@ -32,6 +32,9 @@ interface DnrRule {
     urlFilter?: string
     resourceTypes?: string[]
     requestDomains?: string[]
+    /** Session-scoped rules only — how the "open in the browser's own reader"
+     *  bypass stays confined to the tab that asked for it. */
+    tabIds?: number[]
   }
 }
 
@@ -50,6 +53,8 @@ interface ChromeApi {
   declarativeNetRequest?: {
     updateDynamicRules(opts: { addRules?: DnrRule[]; removeRuleIds?: number[] }): Promise<void>
     getDynamicRules(): Promise<DnrRule[]>
+    updateSessionRules?(opts: { addRules?: DnrRule[]; removeRuleIds?: number[] }): Promise<void>
+    getSessionRules?(): Promise<DnrRule[]>
   }
   storage?: {
     local: ChromeStorageArea
@@ -57,6 +62,7 @@ interface ChromeApi {
   tabs?: {
     create(props: { url: string; active?: boolean }): Promise<ChromeTab>
     getCurrent(): Promise<ChromeTab | undefined>
+    update?(tabId: number, props: { url: string }): Promise<ChromeTab | undefined>
     remove(tabId: number): Promise<void>
   }
   action?: {

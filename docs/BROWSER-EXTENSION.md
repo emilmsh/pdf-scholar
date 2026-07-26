@@ -56,18 +56,42 @@ lands, the shared parts are the natural thing to extract into a common
 
 `background.ts` registers a dynamic `declarativeNetRequest` rule that redirects
 any main-frame navigation to a `*.pdf` URL to
-`chrome-extension://<id>/viewer.html?file=<original-url>`. The rule is dynamic
+`chrome-extension://<id>/viewer.html?rawfile=<original-url>`. The rule is dynamic
 because the redirect target embeds the extension's own origin, only known at
 runtime via `chrome.runtime.getURL`; `regexSubstitution` folds the matched URL
-in as the `?file=` param. `extension-api.ts:getPendingPath` reads that param and
-the shell opens the document — the same "pending path" pattern the Electron app
-uses for a freshly spawned window.
+in as the `?rawfile=` param. `extension-api.ts:getPendingPath` reads that param
+and the shell opens the document — the same "pending path" pattern the Electron
+app uses for a freshly spawned window.
 
-- **http(s) PDFs**: covered by `host_permissions`.
+**Why `rawfile` and not `file`:** `regexSubstitution` cannot percent-encode, so
+the document URL lands in the page URL *verbatim*. Read back with
+`URLSearchParams` that is silently wrong — the `&` in
+`report.pdf?utm_source=chatgpt.com&utm_medium=app` (or in any signed CDN link)
+starts a new param and everything after it is lost, and `+` decodes to a space.
+The distinct param name marks the value as "verbatim, to the end of the URL";
+links the app builds itself stay on the encoded `?file=`. Both forms are parsed
+by `src/shared/viewer-url.ts`, gated by `npm run test:viewer-url`.
+
+- **http(s) PDFs**: covered by `host_permissions`. The viewer page fetches the
+  URL a second time (the redirect discarded the browser's own request), and that
+  fetch is *not* the navigation the site expected: it carries no cookies. A PDF
+  behind a session, a paywall or a bot check answers 401/403, or 200 with a
+  sign-in page. `readFile` therefore retries once with `credentials: 'include'`
+  — the cookies the built-in viewer would have sent — and a body that is markup
+  rather than a PDF is named as such instead of surfacing later as a pdf.js
+  parse error. When even that fails, the error banner offers **"Åpne i
+  nettleserens leser"**: a session-scoped `allow` rule pinned to that one URL in
+  that one tab steps our redirect aside so the built-in reader can take it. A URL
+  the browser can open is never a dead end.
 - **file:// PDFs** (the File Explorer double-click case): additionally require
   the user to enable **"Allow access to file URLs"** on the extension's details
   page. This is a one-time manual toggle Chromium reserves for the user; an
   extension cannot grant it to itself.
+- **PDFs served without a `.pdf` URL** (arXiv's `/pdf/2401.12345`, DOI
+  resolvers, Drive): not intercepted at all — the rule matches on the URL, so
+  the browser's own viewer keeps those. Closing that gap needs a
+  `responseHeaders` condition on `content-type` (Chrome 128+, i.e. a
+  `minimum_chrome_version` bump).
 
 ## Build & load
 

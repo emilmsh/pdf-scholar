@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FilePayload, ReadingPosition, RecentFile, Settings, ThemeName } from '../../shared/types'
 import { bridge } from './bridge'
+import { buildViewerUrl } from '../../shared/viewer-url'
+import { openInBrowserViewer } from './extension-api'
 import { setLanguage, t } from './i18n'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import {
@@ -37,6 +39,9 @@ export default function ExtensionApp(): React.JSX.Element {
     () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
   )
   const [error, setError] = useState<string | null>(null)
+  /** The URL an open failed on, when the browser's own reader can still take it
+   *  (see openPath) — drives the escape-hatch button in the error banner. */
+  const [errorFallback, setErrorFallback] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   /** Bumped when the open document is replaced with fresh bytes in place
    *  (external-update conflict) — forces PdfViewer to remount, matching
@@ -88,17 +93,19 @@ export default function ExtensionApp(): React.JSX.Element {
     bridge.docOpened(p.path)
     setPayload(p)
     setError(null)
+    setErrorFallback(null)
     document.title = `${p.name} — PDF Scholar`
-    // Reflect the document in the address bar: a reopenable URL goes into
-    // ?file= (so a reload restores the document); a picker-opened file has no
-    // path the browser itself can reopen, so its name rides in the hash purely
-    // for display.
+    // Reflect the document in the address bar: a reopenable URL goes into the
+    // encoded ?file= param (so a reload restores the document, and the raw param
+    // the redirect rule wrote is replaced by one that round-trips); a
+    // picker-opened file has no path the browser itself can reopen, so its name
+    // rides in the hash purely for display.
     history.replaceState(
       null,
       '',
       p.path.startsWith('fsa:')
         ? `${location.pathname}#${encodeURIComponent(p.name)}`
-        : `${location.pathname}?file=${encodeURIComponent(p.path)}`
+        : buildViewerUrl(location.pathname, p.path)
     )
   }, [])
 
@@ -107,6 +114,10 @@ export default function ExtensionApp(): React.JSX.Element {
       const result = await bridge.readFile(path)
       if ('error' in result) {
         setError(t('app.openFailed', { error: result.error }))
+        // A URL the browser itself can open is never a dead end: offer the
+        // built-in reader rather than leaving the tab on an error (reloading
+        // would only hit our redirect rule again). A picked file has no URL.
+        if (/^(https?|file):/i.test(path)) setErrorFallback(path)
         return
       }
       await openPayload(result)
@@ -205,7 +216,18 @@ export default function ExtensionApp(): React.JSX.Element {
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
-          <button onClick={() => setError(null)} aria-label="Lukk">
+          {errorFallback && (
+            <button className="btn-secondary" onClick={() => void openInBrowserViewer(errorFallback)}>
+              {t('app.openInBrowser')}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setError(null)
+              setErrorFallback(null)
+            }}
+            aria-label="Lukk"
+          >
             ✕
           </button>
         </div>

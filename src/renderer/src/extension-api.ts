@@ -26,6 +26,7 @@ import type {
   RecentFile,
   Settings
 } from '../../shared/types'
+import { buildViewerUrl, fileNameFromUrl, parseViewerTarget } from '../../shared/viewer-url'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
 import {
@@ -72,16 +73,15 @@ const handleBaseline = new Map<string, number>()
 const FSA = 'fsa:'
 
 /** Display name for a path: picked files carry the pseudo-prefix, real paths
- *  their last segment. */
+ *  their last segment (query and fragment stripped — see fileNameFromUrl). */
 function fileNameOf(path: string): string {
   if (path.startsWith(FSA)) return path.slice(FSA.length)
-  return decodeURIComponent(path.split(/[/\\]/).pop() ?? path)
+  return fileNameFromUrl(path)
 }
 
 /** The extension viewer URL for a given source path/URL. */
 function viewerUrl(path: string): string {
-  const base = chrome?.runtime?.getURL('viewer.html') ?? 'viewer.html'
-  return `${base}?file=${encodeURIComponent(path)}`
+  return buildViewerUrl(chrome?.runtime?.getURL('viewer.html') ?? 'viewer.html', path)
 }
 
 function recordRecent(payload: { path: string; name: string }): void {
@@ -105,13 +105,11 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
 
     // ---------- Documents ----------
 
-    // The background/viewer navigation carries the original document URL as a
-    // ?file= param; the shell opens it on mount (mirrors the Electron
-    // "pending path" handed to a freshly spawned window).
-    getPendingPath: async () => {
-      const m = new URLSearchParams(location.search).get('file')
-      return m ? m : null
-    },
+    // The background/viewer navigation carries the original document URL in the
+    // page URL; the shell opens it on mount (mirrors the Electron "pending path"
+    // handed to a freshly spawned window). Parsing lives in shared/viewer-url.ts
+    // because the redirect rule cannot encode what it writes there.
+    getPendingPath: async () => parseViewerTarget(location.href),
 
     // file:// requires the "Allow access to file URLs" toggle in the extension
     // details page; http(s) requires the host in manifest host_permissions.
@@ -119,13 +117,21 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // handle instead, which is what makes it reopenable from the recents list.
     readFile: async (path): Promise<FilePayload | FileError> => {
       if (path.startsWith(FSA)) return readViaHandle(path)
-      try {
-        const res = await fetch(path)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        return { path, name: fileNameOf(path), data: new Uint8Array(await res.arrayBuffer()) }
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : String(err) }
-      }
+      // Two attempts, on the one axis where we differ from the browser's own
+      // reader: cookies. The first fetch is the plain one that has always
+      // worked; if the host answers 401/403 or hands back a login page instead
+      // of the PDF, retry WITH the site's cookies — which is what the built-in
+      // viewer sent for that same navigation. This is the difference between "it
+      // opens in Edge" and an error banner for anything behind a session, a
+      // paywall or a bot check (Cloudflare's clearance cookie). Credentials are
+      // not sent on the first try because an extension page is a cross-site
+      // context, and some hosts reject a credentialed request they would
+      // otherwise serve.
+      const first = await fetchDocument(path, 'same-origin')
+      if (!('error' in first)) return first
+      if (!/^https?:/i.test(path)) return first // no cookies to add for file://
+      const retry = await fetchDocument(path, 'include')
+      return 'error' in retry ? first : retry
     },
 
     openFileDialog: async (): Promise<FilePayload | FileError | null> => {
@@ -284,6 +290,85 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         return false
       }
     }
+  }
+}
+
+/** One fetch attempt for a document URL, in the platform's payload/error shape.
+ *  `credentials` is the axis readFile retries on. */
+async function fetchDocument(
+  path: string,
+  credentials: RequestCredentials
+): Promise<FilePayload | FileError> {
+  try {
+    const res = await fetch(path, { credentials })
+    if (!res.ok) return { error: t('doc.httpError', { status: String(res.status) }) }
+    const data = new Uint8Array(await res.arrayBuffer())
+    // A host that refuses the extension usually answers with a login, consent or
+    // bot-check PAGE — sometimes with 200. Passing that to pdf.js surfaces much
+    // later as an unrelated "invalid PDF", so name it here instead. Narrow on
+    // purpose: it takes BOTH a missing PDF header and markup in the body, so a
+    // real document served under a wrong content type still opens.
+    if (!hasPdfHeader(data) && looksLikeWebPage(res, data)) return { error: t('doc.notPdf') }
+    return { path, name: fileNameOf(path), data }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** `%PDF` somewhere in the first KB — the same tolerance pdf.js allows for files
+ *  that carry junk before the header. */
+function hasPdfHeader(data: Uint8Array): boolean {
+  const head = data.subarray(0, 1024)
+  for (let i = 0; i + 4 <= head.length; i++) {
+    if (head[i] === 0x25 && head[i + 1] === 0x50 && head[i + 2] === 0x44 && head[i + 3] === 0x46) {
+      return true
+    }
+  }
+  return false
+}
+
+/** True when the body is a web page rather than a document. */
+function looksLikeWebPage(res: Response, data: Uint8Array): boolean {
+  if (/^\s*(text\/html|application\/xhtml)/i.test(res.headers.get('content-type') ?? '')) return true
+  const head = new TextDecoder('utf-8', { fatal: false })
+    .decode(data.subarray(0, 512))
+    .trimStart()
+    .toLowerCase()
+  return head.startsWith('<!doctype html') || head.startsWith('<html')
+}
+
+/** Escape hatch for a URL the browser can open but we cannot fetch (a host that
+ *  rejects the extension's request outright, an interstitial, a cookie wall):
+ *  step our own redirect rule aside for exactly this URL in exactly this tab,
+ *  then navigate there so the built-in reader takes it. The rule is
+ *  session-scoped — it dies with the browser session and never widens the
+ *  takeover beyond the click that asked for it.
+ *
+ *  NB: tabs.getCurrent/update need no "tabs" permission (see background.ts) —
+ *  that permission only gates the sensitive tab fields, which we never read. */
+export async function openInBrowserViewer(url: string): Promise<boolean> {
+  const dnr = chrome?.declarativeNetRequest
+  const tabs = chrome?.tabs
+  if (!dnr?.updateSessionRules || !tabs?.getCurrent) return false
+  try {
+    const tabId = (await tabs.getCurrent())?.id
+    if (tabId == null) return false
+    const existing = (await dnr.getSessionRules?.()) ?? []
+    await dnr.updateSessionRules({
+      addRules: [
+        {
+          id: Math.max(0, ...existing.map((r) => r.id)) + 1,
+          priority: 2, // beats the redirect rule (priority 1)
+          action: { type: 'allow' },
+          // `|…|` anchors both ends: this one URL, nothing near it.
+          condition: { urlFilter: `|${url}|`, resourceTypes: ['main_frame'], tabIds: [tabId] }
+        }
+      ]
+    })
+    await tabs.update?.(tabId, { url })
+    return true
+  } catch {
+    return false
   }
 }
 
