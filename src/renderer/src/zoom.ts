@@ -1,5 +1,6 @@
 // Zoom limits, shared by the main pages view and the reference pane so the two
 // can never drift apart.
+import { clamp } from './clamp'
 
 export const ZOOM_MIN = 0.25
 
@@ -14,5 +15,5 @@ export const ZOOM_MIN = 0.25
 export const ZOOM_MAX = 8
 
 export function clampZoom(v: number): number {
-  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v))
+  return clamp(v, ZOOM_MIN, ZOOM_MAX)
 }

@@ -24,6 +24,7 @@ import {
   UNDERLINE_COLOR
 } from './annotations'
 import type { MarkupToolType } from './annotations'
+import { clamp } from './clamp'
 
 /** The three freehand tools that carry colour + width + opacity */
 export const DRAW_PREF_KEYS = ['pen', 'marker', 'shape'] as const
@@ -86,9 +87,6 @@ export const DEFAULT_TOOL_PREFS: ToolPrefs = {
 }
 
 const LS_KEY = 'pdfx-tool-prefs'
-
-const clamp = (v: number, min: number, max: number): number =>
-  Math.min(max, Math.max(min, v))
 
 const isRgb = (v: unknown): v is [number, number, number] =>
   Array.isArray(v) && v.length === 3 && v.every((n) => typeof n === 'number' && n >= 0 && n <= 1)

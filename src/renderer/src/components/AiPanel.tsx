@@ -41,6 +41,7 @@ import type { ChatMessage, StoredConversation } from '../chat-store'
 import { deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
+import { useDismissable } from '../useDismissable'
 import {
   IconChevronDown,
   IconGlobe,
@@ -650,13 +651,9 @@ interface ModelMenuProps {
 function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuProps): React.JSX.Element {
   useLang()
   const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const close = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
-    }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
-  }, [onClose])
+  // Was the one surface in the app with no Escape path at all; the shared hook
+  // gives it one, and switches mousedown -> pointerdown so touch works too.
+  useDismissable(ref, true, onClose)
 
   const provider = config.provider
   const model = config.models[provider] ?? ''
@@ -1679,20 +1676,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
 
   // Esc and clicks outside dismiss the popover — the Lukk button must never
   // be the only way out (it once sat offscreen and trapped the bubble open)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    const onDown = (e: MouseEvent): void => {
-      if (popRef.current && !popRef.current.contains(e.target as Node)) onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('mousedown', onDown)
-    return () => {
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('mousedown', onDown)
-    }
-  }, [onClose])
+  useDismissable(popRef, true, onClose)
 
   return (
     <div

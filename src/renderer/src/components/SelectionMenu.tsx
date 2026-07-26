@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   addCustomColor,
   colorLabel,
@@ -13,6 +13,7 @@ import type { MsgKey } from '../i18n'
 import { useDraggable } from '../useDraggable'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
+import { useDismissable } from '../useDismissable'
 import {
   IconBook,
   IconComment,
@@ -37,14 +38,8 @@ function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX
   const [hex, setHex] = useState('#')
   const ref = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (!open) return
-    const close = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    window.addEventListener('mousedown', close)
-    return () => window.removeEventListener('mousedown', close)
-  }, [open])
+  const closePicker = useCallback(() => setOpen(false), [])
+  useDismissable(ref, open, closePicker)
 
   const commit = (value: string): void => {
     if (!HEX_RE.test(value)) return

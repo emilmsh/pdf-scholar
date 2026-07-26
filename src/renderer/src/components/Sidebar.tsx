@@ -1,10 +1,11 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import { t, useLang } from '../i18n'
 import { bridge } from '../bridge'
 import { IconChevronDown, IconCopy, IconDocument, IconFolderOpen } from './icons'
+import { useDismissable } from '../useDismissable'
 
 const THUMB_WIDTH = 132
 
@@ -102,24 +103,12 @@ function Sidebar({
   const [copied, setCopied] = useState(false)
   const docRef = useRef<HTMLDivElement>(null)
 
+  // The «Kopiert» confirmation is per-opening, so it resets when the menu shuts
   useEffect(() => {
-    if (!docMenuOpen) {
-      setCopied(false)
-      return
-    }
-    const close = (e: Event): void => {
-      if (docRef.current && !docRef.current.contains(e.target as Node)) setDocMenuOpen(false)
-    }
-    const onEsc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setDocMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    window.addEventListener('keydown', onEsc, true)
-    return () => {
-      window.removeEventListener('pointerdown', close, true)
-      window.removeEventListener('keydown', onEsc, true)
-    }
+    if (!docMenuOpen) setCopied(false)
   }, [docMenuOpen])
+  const closeDocMenu = useCallback(() => setDocMenuOpen(false), [])
+  useDismissable(docRef, docMenuOpen, closeDocMenu)
 
   const copyPath = (): void => {
     if (!docPath) return

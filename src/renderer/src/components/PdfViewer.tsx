@@ -102,6 +102,7 @@ import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
 import type { ExportFormat } from './Sidebar'
+import { clamp } from '../clamp'
 
 // One worker per open document (not a shared global port) so the document can
 // be re-opened after the annotation engine rewrites the file on disk.
@@ -295,10 +296,6 @@ interface Props {
    *  current file's path and this action. Desktop leaves it undefined — the tab
    *  bar already carries the file identity. */
   onOpenFile?(): void
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v))
 }
 
 export default function PdfViewer({

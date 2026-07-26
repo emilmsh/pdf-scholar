@@ -4,6 +4,7 @@ import type { ThemeName } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { IconArrowLeft, IconArrowRight, IconFullscreen } from './icons'
+import { clamp } from '../clamp'
 
 interface PageSize {
   w: number
@@ -29,10 +30,6 @@ interface Props {
   /** Keep the underlying viewer's current page in sync so exiting lands there */
   onPageChange(page: number): void
   onExit(): void
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, v))
 }
 
 /** Acrobat-style presentation mode: one page at a time, fit to the screen on a

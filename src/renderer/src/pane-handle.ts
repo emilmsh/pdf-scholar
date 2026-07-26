@@ -11,6 +11,7 @@
 import type { PageRect, ViewRotation } from '../../shared/types'
 import { pageRectToView } from './rotation'
 import type { RowLayout } from './rotation'
+import { clamp } from './clamp'
 
 /** Air left above a page landed on by scrollToPage, so it is not flush with the
  *  viewport's top edge. position() adds it back, which makes the two exact
@@ -48,8 +49,6 @@ interface Deps {
    *  and the target page has to render before anything can refine against it. */
   afterScroll(): void
 }
-
-const clamp = (v: number, min: number, max: number): number => Math.min(max, Math.max(min, v))
 
 export function makePaneHandle(deps: Deps): PaneHandle {
   const handle: PaneHandle = {

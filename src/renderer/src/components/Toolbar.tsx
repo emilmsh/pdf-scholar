@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
   LanguagePreference,
   Settings,
@@ -31,6 +31,7 @@ import type { DrawPrefKey, EraserScope, MarkupPref, ToolPref } from '../tool-pre
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import { READ_ALOUD } from '../flags'
+import { useDismissable } from '../useDismissable'
 import { updateOutcomeText } from './Welcome'
 import {
   IconArrowLeft,
@@ -245,6 +246,11 @@ function ResetLink({ hidden, onClick }: { hidden: boolean; onClick(): void }): R
   )
 }
 
+/** Every toolbar menu opts out of useDismissable's own Escape: the consolidated
+ *  keydown effect below owns Escape for all of them, because it has to close the
+ *  reset confirmation before the menu that contains it. */
+const NO_ESCAPE = { escape: false } as const
+
 export default function Toolbar({
   page,
   pageCount,
@@ -362,14 +368,16 @@ export default function Toolbar({
   const [hiddenCount, setHiddenCount] = useState(0)
   const [overflowMenuOpen, setOverflowMenuOpen] = useState(false)
 
-  useEffect(() => {
-    if (!toolMenu) return
-    const close = (e: Event): void => {
-      if (toolMenuRef.current && !toolMenuRef.current.contains(e.target as Node)) setToolMenu(null)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [toolMenu])
+  // Stable closers so the shared hook does not re-bind its listeners each render
+  const closeToolMenu = useCallback(() => setToolMenu(null), [])
+  const closeThemeMenu = useCallback(() => setThemeMenuOpen(false), [])
+  const closeViewMenu = useCallback(() => setViewMenuOpen(false), [])
+  const closeSettingsMenu = useCallback(() => setSettingsMenuOpen(false), [])
+  const closeOverflowMenu = useCallback(() => setOverflowMenuOpen(false), [])
+
+  // Escape for all five toolbar menus is owned by the consolidated handler
+  // below, which has to close the reset confirmation first — hence escape: false.
+  useDismissable(toolMenuRef, toolMenu !== null, closeToolMenu, NO_ESCAPE)
 
   // 'shape' is not a draw tool of its own (the four shapes are) — its options
   // popover is opened straight from the Former button, not through here.
@@ -404,40 +412,24 @@ export default function Toolbar({
     setPanePageInput(String(panePage))
   }, [panePage])
 
-  useEffect(() => {
-    if (!themeMenuOpen) return
-    const close = (e: Event): void => {
-      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node))
-        setThemeMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [themeMenuOpen])
+  useDismissable(themeMenuRef, themeMenuOpen, closeThemeMenu, NO_ESCAPE)
 
-  useEffect(() => {
-    if (!viewMenuOpen) return
-    const close = (e: Event): void => {
-      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target as Node))
-        setViewMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [viewMenuOpen])
+  useDismissable(viewMenuRef, viewMenuOpen, closeViewMenu, NO_ESCAPE)
 
-  useEffect(() => {
-    if (!settingsMenuOpen) return
-    const close = (e: Event): void => {
-      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node))
-        setSettingsMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    return () => window.removeEventListener('pointerdown', close, true)
-  }, [settingsMenuOpen])
+  useDismissable(settingsMenuRef, settingsMenuOpen, closeSettingsMenu, NO_ESCAPE)
 
   // Esc closes any open toolbar menu (and the reset confirmation) before the
   // viewer's own Esc chain gets a look in — a menu must never trap the user.
   useEffect(() => {
-    if (!themeMenuOpen && !viewMenuOpen && !settingsMenuOpen && !toolMenu && !resetAsk) return
+    if (
+      !themeMenuOpen &&
+      !viewMenuOpen &&
+      !settingsMenuOpen &&
+      !overflowMenuOpen &&
+      !toolMenu &&
+      !resetAsk
+    )
+      return
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return
       e.stopPropagation()
@@ -448,11 +440,12 @@ export default function Toolbar({
       setThemeMenuOpen(false)
       setViewMenuOpen(false)
       setSettingsMenuOpen(false)
+      setOverflowMenuOpen(false)
       setToolMenu(null)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [themeMenuOpen, viewMenuOpen, settingsMenuOpen, toolMenu, resetAsk])
+  }, [themeMenuOpen, viewMenuOpen, settingsMenuOpen, overflowMenuOpen, toolMenu, resetAsk])
 
   // Version + update capability are static — fetch once, the first time the
   // gear menu opens.
@@ -740,22 +733,7 @@ export default function Toolbar({
     if (hiddenActions.length === 0) setOverflowMenuOpen(false)
   }, [hiddenActions.length])
 
-  useEffect(() => {
-    if (!overflowMenuOpen) return
-    const close = (e: Event): void => {
-      if (overflowMenuRef.current && !overflowMenuRef.current.contains(e.target as Node))
-        setOverflowMenuOpen(false)
-    }
-    const onEsc = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOverflowMenuOpen(false)
-    }
-    window.addEventListener('pointerdown', close, true)
-    window.addEventListener('keydown', onEsc, true)
-    return () => {
-      window.removeEventListener('pointerdown', close, true)
-      window.removeEventListener('keydown', onEsc, true)
-    }
-  }, [overflowMenuOpen])
+  useDismissable(overflowMenuRef, overflowMenuOpen, closeOverflowMenu, NO_ESCAPE)
 
   /** Colour + width + opacity for pen/marker/shape, with a quiet reset */
   const drawToolMenu = (tool: DrawPrefKey): React.JSX.Element => {
