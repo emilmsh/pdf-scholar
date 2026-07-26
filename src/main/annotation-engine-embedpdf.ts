@@ -20,6 +20,7 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  FileError,
   ModifyAnnotationRequest
 } from '../shared/types'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
@@ -58,8 +59,11 @@ async function isAppenderFile(path: string): Promise<boolean> {
 
 /** Names the desktop remedy (the appender) rather than the browser's, which is
  *  why this one string stays per-platform while the rest live in ENGINE_ERRORS. */
-const OVERSIZE_MSG =
-  'Dokumentet er for stort til å annoteres (minnegrense i skrivemotoren). Les og marker tekst går fint — lagring av annoteringer i så store filer støttes ikke ennå.'
+const OVERSIZE: FileError = {
+  code: 'doc-too-large',
+  error:
+    'Dokumentet er for stort til å annoteres (minnegrense i skrivemotoren). Les og marker tekst går fint — lagring av annoteringer i så store filer støttes ikke ennå.'
+}
 
 // Lazy singleton: WASM init is ~50 ms and the module is ESM-only (dynamic
 // import from the CJS main bundle, mirroring the mupdf loader).
@@ -125,12 +129,12 @@ async function withPdf(
   try {
     // Honest failure beats optimistic loss: refuse oversize files up front —
     // an in-memory write that can never flush is data loss wearing an "ok".
-    if ((await stat(path)).size > WASM_SAFE_LIMIT) return { error: OVERSIZE_MSG }
+    if ((await stat(path)).size > WASM_SAFE_LIMIT) return OVERSIZE
     return await cache.mutate(path, op, (result) => !('error' in result))
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (/password/i.test(msg)) return { error: ENGINE_ERRORS.passwordProtected }
-    if (OOM_RE.test(msg)) return { error: OVERSIZE_MSG }
+    if (/password/i.test(msg)) return ENGINE_ERRORS.passwordProtected
+    if (OOM_RE.test(msg)) return OVERSIZE
     return { error: msg }
   }
 }
@@ -150,7 +154,7 @@ export const flushAllAnnotations = (): Promise<void> => cache.flushAll()
 // appender routing and the doc cache; the write itself is the shared op.
 
 export async function applyAnnotation(req: AnnotateRequest): Promise<AnnotateResult> {
-  if (hasNoPosition(req)) return { error: ENGINE_ERRORS.noPosition }
+  if (hasNoPosition(req)) return ENGINE_ERRORS.noPosition
   // Large files bypass the WASM engine entirely (the appender writes to disk
   // synchronously; flushAnnotations/dropAnnotations are natural no-ops since
   // the path never enters the doc cache). The appender NEVER falls back here:

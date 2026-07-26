@@ -3,7 +3,7 @@ import type { FilePayload, ReadingPosition, RecentFile, Settings, ThemeName } fr
 import { bridge } from './bridge'
 import { buildViewerUrl } from '../../shared/viewer-url'
 import { openInBrowserViewer } from './extension-api'
-import { setLanguage, t } from './i18n'
+import { errorText, setLanguage, t } from './i18n'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import {
   checkForExtensionUpdate,
@@ -122,7 +122,7 @@ export default function ExtensionApp(): React.JSX.Element {
         ) {
           return
         }
-        setError(t('app.openFailed', { error: result.error }))
+        setError(t('app.openFailed', { error: errorText(result) }))
         // Still offer the hand-off by hand for the cases above.
         if (/^(https?|file):/i.test(path)) setErrorFallback(path)
         return
@@ -136,7 +136,7 @@ export default function ExtensionApp(): React.JSX.Element {
     const result = await bridge.openFileDialog()
     if (!result) return
     if ('error' in result) {
-      setError(t('app.openFailed', { error: result.error }))
+      setError(t('app.openFailed', { error: errorText(result) }))
       return
     }
     await openPayload(result)

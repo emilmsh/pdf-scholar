@@ -4,6 +4,8 @@
 // enough). Non-React modules (exports, prompts) call t() at use time.
 import { useSyncExternalStore } from 'react'
 
+import type { FileError } from '../../shared/types'
+
 export type Lang = 'nb' | 'en'
 /** User's choice — 'auto' follows the OS/browser language */
 export type LanguagePreference = Lang | 'auto'
@@ -32,6 +34,17 @@ const nb = {
   'crash.reload': 'Last inn på nytt',
   'app.openInBrowser': 'Åpne i nettleserens leser',
   'app.saveFailed': 'Kunne ikke lagre: {error}',
+  // One per EngineErrorCode. These ride inside the {error} slot of the toasts
+  // above, so they are lowercase sentence fragments with no full stop.
+  'engine.annot-not-found': 'fant ikke merknaden i filen',
+  'engine.annot-no-position': 'merknaden har ingen posisjon',
+  'engine.annot-no-object-number': 'fikk ikke objektnummer for merknaden',
+  'engine.annot-update-rejected': 'endringen ble avvist av skrivemotoren',
+  'engine.annot-list-asymmetric': 'merknadslisten er usymmetrisk — kan ikke identifisere trygt',
+  'engine.pdf-password-protected': 'PDF-en er passordbeskyttet',
+  'engine.doc-too-large': 'dokumentet er for stort til å annoteres (minnegrense i skrivemotoren)',
+  'engine.doc-too-large-browser': 'dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren)',
+  'engine.doc-not-open': 'dokumentet er ikke åpent for redigering',
 
   // Welcome
   'welcome.tagline': 'Laget for forskning.',
@@ -483,6 +496,15 @@ const en: Dict = {
   'crash.reload': 'Reload',
   'app.openInBrowser': 'Open in the browser’s reader',
   'app.saveFailed': 'Could not save: {error}',
+  'engine.annot-not-found': 'the annotation was not found in the file',
+  'engine.annot-no-position': 'the annotation has no position',
+  'engine.annot-no-object-number': 'no object number came back for the annotation',
+  'engine.annot-update-rejected': 'the write engine rejected the change',
+  'engine.annot-list-asymmetric': 'the annotation list is asymmetric — cannot identify safely',
+  'engine.pdf-password-protected': 'the PDF is password protected',
+  'engine.doc-too-large': 'the document is too large to annotate (write-engine memory limit)',
+  'engine.doc-too-large-browser': 'the document is too large to annotate in the browser (write-engine memory limit)',
+  'engine.doc-not-open': 'the document is not open for editing',
 
   'welcome.tagline': 'Made for research.',
   'welcome.openPdf': 'Open PDF …',
@@ -934,4 +956,16 @@ export function t(key: MsgKey, vars?: Record<string, string | number>): string {
 /** Locale for date formatting etc. */
 export function locale(): string {
   return current === 'nb' ? 'nb-NO' : 'en-GB'
+}
+
+/** The text to show for a failure that came back over IPC.
+ *
+ *  main and shared cannot reach this module, so a recognised failure travels as a
+ *  CODE and gets translated here. Anything else — an fs error, a provider's own
+ *  message — keeps its text, because that detail is the whole value and no
+ *  invented translation could carry it. Every toast that shows an engine failure
+ *  goes through this, so an English user never reads a Norwegian fragment inside
+ *  a translated sentence. */
+export function errorText(e: FileError): string {
+  return e.code ? t(`engine.${e.code}`) : e.error
 }

@@ -20,6 +20,7 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  FileError,
   ModifyAnnotationRequest
 } from './types'
 import type { PdfAnnotationObject, PdfDocumentObject } from '@embedpdf/models'
@@ -41,17 +42,26 @@ export const OOM_RE = /realloc|malloc|out of memory|cannot enlarge memory|oom|ab
  *  300 MB leaves headroom under the ~350 MB theoretical ceiling. */
 export const WASM_SAFE_LIMIT = 300 * 1024 * 1024
 
-/** Messages the ops below can return. Kept here so the two engines cannot drift
- *  into describing the same failure two different ways. */
+/** The failures the ops below can report. Each carries a CODE so the renderer
+ *  can translate it, plus the Norwegian text as the fallback and the log line —
+ *  main and shared have no access to the renderer's i18n. Kept here so the two
+ *  engines cannot drift into describing the same failure two different ways. */
 export const ENGINE_ERRORS = {
-  notFound: 'Fant ikke annotasjonen i filen',
-  noPosition: 'Annotasjonen har ingen posisjon',
-  noObjectNumber: 'Fikk ikke objektnummer for annotasjonen',
-  updateRejected: 'Oppdateringen ble avvist av motoren',
-  passwordProtected: 'PDF-en er passordbeskyttet',
-  asymmetric: (models: number, objNums: number): string =>
-    `Annotasjonslisten er usymmetrisk (${models} vs ${objNums}) — kan ikke identifisere trygt`
-} as const
+  notFound: { code: 'annot-not-found', error: 'Fant ikke annotasjonen i filen' },
+  noPosition: { code: 'annot-no-position', error: 'Annotasjonen har ingen posisjon' },
+  noObjectNumber: {
+    code: 'annot-no-object-number',
+    error: 'Fikk ikke objektnummer for annotasjonen'
+  },
+  updateRejected: { code: 'annot-update-rejected', error: 'Oppdateringen ble avvist av motoren' },
+  passwordProtected: { code: 'pdf-password-protected', error: 'PDF-en er passordbeskyttet' },
+  asymmetric: (models: number, objNums: number): FileError => ({
+    code: 'annot-list-asymmetric',
+    // The counts stay in the message: they are the diagnostic, and no
+    // translated sentence can carry them without the renderer knowing them.
+    error: `Annotasjonslisten er usymmetrisk (${models} vs ${objNums}) — kan ikke identifisere trygt`
+  })
+} as const satisfies Record<string, FileError | ((...a: never[]) => FileError)>
 
 /** The raw FPDF functions we reach for. PdfiumNative does not surface the fork's
  *  EPDF object-number extensions in its high-level model API, so the ops below
@@ -138,16 +148,16 @@ async function findByObjectNumber(
   { engine, doc, docId }: OpenDoc,
   pageIndex: number,
   id: number
-): Promise<PdfAnnotationObject | { error: string }> {
+): Promise<PdfAnnotationObject | FileError> {
   const page = doc.pages[pageIndex]
   const models = await engine.getPageAnnotations(doc, page).toPromise()
   const objNums = rawObjectNumbers(engine, docId, pageIndex)
   const index = objNums.indexOf(id)
-  if (index === -1) return { error: ENGINE_ERRORS.notFound }
+  if (index === -1) return ENGINE_ERRORS.notFound
   if (models.length !== objNums.length) {
     // The model API filtered something — index alignment is unsafe rather than
     // merely wrong, so refuse instead of guessing.
-    return { error: ENGINE_ERRORS.asymmetric(models.length, objNums.length) }
+    return ENGINE_ERRORS.asymmetric(models.length, objNums.length)
   }
   return models[index]
 }
@@ -170,7 +180,7 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
     // create-then-recolor-by-id case).
     const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
     const id = objNums[objNums.length - 1]
-    if (!id) return { error: ENGINE_ERRORS.noObjectNumber }
+    if (!id) return ENGINE_ERRORS.noObjectNumber
     return { ok: true, id }
   })
 }
@@ -215,7 +225,7 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
     }
     ;(m as { modified?: Date }).modified = new Date()
     const ok = await engine.updatePageAnnotation(doc, doc.pages[req.pageIndex], m).toPromise()
-    return ok ? { ok: true, id: req.id } : { error: ENGINE_ERRORS.updateRejected }
+    return ok ? { ok: true, id: req.id } : ENGINE_ERRORS.updateRejected
   })
 }
 
@@ -226,6 +236,6 @@ export function deleteOn(open: OpenDoc, req: DeleteAnnotationRequest): Promise<A
     const removed = withPageHandle(engine, docId, req.pageIndex, (pagePtr, raw) =>
       raw.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, req.id)
     )
-    return removed ? { ok: true, id: req.id } : { error: ENGINE_ERRORS.notFound }
+    return removed ? { ok: true, id: req.id } : ENGINE_ERRORS.notFound
   })
 }

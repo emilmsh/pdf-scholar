@@ -14,6 +14,7 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  FileError,
   ModifyAnnotationRequest
 } from '../../shared/types'
 import type { OpenDoc } from '../../shared/pdfium-annot-ops'
@@ -34,11 +35,14 @@ import wasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
 // honest refusal up front beats silent loss at save time. The desktop routes
 // such files to the incremental appender; porting that appender to the browser
 // is future work, so here it is a hard limit.
-const OVERSIZE_MSG =
-  'Dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren). Les og marker tekst går fint.'
+const OVERSIZE: FileError = {
+  code: 'doc-too-large-browser',
+  error:
+    'Dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren). Les og marker tekst går fint.'
+}
 /** No desktop equivalent: on the desktop main owns the draft and can always
  *  create one, while here the bytes only exist while the viewer is mounted. */
-const NOT_OPEN_MSG = 'Dokumentet er ikke åpent for redigering'
+const NOT_OPEN: FileError = { code: 'doc-not-open', error: 'Dokumentet er ikke åpent for redigering' }
 
 let enginePromise: Promise<PdfiumNative> | null = null
 
@@ -101,8 +105,8 @@ async function withDoc(
   op: (open: OpenDoc) => Promise<AnnotateResult>
 ): Promise<AnnotateResult> {
   const entry = docs.get(path)
-  if (!entry) return { error: NOT_OPEN_MSG }
-  if (entry.bytes.length > WASM_SAFE_LIMIT) return { error: OVERSIZE_MSG }
+  if (!entry) return NOT_OPEN
+  if (entry.bytes.length > WASM_SAFE_LIMIT) return OVERSIZE
   try {
     return await op(await openEntry(entry))
   } catch (err) {
@@ -112,9 +116,9 @@ async function withDoc(
     if (OOM_RE.test(msg)) {
       enginePromise = null
       entry.open = null
-      return { error: OVERSIZE_MSG }
+      return OVERSIZE
     }
-    if (/password/i.test(msg)) return { error: ENGINE_ERRORS.passwordProtected }
+    if (/password/i.test(msg)) return ENGINE_ERRORS.passwordProtected
     return { error: msg }
   }
 }
@@ -123,7 +127,7 @@ async function withDoc(
 // document's lifetime differs from the desktop's.
 
 export function browserApplyAnnotation(req: AnnotateRequest): Promise<AnnotateResult> {
-  if (hasNoPosition(req)) return Promise.resolve({ error: ENGINE_ERRORS.noPosition })
+  if (hasNoPosition(req)) return Promise.resolve(ENGINE_ERRORS.noPosition)
   return withDoc(req.path, (open) => applyOn(open, req))
 }
 

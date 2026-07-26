@@ -97,7 +97,7 @@ import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
-import { locale, t, useLang } from '../i18n'
+import { errorText, locale, t, useLang } from '../i18n'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
@@ -1819,7 +1819,7 @@ export default function PdfViewer({
     if (isElectron) {
       const result = await bridge.docSave(payload.path)
       if (result && 'error' in result) {
-        showToast(t('viewer.saveFailed', { error: result.error }))
+        showToast(t('viewer.saveFailed', { error: errorText(result) }))
         return
       }
       setDirty(false)
@@ -1838,7 +1838,7 @@ export default function PdfViewer({
     const result = await bridge.saveDocumentBytes(payload.path, payload.name, bytes)
     if (!result) return // user cancelled the location picker
     if ('error' in result) {
-      showToast(t('viewer.saveFailed', { error: result.error }))
+      showToast(t('viewer.saveFailed', { error: errorText(result) }))
       return
     }
     setDirty(false)
@@ -1857,7 +1857,7 @@ export default function PdfViewer({
     const result = await bridge.saveFileAs(payload.name, bytes, payload.path)
     if (!result) return // user cancelled the dialog
     if ('error' in result) {
-      showToast(t('viewer.saveFailed', { error: result.error }))
+      showToast(t('viewer.saveFailed', { error: errorText(result) }))
       return
     }
     if (isElectron) {
@@ -1952,7 +1952,7 @@ export default function PdfViewer({
           pendingWritesRef.current -= 1
         })
       if ('error' in result) {
-        showToast(t('viewer.annotSaveFailed', { error: result.error }))
+        showToast(t('viewer.annotSaveFailed', { error: errorText(result) }))
         mutatePage(handle.pageNumber, (list) => list.filter((r) => r.id !== handle.localId))
       } else {
         handle.fileId = result.id
@@ -1981,7 +1981,7 @@ export default function PdfViewer({
         .finally(() => {
           pendingWritesRef.current -= 1
         })
-      if ('error' in result) showToast(t('viewer.annotDeleteFailed', { error: result.error }))
+      if ('error' in result) showToast(t('viewer.annotDeleteFailed', { error: errorText(result) }))
       else {
         markDirtyRef.current()
         if (wasFilePainted) void reloadDocument()
@@ -2015,7 +2015,7 @@ export default function PdfViewer({
         .finally(() => {
           pendingWritesRef.current -= 1
         })
-      if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: result.error }))
+      if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: errorText(result) }))
       else {
         markDirtyRef.current()
         // 'file' annots are painted by pdf.js from the file — refresh the canvas
@@ -3320,7 +3320,7 @@ export default function PdfViewer({
               ? [toDocx(rows, meta), `${base} - ${suffix}.docx`]
               : [toPlainText(rows, meta), `${base} - ${suffix}.txt`]
       const result = await bridge.saveTextFile(name, content)
-      if (result && 'error' in result) showToast(t('viewer.saveFailed', { error: result.error }))
+      if (result && 'error' in result) showToast(t('viewer.saveFailed', { error: errorText(result) }))
       else if (result) showToast(t('viewer.exported', { path: result.path }))
     },
     [pdf, payload.name, showToast]
@@ -4100,7 +4100,7 @@ export default function PdfViewer({
                 }
               }
               const result = await bridge.printFile(payload.path)
-              if (result && 'error' in result) showToast(t('viewer.printFailed', { error: result.error }))
+              if (result && 'error' in result) showToast(t('viewer.printFailed', { error: errorText(result) }))
             })()
           }}
           readAloudOpen={readAloud !== 'closed'}

@@ -46,8 +46,31 @@ export interface FilePayload {
   data: Uint8Array
 }
 
+/** A failure the engine can name, as opposed to one it can only quote.
+ *
+ *  main and shared cannot reach the renderer's i18n, so they used to send
+ *  Norwegian prose across IPC and an English user read a Norwegian sentence
+ *  inside a translated shell. A code lets the renderer translate instead. Only
+ *  failures we RECOGNISE get one: an fs or provider error still travels as its
+ *  own message, because inventing a code for "whatever the OS said" would lose
+ *  the only detail that helps. */
+export type EngineErrorCode =
+  | 'annot-not-found'
+  | 'annot-no-position'
+  | 'annot-no-object-number'
+  | 'annot-update-rejected'
+  | 'annot-list-asymmetric'
+  | 'pdf-password-protected'
+  | 'doc-too-large'
+  | 'doc-too-large-browser'
+  | 'doc-not-open'
+
 export interface FileError {
+  /** Always set: the fallback text, and what goes in the log */
   error: string
+  /** Set when the failure is one of the recognised kinds above, so the renderer
+   *  can show its own translation rather than this string. */
+  code?: EngineErrorCode | undefined
 }
 
 /** A partial update where "not changing this field" may be written as an explicit

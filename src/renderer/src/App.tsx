@@ -8,7 +8,7 @@ import type {
   ThemeName
 } from '../../shared/types'
 import { bridge, isElectron } from './bridge'
-import { setLanguage, t, useLang } from './i18n'
+import { errorText, setLanguage, t, useLang } from './i18n'
 import { primaryMod } from './platform'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
@@ -347,7 +347,7 @@ export default function App(): React.JSX.Element {
       }
       const result = await bridge.readFile(path)
       if ('error' in result) {
-        setError(t('app.openFailed', { error: result.error }))
+        setError(t('app.openFailed', { error: errorText(result) }))
         return
       }
       const initialPosition = await bridge.getPosition(path)
@@ -428,7 +428,7 @@ export default function App(): React.JSX.Element {
           setActiveId(existing.id) // file gone/busy — keep showing what we have
           return
         }
-        setError(t('app.openFailed', { error: result.error }))
+        setError(t('app.openFailed', { error: errorText(result) }))
         return
       }
       await openPayload(result)
@@ -440,7 +440,7 @@ export default function App(): React.JSX.Element {
     const result = await bridge.openFileDialog()
     if (!result) return
     if ('error' in result) {
-      setError(t('app.openFailed', { error: result.error }))
+      setError(t('app.openFailed', { error: errorText(result) }))
       return
     }
     await openPayload(result)
