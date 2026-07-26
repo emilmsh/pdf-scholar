@@ -115,7 +115,7 @@ export const webApi: PdfxApi = {
   docIsDirty: async () => false,
   docWasModifiedExternally: async () => false,
   docSave: async () => ({ ok: true }),
-  docConfirmClose: async () => 'discard',
+  docConfirmClose: async () => ({ verdict: 'discard' }),
   docConfirmExternalUpdate: async () => 'discard',
   docDiscard: async () => {},
   // No cross-window annotation sync outside Electron: a second browser tab has

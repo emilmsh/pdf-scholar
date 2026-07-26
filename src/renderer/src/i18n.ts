@@ -23,6 +23,8 @@ const nb = {
   'app.delete': 'Slett',
   'app.back': 'Tilbake',
   'app.pageAbbrev': 's.',
+  'app.openFailed': 'Kunne ikke åpne filen: {error}',
+  'app.saveFailed': 'Kunne ikke lagre: {error}',
 
   // Welcome
   'welcome.tagline': 'Laget for forskning.',
@@ -465,6 +467,8 @@ const en: Dict = {
   'app.delete': 'Delete',
   'app.back': 'Back',
   'app.pageAbbrev': 'p.',
+  'app.openFailed': 'Could not open the file: {error}',
+  'app.saveFailed': 'Could not save: {error}',
 
   'welcome.tagline': 'Made for research.',
   'welcome.openPdf': 'Open PDF …',

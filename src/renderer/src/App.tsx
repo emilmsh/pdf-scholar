@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
+  CloseOutcome,
   FilePayload,
   ReadingPosition,
   RecentFile,
@@ -169,21 +170,30 @@ export default function App(): React.JSX.Element {
    *  (the browser CAN still cancel at that stage; losing the marks would be
    *  worse than desktop, which has no picker step). */
   const confirmCloseVerdict = useCallback(
-    async (path: string, name: string): Promise<'save' | 'discard' | 'cancel'> => {
+    async (path: string, name: string): Promise<CloseOutcome> => {
       if (isElectron) return bridge.docConfirmClose(path)
       const verdict = await new Promise<'save' | 'discard' | 'cancel'>((resolve) =>
         setConfirmState({ name, resolve })
       )
       setConfirmState(null)
-      if (verdict !== 'save') return verdict
+      if (verdict !== 'save') return { verdict }
       const bytes = await browserCurrentBytes(path)
-      if (!bytes) return 'cancel'
+      if (!bytes) return { verdict: 'cancel' }
       const result = await bridge.saveDocumentBytes(path, name, bytes)
-      if (!result || 'error' in result) return 'cancel'
-      return 'save'
+      // A cancelled picker (null) is the user's own choice and needs no
+      // message; a real write failure must not pass for a cancel in silence.
+      if (!result) return { verdict: 'cancel' }
+      if ('error' in result) return { verdict: 'cancel', error: result.error }
+      return { verdict: 'save' }
     },
     []
   )
+
+  /** A save the user asked for that did not happen. Keeping the document open
+   *  is the right recovery, but only once they know why it stayed open. */
+  const reportCloseFailure = useCallback((outcome: CloseOutcome): void => {
+    if (outcome.error) setError(t('app.saveFailed', { error: outcome.error }))
+  }, [])
 
   /** Browser stand-in for the external-update prompt below — same three
    *  verdicts, wording tailored to "the file changed under your feet". */
@@ -296,12 +306,15 @@ export default function App(): React.JSX.Element {
         reallyCloseTab(id)
         return
       }
-      void confirmCloseVerdict(tab.payload.path, tab.payload.name).then((verdict) => {
-        if (verdict === 'cancel') return
+      void confirmCloseVerdict(tab.payload.path, tab.payload.name).then((outcome) => {
+        if (outcome.verdict === 'cancel') {
+          reportCloseFailure(outcome)
+          return
+        }
         reallyCloseTab(id)
       })
     },
-    [reallyCloseTab, confirmCloseVerdict]
+    [reallyCloseTab, confirmCloseVerdict, reportCloseFailure]
   )
 
   // Move a tab to another window (drag) or tear it off into a new one. The
@@ -331,13 +344,16 @@ export default function App(): React.JSX.Element {
     async (id: string, path: string) => {
       if (dirtyTabsRef.current.has(id)) {
         const tab = tabsRef.current.find((t) => t.id === id)
-        const verdict = await confirmCloseVerdict(path, tab?.payload.name ?? path)
-        if (verdict === 'cancel') return
+        const outcome = await confirmCloseVerdict(path, tab?.payload.name ?? path)
+        if (outcome.verdict === 'cancel') {
+          reportCloseFailure(outcome)
+          return
+        }
         setTabDirty(id, false) // saved or discarded — the remounted viewer starts clean
       }
       const result = await bridge.readFile(path)
       if ('error' in result) {
-        setError(`Kunne ikke åpne filen: ${result.error}`)
+        setError(t('app.openFailed', { error: result.error }))
         return
       }
       const initialPosition = await bridge.getPosition(path)
@@ -346,7 +362,7 @@ export default function App(): React.JSX.Element {
       )
       setActiveId(id)
     },
-    [setTabDirty, confirmCloseVerdict]
+    [setTabDirty, confirmCloseVerdict, reportCloseFailure]
   )
 
   /** «Save a copy» semantics: continue working in the copy. The edits were
@@ -418,7 +434,7 @@ export default function App(): React.JSX.Element {
           setActiveId(existing.id) // file gone/busy — keep showing what we have
           return
         }
-        setError(`Kunne ikke åpne filen: ${result.error}`)
+        setError(t('app.openFailed', { error: result.error }))
         return
       }
       await openPayload(result)
@@ -430,7 +446,7 @@ export default function App(): React.JSX.Element {
     const result = await bridge.openFileDialog()
     if (!result) return
     if ('error' in result) {
-      setError(`Kunne ikke åpne filen: ${result.error}`)
+      setError(t('app.openFailed', { error: result.error }))
       return
     }
     await openPayload(result)

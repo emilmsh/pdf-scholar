@@ -106,7 +106,7 @@ export default function ExtensionApp(): React.JSX.Element {
     async (path: string) => {
       const result = await bridge.readFile(path)
       if ('error' in result) {
-        setError(`Kunne ikke åpne filen: ${result.error}`)
+        setError(t('app.openFailed', { error: result.error }))
         return
       }
       await openPayload(result)
@@ -118,7 +118,7 @@ export default function ExtensionApp(): React.JSX.Element {
     const result = await bridge.openFileDialog()
     if (!result) return
     if ('error' in result) {
-      setError(`Kunne ikke åpne filen: ${result.error}`)
+      setError(t('app.openFailed', { error: result.error }))
       return
     }
     await openPayload(result)

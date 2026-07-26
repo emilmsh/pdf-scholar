@@ -53,6 +53,16 @@ export interface FileError {
 /** Outcome of dropping a dragged tab (see PdfxApi.tabDropAtCursor) */
 export type TabDropResult = 'window' | 'new' | 'same'
 
+/** What the unsaved-changes prompt settled on. `error` only ever accompanies
+ *  'cancel': the user chose Save, the write failed, and the document must stay
+ *  open with its draft intact — the caller keeps the tab AND says why. Without
+ *  this channel a failed save is indistinguishable from a successful one, and
+ *  the tab closes over annotations that never reached disk. */
+export interface CloseOutcome {
+  verdict: 'save' | 'discard' | 'cancel'
+  error?: string
+}
+
 export type AnnotationType =
   | 'highlight'
   | 'underline'
@@ -266,7 +276,7 @@ export interface PdfxApi {
   /** Write the draft back over the original file */
   docSave(path: string): Promise<{ ok: true } | FileError>
   /** Native save/discard/cancel prompt; performs the chosen action */
-  docConfirmClose(path: string): Promise<'save' | 'discard' | 'cancel'>
+  docConfirmClose(path: string): Promise<CloseOutcome>
   /** Native prompt shown when re-opening a path whose tab has unsaved
    *  annotations AND the on-disk file has changed underneath it — a plain
    *  reload would silently drop the annotated draft. Question only, no

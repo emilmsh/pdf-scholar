@@ -6,6 +6,7 @@ import type {
   AiCitation,
   AiImage,
   AnnotationType,
+  FileError,
   FilePayload,
   PageRect,
   ReadingPosition,
@@ -2001,6 +2002,16 @@ export default function PdfViewer({
     [matchesHandle]
   )
 
+  /** A rejected write and an {error} result mean the same thing to the user:
+   *  the mark never reached the file. The three engine* helpers below normalise
+   *  rejections into {error} so every caller stays on one path — most of them
+   *  only `void` these calls, so an escaping rejection would leave the
+   *  optimistic mark on screen with nothing said and no rollback. */
+  const asWriteError = useCallback(
+    (err: unknown): FileError => ({ error: err instanceof Error ? err.message : String(err) }),
+    []
+  )
+
   /** Add + persist an annotation (used by user actions, redo-create, undo-delete) */
   const engineCreate = useCallback(
     async (handle: AnnotHandle, snapshot: PageAnnotation) => {
@@ -2027,6 +2038,7 @@ export default function PdfViewer({
           fontSize: snapshot.fontSize,
           blend: snapshot.blend
         })
+        .catch(asWriteError)
         .finally(() => {
           pendingWritesRef.current -= 1
         })
@@ -2041,7 +2053,7 @@ export default function PdfViewer({
         )
       }
     },
-    [payload.path, mutatePage, showToast]
+    [payload.path, mutatePage, showToast, asWriteError]
   )
 
   const engineDelete = useCallback(
@@ -2056,6 +2068,7 @@ export default function PdfViewer({
           pageIndex: handle.pageNumber - 1,
           id: handle.fileId
         })
+        .catch(asWriteError)
         .finally(() => {
           pendingWritesRef.current -= 1
         })
@@ -2065,7 +2078,7 @@ export default function PdfViewer({
         if (wasFilePainted) void reloadDocument()
       }
     },
-    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
+    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument, asWriteError]
   )
 
   const engineChange = useCallback(
@@ -2089,6 +2102,7 @@ export default function PdfViewer({
           rect: patch.translate ? undefined : patch.quads?.[0],
           translate: patch.translate
         })
+        .catch(asWriteError)
         .finally(() => {
           pendingWritesRef.current -= 1
         })
@@ -2101,7 +2115,7 @@ export default function PdfViewer({
         }
       }
     },
-    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument]
+    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument, asWriteError]
   )
 
   // Another window annotated the same file. Both windows write into the ONE
