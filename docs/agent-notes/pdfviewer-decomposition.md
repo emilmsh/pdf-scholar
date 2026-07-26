@@ -4,7 +4,7 @@
 written: one default-exported component holding 71 `useState`, 86 `useRef`,
 33 `useEffect`, 4 `useLayoutEffect` and 124 `useCallback` in a single function
 body. 64 commits had touched it. It is the largest single piece of debt in the
-repo. Two extractions have since taken it to ~4 650.
+repo. Three extractions have since taken it to ~4 610.
 
 It is also not a file you can safely split in one pass. This note exists so the
 work can be done in small, individually verifiable steps instead — and so the
@@ -48,8 +48,11 @@ below them are estimates, and step 3 turned out to be wrong — see the postmort
 3. **Search + semantic search** — **DO NOT extract as `useDocumentSearch(paneHandle)`.**
    Attempted and abandoned; see the postmortem below. A different seam might
    exist, but it is not this one.
-4. **Undo/redo** → `useUndoStack(engineCreate, engineDelete, engineChange)`.
-   Pure refs, ~50 lines, three injected callbacks. Independent of step 3.
+4. ~~**Undo/redo** → `useUndoStack(engineCreate, engineDelete, engineChange)`~~
+   **Done** (40 lines out). The one estimate the plan got right: three injected
+   callbacks, no other coupling. `AnnotHandle`, `AnnotPatch` and `UndoEntry` are
+   now exported from the component and imported type-only, so there is no runtime
+   cycle — the same pattern `useReadAloud` uses for `PaneId`.
 5. **Navigation history** → `useNavHistory(paneHandle)`. Already keyed per pane.
    NOTE: verify against the step-3 postmortem first — if it dispatches on the
    active pane the same way search does, it has the same problem.

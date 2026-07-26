@@ -105,6 +105,7 @@ import type { ExportFormat } from './Sidebar'
 import { clamp } from '../clamp'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { PANEL_DEFAULTS, PANEL_LS_KEY, usePanelWidths } from '../hooks/usePanelWidths'
+import { useUndoStack } from '../hooks/useUndoStack'
 
 // One worker per open document (not a shared global port) so the document can
 // be re-opened after the annotation engine rewrites the file on disk.
@@ -195,7 +196,7 @@ interface PageSize {
   h: number
 }
 
-interface AnnotPatch {
+export interface AnnotPatch {
   color?: [number, number, number]
   contents?: string
   /** Note drag: replacement quads (engine gets quads[0] as the new rect) */
@@ -208,13 +209,13 @@ interface AnnotPatch {
 }
 
 /** Mutable identity for an annotation across undo/redo and document reloads */
-interface AnnotHandle {
+export interface AnnotHandle {
   pageNumber: number
   localId: string
   fileId: number | null
 }
 
-type UndoEntry =
+export type UndoEntry =
   | { kind: 'create'; handle: AnnotHandle; snapshot: PageAnnotation }
   | { kind: 'delete'; handle: AnnotHandle; snapshot: PageAnnotation }
   | { kind: 'change'; handle: AnnotHandle; before: AnnotPatch; after: AnnotPatch }
@@ -2074,51 +2075,10 @@ export default function PdfViewer({
 
   // ---------- Undo / redo ----------
 
-  const undoStackRef = useRef<UndoEntry[]>([])
-  const redoStackRef = useRef<UndoEntry[]>([])
-  const undoBusyRef = useRef(false)
-  // Mirrored stack depths so the toolbar's undo/redo buttons re-render
-  const [undoDepths, setUndoDepths] = useState({ undo: 0, redo: 0 })
-
-  const syncUndoDepths = useCallback(() => {
-    setUndoDepths({ undo: undoStackRef.current.length, redo: redoStackRef.current.length })
-  }, [])
-
-  const pushUndo = useCallback(
-    (entry: UndoEntry) => {
-      undoStackRef.current.push(entry)
-      if (undoStackRef.current.length > 100) undoStackRef.current.shift()
-      redoStackRef.current = []
-      syncUndoDepths()
-    },
-    [syncUndoDepths]
-  )
-
-  const performUndoRedo = useCallback(
-    async (direction: 'undo' | 'redo') => {
-      if (undoBusyRef.current) return
-      const source = direction === 'undo' ? undoStackRef : redoStackRef
-      const target = direction === 'undo' ? redoStackRef : undoStackRef
-      const entry = source.current.pop()
-      if (!entry) return
-      undoBusyRef.current = true
-      try {
-        if (entry.kind === 'create') {
-          if (direction === 'undo') await engineDelete(entry.handle)
-          else await engineCreate(entry.handle, entry.snapshot)
-        } else if (entry.kind === 'delete') {
-          if (direction === 'undo') await engineCreate(entry.handle, entry.snapshot)
-          else await engineDelete(entry.handle)
-        } else {
-          await engineChange(entry.handle, direction === 'undo' ? entry.before : entry.after)
-        }
-        target.current.push(entry)
-      } finally {
-        undoBusyRef.current = false
-        syncUndoDepths()
-      }
-    },
-    [engineCreate, engineDelete, engineChange, syncUndoDepths]
+  const { pushUndo, performUndoRedo, undoDepths } = useUndoStack(
+    engineCreate,
+    engineDelete,
+    engineChange
   )
 
   // ---------- User-facing annotation actions ----------
