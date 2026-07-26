@@ -37,6 +37,7 @@ import {
   saveFileHandle
 } from './extension-fs-grants'
 import { t } from './i18n'
+import { DEFAULT_SETTINGS } from '../../shared/defaults'
 
 /** True when running inside a WebExtension page (has a runtime id). */
 export function isExtensionContext(): boolean {
@@ -46,14 +47,10 @@ export function isExtensionContext(): boolean {
 const K_SETTINGS = 'pdfx-settings'
 const K_POSITIONS = 'pdfx-positions'
 const K_RECENTS = 'pdfx-recents'
+/** Why the last document was handed to the browser's own reader — the only trace
+ *  of a hand-off that is deliberately invisible (see openInBrowserViewer). */
+const K_LAST_FALLBACK = 'pdfx-last-fallback'
 
-const DEFAULT_SETTINGS: Settings = {
-  theme: 'day',
-  autoLight: 'day',
-  autoDark: 'night',
-  keepAwake: false,
-  language: 'auto'
-}
 
 /** File System Access handles from in-app "Open" — keyed by the path we return,
  *  so a later docSave can write back silently. file://-opened documents have no
@@ -347,10 +344,17 @@ function looksLikeWebPage(res: Response, data: Uint8Array): boolean {
   return head.startsWith('<!doctype html') || head.startsWith('<html')
 }
 
-/** Escape hatch for a URL the browser can open but we cannot fetch (a host that
- *  rejects the extension's request outright, an interstitial, a cookie wall, a
- *  spent one-shot link): step our redirect rules aside in this tab, then navigate
- *  there so the built-in reader takes it.
+/** Hand the tab back to the browser's own reader for a URL we cannot fetch (a
+ *  host that rejects the extension's request outright, an interstitial, a cookie
+ *  wall, a spent one-shot link): step our redirect rules aside in this tab, then
+ *  navigate there so the built-in viewer takes it.
+ *
+ *  The parity bar for this extension is Edge's built-in reader — if it would have
+ *  rendered the navigation we hijacked, the user must end up looking at the
+ *  document, not at our error banner. So the shell calls this *automatically* for
+ *  the navigation that opened the tab; `reason` is kept in storage under
+ *  K_LAST_FALLBACK because that hand-off is otherwise completely silent, and the
+ *  page that knew why is gone a moment later.
  *
  *  Scoped to the TAB rather than to the URL, deliberately. An anchored per-URL
  *  rule looks tighter but misses the case this exists for: the host answers with
@@ -361,13 +365,16 @@ function looksLikeWebPage(res: Response, data: Uint8Array): boolean {
  *
  *  NB: tabs.getCurrent/update need no "tabs" permission (see background.ts) —
  *  that permission only gates the sensitive tab fields, which we never read. */
-export async function openInBrowserViewer(url: string): Promise<boolean> {
+export async function openInBrowserViewer(url: string, reason?: string): Promise<boolean> {
   const dnr = chrome?.declarativeNetRequest
   const tabs = chrome?.tabs
   if (!dnr?.updateSessionRules || !tabs?.getCurrent) return false
   try {
     const tabId = (await tabs.getCurrent())?.id
     if (tabId == null) return false
+    console.warn(`[PDF Scholar] handing ${url} to the browser's reader: ${reason ?? 'unknown'}`)
+    // Awaited, not fire-and-forget: the navigation below tears this page down.
+    await chrome?.storage?.local.set({ [K_LAST_FALLBACK]: { url, reason, at: Date.now() } })
     const existing = (await dnr.getSessionRules?.()) ?? []
     await dnr.updateSessionRules({
       addRules: [

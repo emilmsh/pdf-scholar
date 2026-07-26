@@ -12,6 +12,7 @@ import {
 } from './extension-update'
 import PdfViewer from './components/PdfViewer'
 import Welcome from './components/Welcome'
+import { DEFAULT_SETTINGS as FALLBACK_SETTINGS } from '../../shared/defaults'
 
 // Single-document shell for the browser-extension target. Each PDF lives in its
 // own browser tab, so there is no in-app TabBar — this renders exactly one
@@ -22,13 +23,6 @@ import Welcome from './components/Welcome'
 // functional parity. Once the tab-mode work lands in App.tsx, the shared parts
 // are the natural thing to extract into a common <AppShell>.
 
-const FALLBACK_SETTINGS: Settings = {
-  theme: 'day',
-  autoLight: 'day',
-  autoDark: 'night',
-  keepAwake: false,
-  language: 'auto'
-}
 
 export default function ExtensionApp(): React.JSX.Element {
   const [payload, setPayload] = useState<FilePayload | null>(null)
@@ -110,13 +104,26 @@ export default function ExtensionApp(): React.JSX.Element {
   }, [])
 
   const openPath = useCallback(
-    async (path: string) => {
+    async (path: string, opts?: { handOffOnFailure?: boolean }) => {
       const result = await bridge.readFile(path)
       if ('error' in result) {
+        // The parity bar is the browser's own reader: if it would have rendered
+        // the navigation we intercepted, an error banner from us IS the
+        // regression, so hand the tab back and let the user read the document.
+        // Only for the navigation that opened this tab (handOffOnFailure) —
+        // navigating away with a document open would take its unsaved
+        // annotations along. And only for http(s): a file:// failure is a
+        // one-time toggle the user can fix ("Allow access to file URLs"), and
+        // silently routing around it would hide the fix forever.
+        if (
+          opts?.handOffOnFailure &&
+          /^https?:/i.test(path) &&
+          (await openInBrowserViewer(path, result.error))
+        ) {
+          return
+        }
         setError(t('app.openFailed', { error: result.error }))
-        // A URL the browser itself can open is never a dead end: offer the
-        // built-in reader rather than leaving the tab on an error (reloading
-        // would only hit our redirect rule again). A picked file has no URL.
+        // Still offer the hand-off by hand for the cases above.
         if (/^(https?|file):/i.test(path)) setErrorFallback(path)
         return
       }
@@ -142,7 +149,7 @@ export default function ExtensionApp(): React.JSX.Element {
     bridge
       .getPendingPath()
       .then(async (path) => {
-        if (path) await openPath(path)
+        if (path) await openPath(path, { handOffOnFailure: true })
       })
       .finally(() => setLoading(false))
   }, [openPath])

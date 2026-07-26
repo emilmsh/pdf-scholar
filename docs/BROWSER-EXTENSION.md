@@ -54,6 +54,13 @@ lands, the shared parts are the natural thing to extract into a common
 
 ## How PDF interception works
 
+> **The parity bar is Edge's own reader.** Whatever the built-in viewer opens, our
+> viewer opens; whatever it hands to the download manager, we hand over too; and
+> where it *would* have rendered a document that we cannot fetch, the user still
+> ends up reading the document — we give the tab back rather than show an error the
+> built-in viewer would never have shown. Owner's rule (2026-07-26): "hvis edge
+> ikke åpner det, trenger ikke vi heller." Every trade-off below follows from it.
+
 `background.ts` registers dynamic `declarativeNetRequest` rules that redirect a
 main-frame PDF navigation to
 `chrome-extension://<id>/viewer.html?rawfile=<original-url>`. The rules are
@@ -111,24 +118,43 @@ surfacing later as a pdf.js parse error, and the server's own
 `Content-Disposition` name wins over anything the URL can suggest, so an arXiv
 link is `2401.12345.pdf` and not a bare number in the library.
 
-**The escape hatch.** When even that fails, the error banner offers **"Åpne i
-nettleserens leser"**: a session-scoped `allow` rule at a higher priority than
-both redirect rules — Chrome re-applies matching `allow` rules in the response
-phase too — steps them aside for that tab, and the tab navigates to the URL so
-the built-in reader takes it. Tab-scoped, not URL-scoped, on purpose: an anchored
-per-URL rule misses the case this exists for, where the host answers with a
-redirect of its own and rule 2 then grabs the *next* URL and drops the user back
-into the error they were escaping. The cost is that this one tab prefers the
-built-in reader for the rest of the session; a new tab gets our viewer back. A URL
-the browser can open is never a dead end.
+**The hand-off.** When even that fails, the tab goes back to the browser's own
+reader: a session-scoped `allow` rule at a higher priority than both redirect
+rules — Chrome re-applies matching `allow` rules in the response phase too —
+steps them aside for that tab, and the tab navigates to the URL so the built-in
+viewer takes it. Tab-scoped, not URL-scoped, on purpose: an anchored per-URL rule
+misses the case this exists for, where the host answers with a redirect of its own
+and rule 2 then grabs the *next* URL and drops the user back into the error they
+were escaping. The cost is that this one tab prefers the built-in reader for the
+rest of the session; a new tab gets our viewer back.
 
-**What is still out of reach**, and why it has to be the escape hatch rather than
-a fix: MV3 has no `filterResponseData`, so the extension can never read the bytes
-the browser already downloaded — every path ends in "fetch it again". That leaves
-PDFs delivered as the answer to a POST, single-use signed links, and hosts that
-reject the request for a reason we cannot reproduce (hotlink protection wants a
-`Referer` that `fetch` may not set from an extension page; a dNR `modifyHeaders`
-rule on our own request is the untested next lever).
+It runs **automatically** for the navigation that opened the tab — per the parity
+bar, a PDF Edge would have shown must not become an error banner — and only for
+that navigation: handing off while a document is open would take its unsaved
+annotations along, so a failure from the recents list or a re-read keeps the banner
+and its **"Åpne i nettleserens leser"** button. A `file://` failure also keeps the
+banner: its cause is the one-time **"Allow access to file URLs"** toggle, and
+silently routing around it would hide the fix forever. Because the automatic
+hand-off is otherwise invisible, the reason is written to
+`chrome.storage.local['pdfx-last-fallback']` before the page goes away — that key
+is the first place to look when a PDF unexpectedly opens in Edge's viewer.
+
+**Two kinds of "we don't open it", and only one of them is a gap.**
+
+*Not a gap — the built-in viewer doesn't open it either:* `Content-Disposition:
+attachment`, `application/octet-stream` and friends. Edge sends those to the
+download manager, so we leave them alone; the file lands on disk and opens in our
+reader from there (the File Explorer path). Nothing to chase.
+
+*A real gap — Edge renders it and we cannot fetch it:* MV3 has no
+`filterResponseData`, so the extension can never read the bytes the browser
+already downloaded, and every path ends in "fetch it again". A PDF delivered as
+the answer to a POST has no request we can repeat; a single-use signed link is
+already spent; hotlink protection wants a `Referer` that `fetch` cannot set from
+an extension page (a dNR `modifyHeaders` rule on our own request is the untested
+next lever). These cannot be fixed inside the sandbox — which is exactly why the
+hand-off above is automatic: the user still reads the document, in the viewer Edge
+would have used anyway.
 
 ### Per-scheme notes
 
