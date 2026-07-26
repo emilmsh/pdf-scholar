@@ -22,12 +22,11 @@ import {
   chatSystem,
   citationPage,
   critiqueSystem,
-  estimateCost,
+  formatTokens,
   explainSystem,
   explainUserMessage,
   figureSystem,
   figureUserMessage,
-  formatCost,
   nextAiRequestId,
   referenceSystem,
   referenceUserMessage,
@@ -1131,19 +1130,21 @@ export default function AiPanel({
     [onCitationClick, ensureDocument]
   )
 
-  const totalCost = useMemo(() => {
-    let sum = 0
-    let known = false
+  /** Everything this conversation has sent and received, as the provider counted
+   *  it. The app deliberately does not turn that into money — see ai.ts. */
+  const totalUsage = useMemo(() => {
+    const sum = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }
+    let any = false
     for (const m of messages) {
-      if (m.role === 'assistant' && m.usage && m.model) {
-        const cost = estimateCost(m.model, m.usage)
-        if (cost !== null) {
-          sum += cost
-          known = true
-        }
-      }
+      const usage = m.role === 'assistant' ? m.usage : null
+      if (!usage) continue
+      any = true
+      sum.inputTokens += usage.inputTokens
+      sum.outputTokens += usage.outputTokens
+      sum.cacheReadTokens += usage.cacheReadTokens
+      sum.cacheWriteTokens += usage.cacheWriteTokens
     }
-    return known ? sum : null
+    return any ? sum : null
   }, [messages])
 
   // Rendered even while closed: the host right-panel collapses to width 0
@@ -1487,13 +1488,7 @@ export default function AiPanel({
                       <AssistantBody parts={m.parts} doc={docRef.current?.doc ?? null} onCitation={handleCitation} />
                     )}
                     {m.usage && m.model && (
-                      <div className="ai-meta">
-                        {(() => {
-                          const cost = estimateCost(m.model, m.usage)
-                          const tokens = `${m.usage.inputTokens + m.usage.cacheReadTokens + m.usage.cacheWriteTokens}→${m.usage.outputTokens} tokens`
-                          return cost !== null ? `≈ ${formatCost(cost)} · ${tokens}` : tokens
-                        })()}
-                      </div>
+                      <div className="ai-meta">{formatTokens(m.usage)}</div>
                     )}
                   </div>
                 )
@@ -1516,8 +1511,8 @@ export default function AiPanel({
           </div>
 
           {composer}
-          {totalCost !== null && (
-            <div className="ai-total">{t('ai.totalCost', { cost: formatCost(totalCost) })}</div>
+          {totalUsage !== null && (
+            <div className="ai-total">{t('ai.totalTokens', { tokens: formatTokens(totalUsage) })}</div>
           )}
         </>
       )}
@@ -1636,8 +1631,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         finalRef.current = full
         setText(full)
         setParts(result.parts)
-        const cost = estimateCost(result.model, result.usage)
-        if (cost !== null) setMeta(`≈ ${formatCost(cost)}`)
+        setMeta(formatTokens(result.usage))
       }
     })()
     return () => {

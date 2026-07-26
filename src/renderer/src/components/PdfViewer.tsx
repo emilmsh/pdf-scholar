@@ -73,8 +73,6 @@ import {
   buildAiDocument,
   chatSystem,
   citationPage,
-  estimateCost,
-  formatCost,
   nextAiRequestId,
   resolveCitation,
   semanticSearchPrompt
@@ -760,8 +758,7 @@ export default function PdfViewer({
     hits: { label: string; citation: AiCitation; pageNumber: number | null }[]
     index: number
     note: string | null
-    cost: string | null
-  }>({ status: 'idle', hits: [], index: -1, note: null, cost: null })
+  }>({ status: 'idle', hits: [], index: -1, note: null })
   const semanticReqRef = useRef<number | null>(null)
   const [aiPinned, setAiPinned] = useState(false)
   const aiPinnedRef = useRef(aiPinned)
@@ -3676,7 +3673,7 @@ export default function PdfViewer({
       bridge.aiAbort(semanticReqRef.current)
       semanticReqRef.current = null
     }
-    setSemantic({ status: 'idle', hits: [], index: -1, note: null, cost: null })
+    setSemantic({ status: 'idle', hits: [], index: -1, note: null })
   }, [])
 
   // ---------- Semantic (AI) search ----------
@@ -3687,10 +3684,10 @@ export default function PdfViewer({
     if (!query) return
     const config = await bridge.aiGetConfig()
     if (!config.hasKey[config.provider]) {
-      setSemantic({ status: 'noKey', hits: [], index: -1, note: null, cost: null })
+      setSemantic({ status: 'noKey', hits: [], index: -1, note: null })
       return
     }
-    setSemantic({ status: 'running', hits: [], index: -1, note: null, cost: null })
+    setSemantic({ status: 'running', hits: [], index: -1, note: null })
     const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
     const doc = buildAiDocument(pages)
     const requestId = nextAiRequestId()
@@ -3707,7 +3704,7 @@ export default function PdfViewer({
     if (semanticReqRef.current !== requestId) return // superseded/aborted
     semanticReqRef.current = null
     if ('error' in result) {
-      setSemantic({ status: 'error', hits: [], index: -1, note: result.error, cost: null })
+      setSemantic({ status: 'error', hits: [], index: -1, note: result.error })
       return
     }
     const hits: { label: string; citation: AiCitation; pageNumber: number | null }[] = []
@@ -3719,13 +3716,11 @@ export default function PdfViewer({
         hits.push({ label: label || fallback.slice(0, 80), citation: c, pageNumber: citationPage(c, doc) })
       }
     }
-    const cost = estimateCost(result.model, result.usage)
     setSemantic({
       status: 'done',
       hits,
       index: -1,
-      note: hits.length === 0 ? result.parts.map((p) => p.text).join(' ').trim() : null,
-      cost: cost !== null ? formatCost(cost) : null
+      note: hits.length === 0 ? result.parts.map((p) => p.text).join(' ').trim() : null
     })
   }, [pdf, searchQuery, payload.name])
   runSemanticSearchRef.current = runSemanticSearch
@@ -4794,7 +4789,6 @@ export default function PdfViewer({
           aiHits={semantic.hits.map((h) => ({ label: h.label, pageNumber: h.pageNumber }))}
           aiIndex={semantic.index}
           aiNote={semantic.note}
-          aiCost={semantic.cost}
           onAiSearch={() => void runSemanticSearch()}
           onAiPick={pickSemanticHit}
           onOpenAiSettings={() => {

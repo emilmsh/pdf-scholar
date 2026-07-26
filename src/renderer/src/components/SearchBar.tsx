@@ -21,7 +21,6 @@ interface Props {
   aiHits: SemanticHitView[]
   aiIndex: number
   aiNote: string | null
-  aiCost: string | null
   onAiSearch(): void
   onAiPick(index: number): void
   onOpenAiSettings(): void
@@ -45,7 +44,6 @@ export default function SearchBar({
   aiHits,
   aiIndex,
   aiNote,
-  aiCost,
   onAiSearch,
   onAiPick,
   onOpenAiSettings,
@@ -85,7 +83,7 @@ export default function SearchBar({
       ? t('search.aiSearching')
       : aiStatus === 'done'
         ? aiHits.length > 0
-          ? t('search.aiHits', { count: aiHits.length }) + (aiCost ? ` · ${t('search.aiCost', { cost: aiCost })}` : '')
+          ? t('search.aiHits', { count: aiHits.length })
           : t('search.aiNoHits')
         : aiStatus === 'error'
           ? t('search.searchError')

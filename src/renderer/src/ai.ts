@@ -1,5 +1,5 @@
 // Renderer-side AI helpers: document text assembly for the API, mapping
-// citations back to page positions, and cost estimation.
+// citations back to page positions, and token accounting.
 import type { AiCitation, AiUsage } from '../../shared/types'
 import { getLanguage } from './i18n'
 import type { PageText } from './search'
@@ -244,36 +244,23 @@ export function citationPage(citation: AiCitation, doc: AiDocument | null): numb
   return 1
 }
 
-// ---------- Cost ----------
+// ---------- Usage ----------
 
-/** USD per MTok [input, output]; cache read = 0.1× input, write = 1.25× */
-const PRICES: [RegExp, [number, number]][] = [
-  [/fable|mythos/i, [10, 50]],
-  [/opus/i, [5, 25]],
-  [/sonnet/i, [3, 15]],
-  [/haiku/i, [1, 5]],
-  [/gpt-5/i, [1.25, 10]],
-  [/gpt-4o/i, [2.5, 10]],
-  [/mock/i, [0, 0]]
-]
-
-export function estimateCost(model: string, usage: AiUsage): number | null {
-  const entry = PRICES.find(([re]) => re.test(model))
-  if (!entry) return null
-  const [inPrice, outPrice] = entry[1]
-  return (
-    (usage.inputTokens * inPrice +
-      usage.outputTokens * outPrice +
-      usage.cacheReadTokens * inPrice * 0.1 +
-      usage.cacheWriteTokens * inPrice * 1.25) /
-    1_000_000
-  )
-}
-
-export function formatCost(dollars: number): string {
-  if (dollars === 0) return '$0'
-  if (dollars < 0.005) return '<$0.01'
-  return `$${dollars.toFixed(2)}`
+/**
+ * Tokens, not money. A price table hardcoded into a shipped app is a promise
+ * the app cannot keep: providers change list prices whenever they like, a new
+ * model can match an old pattern at a new rate, and a number the user reads as
+ * "what this cost" would quietly drift from what they are actually billed. Only
+ * the provider knows the price, and the app is not in that loop at all.
+ *
+ * Token counts come from the provider's own response, so they never go stale —
+ * and they are the input to the two things that actually protect a reader: a
+ * spending cap on the key, and the usage page in the provider's console. Both
+ * are linked from the key settings.
+ */
+export function formatTokens(usage: AiUsage): string {
+  const inTokens = usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens
+  return `${inTokens.toLocaleString()}→${usage.outputTokens.toLocaleString()} tokens`
 }
 
 // ---------- Prompts (follow the app language) ----------

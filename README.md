@@ -224,7 +224,10 @@ work, so the chips are the feature — the prose around them is just delivery.
   model list across all three, with per-model reasoning-effort control. Keys are
   encrypted locally with the Windows keychain, and the document leaves your machine only
   when you ask a question
-- Every answer shows its estimated cost
+- **No price estimates, on purpose.** Each answer shows the tokens the provider
+  counted, and the key settings link straight to the page where you set a spending cap
+  and watch your usage. List prices change after an app ships; a number in here would
+  quietly stop matching your bill, and only your provider knows the real one
 
 ![Explain a figure — the region dragged out of the page sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
 
