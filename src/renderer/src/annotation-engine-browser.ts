@@ -16,10 +16,16 @@ import type {
   DeleteAnnotationRequest,
   ModifyAnnotationRequest
 } from '../../shared/types'
-import { buildAnnotation, rgbToHex, toRect } from '../../shared/annotation-build'
-import { snapshotApLessLinks, stripGeneratedLinkAPs } from '../../shared/link-ap-guard'
-import type { PdfAnnotationObject, PdfDocumentObject } from '@embedpdf/models'
-import { PdfAnnotationSubtype } from '@embedpdf/models'
+import type { OpenDoc } from '../../shared/pdfium-annot-ops'
+import {
+  applyOn,
+  deleteOn,
+  ENGINE_ERRORS,
+  hasNoPosition,
+  OOM_RE,
+  updateOn,
+  WASM_SAFE_LIMIT
+} from '../../shared/pdfium-annot-ops'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import wasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
 
@@ -28,10 +34,11 @@ import wasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
 // honest refusal up front beats silent loss at save time. The desktop routes
 // such files to the incremental appender; porting that appender to the browser
 // is future work, so here it is a hard limit.
-const WASM_SAFE_LIMIT = 300 * 1024 * 1024
 const OVERSIZE_MSG =
   'Dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren). Les og marker tekst går fint.'
-const OOM_RE = /realloc|malloc|out of memory|cannot enlarge memory|oom|aborted/i
+/** No desktop equivalent: on the desktop main owns the draft and can always
+ *  create one, while here the bytes only exist while the viewer is mounted. */
+const NOT_OPEN_MSG = 'Dokumentet er ikke åpent for redigering'
 
 let enginePromise: Promise<PdfiumNative> | null = null
 
@@ -49,7 +56,7 @@ async function getEngine(): Promise<PdfiumNative> {
 
 interface BrowserDoc {
   bytes: Uint8Array
-  open: Promise<{ engine: PdfiumNative; doc: PdfDocumentObject; docId: string }> | null
+  open: Promise<OpenDoc> | null
 }
 
 const docs = new Map<string, BrowserDoc>()
@@ -91,14 +98,13 @@ function openEntry(entry: BrowserDoc): NonNullable<BrowserDoc['open']> {
 
 async function withDoc(
   path: string,
-  op: (engine: PdfiumNative, doc: PdfDocumentObject, docId: string) => Promise<AnnotateResult>
+  op: (open: OpenDoc) => Promise<AnnotateResult>
 ): Promise<AnnotateResult> {
   const entry = docs.get(path)
-  if (!entry) return { error: 'Dokumentet er ikke åpent for redigering' }
+  if (!entry) return { error: NOT_OPEN_MSG }
   if (entry.bytes.length > WASM_SAFE_LIMIT) return { error: OVERSIZE_MSG }
   try {
-    const { engine, doc, docId } = await openEntry(entry)
-    return await op(engine, doc, docId)
+    return await op(await openEntry(entry))
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     // An emscripten abort kills the whole WASM instance — reset so the next
@@ -108,163 +114,25 @@ async function withDoc(
       entry.open = null
       return { error: OVERSIZE_MSG }
     }
-    if (/password/i.test(msg)) return { error: 'PDF-en er passordbeskyttet' }
+    if (/password/i.test(msg)) return { error: ENGINE_ERRORS.passwordProtected }
     return { error: msg }
   }
 }
 
-// ---------- Raw-pointer bridge (identical to the desktop engine) ----------
+// The three entry points. The writes themselves are the shared ops; only the
+// document's lifetime differs from the desktop's.
 
-interface RawPdfium {
-  FPDFPage_GetAnnotCount(pagePtr: number): number
-  FPDFPage_GetAnnot(pagePtr: number, index: number): number
-  FPDFPage_CloseAnnot(annotPtr: number): void
-  FPDFAnnot_GetSubtype(annotPtr: number): number
-  FPDFAnnot_HasKey(annotPtr: number, key: string): boolean
-  FPDFAnnot_SetAP(annotPtr: number, appearanceMode: number, value: number): boolean
-  EPDFAnnot_GetObjectNumber(annotPtr: number): number
-  EPDFPage_RemoveAnnotByObjectNumber(pagePtr: number, objNum: number): boolean
+export function browserApplyAnnotation(req: AnnotateRequest): Promise<AnnotateResult> {
+  if (hasNoPosition(req)) return Promise.resolve({ error: ENGINE_ERRORS.noPosition })
+  return withDoc(req.path, (open) => applyOn(open, req))
 }
 
-function withPageHandle<T>(
-  engine: PdfiumNative,
-  docId: string,
-  pageIndex: number,
-  fn: (pagePtr: number, raw: RawPdfium) => T
-): T {
-  const anyEngine = engine as unknown as {
-    cache: { getContext(id: string): { borrowPage<R>(idx: number, f: (ctx: { pagePtr: number }) => R): R } }
-    pdfiumModule: RawPdfium
-  }
-  const raw = anyEngine.pdfiumModule
-  return anyEngine.cache.getContext(docId).borrowPage(pageIndex, (ctx) => fn(ctx.pagePtr, raw))
+export function browserUpdateAnnotation(req: ModifyAnnotationRequest): Promise<AnnotateResult> {
+  return withDoc(req.path, (open) => updateOn(open, req))
 }
 
-/** Bracket an engine op so it can't leak PDFium-synthesized link borders —
- *  identical to the desktop guard, see src/shared/link-ap-guard.ts. */
-async function withLinkApGuard<T>(
-  engine: PdfiumNative,
-  docId: string,
-  pageIndex: number,
-  fn: () => Promise<T>
-): Promise<T> {
-  const apLess = withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
-    snapshotApLessLinks(pagePtr, raw)
-  )
-  try {
-    return await fn()
-  } finally {
-    try {
-      withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
-        stripGeneratedLinkAPs(pagePtr, raw, apLess)
-      )
-    } catch {
-      /* op failed hard (e.g. OOM killed the instance) — nothing left to strip */
-    }
-  }
-}
-
-/** index -> PDF object number for every annotation on the page (in /Annots order) */
-function rawObjectNumbers(engine: PdfiumNative, docId: string, pageIndex: number): number[] {
-  return withPageHandle(engine, docId, pageIndex, (pagePtr, raw) => {
-    const out: number[] = []
-    const count = raw.FPDFPage_GetAnnotCount(pagePtr)
-    for (let i = 0; i < count; i++) {
-      const annotPtr = raw.FPDFPage_GetAnnot(pagePtr, i)
-      out.push(raw.EPDFAnnot_GetObjectNumber(annotPtr))
-      raw.FPDFPage_CloseAnnot(annotPtr)
-    }
-    return out
-  })
-}
-
-async function findByObjectNumber(
-  engine: PdfiumNative,
-  doc: PdfDocumentObject,
-  docId: string,
-  pageIndex: number,
-  id: number
-): Promise<PdfAnnotationObject | { error: string }> {
-  const page = doc.pages[pageIndex]
-  const models = await engine.getPageAnnotations(doc, page).toPromise()
-  const objNums = rawObjectNumbers(engine, docId, pageIndex)
-  const index = objNums.indexOf(id)
-  if (index === -1) return { error: 'Fant ikke annotasjonen i filen' }
-  if (models.length !== objNums.length) {
-    return { error: `Annotasjonslisten er usymmetrisk (${models.length} vs ${objNums.length}) — kan ikke identifisere trygt` }
-  }
-  return models[index]
-}
-
-// ---------- The three engine operations (logic mirrors the desktop) ----------
-
-export async function browserApplyAnnotation(req: AnnotateRequest): Promise<AnnotateResult> {
-  if (req.quads.length === 0 && req.type !== 'ink' && req.type !== 'line' && req.type !== 'arrow') {
-    return { error: 'Annotasjonen har ingen posisjon' }
-  }
-  return withDoc(req.path, (engine, doc, docId) =>
-    withLinkApGuard(engine, docId, req.pageIndex, async () => {
-      const spec = buildAnnotation(req)
-      if ('error' in spec) return spec
-      await engine.createPageAnnotation(doc, doc.pages[req.pageIndex], spec).toPromise()
-      const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
-      const id = objNums[objNums.length - 1]
-      if (!id) return { error: 'Fikk ikke objektnummer for annotasjonen' }
-      return { ok: true, id }
-    })
-  )
-}
-
-export async function browserUpdateAnnotation(req: ModifyAnnotationRequest): Promise<AnnotateResult> {
-  return withDoc(req.path, (engine, doc, docId) =>
-    withLinkApGuard(engine, docId, req.pageIndex, async () => {
-      const model = await findByObjectNumber(engine, doc, docId, req.pageIndex, req.id)
-      if ('error' in model) return model
-      const m = model as PdfAnnotationObject & {
-        strokeColor?: string
-        fontColor?: string
-        linePoints?: { start: { x: number; y: number }; end: { x: number; y: number } }
-        inkList?: { points: { x: number; y: number }[] }[]
-      }
-      if (req.color) {
-        const hex = rgbToHex(req.color)
-        if (m.type === PdfAnnotationSubtype.FREETEXT) m.fontColor = hex
-        else m.strokeColor = hex
-      }
-      if (req.opacity !== undefined) (m as { opacity?: number }).opacity = req.opacity
-      if (req.contents !== undefined) m.contents = req.contents
-      if (req.rect && m.type !== PdfAnnotationSubtype.LINE) m.rect = toRect(req.rect)
-      if (req.translate) {
-        const { dx, dy } = req.translate
-        if (m.type === PdfAnnotationSubtype.LINE && m.linePoints) {
-          m.linePoints = {
-            start: { x: m.linePoints.start.x + dx, y: m.linePoints.start.y + dy },
-            end: { x: m.linePoints.end.x + dx, y: m.linePoints.end.y + dy }
-          }
-        } else if (m.type === PdfAnnotationSubtype.INK && m.inkList) {
-          m.inkList = m.inkList.map((s) => ({ points: s.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) }))
-        }
-        m.rect = {
-          origin: { x: m.rect.origin.x + dx, y: m.rect.origin.y + dy },
-          size: m.rect.size
-        }
-      }
-      ;(m as { modified?: Date }).modified = new Date()
-      const ok = await engine.updatePageAnnotation(doc, doc.pages[req.pageIndex], m).toPromise()
-      return ok ? { ok: true, id: req.id } : { error: 'Oppdateringen ble avvist av motoren' }
-    })
-  )
-}
-
-export async function browserDeleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult> {
-  return withDoc(req.path, (engine, _doc, docId) =>
-    withLinkApGuard(engine, docId, req.pageIndex, async () => {
-      const removed = withPageHandle(engine, docId, req.pageIndex, (pagePtr, raw) =>
-        raw.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, req.id)
-      )
-      return removed ? { ok: true, id: req.id } : { error: 'Fant ikke annotasjonen i filen' }
-    })
-  )
+export function browserDeleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult> {
+  return withDoc(req.path, (open) => deleteOn(open, req))
 }
 
 /** Serialize the live document — original bytes plus every annotation edit.
