@@ -232,9 +232,17 @@ work, so the chips are the feature — the prose around them is just delivery.
   The answer describes what is actually in the crop, and cites the pages it draws on. You
   can paste or attach images the same way
 - Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
-  model list across all three, with per-model reasoning-effort control. Keys are
-  encrypted locally with the Windows keychain, and the document leaves your machine only
-  when you ask a question
+  model list across all three, with per-model reasoning-effort control. Your key never
+  leaves your machine, and the document leaves it only when you ask a question
+- **How your key is stored, exactly.** The app uses the strongest thing each platform
+  actually offers, and the key settings name the one in force on your machine rather
+  than promising "encrypted" in general. On the desktop: the operating system's own key
+  store — Windows DPAPI, macOS Keychain, Linux Secret Service — decryptable only by your
+  user account on that machine. In the browser extension, which has no way to reach an OS
+  key store: encrypted under a key no script can export, which stops anything that merely
+  reads the browser profile but not code running inside it. Where there is no key store
+  at all (Linux without a keyring), the key is held in memory for that session and never
+  written to disk. [docs/PRIVACY.md](docs/PRIVACY.md) states the limits of each
 - **No price estimates, on purpose.** Each answer shows the tokens the provider
   counted, and the key settings link straight to the page where you set a spending cap
   and watch your usage. List prices change after an app ships; a number in here would
