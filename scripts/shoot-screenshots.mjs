@@ -177,6 +177,11 @@ const SHOTS = [
       // chips in the shot point somewhere a reader can verify.
       await ui.ask('Hvordan fungerer positional encoding i denne artikkelen?')
       ui.expectAnswer()
+      // Then TAKE the chip's word for it. A picture of an answer proves the
+      // assistant can write; a picture of the cited sentence highlighted on the
+      // page, next to the answer that claimed it, proves the part that matters.
+      await ui.followFirstCitation()
+      ui.expectCitationVisible()
     `
   },
   {
@@ -184,15 +189,22 @@ const SHOTS = [
     caption: 'Explain a figure: a snipped region and the answer about it',
     needsAi: true,
     setup: `
-      // Panels closed: the bubble is the subject of this shot, and it is the
-      // toolbar flow a reader would actually use.
+      // The CHAT flow, not the floating bubble: it puts the region you marked
+      // directly above the answer about it, so one frame carries the whole
+      // story — drag a box, it lands in the conversation, you get a real
+      // description back. (The bubble is the same request with less to show.)
       await ui.closePanels()
       await ui.fitWidth()
-      await ui.goToPage(6)
-      await ui.snipRegion()
-      ui.expectSnippedFigure()
-      await ui.waitForQuick()
-      ui.expectQuickAnswer()
+      await ui.goToPage(3)
+      await ui.openAssistant()
+      await ui.newConversation()
+      // Bring the whole figure and its caption into view first: the marked
+      // region shows up as a thumbnail in the chat, and a thumbnail of
+      // something half off-screen is no evidence of anything.
+      await ui.centreOn('Figure 1')
+      await ui.snipIntoChat()
+      await ui.send('Hva viser denne figuren?')
+      ui.expectAnswer({ image: true, chips: false })
     `
   },
   {
@@ -463,12 +475,95 @@ const ui = {
     if (text.length < 120) throw new Error('answer suspiciously short: ' + JSON.stringify(text.slice(0, 80)));
     // Document chips, not web chips: the claim is that answers link back to the
     // PDF, and that is exactly what the screenshot is evidence for.
-    const chips = last.querySelectorAll('.ai-chip:not(.ai-chip-web)');
-    if (chips.length === 0) throw new Error('answer has no document citation chips');
+    if (!opts || opts.chips !== false) {
+      const chips = last.querySelectorAll('.ai-chip:not(.ai-chip-web)');
+      if (chips.length === 0) throw new Error('answer has no document citation chips');
+    }
     if (opts && opts.image) {
       const shown = document.querySelectorAll('.ai-msg.ai-user .ai-msg-images img, .ai-msg-images img');
       if (shown.length === 0) throw new Error('no snipped image in the conversation');
     }
+  },
+  /** Click the answer's first document citation and land on the passage.
+   *
+   *  This is the claim the shot exists to prove — a chip is not a footnote, it
+   *  is a jump — so the picture has to be taken with the cited sentence
+   *  highlighted on the page, not with the panel alone. The highlight releases
+   *  itself after 7 s (it is a pointer, not a selection), so whatever follows
+   *  this must be quick. */
+  async followFirstCitation() {
+    const msgs = document.querySelectorAll('.ai-msg.ai-assistant');
+    const last = msgs[msgs.length - 1];
+    const chip = last && last.querySelector('.ai-chip:not(.ai-chip-web)');
+    if (!chip) throw new Error('no document citation chip to click');
+    const label = (chip.textContent || '').trim();
+    click(chip);
+    // Resolving the passage means scrolling, waiting for a text layer and
+    // measuring rects — poll for the highlight rather than guess a delay
+    for (let i = 0; i < 25; i++) {
+      await settle(200);
+      if (document.querySelector('.search-hit.cite-flash')) return label;
+    }
+    throw new Error('citation ' + label + ' did not highlight anything');
+  },
+  /** The highlight must be ON SCREEN, not merely in the DOM: the jump aims for
+   *  a third of the way down the viewport, and a shot of the right page with
+   *  the passage scrolled out of frame proves nothing. */
+  expectCitationVisible() {
+    const host = document.querySelector('.pages[data-pane="a"]');
+    const box = host.getBoundingClientRect();
+    const hits = [...document.querySelectorAll('.search-hit.cite-flash')];
+    if (hits.length === 0) throw new Error('the citation highlight is gone (it fades after 7 s)');
+    const seen = hits.filter((h) => {
+      const r = h.getBoundingClientRect();
+      return r.bottom > box.top + 20 && r.top < box.bottom - 20 && r.width > 4;
+    });
+    if (seen.length === 0) throw new Error('the cited passage is highlighted off-screen');
+  },
+  /** Start a fresh conversation, so a shot is not framed around the tail of the
+   *  previous shot's chat — every shot shares one app session. */
+  async newConversation() {
+    const b = [...document.querySelectorAll('.ai-panel .tb-btn')]
+      .find((x) => /ny samtale|new conversation/i.test(x.title || ''));
+    if (!b) throw new Error('no new-conversation button');
+    click(b);
+    await settle(500);
+  },
+  /** Centre a page's figure in the viewport before snipping it, so the shot
+   *  shows the thing that was marked at a size a reader can recognise. */
+  async centreOn(captionStart) {
+    const host = document.querySelector('.pages[data-pane="a"]');
+    const box = host.getBoundingClientRect();
+    const cap = [...host.querySelectorAll('.pdf-page .textLayer span')]
+      .find((x) => (x.textContent || '').trim().startsWith(captionStart));
+    if (!cap) throw new Error('no caption starting with ' + captionStart);
+    const r = cap.getBoundingClientRect();
+    host.scrollTop += r.bottom - box.bottom + 40;
+    host.dispatchEvent(new Event('scroll'));
+    await settle(700);
+  },
+  /** Snip a region straight into the CHAT (the composer's own snip button)
+   *  rather than into the floating bubble. Two reasons: it stages the region as
+   *  an attachment you can still add a question to — the app never fires a
+   *  request off a single click — and the finished conversation then shows the
+   *  region you marked directly above the answer about it, which is the whole
+   *  story in one frame. */
+  async snipIntoChat() {
+    const b = [...document.querySelectorAll('.ai-composer .ai-attach-add')]
+      .find((x) => /område/i.test(x.title || ''));
+    if (!b) throw new Error('no snip button in the composer');
+    click(b);
+    await settle(500);
+    await this.dragSnipBox('Figure 1');
+    for (let i = 0; i < 20; i++) {
+      await settle(400);
+      const img = document.querySelector('.ai-attach img');
+      if (img) {
+        if (!img.complete || img.naturalWidth < 100) continue;
+        return;
+      }
+    }
+    throw new Error('the snipped region never reached the composer');
   },
   /** Drag a box over the visible part of the page.
    *
@@ -481,6 +576,21 @@ const ui = {
     if (!b) throw new Error('no snip button');
     click(b);
     await settle(500);
+    await this.dragSnipBox();
+    // The TOOLBAR snip arms target 'quick' (PdfViewer: setSnip({target:'quick'})),
+    // so the result is the floating bubble, not the side panel's composer -
+    // asserting on .ai-attach here was asserting the panel's flow instead.
+    // Rasterising is async, so poll rather than guess a delay.
+    for (let i = 0; i < 20; i++) {
+      await settle(400);
+      if (document.querySelector('.ai-quick')) return;
+    }
+    throw new Error('snip produced no quick bubble');
+  },
+  /** The drag itself, shared by both snip entry points. Pass the start of a
+   *  caption ("Figure 1") to end the box just under it, so the frame is the
+   *  figure and its caption rather than an arbitrary slice of the page. */
+  async dragSnipBox(captionStart) {
     const overlay = document.querySelector('.snip-overlay');
     if (!overlay) throw new Error('snip overlay did not appear');
     const host = document.querySelector('.pages[data-pane="a"]');
@@ -505,9 +615,15 @@ const ui = {
     const w = box.right - box.left, ht = box.bottom - box.top;
     if (w < 200 || ht < 150) throw new Error('too little of the page is visible to snip: ' + Math.round(w) + 'x' + Math.round(ht));
     const x1 = Math.round(box.left + w * 0.10);
-    const y1 = Math.round(box.top + ht * 0.10);
+    const y1 = Math.round(box.top + ht * 0.06);
     const x2 = Math.round(box.left + w * 0.90);
-    const y2 = Math.round(box.top + ht * 0.62);
+    let y2 = Math.round(box.top + ht * 0.62);
+    if (captionStart) {
+      const cap = [...page.querySelectorAll('.textLayer span')]
+        .find((s) => (s.textContent || '').trim().startsWith(captionStart));
+      const r = cap && cap.getBoundingClientRect();
+      if (r && r.bottom > y1 + 120 && r.bottom < box.bottom - 6) y2 = Math.round(r.bottom + 6);
+    }
     const opts = (x, y) => ({
       bubbles: true, cancelable: true, clientX: x, clientY: y,
       button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true
@@ -520,15 +636,6 @@ const ui = {
     await settle(150);
     if (!document.querySelector('.snip-marquee')) throw new Error('the drag drew no marquee');
     overlay.dispatchEvent(new PointerEvent('pointerup', opts(x2, y2)));
-    // The TOOLBAR snip arms target 'quick' (PdfViewer: setSnip({target:'quick'})),
-    // so the result is the floating bubble, not the side panel's composer -
-    // asserting on .ai-attach here was asserting the panel's flow instead.
-    // Rasterising is async, so poll rather than guess a delay.
-    for (let i = 0; i < 20; i++) {
-      await settle(400);
-      if (document.querySelector('.ai-quick')) return;
-    }
-    throw new Error('snip produced no quick bubble');
   },
   /** The bubble must actually show the snipped region, not an empty frame */
   expectSnippedFigure() {

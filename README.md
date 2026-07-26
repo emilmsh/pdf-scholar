@@ -4,18 +4,25 @@
 
 <h1 align="center">PDF Scholar</h1>
 
-<p align="center"><strong>A PDF reader and annotator for Windows — built for the documents you work through, not the ones you skim.</strong></p>
+<p align="center"><strong>A Windows PDF reader built for reading.</strong></p>
 
-Most PDF readers are built to *show* you a page. That is plenty for a boarding pass, and
-not nearly enough for the forty-page paper you will be arguing with all week. PDF Scholar
-is for the second kind of document: the annotation tools sit one click away, a figure can
-be parked in its own column beside the passage that discusses it, and the optional AI
-assistant has to point at the sentence it used before you believe a word of it. Your
-document stays on your machine unless you ask a question, and the file on disk is not
-touched until you press Save.
+Windows is not short of PDF apps. What it lacks is one that behaves as though reading the
+document were the point. Most bury the page under ribbons for form filling, signing,
+conversion and OCR, while the things you do every hour sit two menus deep. PDF Scholar is
+reading, learning and annotating first: the page gets the window, the tools you actually
+use are one click from it, and everything else stays out of the way until you ask.
+
+That leaves room for what a long document asks of you. A page you can stand to look at all
+day, in light, sepia or dark. Highlight, pen, shapes and notes, each with its own colour,
+thickness and opacity, remembered between sessions. A second column, so a figure can sit
+beside the passage that discusses it. Cross-references you can follow and step back from,
+which is the difference between reading a paper and losing your place in one. And an
+optional assistant that answers from the document, cites the sentence it used, explains a
+figure you drag a box around, and finds the passage you half-remember. Free,
+MIT-licensed, and offline unless you ask a question.
 
 Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
-the same reader inside Edge and Chrome.
+the same reader inside your browser.
 
 ![Reading view](docs/screenshots/reading.png)
 
@@ -193,30 +200,33 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 
 **AI assistant (bring your own key)**
 
-![AI assistant](docs/screenshots/assistant.png)
+![The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip](docs/screenshots/assistant.png)
 
 The assistant answers from the document you have open, and every claim it makes carries a
 source chip you can click. An answer you cannot check is worth very little in academic
 work, so the chips are the feature — the prose around them is just delivery.
 
 - Ask about a dense passage ("explain this simply", "what does this term mean here?").
-  Each claim gets a source chip ("s. 12") that jumps to the passage and highlights it,
-  down to sentence level
+  Each claim gets a source chip ("s. 12"); click it and the document jumps to that page
+  and highlights the sentence the claim came from, as in the picture above. Getting back
+  is one click on the pill in the corner
 - Structured article summaries (research question / method / data / findings /
   limitations)
 - Ask about your own annotations: "summarize what I've highlighted"
 - Context-menu actions on any selection: explain, simplify, critique ("what would a
   referee ask?"), look up a cited reference, find similar passages, or ask your own
   question
-- **Explain a figure**: drag a box around a chart or table and the assistant explains it.
-  You can also paste or attach images in the chat
+- **Explain a figure**: drag a box around a chart, diagram or table and the region lands
+  in the chat as an attachment you can add a question to — nothing is sent until you do.
+  The answer describes what is actually in the crop, and cites the pages it draws on. You
+  can paste or attach images the same way
 - Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
   model list across all three, with per-model reasoning-effort control. Keys are
   encrypted locally with the Windows keychain, and the document leaves your machine only
   when you ask a question
 - Every answer shows its estimated cost
 
-![Explain a figure — drag a box around a chart or table and the assistant explains it](docs/screenshots/assistant_figure.png)
+![Explain a figure — the region dragged out of the page sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
 
 **Language and themes**
 
