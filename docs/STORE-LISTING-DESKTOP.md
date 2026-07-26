@@ -109,32 +109,30 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.28.x
+## What's new in this version (≤ 1 500 chars) — v0.29.x
 
 **EN:**
 ```
-• Split view opens and closes with S, and remembers the column you closed — page, zoom, rotation and width
-• Opening the contents or assistant panel now takes the same share out of both columns
-• One page + zoom cluster in the toolbar, driving the column the switcher points at
-• Fit width and fit page reach the edges of the column instead of stopping short
-• Two columns of the same document, each with its own page, zoom and rotation
-• Annotate in either column, and Ctrl+click an internal link to open it in the other one
-• Two windows on the same file share one draft and sync as you annotate
-• Colour, thickness and opacity per tool, remembered between sessions
-• Export your notes to Word, alongside Markdown, HTML and plain text
+• Half the download: 197 MB instead of 409, with nothing removed from the app
+• A save that fails now says so. Three paths could previously report success while the newest marks never reached the file
+• The assistant's key settings state exactly what protects your API key on your machine, instead of promising "encrypted" everywhere
+• On Linux without a keyring, the key is kept for the session only rather than written to disk unencrypted
+• Every menu and bubble closes with Esc and with a click outside, on touch as well as mouse
+• Error messages are no longer part Norwegian when the app is set to English
+• Free text you drag smaller now scrolls instead of clipping
+• Smoother while reading: the sidebar and the keyboard stop redoing work on every scroll
 ```
 
 **NO:**
 ```
-• Delt visning åpnes og lukkes med S, og husker kolonnen du lukket — side, zoom, rotasjon og bredde
-• Å åpne innholds- eller assistentpanelet tar nå like stor andel fra begge kolonner
-• Én side- og zoomklynge i verktøylinja, som styrer kolonnen velgeren peker på
-• Tilpass bredde og hel side går helt ut til kanten av kolonnen
-• To kolonner av samme dokument, hver med egen side, zoom og rotasjon
-• Annoter i begge kolonner, og Ctrl+klikk en intern lenke for å åpne den i den andre
-• To vinduer på samme fil deler ett utkast og synkroniseres mens du annoterer
-• Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
-• Eksporter notatene dine til Word, i tillegg til Markdown, HTML og ren tekst
+• Halvparten så stor nedlasting: 197 MB i stedet for 409, uten at noe er fjernet fra appen
+• En lagring som feiler sier det nå. Tre veier kunne før melde suksess mens de nyeste merkene aldri nådde fila
+• Nøkkelinnstillingene i assistenten sier nøyaktig hva som beskytter API-nøkkelen din på din maskin, i stedet for å love «kryptert» overalt
+• På Linux uten nøkkelring beholdes nøkkelen bare for økta, framfor å skrives ukryptert til disk
+• Alle menyer og bobler lukkes med Esc og med klikk utenfor, på berøring like godt som med mus
+• Feilmeldinger er ikke lenger delvis norske når appen står på engelsk
+• Fritekst du drar mindre kan nå rulles i stedet for å bli klippet
+• Jevnere lesing: sidepanelet og tastaturet slutter å gjøre arbeidet om på hver rulling
 ```
 
 ---
