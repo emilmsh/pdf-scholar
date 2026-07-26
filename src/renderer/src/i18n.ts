@@ -24,6 +24,13 @@ const nb = {
   'app.back': 'Tilbake',
   'app.pageAbbrev': 's.',
   'app.openFailed': 'Kunne ikke åpne filen: {error}',
+  // Shown by the render-error boundary — the only screen a user sees when the
+  // UI itself failed, so it has to say what to do next.
+  'crash.title': 'Noe gikk galt',
+  'crash.body':
+    'Visningen stoppet uventet. Ulagrede merknader ligger trygt lagret, og hentes opp igjen når du laster inn på nytt.',
+  'crash.reload': 'Last inn på nytt',
+  'app.openInBrowser': 'Åpne i nettleserens leser',
   'app.saveFailed': 'Kunne ikke lagre: {error}',
 
   // Welcome
@@ -59,6 +66,9 @@ const nb = {
   'doc.openFile': 'Åpne en annen fil …',
   'doc.pickedHint': 'Valgt via filvelger – ingen mappebane',
   'doc.pickedUnavailable': 'Nettleseren har ikke lenger tilgang til denne filen. Åpne den på nytt med «Åpne PDF …».',
+  // Reasons that ride inside app.openFailed — hence lowercase.
+  'doc.httpError': 'nettstedet avviste forespørselen (HTTP {status})',
+  'doc.notPdf': 'nettstedet svarte med en nettside i stedet for PDF-en (innlogging eller robotsjekk)',
   'tb.sidebarTip': 'Sidepanel (T) — miniatyrer og innhold',
   'tb.navBackTip': 'Tilbake (Alt+←)',
   'tb.navForwardTip': 'Frem (Alt+→)',
@@ -458,6 +468,11 @@ const en: Dict = {
   'app.back': 'Back',
   'app.pageAbbrev': 'p.',
   'app.openFailed': 'Could not open the file: {error}',
+  'crash.title': 'Something went wrong',
+  'crash.body':
+    'The view stopped unexpectedly. Unsaved annotations are safely stored and will be picked up again when you reload.',
+  'crash.reload': 'Reload',
+  'app.openInBrowser': 'Open in the browser’s reader',
   'app.saveFailed': 'Could not save: {error}',
 
   'welcome.tagline': 'Made for research.',
@@ -488,6 +503,8 @@ const en: Dict = {
   'doc.openFile': 'Open another file …',
   'doc.pickedHint': 'Chosen via file picker – no folder path',
   'doc.pickedUnavailable': 'The browser no longer has access to this file. Open it again with “Open PDF …”.',
+  'doc.httpError': 'the site refused the request (HTTP {status})',
+  'doc.notPdf': 'the site answered with a web page instead of the PDF (sign-in or bot check)',
   'tb.sidebarTip': 'Sidebar (T) — thumbnails and contents',
   'tb.navBackTip': 'Back (Alt+←)',
   'tb.navForwardTip': 'Forward (Alt+→)',

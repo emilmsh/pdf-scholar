@@ -214,6 +214,17 @@ if (!gotLock) {
     w.webContents.send('open-path', path)
   })
 
+  // Main owns every file write. A rejection escaping an IPC handler used to
+  // disappear entirely — no handler existed — which is precisely the class of
+  // failure that loses annotations while looking like nothing happened. This
+  // does not swallow anything; it makes it findable in the log.
+  process.on('unhandledRejection', (reason) => {
+    console.error('[pdfx] unhandled rejection in main:', reason)
+  })
+  process.on('uncaughtException', (err) => {
+    console.error('[pdfx] uncaught exception in main:', err)
+  })
+
   app.whenReady().then(() => {
     app.setAppUserModelId('no.emil.pdfx')
     console.log('[pdfx] annotation engine: embedpdf (MIT)')

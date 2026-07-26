@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type {
   LanguagePreference,
   Settings,
-  ThemeName,
   ThemePreference,
   UpdateCheckOutcome,
   UpdateUnsupportedReason
@@ -119,7 +118,6 @@ interface Props {
   pageCount: number
   zoomPercent: number
   settings: Settings
-  resolvedTheme: ThemeName
   sidebarOpen: boolean
   canNavBack: boolean
   canNavForward: boolean
@@ -256,7 +254,6 @@ export default function Toolbar({
   pageCount,
   zoomPercent,
   settings,
-  resolvedTheme,
   sidebarOpen,
   canNavBack,
   canNavForward,

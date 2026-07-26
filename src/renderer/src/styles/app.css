@@ -4990,3 +4990,64 @@ button {
   }
 
 }
+
+/* ============================================================
+   Render-error fallback (see ErrorBoundary.tsx)
+   ============================================================ */
+
+/* Deliberately plain: this screen renders after something in the UI threw, so
+   it must not depend on anything the app sets up at runtime. Theme variables are
+   fine (they live on <html>), component state is not. */
+.crash {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 40px;
+  text-align: center;
+  background: var(--bg-canvas);
+  color: var(--text);
+}
+
+.crash h1 {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.crash p {
+  max-width: 46ch;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.crash pre {
+  max-width: 70ch;
+  max-height: 30vh;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--danger);
+  font-size: 12px;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.crash-reload {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.crash-reload:hover {
+  filter: brightness(1.07);
+}

@@ -22,7 +22,6 @@ import type {
   DeleteAnnotationRequest,
   ModifyAnnotationRequest
 } from '../shared/types'
-import type { PdfDocumentObject } from '@embedpdf/models'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import { DocCache } from './doc-cache'
 import { appendAnnotation, appendDeleteAnnotation, appendUpdateAnnotation } from './incremental-appender'
