@@ -32,6 +32,11 @@ interface DnrRule {
     urlFilter?: string
     resourceTypes?: string[]
     requestDomains?: string[]
+    requestMethods?: string[]
+    /** Chrome 128+. Values match case-insensitively and support `*` / `?`.
+     *  A rule carrying these is evaluated once the response headers arrive. */
+    responseHeaders?: { header: string; values?: string[] }[]
+    excludedResponseHeaders?: { header: string; values?: string[] }[]
     /** Session-scoped rules only — how the "open in the browser's own reader"
      *  bypass stays confined to the tab that asked for it. */
     tabIds?: number[]

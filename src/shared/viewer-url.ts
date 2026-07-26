@@ -52,13 +52,54 @@ export function buildViewerUrl(base: string, path: string): string {
 
 /** Display name for a document URL: its last path segment, with the query and
  *  fragment cut off first — `paper.pdf?utm_source=chatgpt.com` is not a file
- *  name. Decoding is best-effort: a stray `%` in the wild must not throw. */
+ *  name. Empty when the path has no last segment (`https://host/download/`),
+ *  which is a caller's cue to name the document some other way. Decoding is
+ *  best-effort: a stray `%` in the wild must not throw. */
 export function fileNameFromUrl(url: string): string {
-  const bare = url.split(/[?#]/)[0]
-  const tail = bare.split(/[/\\]/).pop() || bare
+  const tail = basename(url.split(/[?#]/)[0])
   try {
     return decodeURIComponent(tail)
   } catch {
     return tail
   }
+}
+
+/** The name a response declares in `Content-Disposition`, if any. Handles the
+ *  RFC 5987 `filename*=UTF-8''…` form (preferred — it can carry non-ASCII) and
+ *  the plain quoted or bare `filename=`. Any path is stripped: the value comes
+ *  from a server and only ever gets shown or suggested in a save dialog. */
+export function fileNameFromDisposition(disposition: string | null | undefined): string | null {
+  if (!disposition) return null
+  const encoded = /filename\*\s*=\s*[^';]*'[^']*'([^;]+)/i.exec(disposition)
+  if (encoded) {
+    try {
+      const name = basename(decodeURIComponent(encoded[1].trim()))
+      if (name) return name
+    } catch {
+      // Malformed escape — fall through to the plain form.
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(disposition)
+  return basename((plain?.[1] ?? plain?.[2] ?? '').trim()) || null
+}
+
+/** A document name worth showing for a PDF we opened from a URL. Now that the
+ *  content-type rule intercepts PDFs the URL says nothing about, the last path
+ *  segment is often useless on its own (`/pdf/2401.12345`, `Delivery.cfm`), so
+ *  prefer the name the response declares and make sure what we end up with reads
+ *  as a PDF — it becomes the tab title, the recents row and the suggested name in
+ *  the save dialog. */
+export function pdfDisplayName(url: string, disposition?: string | null): string {
+  const base = fileNameFromDisposition(disposition) || fileNameFromUrl(url) || hostOf(url)
+  if (!base) return 'PDF'
+  return /\.pdf$/i.test(base) ? base : `${base}.pdf`
+}
+
+function basename(name: string): string {
+  return name.split(/[/\\]/).pop() ?? name
+}
+
+function hostOf(url: string): string {
+  const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#]*)/i.exec(url)
+  return m ? m[1] : ''
 }

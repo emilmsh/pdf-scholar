@@ -54,14 +54,40 @@ lands, the shared parts are the natural thing to extract into a common
 
 ## How PDF interception works
 
-`background.ts` registers a dynamic `declarativeNetRequest` rule that redirects
-any main-frame navigation to a `*.pdf` URL to
-`chrome-extension://<id>/viewer.html?rawfile=<original-url>`. The rule is dynamic
-because the redirect target embeds the extension's own origin, only known at
-runtime via `chrome.runtime.getURL`; `regexSubstitution` folds the matched URL
+`background.ts` registers dynamic `declarativeNetRequest` rules that redirect a
+main-frame PDF navigation to
+`chrome-extension://<id>/viewer.html?rawfile=<original-url>`. The rules are
+dynamic because the redirect target embeds the extension's own origin, only known
+at runtime via `chrome.runtime.getURL`; `regexSubstitution` folds the matched URL
 in as the `?rawfile=` param. `extension-api.ts:getPendingPath` reads that param
 and the shell opens the document — the same "pending path" pattern the Electron
 app uses for a freshly spawned window.
+
+A PDF announces itself in two different ways, and covering only the first leaves
+half the web with the browser's own reader:
+
+| | Rule 1 | Rule 2 |
+|---|---|---|
+| Matches on | URL ends in `.pdf` | response `content-type: application/pdf` |
+| Decided | before the request is sent | when the response headers arrive |
+| Covers | most direct links, `file://` | arXiv `/pdf/2401.12345`, SSRN `Delivery.cfm`, DOI resolvers, Drive, `?download=1` endpoints |
+| Needs | — | Chrome/Edge 128+ (`responseHeaders` conditions) |
+
+Rule 2 is registered in its own `updateDynamicRules` call and its failure is
+swallowed: an older browser rejects the condition outright, and rule 1 must not
+go down with it. Chrome evaluates it on the headers and then abandons the body,
+so the document is not downloaded twice — but the request *has* reached the
+server, which is why rule 2's scope is narrow:
+
+- **GET only.** A PDF that is the answer to a POST cannot be re-fetched by the
+  viewer (the body is gone), and the browser's reader renders it fine.
+- **Not `Content-Disposition: attachment`.** That response is a download; saving
+  it to disk is what the user asked for by clicking the link. It also stays
+  openable in our reader afterwards — that is the File Explorer path.
+- **`main_frame` only.** A PDF embedded in a page stays with the browser's
+  plugin viewer; taking those over is a separate, much larger feature.
+- A **single-use signed URL** can be spent by the time the viewer re-fetches it.
+  That lands in the escape hatch below.
 
 **Why `rawfile` and not `file`:** `regexSubstitution` cannot percent-encode, so
 the document URL lands in the page URL *verbatim*. Read back with
@@ -72,26 +98,46 @@ The distinct param name marks the value as "verbatim, to the end of the URL";
 links the app builds itself stay on the encoded `?file=`. Both forms are parsed
 by `src/shared/viewer-url.ts`, gated by `npm run test:viewer-url`.
 
-- **http(s) PDFs**: covered by `host_permissions`. The viewer page fetches the
-  URL a second time (the redirect discarded the browser's own request), and that
-  fetch is *not* the navigation the site expected: it carries no cookies. A PDF
-  behind a session, a paywall or a bot check answers 401/403, or 200 with a
-  sign-in page. `readFile` therefore retries once with `credentials: 'include'`
-  — the cookies the built-in viewer would have sent — and a body that is markup
-  rather than a PDF is named as such instead of surfacing later as a pdf.js
-  parse error. When even that fails, the error banner offers **"Åpne i
-  nettleserens leser"**: a session-scoped `allow` rule pinned to that one URL in
-  that one tab steps our redirect aside so the built-in reader can take it. A URL
-  the browser can open is never a dead end.
+### Getting the bytes: the second fetch
+
+The redirect discards the browser's own request, so the viewer page fetches the
+URL again — and that fetch is *not* the navigation the site expected. It is
+cross-site, so it carries no cookies, and anything behind a session, a paywall or
+a bot check answers 401/403, or 200 with a sign-in page. `readFile` therefore
+makes up to two attempts: the plain one, then a retry with
+`credentials: 'include'` — the cookies the built-in viewer would have sent. A
+body that is markup rather than a PDF is named as such (`doc.notPdf`) instead of
+surfacing later as a pdf.js parse error, and the server's own
+`Content-Disposition` name wins over anything the URL can suggest, so an arXiv
+link is `2401.12345.pdf` and not a bare number in the library.
+
+**The escape hatch.** When even that fails, the error banner offers **"Åpne i
+nettleserens leser"**: a session-scoped `allow` rule at a higher priority than
+both redirect rules — Chrome re-applies matching `allow` rules in the response
+phase too — steps them aside for that tab, and the tab navigates to the URL so
+the built-in reader takes it. Tab-scoped, not URL-scoped, on purpose: an anchored
+per-URL rule misses the case this exists for, where the host answers with a
+redirect of its own and rule 2 then grabs the *next* URL and drops the user back
+into the error they were escaping. The cost is that this one tab prefers the
+built-in reader for the rest of the session; a new tab gets our viewer back. A URL
+the browser can open is never a dead end.
+
+**What is still out of reach**, and why it has to be the escape hatch rather than
+a fix: MV3 has no `filterResponseData`, so the extension can never read the bytes
+the browser already downloaded — every path ends in "fetch it again". That leaves
+PDFs delivered as the answer to a POST, single-use signed links, and hosts that
+reject the request for a reason we cannot reproduce (hotlink protection wants a
+`Referer` that `fetch` may not set from an extension page; a dNR `modifyHeaders`
+rule on our own request is the untested next lever).
+
+### Per-scheme notes
+
+- **http(s) PDFs**: covered by `host_permissions`.
 - **file:// PDFs** (the File Explorer double-click case): additionally require
   the user to enable **"Allow access to file URLs"** on the extension's details
   page. This is a one-time manual toggle Chromium reserves for the user; an
-  extension cannot grant it to itself.
-- **PDFs served without a `.pdf` URL** (arXiv's `/pdf/2401.12345`, DOI
-  resolvers, Drive): not intercepted at all — the rule matches on the URL, so
-  the browser's own viewer keeps those. Closing that gap needs a
-  `responseHeaders` condition on `content-type` (Chrome 128+, i.e. a
-  `minimum_chrome_version` bump).
+  extension cannot grant it to itself. Rule 2 is http(s)-only, so a local PDF
+  without a `.pdf` name stays with the browser.
 
 ## Build & load
 

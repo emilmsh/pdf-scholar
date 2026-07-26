@@ -96,6 +96,34 @@ eq(
 eq(V.fileNameFromUrl('https://example.org/a.pdf#page=6'), 'a.pdf', 'fragment stripped from name')
 eq(V.fileNameFromUrl('https://example.org/min%20fil.pdf'), 'min fil.pdf', 'percent-decoded name')
 eq(V.fileNameFromUrl('https://example.org/100%.pdf'), '100%.pdf', 'malformed escape survives')
+eq(V.fileNameFromUrl('https://example.org/download/'), '', 'no last segment → empty, not the URL')
+
+// --- Names for PDFs the URL says nothing about (the content-type rule) --------
+const disp = V.fileNameFromDisposition
+eq(disp('attachment; filename="attention.pdf"'), 'attention.pdf', 'quoted filename')
+eq(disp('inline; filename=attention.pdf'), 'attention.pdf', 'bare filename')
+eq(disp("attachment; filename*=UTF-8''bl%C3%A5%20rapport.pdf"), 'blå rapport.pdf', 'RFC 5987 filename*')
+eq(disp("attachment; filename*=UTF-8'nb'rapport.pdf"), 'rapport.pdf', 'filename* with language tag')
+eq(
+  disp('attachment; filename="fallback.pdf"; filename*=UTF-8\'\'real%20name.pdf'),
+  'real name.pdf',
+  'filename* wins over filename'
+)
+eq(disp('attachment; filename="../../etc/passwd.pdf"'), 'passwd.pdf', 'server-supplied path stripped')
+eq(disp('attachment'), null, 'no filename → null')
+eq(disp(null), null, 'no header → null')
+
+const name = V.pdfDisplayName
+eq(name('https://arxiv.org/pdf/2401.12345'), '2401.12345.pdf', 'arXiv-style URL gets a .pdf name')
+eq(name('https://arxiv.org/pdf/2401.12345v2'), '2401.12345v2.pdf', 'versioned arXiv URL')
+eq(name('https://example.org/papers/attention.pdf'), 'attention.pdf', 'plain .pdf URL unchanged')
+eq(name('https://example.org/papers/REPORT.PDF'), 'REPORT.PDF', 'existing .PDF suffix kept as is')
+eq(
+  name('https://ssrn.com/Delivery.cfm?abstractid=1', 'attachment; filename="working-paper.pdf"'),
+  'working-paper.pdf',
+  'declared name beats the URL'
+)
+eq(name('https://example.org/download/'), 'example.org.pdf', 'path-less URL falls back to the host')
 
 if (failures === 0) {
   console.log('\nALL VIEWER-URL ROUND-TRIPS PASS ✓')

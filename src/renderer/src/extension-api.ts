@@ -26,7 +26,7 @@ import type {
   RecentFile,
   Settings
 } from '../../shared/types'
-import { buildViewerUrl, fileNameFromUrl, parseViewerTarget } from '../../shared/viewer-url'
+import { buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
 import {
@@ -72,11 +72,17 @@ const handleBaseline = new Map<string, number>()
  *  the same basename share the key, and the most recently opened one wins. */
 const FSA = 'fsa:'
 
-/** Display name for a path: picked files carry the pseudo-prefix, real paths
- *  their last segment (query and fragment stripped — see fileNameFromUrl). */
+/** Names resolved from a response's Content-Disposition, keyed by the URL they
+ *  came from. Only the fetch sees that header, but the recents row is written
+ *  later from the path alone (docOpened) — without this, the same document would
+ *  be "attention.pdf" in the tab title and "2401.12345.pdf" in the library. */
+const names = new Map<string, string>()
+
+/** Display name for a path: picked files carry the pseudo-prefix, real paths the
+ *  name the server declared, else one derived from the URL (see pdfDisplayName). */
 function fileNameOf(path: string): string {
   if (path.startsWith(FSA)) return path.slice(FSA.length)
-  return fileNameFromUrl(path)
+  return names.get(path) ?? pdfDisplayName(path)
 }
 
 /** The extension viewer URL for a given source path/URL. */
@@ -309,7 +315,11 @@ async function fetchDocument(
     // purpose: it takes BOTH a missing PDF header and markup in the body, so a
     // real document served under a wrong content type still opens.
     if (!hasPdfHeader(data) && looksLikeWebPage(res, data)) return { error: t('doc.notPdf') }
-    return { path, name: fileNameOf(path), data }
+    // The server's own name beats anything the URL can tell us — remember it so
+    // every later use of this path agrees (see `names`).
+    const name = pdfDisplayName(path, res.headers.get('content-disposition'))
+    names.set(path, name)
+    return { path, name, data }
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) }
   }
@@ -338,11 +348,16 @@ function looksLikeWebPage(res: Response, data: Uint8Array): boolean {
 }
 
 /** Escape hatch for a URL the browser can open but we cannot fetch (a host that
- *  rejects the extension's request outright, an interstitial, a cookie wall):
- *  step our own redirect rule aside for exactly this URL in exactly this tab,
- *  then navigate there so the built-in reader takes it. The rule is
- *  session-scoped — it dies with the browser session and never widens the
- *  takeover beyond the click that asked for it.
+ *  rejects the extension's request outright, an interstitial, a cookie wall, a
+ *  spent one-shot link): step our redirect rules aside in this tab, then navigate
+ *  there so the built-in reader takes it.
+ *
+ *  Scoped to the TAB rather than to the URL, deliberately. An anchored per-URL
+ *  rule looks tighter but misses the case this exists for: the host answers with
+ *  a redirect of its own, and the content-type rule then grabs the *next* URL and
+ *  drops the user right back into the error they were escaping. The cost is that
+ *  this one tab prefers the browser's reader for the rest of the session (session
+ *  rules die with it) — a new tab gets our viewer back.
  *
  *  NB: tabs.getCurrent/update need no "tabs" permission (see background.ts) —
  *  that permission only gates the sensitive tab fields, which we never read. */
@@ -358,10 +373,11 @@ export async function openInBrowserViewer(url: string): Promise<boolean> {
       addRules: [
         {
           id: Math.max(0, ...existing.map((r) => r.id)) + 1,
-          priority: 2, // beats the redirect rule (priority 1)
+          // Beats both redirect rules (priority 1), in the response phase too —
+          // Chrome re-applies matching allow rules when it evaluates those.
+          priority: 2,
           action: { type: 'allow' },
-          // `|…|` anchors both ends: this one URL, nothing near it.
-          condition: { urlFilter: `|${url}|`, resourceTypes: ['main_frame'], tabIds: [tabId] }
+          condition: { resourceTypes: ['main_frame'], tabIds: [tabId] }
         }
       ]
     })
