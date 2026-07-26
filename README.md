@@ -234,19 +234,27 @@ work, so the chips are the feature — the prose around them is just delivery.
 - Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
   model list across all three, with per-model reasoning-effort control. Your key never
   leaves your machine, and the document leaves it only when you ask a question
-- **How your key is stored, exactly.** The app uses the strongest thing each platform
-  actually offers, and the key settings name the one in force on your machine rather
-  than promising "encrypted" in general. On the desktop: the operating system's own key
-  store — Windows DPAPI, macOS Keychain, Linux Secret Service — decryptable only by your
-  user account on that machine. In the browser extension, which has no way to reach an OS
-  key store: encrypted under a key no script can export, which stops anything that merely
-  reads the browser profile but not code running inside it. Where there is no key store
-  at all (Linux without a keyring), the key is held in memory for that session and never
-  written to disk. [docs/PRIVACY.md](docs/PRIVACY.md) states the limits of each
 - **No price estimates, on purpose.** Each answer shows the tokens the provider
   counted, and the key settings link straight to the page where you set a spending cap
   and watch your usage. List prices change after an app ships; a number in here would
   quietly stop matching your bill, and only your provider knows the real one
+
+**Where your key is kept**
+
+You paste the key once, in the assistant's settings. What protects it there depends on
+where you are running the app, so the settings panel names the row that applies to you:
+
+| Where you run it | How the key is stored | Who can get at it |
+| --- | --- | --- |
+| **Windows / macOS desktop** | Encrypted by the operating system's own key store: DPAPI on Windows, Keychain on macOS | Only your user account on that machine. Copy the file to another PC and it is useless |
+| **Linux desktop** | The same, through the system keyring (gnome-keyring or kwallet) | Same as above. With no keyring running, the app keeps the key in memory for the session and writes nothing to disk — you re-enter it next launch |
+| **Browser extension** | Encrypted with AES-GCM, under a key the browser will not hand out to any script | Anything that only *reads* the browser profile — a backup, a synced copy, another program — finds ciphertext rather than your key. The browser does not promise the encryption key itself is encrypted where it stores it, so treat this as a layer rather than a keychain: an extension cannot reach the OS key store at all |
+
+What none of them stop is a program already running as you: it can ask for the key to be
+decrypted, exactly as the app does. That is the ceiling for anything that remembers a
+credential for you without asking for a master password every time. The protection that
+holds regardless is a spending cap in the provider's console — which is why the key
+settings link straight to it. [docs/PRIVACY.md](docs/PRIVACY.md) goes into more detail.
 
 ![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
 
