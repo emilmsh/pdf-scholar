@@ -97,12 +97,14 @@ import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
-import { getLanguage, locale, t, useLang } from '../i18n'
+import { locale, t, useLang } from '../i18n'
 import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
 import type { ExportFormat } from './Sidebar'
 import { clamp } from '../clamp'
+import { useReadAloud } from '../hooks/useReadAloud'
+import { PANEL_DEFAULTS, PANEL_LS_KEY, usePanelWidths } from '../hooks/usePanelWidths'
 
 // One worker per open document (not a shared global port) so the document can
 // be re-opened after the annotation engine rewrites the file on disk.
@@ -169,24 +171,6 @@ function paneOfEl(el: Element | null | undefined): PaneId {
   return host?.dataset.pane === 'b' ? 'b' : 'a'
 }
 
-/** Drag-resizable panel widths: defaults, clamps and persistence. Left (TOC)
- *  and right (assistant/search) share identical defaults and clamps so the two
- *  sides look and behave the same — the owner wants them symmetric.
- *
- *  `pane` is the odd one out: it is the split view's divider, and it stores the
- *  second column's SHARE of the pages area (0–1), not a pixel width. A stored
- *  width can only ever be paid for by the first column — open a side panel and
- *  the left half shrinks alone — whereas a share makes both columns give up the
- *  same proportion. `PANEL_MIN.pane` stays a px floor per column, converted to a
- *  share against the live width whenever the divider is dragged; the ceiling
- *  falls out of it (one column's floor is the other's limit), so PANEL_MAX.pane
- *  is only there to keep the three records the same shape. */
-const PANEL_DEFAULTS = { sidebar: 340, ai: 340, web: 340, pane: 0.5 }
-const PANEL_MIN = { sidebar: 264, ai: 264, web: 264, pane: 260 }
-const PANEL_MAX = { sidebar: 600, ai: 600, web: 600, pane: 1 }
-type PanelKey = keyof typeof PANEL_DEFAULTS
-const PANEL_LS_KEY = 'pdfx-panel-widths'
-
 const TOOLBAR_PIN_LS_KEY = 'pdfx-toolbar-pinned'
 
 /** Toolbar starts pinned unless the user unpinned it in a previous session */
@@ -203,23 +187,6 @@ function saveToolbarPinned(pinned: boolean): void {
     localStorage.setItem(TOOLBAR_PIN_LS_KEY, pinned ? '1' : '0')
   } catch {
     /* pin preference is best-effort */
-  }
-}
-
-function loadPanelWidths(): Record<PanelKey, number> {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PANEL_LS_KEY) ?? '{}')
-    const paneShare = Number(parsed.pane)
-    return {
-      sidebar: clamp(Number(parsed.sidebar) || PANEL_DEFAULTS.sidebar, PANEL_MIN.sidebar, PANEL_MAX.sidebar),
-      ai: clamp(Number(parsed.ai) || PANEL_DEFAULTS.ai, PANEL_MIN.ai, PANEL_MAX.ai),
-      web: clamp(Number(parsed.web) || PANEL_DEFAULTS.web, PANEL_MIN.web, PANEL_MAX.web),
-      // A share, so anything outside (0, 1) is a pixel width written by an older
-      // build — fall back to an even split rather than clamping nonsense
-      pane: paneShare > 0 && paneShare < 1 ? paneShare : PANEL_DEFAULTS.pane
-    }
-  } catch {
-    return { ...PANEL_DEFAULTS }
   }
 }
 
@@ -408,11 +375,6 @@ export default function PdfViewer({
   const [tocPinned, setTocPinned] = useState(false)
   const tocPinnedRef = useRef(tocPinned)
   tocPinnedRef.current = tocPinned
-  /** Drag-resizable panel widths (px), persisted per user */
-  const [panelW, setPanelW] = useState(loadPanelWidths)
-  const panelWRef = useRef(panelW)
-  panelWRef.current = panelW
-  const [resizingPanel, setResizingPanel] = useState<PanelKey | null>(null)
   /** Split view: a second pages column beside the first — same document, same
    *  tools, own page and own zoom. See PagesPane.tsx for why it is not a second
    *  PdfViewer (one pdf.js document, one annotation map, one save model). */
@@ -514,10 +476,6 @@ export default function PdfViewer({
    *  the pane's width, and a mode-derived target is the more predictable of the
    *  two anyway. */
   const paneBFitTarget: 'width' | 'page' = paneBFit === 'width' ? 'page' : 'width'
-  /** pagesAreaWidth is declared further down (it needs the pages container) —
-   *  reached through a ref so this callback's dependency array does not touch it
-   *  during render, which would be a temporal-dead-zone reference. */
-  const pagesAreaWidthRef = useRef<() => number>(() => 0)
 
   /** What the second column was showing when it was last closed, so S brings it
    *  back rather than a fresh copy of the left column. The case this exists for:
@@ -779,6 +737,20 @@ export default function PdfViewer({
   const viewerRootRef = useRef<HTMLDivElement>(null)
   const scaleRef = useRef(scale)
   scaleRef.current = scale
+
+  // ---------- Panel resizing (sidebar / AI panel dividers) ----------
+  // Called here rather than with the other panel state further up: the split
+  // divider measures the pages area from `pagesHostRef` (just above), and
+  // `panelW.pane` has to exist before the resize observer below reads it.
+  const {
+    panelW,
+    setPanelW,
+    panelWRef,
+    resizingPanel,
+    beginPanelResize,
+    resetPanelWidth,
+    persistPanelWidths
+  } = usePanelWidths(pagesHostRef)
 
   // ---------- Pane-agnostic geometry ----------
   // Split view puts a SECOND pages column on screen at its own zoom. Every
@@ -1794,64 +1766,6 @@ export default function PdfViewer({
   const [annotsHidden, setAnnotsHidden] = useState(false)
   const annotsHiddenRef = useRef(annotsHidden)
   annotsHiddenRef.current = annotsHidden
-
-  // ---------- Panel resizing (sidebar / AI panel dividers) ----------
-
-  const persistPanelWidths = (): void => {
-    try {
-      localStorage.setItem(PANEL_LS_KEY, JSON.stringify(panelWRef.current))
-    } catch {
-      /* width preference is best-effort */
-    }
-  }
-
-  const beginPanelResize = useCallback((panel: PanelKey, e: React.PointerEvent) => {
-    e.preventDefault()
-    const startX = e.clientX
-    const startW = panelWRef.current[panel]
-    // The split divider moves a share, so it needs the width it is dividing —
-    // measured once at grab time, since nothing but the drag changes it.
-    const total = panel === 'pane' ? pagesAreaWidthRef.current() : 0
-    setResizingPanel(panel)
-    const onMove = (ev: PointerEvent): void => {
-      const dx = ev.clientX - startX
-      if (panel === 'pane') {
-        if (total <= 0) return
-        // Both columns keep the same px floor, expressed as a share of the area
-        const floor = Math.min(PANEL_MIN.pane / total, 0.5)
-        const share = clamp((startW * total - dx) / total, floor, 1 - floor)
-        setPanelW((p) => (Math.abs(p.pane - share) < 0.0005 ? p : { ...p, pane: share }))
-        return
-      }
-      // The sidebar grows rightwards; the AI panel sits to the right of what it
-      // resizes, so it grows leftwards
-      const w = clamp(Math.round(panel === 'sidebar' ? startW + dx : startW - dx), PANEL_MIN[panel], PANEL_MAX[panel])
-      setPanelW((p) => (p[panel] === w ? p : { ...p, [panel]: w }))
-    }
-    const onUp = (): void => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-      setResizingPanel(null)
-      persistPanelWidths()
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }, [])
-
-  /** The width the two pages columns share right now (both columns, no panels) —
-   *  what the divider's share is a share OF. */
-  const pagesAreaWidth = useCallback((): number => {
-    const a = pagesHostRef.current
-    if (!a) return 0
-    const b = a.parentElement?.querySelector<HTMLElement>('.pages-host.pane-b')
-    return a.clientWidth + (b?.clientWidth ?? 0)
-  }, [])
-  pagesAreaWidthRef.current = pagesAreaWidth
-
-  const resetPanelWidth = useCallback((panel: PanelKey) => {
-    setPanelW((p) => ({ ...p, [panel]: PANEL_DEFAULTS[panel] }))
-    window.setTimeout(persistPanelWidths, 0)
-  }, [])
 
   // ---------- Save model (dirty = unsaved draft exists) ----------
 
@@ -3754,211 +3668,29 @@ export default function PdfViewer({
 
   // ---------- Read aloud ----------
 
-  interface ReadSentence {
-    pageNumber: number
-    start: number
-    end: number
-    text: string
-  }
-
-  const [readAloud, setReadAloud] = useState<'closed' | 'playing' | 'paused'>('closed')
-  const [readRate, setReadRate] = useState(1)
-  const [readVoice, setReadVoice] = useState<string>('')
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
-  const readSessionRef = useRef<{
-    sentences: ReadSentence[]
-    index: number
-    stopped: boolean
-  } | null>(null)
-  const readPrefsRef = useRef({ rate: 1, voiceURI: '' })
-  readPrefsRef.current = { rate: readRate, voiceURI: readVoice }
-
-  useEffect(() => {
-    const synth = window.speechSynthesis
-    if (!synth) return
-    const load = (): void => setVoices(synth.getVoices())
-    load()
-    synth.addEventListener('voiceschanged', load)
-    return () => synth.removeEventListener('voiceschanged', load)
-  }, [])
-
-  // Default voice: match the app language when such a voice exists
-  useEffect(() => {
-    if (readVoice || voices.length === 0) return
-    const wanted = getLanguage() === 'nb' ? ['nb', 'no'] : ['en']
-    const match = voices.find((v) => wanted.some((p) => v.lang.toLowerCase().startsWith(p)))
-    setReadVoice((match ?? voices.find((v) => v.default) ?? voices[0]).voiceURI)
-  }, [voices, readVoice])
-
-  /** The user picked a voice by hand — stop auto-selecting per document */
-  const voiceManualRef = useRef(false)
-
-  /** Crude but effective: is the document Norwegian or English? */
-  const detectDocLanguage = useCallback((texts: PageText[]): 'nb' | 'en' => {
-    const sample = texts
-      .slice(0, 3)
-      .map((p) => p.text)
-      .join(' ')
-      .toLowerCase()
-      .slice(0, 4000)
-    const nbHits =
-      ((sample.match(/\b(og|ikke|det|som|på|til|med|har|å|skal|kan|fra|ved|også|eller|være)\b/g) ??
-        []).length +
-        (sample.match(/[æøå]/g) ?? []).length * 2)
-    const enHits = (sample.match(/\b(the|of|and|that|with|this|from|which|are|have|been|their)\b/g) ??
-      []).length
-    return nbHits > enHits ? 'nb' : 'en'
-  }, [])
-
-  /** Best available voice for a language ("Natural" Windows voices first) */
-  const pickVoiceFor = useCallback(
-    (lang: 'nb' | 'en'): SpeechSynthesisVoice | null => {
-      const prefixes = lang === 'nb' ? ['nb', 'no'] : ['en']
-      const candidates = voices.filter((v) =>
-        prefixes.some((p) => v.lang.toLowerCase().startsWith(p))
-      )
-      if (candidates.length === 0) return null
-      return candidates.find((v) => /natural/i.test(v.name)) ?? candidates[0]
-    },
-    [voices]
-  )
-
-  /** Follow the spoken sentence: highlight it and keep it comfortably in view */
-  const highlightSentence = useCallback(
-    async (s: ReadSentence) => {
-      const el = containerRef.current
-      const lay = layoutRef.current
-      const texts = pageTextsRef.current
-      if (!el || !lay || !texts) return
-      const pageTop = lay.tops[s.pageNumber - 1]
-      if (Math.abs(el.scrollTop - pageTop) > el.clientHeight * 2) {
-        el.scrollTop = Math.max(0, pageTop - 8)
-        updateRange()
-      }
-      const pageEl = await waitForTextLayer('a', s.pageNumber)
-      if (!pageEl || readSessionRef.current?.stopped !== false) return
-      const rects = resolveMatchRects(
-        pageEl,
-        texts[s.pageNumber - 1],
-        { pageNumber: s.pageNumber, start: s.start, end: s.end, snippet: '', snippetOffset: 0 },
-        scaleRef.current
-      )
-      if (!rects || rects.length === 0) return
-      setSearchHits({ pageNumber: s.pageNumber, rects })
-      const lay2 = layoutRef.current
-      if (!lay2) return
-      const y = lay2.tops[s.pageNumber - 1] + rects[0].y * scaleRef.current
-      const viewTop = el.scrollTop
-      if (y < viewTop + 70 || y > viewTop + el.clientHeight - 150) {
-        el.scrollTo({ top: Math.max(0, y - el.clientHeight * 0.3), behavior: 'smooth' })
-      }
-    },
-    [updateRange, waitForTextLayer]
-  )
-
-  const speakFrom = useCallback(
-    (index: number) => {
-      const session = readSessionRef.current
-      const synth = window.speechSynthesis
-      if (!session || session.stopped || !synth) return
-      if (index >= session.sentences.length) {
-        session.stopped = true
-        readSessionRef.current = null
-        setReadAloud('closed')
-        setSearchHits(null)
-        return
-      }
-      session.index = index
-      const s = session.sentences[index]
-      const utterance = new SpeechSynthesisUtterance(s.text)
-      utterance.rate = readPrefsRef.current.rate
-      const voice = synth.getVoices().find((v) => v.voiceURI === readPrefsRef.current.voiceURI)
-      if (voice) utterance.voice = voice
-      utterance.onstart = () => void highlightSentence(s)
-      utterance.onend = () => {
-        if (readSessionRef.current === session && !session.stopped) speakFrom(index + 1)
-      }
-      utterance.onerror = () => {
-        if (readSessionRef.current === session && !session.stopped) speakFrom(index + 1)
-      }
-      synth.speak(utterance)
-    },
-    [highlightSentence]
-  )
-
-  /** Split page texts into sentences with char offsets (from a given page) */
-  const buildSentences = useCallback((texts: PageText[], fromPage: number): ReadSentence[] => {
-    const out: ReadSentence[] = []
-    for (let p = fromPage - 1; p < texts.length; p++) {
-      const text = texts[p].text
-      const regex = /[^.!?\n]+[.!?]*[\s]*/g
-      let match: RegExpExecArray | null
-      while ((match = regex.exec(text)) !== null) {
-        const raw = match[0]
-        const trimmed = raw.trim()
-        if (trimmed.length < 2) continue
-        const leading = raw.indexOf(trimmed[0])
-        out.push({
-          pageNumber: p + 1,
-          start: match.index + leading,
-          end: match.index + leading + trimmed.length,
-          text: trimmed
-        })
-      }
-    }
-    return out
-  }, [])
-
-  const stopReadAloud = useCallback(() => {
-    const session = readSessionRef.current
-    if (session) session.stopped = true
-    readSessionRef.current = null
-    window.speechSynthesis?.cancel()
-    setReadAloud('closed')
-    setSearchHits(null)
-  }, [])
-
-  const startReadAloud = useCallback(async () => {
-    if (!pdf || !window.speechSynthesis) return
-    window.speechSynthesis.cancel()
-    const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
-    const sentences = buildSentences(texts, currentPage)
-    if (sentences.length === 0) return
-    // Read English papers with an English voice even when the UI is Norwegian
-    // (and vice versa) — unless the user picked a voice themselves
-    if (!voiceManualRef.current) {
-      const voice = pickVoiceFor(detectDocLanguage(texts))
-      if (voice) {
-        setReadVoice(voice.voiceURI)
-        readPrefsRef.current.voiceURI = voice.voiceURI
-      }
-    }
-    readSessionRef.current = { sentences, index: 0, stopped: false }
-    setReadAloud('playing')
-    speakFrom(0)
-  }, [pdf, currentPage, buildSentences, speakFrom, detectDocLanguage, pickVoiceFor])
-
-  const toggleReadPause = useCallback(() => {
-    const synth = window.speechSynthesis
-    if (!synth) return
-    setReadAloud((state) => {
-      if (state === 'playing') {
-        synth.pause()
-        return 'paused'
-      }
-      if (state === 'paused') {
-        synth.resume()
-        return 'playing'
-      }
-      return state
-    })
-  }, [])
-
-  // Never keep speaking from a background tab / after close
-  useEffect(() => {
-    if (!active && readSessionRef.current) stopReadAloud()
-  }, [active, stopReadAloud])
-  useEffect(() => () => window.speechSynthesis?.cancel(), [])
+  const {
+    readAloud,
+    readRate,
+    setReadRate,
+    readVoice,
+    setReadVoice,
+    voices,
+    voiceManualRef,
+    startReadAloud,
+    stopReadAloud,
+    toggleReadPause
+  } = useReadAloud({
+    pdf,
+    active,
+    currentPage,
+    containerRef,
+    layoutRef,
+    pageTextsRef,
+    scaleRef,
+    updateRange,
+    waitForTextLayer,
+    setSearchHits
+  })
 
   // ---------- AI ----------
 

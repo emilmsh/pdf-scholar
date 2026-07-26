@@ -1,9 +1,10 @@
 # Breaking up PdfViewer.tsx — an ordered plan
 
-`src/renderer/src/components/PdfViewer.tsx` is ~4 900 lines: one default-exported
-component holding 71 `useState`, 86 `useRef`, 33 `useEffect`, 4 `useLayoutEffect`
-and 124 `useCallback` in a single function body. 64 commits have touched it. It is
-the largest single piece of debt in the repo.
+`src/renderer/src/components/PdfViewer.tsx` was ~4 900 lines when this was
+written: one default-exported component holding 71 `useState`, 86 `useRef`,
+33 `useEffect`, 4 `useLayoutEffect` and 124 `useCallback` in a single function
+body. 64 commits had touched it. It is the largest single piece of debt in the
+repo. Two extractions have since taken it to ~4 650.
 
 It is also not a file you can safely split in one pass. This note exists so the
 work can be done in small, individually verifiable steps instead — and so the
@@ -28,28 +29,61 @@ those refs is a seam that a careless split turns into a runtime `undefined`.
 
 ## Extract in this order
 
-Each of these owns its state, and reaches the rest of the component only through
-refs it already reads or a `PaneHandle` it is handed. None of the eleven
-late-bound refs crosses these seams. Put them in `src/renderer/src/hooks/`.
+Put them in `src/renderer/src/hooks/`. Steps 1 and 2 are **done**; the estimates
+below them are estimates, and step 3 turned out to be wrong — see the postmortem.
 
-1. **Read aloud** → `useReadAloud(pdf, active)`. Four `useState`, three
-   `useRef`; its only outbound dependency is page text. Start here: the feature
-   is hidden behind `READ_ALOUD` (see `src/renderer/src/flags.ts`), so a mistake
-   cannot reach a user. It is the free rehearsal for the pattern.
-2. **Panel resizing** → `usePanelWidths()`. Owns `panelW` / `resizingPanel` plus
-   the localStorage load and save that currently sit near the top of the file.
-3. **Search + semantic search** → `useDocumentSearch(paneHandle)`. Talks to the
-   rest only through `searchHits` and a `PaneHandle`.
+1. ~~**Read aloud** → `useReadAloud`~~ **Done** (298 lines out). The plan said
+   "its only outbound dependency is page text". That was wrong: it needs ten
+   injected values (`pdf`, `active`, `currentPage`, `containerRef`, `layoutRef`,
+   `pageTextsRef`, `scaleRef`, `updateRange`, `waitForTextLayer`,
+   `setSearchHits`), because `highlightSentence` drives pane A's scroller and
+   paints through the search-hit overlay. Still a clean seam — ten parameters, no
+   late-bound ref crossing it — just not a cheap one. Starting here was right for
+   the other reason: `READ_ALOUD` hides it, so a mistake could not reach a user.
+2. ~~**Panel resizing** → `usePanelWidths(pagesHostRef)`~~ **Done** (153 lines
+   out). One injected ref. Also returns `persistPanelWidths`, which `toggleSplit`
+   calls from outside the region, and exports `PANEL_DEFAULTS` / `PANEL_LS_KEY`
+   because the gear menu's reset clears them. `pagesAreaWidthRef` — one of the
+   eleven — is read and assigned only inside this region, so it travelled intact.
+3. **Search + semantic search** — **DO NOT extract as `useDocumentSearch(paneHandle)`.**
+   Attempted and abandoned; see the postmortem below. A different seam might
+   exist, but it is not this one.
 4. **Undo/redo** → `useUndoStack(engineCreate, engineDelete, engineChange)`.
-   Pure refs, ~50 lines, three injected callbacks.
+   Pure refs, ~50 lines, three injected callbacks. Independent of step 3.
 5. **Navigation history** → `useNavHistory(paneHandle)`. Already keyed per pane.
+   NOTE: verify against the step-3 postmortem first — if it dispatches on the
+   active pane the same way search does, it has the same problem.
 6. **Touch input** → `useTouchGestures(containerRef, innerRef, gestureRef)`.
    Requires one change first: pass `pagePointFromClient` in as a parameter
    instead of reading it from the closure through its late-bound ref.
 7. **Save model** → `useSaveModel(payload, onDirtyChange, onExternalSaveConflict)`.
 
-That is roughly 1 200 lines out of the component with no new prop-drilling,
-because each hook takes what it already reads.
+## Postmortem: why search is not the seam it looks like
+
+Worth reading before attempting steps 5–7, because the same two shapes are what
+make a seam fake.
+
+**A single `PaneHandle` parameter is a behaviour change, not a refactor.**
+`gotoMatch` and `waitForTextLayer` do not act on *a* pane; they act on the
+*active* one, via `activePaneRef` → `handleForRef.current(pane)`. Hand the hook
+one `PaneHandle` and every search hit lands in column A — silently, and only in
+split view, which is exactly the kind of regression no typecheck catches and no
+test covers. `handleForRef` is one of the eleven, assigned as a fresh inline
+closure and read from about fifteen places; there is no value to pass in without
+first restructuring that dispatcher.
+
+**The recursion crosses the cut in both directions.** `pickSemanticHit` (inside
+the region) calls `jumpToAiCitation` (below it), which reads `waitForTextLayer`,
+`gotoSeqRef` and `setSearchHits` from inside the region — and lists
+`waitForTextLayer` in its dependency array, so it is evaluated during render, not
+at call time. The hook would have to be called before `jumpToAiCitation` exists,
+and `pickSemanticHit` could then only reach it through a newly invented twelfth
+late-bound ref. Adding to the eleven to remove 175 lines is not progress.
+
+Measured cost if forced anyway: seven inbound values, twenty-four outbound, for
+~175 lines moved. That is the "replace closure access with a wide context object
+and make things worse" case this document warns about — it just wears a smaller
+number than the annotation block does.
 
 ## Leave these alone
 
