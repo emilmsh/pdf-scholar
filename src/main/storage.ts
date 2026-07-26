@@ -2,6 +2,7 @@ import { app } from 'electron'
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { AiConfig, AiProviderId, ReadingPosition, RecentFile, Settings } from '../shared/types'
+import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
 export type { Settings }
 
 export interface StoredAiConfig extends AiConfig {
@@ -27,12 +28,7 @@ export interface AppState {
 
 const DEFAULT_AI: StoredAiConfig = {
   provider: 'anthropic',
-  models: {
-    anthropic: 'claude-sonnet-5',
-    openai: 'gpt-5.6-terra',
-    azure: '',
-    mock: 'mock-1'
-  },
+  models: { ...DEFAULT_AI_MODELS },
   azure: { endpoint: '', deployment: '' },
   thinking: 'medium',
   keys: { anthropic: '', openai: '', azure: '', mock: '' }
@@ -41,13 +37,7 @@ const DEFAULT_AI: StoredAiConfig = {
 const DEFAULTS: AppState = {
   recents: [],
   positions: {},
-  settings: {
-    theme: 'day',
-    autoLight: 'day',
-    autoDark: 'night',
-    keepAwake: false,
-    language: 'auto'
-  },
+  settings: { ...DEFAULT_SETTINGS },
   ai: DEFAULT_AI
 }
 

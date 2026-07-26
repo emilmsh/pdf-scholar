@@ -106,6 +106,7 @@ import { clamp } from '../clamp'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { PANEL_DEFAULTS, PANEL_LS_KEY, usePanelWidths } from '../hooks/usePanelWidths'
 import { useUndoStack } from '../hooks/useUndoStack'
+import { DEFAULT_SETTINGS } from '../../../shared/defaults'
 
 // One worker per open document (not a shared global port) so the document can
 // be re-opened after the annotation engine rewrites the file on disk.
@@ -3133,13 +3134,10 @@ export default function PdfViewer({
    *  positions, and — obviously — any annotation in any file. The confirm
    *  dialog's detail line says so, so the user knows before pressing it. */
   const resetPreferences = useCallback(() => {
-    onSettingsChange({
-      theme: 'day',
-      autoLight: 'day',
-      autoDark: 'night',
-      keepAwake: false,
-      language: 'auto'
-    })
+    // Spread, not a literal: this argument is a Partial<Settings>, so a new
+    // preference listed here by hand would compile clean and silently stop
+    // being reset.
+    onSettingsChange({ ...DEFAULT_SETTINGS })
     clearToolPrefs()
     setPrefs(structuredClone(DEFAULT_TOOL_PREFS))
     clearCustomColors()

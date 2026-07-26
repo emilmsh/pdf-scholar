@@ -1,25 +1,9 @@
 {
+  "extends": "./config/tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "strict": true,
-    // Cheap strictness on top of strict: all four cost zero errors today, and
-    // they are here to stop that from changing quietly. noUnusedParameters is
-    // included deliberately — an unused prop is usually a prop that stopped
-    // being threaded through.
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true,
-    "noEmit": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true
+    "jsx": "react-jsx"
   },
   "include": ["src/renderer/src", "src/shared"]
 }

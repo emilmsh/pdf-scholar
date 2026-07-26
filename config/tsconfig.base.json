@@ -1,0 +1,24 @@
+// Compiler options every target shares. The three project configs differ only in
+// lib/jsx and which files they include, so the strictness lives here once:
+// enabling a flag in three places by hand is exactly how they drift, and catching
+// drift is what these flags are for.
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "strict": true,
+    // On top of strict, and all free at the time they were turned on — they are
+    // here to keep it that way. noUnusedParameters is deliberate: an unused prop
+    // is usually a prop that stopped being threaded through.
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}

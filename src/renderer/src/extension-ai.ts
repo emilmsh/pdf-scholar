@@ -27,13 +27,14 @@ import type {
 import { runProviderChat } from '../../shared/ai-chat'
 import { store } from './extension-store'
 import { isSealed, seal, sealingAvailable, unseal } from './extension-key-crypto'
+import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 
 const K_AI_CONFIG = 'pdfx-ai-config'
 const K_AI_KEYS = 'pdfx-ai-keys'
 
 const DEFAULT_CONFIG: AiConfig = {
   provider: 'mock',
-  models: { anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-terra', azure: '', mock: 'mock-1' },
+  models: { ...DEFAULT_AI_MODELS },
   azure: { endpoint: '', deployment: '' },
   thinking: 'medium'
 }

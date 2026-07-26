@@ -102,6 +102,13 @@ const sessionKeys = new Map<AiProviderId, string>()
 const canUseKeystore = (): boolean => safeStorage.isEncryptionAvailable()
 
 function keyStorageMode(): KeyStorageMode {
+  // A surviving `plain:` blob outranks everything else we could say. Migration
+  // clears these at startup, but it has to write the state file to do so — if
+  // that write failed (read-only profile, full disk), the plaintext is still
+  // there and still being read. Reporting the mode we WISH we had would be the
+  // one lie this type exists to prevent.
+  const keys = getState().ai.keys
+  if (PROVIDERS.some((p) => (keys[p] ?? '').startsWith('plain:'))) return 'plaintext'
   if (canUseKeystore()) return 'os-keystore'
   return 'session-only'
 }

@@ -1,23 +1,7 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "WebWorker"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
-    // Cheap strictness on top of strict: all four cost zero errors today, and
-    // they are here to stop that from changing quietly. noUnusedParameters is
-    // included deliberately — an unused prop is usually a prop that stopped
-    // being threaded through.
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true,
-    "noEmit": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true
+    "lib": ["ES2022", "DOM", "WebWorker"]
   },
   "include": ["../src/extension/background.ts", "../src/renderer/src/chrome.d.ts"]
 }

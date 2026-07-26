@@ -14,6 +14,7 @@ import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
 import TabBar from './components/TabBar'
 import Welcome from './components/Welcome'
+import { DEFAULT_SETTINGS as FALLBACK_SETTINGS } from '../../shared/defaults'
 
 interface OpenTab {
   id: string
@@ -24,13 +25,6 @@ interface OpenTab {
   epoch: number
 }
 
-const FALLBACK_SETTINGS: Settings = {
-  theme: 'day',
-  autoLight: 'day',
-  autoDark: 'night',
-  keepAwake: false,
-  language: 'auto'
-}
 
 let tabCounter = 0
 

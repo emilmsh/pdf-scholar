@@ -12,6 +12,8 @@ import type {
 import { t } from './i18n'
 import { createExtensionApi, isExtensionContext } from './extension-api'
 import { version as appVersion } from '../../../package.json'
+import { DEFAULT_SETTINGS } from '../../shared/defaults'
+import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 import {
   browserApplyAnnotation,
   browserDeleteAnnotation,
@@ -32,13 +34,6 @@ interface WebState {
 
 const LS_KEY = 'pdfx-web-state'
 
-const DEFAULT_SETTINGS: Settings = {
-  theme: 'day',
-  autoLight: 'day',
-  autoDark: 'night',
-  keepAwake: false,
-  language: 'auto'
-}
 
 function loadWebState(): WebState {
   const fallback: WebState = { positions: {}, settings: DEFAULT_SETTINGS }
@@ -300,7 +295,7 @@ const webAiAborted = new Set<number>()
 function loadWebAiConfig(): AiConfig {
   const fallback: AiConfig = {
     provider: 'mock',
-    models: { anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-terra', azure: '', mock: 'mock-1' },
+    models: { ...DEFAULT_AI_MODELS },
     azure: { endpoint: '', deployment: '' },
     thinking: 'medium'
   }
