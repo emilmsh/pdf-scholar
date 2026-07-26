@@ -28,6 +28,9 @@ jobs:
       # Engine round-trip test (EmbedPDF writes, mupdf independently verifies) —
       # pure Node + WASM, runs identically on every OS
       - run: npm run test:engine
+      # The >150 MB path takes the incremental appender instead of the engine —
+      # a separate write implementation, so it needs its own gate
+      - run: npm run test:appender
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

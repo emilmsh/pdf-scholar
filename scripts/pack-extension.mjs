@@ -13,8 +13,9 @@
 //              there ("manifest not found").
 //
 // Entry names always use forward slashes (see scripts/lib/zip.mjs — the Windows
-// built-ins write backslashes, which store uploaders mis-parse). Mirrors what
-// release.yml builds on Linux with `zip`.
+// built-ins write backslashes, which store uploaders mis-parse). This script is
+// the ONLY implementation of those two zip shapes: release.yml calls it rather
+// than rebuilding the layout in shell, so the contract cannot drift.
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { writeZip } from './lib/zip.mjs'

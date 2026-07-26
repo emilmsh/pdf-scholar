@@ -33,13 +33,13 @@
   },
   "author": "Emil Mathias Strøm Halseth",
   "license": "MIT",
+  "//dependencies": "Runtime-only: electron-builder packs everything here into the installer. Anything the RENDERER imports is bundled by vite instead (externalizeDepsPlugin runs for main/preload only) and belongs in devDependencies — listing it here ships a second, unused copy.",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0",
     "@embedpdf/engines": "^2.14.4",
     "@embedpdf/models": "^2.14.4",
     "@embedpdf/pdfium": "^2.14.4",
-    "electron-updater": "^6.8.9",
-    "katex": "^0.18.1"
+    "electron-updater": "^6.8.9"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
@@ -49,6 +49,8 @@
     "electron": "^43.1.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "esbuild": "^0.25.12",
+    "katex": "^0.18.1",
     "mupdf": "1.28.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.1.200",

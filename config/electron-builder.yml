@@ -15,6 +15,13 @@ directories:
 files:
   - out/**/*
   - '!**/*.map'
+  # electron-builder packs production `dependencies` on its own path, ignoring
+  # the list above. @embedpdf/engines pulls in seven font packs whose .otf files
+  # are 150 MB — 80%+ of the installer — and none of them are ever opened: the
+  # engine imports each pack's tiny `fonts` MANIFEST and resolves the binaries
+  # from jsDelivr at runtime (engines/dist/lib/pdfium/index.js buildCdnUrls).
+  # Keep each pack's dist/ so those static imports still resolve; drop fonts/.
+  - '!node_modules/@embedpdf/fonts-*/fonts/**'
 asarUnpack:
   # loaded via dynamic import() — keep it on real disk
   - node_modules/@anthropic-ai/sdk/**
