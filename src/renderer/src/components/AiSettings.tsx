@@ -11,6 +11,7 @@ import { useState } from 'react'
 import type { AiConfigView, AiProviderId } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
+import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
 import { DEFAULT_MODELS, KEY_PROVIDERS, SPEND_CAP_URLS } from './ai-models'
 
 interface SettingsProps {
@@ -32,12 +33,14 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
   })
   const [endpoint, setEndpoint] = useState(config.azure.endpoint)
   const [deployment, setDeployment] = useState(config.azure.deployment)
+  const [apiVersion, setApiVersion] = useState(config.azure.apiVersion)
   const [saving, setSaving] = useState(false)
 
   const save = async (): Promise<void> => {
     setSaving(true)
     const patch: Parameters<typeof bridge.aiSetConfig>[0] = {
-      azure: { endpoint: endpoint.trim(), deployment: deployment.trim() }
+      // apiVersion '' = use the app's built-in default (placeholder shows it)
+      azure: { endpoint: endpoint.trim(), deployment: deployment.trim(), apiVersion: apiVersion.trim() }
     }
     for (const { id } of KEY_PROVIDERS) {
       if (keys[id].trim()) (patch.keys ??= {})[id] = keys[id].trim()
@@ -57,6 +60,9 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
         })
       }
     }
+    // A new key is the moment the live model list becomes fetchable — refresh
+    // now so the model menu is current the first time it opens.
+    if (patch.keys) next = await bridge.aiRefreshModels(true)
     setSaving(false)
     onSaved(next)
   }
@@ -123,6 +129,15 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
                 <input
                   value={deployment}
                   onChange={(e) => setDeployment(e.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+              <label className="ai-field">
+                <span>{t('ai.apiVersion')}</span>
+                <input
+                  value={apiVersion}
+                  placeholder={DEFAULT_AZURE_API_VERSION}
+                  onChange={(e) => setApiVersion(e.target.value)}
                   spellCheck={false}
                 />
               </label>

@@ -400,6 +400,8 @@ const nb = {
   'ai.thinkHigh': 'Høy',
   'ai.endpoint': 'Endepunkt',
   'ai.deployment': 'Deployment',
+  'ai.apiVersion': 'API-versjon (valgfri)',
+  'ai.modelMissing': 'Leverandøren lister ikke lenger denne modellen — den kan være utfaset. Velg en annen.',
   'ai.settingsNote':
     'Nøkkelen brukes kun direkte mot leverandørens API. Dokumentteksten sendes til leverandøren først når du stiller et spørsmål.',
   // One per KeyStorageMode. Each says what protects the key AND what does not —
@@ -843,6 +845,8 @@ const en: Dict = {
   'ai.thinkHigh': 'High',
   'ai.endpoint': 'Endpoint',
   'ai.deployment': 'Deployment',
+  'ai.apiVersion': 'API version (optional)',
+  'ai.modelMissing': 'The provider no longer lists this model — it may have been retired. Pick another.',
   'ai.settingsNote':
     'The key is used only directly against the provider’s API. The document text is sent to the provider only when you ask a question.',
   'ai.keyStoreOs':

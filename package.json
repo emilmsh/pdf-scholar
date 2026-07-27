@@ -22,6 +22,7 @@
     "shoot": "node scripts/shoot-screenshots.mjs",
     "check:shots": "node scripts/check-screenshots.mjs",
     "check:css": "node scripts/check-dead-css.mjs",
+    "check:models": "node scripts/check-models.mjs",
     "test:engine": "esbuild src/main/annotation-engine-embedpdf.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.engine-test-bundle.mjs && node scripts/test-engine-embedpdf.mjs",
     "test:appender": "node scripts/test-appender.mjs",
     "test:cache": "node scripts/test-engine-cache.mjs",

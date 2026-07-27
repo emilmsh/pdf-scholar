@@ -141,6 +141,13 @@ not as acceptable platform lag.
     all; full parity would need a native-messaging host. If a new platform is added,
     it must map to one of these modes and say so — a platform whose protection is
     not describable here does not ship the AI features.
+13. **The live AI model catalog is parity-identical by construction.** Fetch,
+    TTL and merge logic live once in `src/shared/ai-model-catalog.ts` (same rule
+    as the chat core); only the cache location differs — desktop persists it in
+    `pdfx-state.json` (main process, `ai:refresh-models` IPC), the extension in
+    `chrome.storage.local` (`extension-ai.ts`). The plain-web preview is
+    keyless/mock-only, so it has no catalog to fetch (`aiRefreshModels` no-ops).
+    Curated-list maintenance is platform-neutral: `docs/MODEL-UPDATE.md`.
 
 ## Maintenance rules
 

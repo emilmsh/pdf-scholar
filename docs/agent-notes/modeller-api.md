@@ -1,5 +1,11 @@
 # API-katalog (agentverifisert juli 2026) — grunnlag for modell/tenkeinnsats-implementasjon
 
+> Vedlikehold: kjør `npm run check:models` og følg `docs/MODEL-UPDATE.md` når
+> katalogen skal fornyes. Appen henter nå modell-lister og kapabiliteter live
+> fra leverandørene (src/shared/ai-model-catalog.ts) og degraderer pent på
+> parameter-400 — dette dokumentet er notatene bak regex-fallbackene i
+> src/shared/ai-chat.ts, ikke lenger eneste kilde.
+
 ## Anthropic
 
 | Modell | ID | Kontekst | Pris inn/ut per MTok |
@@ -11,7 +17,7 @@
 
 Thinking-regler:
 - `budget_tokens` gir **400** på Fable/Opus 4.8/Sonnet 5. Bruk `thinking: {type:"adaptive"}` + `output_config: {effort: "low|medium|high|xhigh|max"}`.
-- Fable 5: thinking alltid på (disabled/budget → 400); `temperature` → 400; krever `client.beta.messages.stream` med `betas: ['server-side-fallback-2026-06-01']`, `fallbacks: [{model:'claude-opus-4-8'}]`; sjekk `stop_reason === 'refusal'` før content leses.
+- Fable 5: thinking alltid på (disabled/budget → 400); `temperature` → 400; krever `client.beta.messages.stream` med `betas: ['server-side-fallback-2026-07-01']`, `fallbacks: 'default'` (Anthropic velger fallback per avslagskategori — ingen pinnet modell-id å vedlikeholde; den eldre array-formen bruker `-2026-06-01`-headeren); sjekk `stop_reason === 'refusal'` før content leses.
 - Sonnet 5: thinking er PÅ som default når feltet utelates — «Av» krever `{type:"disabled"}`.
 - Opus 4.8: utelatt felt = av.
 - Haiku 4.5: `effort` feiler; thinking via `budget_tokens` (min 1024) eller utelat.

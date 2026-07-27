@@ -19,12 +19,16 @@ import type {
   AiChatResult,
   AiCitation,
   AiContentPart,
+  AiModelCaps,
+  AiModelCatalog,
   AiProviderId,
   AiUsage,
   ThinkingLevel
 } from './types'
+import { remoteModel } from './ai-model-catalog'
+import { DEFAULT_AZURE_API_VERSION } from './defaults'
 
-// ---------- Reasoning-effort mapping (verified 2026-07, see docs/agent-notes/modeller-api.md) ----------
+// ---------- Reasoning-effort mapping (verified 2026-07, see docs/MODEL-UPDATE.md) ----------
 
 type Effort = 'low' | 'medium' | 'high'
 const EFFORT: Record<Exclude<ThinkingLevel, 'off'>, Effort> = {
@@ -33,32 +37,80 @@ const EFFORT: Record<Exclude<ThinkingLevel, 'off'>, Effort> = {
   high: 'high'
 }
 
+/** What request shaping needs to know about an Anthropic model. Resolved from
+ *  the live capability catalog when a snapshot exists (fetched via
+ *  ai-model-catalog.ts with the user's key); the regex fallback below covers
+ *  first-run/offline and matches the families verified by hand in
+ *  docs/MODEL-UPDATE.md. When both disagree, the API's own answer wins. */
+interface AnthropicTraits {
+  /** Effort levels accepted in output_config ([] = none — Haiku-style) */
+  effort: string[]
+  /** Accepts thinking: {type:'adaptive'} */
+  adaptive: boolean
+  /** Fable family: thinking cannot be configured — never send the field */
+  alwaysThinks: boolean
+  /** 'off' needs an explicit {type:'disabled'} because omitting the field
+   *  means "thinking on" for this model (Sonnet 5 and newer generations) */
+  explicitOff: boolean
+}
+
+function anthropicTraits(model: string, caps?: AiModelCaps): AnthropicTraits {
+  // Always-on thinking is a family behavior the capability tree does not
+  // expose, so the Fable test applies on both branches.
+  const isFable = /fable|mythos/i.test(model)
+  if (caps) {
+    return {
+      effort: caps.effort,
+      adaptive: caps.adaptiveThinking,
+      alwaysThinks: isFable,
+      // adaptive-without-budget marks the generations where an omitted field
+      // means "thinking on" and explicit disabled is accepted (Sonnet 5,
+      // Opus 4.8+); budget-capable models (Haiku 4.5) treat omission as off.
+      explicitOff: caps.adaptiveThinking && !caps.budgetThinking
+    }
+  }
+  const isHaiku = /haiku/i.test(model)
+  return {
+    effort: isHaiku ? [] : ['low', 'medium', 'high'],
+    adaptive: !isHaiku,
+    alwaysThinks: isFable,
+    explicitOff: /sonnet-[5-9]/i.test(model)
+  }
+}
+
 /** Anthropic thinking params for a model + level. Rules that bite:
  *  budget_tokens is rejected (400) on Fable/Opus 4.8/Sonnet 5 — use adaptive
  *  thinking + output_config.effort; Haiku rejects effort entirely; Sonnet 5
- *  thinks by default so "off" must be explicit. */
+ *  thinks by default so "off" must be explicit. A model the traits misjudge is
+ *  caught by the degrade-on-400 retry in chatAnthropic, so the worst case is a
+ *  plain answer without thinking tuning, not an error. */
 function anthropicThinking(
   model: string,
-  level: ThinkingLevel
+  level: ThinkingLevel,
+  caps?: AiModelCaps
 ): {
   thinking?: { type: 'adaptive' } | { type: 'disabled' }
   outputConfig?: { effort: Effort }
   maxTokens: number
 } {
-  const isHaiku = /haiku/i.test(model)
-  const isFable = /fable|mythos/i.test(model)
-  // Haiku: no effort support; keep it simple (no thinking)
-  if (isHaiku) return { maxTokens: 4096 }
+  const traits = anthropicTraits(model, caps)
   if (level === 'off') {
-    // Fable always thinks; Sonnet 5 thinks by default → disable explicitly
-    if (isFable) return { outputConfig: { effort: 'low' }, maxTokens: 12000 }
-    if (/sonnet-5/i.test(model)) return { thinking: { type: 'disabled' }, maxTokens: 4096 }
-    return { maxTokens: 4096 } // Opus: omitting thinking = off
+    // Fable-style: thinking cannot be turned off — lowest effort is the honest mapping
+    if (traits.alwaysThinks) {
+      return traits.effort.includes('low')
+        ? { outputConfig: { effort: 'low' }, maxTokens: 12000 }
+        : { maxTokens: 12000 }
+    }
+    if (traits.explicitOff) return { thinking: { type: 'disabled' }, maxTokens: 4096 }
+    return { maxTokens: 4096 }
   }
   const effort = EFFORT[level]
-  // Fable: thinking always on, don't send the thinking field
-  if (isFable) return { outputConfig: { effort }, maxTokens: 16000 }
-  return { thinking: { type: 'adaptive' }, outputConfig: { effort }, maxTokens: 12000 }
+  const outputConfig = traits.effort.includes(effort) ? { effort } : undefined
+  if (traits.alwaysThinks) return { ...(outputConfig && { outputConfig }), maxTokens: 16000 }
+  // No adaptive support (Haiku, pre-4.6 ids): send no thinking at all; effort
+  // still goes through when the model accepts it (e.g. Opus 4.5).
+  if (!traits.adaptive) return { ...(outputConfig && { outputConfig }), maxTokens: 4096 }
+  return { thinking: { type: 'adaptive' }, ...(outputConfig && { outputConfig }), maxTokens: 12000 }
 }
 
 /** OpenAI reasoning_effort value (none maps 'off') */
@@ -137,6 +189,7 @@ async function chatAnthropic(
   apiKey: string,
   model: string,
   thinking: ThinkingLevel,
+  caps: AiModelCaps | undefined,
   req: AiChatRequest,
   emit: Emit,
   signal: AbortSignal
@@ -184,7 +237,7 @@ async function chatAnthropic(
     return { role: m.role, content: m.text }
   })
 
-  const tuning = anthropicThinking(model, thinking)
+  const tuning = anthropicThinking(model, thinking, caps)
   const isFable = /fable|mythos/i.test(model)
   const params: Record<string, unknown> = {
     model,
@@ -195,12 +248,46 @@ async function chatAnthropic(
   if (tuning.thinking) params.thinking = tuning.thinking
   if (tuning.outputConfig) params.output_config = tuning.outputConfig
   if (webSearchEnabled(req)) params.tools = [anthropicWebSearchTool(model)]
-  // Fable: safety-classifier refusals are opt-in recoverable via server-side
-  // fallback to Opus 4.8 (see docs/agent-notes/modeller-api.md)
+  // Fable: safety-classifier refusals are opt-in recoverable server-side. The
+  // 'default' mode routes to Anthropic's recommended fallback per refusal
+  // category, so there is no pinned fallback model id to keep current here.
   if (isFable) {
-    params.betas = ['server-side-fallback-2026-06-01']
-    params.fallbacks = [{ model: 'claude-opus-4-8' }]
+    params.betas = ['server-side-fallback-2026-07-01']
+    params.fallbacks = 'default'
   }
+
+  // Degrade-on-400 net: when the API rejects a request over a parameter WE
+  // added (a model the traits misjudged — new family, retired heuristic), strip
+  // exactly the mentioned parameter group and let the caller retry once. This
+  // is the layer that keeps unknown future models answering — without thinking
+  // tuning or with the basic search tool — instead of surfacing a raw 400.
+  const degrade = (message: string): boolean => {
+    let changed = false
+    if (
+      ('thinking' in params || 'output_config' in params) &&
+      /thinking|output_config|effort|budget_tokens/i.test(message)
+    ) {
+      delete params.thinking
+      delete params.output_config
+      changed = true
+    }
+    if (Array.isArray(params.tools) && /web_search/i.test(message)) {
+      const tools = params.tools as { type?: string }[]
+      if (tools.some((t) => t.type !== 'web_search_20250305')) {
+        params.tools = [
+          { type: 'web_search_20250305', name: 'web_search', max_uses: WEB_SEARCH_MAX_USES }
+        ]
+        changed = true
+      }
+    }
+    if ('fallbacks' in params && /fallback|betas/i.test(message)) {
+      delete params.fallbacks
+      delete params.betas
+      changed = true
+    }
+    return changed
+  }
+
   const api = isFable ? client.beta.messages : client.messages
   type AnthropicStream = ReturnType<typeof client.messages.stream>
   // Bind to `api`: the SDK's stream() reads this._client internally, so calling it
@@ -216,17 +303,44 @@ async function chatAnthropic(
   const usage: AiUsage = { ...EMPTY_USAGE }
   const blocks: FinalMessage['content'] = []
   let final: FinalMessage
-  for (let round = 0; ; round++) {
-    const stream = streamFn(params, { signal })
-    stream.on('text', (delta: string) => emit(delta))
-    final = await stream.finalMessage()
+  // Parameter 400s are validated before any output, so a degraded retry is only
+  // safe (no duplicated text in the panel) while nothing has streamed yet.
+  let emitted = false
+  for (let round = 0, retries = 0; ; ) {
+    try {
+      const stream = streamFn(params, { signal })
+      stream.on('text', (delta: string) => {
+        emitted = true
+        emit(delta)
+      })
+      final = await stream.finalMessage()
+    } catch (err) {
+      const status = (err as { status?: unknown } | null)?.status
+      const message = err instanceof Error ? err.message : String(err)
+      if (status === 400 && !emitted && retries < 2 && degrade(message)) {
+        retries++
+        continue
+      }
+      throw err
+    }
     blocks.push(...final.content)
     usage.inputTokens += final.usage.input_tokens
     usage.outputTokens += final.usage.output_tokens
     usage.cacheReadTokens += final.usage.cache_read_input_tokens ?? 0
     usage.cacheWriteTokens += final.usage.cache_creation_input_tokens ?? 0
     if (final.stop_reason !== 'pause_turn' || round >= 5) break
+    round++
     ;(params.messages as unknown[]).push({ role: 'assistant', content: final.content })
+  }
+
+  // Safety classifiers decline with HTTP 200 + stop_reason 'refusal' (content
+  // empty, or partial after a mid-stream stop). With no text at all there is
+  // nothing to render — say what happened instead of showing a blank answer.
+  if (
+    final.stop_reason === 'refusal' &&
+    !blocks.some((b: (typeof blocks)[number]) => b.type === 'text' && b.text)
+  ) {
+    return { error: 'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren). Prøv å omformulere, eller bytt modell.' }
   }
 
   // char_location = grounded document citation; web_search_result_location =
@@ -373,14 +487,29 @@ async function chatOpenAiResponses(
   if (webSearchEnabled(req)) body.tools = [{ type: 'web_search' }]
   if (/gpt-5|o[0-9]/i.test(model)) body.reasoning = { effort: openAiEffort(thinking) }
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify(body),
-    signal
-  })
-  if (!response.ok || !response.body) {
+  // Same degrade-on-400 idea as the Anthropic path: when the model rejects a
+  // parameter we added on a heuristic (reasoning effort, the web-search tool),
+  // strip that parameter and retry rather than failing the whole question.
+  let response: Response
+  for (let attempt = 0; ; attempt++) {
+    response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(body),
+      signal
+    })
+    if (response.ok && response.body) break
     const detail = await response.text().catch(() => '')
+    if (response.status === 400 && attempt < 2) {
+      if ('reasoning' in body && /reasoning/i.test(detail)) {
+        delete body.reasoning
+        continue
+      }
+      if ('tools' in body && /web_search|tools?\b/i.test(detail)) {
+        delete body.tools
+        continue
+      }
+    }
     return { error: `HTTP ${response.status}: ${detail.slice(0, 300)}` }
   }
 
@@ -511,14 +640,27 @@ async function chatOpenAiCompatible(
   // gpt-5.6 reasoning control (harmless on models that ignore it)
   if (/gpt-5|o[0-9]/i.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking)
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...headers },
-    body: JSON.stringify(body),
-    signal
-  })
-  if (!response.ok || !response.body) {
+  // Deployments name models we cannot inspect, so the reasoning heuristic can
+  // misfire — a 400 blaming it gets one retry without, same net as the other paths.
+  let response: Response
+  for (let attempt = 0; ; attempt++) {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify(body),
+      signal
+    })
+    if (response.ok && response.body) break
     const detail = await response.text().catch(() => '')
+    if (
+      response.status === 400 &&
+      attempt < 1 &&
+      'reasoning_effort' in body &&
+      /reasoning/i.test(detail)
+    ) {
+      delete body.reasoning_effort
+      continue
+    }
     return { error: `HTTP ${response.status}: ${detail.slice(0, 300)}` }
   }
 
@@ -626,8 +768,11 @@ export interface ProviderChatParams {
   /** Decrypted/plaintext key for the chosen provider (empty for mock) */
   key: string
   models: Record<AiProviderId, string>
-  azure: { endpoint: string; deployment: string }
+  azure: { endpoint: string; deployment: string; apiVersion: string }
   thinking: ThinkingLevel
+  /** Live model catalog (capability data for request shaping); absent or empty
+   *  falls back to the per-family heuristics */
+  catalog?: AiModelCatalog
   req: AiChatRequest
   emit: Emit
   signal: AbortSignal
@@ -638,11 +783,13 @@ export interface ProviderChatParams {
  *  missing-key case in its own words); this only validates provider-specific
  *  extras (Azure endpoint/deployment). Aborts surface as { error: 'Avbrutt' }. */
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
-  const { provider, key, models, azure, thinking, req, emit, signal } = params
+  const { provider, key, models, azure, thinking, catalog, req, emit, signal } = params
   try {
     switch (provider) {
-      case 'anthropic':
-        return await chatAnthropic(key, models.anthropic, thinking, req, emit, signal)
+      case 'anthropic': {
+        const caps = remoteModel(catalog, 'anthropic', models.anthropic)?.caps
+        return await chatAnthropic(key, models.anthropic, thinking, caps, req, emit, signal)
+      }
       case 'openai':
         return await chatOpenAiResponses(key, models.openai, thinking, req, emit, signal)
       case 'azure': {
@@ -650,8 +797,9 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
         if (!endpoint || !azure.deployment) {
           return { error: 'Azure-endepunkt og deployment må fylles ut i KI-innstillingene.' }
         }
+        const apiVersion = azure.apiVersion.trim() || DEFAULT_AZURE_API_VERSION
         return await chatOpenAiCompatible(
-          `${endpoint}/openai/deployments/${azure.deployment}/chat/completions?api-version=2024-12-01-preview`,
+          `${endpoint}/openai/deployments/${azure.deployment}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`,
           { 'api-key': key },
           null,
           thinking,

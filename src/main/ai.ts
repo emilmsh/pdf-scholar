@@ -18,6 +18,7 @@ import type {
   KeyStorageMode
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
+import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
 
 const PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'mock']
@@ -186,7 +187,8 @@ function configView(): AiConfigView {
     thinking: ai.thinking,
     hasKey,
     keyStorage: keyStorageMode(),
-    keysSupported: true
+    keysSupported: true,
+    catalog: getState().modelCatalog
   }
 }
 
@@ -235,6 +237,24 @@ export function registerAiIpc(): void {
     }
   )
 
+  // Refresh the live model catalog from every provider with a usable key.
+  // TTL-gated inside refreshCatalog unless forced, so the UI can call this on
+  // every settings/menu open without hammering the providers; failures keep
+  // the previous snapshot and are invisible here by design.
+  ipcMain.handle('ai:refresh-models', async (_e, force: boolean) => {
+    const state = getState()
+    const next = await refreshCatalog(
+      state.modelCatalog,
+      { anthropic: keyFor('anthropic'), openai: keyFor('openai') },
+      force === true
+    )
+    if (CATALOG_PROVIDERS.some((p) => next[p] !== state.modelCatalog[p])) {
+      state.modelCatalog = next
+      saveState()
+    }
+    return configView()
+  })
+
   ipcMain.handle('ai:chat', async (e: IpcMainInvokeEvent, req: AiChatRequest): Promise<AiChatResult> => {
     const sender = e.sender
     const controller = new AbortController()
@@ -265,6 +285,7 @@ export function registerAiIpc(): void {
         models: ai.models,
         azure: ai.azure,
         thinking: ai.thinking,
+        catalog: getState().modelCatalog,
         req,
         emit,
         signal: controller.signal

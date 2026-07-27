@@ -1,14 +1,16 @@
 // The provider/model catalogue: which providers exist, which models each one
 // offers, what a model is called in the UI, and where its spending cap lives.
-// Pure data plus one formatting helper — no JSX, no state.
+// Pure data plus formatting/merge helpers — no JSX, no state.
 //
 // Its own file because three separate surfaces read it (the key manager, the
 // header chip's quick menu, and the panel header's model name) and because it
 // is the part of the AI code with an external maintenance cadence: model ids
-// churn with the providers, and the lists are verified by hand against
-// docs/agent-notes/modeller-api.md. Keeping it apart means a model refresh
-// touches nothing that renders.
-import type { AiProviderId, ThinkingLevel } from '../../../shared/types'
+// churn with the providers. The curated list below is the shipped baseline;
+// at runtime it is merged with the live catalog fetched from the providers
+// (modelOptions below), so new models appear without an app update and retired
+// ones get flagged. Refresh workflow for the curated data: docs/MODEL-UPDATE.md
+// (`npm run check:models` reports the drift).
+import type { AiModelCatalog, AiProviderId, ThinkingLevel } from '../../../shared/types'
 import { t } from '../i18n'
 import type { MsgKey } from '../i18n'
 
@@ -50,6 +52,42 @@ export const MODELS: Record<
 export const DEFAULT_MODELS: Partial<Record<AiProviderId, string>> = {
   anthropic: 'claude-sonnet-5',
   openai: 'gpt-5.6-terra'
+}
+
+/** One entry in a model dropdown: the curated list merged with the live
+ *  catalog. `missing` = curated/selected id no longer listed by the provider
+ *  (probably retired — the UI marks it); `curated` = shipped entry with a
+ *  hand-written label and hint, as opposed to a live-discovered id. */
+export interface ModelOption {
+  id: string
+  label: string
+  short: string
+  hint?: MsgKey
+  curated: boolean
+  missing: boolean
+}
+
+/** The dropdown list for a provider: curated entries first (flagged when the
+ *  live catalog no longer lists them), then live-discovered models the curated
+ *  list does not know yet, in the provider's own (newest-first) order. With no
+ *  fetched catalog this degrades to exactly the curated list. */
+export function modelOptions(provider: AiProviderId, catalog?: AiModelCatalog): ModelOption[] {
+  const curated = MODELS[provider] ?? []
+  const remote =
+    provider === 'anthropic' || provider === 'openai' ? catalog?.[provider] : undefined
+  if (!remote) return curated.map((m) => ({ ...m, curated: true, missing: false }))
+  const remoteIds = new Set(remote.models.map((m) => m.id))
+  const options: ModelOption[] = curated.map((m) => ({
+    ...m,
+    curated: true,
+    missing: !remoteIds.has(m.id)
+  }))
+  for (const m of remote.models) {
+    if (curated.some((c) => c.id === m.id)) continue
+    const label = m.displayName ?? prettyModelName(provider, m.id)
+    options.push({ id: m.id, label, short: prettyModelName(provider, m.id), curated: false, missing: false })
+  }
+  return options
 }
 
 /** Clean display name for the header chip. Uses the curated `short` name when the

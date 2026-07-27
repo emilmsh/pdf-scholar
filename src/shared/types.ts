@@ -188,9 +188,42 @@ export interface AiConfig {
   provider: AiProviderId
   /** Model id/deployment per provider */
   models: Record<AiProviderId, string>
-  azure: { endpoint: string; deployment: string }
+  /** apiVersion '' means "use the app's built-in default" — stored empty so the
+   *  default can move with app updates without touching saved config */
+  azure: { endpoint: string; deployment: string; apiVersion: string }
   /** Reasoning effort (default 'medium') */
   thinking: ThinkingLevel
+}
+
+/** Capability summary for an Anthropic model, normalized from the Models API's
+ *  `capabilities` tree. This is what lets request shaping stop guessing from
+ *  model-name regexes: the API says outright whether adaptive thinking and
+ *  which effort levels are accepted. Absent for providers whose models
+ *  endpoint returns no capability data (OpenAI). */
+export interface AiModelCaps {
+  /** capabilities.thinking.types.adaptive.supported */
+  adaptiveThinking: boolean
+  /** capabilities.thinking.types.enabled.supported (budget_tokens style) */
+  budgetThinking: boolean
+  /** Effort levels with supported:true, in ladder order ([] = no effort param) */
+  effort: string[]
+}
+
+/** One model as reported live by a provider's models endpoint */
+export interface AiRemoteModel {
+  id: string
+  displayName?: string
+  caps?: AiModelCaps
+}
+
+/** Cached snapshot of the providers' live model lists, fetched with the user's
+ *  own API key (see src/shared/ai-model-catalog.ts). Per-provider timestamps so
+ *  one provider failing to refresh never blocks the other. Missing entry =
+ *  never fetched (no key yet, or fetch always failed) — callers fall back to
+ *  the curated list / regex heuristics. */
+export interface AiModelCatalog {
+  anthropic?: { fetchedAt: number; models: AiRemoteModel[] }
+  openai?: { fetchedAt: number; models: AiRemoteModel[] }
 }
 
 /** What is actually protecting a stored API key right now.
@@ -233,6 +266,9 @@ export interface AiConfigView extends AiConfig {
    *  extension can; the plain-web preview is mock-only). Drives the
    *  "add your API key" callout in the assistant. */
   keysSupported: boolean
+  /** Live model lists as last fetched from the providers ({} until a key
+   *  exists and a refresh has succeeded) */
+  catalog: AiModelCatalog
 }
 
 /** An image attached to a user message (figure snip, pasted screenshot).
@@ -441,6 +477,11 @@ export interface PdfxApi {
   aiGetConfig(): Promise<AiConfigView>
   /** Patch config; `keys` entries are plaintext and encrypted at rest in main */
   aiSetConfig(patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }): Promise<AiConfigView>
+  /** Refresh the live model catalog from every provider with a usable key.
+   *  TTL-gated (a fresh cache returns immediately) unless force; resolves with
+   *  the updated view either way, so callers can just re-render from it.
+   *  Fetch failures keep the previous snapshot — this never makes things worse. */
+  aiRefreshModels(force?: boolean): Promise<AiConfigView>
   /** Streams deltas via onAiDelta; resolves with the final result */
   aiChat(request: AiChatRequest): Promise<AiChatResult>
   aiAbort(requestId: number): void

@@ -1,7 +1,15 @@
 import { app } from 'electron'
 import { copyFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import type { AiConfig, AiProviderId, Patch, ReadingPosition, RecentFile, Settings } from '../shared/types'
+import type {
+  AiConfig,
+  AiModelCatalog,
+  AiProviderId,
+  Patch,
+  ReadingPosition,
+  RecentFile,
+  Settings
+} from '../shared/types'
 import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
 export type { Settings }
 
@@ -23,13 +31,15 @@ export interface AppState {
   positions: Record<string, ReadingPosition>
   settings: Settings
   ai: StoredAiConfig
+  /** Live model lists cached from the providers (see shared/ai-model-catalog.ts) */
+  modelCatalog: AiModelCatalog
   window?: WindowState
 }
 
 const DEFAULT_AI: StoredAiConfig = {
   provider: 'anthropic',
   models: { ...DEFAULT_AI_MODELS },
-  azure: { endpoint: '', deployment: '' },
+  azure: { endpoint: '', deployment: '', apiVersion: '' },
   thinking: 'medium',
   keys: { anthropic: '', openai: '', azure: '', mock: '' }
 }
@@ -38,7 +48,8 @@ const DEFAULTS: AppState = {
   recents: [],
   positions: {},
   settings: { ...DEFAULT_SETTINGS },
-  ai: DEFAULT_AI
+  ai: DEFAULT_AI,
+  modelCatalog: {}
 }
 
 export function mergeAiConfig(

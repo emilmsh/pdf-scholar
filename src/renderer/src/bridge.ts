@@ -176,7 +176,8 @@ export const webApi: PdfxApi = {
     hasKey: { anthropic: false, openai: false, azure: false, mock: true },
     // Mock-only preview: no key is ever stored, so there is nothing to protect
     keyStorage: 'session-only' as const,
-    keysSupported: false
+    keysSupported: false,
+    catalog: {}
   }),
   aiSetConfig: async (patch) => {
     const current = loadWebAiConfig()
@@ -191,9 +192,12 @@ export const webApi: PdfxApi = {
       ...next,
       hasKey: { anthropic: false, openai: false, azure: false, mock: true },
       keyStorage: 'session-only' as const,
-      keysSupported: false
+      keysSupported: false,
+      catalog: {}
     }
   },
+  // No keys in the preview → nothing to fetch; hand back the current view
+  aiRefreshModels: async () => webApi.aiGetConfig(),
   aiChat: async (request): Promise<AiChatResult> => {
     const config = loadWebAiConfig()
     if (config.provider !== 'mock') {
@@ -296,7 +300,7 @@ function loadWebAiConfig(): AiConfig {
   const fallback: AiConfig = {
     provider: 'mock',
     models: { ...DEFAULT_AI_MODELS },
-    azure: { endpoint: '', deployment: '' },
+    azure: { endpoint: '', deployment: '', apiVersion: '' },
     thinking: 'medium'
   }
   try {

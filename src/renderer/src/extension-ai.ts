@@ -21,21 +21,24 @@ import type {
   AiChatResult,
   AiConfig,
   AiConfigView,
+  AiModelCatalog,
   AiProviderId,
   PdfxApi
 } from '../../shared/types'
 import { runProviderChat } from '../../shared/ai-chat'
+import { CATALOG_PROVIDERS, refreshCatalog } from '../../shared/ai-model-catalog'
 import { store } from './extension-store'
 import { isSealed, seal, sealingAvailable, unseal } from './extension-key-crypto'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 
 const K_AI_CONFIG = 'pdfx-ai-config'
 const K_AI_KEYS = 'pdfx-ai-keys'
+const K_AI_CATALOG = 'pdfx-ai-model-catalog'
 
 const DEFAULT_CONFIG: AiConfig = {
   provider: 'mock',
   models: { ...DEFAULT_AI_MODELS },
-  azure: { endpoint: '', deployment: '' },
+  azure: { endpoint: '', deployment: '', apiVersion: '' },
   thinking: 'medium'
 }
 
@@ -72,7 +75,7 @@ async function usableKeys(stored: Keys): Promise<Keys> {
   return out
 }
 
-async function toView(config: AiConfig, keys: Keys): Promise<AiConfigView> {
+async function toView(config: AiConfig, keys: Keys, catalog: AiModelCatalog): Promise<AiConfigView> {
   const usable = await usableKeys(keys)
   const hasKey = {} as Record<AiProviderId, boolean>
   for (const p of PROVIDER_IDS) {
@@ -85,9 +88,12 @@ async function toView(config: AiConfig, keys: Keys): Promise<AiConfigView> {
     thinking: config.thinking,
     hasKey,
     keyStorage: (await sealingAvailable()) ? 'browser-nonextractable' : 'session-only',
-    keysSupported: true
+    keysSupported: true,
+    catalog
   }
 }
+
+const loadCatalog = (): Promise<AiModelCatalog> => store.get<AiModelCatalog>(K_AI_CATALOG, {})
 
 /** Re-seal any key an older version stored as plaintext. Runs on the first
  *  config read, so an upgrade takes the plaintext out of chrome.storage.local
@@ -120,16 +126,24 @@ const activeControllers = new Map<number, AbortController>()
 
 export function createExtensionAi(): Pick<
   PdfxApi,
-  'aiGetConfig' | 'aiSetConfig' | 'aiChat' | 'aiAbort' | 'onAiDelta'
+  'aiGetConfig' | 'aiSetConfig' | 'aiRefreshModels' | 'aiChat' | 'aiAbort' | 'onAiDelta'
 > {
   return {
     aiGetConfig: async () => {
-      const [config, stored] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
-      return toView(config, await migrateUnsealedKeys(stored))
+      const [config, stored, catalog] = await Promise.all([
+        loadConfig(),
+        store.get<Keys>(K_AI_KEYS, {}),
+        loadCatalog()
+      ])
+      return toView(config, await migrateUnsealedKeys(stored), catalog)
     },
 
     aiSetConfig: async (patch) => {
-      const [current, keys] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
+      const [current, keys, catalog] = await Promise.all([
+        loadConfig(),
+        store.get<Keys>(K_AI_KEYS, {}),
+        loadCatalog()
+      ])
       const next: AiConfig = {
         provider: patch.provider ?? current.provider,
         models: { ...current.models, ...patch.models },
@@ -156,7 +170,26 @@ export function createExtensionAi(): Pick<
         }
         store.set(K_AI_KEYS, keys)
       }
-      return toView(next, keys)
+      return toView(next, keys, catalog)
+    },
+
+    // Same contract as the desktop's ai:refresh-models IPC: TTL-gated fetch of
+    // the providers' live model lists with the stored keys; failures keep the
+    // previous snapshot. The updated view comes back so callers just re-render.
+    aiRefreshModels: async (force?: boolean) => {
+      const [config, stored, catalog] = await Promise.all([
+        loadConfig(),
+        store.get<Keys>(K_AI_KEYS, {}),
+        loadCatalog()
+      ])
+      const usable = await usableKeys(stored)
+      const next = await refreshCatalog(
+        catalog,
+        { anthropic: usable.anthropic, openai: usable.openai },
+        force === true
+      )
+      if (CATALOG_PROVIDERS.some((p) => next[p] !== catalog[p])) store.set(K_AI_CATALOG, next)
+      return toView(config, stored, next)
     },
 
     aiChat: async (request: AiChatRequest): Promise<AiChatResult> => {
@@ -182,6 +215,7 @@ export function createExtensionAi(): Pick<
           models: config.models,
           azure: config.azure,
           thinking: config.thinking,
+          catalog: await loadCatalog(),
           req: request,
           emit,
           signal: controller.signal

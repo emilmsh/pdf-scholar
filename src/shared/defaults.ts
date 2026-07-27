@@ -31,3 +31,8 @@ export const DEFAULT_AI_MODELS: Record<AiProviderId, string> = {
   azure: '',
   mock: 'mock-1'
 }
+
+/** Azure OpenAI data-plane api-version used when the user has not overridden it
+ *  in the settings (config stores '' for "use the default"). Bump this when
+ *  Azure requires a newer version for current models — see docs/MODEL-UPDATE.md. */
+export const DEFAULT_AZURE_API_VERSION = '2024-12-01-preview'
