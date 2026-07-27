@@ -3264,6 +3264,19 @@ button {
   margin-top: 5px;
 }
 
+/* Excerpt-mode disclosure on an answer: the document was too large for the
+   model's context window, so the request attached selected pages only */
+.ai-excerpt-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  margin-right: 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
 .ai-error {
   font-size: 12.5px;
   color: var(--danger);

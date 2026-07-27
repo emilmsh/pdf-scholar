@@ -42,7 +42,7 @@ gate — every `!` line maps to a row in the table below.
 
 | Finding | File to touch | What to do |
 |---|---|---|
-| New model at provider | `src/renderer/src/components/ai-models.ts` (`MODELS`) | Add id + `label`/`short`/`hint`, keep capability order (heaviest first). Until you do, the model already works via the live catalog with a generic label. |
+| New model at provider | `src/renderer/src/components/ai-models.ts` (`MODELS`) | Add id + `label`/`short`/`hint`, keep capability order (heaviest first). Until you do, the model already works via the live catalog with a generic label. Also add the model's context window to `MODEL_CONTEXT_TOKENS` in the same file (verify against provider docs; conservative floor, decides when huge documents switch to excerpt mode) — an unlisted model falls back to the provider floor, which only ever errs toward excerpting early. |
 | Curated model retired | same | Remove the entry (users who still have it selected see the ⚠ marker and a tooltip). |
 | Default model retired/wrong | `src/shared/defaults.ts` (`DEFAULT_AI_MODELS`) | **Product decision — Emil decides which model is the default.** Never change silently. |
 | Capability summary contradicts the heuristics | `src/shared/ai-chat.ts` (`anthropicTraits` fallback, `anthropicWebSearchTool` regex, OpenAI `/gpt-5|o[0-9]/` reasoning gate) | Update the regex fallbacks so first-run/offline behavior matches the API's answer. |

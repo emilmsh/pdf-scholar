@@ -22,6 +22,10 @@ export type ChatMessage =
       usage?: AiUsage | undefined
       model?: string | undefined
       error?: string | undefined
+      /** Set when the request attached a BM25 excerpt instead of the full
+       *  document (too large for the model's context window) — drives the
+       *  transparency chip on the answer */
+      excerpt?: { included: number; total: number } | undefined
     }
 
 export interface StoredConversation {

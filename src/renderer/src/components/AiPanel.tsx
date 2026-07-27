@@ -25,11 +25,14 @@ import {
   annotationsQuestion,
   chatSystem,
   citationPage,
+  excerptSystemNote,
   formatTokens,
   nextAiRequestId,
+  prepareDocumentForRequest,
   resolveCitation,
   summaryPrompt
 } from '../ai'
+import { charCitationsToQuotes } from '../ai-retrieval'
 import { t, useLang, locale } from '../i18n'
 import { isFindHotkey } from '../platform'
 import type { AiDocument, ResolvedCitation } from '../ai'
@@ -321,13 +324,30 @@ export default function AiPanel({
       const ensured = docRef.current ?? (await ensureDocument())
       docRef.current = ensured
       if (ensured) setDocReady(true)
+      // Above the model's context window the full text cannot ride along:
+      // attach a BM25 excerpt picked for this conversation's questions instead
+      // (ai-retrieval.ts). On the everyday path prep.excerpt is null and the
+      // attached document is byte-identical to before (prompt cache intact).
+      const prep = ensured
+        ? config
+          ? prepareDocumentForRequest(
+              ensured,
+              config.provider,
+              config.models[config.provider],
+              history
+                .filter((m) => m.role === 'user')
+                .map((m) => m.text)
+                .join('\n')
+            )
+          : { doc: ensured.doc, excerpt: null }
+        : null
       const requestId = nextRequestId()
       currentIdRef.current = requestId
       const result = await bridge.aiChat({
         requestId,
-        system: chatSystem(),
+        system: chatSystem() + (prep?.excerpt ? excerptSystemNote() : ''),
         messages: history,
-        document: ensured ? { title: docTitle, text: ensured.doc.text } : null,
+        document: prep ? { title: docTitle, text: prep.doc.text } : null,
         webSearch: webSearchRef.current
       })
       currentIdRef.current = null
@@ -336,13 +356,24 @@ export default function AiPanel({
       if ('error' in result) {
         setMessages((m) => [...m, { role: 'assistant', parts: [], error: result.error }])
       } else {
+        // Char citations point into the excerpt this request attached —
+        // resolve them to real pages now, while that exact text is known
+        const parts = prep?.excerpt
+          ? charCitationsToQuotes(result.parts, prep.doc)
+          : result.parts
         setMessages((m) => [
           ...m,
-          { role: 'assistant', parts: result.parts, usage: result.usage, model: result.model }
+          {
+            role: 'assistant',
+            parts,
+            usage: result.usage,
+            model: result.model,
+            excerpt: prep?.excerpt ?? undefined
+          }
         ])
       }
     },
-    [busy, docTitle, ensureDocument]
+    [busy, config, docTitle, ensureDocument]
   )
 
   const stop = useCallback(() => {
@@ -827,8 +858,15 @@ export default function AiPanel({
                     ) : (
                       <AssistantBody parts={m.parts} doc={docRef.current?.doc ?? null} onCitation={handleCitation} />
                     )}
-                    {m.usage && m.model && (
-                      <div className="ai-meta">{formatTokens(m.usage)}</div>
+                    {(m.excerpt || (m.usage && m.model)) && (
+                      <div className="ai-meta">
+                        {m.excerpt && (
+                          <span className="ai-excerpt-chip" title={t('ai.excerptTip')}>
+                            {t('ai.excerptChip', { included: m.excerpt.included, total: m.excerpt.total })}
+                          </span>
+                        )}
+                        {m.usage && m.model && formatTokens(m.usage)}
+                      </div>
                     )}
                   </div>
                 )

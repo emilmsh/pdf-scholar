@@ -203,9 +203,9 @@ export default function SearchBar({
         </div>
       )}
       {isAi && aiStatus === 'error' && aiNote && <div className="search-ai-note">{aiNote}</div>}
-      {isAi && aiStatus === 'done' && aiHits.length === 0 && aiNote && (
-        <div className="search-ai-note">{aiNote}</div>
-      )}
+      {/* With hits the note is the excerpt disclaimer (huge documents are
+          searched via a page excerpt); with none it is the model's answer */}
+      {isAi && aiStatus === 'done' && aiNote && <div className="search-ai-note">{aiNote}</div>}
       {isAi && aiHits.length > 0 && (
         <div className="search-results" ref={listRef}>
           {aiHits.map((h, i) => (

@@ -27,6 +27,7 @@
     "test:appender": "node scripts/test-appender.mjs",
     "test:cache": "node scripts/test-engine-cache.mjs",
     "test:rotation": "node scripts/test-rotation.mjs",
+    "test:retrieval": "node scripts/test-ai-retrieval.mjs",
     "test:viewer-url": "node scripts/test-viewer-url.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
     "test:torn-read": "node scripts/test-torn-read.mjs",

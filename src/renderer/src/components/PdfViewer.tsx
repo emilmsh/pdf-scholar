@@ -81,11 +81,14 @@ import {
   buildAiDocument,
   chatSystem,
   citationPage,
+  excerptSystemNote,
   nextAiRequestId,
+  prepareDocumentForRequest,
   resolveCitation,
   semanticSearchPrompt
 } from '../ai'
-import type { ResolvedCitation } from '../ai'
+import type { AiDocument, ResolvedCitation } from '../ai'
+import { charCitationsToQuotes } from '../ai-retrieval'
 import AnnotPopover from './AnnotPopover'
 import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
 import { OverlayScrollbars } from './OverlayScrollbars'
@@ -2635,14 +2638,14 @@ export default function PdfViewer({
           // context around the selection.
           void (async () => {
             let pageContext = ''
-            let document: { title: string; text: string; pageStarts: number[] } | null = null
+            let document: { title: string; pages: PageText[]; doc: AiDocument } | null = null
             try {
               // Build the document inline (buildAiDocument is a module fn) —
               // ensureAiDocument is declared later in the component, so
               // depending on it here would hit the const TDZ.
               const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
               const doc = buildAiDocument(pages)
-              document = { title: payload.name, text: doc.text, pageStarts: doc.pageStarts }
+              document = { title: payload.name, pages, doc }
               const pageText = pages[pageNumber - 1]?.text ?? ''
               const at = pageText.indexOf(selText.slice(0, 80))
               pageContext =
@@ -3637,6 +3640,14 @@ export default function PdfViewer({
     setSemantic({ status: 'running', hits: [], index: -1, note: null })
     const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
     const doc = buildAiDocument(pages)
+    // Above the model's context window the search runs over a BM25 excerpt
+    // keyed on the query (ai-retrieval.ts); a note under the results says so.
+    const prep = prepareDocumentForRequest(
+      { pages, doc },
+      config.provider,
+      config.models[config.provider],
+      query
+    )
     const requestId = nextAiRequestId()
     semanticReqRef.current = requestId
     // System + document block are byte-identical to the chat panel so the
@@ -3644,9 +3655,9 @@ export default function PdfViewer({
     // message only.
     const result = await bridge.aiChat({
       requestId,
-      system: chatSystem(),
+      system: chatSystem() + (prep.excerpt ? excerptSystemNote() : ''),
       messages: [{ role: 'user', text: semanticSearchPrompt(query) }],
-      document: { title: payload.name, text: doc.text }
+      document: { title: payload.name, text: prep.doc.text }
     })
     if (semanticReqRef.current !== requestId) return // superseded/aborted
     semanticReqRef.current = null
@@ -3654,20 +3665,28 @@ export default function PdfViewer({
       setSemantic({ status: 'error', hits: [], index: -1, note: result.error })
       return
     }
+    // Char citations point into the excerpt this request attached — resolve
+    // them to real pages now, while that exact text is known
+    const parts = prep.excerpt ? charCitationsToQuotes(result.parts, prep.doc) : result.parts
     const hits: { label: string; citation: AiCitation; pageNumber: number | null }[] = []
-    for (const part of result.parts) {
+    for (const part of parts) {
       const label = part.text.replace(/^\s*\d+[.)]\s*/, '').trim()
       for (const c of part.citations) {
         if (c.kind === 'web') continue // semantic hits must live in the document
         const fallback = c.kind === 'char' ? c.citedText : c.quote
-        hits.push({ label: label || fallback.slice(0, 80), citation: c, pageNumber: citationPage(c, doc) })
+        hits.push({ label: label || fallback.slice(0, 80), citation: c, pageNumber: citationPage(c, prep.doc) })
       }
     }
     setSemantic({
       status: 'done',
       hits,
       index: -1,
-      note: hits.length === 0 ? result.parts.map((p) => p.text).join(' ').trim() : null
+      note:
+        hits.length === 0
+          ? parts.map((p) => p.text).join(' ').trim()
+          : prep.excerpt
+            ? t('ai.excerptSearchNote')
+            : null
     })
   }, [pdf, searchQuery, payload.name])
   runSemanticSearchRef.current = runSemanticSearch

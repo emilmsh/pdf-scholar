@@ -22,15 +22,20 @@ import {
   askSystem,
   askUserMessage,
   critiqueSystem,
+  excerptSystemNote,
   formatTokens,
   explainSystem,
   explainUserMessage,
   figureSystem,
   figureUserMessage,
   nextAiRequestId,
+  prepareDocumentForRequest,
   referenceSystem,
   referenceUserMessage
 } from '../ai'
+import type { AiDocument, PreparedDocument } from '../ai'
+import { charCitationsToQuotes } from '../ai-retrieval'
+import type { PageText } from '../search'
 import { t, useLang } from '../i18n'
 import { isFindHotkey } from '../platform'
 import { useResizable } from '../useResizable'
@@ -56,9 +61,10 @@ export interface AiQuickState {
   pageContext: string
   /** Reference lookup, critique and free-form questions need the whole
    *  document attached so the model can draw on the full paper;
-   *  explain/simplify/figure stay page-local. pageStarts lets the citation
-   *  chips resolve char offsets to page numbers. */
-  document?: { title: string; text: string; pageStarts: number[] } | null
+   *  explain/simplify/figure stay page-local. Pages + built doc rather than
+   *  bare text: documents beyond the model's context window attach a BM25
+   *  excerpt built from the pages at request time (ai-retrieval.ts). */
+  document?: { title: string; pages: PageText[]; doc: AiDocument } | null
   /** Figure mode: the snipped page region, sent as an image */
   image?: AiImage
 }
@@ -89,6 +95,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [meta, setMeta] = useState<string | null>(null)
+  const [excerptInfo, setExcerptInfo] = useState<{ included: number; total: number } | null>(null)
   const [parts, setParts] = useState<AiContentPart[] | null>(null)
   const requestIdRef = useRef<number | null>(null)
   const finalRef = useRef('')
@@ -112,17 +119,34 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
       if (id === requestId && !stale) setText((s) => s + delta)
     })
     void (async () => {
+      // Reference lookup, critique and free-form questions attach the whole
+      // document so the model can draw on the full paper; the others stay
+      // page-local (figure carries its snip as an image instead). Above the
+      // model's context window a BM25 excerpt keyed on the selection (and the
+      // typed question) rides along instead — see ai-retrieval.ts.
+      let prep: PreparedDocument | null = null
+      if (usesDocument && state.document) {
+        const config = await bridge.aiGetConfig()
+        prep = prepareDocumentForRequest(
+          state.document,
+          config.provider,
+          config.models[config.provider],
+          [asked ?? '', state.selection].filter(Boolean).join('\n')
+        )
+      }
       const result = await bridge.aiChat({
         requestId,
-        system: isReference
-          ? referenceSystem()
-          : isCritique
-            ? critiqueSystem()
-            : isAsk
-              ? askSystem()
-              : isFigure
-                ? figureSystem()
-                : explainSystem(state.mode as 'explain' | 'simplify'),
+        system:
+          (isReference
+            ? referenceSystem()
+            : isCritique
+              ? critiqueSystem()
+              : isAsk
+                ? askSystem()
+                : isFigure
+                  ? figureSystem()
+                  : explainSystem(state.mode as 'explain' | 'simplify')) +
+          (prep?.excerpt ? excerptSystemNote() : ''),
         messages: [
           {
             role: 'user',
@@ -136,12 +160,8 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             ...(isFigure && state.image ? { images: [state.image] } : {})
           }
         ],
-        // Reference lookup, critique and free-form questions attach the whole
-        // document so the model can draw on the full paper; the others stay
-        // page-local (figure carries its snip as an image instead).
-        document: usesDocument && state.document
-          ? { title: state.document.title, text: state.document.text }
-          : null,
+        document:
+          prep && state.document ? { title: state.document.title, text: prep.doc.text } : null,
         // Context-menu actions have no globe toggle — always instruction-gated:
         // «sjekk denne referansen på nettet» in a free-form question just works,
         // but nothing is searched unless the user asked for it.
@@ -152,11 +172,17 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
       if ('error' in result) {
         setError(result.error)
       } else {
-        const full = result.parts.map((p) => p.text).join('')
+        // Char citations point into the excerpt this request attached —
+        // resolve them to real pages now, while that exact text is known
+        const parts = prep?.excerpt
+          ? charCitationsToQuotes(result.parts, prep.doc)
+          : result.parts
+        const full = parts.map((p) => p.text).join('')
         finalRef.current = full
         setText(full)
-        setParts(result.parts)
+        setParts(parts)
         setMeta(formatTokens(result.usage))
+        if (prep?.excerpt) setExcerptInfo(prep.excerpt)
       }
     })()
     return () => {
@@ -292,7 +318,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             ) : parts && usesDocument ? (
               <AssistantBody
                 parts={parts}
-                doc={state.document ? { text: state.document.text, pageStarts: state.document.pageStarts } : null}
+                doc={state.document?.doc ?? null}
                 onCitation={(c) => onCitation?.(c)}
               />
             ) : text ? (
@@ -304,6 +330,11 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         )}
       </div>
       <div className="ai-quick-actions">
+        {excerptInfo && (
+          <span className="ai-meta ai-excerpt-chip" title={t('ai.excerptTip')}>
+            {t('ai.excerptChip', { included: excerptInfo.included, total: excerptInfo.total })}
+          </span>
+        )}
         {meta && <span className="ai-meta">{meta}</span>}
         <button
           className="btn-secondary"

@@ -176,6 +176,22 @@ CITATION RULES (important):
 
 // ---------- Providers ----------
 
+// Request-too-big rejections, across provider phrasings (Anthropic "prompt is
+// too long: N tokens > M maximum", OpenAI "exceeds the context window" /
+// "maximum context length is N tokens"). The renderer excerpts oversized
+// documents before sending (ai-retrieval.ts), so reaching this means the
+// token estimate or the curated context floor was wrong for this model —
+// the reader still deserves a sentence instead of a raw HTTP 400.
+const CONTEXT_OVERFLOW_RE =
+  /prompt is too long|too many tokens|context window|context length|maximum.{0,30}(context|tokens)/i
+const CONTEXT_OVERFLOW_MSG =
+  'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Prøv en ny samtale, eller bytt til en modell med større kontekstvindu.'
+
+/** Pass provider error text through, except the context-overflow case */
+function friendlyProviderError(message: string): string {
+  return CONTEXT_OVERFLOW_RE.test(message) ? CONTEXT_OVERFLOW_MSG : message
+}
+
 const EMPTY_USAGE: AiUsage = {
   inputTokens: 0,
   outputTokens: 0,
@@ -510,7 +526,7 @@ async function chatOpenAiResponses(
         continue
       }
     }
-    return { error: `HTTP ${response.status}: ${detail.slice(0, 300)}` }
+    return { error: friendlyProviderError(`HTTP ${response.status}: ${detail.slice(0, 300)}`) }
   }
 
   // Typed SSE events; each data payload carries its own `type`, so the
@@ -661,7 +677,7 @@ async function chatOpenAiCompatible(
       delete body.reasoning_effort
       continue
     }
-    return { error: `HTTP ${response.status}: ${detail.slice(0, 300)}` }
+    return { error: friendlyProviderError(`HTTP ${response.status}: ${detail.slice(0, 300)}`) }
   }
 
   const reader = response.body.getReader()
@@ -813,6 +829,6 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
     }
   } catch (err) {
     if (signal.aborted) return { error: 'Avbrutt' }
-    return { error: err instanceof Error ? err.message : String(err) }
+    return { error: friendlyProviderError(err instanceof Error ? err.message : String(err)) }
   }
 }

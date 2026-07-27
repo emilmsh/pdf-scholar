@@ -1,15 +1,22 @@
 // Renderer-side AI helpers: document text assembly for the API, mapping
 // citations back to page positions, and token accounting.
-import type { AiCitation, AiUsage } from '../../shared/types'
+import type { AiCitation, AiProviderId, AiUsage } from '../../shared/types'
 import { getLanguage } from './i18n'
 import type { PageText } from './search'
+import type { AiDocument, Bm25Index } from './ai-retrieval'
+import {
+  buildBm25Index,
+  buildExcerptDocument,
+  documentFits,
+  excerptCharBudget,
+  selectExcerptPages,
+  slotAtOffset
+} from './ai-retrieval'
+import { contextTokensFor } from './components/ai-models'
 
-export interface AiDocument {
-  /** All pages joined with blank lines, each prefixed with a page marker */
-  text: string
-  /** Char offset of each page's content within `text` (page i = index i) */
-  pageStarts: number[]
-}
+// The interface lives in ai-retrieval.ts (a pure module the node test can
+// import); everything renderer-side keeps importing it from here.
+export type { AiDocument } from './ai-retrieval'
 
 // Shared request-id counter for ALL renderer callers of ai:chat (chat panel,
 // quick popover, semantic search). The main process keys in-flight requests
@@ -32,6 +39,61 @@ export function buildAiDocument(pages: PageText[]): AiDocument {
     if (i < pages.length - 1) text += '\n\n'
   }
   return { text, pageStarts }
+}
+
+/** What a request should attach for this document and question.
+ *  `excerpt` is null when the full document fits the model's window — the
+ *  everyday path, byte-identical to before so the prompt cache keeps working.
+ *  Above the window it is the excerpt metadata for the transparency chip, and
+ *  `doc` is the BM25-selected excerpt this SPECIFIC request attached — char
+ *  citations in the answer are only meaningful against exactly that text, so
+ *  resolve them against it at receive time (charCitationsToQuotes). */
+export interface PreparedDocument {
+  doc: AiDocument
+  excerpt: { included: number; total: number } | null
+}
+
+// The tokenized index is query-independent; keyed on the pages array itself
+// (stable via pageTextsRef) so follow-up questions on the same huge document
+// pay the tokenization cost once.
+const bm25IndexCache = new WeakMap<PageText[], Bm25Index>()
+
+export function prepareDocumentForRequest(
+  ensured: { pages: PageText[]; doc: AiDocument },
+  provider: AiProviderId,
+  modelId: string,
+  queryText: string
+): PreparedDocument {
+  const contextTokens = contextTokensFor(provider, modelId)
+  if (documentFits(ensured.doc.text.length, contextTokens)) {
+    return { doc: ensured.doc, excerpt: null }
+  }
+  const texts = ensured.pages.map((p) => p.text)
+  let index = bm25IndexCache.get(ensured.pages)
+  if (!index) {
+    index = buildBm25Index(texts)
+    bm25IndexCache.set(ensured.pages, index)
+  }
+  const indices = selectExcerptPages(texts, queryText, excerptCharBudget(contextTokens), index)
+  const nb = getLanguage() === 'nb'
+  const header = nb
+    ? `[Utdrag: ${indices.length} av ${texts.length} sider vedlagt — resten er utelatt]`
+    : `[Excerpt: ${indices.length} of ${texts.length} pages attached — the rest is omitted]`
+  return {
+    doc: buildExcerptDocument(texts, indices, nb ? 'Side' : 'Page', header),
+    excerpt: { included: indices.length, total: texts.length }
+  }
+}
+
+/** System-prompt companion for excerpt mode. English on purpose — model-facing
+ *  instructions stay English for both UI languages (same rule as the quote
+ *  contract in shared/ai-chat.ts). */
+export function excerptSystemNote(): string {
+  return `
+
+EXCERPT MODE
+- This document is larger than your context window, so only the most relevant pages are attached (selected by text search against the user's question), each under its original page marker. Where other instructions say the full document text is attached, read "the attached excerpt" instead.
+- The pages between the attached ones are missing. If the excerpt does not answer the question, say that the relevant part of the document may not be attached — never conclude that the document lacks something from the excerpt alone.`
 }
 
 export interface ResolvedCitation {
@@ -75,18 +137,16 @@ export function resolveCitation(
     }
     return null
   }
-  // char kind: find the page whose range contains the citation start.
-  // Offsets inside the leading "[Side 1]" marker clamp to the first page.
-  let pageIndex = 0
-  for (let i = doc.pageStarts.length - 1; i >= 0; i--) {
-    if (citation.start >= doc.pageStarts[i]) {
-      pageIndex = i
-      break
-    }
-  }
+  // char kind: find the slot whose range contains the citation start (offsets
+  // inside the leading "[Side 1]" marker clamp to the first slot), then map
+  // slot → real page (identity on full documents, pageNumbers on excerpts —
+  // a slot's text IS its page's text, so in-page offsets carry over as-is).
+  const slot = slotAtOffset(doc.pageStarts, citation.start)
+  const pageIndex = (doc.pageNumbers?.[slot] ?? slot + 1) - 1
+  if (pageIndex < 0 || pageIndex >= pages.length) return null
   const pageLen = pages[pageIndex].text.length
-  const start = citation.start - doc.pageStarts[pageIndex]
-  const end = Math.min(citation.end - doc.pageStarts[pageIndex], pageLen)
+  const start = citation.start - doc.pageStarts[slot]
+  const end = Math.min(citation.end - doc.pageStarts[slot], pageLen)
   if (start >= pageLen || end <= 0 || end <= start) return null
   return { pageNumber: pageIndex + 1, start: Math.max(0, start), end }
 }
@@ -226,10 +286,8 @@ export function citationPage(citation: AiCitation, doc: AiDocument | null): numb
   if (citation.kind === 'web') return null
   if (citation.kind === 'quote') return citation.pageNumber
   if (!doc || doc.pageStarts.length === 0) return null
-  for (let i = doc.pageStarts.length - 1; i >= 0; i--) {
-    if (citation.start >= doc.pageStarts[i]) return i + 1
-  }
-  return 1
+  const slot = slotAtOffset(doc.pageStarts, citation.start)
+  return doc.pageNumbers?.[slot] ?? slot + 1
 }
 
 // ---------- Usage ----------

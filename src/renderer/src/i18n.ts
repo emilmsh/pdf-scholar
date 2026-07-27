@@ -386,6 +386,10 @@ const nb = {
   'ai.sendTip': 'Send (Enter)',
   'ai.stopTip': 'Stopp',
   'ai.totalTokens': 'Samtalen har brukt {tokens}',
+  'ai.excerptChip': 'Utdrag: {included} av {total} sider',
+  'ai.excerptTip':
+    'Dokumentet er større enn modellens kontekstvindu, så bare de mest relevante sidene ble vedlagt. Svaret kan mangle innhold fra sider utenfor utdraget.',
+  'ai.excerptSearchNote': 'Stort dokument: søket gikk i et utdrag av sidene.',
   'ai.sourceChip': 'kilde',
   'ai.chipTip': 'Hopp til kilden i dokumentet',
   'ai.providerMock': 'Test uten nøkkel (mock)',
@@ -831,6 +835,10 @@ const en: Dict = {
   'ai.sendTip': 'Send (Enter)',
   'ai.stopTip': 'Stop',
   'ai.totalTokens': 'This conversation has used {tokens}',
+  'ai.excerptChip': 'Excerpt: {included} of {total} pages',
+  'ai.excerptTip':
+    "The document is larger than the model's context window, so only the most relevant pages were attached. The answer may miss content from pages outside the excerpt.",
+  'ai.excerptSearchNote': 'Large document: the search ran over an excerpt of the pages.',
   'ai.sourceChip': 'source',
   'ai.chipTip': 'Jump to the source in the document',
   'ai.providerMock': 'Test without a key (mock)',

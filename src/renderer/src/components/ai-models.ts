@@ -105,6 +105,35 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
     .trim()
 }
 
+// Context-window floors (tokens): what decides when a document is too large
+// to attach whole and must be excerpted instead (ai-retrieval.ts). Floors, not
+// specs — deliberately conservative, because the two failure modes are not
+// symmetric: a low guess costs an unnecessary excerpt, a high guess costs a
+// hard provider error in the middle of a question. Live-discovered and custom
+// ids get the provider floor (Azure lowest: deployments routinely cap below
+// the base model). Maintained with the curated MODELS list (docs/MODEL-UPDATE.md).
+const MODEL_CONTEXT_TOKENS: Record<string, number> = {
+  'claude-fable-5': 200_000,
+  'claude-opus-4-8': 200_000,
+  'claude-sonnet-5': 200_000,
+  'claude-haiku-4-5': 200_000,
+  'gpt-5.6-sol': 250_000,
+  'gpt-5.6-terra': 250_000,
+  'gpt-5.6-luna': 250_000
+}
+
+const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {
+  anthropic: 200_000,
+  openai: 200_000,
+  azure: 120_000,
+  mock: 200_000
+}
+
+/** Context-window floor for a model (tokens) */
+export function contextTokensFor(provider: AiProviderId, modelId: string): number {
+  return MODEL_CONTEXT_TOKENS[modelId] ?? PROVIDER_CONTEXT_FLOOR[provider] ?? 120_000
+}
+
 // Where each provider lets you set a spending cap — linked from the key field
 // so the reminder to cap a key is one click from acting on it.
 export const SPEND_CAP_URLS: Partial<Record<AiProviderId, string>> = {
