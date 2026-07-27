@@ -8,16 +8,16 @@
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
 reports, books. The window is nearly all page: one slim toolbar carries the tools you use
-every hour, the contents and assistant panels stay out of the way until you call them, and
-V hides the toolbar as well, leaving the page and nothing else.
+every hour, the contents and assistant panels stay out of the way until you call them, and 
+toggling fullscreen or the toolbar is always one click away, leaving the page and nothing else.
 
 Everything a long document asks of you is here. A page you can stand to look at all day, in
-light, sepia or dark. Highlight, pen, shapes and notes, each with its own colour, thickness
-and opacity, remembered between sessions. A second column, so a figure can sit beside the
-passage that discusses it. Cross-references you can follow and step back from, which is the
-difference between reading a paper and losing your place in one. And an optional assistant
-that answers from the document, cites the sentence it used, explains a figure you drag a box
-around, and finds the passage you half-remember. Free, MIT-licensed, and offline unless you
+light, sepia or dark mode. Highlight, pen, shapes and notes, each with its own colour, thickness
+and opacity, remembered between sessions. A second reading pane, so a figure or table can sit beside the
+passage that discusses it. Cross-references you can go to and return from, which is the
+difference between reading a paper and losing your place in one. And an optional AI-assistant
+that answers from the document, cites the sentence it used, explains snapshots of figures and images, 
+and finds the passage you half-remember. Free, MIT-licensed, and offline unless you
 ask a question.
 
 Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
@@ -46,10 +46,7 @@ settings.
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-PDF%20Scholar-2f6f7b?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9N75CPC0G9M2)
 
 **[⬇ Get PDF Scholar from the Microsoft Store](https://apps.microsoft.com/detail/9N75CPC0G9M2)** —
-the same app as an MSIX package, x64 and arm64. Because the Store signs the package on
-ingestion, there is no SmartScreen "unknown publisher" warning on first run, and Windows
-handles updates. The installer above instead updates itself from GitHub releases; either
-route gives you the same app.
+the same app as an MSIX package, x64 and arm64, although the installer is updated more frequently. 
 
 ### Desktop app (macOS) — beta
 
