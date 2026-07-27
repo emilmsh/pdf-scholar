@@ -706,6 +706,9 @@ export default function PdfViewer({
   const [pillInput, setPillInput] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  // Bumped on every openSearch so the bar refocuses+selects even when it is
+  // already open (Ctrl+F with a new selection while searching)
+  const [searchFocusToken, setSearchFocusToken] = useState(0)
   const [searchOptions, setSearchOptions] = useState<SearchOptions>({
     matchCase: false,
     wholeWords: false
@@ -3600,8 +3603,14 @@ export default function PdfViewer({
   }, [searchOpen, searchQuery, searchOptions, pdf, gotoMatch])
 
   const openSearch = useCallback(() => {
+    // Seed the query with the current text selection: select a word, Ctrl+F,
+    // and it is already in the field (selected, so typing replaces it).
+    // Collapse whitespace — cross-span selections stringify with newlines.
+    const selection = window.getSelection()?.toString().replace(/\s+/g, ' ').trim() ?? ''
+    if (selection) setSearchQuery(selection.slice(0, 200))
     searchJumpedRef.current = false
     setSearchOpen(true)
+    setSearchFocusToken((n) => n + 1)
   }, [])
 
   const closeSearch = useCallback(() => {
@@ -4048,6 +4057,9 @@ export default function PdfViewer({
             ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
           }}
           onKeyDown={(e) => {
+            // Ctrl/Cmd+F bubbles to the window handler: search steals focus and
+            // the onBlur below commits (or discards an empty) draft
+            if (primaryMod(e) && (e.key === 'f' || e.key === 'F')) return
             e.stopPropagation()
             if (e.key === 'Escape') setFreeTextDraft(null)
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -4525,6 +4537,7 @@ export default function PdfViewer({
 
       {searchOpen && (
         <SearchBar
+          focusToken={searchFocusToken}
           query={searchQuery}
           options={searchOptions}
           matches={searchMatches}

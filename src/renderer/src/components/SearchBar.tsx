@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
 import { t, useLang } from '../i18n'
+import { isFindHotkey } from '../platform'
 
 export interface SemanticHitView {
   label: string
@@ -8,6 +9,9 @@ export interface SemanticHitView {
 }
 
 interface Props {
+  /** Bumped by the viewer on every open request so the input refocuses even
+   *  when the bar is already mounted (Ctrl+F with a fresh selection) */
+  focusToken: number
   query: string
   options: SearchOptions
   matches: SearchMatch[]
@@ -33,6 +37,7 @@ interface Props {
 }
 
 export default function SearchBar({
+  focusToken,
   query,
   options,
   matches,
@@ -62,7 +67,7 @@ export default function SearchBar({
   useEffect(() => {
     inputRef.current?.focus()
     inputRef.current?.select()
-  }, [])
+  }, [focusToken])
 
   useEffect(() => {
     listRef.current
@@ -117,6 +122,7 @@ export default function SearchBar({
             placeholder={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
             onChange={(e) => onQueryChange(e.target.value)}
             onKeyDown={(e) => {
+              if (isFindHotkey(e)) return // bubbles to the window handler: reselect
               e.stopPropagation()
               if (isAi) {
                 if (e.key === 'Enter') onAiSearch()

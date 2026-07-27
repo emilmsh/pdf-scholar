@@ -32,6 +32,7 @@ import {
   referenceUserMessage
 } from '../ai'
 import { t, useLang } from '../i18n'
+import { isFindHotkey } from '../platform'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { useDismissable } from '../useDismissable'
@@ -268,6 +269,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
               spellCheck={false}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
+                if (isFindHotkey(e)) return // bubbles to the window handler: focus search
                 e.stopPropagation()
                 if (e.key === 'Enter' && question.trim()) setAsked(question.trim())
                 if (e.key === 'Escape') onClose()

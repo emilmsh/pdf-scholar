@@ -10,3 +10,11 @@ export const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform)
 export function primaryMod(e: { ctrlKey: boolean; metaKey: boolean }): boolean {
   return isMac ? e.metaKey : e.ctrlKey
 }
+
+/** Ctrl/Cmd+F. Text fields that stop keydown propagation (composer, popovers,
+ *  the search field itself) must let this one bubble: the viewer's window
+ *  handler opens/focuses document search from anywhere, and its preventDefault
+ *  is what keeps the browser's own find bar shut in the web/extension targets. */
+export function isFindHotkey(e: { ctrlKey: boolean; metaKey: boolean; key: string }): boolean {
+  return primaryMod(e) && (e.key === 'f' || e.key === 'F')
+}

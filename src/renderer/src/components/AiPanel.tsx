@@ -31,6 +31,7 @@ import {
   summaryPrompt
 } from '../ai'
 import { t, useLang, locale } from '../i18n'
+import { isFindHotkey } from '../platform'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
 import type { ChatMessage, StoredConversation } from '../chat-store'
@@ -561,6 +562,7 @@ export default function AiPanel({
           placeholder={t('ai.composerPlaceholder')}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
+            if (isFindHotkey(e)) return // bubbles to the window handler: focus search
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
               sendFromComposer()
