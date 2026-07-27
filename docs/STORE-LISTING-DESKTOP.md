@@ -109,30 +109,22 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.29.x
+## What's new in this version (≤ 1 500 chars) — v0.30.x
 
 **EN:**
 ```
-• Half the download: 197 MB instead of 409, with nothing removed from the app
-• A save that fails now says so, instead of reporting success while your newest marks never reached the file
-• The assistant's key settings name exactly what protects your API key on this machine
-• On Linux without a keyring, the key is kept for the session only rather than written to disk unencrypted
-• Every menu and bubble closes with Esc and with a click outside, on touch as well as mouse
-• Error messages are no longer part Norwegian when the app is set to English
-• Free text you drag smaller now scrolls instead of clipping
-• Smoother scrolling, especially with the sidebar open
+• Ask about documents of any size: when a document is too large for the AI model, the assistant answers from the most relevant pages — and says so on the answer — instead of failing
+• New AI models appear in the model menu on their own and retired ones are flagged, without waiting for an app update
+• Ctrl+F starts from the text you have selected and always lands in the search field
+• Opening a file that is still being written (a download in progress) now says what happened and offers a retry that waits for the whole file
 ```
 
 **NO:**
 ```
-• Halvparten så stor nedlasting: 197 MB i stedet for 409, uten at noe er fjernet fra appen
-• En lagring som feiler sier det nå, i stedet for å melde suksess mens de nyeste merkene aldri nådde fila
-• Nøkkelinnstillingene i assistenten sier nøyaktig hva som beskytter API-nøkkelen din på denne maskinen
-• På Linux uten nøkkelring beholdes nøkkelen bare for økta, framfor å skrives ukryptert til disk
-• Alle menyer og bobler lukkes med Esc og med klikk utenfor, på berøring like godt som med mus
-• Feilmeldinger er ikke lenger delvis norske når appen står på engelsk
-• Fritekst du drar mindre kan nå rulles i stedet for å bli klippet
-• Jevnere rulling, særlig med sidepanelet åpent
+• Spør om dokumenter uansett størrelse: når et dokument er for stort for KI-modellen, svarer assistenten fra de mest relevante sidene — og sier det på svaret — i stedet for å feile
+• Nye KI-modeller dukker opp i modellmenyen av seg selv, og utgåtte merkes, uten å vente på en appoppdatering
+• Ctrl+F starter med teksten du har markert og lander alltid i søkefeltet
+• Åpning av en fil som fortsatt skrives (en pågående nedlasting) sier nå hva som skjedde og tilbyr et nytt forsøk som venter til fila er hel
 ```
 
 ---
