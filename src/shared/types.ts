@@ -317,7 +317,11 @@ export interface UpdateCheckOutcome {
 
 export interface PdfxApi {
   openFileDialog(): Promise<FilePayload | FileError | null>
-  readFile(path: string): Promise<FilePayload | FileError>
+  /** `awaitSettled` waits for the file to stop changing before reading it, for
+   *  the retry after a parse failure — the likeliest cause of one is that the
+   *  program which asked us to open the file was still writing it. Platforms
+   *  that serve URLs rather than files ignore the flag and simply read again. */
+  readFile(path: string, opts?: { awaitSettled?: boolean }): Promise<FilePayload | FileError>
   getRecents(): Promise<RecentFile[]>
   getSettings(): Promise<Settings>
   getPosition(path: string): Promise<ReadingPosition | null>

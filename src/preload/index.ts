@@ -13,7 +13,8 @@ import type {
 
 const api: PdfxApi = {
   openFileDialog: () => ipcRenderer.invoke('dialog:open'),
-  readFile: (path: string) => ipcRenderer.invoke('file:read', path),
+  readFile: (path: string, opts?: { awaitSettled?: boolean }) =>
+    ipcRenderer.invoke('file:read', path, opts),
   getRecents: () => ipcRenderer.invoke('recents:get'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   getPosition: (path: string) => ipcRenderer.invoke('position:get', path),

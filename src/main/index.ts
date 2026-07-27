@@ -10,7 +10,7 @@ import {
   shell
 } from 'electron'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { open, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type {
@@ -506,13 +506,64 @@ async function flushDraft(originalPath: string): Promise<void> {
   }
 }
 
-async function loadPdf(path: string): Promise<FilePayload | FileError> {
+// A PDF handler is regularly launched BY the program still writing the file: a
+// LaTeX rebuild, a download finishing, an app copying an attachment out of its
+// own storage and opening it in the same breath. One read then returns a
+// half-written file, which the parser can only call a broken PDF.
+//
+// The test is whether the file is WHOLE, not whether it has stopped moving: a
+// copy that pauses for a moment looks settled by timestamps alone, and a
+// truncated PDF is exactly what a paused copy leaves behind. Every complete PDF
+// ends with an %%EOF marker, so waiting for one in the tail asks the real
+// question. The mtime/size check on top of it catches the file still growing
+// past an EOF that an earlier incremental save left mid-file.
+//
+// Only ever asked for on a retry — a first open never waits.
+const SETTLE_POLL_MS = 120
+const SETTLE_TIMEOUT_MS = 2000
+/** Enough tail to hold the trailer and any junk a writer leaves after it */
+const EOF_SCAN_BYTES = 2048
+
+async function looksComplete(path: string): Promise<string | null> {
+  try {
+    const { size, mtimeMs } = await stat(path)
+    const handle = await open(path, 'r')
+    try {
+      const length = Math.min(EOF_SCAN_BYTES, size)
+      const tail = Buffer.alloc(length)
+      await handle.read(tail, 0, length, Math.max(0, size - length))
+      if (!tail.includes('%%EOF')) return null
+    } finally {
+      await handle.close()
+    }
+    return `${size}:${mtimeMs}`
+  } catch {
+    return null // gone, locked or unreadable: let the read itself report it
+  }
+}
+
+async function waitUntilWhole(path: string): Promise<void> {
+  let previous: string | null = null
+  const deadline = Date.now() + SETTLE_TIMEOUT_MS
+  for (;;) {
+    const current = await looksComplete(path)
+    if (current !== null && current === previous) return
+    if (Date.now() >= deadline) return
+    previous = current
+    await new Promise((resolve) => setTimeout(resolve, SETTLE_POLL_MS))
+  }
+  // Timing out reads anyway: a writer this slow is better reported as a broken
+  // file than waited on while the window sits empty.
+}
+
+async function loadPdf(path: string, awaitSettled = false): Promise<FilePayload | FileError> {
   try {
     // Recent annotation writes may still sit in the engine's cached doc —
     // flush so the bytes we hand the renderer include them
     await flushDraft(path)
     // A leftover draft means unsaved changes from a previous session —
     // load those bytes so the work is silently recovered
+    if (awaitSettled) await waitUntilWhole(readPathFor(path))
     const data = await readFile(readPathFor(path))
     const name = basename(path)
     addRecent(path, name)
@@ -573,7 +624,9 @@ function registerIpc(): void {
     return 'new'
   })
 
-  ipcMain.handle('file:read', (_e, path: string) => loadPdf(path))
+  ipcMain.handle('file:read', (_e, path: string, opts?: { awaitSettled?: boolean }) =>
+    loadPdf(path, opts?.awaitSettled === true)
+  )
 
   ipcMain.handle('recents:get', () => getState().recents)
 

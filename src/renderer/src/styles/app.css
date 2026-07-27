@@ -2143,6 +2143,12 @@ button {
   text-align: center;
 }
 
+.viewer-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 /* Search bar */
 
 .search-bar {

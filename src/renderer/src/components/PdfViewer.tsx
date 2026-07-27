@@ -136,6 +136,23 @@ function openDocument(data: Uint8Array): DocResources {
   return { task, port }
 }
 
+/** What the parser said, plus what it was actually given. A file that is still
+ *  being written and a genuinely broken document fail with the same message, and
+ *  only the byte count and the two ends tell them apart. Logged as well as
+ *  shown, because a screenshot of the error screen is often all we get. */
+function loadFailure(err: unknown, bytes: Uint8Array): Error {
+  const message = err instanceof Error ? err.message : String(err)
+  const printable = (part: Uint8Array): string =>
+    Array.from(part, (b) => (b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : '·')).join('')
+  const shape = t('viewer.errorBytes', {
+    bytes: String(bytes.byteLength),
+    head: printable(bytes.subarray(0, 8)),
+    tail: printable(bytes.subarray(-8))
+  })
+  console.error(`[pdfx] document load failed: ${message} — ${shape}`)
+  return new Error(`${message} ${shape}`)
+}
+
 async function collectAnnotations(
   doc: PDFDocumentProxy
 ): Promise<Map<number, PageAnnotation[]>> {
@@ -873,20 +890,60 @@ export default function PdfViewer({
 
   const docResourcesRef = useRef<DocResources | null>(null)
 
+  /** Read the file again, once it has stopped changing. null when there is
+   *  nothing to re-read from — a document handed to us as bytes by a file input
+   *  has no path behind it. */
+  const rereadSettled = useCallback(async (): Promise<Uint8Array | null> => {
+    const result = await bridge.readFile(payload.path, { awaitSettled: true })
+    return 'error' in result ? null : result.data
+  }, [payload.path])
+
+  /** Bumped by the error screen's "try again": a retry starts by reading the
+   *  file, since the bytes already in hand are the ones that failed. */
+  const [loadAttempt, setLoadAttempt] = useState(0)
+
   useEffect(() => {
     let destroyed = false
-    // In the browser the annotation engine edits an in-memory twin of the
-    // document (desktop edits a draft file instead) — register the bytes so
-    // bridge.annotate/update/delete have a document to write into.
-    if (!isElectron) registerBrowserDoc(payload.path, payload.data)
-    // Spike: when the PDFium raster flag is on, the same bytes also feed the
-    // render engine (no-op otherwise — the register call guards on the flag)
-    registerPdfiumDoc(payload.path, payload.data)
-    // pdf.js transfers the underlying buffer to its worker, so hand it a copy
-    const resources = openDocument(payload.data.slice())
-    docResourcesRef.current = resources
+    /** Register the bytes with the engines that need them, then hand pdf.js its
+     *  own copy. In the browser the annotation engine edits an in-memory twin of
+     *  the document (desktop edits a draft file instead), so the registration
+     *  must follow whatever bytes pdf.js actually parsed — otherwise a retry
+     *  would annotate a different version than the one on screen. */
+    const openWith = (bytes: Uint8Array): { bytes: Uint8Array; resources: DocResources } => {
+      if (!isElectron) registerBrowserDoc(payload.path, bytes)
+      // Spike: when the PDFium raster flag is on, the same bytes also feed the
+      // render engine (no-op otherwise — the register call guards on the flag)
+      registerPdfiumDoc(payload.path, bytes)
+      // pdf.js transfers the underlying buffer to its worker, so hand it a copy
+      const resources = openDocument(bytes.slice())
+      docResourcesRef.current = resources
+      return { bytes, resources }
+    }
     ;(async () => {
-      const doc = await resources.task.promise
+      const initial = loadAttempt === 0 ? payload.data : ((await rereadSettled()) ?? payload.data)
+      if (destroyed) return
+      let attempt = openWith(initial)
+      let doc: PDFDocumentProxy
+      try {
+        doc = await attempt.resources.task.promise
+      } catch (err) {
+        if (destroyed) return
+        // We are a PDF handler: the program that asked us to open this file is
+        // often the one still writing it, and a half-written file parses as a
+        // broken one. Wait for it to settle, read again, and only then believe
+        // the failure.
+        const fresh = await rereadSettled()
+        if (destroyed) return
+        if (!fresh) throw loadFailure(err, attempt.bytes)
+        attempt.resources.task.destroy()
+        attempt.resources.port.terminate()
+        attempt = openWith(fresh)
+        try {
+          doc = await attempt.resources.task.promise
+        } catch (again) {
+          throw loadFailure(again, attempt.bytes)
+        }
+      }
       if (destroyed) return
       setPdf(doc)
       const collected: PageSize[] = []
@@ -911,7 +968,7 @@ export default function PdfViewer({
       docResourcesRef.current?.port.terminate()
       docResourcesRef.current = null
     }
-  }, [payload])
+  }, [payload, loadAttempt, rereadSettled])
 
   /** Re-open the document after the engine rewrote it, seamlessly swapping it
    *  (old canvases stay visible until re-rendered). Desktop re-reads the draft
@@ -3941,9 +3998,22 @@ export default function PdfViewer({
       <div className="viewer-error">
         <p>{t('viewer.errorTitle')}</p>
         <p className="viewer-error-detail">{error}</p>
-        <button className="btn-primary" onClick={onClose}>
-          {t('app.back')}
-        </button>
+        <div className="viewer-error-actions">
+          {/* Retry first: the file being written while we read it is the most
+              common reason a document that is fine fails to open. */}
+          <button
+            className="btn-primary"
+            onClick={() => {
+              setError(null)
+              setLoadAttempt((n) => n + 1)
+            }}
+          >
+            {t('viewer.errorRetry')}
+          </button>
+          <button className="btn-secondary" onClick={onClose}>
+            {t('app.back')}
+          </button>
+        </div>
       </div>
     )
   }

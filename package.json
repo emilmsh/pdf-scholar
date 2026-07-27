@@ -28,6 +28,7 @@
     "test:rotation": "node scripts/test-rotation.mjs",
     "test:viewer-url": "node scripts/test-viewer-url.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
+    "test:torn-read": "node scripts/test-torn-read.mjs",
     "test:listing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-store-listing.ps1",
     "test:ext-publish": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ext-publish.ps1 -CheckOnly",
     "bench:engine": "node scripts/engine-bench.mjs",

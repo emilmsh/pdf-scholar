@@ -316,6 +316,11 @@ const nb = {
 
   // Viewer
   'viewer.errorTitle': 'Kunne ikke vise dokumentet.',
+  // The shape of what we read, appended to whatever the parser said: a file
+  // another program was still writing looks exactly like a broken one until you
+  // see the byte count and the two ends.
+  'viewer.errorBytes': '({bytes} byte lest, begynner «{head}», slutter «{tail}»)',
+  'viewer.errorRetry': 'Prøv igjen',
   'viewer.opening': 'Åpner {name} …',
   'viewer.backToPage': '‹ Tilbake til s. {page}',
   'viewer.forwardToPage': 'Frem til s. {page} ›',
@@ -761,6 +766,8 @@ const en: Dict = {
   'search.searchError': 'AI search failed',
 
   'viewer.errorTitle': 'Could not display the document.',
+  'viewer.errorBytes': '({bytes} bytes read, starts “{head}”, ends “{tail}”)',
+  'viewer.errorRetry': 'Try again',
   'viewer.opening': 'Opening {name} …',
   'viewer.backToPage': '‹ Back to p. {page}',
   'viewer.forwardToPage': 'Forward to p. {page} ›',
