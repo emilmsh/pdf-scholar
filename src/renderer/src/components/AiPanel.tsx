@@ -500,6 +500,13 @@ export default function AiPanel({
     [onCitationClick, ensureDocument]
   )
 
+  /** The conversation's first excerpt answer — the language hint renders once,
+   *  under that answer, not under every excerpt answer */
+  const firstExcerptIndex = useMemo(
+    () => messages.findIndex((m) => m.role === 'assistant' && m.excerpt),
+    [messages]
+  )
+
   /** Everything this conversation has sent and received, as the provider counted
    *  it. The app deliberately does not turn that into money — see ai.ts. */
   const totalUsage = useMemo(() => {
@@ -867,6 +874,11 @@ export default function AiPanel({
                         )}
                         {m.usage && m.model && formatTokens(m.usage)}
                       </div>
+                    )}
+                    {/* Once per conversation: excerpt selection is lexical, so
+                        a question in the document's language retrieves better */}
+                    {m.excerpt && i === firstExcerptIndex && (
+                      <div className="ai-excerpt-hint">{t('ai.excerptLangHint')}</div>
                     )}
                   </div>
                 )

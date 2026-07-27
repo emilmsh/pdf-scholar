@@ -388,8 +388,10 @@ const nb = {
   'ai.totalTokens': 'Samtalen har brukt {tokens}',
   'ai.excerptChip': 'Utdrag: {included} av {total} sider',
   'ai.excerptTip':
-    'Dokumentet er større enn modellens kontekstvindu, så bare de mest relevante sidene ble vedlagt. Svaret kan mangle innhold fra sider utenfor utdraget.',
-  'ai.excerptSearchNote': 'Stort dokument: søket gikk i et utdrag av sidene.',
+    'Dokumentet er større enn modellens kontekstvindu, så bare de mest relevante sidene ble vedlagt. Svaret kan mangle innhold fra sider utenfor utdraget. Utvalget treffer best når spørsmålet bruker dokumentets eget språk og begreper.',
+  'ai.excerptLangHint':
+    'Tips: still spørsmål på dokumentets eget språk — sideutvalget bygger på tekstlikhet og treffer bedre da.',
+  'ai.excerptSearchNote': 'Stort dokument: søket gikk i et utdrag av sidene. Søk gjerne på dokumentets språk.',
   'ai.sourceChip': 'kilde',
   'ai.chipTip': 'Hopp til kilden i dokumentet',
   'ai.providerMock': 'Test uten nøkkel (mock)',
@@ -837,8 +839,11 @@ const en: Dict = {
   'ai.totalTokens': 'This conversation has used {tokens}',
   'ai.excerptChip': 'Excerpt: {included} of {total} pages',
   'ai.excerptTip':
-    "The document is larger than the model's context window, so only the most relevant pages were attached. The answer may miss content from pages outside the excerpt.",
-  'ai.excerptSearchNote': 'Large document: the search ran over an excerpt of the pages.',
+    "The document is larger than the model's context window, so only the most relevant pages were attached. The answer may miss content from pages outside the excerpt. The selection lands best when the question uses the document's own language and terms.",
+  'ai.excerptLangHint':
+    "Tip: ask in the document's own language — the page selection is based on text similarity and lands better that way.",
+  'ai.excerptSearchNote':
+    "Large document: the search ran over an excerpt of the pages. Searching in the document's language works best.",
   'ai.sourceChip': 'source',
   'ai.chipTip': 'Jump to the source in the document',
   'ai.providerMock': 'Test without a key (mock)',
