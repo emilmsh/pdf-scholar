@@ -4,6 +4,14 @@ The order matters more than the ceremony. Screenshots come first because they ar
 the only step that cannot be automated and the easiest to forget — and a stale
 one is the first thing a visitor sees, and it ships to the Microsoft Store.
 
+**Two sizes of release.** A **release** — the default meaning of the word when
+nothing more is said — is GitHub only: steps 0–3. A **full release** also pushes
+the store channels: steps 4–5 (Microsoft Store, then the extension stores). The
+distinction exists because the store channels routinely have submissions still
+sitting in review, and a new push there while one is pending is at best queued
+and at worst a conflict — so the stores are only touched on an explicit "full
+release" from Emil.
+
 ## 0. Screenshots — by hand, Emil
 
 **What ships is Emil's call.** Framing, what is on screen, which answer is worth
@@ -74,7 +82,7 @@ gh release edit vX.Y.Z --draft=false
 Only now does electron-updater see it. Prune `release/` locally so one current
 installer remains.
 
-## 4. Microsoft Store
+## 4. Microsoft Store — full release only
 
 ```bash
 gh workflow run store-publish.yml -f check_only=true
@@ -91,7 +99,7 @@ fails if it does not match the version being published — update that section. 
 **screenshots are not synced**; upload them in Partner Center by hand. Once a
 submission is created through the API, never edit it in the Partner Center UI.
 
-## 5. Extension stores
+## 5. Extension stores — full release only
 
 Upload `pdf-scholar-extension-store.zip` (manifest at the zip root) to Edge
 Add-ons and the Chrome Web Store. Copy from `docs/STORE-LISTING.md`; the
