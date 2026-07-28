@@ -7,9 +7,9 @@
 // --remote-debugging-port`, list the page targets over HTTP, talk CDP over the
 // socket, and drive the UI with Runtime.evaluate.
 import { spawn } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -70,6 +70,23 @@ export async function waitForPageTargets(port, count = 1, timeoutMs = 30_000) {
   }
 }
 
+/** Electron's own binary, found the way Node resolves a module: from `root`
+ *  upwards. A git worktree (which is how these sessions check the repo out) has
+ *  an EMPTY node_modules and borrows the parent checkout's — so a path pinned to
+ *  `root` spawns nothing and the failure reads as ENOENT on an exe that does
+ *  exist one directory up. */
+function electronBinary(root) {
+  const exe = process.platform === 'win32' ? 'electron.exe' : 'electron'
+  let dir = resolve(root)
+  for (;;) {
+    const candidate = join(dir, 'node_modules', 'electron', 'dist', exe)
+    if (existsSync(candidate)) return candidate
+    const parent = dirname(dir)
+    if (parent === dir) return join(root, 'node_modules', 'electron', 'dist', exe) // original, for the error message
+    dir = parent
+  }
+}
+
 /**
  * Spawn the built app in a THROWAWAY profile, so a run never touches the real
  * recents / reading positions / theme, always starts from factory defaults, and
@@ -83,13 +100,7 @@ export async function waitForPageTargets(port, count = 1, timeoutMs = 30_000) {
 export function launchApp({ root, mainJs, args = [], port, prepareProfile, env }) {
   const profile = mkdtempSync(join(tmpdir(), 'pdfx-cdp-'))
   if (prepareProfile) prepareProfile(profile)
-  const bin = join(
-    root,
-    'node_modules',
-    'electron',
-    'dist',
-    process.platform === 'win32' ? 'electron.exe' : 'electron'
-  )
+  const bin = electronBinary(root)
   const child = spawn(
     bin,
     [mainJs, ...args, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`],

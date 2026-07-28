@@ -57,7 +57,10 @@ const ui = {
     // between Pages and Notes) and an index silently selected the wrong tab.
     const tabs = [...document.querySelectorAll('.sidebar-tabs button')];
     const notes = tabs.find((b) => /Merknader|Annotations/.test(b.textContent || ''));
-    if (!notes) throw new Error(`notes tab not found (tabs: ${tabs.map((b) => b.textContent).join('|')})`);
+    // Plain concatenation, and no backticks anywhere in this block: PRELUDE is
+    // itself a template literal, so a backtick or an interpolation here — even
+    // inside a comment — is read by the OUTER file and breaks it at parse time.
+    if (!notes) throw new Error('notes tab not found, tabs: ' + tabs.map((b) => b.textContent).join('|'));
     click(notes);
     await settle(400);
   },
