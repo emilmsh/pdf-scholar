@@ -165,6 +165,17 @@ function anthropicWebSearchTool(model: string): Record<string, unknown> {
   }
 }
 
+// The document hand-off for providers with no native document block: OpenAI and
+// Azure take it as a user turn plus a synthetic acknowledgement, so the model
+// treats the pages as material rather than as an instruction. English on
+// purpose — same rule as WEB_HINT_* and QUOTE_CONTRACT below: model-facing text
+// stays English for both UI languages, and the answer's language is set by the
+// system prompt (chatSystem() in src/renderer/src/ai.ts, which tells the model
+// to answer in the language the user writes in). These two used to be
+// Norwegian, which pulled answers toward Norwegian on English papers.
+const DOC_PREAMBLE = 'DOCUMENT — answer based on this'
+const DOC_ACK = 'I have read the document and am ready.'
+
 // Prompt contract for providers without native citations (mirrors the
 // oe-intervju QUOTE_GROUNDING_RULES pattern): verbatim quotes we can locate.
 // Instructions address the model and stay English for both UI languages; the
@@ -479,9 +490,9 @@ async function chatOpenAiResponses(
   if (req.document) {
     input.push({
       role: 'user',
-      content: `DOKUMENT («${req.document.title}») — svar basert på dette:\n\n${req.document.text}`
+      content: `${DOC_PREAMBLE} ("${req.document.title}"):\n\n${req.document.text}`
     })
-    input.push({ role: 'assistant', content: 'Jeg har lest dokumentet og er klar.' })
+    input.push({ role: 'assistant', content: DOC_ACK })
   }
   for (const m of req.messages) {
     const images = m.images ?? []
@@ -638,9 +649,9 @@ async function chatOpenAiCompatible(
   if (req.document) {
     messages.push({
       role: 'user',
-      content: `DOKUMENT («${req.document.title}») — svar basert på dette:\n\n${req.document.text}`
+      content: `${DOC_PREAMBLE} ("${req.document.title}"):\n\n${req.document.text}`
     })
-    messages.push({ role: 'assistant', content: 'Jeg har lest dokumentet og er klar.' })
+    messages.push({ role: 'assistant', content: DOC_ACK })
   }
   for (const m of req.messages) {
     const images = m.images ?? []
