@@ -35,8 +35,8 @@ Mål: en poliert, moderne PDF-leser og -annotator for Windows, med et informasjo
 - [x] Klikkbare hyperlenker i dokumentet: interne mål med presis Y-posisjon, eksterne åpnes i nettleser (levert 2026-07-09)
 - [x] Kontekstmeny ved tekstmarkering v1: Kopier, Nettsøk, Ordbok, Oversett (levert 2026-07-09)
 - [x] Søkelinje (Ctrl+F): skill store/små bokstaver, hele ord (æøå-sikker), resultatliste med utdrag, treffmarkering på siden, F3/Shift+F3, søkehopp gir tilbake-pille (levert 2026-07-09)
-- [ ] Marker alle treff samtidig; søkehistorikk
-- [ ] Bokmerker-fane utvalg
+- [x] Marker alle treff samtidig (dempet bakgrunnsmarkering bak det aktive treffet, løst per montert side) + søkehistorikk med «tøm» (siste 10, pil-navigasjon; levert 2026-07-29)
+- [x] **Bokmerker-fane** (levert 2026-07-29) — fjerde sidepanelfane: bokmerk gjeldende side med B eller knappen, gi navn inline, klikk hopper (med tilbake-pille), lagres per fil ved siden av leseposisjonen på alle tre plattformene. Drag-omorganisering utgår: listen sorteres etter sidetall
 
 ## Fase 4 — Annoteringsfundament (Emils prioritet nr. 2)
 Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farger)/Underline/StrikeOut/Squiggly/notater som standard PDF-annotasjoner med appearance streams, inkrementell lagring og atomisk filbytte.
@@ -67,7 +67,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] **Eksporter annotasjonssammendrag** som Markdown, HTML og ren tekst — inkluderer faktisk markert tekst (hentet via quad/tekst-geometri), kommentarer og forfatter, gruppert per side (levert 2026-07-09)
 - [x] Markert tekst-utdrag i selve listen («utdrag» — kommentar som andrelinje) (levert 2026-07-10)
 - [x] Søk i merknader + fargefilter (5 palettfarger, kombinerbart med søk) (levert 2026-07-10)
-- [ ] Tøm alle med bekreftelse
+- [x] Tøm alle med bekreftelse (levert 2026-07-29) — én angrehandling: ny `batch`-variant i undo-stakken, én reload og én samletoast for hele operasjonen
 - [ ] «Annoterte sider»: ny PDF med kun sider som har annotasjoner
 
 ## Fase 6.5 — Faner (Emil ønsker dette tidlig, trukket frem fra fase 7)
@@ -93,7 +93,7 @@ Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 refera
 - [x] Spør annotasjonene (levert 2026-07-11): ✦-knapp i Merknader-fanen + forslag i panelets tomtilstand (vises kun når dokumentet har merknader) → sender merknadsblokken (side/type/utdrag/kommentar fra eksportuttrekket) inn i chatten; blokken ligger i historikken så oppfølgingsspørsmål beholder den
 - [x] Referanseoppslag (levert 2026-07-15) — differensiatoren: «Referanse» i markeringsmenyen («Hva er det som siteres her – og hvorfor?») slår opp den valgte siteringen og forklarer det refererte verket
 - [ ] Begrepshjelp (ordliste slik begrepene brukes i dokumentet)
-- [ ] PDF-base64-fallback for skannede dokumenter (page_location-siteringer)
+- [ ] PDF-base64-fallback for skannede dokumenter (page_location-siteringer). *Delvis 2026-07-29:* appen SIER nå at dokumentet mangler tekstlag i stedet for å sende et tomt dokument til modellen (varsel i panelet + egen status i KI-søket, og den peker på «Forklar område» som virker) — men å faktisk LESE en skannet side gjenstår
 - [ ] Nivå 3 (parkert): kryssdokument, forhør-meg-quiz, metodekritikk-modus, forklar figur
 
 ## Fase 8 — Filhåndtering + sky (Emils prioritet nr. 4)

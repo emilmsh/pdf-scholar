@@ -22,7 +22,7 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 ## 3. Navigation
 - **Outline tab**: hierarchical clickable TOC; right-click → Add Outline Item (from selected text), Rename, Delete, Change Destination; drag to nest.
 - **Thumbnails tab**: page grid, click to jump.
-- **Bookmarks tab**: user page markers; rename, delete, drag-reorder, search.
+- **Bookmarks tab**: user page markers; rename, delete, drag-reorder, search. *Shipped 2026-07-29 without drag-reorder or search:* the list is kept in page order, which is the order a reader wants and removes the need to arrange it, and a handful of named pages does not need a search field. Two windows on the same file both write the whole list, so the last one wins — the same last-write-wins the reading position has.
 - **Go to page**: click the page pill and type a number (Ctrl+G).
 - **Page scrubber**: slim slider on the right edge (vertical scroll) or bottom edge (horizontal).
 - **Navigation history back**: after ANY jump (internal hyperlink, outline, bookmark, search result, go-to-page) show a **"Back to p. N"** pill bottom-left returning to the previous reading position; maintain a full back stack.
