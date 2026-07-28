@@ -99,6 +99,9 @@ async function fileToAiImage(file: Blob): Promise<AiImage | null> {
 export interface EnsuredDocument {
   pages: PageText[]
   doc: AiDocument
+  /** False for a scanned PDF: pdf.js extracts nothing, so `doc` is page markers
+   *  and no more. The panel says so instead of asking a model about it. */
+  hasText: boolean
 }
 
 type PanelMessage = ChatMessage
@@ -259,6 +262,24 @@ export default function AiPanel({
     ])
     onSeedConsumed()
   }, [open, seed, onSeedConsumed])
+
+  // Find out whether the document has a text layer BEFORE the first question,
+  // not on the way into it: a scanned PDF cannot be read by any model here, and
+  // that belongs in the landing state rather than in an answer that reports the
+  // document says nothing. Extraction is cached in the viewer, so this is the
+  // same work the first question would have done anyway.
+  useEffect(() => {
+    if (!open || docRef.current) return
+    let cancelled = false
+    void ensureDocument().then((ensured) => {
+      if (cancelled || !ensured) return
+      docRef.current = ensured
+      setDocReady(true)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open, ensureDocument])
 
   // A region snipped for the chat lands as a staged composer attachment
   useEffect(() => {
@@ -837,8 +858,14 @@ export default function AiPanel({
                 </button>
               </div>
             )}
+            {docRef.current && !docRef.current.hasText && (
+              <div className="ai-notice">
+                <p>{t('ai.calloutNoText')}</p>
+              </div>
+            )}
             {composer}
-            {suggestionsBlock}
+            {/* "Summarize the document" is a dead end without a text layer */}
+            {docRef.current?.hasText !== false && suggestionsBlock}
           </div>
         </div>
       ) : (

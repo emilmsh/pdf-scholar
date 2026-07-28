@@ -338,6 +338,7 @@ const nb = {
   'search.aiOpenSettings': 'Åpne KI-innstillinger',
   'search.searchError': 'KI-søket feilet',
   'search.historyClear': 'Tøm søkehistorikk',
+  'search.aiNoText': 'Dokumentet har ingen tekst å søke i (skannet)',
 
   // Viewer
   'viewer.errorTitle': 'Kunne ikke vise dokumentet.',
@@ -476,6 +477,8 @@ const nb = {
     'Assistenten svarer nå med en innebygd testmodell — ikke ekte KI. Legg inn din egen API-nøkkel for å komme i gang.',
   'ai.calloutNoKey': 'Ingen API-nøkkel er lagret for valgt leverandør, så assistenten kan ikke svare ennå.',
   'ai.calloutCta': 'Legg til API-nøkkel',
+  'ai.calloutNoText':
+    'Dette dokumentet har ingen tekst å lese — sidene er bilder (skannet). Assistenten kan derfor ikke besvare spørsmål om innholdet. «Forklar område» virker fortsatt: dra en firkant rundt en figur eller et tekstparti, og bildet sendes i stedet.',
   'ai.aborted': 'Avbrutt',
   'ai.newChatTip': 'Ny samtale',
   'ai.historyTip': 'Samtalehistorikk for dette dokumentet',
@@ -822,6 +825,7 @@ const en: Dict = {
   'search.aiOpenSettings': 'Open AI settings',
   'search.searchError': 'AI search failed',
   'search.historyClear': 'Clear search history',
+  'search.aiNoText': 'This document has no text to search (scanned)',
 
   'viewer.errorTitle': 'Could not display the document.',
   'viewer.errorBytes': '({bytes} bytes read, starts “{head}”, ends “{tail}”)',
@@ -951,6 +955,8 @@ const en: Dict = {
     'The assistant is currently answering with a built-in test model — not real AI. Add your own API key to get started.',
   'ai.calloutNoKey': 'No API key is stored for the selected provider, so the assistant cannot answer yet.',
   'ai.calloutCta': 'Add API key',
+  'ai.calloutNoText':
+    'This document has no text to read — its pages are images (scanned). The assistant therefore cannot answer questions about the contents. “Explain area” still works: drag a box around a figure or a passage and the image is sent instead.',
   'ai.aborted': 'Stopped',
   'ai.newChatTip': 'New conversation',
   'ai.historyTip': 'Conversation history for this document',

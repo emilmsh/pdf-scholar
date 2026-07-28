@@ -48,6 +48,19 @@ export async function buildPageTexts(pdf: PDFDocumentProxy): Promise<PageText[]>
   return pages
 }
 
+/** Whether the document has a text layer worth reading at all.
+ *
+ *  A scanned PDF is pictures of words: getTextContent returns nothing, so every
+ *  page comes back as `{ text: '', runs: [] }` with no error anywhere. Callers
+ *  that would otherwise send an empty document to a model — or search text that
+ *  does not exist — have to ask first, because the failure is silent and looks
+ *  like the document simply saying nothing.
+ *
+ *  A page or two of scanned plates inside a normal paper is not this case, hence
+ *  "any page", not "every page". */
+export const hasExtractableText = (pages: PageText[]): boolean =>
+  pages.some((p) => p.text.trim() !== '')
+
 const WORD_CHAR = /[\p{L}\p{N}_]/u
 
 function isWholeWord(text: string, start: number, end: number): boolean {

@@ -22,7 +22,7 @@ interface Props {
   mode: 'text' | 'ai'
   onModeChange(mode: 'text' | 'ai'): void
   /** AI-mode state (only meaningful when mode === 'ai') */
-  aiStatus: 'idle' | 'running' | 'done' | 'noKey' | 'error'
+  aiStatus: 'idle' | 'running' | 'done' | 'noKey' | 'noText' | 'error'
   aiHits: SemanticHitView[]
   aiIndex: number
   aiNote: string | null
@@ -113,7 +113,9 @@ export default function SearchBar({
           : t('search.aiNoHits')
         : aiStatus === 'error'
           ? t('search.searchError')
-          : ''
+          : aiStatus === 'noText'
+            ? t('search.aiNoText')
+            : ''
 
   return (
     <div className="search-bar" onMouseDown={(e) => e.stopPropagation()}>

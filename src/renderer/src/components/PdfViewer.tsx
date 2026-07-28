@@ -101,7 +101,13 @@ import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
 import { errorText, locale, t, useLang } from '../i18n'
-import { buildPageTexts, findMatches, resolveAllMatchRects, resolveMatchRects } from '../search'
+import {
+  buildPageTexts,
+  findMatches,
+  hasExtractableText,
+  resolveAllMatchRects,
+  resolveMatchRects
+} from '../search'
 import { addSearchHistory, clearSearchHistory } from '../search-history'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
@@ -754,7 +760,7 @@ export default function PdfViewer({
   // Semantic (AI) search mode alongside exact text search
   const [searchMode, setSearchMode] = useState<'text' | 'ai'>('text')
   const [semantic, setSemantic] = useState<{
-    status: 'idle' | 'running' | 'done' | 'noKey' | 'error'
+    status: 'idle' | 'running' | 'done' | 'noKey' | 'noText' | 'error'
     hits: { label: string; citation: AiCitation; pageNumber: number | null }[]
     index: number
     note: string | null
@@ -3784,8 +3790,14 @@ export default function PdfViewer({
       setSemantic({ status: 'noKey', hits: [], index: -1, note: null })
       return
     }
-    setSemantic({ status: 'running', hits: [], index: -1, note: null })
     const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
+    // No text layer, nothing to search semantically either — say so instead of
+    // paying for a request against a document made of page markers.
+    if (!hasExtractableText(pages)) {
+      setSemantic({ status: 'noText', hits: [], index: -1, note: null })
+      return
+    }
+    setSemantic({ status: 'running', hits: [], index: -1, note: null })
     const doc = buildAiDocument(pages)
     // Above the model's context window the search runs over a BM25 excerpt
     // keyed on the query (ai-retrieval.ts); a note under the results says so.
@@ -3895,7 +3907,10 @@ export default function PdfViewer({
   const ensureAiDocument = useCallback(async (): Promise<EnsuredDocument | null> => {
     if (!pdf) return null
     const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
-    return { pages, doc: buildAiDocument(pages) }
+    // hasText travels with the document because a scanned PDF yields a document
+    // that is nothing but page markers, and the panel has to say so rather than
+    // spend a request on it and show whatever the model makes of the emptiness.
+    return { pages, doc: buildAiDocument(pages), hasText: hasExtractableText(pages) }
   }, [pdf])
 
   /** Citation chip clicked: jump to the cited passage and highlight it,

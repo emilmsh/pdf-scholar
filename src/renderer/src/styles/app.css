@@ -3118,6 +3118,23 @@ button {
   margin: 0;
 }
 
+/* A statement of fact, not a call to action (there is no key to add and no
+   button to press), so it stays neutral rather than borrowing the accent. */
+.ai-notice {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: var(--hover);
+  border-radius: 10px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  text-align: left;
+  color: var(--text-secondary);
+}
+
+.ai-notice p {
+  margin: 0;
+}
+
 .ai-landing .ai-suggestions {
   margin-top: 0;
 }
