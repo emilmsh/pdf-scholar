@@ -19,6 +19,7 @@
 // Persistence is this module's saveDocumentBytes/saveFileAs below.
 
 import type {
+  DocBookmark,
   FilePayload,
   FileError,
   PdfxApi,
@@ -46,6 +47,7 @@ export function isExtensionContext(): boolean {
 
 const K_SETTINGS = 'pdfx-settings'
 const K_POSITIONS = 'pdfx-positions'
+const K_BOOKMARKS = 'pdfx-bookmarks'
 const K_RECENTS = 'pdfx-recents'
 /** Why the last document was handed to the browser's own reader — the only trace
  *  of a hand-off that is deliberately invisible (see openInBrowserViewer). */
@@ -187,6 +189,18 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       void store
         .get<Record<string, ReadingPosition>>(K_POSITIONS, {})
         .then((all) => store.set(K_POSITIONS, { ...all, [path]: pos }))
+    },
+    getBookmarks: async (path) => {
+      const all = await store.get<Record<string, DocBookmark[]>>(K_BOOKMARKS, {})
+      return all[path] ?? []
+    },
+    setBookmarks: (path, bookmarks) => {
+      void store.get<Record<string, DocBookmark[]>>(K_BOOKMARKS, {}).then((all) => {
+        const next = { ...all }
+        if (bookmarks.length === 0) delete next[path]
+        else next[path] = bookmarks
+        return store.set(K_BOOKMARKS, next)
+      })
     },
     // Heal names written before fileNameOf existed (picked files were stored as
     // "fsa:<name>" because the name was derived from the pseudo-path).

@@ -2,9 +2,10 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
+import type { DocBookmark } from '../../../shared/types'
 import { t, useLang } from '../i18n'
 import { bridge } from '../bridge'
-import { IconChevronDown, IconCopy, IconDocument, IconFolderOpen } from './icons'
+import { IconBookmark, IconChevronDown, IconCopy, IconDocument, IconFolderOpen } from './icons'
 import { useDismissable } from '../useDismissable'
 
 const THUMB_WIDTH = 132
@@ -55,6 +56,11 @@ interface Props {
   onDeleteAnnot(pageNumber: number, record: PageAnnotation): void
   /** Delete every annotation in the document (one undoable action) */
   onDeleteAllAnnots(): void
+  /** Page bookmarks for the open file, already in page order */
+  bookmarks: readonly DocBookmark[]
+  /** Bookmark the page, or remove the bookmark it already has */
+  onToggleBookmark(page: number): void
+  onRenameBookmark(page: number, label: string): void
   onExport(format: ExportFormat): void
   /** Open the AI panel with the "summarize my annotations" question */
   onAskAi(): void
@@ -70,7 +76,7 @@ interface Props {
   onOpenFile?: (() => void) | undefined
 }
 
-type Tab = 'thumbs' | 'outline' | 'annots'
+type Tab = 'thumbs' | 'outline' | 'marks' | 'annots'
 
 function Sidebar({
   open,
@@ -84,6 +90,9 @@ function Sidebar({
   onJumpToAnnot,
   onDeleteAnnot,
   onDeleteAllAnnots,
+  bookmarks,
+  onToggleBookmark,
+  onRenameBookmark,
   onExport,
   onAskAi,
   docName,
@@ -228,6 +237,13 @@ function Sidebar({
         <button className={tab === 'thumbs' ? 'active' : ''} onClick={() => pickTab('thumbs')}>
           {t('side.pages')}
         </button>
+        <button
+          className={tab === 'marks' ? 'active' : ''}
+          onClick={() => pickTab('marks')}
+          title={t('side.bookmarksTip')}
+        >
+          {t('side.bookmarks')}
+        </button>
         <button className={tab === 'annots' ? 'active' : ''} onClick={() => pickTab('annots')}>
           {t('side.annots')}
         </button>
@@ -269,6 +285,16 @@ function Sidebar({
         </div>
       )}
 
+      {tab === 'marks' && (
+        <BookmarkList
+          bookmarks={bookmarks}
+          currentPage={currentPage}
+          onJumpToPage={onJumpToPage}
+          onToggle={onToggleBookmark}
+          onRename={onRenameBookmark}
+        />
+      )}
+
       {tab === 'annots' && (
         <AnnotationList
           annotations={annotations}
@@ -286,6 +312,94 @@ function Sidebar({
 
 function colorDistance(a: [number, number, number], b: [number, number, number]): number {
   return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
+}
+
+function BookmarkList({
+  bookmarks,
+  currentPage,
+  onJumpToPage,
+  onToggle,
+  onRename
+}: {
+  bookmarks: readonly DocBookmark[]
+  currentPage: number
+  onJumpToPage(page: number): void
+  onToggle(page: number): void
+  onRename(page: number, label: string): void
+}): React.JSX.Element {
+  /** Page whose label is being edited, or null. The draft lives here rather than
+   *  in the row so committing does not depend on the row surviving a re-sort. */
+  const [editing, setEditing] = useState<{ page: number; draft: string } | null>(null)
+  const marked = bookmarks.some((b) => b.page === currentPage)
+
+  const commit = (): void => {
+    if (editing) onRename(editing.page, editing.draft.trim())
+    setEditing(null)
+  }
+
+  return (
+    <div className="bookmark-list">
+      <button
+        className={`bookmark-add${marked ? ' is-marked' : ''}`}
+        onClick={() => onToggle(currentPage)}
+        title={t('side.bookmarkToggleTip')}
+      >
+        <IconBookmark size={14} filled={marked} />
+        {marked
+          ? t('side.bookmarkRemoveHere', { page: currentPage })
+          : t('side.bookmarkAddHere', { page: currentPage })}
+      </button>
+
+      {bookmarks.length === 0 && <p className="sidebar-empty">{t('side.noBookmarks')}</p>}
+
+      {bookmarks.map((b) => (
+        <div key={b.page} className={`bookmark-row${b.page === currentPage ? ' current' : ''}`}>
+          {editing?.page === b.page ? (
+            <input
+              className="bookmark-rename"
+              autoFocus
+              value={editing.draft}
+              placeholder={t('side.bookmarkNamePlaceholder')}
+              onChange={(e) => setEditing({ page: b.page, draft: e.target.value })}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                if (e.key === 'Enter') commit()
+                else if (e.key === 'Escape') setEditing(null)
+              }}
+            />
+          ) : (
+            <>
+              <button
+                className="bookmark-main"
+                onClick={() => onJumpToPage(b.page)}
+                // Double-click to rename, matching the page pill; the pencil is
+                // the discoverable path to the same thing.
+                onDoubleClick={() => setEditing({ page: b.page, draft: b.label })}
+              >
+                <span className="bookmark-page">{t('app.pageAbbrev')} {b.page}</span>
+                <span className="bookmark-label">{b.label || t('side.bookmarkUnnamed')}</span>
+              </button>
+              <button
+                className="bookmark-edit"
+                title={t('side.bookmarkRename')}
+                onClick={() => setEditing({ page: b.page, draft: b.label })}
+              >
+                ✎
+              </button>
+              <button
+                className="bookmark-delete"
+                title={t('side.bookmarkDelete')}
+                onClick={() => onToggle(b.page)}
+              >
+                ✕
+              </button>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function AnnotationList({

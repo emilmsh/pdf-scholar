@@ -113,6 +113,13 @@ export const IconPin = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** Bookmark: the ribbon. Filled when the current page carries one. */
+export const IconBookmark = (p: IconProps & { filled?: boolean }): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M7 4h10v16l-5-4-5 4z" {...(p.filled ? { fill: 'currentColor' } : {})} />
+  </Svg>
+)
+
 /** Toolbar unpinned: the tack lying on its side */
 export const IconPinOff = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>

@@ -20,6 +20,7 @@ import type {
   FileError,
   FilePayload,
   ModifyAnnotationRequest,
+  DocBookmark,
   ReadingPosition,
   Settings
 } from '../shared/types'
@@ -41,7 +42,15 @@ import {
   saveDraft,
   wasModifiedExternally
 } from './drafts'
-import { addRecent, getState, mergeSettings, saveState, setPosition } from './storage'
+import {
+  addRecent,
+  getBookmarks,
+  getState,
+  mergeSettings,
+  saveState,
+  setBookmarks,
+  setPosition
+} from './storage'
 import { initUpdater } from './updater'
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
@@ -636,6 +645,8 @@ function registerIpc(): void {
 
   ipcMain.handle('position:get', (_e, path: string) => getState().positions[path] ?? null)
 
+  ipcMain.handle('bookmarks:get', (_e, path: string) => getBookmarks(path))
+
   ipcMain.handle('pending-path:get', (e) => {
     const id = e.sender.id
     const path = pendingPaths.get(id) ?? null
@@ -644,6 +655,10 @@ function registerIpc(): void {
   })
 
   ipcMain.on('position:set', (_e, path: string, pos: ReadingPosition) => setPosition(path, pos))
+
+  ipcMain.on('bookmarks:set', (_e, path: string, bookmarks: DocBookmark[]) =>
+    setBookmarks(path, bookmarks)
+  )
 
   ipcMain.on('settings:set', (_e, patch: Partial<Settings>) => {
     const state = getState()

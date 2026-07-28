@@ -1537,16 +1537,26 @@ button {
 
 .sidebar-tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px;
+  gap: 2px;
+  padding: 8px 4px;
 }
 
+/* Four tabs now share the 248px default panel: 58px each, and the longest label
+   ("Bokmerker"/"Merknader") measures 55px at 11px SEMIBOLD — which is the width
+   that matters, since the active tab is the bold one. Hence 11px rather than the
+   12px three tabs could afford. Narrower than the default (the panel is
+   resizable) ellipsises instead of overflowing; every tab keeps its tooltip.
+   min-width:0 is what lets a flex child shrink below its text width at all. */
 .sidebar-tabs button {
   flex: 1;
-  padding: 5px 0;
+  min-width: 0;
+  padding: 5px 1px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar-tabs button:hover {
@@ -2746,6 +2756,120 @@ button {
 .annot-list-delete:hover {
   background: rgb(var(--danger-rgb) / 0.12);
   color: var(--danger);
+}
+
+/* ---- Bookmarks tab ---- */
+
+.bookmark-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 6px 8px;
+}
+
+.bookmark-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.bookmark-add:hover {
+  background: var(--hover);
+}
+
+/* Already bookmarked: the same button now removes it, so it stops advertising */
+.bookmark-add.is-marked {
+  color: var(--text-secondary);
+}
+
+.bookmark-row {
+  display: flex;
+  align-items: center;
+  border-radius: 7px;
+}
+
+.bookmark-row:hover {
+  background: var(--hover);
+}
+
+/* The page you are on, so the list says where you are without being clicked */
+.bookmark-row.current .bookmark-page {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.bookmark-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  font-size: 12px;
+}
+
+.bookmark-page {
+  flex-shrink: 0;
+  min-width: 30px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.bookmark-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
+.bookmark-edit,
+.bookmark-delete {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  opacity: 0;
+}
+
+.bookmark-row:hover .bookmark-edit,
+.bookmark-row:hover .bookmark-delete {
+  opacity: 1;
+}
+
+.bookmark-edit:hover {
+  background: var(--active);
+  color: var(--text);
+}
+
+.bookmark-delete {
+  margin-right: 4px;
+}
+
+.bookmark-delete:hover {
+  background: rgb(var(--danger-rgb) / 0.12);
+  color: var(--danger);
+}
+
+.bookmark-rename {
+  flex: 1;
+  margin: 3px 6px;
+  padding: 4px 7px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 12px;
 }
 
 /* Note popover */

@@ -5,6 +5,7 @@ import type {
   AiConfig,
   AiModelCatalog,
   AiProviderId,
+  DocBookmark,
   Patch,
   ReadingPosition,
   RecentFile,
@@ -29,6 +30,8 @@ export interface WindowState {
 export interface AppState {
   recents: RecentFile[]
   positions: Record<string, ReadingPosition>
+  /** Per-file page bookmarks, keyed by the same path as `positions` */
+  bookmarks: Record<string, DocBookmark[]>
   settings: Settings
   ai: StoredAiConfig
   /** Live model lists cached from the providers (see shared/ai-model-catalog.ts) */
@@ -47,6 +50,7 @@ const DEFAULT_AI: StoredAiConfig = {
 const DEFAULTS: AppState = {
   recents: [],
   positions: {},
+  bookmarks: {},
   settings: { ...DEFAULT_SETTINGS },
   ai: DEFAULT_AI,
   modelCatalog: {}
@@ -128,5 +132,18 @@ export function addRecent(path: string, name: string): void {
 
 export function setPosition(path: string, pos: ReadingPosition): void {
   getState().positions[path] = pos
+  saveState()
+}
+
+export function getBookmarks(path: string): DocBookmark[] {
+  return getState().bookmarks[path] ?? []
+}
+
+/** Replace one file's bookmarks. An empty list drops the key rather than storing
+ *  `[]`, so unbookmarking the last page leaves no trace in the state file. */
+export function setBookmarks(path: string, bookmarks: DocBookmark[]): void {
+  const state = getState()
+  if (bookmarks.length === 0) delete state.bookmarks[path]
+  else state.bookmarks[path] = bookmarks
   saveState()
 }

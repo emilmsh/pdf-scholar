@@ -7,6 +7,7 @@ import type {
   DeleteAnnotationRequest,
   ModifyAnnotationRequest,
   PdfxApi,
+  DocBookmark,
   ReadingPosition,
   Settings
 } from '../shared/types'
@@ -18,8 +19,11 @@ const api: PdfxApi = {
   getRecents: () => ipcRenderer.invoke('recents:get'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   getPosition: (path: string) => ipcRenderer.invoke('position:get', path),
+  getBookmarks: (path: string) => ipcRenderer.invoke('bookmarks:get', path),
   getPendingPath: () => ipcRenderer.invoke('pending-path:get'),
   setPosition: (path: string, pos: ReadingPosition) => ipcRenderer.send('position:set', path, pos),
+  setBookmarks: (path: string, bookmarks: DocBookmark[]) =>
+    ipcRenderer.send('bookmarks:set', path, bookmarks),
   setSettings: (patch: Partial<Settings>) => ipcRenderer.send('settings:set', patch),
   annotate: (req: AnnotateRequest) => ipcRenderer.invoke('annotate', req),
   updateAnnotation: (req: ModifyAnnotationRequest) => ipcRenderer.invoke('annotation:update', req),

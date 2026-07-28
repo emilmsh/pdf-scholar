@@ -53,9 +53,12 @@ const ui = {
     const side = btn('Sidepanel');
     if (!side) throw new Error('no sidebar button');
     if (!side.classList.contains('is-active')) { click(side); await settle(500); }
-    const tabs = document.querySelectorAll('.sidebar-tabs button');
-    if (tabs.length < 3) throw new Error('sidebar tabs missing');
-    click(tabs[2]);
+    // By LABEL, not by index: the tab strip has grown before (Bookmarks landed
+    // between Pages and Notes) and an index silently selected the wrong tab.
+    const tabs = [...document.querySelectorAll('.sidebar-tabs button')];
+    const notes = tabs.find((b) => /Merknader|Annotations/.test(b.textContent || ''));
+    if (!notes) throw new Error(`notes tab not found (tabs: ${tabs.map((b) => b.textContent).join('|')})`);
+    click(notes);
     await settle(400);
   },
   /** One row per annotation the app knows about, file-painted or session */

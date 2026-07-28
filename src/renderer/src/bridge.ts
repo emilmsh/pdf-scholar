@@ -5,6 +5,7 @@ import type {
   AiChatResult,
   AiConfig,
   AiContentPart,
+  DocBookmark,
   PdfxApi,
   ReadingPosition,
   Settings
@@ -29,6 +30,7 @@ export const isExtension = !isElectron && isExtensionContext()
 
 interface WebState {
   positions: Record<string, ReadingPosition>
+  bookmarks: Record<string, DocBookmark[]>
   settings: Settings
 }
 
@@ -36,7 +38,7 @@ const LS_KEY = 'pdfx-web-state'
 
 
 function loadWebState(): WebState {
-  const fallback: WebState = { positions: {}, settings: DEFAULT_SETTINGS }
+  const fallback: WebState = { positions: {}, bookmarks: {}, settings: DEFAULT_SETTINGS }
   try {
     const parsed = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}')
     return {
@@ -79,6 +81,7 @@ export const webApi: PdfxApi = {
   getRecents: async () => [],
   getSettings: async () => loadWebState().settings,
   getPosition: async (path) => loadWebState().positions[path] ?? null,
+  getBookmarks: async (path) => loadWebState().bookmarks?.[path] ?? [],
   getPendingPath: async () => {
     // A new browser tab opened via newWindow() carries #open=<path>
     const m = /#open=([^&]+)/.exec(location.hash)
@@ -87,6 +90,13 @@ export const webApi: PdfxApi = {
   setPosition: (path, pos) => {
     const state = loadWebState()
     state.positions[path] = pos
+    saveWebState(state)
+  },
+  setBookmarks: (path, bookmarks) => {
+    const state = loadWebState()
+    state.bookmarks = state.bookmarks ?? {}
+    if (bookmarks.length === 0) delete state.bookmarks[path]
+    else state.bookmarks[path] = bookmarks
     saveWebState(state)
   },
   setSettings: (patch) => {

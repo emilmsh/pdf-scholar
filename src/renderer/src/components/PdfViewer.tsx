@@ -6,6 +6,7 @@ import type {
   AiCitation,
   AiImage,
   AnnotationType,
+  DocBookmark,
   FileError,
   FilePayload,
   PageRect,
@@ -337,6 +338,10 @@ export default function PdfViewer({
   const [containerWidth, setContainerWidth] = useState(0)
   const [range, setRange] = useState<[number, number]>([1, 1])
   const [currentPage, setCurrentPage] = useState(initialPosition?.page ?? 1)
+  // The keyboard handler is assigned per render but reads through refs, so the
+  // bookmark shortcut needs the live page rather than a captured one.
+  const currentPageRef = useRef(currentPage)
+  currentPageRef.current = currentPage
   const [error, setError] = useState<string | null>(null)
   /** Edge-style toolbar auto-hide. Pinned (default) = always visible; unpinned
    *  = tucks away and reveals on top-edge hover. Persisted across sessions. */
@@ -1898,6 +1903,60 @@ export default function PdfViewer({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payload.path])
+
+  // ---------- Page bookmarks ----------
+  //
+  // A view-layer list per file, kept next to the reading position and never
+  // written into the PDF. Held in page order so the sidebar and the B key agree
+  // on what "the next one" is without either sorting.
+  const [bookmarks, setBookmarks] = useState<DocBookmark[]>([])
+  const bookmarksRef = useRef(bookmarks)
+  bookmarksRef.current = bookmarks
+
+  useEffect(() => {
+    let stale = false
+    void bridge.getBookmarks(payload.path).then((list) => {
+      if (!stale) setBookmarks([...list].sort((a, b) => a.page - b.page))
+    })
+    return () => {
+      stale = true
+    }
+  }, [payload.path])
+
+  /** Write through immediately: the list is a handful of small objects, so a
+   *  debounce would only add a window in which a crash loses the last click. */
+  const persistBookmarks = useCallback(
+    (next: DocBookmark[]) => {
+      setBookmarks(next)
+      bridge.setBookmarks(payload.path, next)
+    },
+    [payload.path]
+  )
+
+  const toggleBookmark = useCallback(
+    (page: number) => {
+      const existing = bookmarksRef.current.find((b) => b.page === page)
+      if (existing) {
+        persistBookmarks(bookmarksRef.current.filter((b) => b.page !== page))
+        showToast(t('viewer.bookmarkRemoved', { page }))
+        return
+      }
+      persistBookmarks(
+        [...bookmarksRef.current, { page, label: '', createdAt: Date.now() }].sort(
+          (a, b) => a.page - b.page
+        )
+      )
+      showToast(t('viewer.bookmarkAdded', { page }))
+    },
+    [persistBookmarks, showToast]
+  )
+
+  const renameBookmark = useCallback(
+    (page: number, label: string) => {
+      persistBookmarks(bookmarksRef.current.map((b) => (b.page === page ? { ...b, label } : b)))
+    },
+    [persistBookmarks]
+  )
 
   const saveDocument = useCallback(async () => {
     // The file may have changed outside the app since editing began — an
@@ -4089,6 +4148,11 @@ export default function PdfViewer({
       } else if (k === 'h') {
         e.preventDefault()
         setAnnotsHidden((h) => !h)
+      } else if (k === 'b') {
+        // Bokmerke / bookmark the page you are reading. Also reachable from the
+        // sidebar tab, which is where the shortcut is advertised.
+        e.preventDefault()
+        toggleBookmark(currentPageRef.current)
       } else if (k === 'r' && READ_ALOUD) {
         e.preventDefault()
         if (readAloud === 'closed') void startReadAloud()
@@ -4477,6 +4541,9 @@ export default function PdfViewer({
           onJumpToAnnot={jumpToAnnot}
           onDeleteAnnot={removeAnnotation}
           onDeleteAllAnnots={() => void removeAllAnnotations()}
+          bookmarks={bookmarks}
+          onToggleBookmark={toggleBookmark}
+          onRenameBookmark={renameBookmark}
           onExport={exportAnnotations}
           onAskAi={askAnnotations}
           docName={payload.name}

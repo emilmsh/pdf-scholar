@@ -40,6 +40,19 @@ export interface ReadingPosition {
   spread?: boolean
 }
 
+/** A page the reader marked to come back to. Stored per file next to the
+ *  reading position, so it is a view-layer bookmark and NOT written into the
+ *  PDF — a /Dest in the file would need the same write path annotations use, and
+ *  no other reader would show it the way we do anyway. */
+export interface DocBookmark {
+  /** 1-based page number */
+  page: number
+  /** What the reader called it; empty means "just this page" and the UI shows
+   *  the page number instead. */
+  label: string
+  createdAt: number
+}
+
 export interface FilePayload {
   path: string
   name: string
@@ -380,6 +393,11 @@ export interface PdfxApi {
   getPosition(path: string): Promise<ReadingPosition | null>
   getPendingPath(): Promise<string | null>
   setPosition(path: string, pos: ReadingPosition): void
+  /** Bookmarks for one file, page order. Same fire-and-forget shape as
+   *  setPosition: the list is small, the write is not worth awaiting, and losing
+   *  the last one to a crash costs a click. */
+  getBookmarks(path: string): Promise<DocBookmark[]>
+  setBookmarks(path: string, bookmarks: DocBookmark[]): void
   setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
    *  goes through src/main/incremental-appender.ts instead) */
