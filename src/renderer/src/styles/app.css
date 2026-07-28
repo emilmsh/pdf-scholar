@@ -2546,6 +2546,26 @@ button {
   background: var(--hover);
 }
 
+/* Destructive, so it sits apart from the export row and stays quiet until
+   hovered — the same restraint as the per-row ✕, which only appears on hover. */
+.annot-clear-all {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 3px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.annot-clear-all:hover {
+  background: rgb(var(--danger-rgb) / 0.12);
+  border-color: rgb(var(--danger-rgb) / 0.35);
+  color: var(--danger);
+}
+
 .annot-list-page {
   font-size: 10.5px;
   font-weight: 600;

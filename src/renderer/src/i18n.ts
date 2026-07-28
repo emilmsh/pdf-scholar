@@ -307,6 +307,12 @@ const nb = {
   'side.noMatches': 'Ingen treff i merknadene.',
   'side.page': 'Side {page}',
   'side.deleteAnnot': 'Slett merknad',
+  'side.clearAll': 'Slett alle ({count})',
+  'side.clearAllTip': 'Slett alle merknader i dokumentet',
+  'side.clearAllConfirm': 'Slette alle {count} merknader?',
+  'side.clearAllConfirmDetail':
+    'Alle markeringer, notater, tegninger og former i dette dokumentet fjernes. Ctrl+Z henter dem tilbake, og endringen skrives ikke til filen før du lagrer.',
+  'side.clearAllAction': 'Slett alle',
   'side.collapse': 'Lukk',
   'side.expand': 'Åpne',
 
@@ -347,6 +353,8 @@ const nb = {
   'viewer.annotDeleteFailed': 'Kunne ikke slette annotasjonen: {error}',
   'viewer.annotStillSaving': 'Annotasjonen lagres fortsatt — prøv igjen straks',
   'viewer.annotChangeFailed': 'Kunne ikke endre annotasjonen: {error}',
+  'viewer.annotsCleared': '{count} merknader slettet — Ctrl+Z angrer',
+  'viewer.annotsClearedPartly': '{failed} av {total} merknader kunne ikke slettes',
   'viewer.toolbarUnpinnedToast':
     'Verktøylinjen er løsnet — den skjuler seg selv; hover toppkanten for å vise den',
   'viewer.resizerTip': 'Dra for å endre bredde — dobbeltklikk nullstiller',
@@ -783,6 +791,12 @@ const en: Dict = {
   'side.noMatches': 'No matches in the annotations.',
   'side.page': 'Page {page}',
   'side.deleteAnnot': 'Delete annotation',
+  'side.clearAll': 'Delete all ({count})',
+  'side.clearAllTip': 'Delete every annotation in the document',
+  'side.clearAllConfirm': 'Delete all {count} annotations?',
+  'side.clearAllConfirmDetail':
+    'Every highlight, note, drawing and shape in this document is removed. Ctrl+Z brings them back, and nothing is written to the file until you save.',
+  'side.clearAllAction': 'Delete all',
   'side.collapse': 'Collapse',
   'side.expand': 'Expand',
 
@@ -818,6 +832,8 @@ const en: Dict = {
   'viewer.annotDeleteFailed': 'Could not delete the annotation: {error}',
   'viewer.annotStillSaving': 'The annotation is still saving — try again in a moment',
   'viewer.annotChangeFailed': 'Could not change the annotation: {error}',
+  'viewer.annotsCleared': '{count} annotations deleted — Ctrl+Z undoes it',
+  'viewer.annotsClearedPartly': '{failed} of {total} annotations could not be deleted',
   'viewer.toolbarUnpinnedToast':
     'Toolbar unpinned — it hides itself; hover the top edge to reveal it',
   'viewer.resizerTip': 'Drag to resize — double-click to reset',

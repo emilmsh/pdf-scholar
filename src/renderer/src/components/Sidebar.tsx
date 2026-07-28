@@ -53,6 +53,8 @@ interface Props {
   onJumpToDest(dest: unknown): void
   onJumpToAnnot(pageNumber: number, record: PageAnnotation): void
   onDeleteAnnot(pageNumber: number, record: PageAnnotation): void
+  /** Delete every annotation in the document (one undoable action) */
+  onDeleteAllAnnots(): void
   onExport(format: ExportFormat): void
   /** Open the AI panel with the "summarize my annotations" question */
   onAskAi(): void
@@ -81,6 +83,7 @@ function Sidebar({
   onJumpToDest,
   onJumpToAnnot,
   onDeleteAnnot,
+  onDeleteAllAnnots,
   onExport,
   onAskAi,
   docName,
@@ -272,6 +275,7 @@ function Sidebar({
           excerpts={excerpts}
           onJump={onJumpToAnnot}
           onDelete={onDeleteAnnot}
+          onDeleteAll={onDeleteAllAnnots}
           onExport={onExport}
           onAskAi={onAskAi}
         />
@@ -289,6 +293,7 @@ function AnnotationList({
   excerpts,
   onJump,
   onDelete,
+  onDeleteAll,
   onExport,
   onAskAi
 }: {
@@ -296,11 +301,16 @@ function AnnotationList({
   excerpts: ReadonlyMap<string, string>
   onJump(pageNumber: number, record: PageAnnotation): void
   onDelete(pageNumber: number, record: PageAnnotation): void
+  onDeleteAll(): void
   onExport(format: ExportFormat): void
   onAskAi(): void
 }): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [colorFilter, setColorFilter] = useState<[number, number, number] | null>(null)
+  const [clearAsk, setClearAsk] = useState(false)
+  const clearAskRef = useRef<HTMLDivElement | null>(null)
+  const closeClearAsk = useCallback(() => setClearAsk(false), [])
+  useDismissable(clearAskRef, clearAsk, closeClearAsk)
 
   const flat = useMemo(() => {
     const rows: { pageNumber: number; record: PageAnnotation }[] = []
@@ -353,6 +363,9 @@ function AnnotationList({
             Word
           </button>
         </div>
+        <button className="annot-clear-all" onClick={() => setClearAsk(true)} title={t('side.clearAllTip')}>
+          {t('side.clearAll', { count: flat.length })}
+        </button>
       </div>
 
       <div className="annot-filter">
@@ -423,6 +436,32 @@ function AnnotationList({
           </div>
         )
       })}
+
+      {/* Same modal treatment as reset-to-defaults: it throws away work, and the
+          detail line says both how much and that Ctrl+Z takes it back. */}
+      {clearAsk && (
+        <div className="confirm-overlay">
+          <div className="confirm-dialog" role="alertdialog" aria-modal="true" ref={clearAskRef}>
+            <p className="confirm-message">{t('side.clearAllConfirm', { count: flat.length })}</p>
+            <p className="confirm-detail">{t('side.clearAllConfirmDetail')}</p>
+            <div className="confirm-actions">
+              <button className="btn-secondary" onClick={() => setClearAsk(false)}>
+                {t('app.cancel')}
+              </button>
+              <button
+                className="btn-primary"
+                autoFocus
+                onClick={() => {
+                  setClearAsk(false)
+                  onDeleteAll()
+                }}
+              >
+                {t('side.clearAllAction')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

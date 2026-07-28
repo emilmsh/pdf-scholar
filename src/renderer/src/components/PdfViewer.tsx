@@ -246,6 +246,12 @@ export type UndoEntry =
   | { kind: 'create'; handle: AnnotHandle; snapshot: PageAnnotation }
   | { kind: 'delete'; handle: AnnotHandle; snapshot: PageAnnotation }
   | { kind: 'change'; handle: AnnotHandle; before: AnnotPatch; after: AnnotPatch }
+  /** One user action that moved several annotations at once ("clear all"), so
+   *  Ctrl+Z takes them all back together rather than one per keypress. The
+   *  entries hold the SAME handle objects the writes used: engineCreate stamps a
+   *  new object number onto the handle it is given, and reusing them is what
+   *  keeps a second undo/redo cycle pointing at the right objects. */
+  | { kind: 'batch'; entries: UndoEntry[] }
 
 interface NavPosition {
   page: number
@@ -2028,11 +2034,17 @@ export default function PdfViewer({
     [payload.path, mutatePage, showToast, asWriteError]
   )
 
-  const engineDelete = useCallback(
-    async (handle: AnnotHandle) => {
+  /** The delete write itself, with no opinion about how to report it. Split out
+   *  of engineDelete because one mark and a whole documentful differ only in
+   *  that: deleting one reloads and toasts immediately, while "clear all" does
+   *  each ONCE at the end — a hundred marks must not mean a hundred reloads. */
+  const deleteOneAnnotation = useCallback(
+    async (handle: AnnotHandle): Promise<{ failed: FileError | null; wasFilePainted: boolean }> => {
       const wasFilePainted = findRecord(handle)?.source === 'file'
       mutatePage(handle.pageNumber, (list) => list.filter((r) => !matchesHandle(r, handle)))
-      if (handle.fileId === null) return
+      // Never written to the file, so there is nothing to delete and nothing to
+      // dirty — the optimistic removal above was the whole operation.
+      if (handle.fileId === null) return { failed: null, wasFilePainted: false }
       pendingWritesRef.current += 1
       const result = await bridge
         .deleteAnnotation({
@@ -2044,13 +2056,20 @@ export default function PdfViewer({
         .finally(() => {
           pendingWritesRef.current -= 1
         })
-      if ('error' in result) showToast(t('viewer.annotDeleteFailed', { error: errorText(result) }))
-      else {
-        markDirtyRef.current()
-        if (wasFilePainted) void reloadDocument()
-      }
+      if ('error' in result) return { failed: result, wasFilePainted: false }
+      markDirtyRef.current()
+      return { failed: null, wasFilePainted }
     },
-    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument, asWriteError]
+    [payload.path, mutatePage, matchesHandle, findRecord, asWriteError]
+  )
+
+  const engineDelete = useCallback(
+    async (handle: AnnotHandle) => {
+      const { failed, wasFilePainted } = await deleteOneAnnotation(handle)
+      if (failed) showToast(t('viewer.annotDeleteFailed', { error: errorText(failed) }))
+      else if (wasFilePainted) void reloadDocument()
+    },
+    [deleteOneAnnotation, showToast, reloadDocument]
   )
 
   const engineChange = useCallback(
@@ -2221,6 +2240,43 @@ export default function PdfViewer({
     },
     [pushUndo, engineDelete]
   )
+
+  /** Delete every annotation in the document as ONE undoable action.
+   *
+   *  Sequential rather than parallel on purpose: the engine serialises writes
+   *  per path anyway, and a burst of concurrent deletes would only queue in a
+   *  place where failures are harder to count. The reload — needed because
+   *  pdf.js painted the marks that came from the file — waits until the end, as
+   *  does the single summary toast; a document with fifty marks would otherwise
+   *  reload fifty times and show fifty toasts of which the user sees the last. */
+  const removeAllAnnotations = useCallback(async () => {
+    const entries: UndoEntry[] = []
+    const handles: AnnotHandle[] = []
+    for (const [pageNumber, list] of annotsRef.current) {
+      for (const record of list) {
+        const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId }
+        handles.push(handle)
+        entries.push({ kind: 'delete', handle, snapshot: { ...record } })
+      }
+    }
+    if (entries.length === 0) return
+    pushUndo({ kind: 'batch', entries })
+    setAnnotPopover(null)
+    setSelected(null)
+    let failed = 0
+    let needsReload = false
+    for (const handle of handles) {
+      const outcome = await deleteOneAnnotation(handle)
+      if (outcome.failed) failed += 1
+      if (outcome.wasFilePainted) needsReload = true
+    }
+    showToast(
+      failed === 0
+        ? t('viewer.annotsCleared', { count: handles.length })
+        : t('viewer.annotsClearedPartly', { failed, total: handles.length })
+    )
+    if (needsReload) void reloadDocument()
+  }, [pushUndo, deleteOneAnnotation, showToast, reloadDocument])
 
   // ---------- Freehand drawing ----------
 
@@ -4314,6 +4370,7 @@ export default function PdfViewer({
           onJumpToDest={jumpToDest}
           onJumpToAnnot={jumpToAnnot}
           onDeleteAnnot={removeAnnotation}
+          onDeleteAllAnnots={() => void removeAllAnnotations()}
           onExport={exportAnnotations}
           onAskAi={askAnnotations}
           docName={payload.name}

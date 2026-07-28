@@ -61,16 +61,25 @@ export function useUndoStack(
       const entry = source.current.pop()
       if (!entry) return
       undoBusyRef.current = true
-      try {
-        if (entry.kind === 'create') {
-          if (direction === 'undo') await engineDelete(entry.handle)
-          else await engineCreate(entry.handle, entry.snapshot)
-        } else if (entry.kind === 'delete') {
-          if (direction === 'undo') await engineCreate(entry.handle, entry.snapshot)
-          else await engineDelete(entry.handle)
+      // Recursive so a batch is just an entry that contains entries; undoing one
+      // walks it backwards, because the operations inside were applied in order
+      // and the file has to pass back through the same states.
+      const apply = async (e: UndoEntry): Promise<void> => {
+        if (e.kind === 'batch') {
+          const items = direction === 'undo' ? [...e.entries].reverse() : e.entries
+          for (const inner of items) await apply(inner)
+        } else if (e.kind === 'create') {
+          if (direction === 'undo') await engineDelete(e.handle)
+          else await engineCreate(e.handle, e.snapshot)
+        } else if (e.kind === 'delete') {
+          if (direction === 'undo') await engineCreate(e.handle, e.snapshot)
+          else await engineDelete(e.handle)
         } else {
-          await engineChange(entry.handle, direction === 'undo' ? entry.before : entry.after)
+          await engineChange(e.handle, direction === 'undo' ? e.before : e.after)
         }
+      }
+      try {
+        await apply(entry)
         target.current.push(entry)
       } finally {
         undoBusyRef.current = false
