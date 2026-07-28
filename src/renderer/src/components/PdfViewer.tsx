@@ -3801,6 +3801,10 @@ export default function PdfViewer({
     searchOpen,
     searchMode,
     searchMatches,
+    // activePane, not just the ref: search drives whichever column is active, so
+    // switching columns has to move the highlights over with it. Reading the ref
+    // alone left them painted in the column you had just left.
+    activePane,
     range,
     paneBPage,
     rotation,
