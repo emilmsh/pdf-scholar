@@ -63,6 +63,11 @@ interface Props {
   selectedId: string | null
   /** Rects of the active search match on this page (page space) */
   searchRects: PageRect[]
+  /** Rects of EVERY match on this page while the find bar is open (page space).
+   *  Separate from searchRects because the two are drawn differently and have
+   *  different owners: the active hit is also how read-aloud and citation jumps
+   *  paint, and highlight-all must not disturb that channel. */
+  searchAllRects: PageRect[]
   /** True when searchRects are a citation-jump flash (holds, then fades out)
    *  rather than a persistent search hit */
   searchFlash?: boolean | undefined
@@ -114,6 +119,7 @@ function PdfPage({
   hideAnnots,
   selectedId,
   searchRects,
+  searchAllRects,
   searchFlash,
   searchFlashId,
   drawTool,
@@ -736,6 +742,19 @@ function PdfPage({
               pageW={pageW}
               pageH={pageH}
               rotation={rotation}
+            />
+          ))}
+        </div>
+      )}
+      {/* Every OTHER match on this page, dim and quiet, drawn first so the
+          current hit paints over its own box. Same view-space contract. */}
+      {searchAllRects.length > 0 && (
+        <div className="annot-overlay">
+          {searchAllRects.map((r, i) => (
+            <div
+              key={i}
+              className="search-hit-all"
+              style={{ left: r.x * scale, top: r.y * scale, width: r.w * scale, height: r.h * scale }}
             />
           ))}
         </div>

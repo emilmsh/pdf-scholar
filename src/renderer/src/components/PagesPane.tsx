@@ -71,6 +71,9 @@ interface Props {
   drawTool: DrawTool | null
   selected: { pageNumber: number; localId: string } | null
   searchHits: { pageNumber: number; rects: PageRect[]; flash?: boolean; flashId?: number } | null
+  /** Highlight-all rects per page, already scoped to THIS column by the viewer
+   *  (they are measured in one column's rotation and valid only there). */
+  searchAllHits: ReadonlyMap<number, PageRect[]> | null
   /** The main column's pointer handlers, reused verbatim — they resolve the
    *  pane and its scale from the DOM (see scaleOfPageEl in PdfViewer), so the
    *  same functions work in either column. */
@@ -119,6 +122,7 @@ export default function PagesPane({
   drawTool,
   selected,
   searchHits,
+  searchAllHits,
   onContextMenu,
   onMouseUp,
   onMouseDown,
@@ -586,6 +590,7 @@ export default function PagesPane({
                   hideAnnots={annotsHidden}
                   selectedId={selected?.pageNumber === pageNumber ? selected.localId : null}
                   searchRects={searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS}
+                  searchAllRects={searchAllHits?.get(pageNumber) ?? EMPTY_RECTS}
                   searchFlash={!!searchHits?.flash && searchHits.pageNumber === pageNumber}
                   searchFlashId={
                     searchHits?.flash && searchHits.pageNumber === pageNumber

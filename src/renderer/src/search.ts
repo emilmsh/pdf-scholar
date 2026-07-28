@@ -91,18 +91,22 @@ export function findMatches(
   return matches
 }
 
-/**
- * Locate a match's rectangles (page space) via the rendered text layer.
- * Returns null if the page's text layer is not in the DOM yet.
- */
-export function resolveMatchRects(
+/** The spans a page's matches are measured against, or null when the text layer
+ *  is not in the DOM yet or does not correspond 1:1 to the extracted runs (see
+ *  the invariant in CLAUDE.md — includeMarkedContent would break it). */
+function matchSpans(pageEl: HTMLElement, pageText: PageText): NodeListOf<HTMLElement> | null {
+  const spans = pageEl.querySelectorAll<HTMLElement>('.text-host .textLayer > span')
+  return spans.length === 0 || spans.length !== pageText.runs.length ? null : spans
+}
+
+/** One match's rects, measured against spans the caller already queried. */
+function rectsFromSpans(
   pageEl: HTMLElement,
   pageText: PageText,
+  spans: NodeListOf<HTMLElement>,
   match: SearchMatch,
   scale: number
 ): PageRect[] | null {
-  const spans = pageEl.querySelectorAll<HTMLElement>('.text-host .textLayer > span')
-  if (spans.length === 0 || spans.length !== pageText.runs.length) return null
   const { runs } = pageText
   let first = -1
   let last = -1
@@ -119,4 +123,44 @@ export function resolveMatchRects(
   range.setStart(startNode, Math.max(0, match.start - runs[first].start))
   range.setEnd(endNode, Math.min(runs[last].length, match.end - runs[last].start))
   return clientRectsToPageRects(range.getClientRects(), pageEl, scale)
+}
+
+/**
+ * Locate a match's rectangles (page space) via the rendered text layer.
+ * Returns null if the page's text layer is not in the DOM yet.
+ */
+export function resolveMatchRects(
+  pageEl: HTMLElement,
+  pageText: PageText,
+  match: SearchMatch,
+  scale: number
+): PageRect[] | null {
+  const spans = matchSpans(pageEl, pageText)
+  return spans ? rectsFromSpans(pageEl, pageText, spans, match, scale) : null
+}
+
+/**
+ * Every match on one page, in one pass. Highlight-all needs the whole page's
+ * rects, and calling resolveMatchRects per match would re-query the span list
+ * and force a separate layout flush each time — on a dense page that is a few
+ * hundred spans re-walked per match. Here the spans are queried once and the
+ * ranges measured together, so the browser can batch the reads.
+ *
+ * Rects come back FLATTENED: the caller paints them, and which match a rect
+ * belongs to does not change how it is drawn.
+ */
+export function resolveAllMatchRects(
+  pageEl: HTMLElement,
+  pageText: PageText,
+  matches: SearchMatch[],
+  scale: number
+): PageRect[] | null {
+  const spans = matchSpans(pageEl, pageText)
+  if (!spans) return null
+  const out: PageRect[] = []
+  for (const match of matches) {
+    const rects = rectsFromSpans(pageEl, pageText, spans, match, scale)
+    if (rects) out.push(...rects)
+  }
+  return out
 }

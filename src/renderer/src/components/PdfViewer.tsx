@@ -101,7 +101,7 @@ import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
 import { errorText, locale, t, useLang } from '../i18n'
-import { buildPageTexts, findMatches, resolveMatchRects } from '../search'
+import { buildPageTexts, findMatches, resolveAllMatchRects, resolveMatchRects } from '../search'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
 import type { ExportFormat } from './Sidebar'
@@ -734,6 +734,22 @@ export default function PdfViewer({
      *  animation replays even when a repeat/same-page click reuses the nodes */
     flashId?: number
   } | null>(null)
+  /** Highlight-all: every match on the pages that are currently mounted.
+   *
+   *  A SEPARATE channel from searchHits on purpose. That one carries the current
+   *  hit and is also written by read-aloud (the spoken sentence) and by citation
+   *  jumps (the 7 s flash) — one highlight for the page, so those three can never
+   *  fight over it. Widening it into a map would drag both of them along.
+   *
+   *  Scoped to one column and one rotation, both recorded here: the rects are
+   *  measured off the rotated text layer's client rects, so they are only valid
+   *  in the column and rotation they were measured in. Search drives the active
+   *  column, so that is the one that gets them. */
+  const [searchAllHits, setSearchAllHits] = useState<{
+    pane: PaneId
+    rotation: ViewRotation
+    byPage: Map<number, PageRect[]>
+  } | null>(null)
   // Semantic (AI) search mode alongside exact text search
   const [searchMode, setSearchMode] = useState<'text' | 'ai'>('text')
   const [semantic, setSemantic] = useState<{
@@ -874,6 +890,9 @@ export default function PdfViewer({
   const aiHitTimerRef = useRef<number | null>(null)
   const searchSeqRef = useRef(0)
   const gotoSeqRef = useRef(0)
+  /** Generation guard for the highlight-all resolve pass, which awaits text
+   *  layers and can therefore land after the search that replaced it. */
+  const allHitsSeqRef = useRef(0)
   const searchJumpedRef = useRef(false)
   const annotsRef = useRef(annots)
   annotsRef.current = annots
@@ -3661,6 +3680,69 @@ export default function PdfViewer({
     return () => window.clearTimeout(timer)
   }, [searchOpen, searchQuery, searchOptions, pdf, gotoMatch])
 
+  // Highlight-all: resolve every match on the pages that are mounted right now.
+  //
+  // Only mounted pages can be measured at all — a page more than RENDER_MARGIN
+  // from the viewport has no text layer (PdfPage clears it), so this re-runs as
+  // the mounted set changes: `range` for column A, `paneBPage` for column B.
+  // Deliberately NOT hung off onScroll, which fires unthrottled; the mounted
+  // range is a coalesced state transition and is the only thing that matters.
+  useEffect(() => {
+    if (!searchOpen || searchMode === 'ai' || searchMatches.length === 0) {
+      setSearchAllHits(null)
+      return
+    }
+    const pane = activePaneRef.current
+    const paneRotation = pane === 'b' ? paneBRotationRef.current : rotationRef.current
+    // Rects measured in another rotation (or column) are simply wrong, not
+    // stale-but-close, so drop them before the async work rather than after.
+    setSearchAllHits((prev) =>
+      prev && (prev.pane !== pane || prev.rotation !== paneRotation) ? null : prev
+    )
+    const texts = pageTextsRef.current
+    const handle = handleForRef.current(pane)
+    const host = handle?.el()
+    if (!texts || !handle || !host) return
+    const byPageMatches = new Map<number, SearchMatch[]>()
+    for (const match of searchMatches) {
+      const list = byPageMatches.get(match.pageNumber)
+      if (list) list.push(match)
+      else byPageMatches.set(match.pageNumber, [match])
+    }
+    const seq = ++allHitsSeqRef.current
+    let cancelled = false
+    void (async () => {
+      const byPage = new Map<number, PageRect[]>()
+      for (const [pageNumber, list] of byPageMatches) {
+        if (!host.querySelector(`.pdf-page[data-page="${pageNumber}"]`)) continue
+        // Mounted, but the text layer renders asynchronously after mount — wait
+        // for it rather than losing the page's highlights until the next scroll.
+        const pageEl = await waitForTextLayer(pane, pageNumber, 2000)
+        if (cancelled || seq !== allHitsSeqRef.current) return
+        if (!pageEl) continue
+        const rects = resolveAllMatchRects(pageEl, texts[pageNumber - 1], list, handle.scale())
+        if (rects && rects.length > 0) byPage.set(pageNumber, rects)
+      }
+      if (cancelled || seq !== allHitsSeqRef.current) return
+      setSearchAllHits(byPage.size > 0 ? { pane, rotation: paneRotation, byPage } : null)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    searchOpen,
+    searchMode,
+    searchMatches,
+    range,
+    paneBPage,
+    rotation,
+    paneBRotation,
+    scale,
+    paneBScale,
+    splitOpen,
+    waitForTextLayer
+  ])
+
   const openSearch = useCallback(() => {
     // Seed the query with the current text selection: select a word, Ctrl+F,
     // and it is already in the field (selected, so typing replaces it).
@@ -3675,6 +3757,7 @@ export default function PdfViewer({
   const closeSearch = useCallback(() => {
     setSearchOpen(false)
     setSearchHits(null)
+    setSearchAllHits(null)
     if (semanticReqRef.current !== null) {
       bridge.aiAbort(semanticReqRef.current)
       semanticReqRef.current = null
@@ -4434,6 +4517,10 @@ export default function PdfViewer({
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }
+                    searchAllRects={
+                      (searchAllHits?.pane === 'a' && searchAllHits.byPage.get(pageNumber)) ||
+                      EMPTY_RECTS
+                    }
                     searchFlash={!!searchHits?.flash && searchHits.pageNumber === pageNumber}
                     searchFlashId={
                       searchHits?.flash && searchHits.pageNumber === pageNumber
@@ -4492,6 +4579,7 @@ export default function PdfViewer({
               drawTool={drawTool}
               selected={selected}
               searchHits={searchHits}
+              searchAllHits={searchAllHits?.pane === 'b' ? searchAllHits.byPage : null}
               onContextMenu={onContextMenu}
               onMouseUp={onMouseUp}
               onMouseDown={onMouseDown}

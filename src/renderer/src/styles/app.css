@@ -1964,6 +1964,15 @@ button {
   }
 }
 
+/* The other matches on the page: enough to see where they are while scanning,
+   deliberately much quieter than the current hit — no outline and no pulse,
+   because forty boxes announcing themselves is not a reading aid. */
+.search-hit-all {
+  position: absolute;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+
 /* Citation-jump flash: same pulse-in, then hold, then a gentle fade near the end
    so it dissolves instead of blinking off. Duration matches the JS release timer
    (7 s in jumpToAiCitation); `forwards` holds opacity 0 until the node unmounts. */
