@@ -23,10 +23,12 @@ import type {
   AiModelCatalog,
   AiProviderId,
   AiUsage,
+  FileError,
   ThinkingLevel
 } from './types'
 import { remoteModel } from './ai-model-catalog'
 import { DEFAULT_AZURE_API_VERSION } from './defaults'
+import { AI_ERRORS } from './engine-errors'
 
 // ---------- Reasoning-effort mapping (verified 2026-07, see docs/MODEL-UPDATE.md) ----------
 
@@ -184,12 +186,16 @@ CITATION RULES (important):
 // the reader still deserves a sentence instead of a raw HTTP 400.
 const CONTEXT_OVERFLOW_RE =
   /prompt is too long|too many tokens|context window|context length|maximum.{0,30}(context|tokens)/i
-const CONTEXT_OVERFLOW_MSG =
-  'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Prøv en ny samtale, eller bytt til en modell med større kontekstvindu.'
 
-/** Pass provider error text through, except the context-overflow case */
-function friendlyProviderError(message: string): string {
-  return CONTEXT_OVERFLOW_RE.test(message) ? CONTEXT_OVERFLOW_MSG : message
+/** A provider failure as a FileError. The context-overflow case is one WE can
+ *  name, so it carries a code the renderer translates — while `error` keeps the
+ *  provider's own sentence, which names the token counts and is the only part
+ *  worth reading in a log. Anything else travels as its own text for the same
+ *  reason: no invented translation could carry that detail. */
+function providerFailure(message: string): FileError {
+  return CONTEXT_OVERFLOW_RE.test(message)
+    ? AI_ERRORS.contextOverflow(message)
+    : { error: message }
 }
 
 const EMPTY_USAGE: AiUsage = {
@@ -356,7 +362,7 @@ async function chatAnthropic(
     final.stop_reason === 'refusal' &&
     !blocks.some((b: (typeof blocks)[number]) => b.type === 'text' && b.text)
   ) {
-    return { error: 'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren). Prøv å omformulere, eller bytt modell.' }
+    return AI_ERRORS.refusal
   }
 
   // char_location = grounded document citation; web_search_result_location =
@@ -526,7 +532,7 @@ async function chatOpenAiResponses(
         continue
       }
     }
-    return { error: friendlyProviderError(`HTTP ${response.status}: ${detail.slice(0, 300)}`) }
+    return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`)
   }
 
   // Typed SSE events; each data payload carries its own `type`, so the
@@ -551,7 +557,7 @@ async function chatOpenAiResponses(
   const decoder = new TextDecoder()
   let buffer = ''
   let finalResp: FinalResponse | null = null
-  let errorMsg: string | null = null
+  let failure: FileError | null = null
   for (;;) {
     const { done, value } = await reader.read()
     if (done) break
@@ -574,10 +580,12 @@ async function chatOpenAiResponses(
             finalResp = parsed.response
             break
           case 'response.failed':
-            errorMsg = parsed.response?.error?.message ?? 'Ukjent feil fra OpenAI'
+            failure = providerFailure(
+              parsed.response?.error?.message ?? AI_ERRORS.providerUnknown.error
+            )
             break
           case 'error':
-            errorMsg = parsed.message ?? 'Ukjent feil fra OpenAI'
+            failure = providerFailure(parsed.message ?? AI_ERRORS.providerUnknown.error)
             break
         }
       } catch {
@@ -585,8 +593,8 @@ async function chatOpenAiResponses(
       }
     }
   }
-  if (errorMsg) return { error: errorMsg }
-  if (!finalResp) return { error: 'Strømmen ble avbrutt uten fullført svar.' }
+  if (failure) return failure
+  if (!finalResp) return AI_ERRORS.streamAborted
 
   const parts: AiContentPart[] = []
   for (const item of finalResp.output ?? []) {
@@ -677,7 +685,7 @@ async function chatOpenAiCompatible(
       delete body.reasoning_effort
       continue
     }
-    return { error: friendlyProviderError(`HTTP ${response.status}: ${detail.slice(0, 300)}`) }
+    return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`)
   }
 
   const reader = response.body.getReader()
@@ -733,7 +741,7 @@ async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Pr
   const answerC = searching ? ' Et nettsøk bekrefter dette i en ekstern kilde.' : ''
   const full = answerA + answerB + answerC
   for (const word of full.split(/(?<= )/)) {
-    if (signal.aborted) return { error: 'Avbrutt' }
+    if (signal.aborted) return AI_ERRORS.aborted
     emit(word)
     await new Promise((resolve) => setTimeout(resolve, 12))
   }
@@ -797,7 +805,7 @@ export interface ProviderChatParams {
 /** Route a chat request to the configured provider. The caller is responsible
  *  for having a key when the provider is not mock (each platform reports the
  *  missing-key case in its own words); this only validates provider-specific
- *  extras (Azure endpoint/deployment). Aborts surface as { error: 'Avbrutt' }. */
+ *  extras (Azure endpoint/deployment). Aborts surface as AI_ERRORS.aborted. */
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
   const { provider, key, models, azure, thinking, catalog, req, emit, signal } = params
   try {
@@ -811,7 +819,7 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
       case 'azure': {
         const endpoint = azure.endpoint.replace(/\/+$/, '')
         if (!endpoint || !azure.deployment) {
-          return { error: 'Azure-endepunkt og deployment må fylles ut i KI-innstillingene.' }
+          return AI_ERRORS.azureUnconfigured
         }
         const apiVersion = azure.apiVersion.trim() || DEFAULT_AZURE_API_VERSION
         return await chatOpenAiCompatible(
@@ -828,7 +836,7 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
         return await chatMock(req, emit, signal)
     }
   } catch (err) {
-    if (signal.aborted) return { error: 'Avbrutt' }
-    return { error: friendlyProviderError(err instanceof Error ? err.message : String(err)) }
+    if (signal.aborted) return AI_ERRORS.aborted
+    return providerFailure(err instanceof Error ? err.message : String(err))
   }
 }

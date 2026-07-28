@@ -64,13 +64,30 @@ export type EngineErrorCode =
   | 'doc-too-large'
   | 'doc-too-large-browser'
   | 'doc-not-open'
+  | 'append-unsupported'
+  | 'append-objstm-edit'
+
+/** The same idea for the AI request path, which fails for its own set of named
+ *  reasons. Kept a separate union because these are whole sentences shown in a
+ *  chat bubble, not fragments spliced into a toast — they live under the
+ *  `aierr.*` i18n prefix, and `errorText` routes on the `ai-` stem. */
+export type AiErrorCode =
+  | 'ai-key-missing'
+  | 'ai-key-undecryptable'
+  | 'ai-key-session-only'
+  | 'ai-azure-unconfigured'
+  | 'ai-context-overflow'
+  | 'ai-refusal'
+  | 'ai-stream-aborted'
+  | 'ai-provider-unknown'
+  | 'ai-aborted'
 
 export interface FileError {
   /** Always set: the fallback text, and what goes in the log */
   error: string
   /** Set when the failure is one of the recognised kinds above, so the renderer
    *  can show its own translation rather than this string. */
-  code?: EngineErrorCode | undefined
+  code?: EngineErrorCode | AiErrorCode | undefined
 }
 
 /** A partial update where "not changing this field" may be written as an explicit

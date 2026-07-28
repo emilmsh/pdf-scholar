@@ -18,6 +18,7 @@ import type {
   KeyStorageMode
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
+import { AI_ERRORS } from '../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
 
@@ -272,12 +273,8 @@ export function registerAiIpc(): void {
         // will not decrypt (DPAPI ties encryption to the OS user, so credential
         // changes or a copied profile invalidate it), a session-only key that
         // this launch has not been given yet, or simply never entered.
-        if (ai.keys[ai.provider] !== '') {
-          return { error: 'API-nøkkelen kunne ikke dekrypteres (brukerkontoen kan ha endret seg). Legg den inn på nytt i KI-innstillingene.' }
-        }
-        return keyStorageMode() === 'session-only'
-          ? { error: 'Nøkkelen lagres bare for denne økta på denne maskinen (ingen nøkkelring tilgjengelig). Legg den inn på nytt i KI-innstillingene.' }
-          : { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
+        if (ai.keys[ai.provider] !== '') return AI_ERRORS.keyUndecryptable
+        return keyStorageMode() === 'session-only' ? AI_ERRORS.keySessionOnly : AI_ERRORS.keyMissing
       }
       const result = await runProviderChat({
         provider: ai.provider,

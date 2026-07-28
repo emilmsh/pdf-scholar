@@ -1,7 +1,7 @@
 // Per-document AI conversation persistence, mirroring the pdfx-custom-colors
 // localStorage pattern in annotations.ts. Renderer-only by design: works
 // identically in Electron and the dev:web fallback.
-import type { AiContentPart, AiImage, AiUsage } from '../../shared/types'
+import type { AiContentPart, AiImage, AiUsage, FileError } from '../../shared/types'
 
 // `| undefined` on every optional field: messages are built as object literals
 // where the unused ones are present and undefined (a user turn with no images
@@ -22,6 +22,11 @@ export type ChatMessage =
       usage?: AiUsage | undefined
       model?: string | undefined
       error?: string | undefined
+      /** Set when the failure was one we can name. Stored ALONGSIDE `error`
+       *  rather than instead of it: the code is what gets translated at render
+       *  time (so a language switch redraws old failures correctly), and `error`
+       *  stays the fallback for conversations saved before codes existed. */
+      errorCode?: FileError['code']
       /** Set when the request attached a BM25 excerpt instead of the full
        *  document (too large for the model's context window) — drives the
        *  transparency chip on the answer */

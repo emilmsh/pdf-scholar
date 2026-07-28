@@ -4,7 +4,7 @@
 // enough). Non-React modules (exports, prompts) call t() at use time.
 import { useSyncExternalStore } from 'react'
 
-import type { FileError } from '../../shared/types'
+import type { AiErrorCode, FileError } from '../../shared/types'
 
 export type Lang = 'nb' | 'en'
 /** User's choice — 'auto' follows the OS/browser language */
@@ -45,6 +45,24 @@ const nb = {
   'engine.doc-too-large': 'dokumentet er for stort til å annoteres (minnegrense i skrivemotoren)',
   'engine.doc-too-large-browser': 'dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren)',
   'engine.doc-not-open': 'dokumentet er ikke åpent for redigering',
+  'engine.append-unsupported':
+    'PDF-en har en struktur denne skrivemåten ikke støtter ennå — filen er urørt',
+  'engine.append-objstm-edit': 'denne merknaden kan ikke endres i så store dokumenter ennå',
+  // One per AiErrorCode. Unlike engine.* these stand alone in a chat bubble, so
+  // they are whole sentences that say what to do next.
+  'aierr.ai-key-missing': 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.',
+  'aierr.ai-key-undecryptable':
+    'Den lagrede API-nøkkelen kunne ikke dekrypteres. Det skjer hvis brukerkontoen eller nettleserprofilen har endret seg. Legg nøkkelen inn på nytt i KI-innstillingene.',
+  'aierr.ai-key-session-only':
+    'Nøkkelen lagres bare for denne økta på denne maskinen (ingen nøkkelring er tilgjengelig). Legg den inn på nytt i KI-innstillingene.',
+  'aierr.ai-azure-unconfigured': 'Azure-endepunkt og deployment må fylles ut i KI-innstillingene.',
+  'aierr.ai-context-overflow':
+    'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Start en ny samtale, eller bytt til en modell med større kontekstvindu.',
+  'aierr.ai-refusal':
+    'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren). Prøv å omformulere, eller bytt modell.',
+  'aierr.ai-stream-aborted': 'Strømmen ble avbrutt uten fullført svar.',
+  'aierr.ai-provider-unknown': 'Ukjent feil fra leverandøren.',
+  'aierr.ai-aborted': 'Avbrutt',
 
   // Welcome
   'welcome.tagline': 'Laget for forskning.',
@@ -518,6 +536,22 @@ const en: Dict = {
   'engine.doc-too-large': 'the document is too large to annotate (write-engine memory limit)',
   'engine.doc-too-large-browser': 'the document is too large to annotate in the browser (write-engine memory limit)',
   'engine.doc-not-open': 'the document is not open for editing',
+  'engine.append-unsupported':
+    'this PDF has a structure that write path does not support yet — the file is untouched',
+  'engine.append-objstm-edit': 'this annotation cannot be changed in documents this large yet',
+  'aierr.ai-key-missing': 'No API key is stored for the selected provider. Open the AI settings.',
+  'aierr.ai-key-undecryptable':
+    'The stored API key could not be decrypted. That happens when the user account or browser profile has changed. Enter the key again in the AI settings.',
+  'aierr.ai-key-session-only':
+    'The key is only kept for this session on this machine (no keyring is available). Enter it again in the AI settings.',
+  'aierr.ai-azure-unconfigured': 'The Azure endpoint and deployment must be filled in under AI settings.',
+  'aierr.ai-context-overflow':
+    'The document (or the conversation) is too large for the model’s context window, so the request was refused. Start a new conversation, or switch to a model with a larger context window.',
+  'aierr.ai-refusal':
+    'The model declined to answer this request (the provider’s safety filter). Try rephrasing, or switch model.',
+  'aierr.ai-stream-aborted': 'The stream ended without a complete answer.',
+  'aierr.ai-provider-unknown': 'Unknown error from the provider.',
+  'aierr.ai-aborted': 'Stopped',
 
   'welcome.tagline': 'Made for research.',
   'welcome.openPdf': 'Open PDF …',
@@ -991,5 +1025,12 @@ export function locale(): string {
  *  goes through this, so an English user never reads a Norwegian fragment inside
  *  a translated sentence. */
 export function errorText(e: FileError): string {
-  return e.code ? t(`engine.${e.code}`) : e.error
+  if (!e.code) return e.error
+  // Two prefixes because the two families read differently: `engine.*` entries
+  // are lowercase fragments spliced into a toast sentence, `aierr.*` entries are
+  // whole sentences shown on their own in a chat bubble.
+  return isAiErrorCode(e.code) ? t(`aierr.${e.code}`) : t(`engine.${e.code}`)
 }
+
+const isAiErrorCode = (code: NonNullable<FileError['code']>): code is AiErrorCode =>
+  code.startsWith('ai-')

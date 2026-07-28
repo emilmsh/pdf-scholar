@@ -36,7 +36,7 @@ import {
 import type { AiDocument, PreparedDocument } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import type { PageText } from '../search'
-import { t, useLang } from '../i18n'
+import { errorText, t, useLang } from '../i18n'
 import { isFindHotkey } from '../platform'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
@@ -170,7 +170,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
       if (stale) return
       setDone(true)
       if ('error' in result) {
-        setError(result.error)
+        setError(errorText(result))
       } else {
         // Char citations point into the excerpt this request attached —
         // resolve them to real pages now, while that exact text is known

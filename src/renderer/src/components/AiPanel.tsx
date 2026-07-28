@@ -33,7 +33,7 @@ import {
   summaryPrompt
 } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
-import { t, useLang, locale } from '../i18n'
+import { errorText, t, useLang, locale } from '../i18n'
 import { isFindHotkey } from '../platform'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
@@ -354,7 +354,10 @@ export default function AiPanel({
       setStreamText('')
       setBusy(false)
       if ('error' in result) {
-        setMessages((m) => [...m, { role: 'assistant', parts: [], error: result.error }])
+        setMessages((m) => [
+          ...m,
+          { role: 'assistant', parts: [], error: result.error, errorCode: result.code }
+        ])
       } else {
         // Char citations point into the excerpt this request attached —
         // resolve them to real pages now, while that exact text is known
@@ -861,7 +864,9 @@ export default function AiPanel({
                 ) : (
                   <div className="ai-msg ai-assistant" key={i}>
                     {m.error ? (
-                      <div className="ai-error">{m.error}</div>
+                      <div className="ai-error">
+                        {errorText({ error: m.error, code: m.errorCode })}
+                      </div>
                     ) : (
                       <AssistantBody parts={m.parts} doc={docRef.current?.doc ?? null} onCitation={handleCitation} />
                     )}

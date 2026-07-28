@@ -3662,7 +3662,7 @@ export default function PdfViewer({
     if (semanticReqRef.current !== requestId) return // superseded/aborted
     semanticReqRef.current = null
     if ('error' in result) {
-      setSemantic({ status: 'error', hits: [], index: -1, note: result.error })
+      setSemantic({ status: 'error', hits: [], index: -1, note: errorText(result) })
       return
     }
     // Char citations point into the excerpt this request attached — resolve

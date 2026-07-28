@@ -27,6 +27,7 @@ import type { PdfAnnotationObject, PdfDocumentObject } from '@embedpdf/models'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import { buildAnnotation, rgbToHex, toRect } from './annotation-build'
+import { ENGINE_ERRORS } from './engine-errors'
 import { snapshotApLessLinks, stripGeneratedLinkAPs } from './link-ap-guard'
 
 /** wasm32 heap exhaustion: every open/serialize round-trips the whole file
@@ -41,27 +42,6 @@ export const OOM_RE = /realloc|malloc|out of memory|cannot enlarge memory|oom|ab
  *  wasm32 cap) — silently losing annotations the user believes were saved.
  *  300 MB leaves headroom under the ~350 MB theoretical ceiling. */
 export const WASM_SAFE_LIMIT = 300 * 1024 * 1024
-
-/** The failures the ops below can report. Each carries a CODE so the renderer
- *  can translate it, plus the Norwegian text as the fallback and the log line —
- *  main and shared have no access to the renderer's i18n. Kept here so the two
- *  engines cannot drift into describing the same failure two different ways. */
-export const ENGINE_ERRORS = {
-  notFound: { code: 'annot-not-found', error: 'Fant ikke annotasjonen i filen' },
-  noPosition: { code: 'annot-no-position', error: 'Annotasjonen har ingen posisjon' },
-  noObjectNumber: {
-    code: 'annot-no-object-number',
-    error: 'Fikk ikke objektnummer for annotasjonen'
-  },
-  updateRejected: { code: 'annot-update-rejected', error: 'Oppdateringen ble avvist av motoren' },
-  passwordProtected: { code: 'pdf-password-protected', error: 'PDF-en er passordbeskyttet' },
-  asymmetric: (models: number, objNums: number): FileError => ({
-    code: 'annot-list-asymmetric',
-    // The counts stay in the message: they are the diagnostic, and no
-    // translated sentence can carry them without the renderer knowing them.
-    error: `Annotasjonslisten er usymmetrisk (${models} vs ${objNums}) — kan ikke identifisere trygt`
-  })
-} as const satisfies Record<string, FileError | ((...a: never[]) => FileError)>
 
 /** The raw FPDF functions we reach for. PdfiumNative does not surface the fork's
  *  EPDF object-number extensions in its high-level model API, so the ops below

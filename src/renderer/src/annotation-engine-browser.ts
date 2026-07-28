@@ -17,11 +17,11 @@ import type {
   FileError,
   ModifyAnnotationRequest
 } from '../../shared/types'
+import { ENGINE_ERRORS } from '../../shared/engine-errors'
 import type { OpenDoc } from '../../shared/pdfium-annot-ops'
 import {
   applyOn,
   deleteOn,
-  ENGINE_ERRORS,
   hasNoPosition,
   OOM_RE,
   updateOn,

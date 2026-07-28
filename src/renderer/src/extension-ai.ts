@@ -26,6 +26,7 @@ import type {
   PdfxApi
 } from '../../shared/types'
 import { runProviderChat } from '../../shared/ai-chat'
+import { AI_ERRORS } from '../../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../../shared/ai-model-catalog'
 import { store } from './extension-store'
 import { isSealed, seal, sealingAvailable, unseal } from './extension-key-crypto'
@@ -199,9 +200,7 @@ export function createExtensionAi(): Pick<
       if (config.provider !== 'mock' && !key) {
         // A sealed value that will not open reads as no key at all, so say what
         // to do about it rather than only that it is missing.
-        return stored[config.provider]
-          ? { error: 'Den lagrede API-nøkkelen kunne ikke dekrypteres i denne nettleserprofilen. Legg den inn på nytt i KI-innstillingene.' }
-          : { error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.' }
+        return stored[config.provider] ? AI_ERRORS.keyUndecryptable : AI_ERRORS.keyMissing
       }
       const controller = new AbortController()
       activeControllers.set(request.requestId, controller)

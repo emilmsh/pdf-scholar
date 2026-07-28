@@ -26,11 +26,11 @@ import type {
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import { DocCache } from './doc-cache'
 import { appendAnnotation, appendDeleteAnnotation, appendUpdateAnnotation } from './incremental-appender'
+import { ENGINE_ERRORS } from '../shared/engine-errors'
 import type { OpenDoc } from '../shared/pdfium-annot-ops'
 import {
   applyOn,
   deleteOn,
-  ENGINE_ERRORS,
   hasNoPosition,
   OOM_RE,
   updateOn,

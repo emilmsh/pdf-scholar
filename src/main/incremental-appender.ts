@@ -19,22 +19,31 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  EngineErrorCode,
   ModifyAnnotationRequest,
   PageRect
 } from '../shared/types'
+import { ENGINE_ERRORS } from '../shared/engine-errors'
 
 // ---------------------------------------------------------------------------
-// User-facing errors (Norwegian bokmål) — everything else logs + maps to these
+// User-facing errors. Every one of these carries a CODE from the shared set
+// (src/shared/engine-errors.ts) so the renderer shows its own translation —
+// the Norwegian text below is the fallback and the log line. The appender used
+// to own private copies of "not found" / "password protected", which is how
+// they fell out of the translated set: an English UI read Norwegian.
 // ---------------------------------------------------------------------------
-export const APPEND_UNSUPPORTED_MSG =
-  'Dokumentet har en PDF-struktur som ikke støttes for direkte annotering ennå — endringen ble ikke lagret.'
-const ENCRYPTED_MSG = 'PDF-en er passordbeskyttet'
-const NOT_FOUND_MSG = 'Fant ikke annotasjonen i filen'
-const OBJSTM_EDIT_MSG = 'Annotasjonen kan ikke endres i så store dokumenter ennå'
+const UNSUPPORTED_MSG = ENGINE_ERRORS.appendUnsupported.error
 
-/** Error whose message is safe to show the user (Norwegian). */
+/** A failure the user should see. `msg` is the fallback text, `detail` the
+ *  developer diagnostic (logged, never shown), `code` what the renderer
+ *  translates. Nearly every throw site means "this PDF construct is not
+ *  supported", so that is the default. */
 class AppendError extends Error {
-  constructor(msg: string, readonly detail?: string) {
+  constructor(
+    msg: string,
+    readonly detail?: string,
+    readonly code: EngineErrorCode = 'append-unsupported'
+  ) {
     super(msg)
   }
 }
@@ -94,7 +103,7 @@ class Lex {
 
   take(): number {
     const b = this.peek()
-    if (b === -1) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'unexpected end of file')
+    if (b === -1) throw new AppendError(UNSUPPORTED_MSG, 'unexpected end of file')
     this.pos++
     return b
   }
@@ -141,7 +150,7 @@ class Lex {
 
   expectKeyword(kw: string): void {
     if (!this.tryKeyword(kw)) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `expected '${kw}' at ${this.pos}`)
+      throw new AppendError(UNSUPPORTED_MSG, `expected '${kw}' at ${this.pos}`)
     }
   }
 
@@ -149,7 +158,7 @@ class Lex {
   int(): number {
     this.skipWs()
     let b = this.peek()
-    if (!isDigit(b)) throw new AppendError(APPEND_UNSUPPORTED_MSG, `expected integer at ${this.pos}`)
+    if (!isDigit(b)) throw new AppendError(UNSUPPORTED_MSG, `expected integer at ${this.pos}`)
     let v = 0
     while (isDigit(b)) {
       v = v * 10 + (b - 0x30)
@@ -172,10 +181,10 @@ class Lex {
       b = this.peek()
     }
     if (this.pos === start) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `expected number at ${start}`)
+      throw new AppendError(UNSUPPORTED_MSG, `expected number at ${start}`)
     }
     const v = Number(this.buf.toString('latin1', start, this.pos))
-    if (!Number.isFinite(v)) throw new AppendError(APPEND_UNSUPPORTED_MSG, `bad number at ${start}`)
+    if (!Number.isFinite(v)) throw new AppendError(UNSUPPORTED_MSG, `bad number at ${start}`)
     return v
   }
 }
@@ -198,7 +207,7 @@ function parseName(lex: Lex): string {
 }
 
 function parseValue(lex: Lex, depth = 0): PdfValue {
-  if (depth > 48) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'object nesting too deep')
+  if (depth > 48) throw new AppendError(UNSUPPORTED_MSG, 'object nesting too deep')
   lex.skipWs()
   const b = lex.peek()
   switch (b) {
@@ -234,7 +243,7 @@ function parseValue(lex: Lex, depth = 0): PdfValue {
             return { t: 'dict', map }
           }
           if (lex.take() !== 0x2f) {
-            throw new AppendError(APPEND_UNSUPPORTED_MSG, `expected name key at ${lex.pos}`)
+            throw new AppendError(UNSUPPORTED_MSG, `expected name key at ${lex.pos}`)
           }
           const key = parseName(lex)
           map.set(key, parseValue(lex, depth + 1))
@@ -304,7 +313,7 @@ function parseIndirect(lex: Lex, windowBase: number): IndirectObject {
     // spec: 'stream' is followed by CRLF or LF (never a lone CR)
     let b = lex.take()
     if (b === 0x0d) b = lex.take()
-    if (b !== 0x0a) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'malformed stream header')
+    if (b !== 0x0a) throw new AppendError(UNSUPPORTED_MSG, 'malformed stream header')
     return { num, gen, value, streamDataOffset: windowBase + lex.pos }
   }
   lex.expectKeyword('endobj')
@@ -437,7 +446,7 @@ function pngUnpredict(data: Buffer, columns: number): Buffer {
           break
         }
         default:
-          throw new AppendError(APPEND_UNSUPPORTED_MSG, `unknown PNG predictor tag ${tag}`)
+          throw new AppendError(UNSUPPORTED_MSG, `unknown PNG predictor tag ${tag}`)
       }
       out[dst + i] = val & 0xff
     }
@@ -456,16 +465,16 @@ function decodeStreamData(dict: PdfDict, raw: Buffer): Buffer {
   let filters: string[] = []
   if (filter?.t === 'name') filters = [filter.v]
   else if (filter?.t === 'arr') filters = filter.items.map((f) => (f.t === 'name' ? f.v : ''))
-  else if (filter) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'unsupported /Filter shape')
+  else if (filter) throw new AppendError(UNSUPPORTED_MSG, 'unsupported /Filter shape')
   if (filters.length === 0) return raw
   if (filters.length > 1 || filters[0] !== 'FlateDecode') {
-    throw new AppendError(APPEND_UNSUPPORTED_MSG, `unsupported filter ${filters.join(',')}`)
+    throw new AppendError(UNSUPPORTED_MSG, `unsupported filter ${filters.join(',')}`)
   }
   let data: Buffer
   try {
     data = inflateSync(raw)
   } catch {
-    throw new AppendError(APPEND_UNSUPPORTED_MSG, 'flate data corrupt')
+    throw new AppendError(UNSUPPORTED_MSG, 'flate data corrupt')
   }
   const parms = dict.get('DecodeParms') ?? dict.get('DP')
   const parmsDict = parms?.t === 'dict' ? parms.map : parms?.t === 'arr' && parms.items[0]?.t === 'dict' ? parms.items[0].map : null
@@ -476,12 +485,12 @@ function decodeStreamData(dict: PdfDict, raw: Buffer): Buffer {
       const colors = parmsDict.get('Colors')
       const bpc = parmsDict.get('BitsPerComponent')
       if ((colors && (colors.t !== 'num' || colors.v !== 1)) || (bpc && (bpc.t !== 'num' || bpc.v !== 8))) {
-        throw new AppendError(APPEND_UNSUPPORTED_MSG, 'unsupported predictor color layout')
+        throw new AppendError(UNSUPPORTED_MSG, 'unsupported predictor color layout')
       }
       const cols = parmsDict.get('Columns')
       data = pngUnpredict(data, cols?.t === 'num' ? cols.v : 1)
     } else if (predV !== 1) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `unsupported predictor ${predV}`)
+      throw new AppendError(UNSUPPORTED_MSG, `unsupported predictor ${predV}`)
     }
   }
   return data
@@ -541,7 +550,7 @@ class PdfFile {
 
   private async read(offset: number, length: number): Promise<Buffer> {
     const len = Math.min(length, this.size - offset)
-    if (len <= 0) throw new AppendError(APPEND_UNSUPPORTED_MSG, `read past EOF at ${offset}`)
+    if (len <= 0) throw new AppendError(UNSUPPORTED_MSG, `read past EOF at ${offset}`)
     const buf = Buffer.alloc(len)
     const { bytesRead } = await this.fh.read(buf, 0, len, offset)
     return bytesRead === len ? buf : buf.subarray(0, bytesRead)
@@ -557,7 +566,7 @@ class PdfFile {
       } catch (err) {
         if (err instanceof NeedMore && !atEof && len < WINDOW_MAX) continue
         if (err instanceof NeedMore) {
-          throw new AppendError(APPEND_UNSUPPORTED_MSG, `object too large to parse at ${offset}`)
+          throw new AppendError(UNSUPPORTED_MSG, `object too large to parse at ${offset}`)
         }
         throw err
       }
@@ -573,7 +582,7 @@ class PdfFile {
     const m = /startxref\s+(\d+)/g
     let last: RegExpExecArray | null = null
     for (let hit = m.exec(tail); hit; hit = m.exec(tail)) last = hit
-    if (!last) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'no startxref in file tail')
+    if (!last) throw new AppendError(UNSUPPORTED_MSG, 'no startxref in file tail')
     this.startxref = Number(last[1])
 
     const queue: number[] = [this.startxref]
@@ -584,7 +593,7 @@ class PdfFile {
       const offset = queue.shift()!
       if (visited.has(offset) || offset <= 0 || offset >= this.size) continue
       visited.add(offset)
-      if (visited.size > 64) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'xref chain too long')
+      if (visited.size > 64) throw new AppendError(UNSUPPORTED_MSG, 'xref chain too long')
       const section = await this.withWindow(offset, (lex) =>
         lex.tryKeyword('xref') ? this.parseClassicSection(lex) : this.parseStreamSection(lex, offset)
       )
@@ -606,8 +615,13 @@ class PdfFile {
       const prev = section.trailer.get('Prev')
       if (prev?.t === 'num') queue.push(prev.v)
     }
-    if (this.trailer.get('Encrypt')) throw new AppendError(ENCRYPTED_MSG, 'encrypted document')
-    if (!this.trailer.get('Root')) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'trailer has no /Root')
+    if (this.trailer.get('Encrypt'))
+      throw new AppendError(
+        ENGINE_ERRORS.passwordProtected.error,
+        'encrypted document',
+        ENGINE_ERRORS.passwordProtected.code
+      )
+    if (!this.trailer.get('Root')) throw new AppendError(UNSUPPORTED_MSG, 'trailer has no /Root')
     let maxNum = 0
     for (const num of this.xref.keys()) maxNum = Math.max(maxNum, num)
     this.nextNum = Math.max(declaredSize, maxNum + 1)
@@ -619,7 +633,7 @@ class PdfFile {
     for (;;) {
       if (lex.tryKeyword('trailer')) {
         const trailer = parseValue(lex)
-        if (trailer.t !== 'dict') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'trailer is not a dict')
+        if (trailer.t !== 'dict') throw new AppendError(UNSUPPORTED_MSG, 'trailer is not a dict')
         return { kind: 'classic', entries, trailer: trailer.map }
       }
       const start = lex.int()
@@ -631,7 +645,7 @@ class PdfFile {
         lex.peek(19) // ensure the record is inside the window
         const rec = lex.buf.toString('latin1', lex.pos, lex.pos + 20)
         const rm = /^(\d{10}) (\d{5}) ([nf])(?:\r\n| \r| \n)$/.exec(rec)
-        if (!rm) throw new AppendError(APPEND_UNSUPPORTED_MSG, `malformed xref record '${rec}'`)
+        if (!rm) throw new AppendError(UNSUPPORTED_MSG, `malformed xref record '${rec}'`)
         lex.pos += 20
         const num = start + i
         if (!entries.has(num)) {
@@ -648,37 +662,37 @@ class PdfFile {
   ): { kind: 'stream'; entries: Map<number, XrefEntry>; trailer: PdfDict } {
     const obj = parseIndirect(lex, offset)
     if (obj.value.t !== 'dict' || obj.streamDataOffset === undefined) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `no xref table or stream at ${offset}`)
+      throw new AppendError(UNSUPPORTED_MSG, `no xref table or stream at ${offset}`)
     }
     const dict = obj.value.map
     if (dictGetName(dict, 'Type') !== 'XRef') {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `object at ${offset} is not /Type /XRef`)
+      throw new AppendError(UNSUPPORTED_MSG, `object at ${offset} is not /Type /XRef`)
     }
     const lengthV = dict.get('Length')
     // xref streams may not reference their /Length indirectly through an
     // entry we don't have yet — require a direct number (all writers comply)
-    if (lengthV?.t !== 'num') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'xref stream /Length not direct')
+    if (lengthV?.t !== 'num') throw new AppendError(UNSUPPORTED_MSG, 'xref stream /Length not direct')
     const rel = obj.streamDataOffset - offset
     if (rel + lengthV.v > lex.buf.length) throw new NeedMore()
     const data = decodeStreamData(dict, Buffer.from(lex.buf.subarray(rel, rel + lengthV.v)))
 
     const wV = dict.get('W')
     if (wV?.t !== 'arr' || wV.items.length < 3 || wV.items.some((i) => i.t !== 'num')) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, 'bad /W in xref stream')
+      throw new AppendError(UNSUPPORTED_MSG, 'bad /W in xref stream')
     }
     const w = wV.items.map((i) => (i as { t: 'num'; v: number }).v)
     const sizeV = dict.get('Size')
-    if (sizeV?.t !== 'num') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'xref stream missing /Size')
+    if (sizeV?.t !== 'num') throw new AppendError(UNSUPPORTED_MSG, 'xref stream missing /Size')
     let index: number[] = [0, sizeV.v]
     const indexV = dict.get('Index')
     if (indexV) {
       if (indexV.t !== 'arr' || indexV.items.some((i) => i.t !== 'num') || indexV.items.length % 2 !== 0) {
-        throw new AppendError(APPEND_UNSUPPORTED_MSG, 'bad /Index in xref stream')
+        throw new AppendError(UNSUPPORTED_MSG, 'bad /Index in xref stream')
       }
       index = indexV.items.map((i) => (i as { t: 'num'; v: number }).v)
     }
     const rowLen = w[0] + w[1] + w[2]
-    if (rowLen <= 0 || rowLen > 32) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'bad xref row width')
+    if (rowLen <= 0 || rowLen > 32) throw new AppendError(UNSUPPORTED_MSG, 'bad xref row width')
     const entries = new Map<number, XrefEntry>()
     let pos = 0
     const field = (width: number): number => {
@@ -690,7 +704,7 @@ class PdfFile {
       const start = index[run]
       const count = index[run + 1]
       for (let i = 0; i < count; i++) {
-        if (pos + rowLen > data.length) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'xref stream truncated')
+        if (pos + rowLen > data.length) throw new AppendError(UNSUPPORTED_MSG, 'xref stream truncated')
         // w[0]===0 → type field absent, defaults to 1 (§7.5.8.3)
         const type = w[0] === 0 ? 1 : field(w[0])
         const f2 = field(w[1])
@@ -717,20 +731,20 @@ class PdfFile {
   async getObject(num: number): Promise<IndirectObject> {
     const entry = this.xref.get(num)
     if (!entry || entry.type === 0) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `object ${num} missing from xref`)
+      throw new AppendError(UNSUPPORTED_MSG, `object ${num} missing from xref`)
     }
     if (entry.type === 1) {
       const obj = await this.withWindow(entry.offset, (lex) => parseIndirect(lex, entry.offset))
       // STRICT: a stale/wrong offset must never lead to a doubtful append
       if (obj.num !== num) {
-        throw new AppendError(APPEND_UNSUPPORTED_MSG, `xref offset for ${num} points at object ${obj.num}`)
+        throw new AppendError(UNSUPPORTED_MSG, `xref offset for ${num} points at object ${obj.num}`)
       }
       return obj
     }
     const container = await this.loadObjectStream(entry.container)
     const off = container.offsets.get(num)
     if (off === undefined) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `object ${num} not in object stream ${entry.container}`)
+      throw new AppendError(UNSUPPORTED_MSG, `object ${num} not in object stream ${entry.container}`)
     }
     const lex = new Lex(container.data.subarray(container.first + off), true)
     return { num, gen: 0, value: parseValue(lex) }
@@ -741,20 +755,20 @@ class PdfFile {
     const cached = this.objStmCache.get(num)
     if (cached) return cached
     const entry = this.xref.get(num)
-    if (entry?.type !== 1) throw new AppendError(APPEND_UNSUPPORTED_MSG, `object stream ${num} not a direct object`)
+    if (entry?.type !== 1) throw new AppendError(UNSUPPORTED_MSG, `object stream ${num} not a direct object`)
     const obj = await this.withWindow(entry.offset, (lex) => parseIndirect(lex, entry.offset))
     if (obj.num !== num || obj.value.t !== 'dict' || obj.streamDataOffset === undefined) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `object ${num} is not a stream`)
+      throw new AppendError(UNSUPPORTED_MSG, `object ${num} is not a stream`)
     }
     const dict = obj.value.map
     if (dictGetName(dict, 'Type') !== 'ObjStm') {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, `object ${num} is not /Type /ObjStm`)
+      throw new AppendError(UNSUPPORTED_MSG, `object ${num} is not /Type /ObjStm`)
     }
     const nV = dict.get('N')
     const firstV = dict.get('First')
     const raw = await this.readStreamData(dict, obj.streamDataOffset)
     if (nV?.t !== 'num' || firstV?.t !== 'num') {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, 'object stream missing /N or /First')
+      throw new AppendError(UNSUPPORTED_MSG, 'object stream missing /N or /First')
     }
     const data = decodeStreamData(dict, raw)
     const offsets = new Map<number, number>()
@@ -774,7 +788,7 @@ class PdfFile {
     let lengthV = dict.get('Length')
     if (lengthV?.t === 'ref') lengthV = (await this.getObject(lengthV.num)).value
     if (lengthV?.t !== 'num' || lengthV.v < 0 || lengthV.v > 256 * 1024 * 1024) {
-      throw new AppendError(APPEND_UNSUPPORTED_MSG, 'bad stream /Length')
+      throw new AppendError(UNSUPPORTED_MSG, 'bad stream /Length')
     }
     return this.read(dataOffset, lengthV.v)
   }
@@ -783,7 +797,7 @@ class PdfFile {
   async resolve(v: PdfValue | undefined): Promise<PdfValue | undefined> {
     let cur = v
     for (let depth = 0; cur?.t === 'ref'; depth++) {
-      if (depth > 8) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'reference chain too deep')
+      if (depth > 8) throw new AppendError(UNSUPPORTED_MSG, 'reference chain too deep')
       cur = (await this.getObject(cur.num)).value
     }
     return cur
@@ -791,7 +805,7 @@ class PdfFile {
 
   async resolveNumber(v: PdfValue | undefined): Promise<number> {
     const r = await this.resolve(v)
-    if (r?.t !== 'num') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'expected a number')
+    if (r?.t !== 'num') throw new AppendError(UNSUPPORTED_MSG, 'expected a number')
     return r.v
   }
 }
@@ -811,20 +825,20 @@ interface PageInfo {
 async function findPage(pdf: PdfFile, pageIndex: number): Promise<PageInfo> {
   const rootRef = pdf.trailer.get('Root')
   const catalog = await pdf.resolve(rootRef)
-  if (catalog?.t !== 'dict') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'catalog is not a dict')
+  if (catalog?.t !== 'dict') throw new AppendError(UNSUPPORTED_MSG, 'catalog is not a dict')
   let nodeRef = catalog.map.get('Pages')
-  if (nodeRef?.t !== 'ref') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'catalog has no /Pages ref')
+  if (nodeRef?.t !== 'ref') throw new AppendError(UNSUPPORTED_MSG, 'catalog has no /Pages ref')
 
   let mediaBox: [number, number, number, number] | null = null
   let rotate = 0
   let idx = pageIndex
   for (let depth = 0; depth < 64; depth++) {
     const nodeObj = await pdf.getObject(nodeRef.num)
-    if (nodeObj.value.t !== 'dict') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'page tree node is not a dict')
+    if (nodeObj.value.t !== 'dict') throw new AppendError(UNSUPPORTED_MSG, 'page tree node is not a dict')
     const dict = nodeObj.value.map
     const mb = await pdf.resolve(dict.get('MediaBox'))
     if (mb) {
-      if (mb.t !== 'arr' || mb.items.length !== 4) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'bad /MediaBox')
+      if (mb.t !== 'arr' || mb.items.length !== 4) throw new AppendError(UNSUPPORTED_MSG, 'bad /MediaBox')
       const nums: number[] = []
       for (const item of mb.items) nums.push(await pdf.resolveNumber(item))
       mediaBox = [
@@ -839,22 +853,22 @@ async function findPage(pdf: PdfFile, pageIndex: number): Promise<PageInfo> {
 
     const type = dictGetName(dict, 'Type')
     if (type === 'Page') {
-      if (idx !== 0) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'page tree /Count inconsistent')
-      if (!mediaBox) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'page has no /MediaBox')
+      if (idx !== 0) throw new AppendError(UNSUPPORTED_MSG, 'page tree /Count inconsistent')
+      if (!mediaBox) throw new AppendError(UNSUPPORTED_MSG, 'page has no /MediaBox')
       const r = ((rotate % 360) + 360) % 360
       if (r !== 0 && r !== 90 && r !== 180 && r !== 270) {
-        throw new AppendError(APPEND_UNSUPPORTED_MSG, `unsupported /Rotate ${rotate}`)
+        throw new AppendError(UNSUPPORTED_MSG, `unsupported /Rotate ${rotate}`)
       }
       return { pageNum: nodeRef.num, pageGen: pdf.genOf(nodeRef.num), pageDict: dict, mediaBox, rotate: r as PageInfo['rotate'] }
     }
-    if (type !== 'Pages') throw new AppendError(APPEND_UNSUPPORTED_MSG, `unexpected page tree node /Type ${type}`)
+    if (type !== 'Pages') throw new AppendError(UNSUPPORTED_MSG, `unexpected page tree node /Type ${type}`)
     const kids = await pdf.resolve(dict.get('Kids'))
-    if (kids?.t !== 'arr') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'pages node has no /Kids')
+    if (kids?.t !== 'arr') throw new AppendError(UNSUPPORTED_MSG, 'pages node has no /Kids')
     let descended = false
     for (const kid of kids.items) {
-      if (kid.t !== 'ref') throw new AppendError(APPEND_UNSUPPORTED_MSG, '/Kids entry is not a reference')
+      if (kid.t !== 'ref') throw new AppendError(UNSUPPORTED_MSG, '/Kids entry is not a reference')
       const kidObj = await pdf.getObject(kid.num)
-      if (kidObj.value.t !== 'dict') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'kid is not a dict')
+      if (kidObj.value.t !== 'dict') throw new AppendError(UNSUPPORTED_MSG, 'kid is not a dict')
       const kidType = dictGetName(kidObj.value.map, 'Type')
       if (kidType === 'Page') {
         if (idx === 0) {
@@ -872,12 +886,12 @@ async function findPage(pdf: PdfFile, pageIndex: number): Promise<PageInfo> {
         }
         idx -= count
       } else {
-        throw new AppendError(APPEND_UNSUPPORTED_MSG, `unexpected kid /Type ${kidType}`)
+        throw new AppendError(UNSUPPORTED_MSG, `unexpected kid /Type ${kidType}`)
       }
     }
-    if (!descended) throw new AppendError(APPEND_UNSUPPORTED_MSG, `page ${pageIndex} not found in page tree`)
+    if (!descended) throw new AppendError(UNSUPPORTED_MSG, `page ${pageIndex} not found in page tree`)
   }
-  throw new AppendError(APPEND_UNSUPPORTED_MSG, 'page tree too deep')
+  throw new AppendError(UNSUPPORTED_MSG, 'page tree too deep')
 }
 
 // ---------------------------------------------------------------------------
@@ -1221,7 +1235,7 @@ function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
     case 'line':
     case 'arrow': {
       const [a, b] = s.strokes?.[0] ?? []
-      if (!a || !b) throw new AppendError('Linjen mangler endepunkter')
+      if (!a || !b) throw new AppendError(UNSUPPORTED_MSG, 'line annotation has no endpoints')
       const w = s.width ?? 2
       ops.push(`${fmtRgb(s.color)} RG`, `${fmtNum(w)} w`, '1 J',
         `${up(g, a[0], a[1])} m`, `${up(g, b[0], b[1])} l`, 'S')
@@ -1266,7 +1280,7 @@ function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
       break
     }
     default:
-      throw new AppendError(`Ukjent annotasjonstype: ${s.type}`)
+      throw new AppendError(UNSUPPORTED_MSG, `unknown annotation type: ${s.type}`)
   }
 
   const content = (gs ? '/G0 gs\n' : '') + ops.join('\n')
@@ -1484,7 +1498,7 @@ async function appendIncrement(pdf: PdfFile, objs: OutObj[]): Promise<void> {
     const rows = Buffer.alloc(nums.length * 7)
     nums.forEach((num, i) => {
       const e = entries.get(num)!
-      if (e.offset > 0xffffffff) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'file exceeds 4 GB')
+      if (e.offset > 0xffffffff) throw new AppendError(UNSUPPORTED_MSG, 'file exceeds 4 GB')
       rows[i * 7] = 1
       rows.writeUInt32BE(e.offset, i * 7 + 1)
       rows.writeUInt16BE(e.gen, i * 7 + 5)
@@ -1535,13 +1549,13 @@ async function annotsHolderRewrite(
   }
   if (annotsVal.t === 'ref') {
     const arrObj = await pdf.getObject(annotsVal.num)
-    if (arrObj.value.t !== 'arr') throw new AppendError(APPEND_UNSUPPORTED_MSG, '/Annots ref is not an array')
+    if (arrObj.value.t !== 'arr') throw new AppendError(UNSUPPORTED_MSG, '/Annots ref is not an array')
     const items = mutate(arrObj.value.items)
     if (items === null) return null
     const gen = pdf.genOf(annotsVal.num) // 0 when it lived in an object stream
     return [{ num: annotsVal.num, gen, data: objectBuffer(annotsVal.num, gen, ARR(items)) }]
   }
-  throw new AppendError(APPEND_UNSUPPORTED_MSG, 'unsupported /Annots shape')
+  throw new AppendError(UNSUPPORTED_MSG, 'unsupported /Annots shape')
 }
 
 async function opCreate(pdf: PdfFile, req: AnnotateRequest): Promise<AnnotateResult> {
@@ -1587,7 +1601,7 @@ async function opDelete(pdf: PdfFile, req: DeleteAnnotationRequest): Promise<Ann
     const kept = items.filter((i) => !(i.t === 'ref' && i.num === req.id))
     return kept.length === items.length ? null : kept
   })
-  if (holder === null) return { error: NOT_FOUND_MSG }
+  if (holder === null) return ENGINE_ERRORS.notFound
   await appendIncrement(pdf, holder)
   return { ok: true, id: req.id }
 }
@@ -1607,23 +1621,23 @@ const shiftPairs = (nums: number[], dux: number, duy: number): number[] =>
 
 async function opUpdate(pdf: PdfFile, req: ModifyAnnotationRequest): Promise<AnnotateResult> {
   const entry = pdf.xref.get(req.id)
-  if (!entry || entry.type === 0) return { error: NOT_FOUND_MSG }
+  if (!entry || entry.type === 0) return ENGINE_ERRORS.notFound
   // A foreign annotation compressed into an object stream: rewriting it as a
   // plain object is possible in principle, but its sibling objects keep
   // pointing at the (now shadowed) container entry — refuse rather than risk
   // a doubtful append.
-  if (entry.type === 2) return { error: OBJSTM_EDIT_MSG }
+  if (entry.type === 2) return ENGINE_ERRORS.appendObjStmEdit
   let obj: IndirectObject
   try {
     obj = await pdf.getObject(req.id)
   } catch {
-    return { error: NOT_FOUND_MSG }
+    return ENGINE_ERRORS.notFound
   }
-  if (obj.value.t !== 'dict' || obj.streamDataOffset !== undefined) return { error: NOT_FOUND_MSG }
+  if (obj.value.t !== 'dict' || obj.streamDataOffset !== undefined) return ENGINE_ERRORS.notFound
   const dict = obj.value.map
   const subtype = dictGetName(dict, 'Subtype')
   const type = subtype ? TYPE_OF_SUBTYPE[subtype] : undefined
-  if (!type) throw new AppendError(APPEND_UNSUPPORTED_MSG, `cannot edit /Subtype ${subtype}`)
+  if (!type) throw new AppendError(UNSUPPORTED_MSG, `cannot edit /Subtype ${subtype}`)
 
   const page = await findPage(pdf, req.pageIndex)
   const g = geomOf(page)
@@ -1661,7 +1675,7 @@ async function opUpdate(pdf: PdfFile, req: ModifyAnnotationRequest): Promise<Ann
       const strokes: PdfValue[] = []
       for (const stroke of inkList.items) {
         const nums = await numArray(pdf, stroke)
-        if (nums === null) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'bad /InkList')
+        if (nums === null) throw new AppendError(UNSUPPORTED_MSG, 'bad /InkList')
         strokes.push(ARR(shiftPairs(nums, dux, duy).map(N)))
       }
       dict.set('InkList', ARR(strokes))
@@ -1713,7 +1727,7 @@ async function shapeFromDict(
   }
 
   const rectNums = await numArray(pdf, dict.get('Rect'))
-  if (!rectNums || rectNums.length !== 4) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'annotation has no /Rect')
+  if (!rectNums || rectNums.length !== 4) throw new AppendError(UNSUPPORTED_MSG, 'annotation has no /Rect')
   const rectU: [number, number, number, number] = [
     Math.min(rectNums[0], rectNums[2]),
     Math.min(rectNums[1], rectNums[3]),
@@ -1742,11 +1756,11 @@ async function shapeFromDict(
   }
   if (type === 'ink') {
     const inkList = await pdf.resolve(dict.get('InkList'))
-    if (inkList?.t !== 'arr') throw new AppendError(APPEND_UNSUPPORTED_MSG, 'ink annotation has no /InkList')
+    if (inkList?.t !== 'arr') throw new AppendError(UNSUPPORTED_MSG, 'ink annotation has no /InkList')
     const strokes: [number, number][][] = []
     for (const strokeV of inkList.items) {
       const nums = await numArray(pdf, strokeV)
-      if (nums === null) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'bad /InkList')
+      if (nums === null) throw new AppendError(UNSUPPORTED_MSG, 'bad /InkList')
       const pts: [number, number][] = []
       for (let i = 0; i + 1 < nums.length; i += 2) pts.push(fromUser(g, nums[i], nums[i + 1]))
       strokes.push(pts)
@@ -1755,7 +1769,7 @@ async function shapeFromDict(
   }
   if (type === 'line' || type === 'arrow') {
     const l = await numArray(pdf, dict.get('L'))
-    if (!l || l.length !== 4) throw new AppendError(APPEND_UNSUPPORTED_MSG, 'line annotation has no /L')
+    if (!l || l.length !== 4) throw new AppendError(UNSUPPORTED_MSG, 'line annotation has no /L')
     const le = await pdf.resolve(dict.get('LE'))
     const isArrow =
       le?.t === 'arr' && le.items.some((i) => i.t === 'name' && i.v !== 'None')
@@ -1813,10 +1827,10 @@ function withFile(path: string, op: (pdf: PdfFile) => Promise<AnnotateResult>): 
     } catch (err) {
       if (err instanceof AppendError) {
         if (err.detail) console.error(`[appender] ${path}: ${err.detail}`)
-        return { error: err.message }
+        return { error: err.message, code: err.code }
       }
       console.error(`[appender] ${path}:`, err)
-      return { error: APPEND_UNSUPPORTED_MSG }
+      return ENGINE_ERRORS.appendUnsupported
     } finally {
       await pdf?.close()
     }
