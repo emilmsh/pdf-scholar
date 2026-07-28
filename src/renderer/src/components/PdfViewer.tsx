@@ -102,6 +102,7 @@ import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
 import { errorText, locale, t, useLang } from '../i18n'
 import { buildPageTexts, findMatches, resolveAllMatchRects, resolveMatchRects } from '../search'
+import { addSearchHistory, clearSearchHistory } from '../search-history'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
 import type { ExportFormat } from './Sidebar'
@@ -3273,7 +3274,8 @@ export default function PdfViewer({
    *
    *  Scope: every PREFERENCE the app remembers — theme, language, keep-awake,
    *  tool colours/widths/opacities, eraser scope, remembered custom colours,
-   *  panel widths, toolbar auto-hide — plus this document's view state.
+   *  recent search queries, panel widths, toolbar auto-hide — plus this
+   *  document's view state.
    *
    *  Deliberately NOT touched: stored API keys (losing those is a real cost and
    *  has nothing to do with "the UI looks wrong"), the recents library, reading
@@ -3287,6 +3289,7 @@ export default function PdfViewer({
     clearToolPrefs()
     setPrefs(structuredClone(DEFAULT_TOOL_PREFS))
     clearCustomColors()
+    clearSearchHistory()
     setPanelW({ ...PANEL_DEFAULTS })
     try {
       localStorage.removeItem(PANEL_LS_KEY)
@@ -3755,6 +3758,11 @@ export default function PdfViewer({
   }, [])
 
   const closeSearch = useCallback(() => {
+    // Remember the query on the way out, and only if it found something. That
+    // covers the common flow — Ctrl+F, type, read the highlighted hits, Escape —
+    // which never presses Enter, while keeping the half-typed prefixes the live
+    // search runs on out of the list.
+    if (searchMatches.length > 0) addSearchHistory(searchQuery)
     setSearchOpen(false)
     setSearchHits(null)
     setSearchAllHits(null)
@@ -3763,7 +3771,7 @@ export default function PdfViewer({
       semanticReqRef.current = null
     }
     setSemantic({ status: 'idle', hits: [], index: -1, note: null })
-  }, [])
+  }, [searchQuery, searchMatches.length])
 
   // ---------- Semantic (AI) search ----------
 

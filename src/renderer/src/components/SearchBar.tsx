@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
+import { clearSearchHistory, loadSearchHistory } from '../search-history'
 import { t, useLang } from '../i18n'
 import { isFindHotkey } from '../platform'
 
@@ -64,9 +65,29 @@ export default function SearchBar({
   const listRef = useRef<HTMLDivElement>(null)
   const isAi = mode === 'ai'
 
+  // Recent queries, offered while the field is focused and empty. Read straight
+  // from the MRU module rather than threaded down as props: nothing outside this
+  // bar cares about the list, and the parent has no state to keep in step.
+  const [history, setHistory] = useState<string[]>([])
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  /** Only while there is nothing typed — once you are typing, the results ARE
+   *  the useful list, and a dropdown over them would be in the way. */
+  const historyVisible = !isAi && historyOpen && query.trim() === '' && history.length > 0
+
+  const pickHistory = (q: string): void => {
+    setHistoryOpen(false)
+    setHistoryIndex(-1)
+    onQueryChange(q)
+    inputRef.current?.focus()
+  }
+
   useEffect(() => {
     inputRef.current?.focus()
     inputRef.current?.select()
+    setHistory(loadSearchHistory())
+    setHistoryOpen(true)
+    setHistoryIndex(-1)
   }, [focusToken])
 
   useEffect(() => {
@@ -120,18 +141,53 @@ export default function SearchBar({
             ref={inputRef}
             value={query}
             placeholder={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
-            onChange={(e) => onQueryChange(e.target.value)}
+            onChange={(e) => {
+              onQueryChange(e.target.value)
+              // Emptying the field is how you ask for the list again after
+              // picking from it — the same move as clearing any combobox.
+              if (e.target.value.trim() === '') {
+                setHistory(loadSearchHistory())
+                setHistoryOpen(true)
+                setHistoryIndex(-1)
+              }
+            }}
+            onFocus={() => {
+              setHistory(loadSearchHistory())
+              setHistoryOpen(true)
+              setHistoryIndex(-1)
+            }}
             onKeyDown={(e) => {
               if (isFindHotkey(e)) return // bubbles to the window handler: reselect
               e.stopPropagation()
               if (isAi) {
                 if (e.key === 'Enter') onAiSearch()
                 else if (e.key === 'Escape') onClose()
-              } else {
-                if (e.key === 'Enter' && e.shiftKey) onPrev()
-                else if (e.key === 'Enter') onNext()
-                else if (e.key === 'Escape') onClose()
+                return
               }
+              // While the history list is showing, the arrows and Enter belong to
+              // it, and Escape dismisses it before the bar itself — the same
+              // priority every other transient surface in the app follows.
+              if (historyVisible && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                e.preventDefault()
+                const step = e.key === 'ArrowDown' ? 1 : -1
+                setHistoryIndex((i) => {
+                  const next = i + step
+                  if (next < 0) return -1
+                  return next >= history.length ? history.length - 1 : next
+                })
+                return
+              }
+              if (historyVisible && e.key === 'Escape') {
+                setHistoryOpen(false)
+                return
+              }
+              if (e.key === 'Enter' && historyVisible && historyIndex >= 0) {
+                pickHistory(history[historyIndex])
+                return
+              }
+              if (e.key === 'Enter' && e.shiftKey) onPrev()
+              else if (e.key === 'Enter') onNext()
+              else if (e.key === 'Escape') onClose()
             }}
             aria-label={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
           />
@@ -174,6 +230,34 @@ export default function SearchBar({
           ✕
         </button>
       </div>
+
+      {historyVisible && (
+        <div className="search-history">
+          {history.map((q, i) => (
+            <button
+              key={q}
+              className={`search-history-row${i === historyIndex ? ' active' : ''}`}
+              // mousedown would blur the field before the click lands, and the
+              // bar closes on focus loss — keep the focus, act on click.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pickHistory(q)}
+            >
+              {q}
+            </button>
+          ))}
+          <button
+            className="search-history-clear"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              clearSearchHistory()
+              setHistory([])
+              setHistoryIndex(-1)
+            }}
+          >
+            {t('search.historyClear')}
+          </button>
+        </div>
+      )}
 
       {!isAi && count > 0 && (
         <div className="search-results" ref={listRef}>

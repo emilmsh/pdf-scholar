@@ -2330,6 +2330,47 @@ button {
   border-radius: 2px;
 }
 
+/* Recent queries, in the slot the results list uses — the field is empty when
+   this shows, so the two never compete for the space. */
+.search-history {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.search-history-row {
+  padding: 5px 8px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-history-row:hover,
+.search-history-row.active {
+  background: var(--hover);
+}
+
+.search-history-clear {
+  margin-top: 3px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.search-history-clear:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
 /* Selection / context menu */
 
 /* Also declared below: the viewport clamp. */

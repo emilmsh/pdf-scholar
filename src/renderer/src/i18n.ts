@@ -204,7 +204,7 @@ const nb = {
   'reset.tip': 'Sett alle innstillinger tilbake slik de var da appen var ny',
   'reset.confirmMessage': 'Nullstille alle innstillinger?',
   'reset.confirmDetail':
-    'Lesemodus, språk, verktøyvalg (farge, bredde og dekkevne), viskelær, panelbredder og verktøylinjen settes tilbake til standard. API-nøkler, biblioteket og merknadene i dokumentene røres ikke.',
+    'Lesemodus, språk, verktøyvalg (farge, bredde og dekkevne), viskelær, søkehistorikk, panelbredder og verktøylinjen settes tilbake til standard. API-nøkler, biblioteket og merknadene i dokumentene røres ikke.',
   'reset.confirmAction': 'Nullstill',
   'reset.done': 'Innstillingene er satt tilbake til standard',
   'settings.about': 'PDF Scholar {version} · MIT',
@@ -337,6 +337,7 @@ const nb = {
   'search.aiNoKey': 'Ingen API-nøkkel er lagret for KI-leverandøren.',
   'search.aiOpenSettings': 'Åpne KI-innstillinger',
   'search.searchError': 'KI-søket feilet',
+  'search.historyClear': 'Tøm søkehistorikk',
 
   // Viewer
   'viewer.errorTitle': 'Kunne ikke vise dokumentet.',
@@ -694,7 +695,7 @@ const en: Dict = {
   'reset.tip': 'Put every setting back the way it was when the app was new',
   'reset.confirmMessage': 'Reset all settings?',
   'reset.confirmDetail':
-    'Reading mode, language, tool settings (colour, width and opacity), the eraser, panel widths and the toolbar go back to their defaults. API keys, the library and the annotations in your documents are left alone.',
+    'Reading mode, language, tool settings (colour, width and opacity), the eraser, search history, panel widths and the toolbar go back to their defaults. API keys, the library and the annotations in your documents are left alone.',
   'reset.confirmAction': 'Reset',
   'reset.done': 'Settings are back to their defaults',
   'settings.about': 'PDF Scholar {version} · MIT',
@@ -820,6 +821,7 @@ const en: Dict = {
   'search.aiNoKey': 'No API key is stored for the AI provider.',
   'search.aiOpenSettings': 'Open AI settings',
   'search.searchError': 'AI search failed',
+  'search.historyClear': 'Clear search history',
 
   'viewer.errorTitle': 'Could not display the document.',
   'viewer.errorBytes': '({bytes} bytes read, starts “{head}”, ends “{tail}”)',
