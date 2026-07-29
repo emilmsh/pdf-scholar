@@ -141,18 +141,22 @@ const SHOTS = [
     `
   },
   {
+    // The point of this shot is how marks LOOK on the page, in both states:
+    // several kinds sitting there, and one of them selected with the knobs that
+    // let its ends be dragged. An earlier version left the selection menu open
+    // over the page, which demonstrated the way in but covered the marks.
     name: 'annotations',
-    caption: 'Selecting text brings up the markup menu, right where the text is',
+    caption: 'Marks of several kinds on the page, one selected with its end knobs',
     setup: `
       await ui.closePanels()
       await ui.showAnnots(true)
       await ui.fitWidth()
       await ui.goToPage(2)
       ui.expectPage(0, 2)
-      // Mark a passage first, so the shot shows the RESULT as well as the way
-      // to get it, then select another sentence and leave the menu standing.
       await ui.highlightSomeText()
-      await ui.openSelectionMenu()
+      await ui.drawRectangleAround('Attention mechanisms have become')
+      await ui.placeNote('Same claim as Bahdanau (2015) — check the setup')
+      await ui.selectMark()
       await ui.settle(400)
     `
   },
@@ -278,7 +282,10 @@ const L = {
   fitWidth: ['Tilpass bredde', 'Fit width'],
   fitToggle: ['veksler', 'toggles'],
   newChat: ['Ny samtale', 'New conversation'],
-  theme: ['Lesemodus', 'Reading mode']
+  theme: ['Lesemodus', 'Reading mode'],
+  shapes: ['Former', 'Shapes'],
+  rectangle: ['Rektangel', 'Rectangle'],
+  note: ['Notat', 'Note']
 };
 const titleOf = (el) => el.title || '';
 const startsAny = (el, names) => names.some((n) => titleOf(el).startsWith(n));
@@ -287,6 +294,39 @@ const btn = (names, root = document) =>
 const click = (el) => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); };
 const ui = {
   settle,
+  /** The page element under the reader in column A. NOT the first .pdf-page in
+   *  the DOM — three pages are mounted around the viewport, and the first of
+   *  them is the one ABOVE, so marks placed there land off-screen (which is
+   *  exactly what happened: a rectangle and a note drawn onto page 1 while the
+   *  shot framed page 2). */
+  pageElA() {
+    const n = this.visiblePage(0);
+    const el = document.querySelector('.pages[data-pane="a"] .pdf-page[data-page="' + n + '"]');
+    if (!el) throw new Error('page ' + n + ' is not mounted');
+    return el;
+  },
+  /** The part of that page which is ACTUALLY IN FRAME, in client coords. At the
+   *  fit-width zoom of a screenshot only the top third of an A4 page is on
+   *  screen, so anything placed by a fraction of the PAGE lands below the fold —
+   *  which is how a rectangle and a note ended up in a shot that showed
+   *  neither. Fractions are of this box. */
+  visibleBoxA() {
+    const host = document.querySelector('.pages[data-pane="a"]').getBoundingClientRect();
+    const page = this.pageElA().getBoundingClientRect();
+    const top = Math.max(host.top, page.top);
+    const bottom = Math.min(host.bottom, page.bottom);
+    if (bottom - top < 80) throw new Error('almost none of the page is in frame');
+    return { left: page.left, width: page.width, top, height: bottom - top };
+  },
+  /** Fail if a mark is off-screen: "it exists in the DOM" is not the same as
+   *  "it is in the picture", and only the second one matters here. */
+  expectInFrame(el, what) {
+    const host = document.querySelector('.pages[data-pane="a"]').getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    const inside = r.bottom > host.top + 8 && r.top < host.bottom - 8 &&
+      r.right > host.left + 8 && r.left < host.right - 8 && r.width > 2 && r.height > 2;
+    if (!inside) throw new Error(what + ' is outside the frame');
+  },
   /** The page actually UNDER THE READER in a column (0 = left, 1 = right),
    *  read from geometry rather than from the toolbar's readout: the readout is
    *  app state, and the whole point of asserting is to catch the case where the
@@ -892,6 +932,133 @@ const ui = {
     await settle(200);
     const marks = document.querySelectorAll('.annot-highlight, .annot-underline').length;
     if (marks === 0) throw new Error('markup produced nothing visible');
+  },
+  /** Draw a rectangle around a passage, low on the page so it does not land on
+   *  the marks the text markup just made. Arms the shape tool through its own
+   *  popover — the same two clicks a reader makes. */
+  /** Client-space box around the paragraph starting with the given phrase, found by
+   *  walking the text layer line by line until the vertical gap says the
+   *  paragraph ended. A rectangle drawn to arbitrary fractions slices through
+   *  body text and looks like a mistake; one that hugs a paragraph looks like a
+   *  reader's decision, which is what the shot is for. */
+  paragraphBox(phrase, pad = 10) {
+    const page = this.pageElA();
+    const lines = [...page.querySelectorAll('.text-host .textLayer > span')]
+      .filter((s) => (s.textContent || '').trim().length > 0)
+      .map((s) => ({ s, r: s.getBoundingClientRect() }))
+      .sort((a, b) => a.r.top - b.r.top);
+    const first = lines.findIndex((l) => (l.s.textContent || '').trim().startsWith(phrase));
+    if (first === -1) throw new Error('no paragraph starting with "' + phrase + '"');
+    const picked = [lines[first]];
+    for (let i = first + 1; i < lines.length; i++) {
+      const gap = lines[i].r.top - picked[picked.length - 1].r.bottom;
+      // Lines inside a paragraph very nearly touch; the gap to the NEXT
+      // paragraph is a fair fraction of a line. 0.9 was too generous and the box
+      // swallowed two paragraphs.
+      if (gap > lines[i].r.height * 0.35) break;
+      picked.push(lines[i]);
+    }
+    const left = Math.min(...picked.map((l) => l.r.left));
+    const right = Math.max(...picked.map((l) => l.r.right));
+    const top = Math.min(...picked.map((l) => l.r.top));
+    const bottom = Math.max(...picked.map((l) => l.r.bottom));
+    return { left: left - pad, top: top - pad, right: right + pad, bottom: bottom + pad };
+  },
+  /** Draw a rectangle around a paragraph. */
+  async drawRectangleAround(phrase) {
+    const shapes = btn(L.shapes);
+    if (!shapes) throw new Error('no shapes button in the toolbar');
+    click(shapes);
+    await settle(300);
+    const pick = [...document.querySelectorAll('.shape-pick')]
+      .find((b) => startsAny(b, L.rectangle));
+    if (!pick) throw new Error('no rectangle in the shape menu');
+    click(pick);
+    await settle(400);
+    const pageEl = this.pageElA();
+    const layer = pageEl.querySelector('.draw-layer');
+    if (!layer) throw new Error('the shape tool did not arm (no draw layer)');
+    const box = this.paragraphBox(phrase);
+    const at = (t, x, y, buttons) => layer.dispatchEvent(new PointerEvent(t, {
+      bubbles: true, pointerId: 31, isPrimary: true, button: 0, buttons,
+      clientX: Math.round(x), clientY: Math.round(y)
+    }));
+    at('pointerdown', box.left, box.top, 1);
+    await settle(60);
+    at('pointermove', (box.left + box.right) / 2, (box.top + box.bottom) / 2, 1);
+    await settle(60);
+    at('pointermove', box.right, box.bottom, 1);
+    await settle(60);
+    at('pointerup', box.right, box.bottom, 0);
+    await settle(700);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle(300);
+    const shape = pageEl.querySelector('.annot-marks svg');
+    if (!shape) throw new Error('the rectangle produced nothing on this page');
+    // WHOLLY inside, not merely overlapping: a box with its bottom edge cut off
+    // by the window looks like a rendering fault in a marketing image.
+    const host = document.querySelector('.pages[data-pane="a"]').getBoundingClientRect();
+    if (box.top < host.top + 4 || box.bottom > host.bottom - 4) {
+      throw new Error('the rectangle would be clipped by the window — frame it elsewhere');
+    }
+  },
+  /** Place a sticky note in the margin and write in it. */
+  async placeNote(text, fx = 0.92, fy = 0.3) {
+    const note = btn(L.note);
+    if (!note) throw new Error('no note button in the toolbar');
+    click(note);
+    await settle(300);
+    const pageEl = this.pageElA();
+    const r = this.visibleBoxA();
+    // The armed note tool listens on its own full-window overlay, for
+    // pointerdown — not for a click on the page underneath it.
+    const overlay = document.querySelector('.note-place-overlay');
+    if (!overlay) throw new Error('the note tool did not arm');
+    overlay.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 33, isPrimary: true, button: 0, buttons: 1,
+      clientX: Math.round(r.left + r.width * fx), clientY: Math.round(r.top + r.height * fy)
+    }));
+    await settle(500);
+    const ta = document.querySelector('.note-popover textarea');
+    if (!ta) throw new Error('the note draft did not open');
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(ta, text);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(200);
+    const save = [...document.querySelectorAll('.note-popover .note-actions button')].pop();
+    if (!save || save.disabled) throw new Error('the note has nothing to save');
+    click(save);
+    await settle(700);
+    const bubble = pageEl.querySelector('.annot-note-mark');
+    if (!bubble) throw new Error('the note produced no bubble on this page');
+    this.expectInFrame(bubble, 'the note bubble');
+  },
+  /** Select a highlight so the shot shows a mark in BOTH states — the knobs on
+   *  its ends beside marks that are merely there.
+   *
+   *  Escape once closes the properties popover and leaves the selection intact
+   *  (it clears the selection only on a second press), which is what keeps the
+   *  page visible behind the knobs. */
+  async selectMark() {
+    const host = document.querySelector('.pages[data-pane="a"]');
+    const mark = host.querySelector('.annot-highlights div, .annot-highlights rect');
+    if (!mark) throw new Error('no highlight to select');
+    const b = mark.getBoundingClientRect();
+    const page = mark.closest('.pdf-page');
+    const opt = { bubbles: true, cancelable: true, view: window, button: 0,
+      clientX: Math.round(b.left + b.width / 2), clientY: Math.round(b.top + b.height / 2) };
+    page.dispatchEvent(new MouseEvent('mousedown', opt));
+    page.dispatchEvent(new MouseEvent('mouseup', opt));
+    page.dispatchEvent(new MouseEvent('click', opt));
+    await settle(500);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle(400);
+    if (document.querySelectorAll('.markup-end').length !== 2) {
+      throw new Error('the selected mark has no end knobs');
+    }
+    if (document.querySelector('.annot-popover')) {
+      throw new Error('the properties popover is still covering the page');
+    }
   }
 };
 `

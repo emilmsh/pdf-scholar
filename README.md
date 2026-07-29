@@ -124,16 +124,12 @@ the current desktop-vs-extension parity.
 - **Presentation mode** (P): one page at a time, full screen
 - Unpin the toolbar (V) and it hides. Hover the top edge to bring it back, the left edge
   for the table of contents, the right edge for the assistant
-- Table of contents, thumbnails, and back/forward navigation (Alt+← / Alt+→) after
-  following internal links
-- **Bookmarks**: press B to mark the page you are on, give it a name, and come back to it
-  from the sidebar. They live beside your reading position, not inside the PDF, so nothing
-  is written to the file
+- Table of contents, thumbnails, bookmarks (B marks the page you are on), and back/forward
+  navigation (Alt+← / Alt+→) after following internal links
 - Remembers your reading position and recent files; a **library** home screen lists what
   you have been reading
 - Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
-  window** to put two documents side by side, or **across the bar to reorder** them.
-  Right-click a tab to close the others, or everything to its right
+  window** to put two documents side by side, or across the bar to reorder
 
 **Split view**
 
@@ -170,7 +166,7 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 
 **Annotation**
 
-![Selecting text brings up the markup menu — colours, comment, note, and the assistant's actions on the selection](docs/screenshots/annotations.png)
+![A highlight, an underline, a box around a paragraph and a sticky note on the same page — the highlight selected, with the knobs that drag its ends](docs/screenshots/annotations.png)
 
 - **Select text and the menu comes to you**: highlight, underline, strikeout and squiggly
   in one row each, a comment or a note, copy, dictionary, translate — and the assistant's
@@ -187,10 +183,9 @@ one, the table it rests on somewhere else. Press **S** and you get both.
   annotation instead
 - Click any annotation to select it, drag to move it, and add a comment to it. Full
   undo/redo (Ctrl+Z / Ctrl+Shift+Z)
-- **Nothing you mark is final.** A highlight that came out one line too short is dragged
-  longer by its end — the mark follows the words, snapping to whole ones, across line
-  breaks. Shapes, text boxes and drawings resize from any corner (a drawing's strokes scale
-  with the box), and a line or arrow has a grip on each end. No erase-and-draw-again
+- Selected marks can be adjusted rather than redrawn: drag either end of a highlight to
+  cover more or less text (it snaps to whole words), or a corner of a shape, text box or
+  drawing to resize it
 - Comment and note bubbles can be dragged **and resized** — pull the corner for a long
   note, double-click the grip to restore the default size
 - **Real PDF annotations** with appearance streams, so they open correctly in Acrobat,
@@ -205,11 +200,9 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 
 **Search & the web**
 - In-document search (Ctrl+F): match case, whole word (Norwegian æøå-safe), a results
-  list with excerpts, jump-to-hit, F3 / Shift+F3. **Every match on the page is marked
-  while you search** — quietly, with the one you are on kept loud — so you can see how a
-  term is distributed before stepping through it
-- The last ten searches are offered when the field is empty, and can be forgotten in one
-  click
+  list with excerpts, jump-to-hit, F3 / Shift+F3. Every match on the page is marked
+  quietly while you search, with the one you are on kept loud, and the last ten searches
+  are offered when the field is empty
 - **AI search**: describe a topic in your own words and get the passages that discuss it,
   ranked and clickable (uses your own API key, like the assistant)
 - Selection menu: copy, search the web, dictionary, translate, and the AI actions below
@@ -235,11 +228,10 @@ the answer rather than take it on trust.
   in the chat as an attachment you can add a question to — nothing is sent until you do.
   The answer describes what is actually in the crop, and cites the pages it draws on. You
   can paste or attach images the same way
-- **Scanned documents are read, not refused.** A PDF that is pictures of words has no text
-  to search, and the assistant says so plainly instead of answering about nothing. Then it
-  offers to read the pages: pick a range, and they are rendered and attached as images with
-  an editable question. The chip names exactly which pages go along, the model is told it
-  can see only those, and it says so when an answer would need pages you did not attach
+- **Scanned documents**: a PDF that is pictures of words has no text to search, and the
+  assistant says so instead of answering about nothing. Pick a page range and those pages
+  are attached as images for it to read — the chip names which ones, and it is told it can
+  see only those
 - Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
   model list across all three, with per-model reasoning-effort control. Your key goes to
   the provider you picked and nowhere else — there is no server of ours in between — and
