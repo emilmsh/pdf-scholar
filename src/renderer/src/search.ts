@@ -28,23 +28,33 @@ export interface SearchOptions {
 
 const MAX_MATCHES = 500
 
+/**
+ * One page's text and runs.
+ *
+ * Split out of buildPageTexts because a whole-document pass is the wrong unit
+ * for anything interactive: on a 15-page paper it takes over a second, and the
+ * markup-end drag needs exactly one page's text before the hand has finished
+ * moving. Extracting that page alone is a few tens of milliseconds.
+ */
+export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): Promise<PageText> {
+  const page = await pdf.getPage(pageNumber)
+  const content = await page.getTextContent()
+  let text = ''
+  const runs: { start: number; length: number }[] = []
+  for (const item of content.items) {
+    if (!('str' in item)) continue
+    if (item.str !== '') {
+      runs.push({ start: text.length, length: item.str.length })
+      text += item.str
+    }
+    if (item.hasEOL) text += '\n'
+  }
+  return { text, runs }
+}
+
 export async function buildPageTexts(pdf: PDFDocumentProxy): Promise<PageText[]> {
   const pages: PageText[] = []
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i)
-    const content = await page.getTextContent()
-    let text = ''
-    const runs: { start: number; length: number }[] = []
-    for (const item of content.items) {
-      if (!('str' in item)) continue
-      if (item.str !== '') {
-        runs.push({ start: text.length, length: item.str.length })
-        text += item.str
-      }
-      if (item.hasEOL) text += '\n'
-    }
-    pages.push({ text, runs })
-  }
+  for (let i = 1; i <= pdf.numPages; i++) pages.push(await buildPageText(pdf, i))
   return pages
 }
 

@@ -34,6 +34,7 @@ import {
   inkPad,
   inkQuad,
   isMovableAnnotation,
+  isTextMarkup,
   lineQuad,
   nextAnnotationId,
   quadsUnion,
@@ -110,6 +111,7 @@ import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
 import { errorText, locale, t, useLang } from '../i18n'
 import {
+  buildPageText,
   buildPageTexts,
   findMatches,
   hasExtractableText,
@@ -3521,6 +3523,30 @@ export default function PdfViewer({
     }
   }, [active, resizeTarget, changeAnnotation])
 
+  /** ONE page's text, for the interactive path. The whole-document pass is far
+   *  too slow to sit inside a gesture — a 15-page paper takes over a second, and
+   *  the end of a highlight has to start moving now. Cached per page; the
+   *  full-document texts are preferred when they happen to exist already. */
+  const onePageTextRef = useRef(new Map<number, PageText>())
+  const onePageTextPendingRef = useRef(new Map<number, Promise<PageText>>())
+  const pageTextFor = useCallback(
+    (pageNumber: number): PageText | undefined =>
+      pageTextsRef.current?.[pageNumber - 1] ?? onePageTextRef.current.get(pageNumber),
+    []
+  )
+  const ensureOnePageText = useCallback(
+    (pageNumber: number): void => {
+      if (!pdf || pageTextFor(pageNumber)) return
+      if (onePageTextPendingRef.current.has(pageNumber)) return
+      const p = buildPageText(pdf, pageNumber)
+      onePageTextPendingRef.current.set(pageNumber, p)
+      void p
+        .then((text) => onePageTextRef.current.set(pageNumber, text))
+        .finally(() => onePageTextPendingRef.current.delete(pageNumber))
+    },
+    [pdf, pageTextFor]
+  )
+
   // ---------- Dragging the ends of a text markup ----------
   //
   // A highlight one line too short used to mean erase and mark again: nothing in
@@ -3537,8 +3563,12 @@ export default function PdfViewer({
     pageNumber: number
     record: PageAnnotation
     end: 'start' | 'end'
-    /** The range the mark covered when the drag began */
-    from: CharRange
+    /** The range the mark covered when the drag began — resolved on FIRST USE,
+     *  not at pointerdown. Reading it needs the page's extracted text, and on a
+     *  15-page paper building that takes over a second: arming the drag only
+     *  once it arrived meant the gesture was already over, so pressing a knob
+     *  and dragging did nothing at all until the text happened to be cached. */
+    from: CharRange | null
     pageEl: HTMLElement
     scale: number
     pane: PaneId
@@ -3551,6 +3581,15 @@ export default function PdfViewer({
     byPage: ReadonlyMap<number, PageRect[]>
   } | null>(null)
 
+  // Selecting a mark is the move before reaching for its end, so extract the
+  // text now: the drag needs it, and starting the pass on pointerdown loses a
+  // race against the hand on any document of a serious size.
+  useEffect(() => {
+    if (!selected) return
+    const record = annotsRef.current.get(selected.pageNumber)?.find((r) => r.id === selected.localId)
+    if (record && isTextMarkup(record)) ensureOnePageText(selected.pageNumber)
+  }, [selected, ensureOnePageText])
+
   const onMarkupEndStart = useCallback(
     (pageNumber: number, record: PageAnnotation, end: 'start' | 'end', e: React.PointerEvent) => {
       const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
@@ -3559,34 +3598,24 @@ export default function PdfViewer({
       // exactly where the text you are extending onto lives. Get it out of the
       // way for the duration of the drag (measured: it swallowed the pointer).
       setAnnotPopover(null)
-      const scale = scaleOfPageElRef.current(pageEl)
-      const start = (texts: PageText[]): void => {
-        const pageText = texts[pageNumber - 1]
-        if (!pageText) return
-        const from = rangeOfQuads(pageEl, pageText, record.quads, scale)
-        // No range means the text layer is not there (or not in step): the drag
-        // simply never arms, and the mark stays exactly as it was.
-        if (!from) return
-        markupEditRef.current = {
-          pageNumber,
-          record,
-          end,
-          from,
-          pageEl,
-          scale,
-          pane: paneOfEl(pageEl),
-          moved: false,
-          latest: null
-        }
+      // Arm SYNCHRONOUSLY. The range this mark covers is read from the page's
+      // extracted text, which may still be building — resolve() picks it up the
+      // moment it lands, so a drag started too early begins working mid-gesture
+      // instead of being dropped on the floor.
+      markupEditRef.current = {
+        pageNumber,
+        record,
+        end,
+        from: null,
+        pageEl,
+        scale: scaleOfPageElRef.current(pageEl),
+        pane: paneOfEl(pageEl),
+        moved: false,
+        latest: null
       }
-      const cached = pageTextsRef.current
-      if (cached) start(cached)
-      else void buildPageTexts(pdf).then((texts) => {
-        pageTextsRef.current = texts
-        start(texts)
-      })
+      ensureOnePageText(pageNumber)
     },
-    [pdf]
+    [ensureOnePageText]
   )
 
   useEffect(() => {
@@ -3597,16 +3626,24 @@ export default function PdfViewer({
       clientX: number,
       clientY: number
     ): { range: CharRange; rects: PageRect[] } | null => {
-      const pageText = pageTextsRef.current?.[edit.pageNumber - 1]
-      if (!pageText) return null
+      const pageText = pageTextFor(edit.pageNumber)
+      if (!pageText) return null // still extracting; the next move will find it
+      // Where the mark started, read off the page the first time it is needed.
+      const from = (edit.from ??= rangeOfQuads(
+        edit.pageEl,
+        pageText,
+        edit.record.quads,
+        edit.scale
+      ))
+      if (!from) return null
       const at = offsetAtPoint(edit.pageEl, pageText, clientX, clientY)
       if (at === null) return null
       // The end being dragged moves; the other one is the anchor. They may not
       // cross: a mark has to keep covering at least one character.
       const raw =
         edit.end === 'start'
-          ? { start: Math.min(at, edit.from.end - 1), end: edit.from.end }
-          : { start: edit.from.start, end: Math.max(at, edit.from.start + 1) }
+          ? { start: Math.min(at, from.end - 1), end: from.end }
+          : { start: from.start, end: Math.max(at, from.start + 1) }
       const range = snapToWords(pageText.text, raw)
       const rects = resolveMatchRects(edit.pageEl, pageText, range, edit.scale)
       return rects && rects.length > 0 ? { range, rects } : null
@@ -3636,7 +3673,7 @@ export default function PdfViewer({
       setMarkupPreview(null)
       const next = edit.latest
       if (!edit.moved || !next) return
-      if (next.range.start === edit.from.start && next.range.end === edit.from.end) return
+      if (next.range.start === edit.from?.start && next.range.end === edit.from?.end) return
       dragEndAtRef.current = performance.now()
       setSelected({ pageNumber: edit.pageNumber, localId: edit.record.id })
       changeAnnotation(edit.pageNumber, edit.record, { quads: next.rects })
@@ -3654,7 +3691,7 @@ export default function PdfViewer({
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
     }
-  }, [active, changeAnnotation])
+  }, [active, changeAnnotation, pageTextFor])
 
   // ---------- Chrome / fullscreen / keyboard ----------
 
