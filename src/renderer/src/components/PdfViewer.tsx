@@ -3030,6 +3030,30 @@ export default function PdfViewer({
   )
   pagePointFromClientRef.current = pagePointFromClient
 
+  /** Screen box of an annotation, padded, for the properties popover to open
+   *  CLEAR of — the popover is 248 px wide and lands where you clicked, which is
+   *  on top of the very handles that let you resize the thing (measured with
+   *  elementFromPoint: a corner grip's topmost element was the popover's colour
+   *  row). The bubble stays draggable, so this only decides where it starts. */
+  const annotAvoidRect = useCallback(
+    (pageNumber: number, record: PageAnnotation): { top: number; bottom: number; left: number } | null => {
+      if (record.quads.length === 0) return null
+      const el = allPageElsRef.current().find((p) => Number(p.dataset.page) === pageNumber)
+      const size = sizes[pageNumber - 1]
+      if (!el || !size) return null
+      const scale = scaleOfPageElRef.current(el)
+      const v = pageRectToView(quadsUnion(record.quads), size.w, size.h, rotationOfPageElRef.current(el))
+      const r = el.getBoundingClientRect()
+      const PAD = 16 // the handles sit ~10 px outside the frame
+      return {
+        top: r.top + v.y * scale - PAD,
+        bottom: r.top + (v.y + v.h) * scale + PAD,
+        left: r.left + v.x * scale
+      }
+    },
+    [sizes]
+  )
+
   const openMenuAt = useCallback((clientX: number, clientY: number, target: EventTarget | null) => {
     const pageEl = (target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
     const sel = window.getSelection()
@@ -3056,7 +3080,13 @@ export default function PdfViewer({
       if (hit) {
         setMenu(null)
         setSelected({ pageNumber, localId: hit.id })
-        setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
+        setAnnotPopover({
+          x: clientX,
+          y: clientY,
+          avoid: annotAvoidRect(pageNumber, hit),
+          pageNumber,
+          localId: hit.id
+        })
         return
       }
       setMenu({
@@ -3114,13 +3144,19 @@ export default function PdfViewer({
           // Single click SELECTS a text box (frame +
           // drag-to-move); double-click opens the text editor.
           setSelected({ pageNumber, localId: hit.id })
-          setAnnotPopover({ x: clientX, y: clientY, pageNumber, localId: hit.id })
+          setAnnotPopover({
+            x: clientX,
+            y: clientY,
+            avoid: annotAvoidRect(pageNumber, hit),
+            pageNumber,
+            localId: hit.id
+          })
         } else {
           setSelected(null)
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient, applyMarkup]
+    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect]
   )
 
   // Double-click a text box to re-open it in the editor (edit text + resize the
@@ -3316,6 +3352,7 @@ export default function PdfViewer({
             setAnnotPopover({
               x: e.clientX,
               y: e.clientY,
+              avoid: annotAvoidRect(drag.pageNumber, drag.record),
               pageNumber: drag.pageNumber,
               localId: drag.record.id
             })
@@ -3354,7 +3391,7 @@ export default function PdfViewer({
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
     }
-  }, [active, dragTarget, changeAnnotation, openFreeTextEditor])
+  }, [active, dragTarget, changeAnnotation, openFreeTextEditor, annotAvoidRect])
 
   // ---------- Annotation resizing (corner handles + line endpoints) ----------
   //

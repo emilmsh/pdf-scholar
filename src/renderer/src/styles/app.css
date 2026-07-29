@@ -4365,6 +4365,18 @@ button {
   bottom: -4px;
 }
 
+/* The selection layer has to sit ABOVE the text layer, which pdf.js gives
+   `z-index: 2` while .annot-overlay has 1. Without this the handles are drawn
+   but unreachable: a real pointer lands on a transparent text span instead, and
+   nothing happens — which is exactly what shipped in v0.31.0. Synthetic events
+   dispatched straight at an element never notice (they bypass hit-testing), so
+   `test:annot-edit` now asserts with elementFromPoint instead.
+   Only this host is raised. .annot-highlights must keep `z-index: auto` or the
+   multiply blend dies (see the note above it). */
+.annot-overlay.annot-select {
+  z-index: 3;
+}
+
 /* Resize handles. The .annot-overlay host stays pointer-events:none (an
    interactive full-page overlay kills text selection); each grip opts itself
    back in — the one exception the rule allows. The ::before is an invisible

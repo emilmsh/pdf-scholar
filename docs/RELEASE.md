@@ -51,6 +51,7 @@ npm run test:engine      # annotation engine round-trip, verified with mupdf
 npm run test:appender    # incremental appender
 npm run build            # needed by the two below
 npm run test:windows     # two windows on one file, end to end
+npm run test:annot-edit  # a mark can be corrected: handles reachable AND working
 npm run test:listing     # the Store copy still parses out of the doc
 ```
 

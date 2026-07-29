@@ -790,7 +790,7 @@ function PdfPage({
         </div>
       )}
       {!hideAnnots && selectedAnnot && (
-        <div className="annot-overlay">
+        <div className="annot-overlay annot-select">
           {/* A marked passage gets knobs on its two ends instead of a box — the
               box would say "resize this rectangle", which is not what a
               highlight is. Rotated, neither is offered, so it keeps the frame as

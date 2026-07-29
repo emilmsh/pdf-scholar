@@ -42,28 +42,22 @@ function textSpans(pageEl: HTMLElement, pageText: PageText): HTMLElement[] | nul
   return Array.from(spans)
 }
 
-/** Caret position under a client point, across the standard API and the older
- *  WebKit-era one Chromium still ships. */
-function caretAt(x: number, y: number): { node: Node; offset: number } | null {
-  const doc = document as Document & {
-    caretPositionFromPoint?(x: number, y: number): { offsetNode: Node; offset: number } | null
-    caretRangeFromPoint?(x: number, y: number): Range | null
-  }
-  const pos = doc.caretPositionFromPoint?.(x, y)
-  if (pos?.offsetNode) return { node: pos.offsetNode, offset: pos.offset }
-  const range = doc.caretRangeFromPoint?.(x, y)
-  return range ? { node: range.startContainer, offset: range.startOffset } : null
-}
-
 /**
  * The character offset under a client point.
  *
- * The caret API answers directly when the point is over a glyph. When it is not
- * — past the end of a line, in the gutter, inside the leading between lines,
- * all of which happen constantly while dragging an end — fall back to the
- * nearest span and pick the edge the cursor is closer to. Without that fallback
- * the drag would simply stop responding whenever it left the text, which reads
- * as the feature being broken rather than as the cursor being 3 px too low.
+ * Deliberately does NOT use caretPositionFromPoint. That API hit-tests the page,
+ * so it answers about whatever is ON TOP — and the selection layer that carries
+ * the drag handles has to sit above the text layer to be grabbable at all. With
+ * it there, the caret API stopped returning text nodes and the drag quietly
+ * resolved to "no change" (caught by test:annot-edit, after the z-index fix that
+ * made the handles reachable). Measuring the geometry ourselves is immune to
+ * whatever is layered over the page, which is the property this needs.
+ *
+ * Two steps: pick the line (nearest span, weighting vertical distance — which
+ * line you are on matters more than how far along it), then binary-search that
+ * line for the character whose trailing edge the pointer has passed. Both work
+ * past the end of a line, in the gutter and in the leading between lines, all of
+ * which happen constantly while dragging.
  */
 export function offsetAtPoint(
   pageEl: HTMLElement,
@@ -74,35 +68,40 @@ export function offsetAtPoint(
   const spans = textSpans(pageEl, pageText)
   if (!spans) return null
 
-  const caret = caretAt(clientX, clientY)
-  const host = caret?.node.parentElement?.closest<HTMLElement>('.textLayer > span')
-  if (host && pageEl.contains(host)) {
-    const index = spans.indexOf(host)
-    const run = pageText.runs[index]
-    if (run) return run.start + Math.min(caret?.offset ?? 0, run.length)
-  }
-
-  // Nearest span, then its nearer edge.
   let best = -1
   let bestDist = Infinity
-  let atEnd = false
   for (let i = 0; i < spans.length; i++) {
     const r = spans[i].getBoundingClientRect()
     if (r.width === 0 && r.height === 0) continue
     const dx = clientX < r.left ? r.left - clientX : clientX > r.right ? clientX - r.right : 0
     const dy = clientY < r.top ? r.top - clientY : clientY > r.bottom ? clientY - r.bottom : 0
-    // Vertical distance weighs more: the line you are on matters more than how
-    // far along it you are, or a drag one line down would grab the line above.
     const dist = dx + dy * 3
     if (dist < bestDist) {
       bestDist = dist
       best = i
-      atEnd = clientX > (r.left + r.right) / 2
     }
   }
   const run = best === -1 ? undefined : pageText.runs[best]
+  const node = best === -1 ? null : spans[best].firstChild
   if (!run) return null
-  return atEnd ? run.start + run.length : run.start
+  if (!node) return run.start
+
+  // The character whose right edge the pointer has passed, found by halving.
+  // ~5 range measurements for a 40-character line, all reads, no layout writes.
+  const range = document.createRange()
+  let lo = 0
+  let hi = run.length
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    range.setStart(node, 0)
+    range.setEnd(node, mid + 1)
+    const rects = range.getClientRects()
+    const last = rects[rects.length - 1]
+    if (!last) break
+    if (last.right <= clientX) lo = mid + 1
+    else hi = mid
+  }
+  return run.start + lo
 }
 
 /**
