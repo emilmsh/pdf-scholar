@@ -214,6 +214,13 @@ Persistence:
   (`extension-api.ts`: `handles` map, `saveDocumentBytes`).
 - **URL / file:// double-click**: no automatic writable handle. First save shows
   one `showSaveFilePicker` dialog (pre-filled name); plain download as fallback.
+- **Ctrl+S** saves over the current file whenever there are unsaved marks (the
+  two cases above). With nothing to save it follows the source: an unchanged
+  local file (`file://` or picked) does nothing, like the desktop app, while an
+  unchanged http(s) PDF — which exists nowhere on disk — opens the same
+  save-a-copy dialog the toolbar's copy button does. Either way the key never
+  falls through to the browser's own Ctrl+S, which would offer to save the
+  viewer page instead of the PDF.
 
 Refinements for full parity:
 

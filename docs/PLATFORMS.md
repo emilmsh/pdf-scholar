@@ -103,6 +103,15 @@ not as acceptable platform lag.
    cannot reopen a file it just downloaded (no readable path back from a
    download, and the FS Access picker handle is not a recents-addressable
    file), so there it stays a plain export with a «Kopi lagret» toast.
+   **Ctrl+S with nothing to save** splits by document SOURCE, not by platform
+   (`isRemoteSource` in `PdfViewer.tsx`): an unchanged local file — desktop
+   path, `file://` double-click, or picked `fsa:` file — does nothing, exactly
+   like the desktop app, because the bytes on disk already match the screen. An
+   unchanged http(s) PDF has no local copy at all, so there the extension routes
+   the key to save-a-copy (same picker, download as fallback): the app swallows
+   the browser's own Ctrl+S (which would offer to save the viewer PAGE), and
+   Edge's built-in viewer downloads the PDF on that key, so leaving it inert
+   would read as broken.
 10. **Document button (browser/extension only)**: the single-tab extension shell
     has no tab bar, so the file's identity (name + source path) and the
     "open another file" action have no home. A left-most toolbar button

@@ -218,6 +218,16 @@ function paneOfEl(el: Element | null | undefined): PaneId {
   return host?.dataset.pane === 'b' ? 'b' : 'a'
 }
 
+/** True when the document was fetched over the network, so nothing of it exists
+ *  on disk yet. Everything else names a local original: `file://` URLs from a
+ *  double-click, the picker's `fsa:` pseudo-paths, and desktop paths (never
+ *  URLs). Drives the one place the distinction matters — Ctrl+S on an unchanged
+ *  document, which has nothing to do for a local file and means "download this
+ *  one" for a web PDF. */
+function isRemoteSource(path: string): boolean {
+  return /^https?:\/\//i.test(path)
+}
+
 const TOOLBAR_PIN_LS_KEY = 'pdfx-toolbar-pinned'
 
 /** Toolbar starts pinned unless the user unpinned it in a previous session */
@@ -4529,7 +4539,16 @@ export default function PdfViewer({
       // and the extension both write in place (the extension via a retained
       // File System Access handle — its first save may prompt once for write
       // access); the plain-web fallback bakes annotations and downloads.
+      //
+      // With nothing to save, an unchanged LOCAL file is already on disk in the
+      // state on screen — Ctrl+S does nothing, same as the desktop app. A PDF
+      // fetched from the web has no local copy at all, so there the key means
+      // "get this file", and since we swallow the browser's own Ctrl+S (which
+      // would offer to save the viewer PAGE, never the PDF) it has to: it does
+      // exactly what the Save-a-copy button does — one Save dialog, or a
+      // download where pickers are missing. Edge's built-in viewer sets that bar.
       if (dirty || (!isElectron && !isExtension)) void saveDocument()
+      else if (isExtension && isRemoteSource(payload.path)) void saveDocumentAs()
     } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && (selected ?? annotPopover)) {
       e.preventDefault()
       const target = selected ?? annotPopover!
