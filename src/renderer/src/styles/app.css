@@ -4334,11 +4334,16 @@ button {
 }
 
 /* Selection frame around the selected annotation (host overlay is pointer-events: none) */
+/* Selection, by the shape of the thing selected: what is one-dimensional gets
+   dots and no box (a marked passage, a line, an arrow), what is two-dimensional
+   gets a box with corner dots (rectangle, ellipse, text box, ink — where the box
+   IS what a resize scales). The box is deliberately quiet: a hairline at half
+   strength, and no glow. The old 1.5px accent border with a 3px halo drew the
+   eye to the frame rather than to the mark inside it. */
 .annot-selection {
   position: absolute;
-  border: 1.5px solid var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
   border-radius: 4px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 .annot-selection i {
   position: absolute;
@@ -4363,6 +4368,14 @@ button {
 .annot-selection i.br {
   right: -4px;
   bottom: -4px;
+}
+
+/* Lines and arrows: no frame at all. The box would enclose mostly blank paper
+   around a diagonal and distract from the mark itself — the two endpoint dots
+   both show the selection and offer the only edit that makes sense. */
+.annot-selection.ends-only {
+  border: none;
+  box-shadow: none;
 }
 
 /* The selection layer has to sit ABOVE the text layer, which pdf.js gives
@@ -4398,12 +4411,12 @@ button {
 .annot-selection i.bl.grip {
   cursor: nesw-resize;
 }
-/* A line's grips sit on its endpoints, placed inline in page coordinates */
+/* A line's grips sit on its endpoints, placed inline in page coordinates. Same
+   7px dot as a box corner: every handle in the app is one size, and the larger
+   dot these used to have read as a different control. */
 .annot-selection i.grip.end {
   cursor: move;
-  width: 9px;
-  height: 9px;
-  margin: -4.5px 0 0 -4.5px;
+  margin: -3.5px 0 0 -3.5px;
 }
 .annot-selection .grip:hover,
 .annot-selection .grip:active {
@@ -4416,31 +4429,34 @@ button {
    target so a finger can grab it. */
 .markup-end {
   position: absolute;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--accent);
+  /* Hairline, and a little softer than the dot: the bar is there to say where
+     the mark ends, not to compete with the words it sits between. */
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
   border-radius: 1px;
   pointer-events: auto;
   touch-action: none;
   cursor: col-resize;
 }
+/* The same 7px dot as a shape's corner grip — one handle size everywhere */
 .markup-end::after {
   content: '';
   position: absolute;
   left: 50%;
-  width: 9px;
-  height: 9px;
-  margin-left: -4.5px;
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
 }
 /* Knob below the start, above the end — so neither sits on the words */
 .markup-end-start::after {
-  bottom: -5px;
+  bottom: -4px;
 }
 .markup-end-end::after {
-  top: -5px;
+  top: -4px;
 }
 .markup-end::before {
   content: '';

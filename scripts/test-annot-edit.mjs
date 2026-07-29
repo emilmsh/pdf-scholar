@@ -296,6 +296,23 @@ try {
   check('a real pointer reaches the corner grip', gripHit.reachable === true,
     gripHit.found ? `topmost element there: ${gripHit.covering}` : 'no grip')
 
+  // One handle size everywhere, and a box only where a box means something.
+  // Emil asked for this by eye; it is cheap to keep by measurement.
+  const look = await evalIn(A, `
+    const page = ui.page();
+    const grip = page.querySelector('.annot-selection .grip');
+    const cs = getComputedStyle(grip);
+    const frame = getComputedStyle(page.querySelector('.annot-selection'));
+    return { grip: cs.width, frameBorder: frame.borderTopWidth, frameShadow: frame.boxShadow };
+  `)
+  check('a shape corner is the 7px dot', look.grip === '7px', look.grip)
+  // A hairline, not an exact string: Chromium reports the USED width, and a 1px
+  // border snaps to one device pixel — 0.8px on a 125% display.
+  const border = Number.parseFloat(look.frameBorder)
+  check('the box is a hairline with no halo',
+    border > 0 && border <= 1.1 && (look.frameShadow === 'none' || look.frameShadow === ''),
+    `${look.frameBorder} border, shadow: ${look.frameShadow}`)
+
   await evalIn(A, `await ui.dragHandle('.annot-selection .br', 120, 80)`)
   const resized = await evalIn(A, `
     const r = ui.page().querySelector('.annot-marks svg rect');

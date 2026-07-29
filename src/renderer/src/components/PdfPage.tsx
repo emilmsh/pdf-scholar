@@ -903,7 +903,10 @@ function SelectionFrame({
   const ends = kind === 'endpoints' ? record.strokes?.[0] : undefined
   return (
     <div
-      className={`annot-selection${kind ? ' resizable' : ''}`}
+      // A line or arrow shows its two endpoint dots and nothing else: a box
+      // around a diagonal frames mostly empty paper and reads as clutter. The
+      // dots are the affordance, and they mark the geometry that actually exists.
+      className={`annot-selection${kind ? ' resizable' : ''}${kind === 'endpoints' ? ' ends-only' : ''}`}
       style={{
         left: v.x * scale,
         top: v.y * scale,
@@ -928,14 +931,11 @@ function SelectionFrame({
             onPointerDown={grab(h)}
           />
         ))
-      ) : (
-        <>
-          <i className="tl" />
-          <i className="tr" />
-          <i className="bl" />
-          <i className="br" />
-        </>
-      )}
+      ) : null}
+      {/* Nothing else. A note has a fixed icon size and a rotated page offers no
+          handles, so those cases get the frame alone — dots that cannot be
+          dragged are the decoration v0.31.0 replaced with real handles, and
+          putting them back would re-tell the same lie. */}
     </div>
   )
 }
