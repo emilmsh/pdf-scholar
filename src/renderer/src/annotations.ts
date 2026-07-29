@@ -575,6 +575,80 @@ export function isMovableAnnotation(a: PageAnnotation): boolean {
   return MOVABLE_TYPES.has(a.type) && a.quads.length > 0
 }
 
+// ---------- Resize (drag a handle instead of deleting and drawing again) -----
+
+/** How an annotation answers a resize handle. A box is dragged by its corners;
+ *  a line has no meaningful corners, only two endpoints. Everything else — text
+ *  markup (its shape belongs to the text; see the end-drag path), notes (a fixed
+ *  icon) — has no handles at all. */
+export type ResizeKind = 'box' | 'endpoints'
+
+export function resizeKindOf(a: PageAnnotation): ResizeKind | null {
+  if (a.type === 'line' || a.type === 'arrow') return a.strokes?.[0]?.length === 2 ? 'endpoints' : null
+  if (a.type === 'square' || a.type === 'circle' || a.type === 'freetext' || a.type === 'ink') {
+    return a.quads.length > 0 ? 'box' : null
+  }
+  return null
+}
+
+/** Smallest box a resize may produce, in PDF points — below this a shape is
+ *  invisible and impossible to grab again. */
+export const MIN_SHAPE_SIZE = 8
+
+/** The four corners, named as in the selection frame's CSS classes */
+export const BOX_HANDLES = ['tl', 'tr', 'bl', 'br'] as const
+export type BoxHandle = (typeof BOX_HANDLES)[number]
+/** Which end of a line a handle grabs */
+export type EndHandle = 'p0' | 'p1'
+export type ResizeHandle = BoxHandle | EndHandle
+
+/** Union box of an annotation's quads — what the selection frame hugs and what
+ *  a box resize starts from. */
+export function quadsUnion(quads: PageRect[]): PageRect {
+  const first = quads[0] ?? { x: 0, y: 0, w: 0, h: 0 }
+  let x0 = first.x
+  let y0 = first.y
+  let x1 = first.x + first.w
+  let y1 = first.y + first.h
+  for (const q of quads) {
+    x0 = Math.min(x0, q.x)
+    y0 = Math.min(y0, q.y)
+    x1 = Math.max(x1, q.x + q.w)
+    y1 = Math.max(y1, q.y + q.h)
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
+/** Room the stroke width takes around an ink path */
+export const inkPad = (width: number): number => width / 2 + 1
+
+/** Bounding box of the ink itself, without the stroke-width padding — what a
+ *  resize scales, so the corner opposite the grabbed one stays exactly put. */
+export function strokesBox(strokes: [number, number][][]): PageRect {
+  return quadsUnion(strokes.flat().map(([x, y]) => ({ x, y, w: 0, h: 0 })))
+}
+
+/** The record-level box for an ink annotation: its strokes plus the room the
+ *  stroke width takes. Shared by the draw tool and the resize path so a scaled
+ *  stroke keeps the box a freshly drawn one would have. */
+export function inkQuad(strokes: [number, number][][], width: number): PageRect {
+  const pad = inkPad(width)
+  const u = strokesBox(strokes)
+  return { x: u.x - pad, y: u.y - pad, w: u.w + 2 * pad, h: u.h + 2 * pad }
+}
+
+/** Same for a line/arrow: enough room around the endpoints for the stroke and
+ *  the arrowhead. */
+export function lineQuad(a: [number, number], b: [number, number], width: number): PageRect {
+  const pad = Math.max(6, width * 3.2)
+  return {
+    x: Math.min(a[0], b[0]) - pad,
+    y: Math.min(a[1], b[1]) - pad,
+    w: Math.abs(b[0] - a[0]) + 2 * pad,
+    h: Math.abs(b[1] - a[1]) + 2 * pad
+  }
+}
+
 function hitsQuads(a: PageAnnotation, x: number, y: number, pad = 2): boolean {
   return a.quads.some(
     (q) => x >= q.x - pad && x <= q.x + q.w + pad && y >= q.y - pad && y <= q.y + q.h + pad

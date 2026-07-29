@@ -24,7 +24,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
-import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
+import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
 import type { RowLayout } from '../rotation'
 import {
   buildRows,
@@ -93,6 +93,12 @@ interface Props {
     b: [number, number]
   ): void
   onPlaceText(pageNumber: number, x: number, y: number, clientX: number, clientY: number): void
+  onResizeStart(
+    pageNumber: number,
+    record: PageAnnotation,
+    handle: ResizeHandle,
+    e: React.PointerEvent
+  ): void
   onExternalLink(url: string): void
   /** Internal link followed inside THIS column. The viewer decides where it
    *  lands — by default the other column, so following a cross-reference never
@@ -134,6 +140,7 @@ export default function PagesPane({
   onErase,
   onShapeComplete,
   onPlaceText,
+  onResizeStart,
   onExternalLink,
   onInternalLink,
   onHandle,
@@ -604,6 +611,7 @@ export default function PagesPane({
                   onErase={onErase}
                   onShapeComplete={onShapeComplete}
                   onPlaceText={onPlaceText}
+                  onResizeStart={onResizeStart}
                 />
               )
             })}

@@ -21,6 +21,7 @@ import { READ_ALOUD } from '../flags'
 import {
   FREETEXT_COLOR,
   FREETEXT_SIZE,
+  MIN_SHAPE_SIZE,
   NOTE_COLOR,
   STRIKEOUT_COLOR,
   UNDERLINE_COLOR,
@@ -30,9 +31,14 @@ import {
   clearCustomColors,
   fromPdfJsAnnotation,
   inkHitTest,
+  inkPad,
+  inkQuad,
   isMovableAnnotation,
+  lineQuad,
   nextAnnotationId,
-  selectionRectsForPage
+  quadsUnion,
+  selectionRectsForPage,
+  strokesBox
 } from '../annotations'
 import {
   clearToolPrefs,
@@ -52,6 +58,7 @@ import type {
   MarkupToolType,
   PageAnnotation,
   PdfJsAnnotationData,
+  ResizeHandle,
   ShapeToolType
 } from '../annotations'
 import {
@@ -2369,20 +2376,7 @@ export default function PdfViewer({
     (pageNumber: number, points: [number, number][]) => {
       const tool = drawToolRef.current
       if (!tool || tool.type === 'eraser') return
-      let minX = Infinity
-      let minY = Infinity
-      let maxX = -Infinity
-      let maxY = -Infinity
-      for (const [x, y] of points) {
-        minX = Math.min(minX, x)
-        minY = Math.min(minY, y)
-        maxX = Math.max(maxX, x)
-        maxY = Math.max(maxY, y)
-      }
-      const pad = tool.width / 2 + 1
-      const quads = [
-        { x: minX - pad, y: minY - pad, w: maxX - minX + 2 * pad, h: maxY - minY + 2 * pad }
-      ]
+      const quads = [inkQuad([points], tool.width)]
       void persistAnnotation(pageNumber, 'ink', quads, tool.color, tool.opacity, undefined, {
         strokes: [points],
         width: tool.width,
@@ -2425,14 +2419,15 @@ export default function PdfViewer({
       const tool = drawToolRef.current
       if (!tool) return
       const isLine = type === 'line' || type === 'arrow'
-      const pad = isLine ? Math.max(6, tool.width * 3.2) : 0
       const quads = [
-        {
-          x: Math.min(a[0], b[0]) - pad,
-          y: Math.min(a[1], b[1]) - pad,
-          w: Math.abs(b[0] - a[0]) + 2 * pad,
-          h: Math.abs(b[1] - a[1]) + 2 * pad
-        }
+        isLine
+          ? lineQuad(a, b, tool.width)
+          : {
+              x: Math.min(a[0], b[0]),
+              y: Math.min(a[1], b[1]),
+              w: Math.abs(b[0] - a[0]),
+              h: Math.abs(b[1] - a[1])
+            }
       ]
       void persistAnnotation(pageNumber, type, quads, tool.color, 1, undefined, {
         width: tool.width,
@@ -3079,6 +3074,10 @@ export default function PdfViewer({
     // Mousedown on a note bubble arms a drag (movement threshold decides
     // between drag and the plain click that opens the popover)
     if (e.button !== 0 || drawToolRef.current || annotsHiddenRef.current) return
+    // A resize handle already took this gesture. Its pointerdown fires first and
+    // stops there, but the compat mousedown still arrives here — without this the
+    // same press would arm a MOVE as well, and the two would fight.
+    if (annotResizeRef.current) return
     const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
     if (!pageEl) return
     const pageNumber = Number(pageEl.dataset.page)
@@ -3280,6 +3279,173 @@ export default function PdfViewer({
       window.removeEventListener('pointercancel', onCancel)
     }
   }, [active, dragTarget, changeAnnotation, openFreeTextEditor])
+
+  // ---------- Annotation resizing (corner handles + line endpoints) ----------
+  //
+  // The twin of dragging: same pointer listeners, same ghost, same undo — the
+  // difference is that a move sends a delta and this sends the NEW geometry
+  // (engine support landed with ModifyAnnotationRequest.quads/strokes). Only
+  // offered unrotated, like the draw tools, because the maths below treats the
+  // cursor delta as page space.
+
+  const annotResizeRef = useRef<{
+    pageNumber: number
+    record: PageAnnotation
+    handle: ResizeHandle
+    startClientX: number
+    startClientY: number
+    moved: boolean
+    /** Scale of the pane the grab started in (the columns zoom apart) */
+    scale: number
+    pane: PaneId
+  } | null>(null)
+  const [resizeGhost, setResizeGhost] = useState<{
+    pageNumber: number
+    rect: PageRect
+    /** Set for a line/arrow: the ghost draws the line itself, since the box
+     *  around a diagonal says nothing about where the end will land. */
+    line: [[number, number], [number, number]] | null
+    pane: PaneId
+  } | null>(null)
+
+  /** The geometry a resize would commit for this cursor position: page space,
+   *  clamped to the page, never below MIN_SHAPE_SIZE. */
+  const resizeTarget = useCallback(
+    (
+      rs: NonNullable<typeof annotResizeRef.current>,
+      clientX: number,
+      clientY: number
+    ): { rect: PageRect; strokes?: [number, number][][] } => {
+      const size = sizes[rs.pageNumber - 1]
+      const maxW = size?.w ?? Infinity
+      const maxH = size?.h ?? Infinity
+      const dx = (clientX - rs.startClientX) / rs.scale
+      const dy = (clientY - rs.startClientY) / rs.scale
+      const box = quadsUnion(rs.record.quads)
+
+      if (rs.handle === 'p0' || rs.handle === 'p1') {
+        const pts = rs.record.strokes?.[0]
+        const a0 = pts?.[0]
+        const b0 = pts?.[1]
+        if (!a0 || !b0) return { rect: box }
+        const grabbed = rs.handle === 'p0' ? a0 : b0
+        const moved: [number, number] = [
+          clamp(grabbed[0] + dx, 0, maxW),
+          clamp(grabbed[1] + dy, 0, maxH)
+        ]
+        const a = rs.handle === 'p0' ? moved : a0
+        const b = rs.handle === 'p0' ? b0 : moved
+        return { rect: lineQuad(a, b, rs.record.width ?? 2), strokes: [[a, b]] }
+      }
+
+      // The corner opposite the grabbed one is the anchor: it stays exactly put
+      // while the grabbed corner follows the cursor.
+      const left = rs.handle === 'tl' || rs.handle === 'bl'
+      const top = rs.handle === 'tl' || rs.handle === 'tr'
+      const anchorX = left ? box.x + box.w : box.x
+      const anchorY = top ? box.y + box.h : box.y
+      const movedX = clamp((left ? box.x : box.x + box.w) + dx, 0, maxW)
+      const movedY = clamp((top ? box.y : box.y + box.h) + dy, 0, maxH)
+      const w = Math.max(MIN_SHAPE_SIZE, Math.abs(movedX - anchorX))
+      const h = Math.max(MIN_SHAPE_SIZE, Math.abs(movedY - anchorY))
+      // Math.min keeps a box that hit the minimum from sticking out of the page
+      const rect: PageRect = {
+        x: Math.min(Math.min(anchorX, movedX), Math.max(0, maxW - w)),
+        y: Math.min(Math.min(anchorY, movedY), Math.max(0, maxH - h)),
+        w,
+        h
+      }
+      if (rs.record.type !== 'ink' || !rs.record.strokes) return { rect }
+      // Ink scales with its box. Both the factors and the anchor come from the
+      // STROKE's own box, not the record's: the record's is inset by the stroke
+      // width, and scaling about that corner drifts the drawing by pad × (s − 1)
+      // — measured at ~2 pt, enough to see the anchored corner creep.
+      const pad = inkPad(rs.record.width ?? 2)
+      const src = strokesBox(rs.record.strokes)
+      const sx = src.w > 0.01 ? Math.max(1, rect.w - 2 * pad) / src.w : 1
+      const sy = src.h > 0.01 ? Math.max(1, rect.h - 2 * pad) / src.h : 1
+      const ax = left ? src.x + src.w : src.x
+      const ay = top ? src.y + src.h : src.y
+      const strokes = rs.record.strokes.map((s) =>
+        s.map(([px, py]) => [ax + (px - ax) * sx, ay + (py - ay) * sy] as [number, number])
+      )
+      // Recompute the box from the scaled strokes so it matches what drawing the
+      // same shape by hand would have produced (stroke-width padding included).
+      return { rect: inkQuad(strokes, rs.record.width ?? 2), strokes }
+    },
+    [sizes]
+  )
+
+  const onResizeStart = useCallback(
+    (pageNumber: number, record: PageAnnotation, handle: ResizeHandle, e: React.PointerEvent) => {
+      const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+      if (!pageEl) return
+      annotResizeRef.current = {
+        pageNumber,
+        record,
+        handle,
+        startClientX: e.clientX,
+        startClientY: e.clientY,
+        moved: false,
+        scale: scaleOfPageElRef.current(pageEl),
+        pane: paneOfEl(pageEl)
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (!active) return
+    const onMove = (e: PointerEvent): void => {
+      const rs = annotResizeRef.current
+      if (!rs) return
+      if (!rs.moved && Math.hypot(e.clientX - rs.startClientX, e.clientY - rs.startClientY) < 3) {
+        return
+      }
+      rs.moved = true
+      const next = resizeTarget(rs, e.clientX, e.clientY)
+      setResizeGhost({
+        pageNumber: rs.pageNumber,
+        rect: next.rect,
+        line: next.strokes?.[0]?.length === 2 ? [next.strokes[0][0], next.strokes[0][1]] : null,
+        pane: rs.pane
+      })
+    }
+    const onUp = (e: PointerEvent): void => {
+      const rs = annotResizeRef.current
+      annotResizeRef.current = null
+      if (!rs) return
+      setResizeGhost(null)
+      if (!rs.moved) return
+      // Suppress the click that would otherwise reopen the properties popover
+      dragEndAtRef.current = performance.now()
+      const next = resizeTarget(rs, e.clientX, e.clientY)
+      const before = quadsUnion(rs.record.quads)
+      const same =
+        Math.abs(next.rect.x - before.x) < 0.01 &&
+        Math.abs(next.rect.y - before.y) < 0.01 &&
+        Math.abs(next.rect.w - before.w) < 0.01 &&
+        Math.abs(next.rect.h - before.h) < 0.01
+      if (same) return
+      const patch: AnnotPatch = { quads: [next.rect] }
+      if (next.strokes) patch.strokes = next.strokes
+      setSelected({ pageNumber: rs.pageNumber, localId: rs.record.id })
+      changeAnnotation(rs.pageNumber, rs.record, patch)
+    }
+    const onCancel = (): void => {
+      if (!annotResizeRef.current) return
+      annotResizeRef.current = null
+      setResizeGhost(null)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+    }
+  }, [active, resizeTarget, changeAnnotation])
 
   // ---------- Chrome / fullscreen / keyboard ----------
 
@@ -4357,6 +4523,27 @@ export default function PdfViewer({
             />
           )
         })()}
+      {resizeGhost &&
+        resizeGhost.pane === pane &&
+        (() => {
+          // Resize handles only exist unrotated, so page space IS view space here
+          // and the ghost needs no rotation transform.
+          const r = resizeGhost.rect
+          const left = lay.lefts[resizeGhost.pageNumber - 1] + r.x * paneScale
+          const top = lay.tops[resizeGhost.pageNumber - 1] + r.y * paneScale
+          const style = { left, top, width: r.w * paneScale, height: r.h * paneScale }
+          // For a line the box is meaningless; draw the line the release will
+          // commit, inside a viewBox in page units so no coordinate is scaled twice.
+          if (resizeGhost.line) {
+            const [a, b] = resizeGhost.line
+            return (
+              <svg className="annot-resize-ghost-line" style={style} viewBox={`0 0 ${r.w} ${r.h}`} preserveAspectRatio="none">
+                <line x1={a[0] - r.x} y1={a[1] - r.y} x2={b[0] - r.x} y2={b[1] - r.y} />
+              </svg>
+            )
+          }
+          return <div className="annot-drag-ghost" style={style} />
+        })()}
     </>
   )
   // The native web view only ever shows for the active tab (a background tab's
@@ -4628,6 +4815,7 @@ export default function PdfViewer({
                     onErase={onEraseAt}
                     onShapeComplete={onShapeComplete}
                     onPlaceText={onPlaceText}
+                    onResizeStart={onResizeStart}
                   />
                 )
               })}
@@ -4685,6 +4873,7 @@ export default function PdfViewer({
               onErase={onEraseAt}
               onShapeComplete={onShapeComplete}
               onPlaceText={onPlaceText}
+              onResizeStart={onResizeStart}
               onExternalLink={onExternalLink}
               onInternalLink={onPaneBInternalLink}
               onHandle={(h) => {

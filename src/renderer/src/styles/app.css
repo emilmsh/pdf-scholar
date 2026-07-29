@@ -4319,6 +4319,53 @@ button {
   bottom: -4px;
 }
 
+/* Resize handles. The .annot-overlay host stays pointer-events:none (an
+   interactive full-page overlay kills text selection); each grip opts itself
+   back in — the one exception the rule allows. The ::before is an invisible
+   24px target so a finger hits what the eye sees as a 7px dot. */
+.annot-selection .grip {
+  pointer-events: auto;
+  touch-action: none;
+}
+.annot-selection .grip::before {
+  content: '';
+  position: absolute;
+  inset: -9px;
+}
+.annot-selection i.tl.grip,
+.annot-selection i.br.grip {
+  cursor: nwse-resize;
+}
+.annot-selection i.tr.grip,
+.annot-selection i.bl.grip {
+  cursor: nesw-resize;
+}
+/* A line's grips sit on its endpoints, placed inline in page coordinates */
+.annot-selection i.grip.end {
+  cursor: move;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+}
+.annot-selection .grip:hover,
+.annot-selection .grip:active {
+  transform: scale(1.25);
+}
+
+/* The line a resize will commit — the box around a diagonal says nothing */
+.annot-resize-ghost-line {
+  position: absolute;
+  z-index: 25;
+  overflow: visible;
+  pointer-events: none;
+}
+.annot-resize-ghost-line line {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+
 /* Floating ghost while dragging a non-note annotation (notes keep .note-drag-ghost) */
 .annot-drag-ghost {
   position: absolute;

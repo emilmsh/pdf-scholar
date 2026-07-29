@@ -2,8 +2,8 @@ import { memo, useEffect, useRef } from 'react'
 import { AnnotationMode, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
-import type { DrawTool, PageAnnotation, ShapeToolType } from '../annotations'
-import { annotationCss, arrowHeadPoints, arrowShaftEnd, rgbCss, squigglyPathData, strokePathData } from '../annotations'
+import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
+import { annotationCss, arrowHeadPoints, arrowShaftEnd, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
@@ -96,6 +96,9 @@ interface Props {
     b: [number, number]
   ): void
   onPlaceText(pageNumber: number, x: number, y: number, clientX: number, clientY: number): void
+  /** A resize handle on the selected annotation was grabbed. The viewer owns the
+   *  drag from here (pointermove/up on the window), exactly as it owns a move. */
+  onResizeStart(pageNumber: number, record: PageAnnotation, handle: ResizeHandle, e: React.PointerEvent): void
 }
 
 interface Cancellable {
@@ -128,7 +131,8 @@ function PdfPage({
   onStrokeComplete,
   onErase,
   onShapeComplete,
-  onPlaceText
+  onPlaceText,
+  onResizeStart
 }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
@@ -774,7 +778,14 @@ function PdfPage({
       )}
       {!hideAnnots && selectedAnnot && (
         <div className="annot-overlay">
-          <SelectionFrame record={selectedAnnot} scale={scale} pageW={pageW} pageH={pageH} rotation={rotation} />
+          <SelectionFrame
+            record={selectedAnnot}
+            scale={scale}
+            pageW={pageW}
+            pageH={pageH}
+            rotation={rotation}
+            onResizeStart={(handle, e) => onResizeStart(pageNumber, selectedAnnot, handle, e)}
+          />
         </div>
       )}
       <div className="text-host" ref={textRef} />
@@ -801,41 +812,51 @@ function PdfPage({
 }
 
 /** Accent selection frame over the union bbox of all quads. PAD is in page-space
- *  points so the frame hugs the annotation at any zoom. Lives inside a
- *  pointer-events:none .annot-overlay host — never make this interactive. */
+ *  points so the frame hugs the annotation at any zoom.
+ *
+ *  The host .annot-overlay is pointer-events:none and MUST stay that way (an
+ *  interactive full-page overlay silently kills text selection — see CLAUDE.md);
+ *  the resize handles are the exception the rule allows, opting themselves back
+ *  in one element at a time.
+ *
+ *  Handles only appear unrotated, the same limit the draw tools have: their
+ *  pointer maths assumes an un-rotated page, and a corner labelled "top-left"
+ *  stops meaning that at 90°. */
 function SelectionFrame({
   record,
   scale,
   pageW,
   pageH,
-  rotation
+  rotation,
+  onResizeStart
 }: {
   record: PageAnnotation
   scale: number
   pageW: number
   pageH: number
   rotation: ViewRotation
+  onResizeStart(handle: ResizeHandle, e: React.PointerEvent): void
 }): React.JSX.Element {
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-  for (const q of record.quads) {
-    minX = Math.min(minX, q.x)
-    minY = Math.min(minY, q.y)
-    maxX = Math.max(maxX, q.x + q.w)
-    maxY = Math.max(maxY, q.y + q.h)
-  }
+  const box = quadsUnion(record.quads)
   const PAD = 4
   const v = pageRectToView(
-    { x: minX - PAD, y: minY - PAD, w: maxX - minX + 2 * PAD, h: maxY - minY + 2 * PAD },
+    { x: box.x - PAD, y: box.y - PAD, w: box.w + 2 * PAD, h: box.h + 2 * PAD },
     pageW,
     pageH,
     rotation
   )
+  const kind = rotation === 0 ? resizeKindOf(record) : null
+  const grab = (handle: ResizeHandle) => (e: React.PointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onResizeStart(handle, e)
+  }
+  // A line's handles sit ON its endpoints, not on the corners of a box that
+  // means nothing for a line: dragging the visible end is the whole gesture.
+  const ends = kind === 'endpoints' ? record.strokes?.[0] : undefined
   return (
     <div
-      className="annot-selection"
+      className={`annot-selection${kind ? ' resizable' : ''}`}
       style={{
         left: v.x * scale,
         top: v.y * scale,
@@ -843,10 +864,31 @@ function SelectionFrame({
         height: v.h * scale
       }}
     >
-      <i className="tl" />
-      <i className="tr" />
-      <i className="bl" />
-      <i className="br" />
+      {kind === 'box' ? (
+        (['tl', 'tr', 'bl', 'br'] as const).map((h) => (
+          <i key={h} className={`${h} grip`} onPointerDown={grab(h)} />
+        ))
+      ) : ends && ends[0] && ends[1] ? (
+        ([['p0', ends[0]], ['p1', ends[1]]] as const).map(([h, p]) => (
+          <i
+            key={h}
+            className="grip end"
+            style={{
+              // Endpoints are page coords; place them relative to the padded box
+              left: (p[0] - (box.x - PAD)) * scale,
+              top: (p[1] - (box.y - PAD)) * scale
+            }}
+            onPointerDown={grab(h)}
+          />
+        ))
+      ) : (
+        <>
+          <i className="tl" />
+          <i className="tr" />
+          <i className="bl" />
+          <i className="br" />
+        </>
+      )}
     </div>
   )
 }
