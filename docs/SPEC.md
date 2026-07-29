@@ -28,7 +28,7 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 - **Navigation history back**: after ANY jump (internal hyperlink, outline, bookmark, search result, go-to-page) show a **"Back to p. N"** pill bottom-left returning to the previous reading position; maintain a full back stack.
 
 ## 4. Annotation Tools
-- **Text markup**: Highlight, Underline, Strikeout (+ Squiggly). Two flows: (a) select text → context-menu action; (b) arm the tool from the toolbar, then drag across text — tool stays armed.
+- **Text markup**: Highlight, Underline, Strikeout (+ Squiggly). Two flows: (a) select text → context-menu action; (b) arm the tool from the toolbar, then drag across text — tool stays armed. A finished mark is **adjustable**: select it and drag either end to cover more or less text (snapping to whole words), rather than deleting it and marking again.
 - **Pen**: presets — fixed-width and pressure-sensitive (stylus pressure → line width); adjustable color, thickness, opacity. Pen is opaque; **Marker** is a translucent freehand highlighter. **Eraser** removes ink.
 - **Shapes**: rectangle, ellipse, line, arrow; border color/thickness, fill color, opacity. Move by drag, resize via corner handles.
 - **Text comment** (typed on page) and **Pop-up Note** (sticky note; click to place, type in popup; color picker inside; can be attached to selected text via context menu → Note).

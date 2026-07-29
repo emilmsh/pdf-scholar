@@ -59,7 +59,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] Fritekst på siden: klikk med tekstverktøyet → skriv → FreeText-annotasjon med riktig DA (tekstfarge, Helv 12) (levert 2026-07-10)
 - [ ] Trykkfølsom penn (krever polygon-appearance i stedet for enkel Ink-bredde — utsatt bevisst for interop)
 - [ ] Lasso-multivalg for blekk
-- [ ] Flytt/endre størrelse på former og fritekst med håndtak
+- [x] Flytt/endre størrelse på former og fritekst med håndtak (levert 2026-07-29) — hjørnehåndtak for firkant/ellipse/fritekst/blekk (blekket skalerer strekene), endepunkthåndtak for linje/pil, og **endene på en tekstmarkering kan dras** slik at en for kort utheving rettes i stedet for å slettes og tegnes på nytt (ordsnapping, `src/renderer/src/text-range.ts`). Krevde at `ModifyAnnotationRequest` tar ny geometri (`quads`/`strokes`) i begge skrivestier. Bevisste grenser: bare urotert visning, ingen resize av notatbobler
 - [ ] Verktøysett-system i verktøylinjen (tilpassbare grupper)
 
 ## Fase 6 — Annotasjonspanel + eksport (Emils prioritet nr. 3)
@@ -72,7 +72,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 
 ## Fase 6.5 — Faner (Emil ønsker dette tidlig, trukket frem fra fase 7)
 - [x] Fanelinje for flere åpne dokumenter: klikk/klikk-på-✕/midtklikk lukker, + åpner, Ctrl+Tab / Ctrl+Shift+Tab veksler, Ctrl+W lukker, Ctrl+O åpner; bakgrunnsfaner beholder full tilstand (scroll, zoom, angre-stakk) og leseposisjon lagres ved fanebytte (levert 2026-07-10)
-- [ ] Dra faner for å endre rekkefølge; «lukk andre faner»-meny
+- [x] Dra faner for å endre rekkefølge; «lukk andre faner»-meny (levert 2026-07-29) — dra bytter plass live i linja (ingen protokollendring: main svarte allerede `'same'` når slippet skjer i eget vindu), meny med «Lukk andre faner»/«Lukk faner til høyre» som spør om én fane om gangen, og «Flytt til venstre/høyre» + Ctrl+Shift+PageUp/PageDown for berøring og tastatur
 
 ## Fase 7 — Skall-paritet og polering
 - [x] **Språkvalg i appen: norsk bokmål og engelsk** (Emils ønske 2026-07-11, levert samme dag) — alle UI-strenger i `src/renderer/src/i18n.ts` med `t()`-oppslag, velger i aA-menyen (Norsk/English/Auto der auto følger OS-språket), gjelder også KI-systemprompter, eksportdokumenter og datoformat. Nye strenger SKAL inn i begge ordbøkene.
@@ -93,7 +93,7 @@ Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 refera
 - [x] Spør annotasjonene (levert 2026-07-11): ✦-knapp i Merknader-fanen + forslag i panelets tomtilstand (vises kun når dokumentet har merknader) → sender merknadsblokken (side/type/utdrag/kommentar fra eksportuttrekket) inn i chatten; blokken ligger i historikken så oppfølgingsspørsmål beholder den
 - [x] Referanseoppslag (levert 2026-07-15) — differensiatoren: «Referanse» i markeringsmenyen («Hva er det som siteres her – og hvorfor?») slår opp den valgte siteringen og forklarer det refererte verket
 - [ ] Begrepshjelp (ordliste slik begrepene brukes i dokumentet)
-- [ ] PDF-base64-fallback for skannede dokumenter (page_location-siteringer). *Delvis 2026-07-29:* appen SIER nå at dokumentet mangler tekstlag i stedet for å sende et tomt dokument til modellen (varsel i panelet + egen status i KI-søket, og den peker på «Forklar område» som virker) — men å faktisk LESE en skannet side gjenstår
+- [x] Skannede dokumenter kan leses (levert 2026-07-29) — appen sier først at dokumentet mangler tekstlag (varsel i panelet + egen status i KI-søket), og **leser sidene som bilder** når du ber om det: sidevelger over komponisten (fra/til, maks 4 om gangen — `MAX_IMAGES`), sidene rendres offscreen som JPEG ≤ 1400 px og stages som vedlegg med redigerbart spørsmål; brikken navngir sidene, og systemprompten sier at bare de vedlagte sidene er synlige og at modellen skal si det når svaret ville krevd andre. Det tomme dokumentet sløyfes i den saken. *Gjenstår:* page_location-siteringer (svaret viser til sidetall i prosa, ikke klikkbare sitater)
 - [ ] Nivå 3 (parkert): kryssdokument, forhør-meg-quiz, metodekritikk-modus, forklar figur
 
 ## Fase 8 — Filhåndtering + sky (Emils prioritet nr. 4)
