@@ -340,6 +340,31 @@ GROUNDING
 - If the document does not answer the question, say so plainly instead of guessing. Never invent quotes, numbers or references.`
 }
 
+/**
+ * Replaces the "the full document text is attached" premise when it is false: a
+ * scanned PDF has no text layer, so the only thing the model can see is the page
+ * images the reader chose to attach. It has to know that, or it answers about the
+ * rest of the document from the title and its own priors — the exact failure the
+ * no-text notice exists to prevent.
+ */
+export function scannedPagesNote(pages: number[]): string {
+  const list = pages.join(', ')
+  if (getLanguage() === 'nb') {
+    return `
+
+SKANNET DOKUMENT
+- Dette dokumentet har ikke tekstlag. Ingen dokumenttekst er vedlagt — det eneste du kan se, er de vedlagte sidebildene (side ${list}).
+- Les det som står på bildene. Vis til sidetall (f.eks. «på side 7»); ordrette [KILDE …]-sitater er ikke mulig her.
+- Hvis svaret ville krevd andre sider enn de vedlagte, si det og be brukeren legge ved de sidene. Gjett aldri på innholdet i sider du ikke ser.`
+  }
+  return `
+
+SCANNED DOCUMENT
+- This document has no text layer. No document text is attached — all you can see is the attached page images (page ${list}).
+- Read what is on the images. Refer to page numbers (e.g. "on page 7"); verbatim [KILDE …] citations are not possible here.
+- If the answer would need pages other than the attached ones, say so and ask the reader to attach them. Never guess at the contents of pages you cannot see.`
+}
+
 export function explainSystem(mode: 'explain' | 'simplify'): string {
   if (getLanguage() === 'nb') {
     const task =

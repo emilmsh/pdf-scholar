@@ -193,6 +193,12 @@ async function collectAnnotations(
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
 
+/** Long side, in px, of a whole page rendered for the assistant to READ (scanned
+ *  documents). 1400 matches the cap on pasted images: enough that body text in a
+ *  300 dpi scan stays legible to a vision model, small enough that four of them
+ *  fit in a request — and in the localStorage chat store — without trouble. */
+const AI_PAGE_IMAGE_SIDE = 1400
+
 /** What the eraser removes in its default 'draw' scope: marks the user drew by
  *  hand. Ink is hit-tested against the stroke path before this set is consulted
  *  (see eraseAt), so it is only about the bbox pass. */
@@ -791,6 +797,15 @@ export default function PdfViewer({
   /** A snipped region on its way into the chat composer (consumed by AiPanel) */
   const [chatSnip, setChatSnip] = useState<{ id: number; image: AiImage } | null>(null)
   const chatSnipSeqRef = useRef(0)
+  /** Whole pages rendered for the assistant to read (scanned documents), on their
+   *  way into the composer as staged attachments — never sent on their own. */
+  const [chatPages, setChatPages] = useState<{
+    id: number
+    pages: number[]
+    images: AiImage[]
+  } | null>(null)
+  const chatPagesSeqRef = useRef(0)
+  const [chatPagesBusy, setChatPagesBusy] = useState(false)
   /** Note placement armed from the toolbar: next page click drops a note */
   const [notePlacing, setNotePlacing] = useState(false)
   /** Late-bound handle to runSemanticSearch (declared below) so the menu
@@ -2888,6 +2903,63 @@ export default function PdfViewer({
       })()
     },
     [pdf, snip]
+  )
+
+  /** Whole pages as images, for the assistant to READ when the document has no
+   *  text layer (the other half of the scanned-PDF story: it could say "I cannot
+   *  read this" but not read it).
+   *
+   *  Rendered offscreen rather than captured from the on-screen canvas, which may
+   *  be low-res at fit-width and is recoloured by the reading theme. JPEG, not
+   *  PNG: a full page of scanned text as PNG runs several megabytes, and every
+   *  attachment is also persisted in the chat store. */
+  const renderPagesAsImages = useCallback(
+    async (from: number, count: number): Promise<{ pages: number[]; images: AiImage[] }> => {
+      if (!pdf) return { pages: [], images: [] }
+      const first = clamp(from, 1, pdf.numPages)
+      const last = Math.min(pdf.numPages, first + Math.max(1, count) - 1)
+      const pages: number[] = []
+      const images: AiImage[] = []
+      for (let n = first; n <= last; n++) {
+        try {
+          const page = await pdf.getPage(n)
+          const base = page.getViewport({ scale: 1, rotation: page.rotate })
+          const k = AI_PAGE_IMAGE_SIDE / Math.max(base.width, base.height)
+          const viewport = page.getViewport({ scale: k, rotation: page.rotate })
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.max(1, Math.floor(viewport.width))
+          canvas.height = Math.max(1, Math.floor(viewport.height))
+          // Scanned pages are photographs of paper: white behind them, so a
+          // transparent canvas does not come out grey once flattened to JPEG.
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.fillStyle = '#ffffff'
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+          }
+          await page.render({ canvas, viewport }).promise
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+          images.push({ mediaType: 'image/jpeg', dataBase64: dataUrl.slice(dataUrl.indexOf(',') + 1) })
+          pages.push(n)
+        } catch {
+          /* one page that will not render is skipped; the rest still go */
+        }
+      }
+      return { pages, images }
+    },
+    [pdf]
+  )
+
+  /** The panel asked for pages; render them and hand them over to be staged. */
+  const onRequestPageImages = useCallback(
+    (from: number, count: number) => {
+      setChatPagesBusy(true)
+      void renderPagesAsImages(from, count)
+        .then(({ pages, images }) => {
+          if (images.length > 0) setChatPages({ id: ++chatPagesSeqRef.current, pages, images })
+        })
+        .finally(() => setChatPagesBusy(false))
+    },
+    [renderPagesAsImages]
   )
 
   /** Toolbar note tool: click a page point, open the note draft there */
@@ -5061,6 +5133,12 @@ export default function PdfViewer({
                 chatSnip={chatSnip}
                 onChatSnipConsumed={() => setChatSnip(null)}
                 onRequestSnip={() => setSnip({ target: 'chat' })}
+                chatPages={chatPages}
+                onChatPagesConsumed={() => setChatPages(null)}
+                onRequestPageImages={onRequestPageImages}
+                pagesBusy={chatPagesBusy}
+                currentPage={currentPage}
+                pageCount={sizes.length}
               />
             </div>
           </div>

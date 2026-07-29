@@ -24,6 +24,7 @@ import {
   annotationsDefaultQuestion,
   annotationsQuestion,
   chatSystem,
+  scannedPagesNote,
   citationPage,
   excerptSystemNote,
   formatTokens,
@@ -96,6 +97,17 @@ async function fileToAiImage(file: Blob): Promise<AiImage | null> {
   }
 }
 
+const clampPage = (n: number, pageCount: number): number =>
+  Number.isFinite(n) ? Math.min(Math.max(1, Math.round(n)), Math.max(1, pageCount)) : 1
+
+/** "7" for one page, "7–10" for a run, "7, 9, 12" when they are not contiguous */
+function pageListLabel(pages: number[]): string {
+  if (pages.length === 0) return ''
+  if (pages.length === 1) return String(pages[0])
+  const contiguous = pages.every((p, i) => i === 0 || p === pages[i - 1] + 1)
+  return contiguous ? `${pages[0]}–${pages[pages.length - 1]}` : pages.join(', ')
+}
+
 export interface EnsuredDocument {
   pages: PageText[]
   doc: AiDocument
@@ -130,6 +142,18 @@ interface PanelProps {
   onChatSnipConsumed(): void
   /** Arm the viewer's snip overlay with the chat as destination */
   onRequestSnip(): void
+  /** Whole pages rendered as images, for a document with no text layer. Staged
+   *  like a snip: they land in the composer with an editable question, and the
+   *  chip says exactly which pages will go along — nothing is sent by itself. */
+  chatPages: { id: number; pages: number[]; images: AiImage[] } | null
+  onChatPagesConsumed(): void
+  onRequestPageImages(from: number, count: number): void
+  /** True while those pages are rendering */
+  pagesBusy: boolean
+  /** The page the reader is on — the default for "read these pages" */
+  currentPage: number
+  /** Total pages, so the range field cannot ask for page 900 of 12 */
+  pageCount: number
 }
 
 const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
@@ -155,7 +179,13 @@ export default function AiPanel({
   onClose,
   chatSnip,
   onChatSnipConsumed,
-  onRequestSnip
+  onRequestSnip,
+  chatPages,
+  onChatPagesConsumed,
+  onRequestPageImages,
+  pagesBusy,
+  currentPage,
+  pageCount
 }: PanelProps): React.JSX.Element | null {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
@@ -185,6 +215,22 @@ export default function AiPanel({
   const fileInputRef = useRef<HTMLInputElement>(null)
   /** Images staged for the next composer send (pasted or attached) */
   const [pendingImages, setPendingImages] = useState<AiImage[]>([])
+  /** When those images ARE pages of this document, which ones — so the chip can
+   *  name them and the model can be told what it is (and is not) looking at. */
+  const [stagedPages, setStagedPages] = useState<number[]>([])
+  /** The range the "read these pages" button will render. Starts at the page the
+   *  reader is on; editable, because they know which pages they mean. */
+  const [readFrom, setReadFrom] = useState(currentPage)
+  const [readTo, setReadTo] = useState(currentPage)
+  const readTouchedRef = useRef(false)
+  const stagedPagesRef = useRef(stagedPages)
+  stagedPagesRef.current = stagedPages
+  // Follow the reader until they type their own range — then leave it alone.
+  useEffect(() => {
+    if (readTouchedRef.current) return
+    setReadFrom(currentPage)
+    setReadTo(currentPage)
+  }, [currentPage])
   /** Annotations staged for the next composer send (sidebar ✦): the block is
    *  fetched and appended at send time, shown as a removable chip until then */
   const [annotsStaged, setAnnotsStaged] = useState(false)
@@ -289,6 +335,18 @@ export default function AiPanel({
     inputRef.current?.focus()
   }, [open, chatSnip, onChatSnipConsumed])
 
+  // Pages rendered for reading replace the staged images outright (they are the
+  // subject of the question, not one more attachment) and prefill an editable
+  // question. The reader still presses send — that rule has no exceptions.
+  useEffect(() => {
+    if (!open || !chatPages) return
+    setPendingImages(chatPages.images.slice(0, MAX_IMAGES))
+    setStagedPages(chatPages.pages.slice(0, MAX_IMAGES))
+    setInput((i) => (i.trim() === '' ? t('ai.readPagesQuestion') : i))
+    onChatPagesConsumed()
+    inputRef.current?.focus()
+  }, [open, chatPages, onChatPagesConsumed])
+
   const handleScroll = useCallback((): void => {
     const el = scrollRef.current
     if (!el) return
@@ -364,11 +422,20 @@ export default function AiPanel({
         : null
       const requestId = nextRequestId()
       currentIdRef.current = requestId
+      // A scanned document with pages attached: the images ARE the document, so
+      // say so and leave the "document" out entirely — without a text layer it
+      // would be page markers and nothing else, which is tokens spent on saying
+      // nothing and an invitation to answer about pages nobody attached.
+      const shownPages = stagedPagesRef.current
+      const imagesOnly = shownPages.length > 0 && ensured?.hasText === false
       const result = await bridge.aiChat({
         requestId,
-        system: chatSystem() + (prep?.excerpt ? excerptSystemNote() : ''),
+        system:
+          chatSystem() +
+          (imagesOnly ? scannedPagesNote(shownPages) : '') +
+          (prep?.excerpt && !imagesOnly ? excerptSystemNote() : ''),
         messages: history,
-        document: prep ? { title: docTitle, text: prep.doc.text } : null,
+        document: imagesOnly || !prep ? null : { title: docTitle, text: prep.doc.text },
         webSearch: webSearchRef.current
       })
       currentIdRef.current = null
@@ -560,6 +627,7 @@ export default function AiPanel({
     if (!input.trim() || busy) return
     const imgs = pendingImages
     setPendingImages([])
+    setStagedPages([])
     if (annotsStaged) {
       setAnnotsStaged(false)
       void (async () => {
@@ -581,11 +649,79 @@ export default function AiPanel({
       <div className="ai-composer-grip" title={t('bubble.resizeHeightTip')} {...composerGrip}>
         <i />
       </div>
+      {/* No text layer: the only way in is page images, so the picker lives with
+          the composer rather than in the landing notice — reading a scanned
+          report means attaching the next pages as you go, which was impossible
+          once the first question had been asked and the landing was gone. */}
+      {docRef.current && !docRef.current.hasText && (
+        <div className="ai-notice-pages">
+          <label>
+            {t('ai.readPagesFrom')}
+            <input
+              type="number"
+              min={1}
+              max={pageCount}
+              value={readFrom}
+              onChange={(e) => {
+                readTouchedRef.current = true
+                const v = clampPage(Number(e.target.value), pageCount)
+                setReadFrom(v)
+                setReadTo((to) => Math.max(v, to))
+              }}
+            />
+          </label>
+          <label>
+            {t('ai.readPagesTo')}
+            <input
+              type="number"
+              min={readFrom}
+              max={pageCount}
+              value={readTo}
+              onChange={(e) => {
+                readTouchedRef.current = true
+                setReadTo(clampPage(Number(e.target.value), pageCount))
+              }}
+            />
+          </label>
+          <button
+            className="btn-primary"
+            disabled={pagesBusy}
+            title={t('ai.readPagesTip', { max: MAX_IMAGES })}
+            onClick={() => {
+              const from = clampPage(readFrom, pageCount)
+              const to = Math.max(from, clampPage(readTo, pageCount))
+              onRequestPageImages(from, Math.min(MAX_IMAGES, to - from + 1))
+            }}
+          >
+            {pagesBusy ? t('ai.readPagesBusy') : t('ai.readPagesCta')}
+          </button>
+          {readTo - readFrom + 1 > MAX_IMAGES && (
+            <p className="ai-notice-cap">{t('ai.readPagesCap', { max: MAX_IMAGES })}</p>
+          )}
+        </div>
+      )}
       {/* ChatGPT-style field: the textarea and its controls live INSIDE one
           rounded surface — the buttons sit bottom-right, never beside it. */}
       <div className="ai-composer-field">
         {(annotsStaged || pendingImages.length > 0) && (
           <div className="ai-attach-row">
+            {/* Which pages are going along, in words — a row of thumbnails does
+                not tell you whether page 7 or page 8 is in the request. */}
+            {stagedPages.length > 0 && (
+              <div className="ai-attach ai-attach-pages">
+                {t('ai.pagesChip', { pages: pageListLabel(stagedPages) })}
+                <button
+                  className="ai-attach-x"
+                  title={t('ai.removePagesTip')}
+                  onClick={() => {
+                    setStagedPages([])
+                    setPendingImages([])
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             {annotsStaged && (
               <div className="ai-attach ai-attach-annots">
                 <IconSparkle size={12} />

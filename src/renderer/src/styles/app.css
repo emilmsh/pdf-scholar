@@ -3258,6 +3258,52 @@ button {
 .ai-notice p {
   margin: 0;
 }
+/* "From page N to M" + the attach button, on one line in a narrow panel. Sits
+   above the composer whenever the document has no text layer, so the next pages
+   can be attached at any point in the conversation. */
+.ai-notice-pages {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+}
+.ai-notice-pages label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+}
+.ai-notice-pages input {
+  width: 48px;
+  padding: 3px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: center;
+}
+.ai-notice-pages .btn-primary {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.ai-notice-cap {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 11.5px;
+  opacity: 0.8;
+}
+/* The chip that names the pages going along with the question */
+.ai-attach-pages {
+  gap: 4px;
+  padding: 3px 4px 3px 8px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
 
 .ai-landing .ai-suggestions {
   margin-top: 0;
