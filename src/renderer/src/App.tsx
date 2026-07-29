@@ -291,25 +291,58 @@ export default function App(): React.JSX.Element {
     [confirmExternalUpdateVerdict, setTabDirty]
   )
 
-  /** Close with the unsaved-changes prompt when the tab is dirty */
-  const closeTab = useCallback(
-    (id: string) => {
+  /** Close with the unsaved-changes prompt when the tab is dirty. Resolves to
+   *  whether the tab actually went away, so a bulk close can ask about one tab at
+   *  a time instead of stacking a dialog per dirty document. */
+  const closeTabAwait = useCallback(
+    async (id: string): Promise<boolean> => {
       const tab = tabsRef.current.find((t) => t.id === id)
-      if (!tab) return
+      if (!tab) return false
       if (!dirtyTabsRef.current.has(id)) {
         reallyCloseTab(id)
-        return
+        return true
       }
-      void confirmCloseVerdict(tab.payload.path, tab.payload.name).then((outcome) => {
-        if (outcome.verdict === 'cancel') {
-          reportCloseFailure(outcome)
-          return
-        }
-        reallyCloseTab(id)
-      })
+      const outcome = await confirmCloseVerdict(tab.payload.path, tab.payload.name)
+      if (outcome.verdict === 'cancel') {
+        reportCloseFailure(outcome)
+        return false
+      }
+      reallyCloseTab(id)
+      return true
     },
     [reallyCloseTab, confirmCloseVerdict, reportCloseFailure]
   )
+
+  const closeTab = useCallback(
+    (id: string) => {
+      void closeTabAwait(id)
+    },
+    [closeTabAwait]
+  )
+
+  /** "Close other tabs" / "Close tabs to the right". Sequential on purpose: with
+   *  two unsaved documents, firing both closes at once would stack two save
+   *  dialogs on top of each other. Cancelling one keeps that tab and moves on to
+   *  the next — the ask was to close the others, not to give up on all of them. */
+  const closeTabs = useCallback(
+    async (ids: string[]) => {
+      for (const id of ids) await closeTabAwait(id)
+    },
+    [closeTabAwait]
+  )
+
+  /** Drag a tab to a new position (also Ctrl+Shift+PageUp/PageDown) */
+  const moveTab = useCallback((id: string, toIndex: number) => {
+    setTabs((prev) => {
+      const from = prev.findIndex((t) => t.id === id)
+      const to = Math.max(0, Math.min(prev.length - 1, toIndex))
+      if (from === -1 || from === to) return prev
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+  }, [])
 
   // Move a tab to another window (drag) or tear it off into a new one. The
   // source tab closes WITHOUT the discard prompt so its unsaved draft (kept on
@@ -479,11 +512,23 @@ export default function App(): React.JSX.Element {
       } else if (primaryMod(e) && (e.key === 'o' || e.key === 'O')) {
         e.preventDefault()
         void openDialog()
+      } else if (
+        primaryMod(e) &&
+        e.shiftKey &&
+        (e.key === 'PageUp' || e.key === 'PageDown')
+      ) {
+        // Move the active tab, the browser shortcut for the same thing
+        const id = activeIdRef.current
+        if (!id) return
+        const at = tabsRef.current.findIndex((t) => t.id === id)
+        if (at === -1) return
+        e.preventDefault()
+        moveTab(id, at + (e.key === 'PageUp' ? -1 : 1))
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, openDialog])
+  }, [cycleTab, closeTab, openDialog, moveTab])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -531,6 +576,8 @@ export default function App(): React.JSX.Element {
         onOpenInNewWindow={(path) => bridge.newWindow(path)}
         onShowInFolder={(path) => bridge.showInFolder(path)}
         onTabDragOut={(id, path) => void moveTabOut(id, path)}
+        onReorder={moveTab}
+        onCloseMany={(ids) => void closeTabs(ids)}
         onMoveToNewWindow={moveToNewWindow}
         onReload={(id, path) => void reloadTab(id, path)}
         onLibrary={() => activeId && closeTab(activeId)}

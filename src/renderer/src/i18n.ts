@@ -83,6 +83,10 @@ const nb = {
   // Tabs
   'tabs.close': 'Lukk fane',
   'tabs.closeTab': 'Lukk fane',
+  'tabs.closeOthers': 'Lukk andre faner',
+  'tabs.closeToRight': 'Lukk faner til høyre',
+  'tabs.moveLeft': 'Flytt til venstre',
+  'tabs.moveRight': 'Flytt til høyre',
   'tabs.new': 'Åpne PDF (Ctrl+O)',
   'tabs.newWindow': 'Nytt vindu (Ctrl+Shift+N)',
   'tabs.openInNewWindow': 'Åpne i nytt vindu',
@@ -607,6 +611,10 @@ const en: Dict = {
 
   'tabs.close': 'Close tab',
   'tabs.closeTab': 'Close tab',
+  'tabs.closeOthers': 'Close other tabs',
+  'tabs.closeToRight': 'Close tabs to the right',
+  'tabs.moveLeft': 'Move left',
+  'tabs.moveRight': 'Move right',
   'tabs.new': 'Open PDF (Ctrl+O)',
   'tabs.newWindow': 'New window (Ctrl+Shift+N)',
   'tabs.openInNewWindow': 'Open in new window',

@@ -23,6 +23,10 @@ interface Props {
   onShowInFolder(path: string): void
   /** A tab was dragged out and released — main decides where it lands */
   onTabDragOut(id: string, path: string): void
+  /** A tab was dragged onto another position within this bar */
+  onReorder(id: string, toIndex: number): void
+  /** Close every tab in this list, one at a time (see closeTabs in App) */
+  onCloseMany(ids: string[]): void
   /** Context-menu fallback: tear the tab off into a new window */
   onMoveToNewWindow(id: string, path: string): void
   /** Re-read the file from disk and remount the viewer (external updates) */
@@ -51,6 +55,8 @@ export default function TabBar({
   onOpenInNewWindow,
   onShowInFolder,
   onTabDragOut,
+  onReorder,
+  onCloseMany,
   onMoveToNewWindow,
   onReload,
   onLibrary
@@ -58,6 +64,9 @@ export default function TabBar({
   useLang()
   const [menu, setMenu] = useState<{ x: number; y: number; tab: TabInfo } | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  /** Where the right-clicked tab currently sits — the move/close-to-the-right
+   *  items are all relative to it, and it moves while the menu is open. */
+  const menuIndex = menu ? tabs.findIndex((x) => x.id === menu.tab.id) : null
 
   useEffect(() => {
     if (!menu) return
@@ -90,7 +99,7 @@ export default function TabBar({
           <span className="tab-app-name">PDF Scholar</span>
         </>
       )}
-      {tabs.map((tab) => (
+      {tabs.map((tab, index) => (
         <div
           key={tab.id}
           className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}`}
@@ -103,6 +112,16 @@ export default function TabBar({
             e.dataTransfer.effectAllowed = 'move'
             e.dataTransfer.setData('text/plain', tab.path)
             setDraggingId(tab.id)
+          }}
+          // Dragging ACROSS the bar reorders, live, the way browsers do. Dropping
+          // outside it still tears the tab off: main answers 'same' when the
+          // cursor is over this window, so the two gestures cannot collide.
+          onDragOver={(e) => {
+            if (!draggingId || draggingId === tab.id) return
+            e.preventDefault()
+            // Take the hovered tab's place. The dragged tab is spliced out before
+            // it is inserted, so this reads the same dragging either way.
+            onReorder(draggingId, index)
           }}
           onDragEnd={() => {
             setDraggingId(null)
@@ -133,7 +152,7 @@ export default function TabBar({
       </button>
       </div>
 
-      {menu && (
+      {menu && menuIndex !== null && (
         <div
           className="tab-menu"
           style={{ left: Math.min(menu.x, window.innerWidth - 220), top: menu.y }}
@@ -175,6 +194,33 @@ export default function TabBar({
           >
             {t('tabs.showInFolder')}
           </button>
+          {/* Touch has no HTML5 drag, and a keyboard has no cursor: the same
+              reorder lives here (long-press opens this menu) and on
+              Ctrl+Shift+PageUp/PageDown. */}
+          {tabs.length > 1 && (
+            <>
+              <button
+                className="menu-item"
+                disabled={menuIndex <= 0}
+                onClick={() => {
+                  onReorder(menu.tab.id, menuIndex - 1)
+                  setMenu(null)
+                }}
+              >
+                {t('tabs.moveLeft')}
+              </button>
+              <button
+                className="menu-item"
+                disabled={menuIndex === -1 || menuIndex >= tabs.length - 1}
+                onClick={() => {
+                  onReorder(menu.tab.id, menuIndex + 1)
+                  setMenu(null)
+                }}
+              >
+                {t('tabs.moveRight')}
+              </button>
+            </>
+          )}
           <button
             className="menu-item"
             onClick={() => {
@@ -184,6 +230,28 @@ export default function TabBar({
           >
             {t('tabs.closeTab')}
           </button>
+          {tabs.length > 1 && (
+            <button
+              className="menu-item"
+              onClick={() => {
+                onCloseMany(tabs.filter((x) => x.id !== menu.tab.id).map((x) => x.id))
+                setMenu(null)
+              }}
+            >
+              {t('tabs.closeOthers')}
+            </button>
+          )}
+          {menuIndex !== -1 && menuIndex < tabs.length - 1 && (
+            <button
+              className="menu-item"
+              onClick={() => {
+                onCloseMany(tabs.slice(menuIndex + 1).map((x) => x.id))
+                setMenu(null)
+              }}
+            >
+              {t('tabs.closeToRight')}
+            </button>
+          )}
         </div>
       )}
     </div>
