@@ -2,7 +2,8 @@
 // the desktop engine (src/main/annotation-engine-embedpdf.ts) and the browser
 // engine (src/renderer/src/annotation-engine-browser.ts) so both bake identical
 // annotations — the appearance a reader sees is decided in exactly one place.
-import type { AnnotateRequest, PageRect } from './types'
+import type { AnnotateRequest, FileError, PageRect } from './types'
+import { ENGINE_ERRORS } from './engine-errors'
 import type { PdfAnnotationObject } from '@embedpdf/models'
 import {
   PdfAnnotationLineEnding,
@@ -39,6 +40,29 @@ export function strokesBBox(strokes: [number, number][][], pad: number): PageRec
   return { x: x0 - pad, y: y0 - pad, w: x1 - x0 + 2 * pad, h: y1 - y0 + 2 * pad }
 }
 
+/** Union of a markup annotation's quads — its /Rect. Shared with the resize
+ *  path so a re-quaded highlight gets the bbox a fresh one would. */
+export function quadsBBox(quads: PageRect[]): PageRect {
+  const first = quads[0] ?? { x: 0, y: 0, w: 0, h: 0 }
+  let x0 = first.x
+  let y0 = first.y
+  let x1 = first.x + first.w
+  let y1 = first.y + first.h
+  for (const q of quads) {
+    x0 = Math.min(x0, q.x)
+    y0 = Math.min(y0, q.y)
+    x1 = Math.max(x1, q.x + q.w)
+    y1 = Math.max(y1, q.y + q.h)
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+}
+
+/** The pad a line's/arrow's bbox needs around its endpoints: enough for the
+ *  stroke width AND the arrowhead. Named because a RESIZE has to reproduce it
+ *  exactly — a re-shaped line whose /Rect came out tighter than a freshly drawn
+ *  one would clip its own arrowhead in other readers. */
+export const linePad = (width: number): number => Math.max(6, width * 4.5)
+
 export const MARKUP = new Set<AnnotateRequest['type']>([
   'highlight',
   'underline',
@@ -46,7 +70,7 @@ export const MARKUP = new Set<AnnotateRequest['type']>([
   'squiggly'
 ])
 
-export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | { error: string } {
+export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | FileError {
   const base = {
     id: crypto.randomUUID(),
     pageIndex: req.pageIndex,
@@ -62,15 +86,7 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | { e
       strikeout: PdfAnnotationSubtype.STRIKEOUT,
       squiggly: PdfAnnotationSubtype.SQUIGGLY
     }[req.type as 'highlight' | 'underline' | 'strikeout' | 'squiggly']
-    const bbox = req.quads.reduce(
-      (a, q) => ({
-        x: Math.min(a.x, q.x),
-        y: Math.min(a.y, q.y),
-        w: Math.max(a.x + a.w, q.x + q.w) - Math.min(a.x, q.x),
-        h: Math.max(a.y + a.h, q.y + q.h) - Math.min(a.y, q.y)
-      }),
-      { ...req.quads[0] }
-    )
+    const bbox = quadsBBox(req.quads)
     return {
       ...base,
       type: subtype,
@@ -93,7 +109,7 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | { e
       } as PdfAnnotationObject
     }
     case 'ink': {
-      if (!req.strokes || req.strokes.length === 0) return { error: 'Streken er tom' }
+      if (!req.strokes || req.strokes.length === 0) return ENGINE_ERRORS.emptyStroke
       const width = req.width ?? 2
       return {
         ...base,
@@ -124,9 +140,9 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | { e
     case 'line':
     case 'arrow': {
       const [a, b] = req.strokes?.[0] ?? []
-      if (!a || !b) return { error: 'Linjen mangler endepunkter' }
+      if (!a || !b) return ENGINE_ERRORS.lineNoEndpoints
       const width = req.width ?? 2
-      const pad = Math.max(6, width * 4.5)
+      const pad = linePad(width)
       return {
         ...base,
         type: PdfAnnotationSubtype.LINE,
@@ -158,6 +174,6 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | { e
       } as PdfAnnotationObject
     }
     default:
-      return { error: `Ukjent annotasjonstype: ${req.type}` }
+      return ENGINE_ERRORS.unknownType(req.type)
   }
 }

@@ -23,6 +23,14 @@ export const ENGINE_ERRORS = {
     error: 'Fikk ikke objektnummer for annotasjonen'
   },
   updateRejected: { code: 'annot-update-rejected', error: 'Oppdateringen ble avvist av motoren' },
+  emptyStroke: { code: 'annot-empty-stroke', error: 'Streken er tom' },
+  lineNoEndpoints: { code: 'annot-line-endpoints', error: 'Linjen mangler endepunkter' },
+  /** The type name is the diagnostic and cannot be reconstructed from a code,
+   *  so it rides along in `error` the way the asymmetric counts do. */
+  unknownType: (type: string): FileError => ({
+    code: 'annot-unknown-type',
+    error: `Ukjent annotasjonstype: ${type}`
+  }),
   passwordProtected: { code: 'pdf-password-protected', error: 'PDF-en er passordbeskyttet' },
   /** The appender met a PDF construct it will not rewrite. The `detail` argument
    *  at the throw site says which one; it is logged, never shown. */

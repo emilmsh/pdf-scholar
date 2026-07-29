@@ -69,6 +69,28 @@ for (const req of reqs) {
   check('freetext contents+rect', 'ok' in res, 'error' in res ? res.error : '')
 }
 
+// 4b. RESHAPE: the request carries the NEW geometry outright (quads / strokes),
+// which is what makes a mark editable at all — before this, getting one line
+// more of a highlight meant deleting it and drawing again.
+{
+  const hl = await updateAnnotation({
+    path: FILE, pageIndex: 1, id: ids.highlight,
+    quads: [{ x: 70, y: 70, w: 200, h: 16 }, { x: 70, y: 88, w: 120, h: 16 }]
+  })
+  check('reshape highlight (1 -> 2 quads)', 'ok' in hl, 'error' in hl ? hl.error : '')
+  // Same shape, scaled ~2x horizontally and vertically about its top-left
+  const ink = await updateAnnotation({
+    path: FILE, pageIndex: 1, id: ids.ink,
+    strokes: [[[72, 200], [128, 150], [188, 210]]]
+  })
+  check('reshape ink (scaled strokes)', 'ok' in ink, 'error' in ink ? ink.error : '')
+  const ln = await updateAnnotation({
+    path: FILE, pageIndex: 1, id: ids.line,
+    strokes: [[[80, 340], [300, 300]]]
+  })
+  check('reshape line (new endpoints)', 'ok' in ln, 'error' in ln ? ln.error : '')
+}
+
 // 5. delete the square
 {
   const res = await deleteAnnotation({ path: FILE, pageIndex: 1, id: ids.square })
@@ -101,6 +123,40 @@ for (const req of reqs) {
   let le = 'none'
   try { const o = arrow?.getObject().get('LE'); le = o && !o.isNull() ? String(o) : 'none' } catch { /* keep */ }
   check('arrowhead (/LE) intact', /ClosedArrow/.test(le), le)
+  // Reshaped in 4b. Read the raw dict values for the geometry keys (the
+  // accessor methods differ per subtype) and mupdf's own rect for the
+  // appearance: /Rect is derived from the regenerated /AP, so a rect that
+  // followed proves the appearance did too — a stale AP would keep the old box.
+  const rawNums = (annot, key) => {
+    try {
+      const o = annot?.getObject().get(key)
+      if (!o || o.isNull()) return []
+      return (String(o).match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+    } catch { return [] }
+  }
+  // mupdf refuses getRect() on subtypes whose box is derived (Highlight, Ink,
+  // Line …), so read /Rect straight from the dict — same numbers, no guard.
+  const rectOf = (annot) => {
+    const r = rawNums(annot, 'Rect')
+    return r.length === 4 ? { w: Math.abs(r[2] - r[0]), h: Math.abs(r[3] - r[1]) } : null
+  }
+  const qp = rawNums(hl, 'QuadPoints')
+  check('highlight reshaped to 2 quads', qp.length === 16, `${qp.length / 8} quads`)
+  const hlBox = rectOf(hl)
+  check('highlight box covers both lines', !!hlBox && Math.abs(hlBox.h - 34) <= 2,
+    hlBox ? `h=${hlBox.h.toFixed(1)}` : 'no /Rect')
+  const inkA = byId.get(ids.ink)
+  const inkPts = rawNums(inkA, 'InkList')
+  const inkMaxX = inkPts.length ? Math.round(Math.max(...inkPts.filter((_, i) => i % 2 === 0))) : 0
+  check('ink strokes rewritten', inkPts.length === 6 && inkMaxX === 188, `${inkPts.length / 2} pts, maxX=${inkMaxX}`)
+  const inkBox = rectOf(inkA)
+  check('ink appearance follows the strokes', !!inkBox && Math.abs(inkBox.w - 120.4) <= 3,
+    inkBox ? `w=${inkBox.w.toFixed(1)}` : 'no /Rect')
+  const ln2 = byId.get(ids.line)?.getLine()
+  const lnOk = ln2 &&
+    Math.round(ln2[0][0]) === 80 && Math.round(ln2[0][1]) === 340 &&
+    Math.round(ln2[1][0]) === 300 && Math.round(ln2[1][1]) === 300
+  check('line endpoints rewritten', !!lnOk, ln2 ? JSON.stringify(ln2.map((p) => p.map(Math.round))) : 'missing')
   const ft = byId.get(ids.freetext)
   check('freetext text updated', ft?.getContents() === 'Endret tekst', JSON.stringify(ft?.getContents()))
   check('freetext resized', ft && Math.round(ft.getRect()[2] - ft.getRect()[0]) === 240,

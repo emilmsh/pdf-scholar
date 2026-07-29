@@ -1560,13 +1560,13 @@ async function annotsHolderRewrite(
 
 async function opCreate(pdf: PdfFile, req: AnnotateRequest): Promise<AnnotateResult> {
   if (req.quads.length === 0 && req.type !== 'ink' && req.type !== 'line' && req.type !== 'arrow') {
-    return { error: 'Annotasjonen har ingen posisjon' }
+    return ENGINE_ERRORS.noPosition
   }
   if (req.type === 'ink' && (!req.strokes || req.strokes.every((s) => s.length === 0))) {
-    return { error: 'Streken er tom' }
+    return ENGINE_ERRORS.emptyStroke
   }
   if ((req.type === 'line' || req.type === 'arrow') && (req.strokes?.[0]?.length ?? 0) < 2) {
-    return { error: 'Linjen mangler endepunkter' }
+    return ENGINE_ERRORS.lineNoEndpoints
   }
   const page = await findPage(pdf, req.pageIndex)
   const g = geomOf(page)
@@ -1679,6 +1679,27 @@ async function opUpdate(pdf: PdfFile, req: ModifyAnnotationRequest): Promise<Ann
         strokes.push(ARR(shiftPairs(nums, dux, duy).map(N)))
       }
       dict.set('InkList', ARR(strokes))
+    }
+  }
+  // A RESIZE replaces the geometry outright (the request carries the new one).
+  // Only the geometry keys are written here: /Rect and the appearance are
+  // regenerated from this patched dict below, exactly as after a move.
+  if (req.quads && req.quads.length > 0 && MARKUP_TYPES.has(type)) {
+    dict.set('QuadPoints', quadPoints(g, req.quads))
+  }
+  if (req.strokes && req.strokes.length > 0) {
+    if (type === 'line' || type === 'arrow') {
+      const [a, b] = req.strokes[0] ?? []
+      if (!a || !b) return ENGINE_ERRORS.lineNoEndpoints
+      const [ax, ay] = toUser(g, a[0], a[1])
+      const [bx, by] = toUser(g, b[0], b[1])
+      dict.set('L', ARR([N(ax), N(ay), N(bx), N(by)]))
+    } else if (type === 'ink') {
+      dict.set('InkList', ARR(
+        req.strokes.map((stroke) =>
+          ARR(stroke.flatMap(([x, y]) => { const [ux, uy] = toUser(g, x, y); return [N(ux), N(uy)] }))
+        )
+      ))
     }
   }
   dict.set('M', { t: 'str', raw: Buffer.from(pdfDate(new Date())) })

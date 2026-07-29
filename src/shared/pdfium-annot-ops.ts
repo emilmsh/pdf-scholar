@@ -26,7 +26,7 @@ import type {
 import type { PdfAnnotationObject, PdfDocumentObject } from '@embedpdf/models'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
-import { buildAnnotation, rgbToHex, toRect } from './annotation-build'
+import { buildAnnotation, linePad, quadsBBox, rgbToHex, strokesBBox, toRect } from './annotation-build'
 import { ENGINE_ERRORS } from './engine-errors'
 import { snapshotApLessLinks, stripGeneratedLinkAPs } from './link-ap-guard'
 
@@ -174,8 +174,10 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
     const m = model as PdfAnnotationObject & {
       strokeColor?: string
       fontColor?: string
+      strokeWidth?: number
       linePoints?: { start: { x: number; y: number }; end: { x: number; y: number } }
       inkList?: { points: { x: number; y: number }[] }[]
+      segmentRects?: { origin: { x: number; y: number }; size: { width: number; height: number } }[]
     }
     if (req.color) {
       const hex = rgbToHex(req.color)
@@ -201,6 +203,26 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
       m.rect = {
         origin: { x: m.rect.origin.x + dx, y: m.rect.origin.y + dy },
         size: m.rect.size
+      }
+    }
+    // A RESIZE sends the new geometry outright. The bbox is recomputed with the
+    // same padding rules buildAnnotation uses at create time (annotation-build),
+    // so a re-shaped mark and a freshly drawn one end up with the same /Rect —
+    // otherwise the second one would look subtly different in other readers.
+    if (req.quads && req.quads.length > 0) {
+      m.segmentRects = req.quads.map(toRect)
+      m.rect = toRect(quadsBBox(req.quads))
+    }
+    if (req.strokes && req.strokes.length > 0) {
+      const width = m.strokeWidth ?? 2
+      if (m.type === PdfAnnotationSubtype.LINE) {
+        const [a, b] = req.strokes[0] ?? []
+        if (!a || !b) return ENGINE_ERRORS.lineNoEndpoints
+        m.linePoints = { start: { x: a[0], y: a[1] }, end: { x: b[0], y: b[1] } }
+        m.rect = toRect(strokesBBox([[a, b]], linePad(width)))
+      } else if (m.type === PdfAnnotationSubtype.INK) {
+        m.inkList = req.strokes.map((s) => ({ points: s.map(([x, y]) => ({ x, y })) }))
+        m.rect = toRect(strokesBBox(req.strokes, width))
       }
     }
     ;(m as { modified?: Date }).modified = new Date()

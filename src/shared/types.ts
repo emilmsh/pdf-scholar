@@ -73,6 +73,9 @@ export type EngineErrorCode =
   | 'annot-no-object-number'
   | 'annot-update-rejected'
   | 'annot-list-asymmetric'
+  | 'annot-empty-stroke'
+  | 'annot-line-endpoints'
+  | 'annot-unknown-type'
   | 'pdf-password-protected'
   | 'doc-too-large'
   | 'doc-too-large-browser'
@@ -199,6 +202,18 @@ export interface ModifyAnnotationRequest {
    *  shifted — per-subtype, because a Line's endpoints and an Ink's stroke list
    *  do not follow a plain rect move. */
   translate?: { dx: number; dy: number } | undefined
+  // ---- resize / re-shape: the caller sends the NEW geometry outright ----
+  // `translate` can only shift what is already there, which is why a mark used
+  // to be un-editable: getting one line more of a highlight, or a square 20 pt
+  // wider, meant deleting it and drawing again. These two carry the replacement
+  // geometry in the same page space as AnnotateRequest, so the engines reuse the
+  // create-time builders for the appearance and nothing about the shape is
+  // computed twice.
+  /** Text markup (highlight/underline/strikeout/squiggly): the whole new quad
+   *  list, one quad per line of text. */
+  quads?: PageRect[] | undefined
+  /** line/arrow: one pair of endpoints. ink: the whole new stroke list. */
+  strokes?: [number, number][][] | undefined
 }
 
 export interface DeleteAnnotationRequest {

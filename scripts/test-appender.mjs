@@ -251,6 +251,60 @@ for (const objectStreams of [false, true]) {
     check('updated annots still have /AP', !!(hl?.hasAp && arrow?.hasAp))
     pdf.destroy()
   }
+
+  // -- RESHAPE: the request carries the new geometry, not a delta. Same three
+  // shapes as test-engine-embedpdf.mjs, so the two write paths are held to one
+  // expectation — a mark edited in a 200 MB file must land where it does in a
+  // small one.
+  {
+    const hlRes = await updateAnnotation({
+      path: FILE, pageIndex: 1, id: ids.highlight,
+      quads: [{ x: 70, y: 70, w: 200, h: 16 }, { x: 70, y: 88, w: 120, h: 16 }]
+    })
+    check('reshape highlight (1 -> 2 quads)', 'ok' in hlRes, 'error' in hlRes ? hlRes.error : '')
+    const inkRes = await updateAnnotation({
+      path: FILE, pageIndex: 1, id: ids.ink,
+      strokes: [[[72, 200], [128, 150], [188, 210]]]
+    })
+    check('reshape ink (scaled strokes)', 'ok' in inkRes, 'error' in inkRes ? inkRes.error : '')
+    const arRes = await updateAnnotation({
+      path: FILE, pageIndex: 1, id: ids.arrow,
+      strokes: [[[80, 340], [300, 300]]]
+    })
+    check('reshape arrow (new endpoints)', 'ok' in arRes, 'error' in arRes ? arRes.error : '')
+
+    const { pdf, out } = mupdfAnnots(FILE, 1)
+    const byId = new Map(out.map((a) => [a.id, a]))
+    const rawNums = (annot, key) => {
+      try {
+        const o = annot?.annot.getObject().get(key)
+        if (!o || o.isNull()) return []
+        return (String(o).match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+      } catch { return [] }
+    }
+    const rectOf = (annot) => {
+      const r = rawNums(annot, 'Rect')
+      return r.length === 4 ? { w: Math.abs(r[2] - r[0]), h: Math.abs(r[3] - r[1]) } : null
+    }
+    const hl2 = byId.get(ids.highlight)
+    const qp = rawNums(hl2, 'QuadPoints')
+    check('highlight has 2 quads (mupdf)', qp.length === 16, `${qp.length / 8} quads`)
+    // /Rect is regenerated from the new appearance, so a box that grew to cover
+    // both lines proves the AP was rebuilt and not left stale.
+    const hlBox = rectOf(hl2)
+    check('highlight box covers both lines', !!hlBox && Math.abs(hlBox.h - 34) <= 2,
+      hlBox ? `h=${hlBox.h.toFixed(1)}` : 'no /Rect')
+    const inkPts = rawNums(byId.get(ids.ink), 'InkList')
+    const inkMaxX = inkPts.length ? Math.round(Math.max(...inkPts.filter((_, i) => i % 2 === 0))) : 0
+    check('ink strokes rewritten', inkPts.length === 6 && inkMaxX === 188, `${inkPts.length / 2} pts, maxX=${inkMaxX}`)
+    const ln = byId.get(ids.arrow)?.annot.getLine()
+    const lnOk = ln &&
+      Math.round(ln[0][0]) === 80 && Math.round(ln[0][1]) === 340 &&
+      Math.round(ln[1][0]) === 300 && Math.round(ln[1][1]) === 300
+    check('arrow /L endpoints rewritten', !!lnOk, ln ? JSON.stringify(ln.map((p) => p.map(Math.round))) : 'missing')
+    check('reshaped annots still have /AP', !!(hl2?.hasAp && byId.get(ids.ink)?.hasAp && byId.get(ids.arrow)?.hasAp))
+    pdf.destroy()
+  }
 }
 
 // =============================================================================
