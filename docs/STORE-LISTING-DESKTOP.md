@@ -109,22 +109,26 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.30.x
+## What's new in this version (≤ 1 500 chars) — v0.31.x
 
 **EN:**
 ```
-• Ask about documents of any size: when a document is too large for the AI model, the assistant answers from the most relevant pages — and says so on the answer — instead of failing
-• New AI models appear in the model menu on their own and retired ones are flagged, without waiting for an app update
-• Ctrl+F starts from the text you have selected and always lands in the search field
-• Opening a file that is still being written (a download in progress) now says what happened and offers a retry that waits for the whole file
+• Marks can be corrected instead of redrawn: drag either end of a highlight to cover more or less text, or a corner of a shape, text box or drawing to resize it
+• Scanned documents can be read: a PDF that is pictures of words says so, and the assistant reads the pages you attach as images
+• Search marks every hit on the page while you look, and offers your last ten searches
+• Bookmarks: press B to mark a page, name it, and come back to it from the sidebar
+• Clear every annotation in one step, and one Ctrl+Z brings them all back
+• Drag tabs to reorder them; right-click one to close the others
 ```
 
 **NO:**
 ```
-• Spør om dokumenter uansett størrelse: når et dokument er for stort for KI-modellen, svarer assistenten fra de mest relevante sidene — og sier det på svaret — i stedet for å feile
-• Nye KI-modeller dukker opp i modellmenyen av seg selv, og utgåtte merkes, uten å vente på en appoppdatering
-• Ctrl+F starter med teksten du har markert og lander alltid i søkefeltet
-• Åpning av en fil som fortsatt skrives (en pågående nedlasting) sier nå hva som skjedde og tilbyr et nytt forsøk som venter til fila er hel
+• Merknader kan rettes i stedet for å tegnes på nytt: dra i enden av en utheving for å dekke mer eller mindre tekst, eller i hjørnet av en form, tekstboks eller tegning for å endre størrelsen
+• Skannede dokumenter kan leses: en PDF som er bilder av ord sier det, og assistenten leser sidene du legger ved som bilder
+• Søket markerer alle treff på siden mens du leter, og tilbyr de ti siste søkene dine
+• Bokmerker: trykk B for å merke en side, gi den navn, og kom tilbake til den fra sidepanelet
+• Tøm alle merknader i én handling, og én Ctrl+Z henter alt tilbake
+• Dra faner for å endre rekkefølge; høyreklikk én for å lukke de andre
 ```
 
 ---
