@@ -4352,6 +4352,55 @@ button {
   transform: scale(1.25);
 }
 
+/* The two ends of a marked passage. Shaped like a text-selection handle — a bar
+   the height of the line with a knob at its foot — because dragging it is the
+   same gesture, on the same material. The ::after knob carries a 24px invisible
+   target so a finger can grab it. */
+.markup-end {
+  position: absolute;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  border-radius: 1px;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: col-resize;
+}
+.markup-end::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  margin-left: -4.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+}
+/* Knob below the start, above the end — so neither sits on the words */
+.markup-end-start::after {
+  bottom: -5px;
+}
+.markup-end-end::after {
+  top: -5px;
+}
+.markup-end::before {
+  content: '';
+  position: absolute;
+  inset: -10px -11px;
+}
+.markup-end:hover::after,
+.markup-end:active::after {
+  transform: scale(1.25);
+}
+
+/* What releasing the end would mark, in the mark's own colour */
+.markup-edit-preview {
+  position: absolute;
+  border-radius: 1px;
+  pointer-events: none;
+}
+
 /* The line a resize will commit — the box around a diagonal says nothing */
 .annot-resize-ghost-line {
   position: absolute;

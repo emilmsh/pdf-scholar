@@ -3,7 +3,7 @@ import { AnnotationMode, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
-import { annotationCss, arrowHeadPoints, arrowShaftEnd, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData } from '../annotations'
+import { annotationCss, arrowHeadPoints, arrowShaftEnd, isTextMarkup, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
@@ -99,6 +99,17 @@ interface Props {
   /** A resize handle on the selected annotation was grabbed. The viewer owns the
    *  drag from here (pointermove/up on the window), exactly as it owns a move. */
   onResizeStart(pageNumber: number, record: PageAnnotation, handle: ResizeHandle, e: React.PointerEvent): void
+  /** An end of a text markup was grabbed — the mark is about to cover more or
+   *  less text. Also viewer-owned. */
+  onMarkupEndStart(
+    pageNumber: number,
+    record: PageAnnotation,
+    end: 'start' | 'end',
+    e: React.PointerEvent
+  ): void
+  /** While an end is being dragged, the rects the release would commit (page
+   *  space) — painted in the mark's own colour instead of the mark itself. */
+  markupPreview: PageRect[]
 }
 
 interface Cancellable {
@@ -132,7 +143,9 @@ function PdfPage({
   onErase,
   onShapeComplete,
   onPlaceText,
-  onResizeStart
+  onResizeStart,
+  onMarkupEndStart,
+  markupPreview
 }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
@@ -778,14 +791,48 @@ function PdfPage({
       )}
       {!hideAnnots && selectedAnnot && (
         <div className="annot-overlay">
-          <SelectionFrame
-            record={selectedAnnot}
-            scale={scale}
-            pageW={pageW}
-            pageH={pageH}
-            rotation={rotation}
-            onResizeStart={(handle, e) => onResizeStart(pageNumber, selectedAnnot, handle, e)}
-          />
+          {/* A marked passage gets knobs on its two ends instead of a box — the
+              box would say "resize this rectangle", which is not what a
+              highlight is. Rotated, neither is offered, so it keeps the frame as
+              its "selected" cue. */}
+          {isTextMarkup(selectedAnnot) && rotation === 0 ? (
+            <MarkupEndHandles
+              record={selectedAnnot}
+              scale={scale}
+              onGrab={(end, e) => onMarkupEndStart(pageNumber, selectedAnnot, end, e)}
+            />
+          ) : (
+            <SelectionFrame
+              record={selectedAnnot}
+              scale={scale}
+              pageW={pageW}
+              pageH={pageH}
+              rotation={rotation}
+              onResizeStart={(handle, e) => onResizeStart(pageNumber, selectedAnnot, handle, e)}
+            />
+          )}
+        </div>
+      )}
+      {/* What releasing the end would mark. Drawn in the mark's own colour so the
+          decision is about the text, not about a dashed rectangle. */}
+      {markupPreview.length > 0 && (
+        <div className="annot-overlay">
+          {markupPreview.map((r, i) => {
+            const v = pageRectToView(r, pageW, pageH, rotation)
+            return (
+              <div
+                key={i}
+                className="markup-edit-preview"
+                style={{
+                  left: v.x * scale,
+                  top: v.y * scale,
+                  width: v.w * scale,
+                  height: v.h * scale,
+                  background: rgbCss(selectedAnnot?.color ?? [0.2, 0.5, 0.9], 0.42)
+                }}
+              />
+            )
+          })}
         </div>
       )}
       <div className="text-host" ref={textRef} />
@@ -890,6 +937,45 @@ function SelectionFrame({
         </>
       )}
     </div>
+  )
+}
+
+/** The two knobs at the ends of a marked passage: drag one and the mark covers
+ *  more or less text, instead of having to erase it and mark again. Shaped like a
+ *  text-selection handle (a bar the height of the line, with a dot below/above)
+ *  because that is the gesture it borrows.
+ *
+ *  Unrotated only — its caller decides that; here page space IS view space. */
+function MarkupEndHandles({
+  record,
+  scale,
+  onGrab
+}: {
+  record: PageAnnotation
+  scale: number
+  onGrab(end: 'start' | 'end', e: React.PointerEvent): void
+}): React.JSX.Element | null {
+  const first = record.quads[0]
+  const last = record.quads[record.quads.length - 1]
+  if (!first || !last) return null
+  const grab = (end: 'start' | 'end') => (e: React.PointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    onGrab(end, e)
+  }
+  const knob = (end: 'start' | 'end', q: PageRect, x: number): React.JSX.Element => (
+    <span
+      key={end}
+      className={`markup-end markup-end-${end}`}
+      style={{ left: x * scale, top: q.y * scale, height: q.h * scale }}
+      onPointerDown={grab(end)}
+    />
+  )
+  return (
+    <>
+      {knob('start', first, first.x)}
+      {knob('end', last, last.x + last.w)}
+    </>
   )
 }
 

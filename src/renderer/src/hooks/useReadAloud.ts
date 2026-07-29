@@ -163,7 +163,7 @@ export function useReadAloud({
       const rects = resolveMatchRects(
         pageEl,
         texts[s.pageNumber - 1],
-        { pageNumber: s.pageNumber, start: s.start, end: s.end, snippet: '', snippetOffset: 0 },
+        { start: s.start, end: s.end },
         scaleRef.current
       )
       if (!rects || rects.length === 0) return

@@ -181,6 +181,13 @@ export type ShapeToolType = (typeof SHAPE_TOOL_TYPES)[number]
 export const MARKUP_TOOL_TYPES = ['highlight', 'underline', 'strikeout', 'squiggly'] as const
 export type MarkupToolType = (typeof MARKUP_TOOL_TYPES)[number]
 
+const MARKUP_TYPE_SET: ReadonlySet<string> = new Set(MARKUP_TOOL_TYPES)
+
+/** A mark ON TEXT (highlight, underline, strikeout, squiggly): its shape belongs
+ *  to the words under it, which is why it is edited by dragging its ends rather
+ *  than by resizing a box. */
+export const isTextMarkup = (a: PageAnnotation): boolean => MARKUP_TYPE_SET.has(a.type)
+
 export function rgbCss(rgb: [number, number, number], alpha: number): string {
   const [r, g, b] = rgb.map((v) => Math.round(v * 255))
   return `rgba(${r}, ${g}, ${b}, ${alpha})`

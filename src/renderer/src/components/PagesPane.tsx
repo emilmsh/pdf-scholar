@@ -99,6 +99,14 @@ interface Props {
     handle: ResizeHandle,
     e: React.PointerEvent
   ): void
+  onMarkupEndStart(
+    pageNumber: number,
+    record: PageAnnotation,
+    end: 'start' | 'end',
+    e: React.PointerEvent
+  ): void
+  /** Page -> rects a markup-end drag would commit, for THIS column */
+  markupPreview: ReadonlyMap<number, PageRect[]> | null
   onExternalLink(url: string): void
   /** Internal link followed inside THIS column. The viewer decides where it
    *  lands — by default the other column, so following a cross-reference never
@@ -141,6 +149,8 @@ export default function PagesPane({
   onShapeComplete,
   onPlaceText,
   onResizeStart,
+  onMarkupEndStart,
+  markupPreview,
   onExternalLink,
   onInternalLink,
   onHandle,
@@ -612,6 +622,8 @@ export default function PagesPane({
                   onShapeComplete={onShapeComplete}
                   onPlaceText={onPlaceText}
                   onResizeStart={onResizeStart}
+                  onMarkupEndStart={onMarkupEndStart}
+                  markupPreview={markupPreview?.get(pageNumber) ?? EMPTY_RECTS}
                 />
               )
             })}

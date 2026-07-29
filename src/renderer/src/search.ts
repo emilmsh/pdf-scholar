@@ -112,12 +112,16 @@ function matchSpans(pageEl: HTMLElement, pageText: PageText): NodeListOf<HTMLEle
   return spans.length === 0 || spans.length !== pageText.runs.length ? null : spans
 }
 
-/** One match's rects, measured against spans the caller already queried. */
+/** One character range's rects, measured against spans the caller already
+ *  queried. Takes a bare {start,end} rather than a SearchMatch: the extent of a
+ *  text markup is the same question asked by a different feature (dragging the
+ *  ends of a highlight, text-range.ts), and the measurement has no opinion about
+ *  which one is asking. */
 function rectsFromSpans(
   pageEl: HTMLElement,
   pageText: PageText,
   spans: NodeListOf<HTMLElement>,
-  match: SearchMatch,
+  match: { start: number; end: number },
   scale: number
 ): PageRect[] | null {
   const { runs } = pageText
@@ -145,7 +149,7 @@ function rectsFromSpans(
 export function resolveMatchRects(
   pageEl: HTMLElement,
   pageText: PageText,
-  match: SearchMatch,
+  match: { start: number; end: number },
   scale: number
 ): PageRect[] | null {
   const spans = matchSpans(pageEl, pageText)

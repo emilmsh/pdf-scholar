@@ -118,6 +118,8 @@ import {
 } from '../search'
 import { addSearchHistory, clearSearchHistory } from '../search-history'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
+import { offsetAtPoint, rangeOfQuads, snapToWords } from '../text-range'
+import type { CharRange } from '../text-range'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
 import type { ExportFormat } from './Sidebar'
 import { clamp } from '../clamp'
@@ -3077,7 +3079,7 @@ export default function PdfViewer({
     // A resize handle already took this gesture. Its pointerdown fires first and
     // stops there, but the compat mousedown still arrives here — without this the
     // same press would arm a MOVE as well, and the two would fight.
-    if (annotResizeRef.current) return
+    if (annotResizeRef.current || markupEditRef.current) return
     const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
     if (!pageEl) return
     const pageNumber = Number(pageEl.dataset.page)
@@ -3446,6 +3448,141 @@ export default function PdfViewer({
       window.removeEventListener('pointercancel', onCancel)
     }
   }, [active, resizeTarget, changeAnnotation])
+
+  // ---------- Dragging the ends of a text markup ----------
+  //
+  // A highlight one line too short used to mean erase and mark again: nothing in
+  // the file says which words a Highlight covers — it is a list of rectangles,
+  // and the text under them is only knowable through the rendered text layer.
+  // So the ends are edited in TEXT terms: read the covered range back off the
+  // page (text-range.ts), move one end to the offset under the cursor, snap to
+  // whole words, and re-measure the rects the way search measures a match.
+  //
+  // Unrotated only: the rects come out of the text layer in view space, and the
+  // view→page inverse for a rotated page is not worth building for this.
+
+  const markupEditRef = useRef<{
+    pageNumber: number
+    record: PageAnnotation
+    end: 'start' | 'end'
+    /** The range the mark covered when the drag began */
+    from: CharRange
+    pageEl: HTMLElement
+    scale: number
+    pane: PaneId
+    moved: boolean
+    /** Last range resolved, so the commit does not re-measure */
+    latest: { range: CharRange; rects: PageRect[] } | null
+  } | null>(null)
+  const [markupPreview, setMarkupPreview] = useState<{
+    pane: PaneId
+    byPage: ReadonlyMap<number, PageRect[]>
+  } | null>(null)
+
+  const onMarkupEndStart = useCallback(
+    (pageNumber: number, record: PageAnnotation, end: 'start' | 'end', e: React.PointerEvent) => {
+      const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+      if (!pageEl || !pdf) return
+      // The properties popover opens right under the mark it belongs to, which is
+      // exactly where the text you are extending onto lives. Get it out of the
+      // way for the duration of the drag (measured: it swallowed the pointer).
+      setAnnotPopover(null)
+      const scale = scaleOfPageElRef.current(pageEl)
+      const start = (texts: PageText[]): void => {
+        const pageText = texts[pageNumber - 1]
+        if (!pageText) return
+        const from = rangeOfQuads(pageEl, pageText, record.quads, scale)
+        // No range means the text layer is not there (or not in step): the drag
+        // simply never arms, and the mark stays exactly as it was.
+        if (!from) return
+        markupEditRef.current = {
+          pageNumber,
+          record,
+          end,
+          from,
+          pageEl,
+          scale,
+          pane: paneOfEl(pageEl),
+          moved: false,
+          latest: null
+        }
+      }
+      const cached = pageTextsRef.current
+      if (cached) start(cached)
+      else void buildPageTexts(pdf).then((texts) => {
+        pageTextsRef.current = texts
+        start(texts)
+      })
+    },
+    [pdf]
+  )
+
+  useEffect(() => {
+    if (!active) return
+    /** The range and rects this cursor position would commit */
+    const resolve = (
+      edit: NonNullable<typeof markupEditRef.current>,
+      clientX: number,
+      clientY: number
+    ): { range: CharRange; rects: PageRect[] } | null => {
+      const pageText = pageTextsRef.current?.[edit.pageNumber - 1]
+      if (!pageText) return null
+      const at = offsetAtPoint(edit.pageEl, pageText, clientX, clientY)
+      if (at === null) return null
+      // The end being dragged moves; the other one is the anchor. They may not
+      // cross: a mark has to keep covering at least one character.
+      const raw =
+        edit.end === 'start'
+          ? { start: Math.min(at, edit.from.end - 1), end: edit.from.end }
+          : { start: edit.from.start, end: Math.max(at, edit.from.start + 1) }
+      const range = snapToWords(pageText.text, raw)
+      const rects = resolveMatchRects(edit.pageEl, pageText, range, edit.scale)
+      return rects && rects.length > 0 ? { range, rects } : null
+    }
+    const onMove = (e: PointerEvent): void => {
+      const edit = markupEditRef.current
+      if (!edit) return
+      const next = resolve(edit, e.clientX, e.clientY)
+      if (!next) return
+      // Same words as last frame: nothing to redraw (word snapping means most
+      // pointer moves resolve to the range already shown).
+      if (
+        edit.latest &&
+        edit.latest.range.start === next.range.start &&
+        edit.latest.range.end === next.range.end
+      ) {
+        return
+      }
+      edit.moved = true
+      edit.latest = next
+      setMarkupPreview({ pane: edit.pane, byPage: new Map([[edit.pageNumber, next.rects]]) })
+    }
+    const onUp = (): void => {
+      const edit = markupEditRef.current
+      markupEditRef.current = null
+      if (!edit) return
+      setMarkupPreview(null)
+      const next = edit.latest
+      if (!edit.moved || !next) return
+      if (next.range.start === edit.from.start && next.range.end === edit.from.end) return
+      dragEndAtRef.current = performance.now()
+      setSelected({ pageNumber: edit.pageNumber, localId: edit.record.id })
+      changeAnnotation(edit.pageNumber, edit.record, { quads: next.rects })
+    }
+    const onCancel = (): void => {
+      if (!markupEditRef.current) return
+      markupEditRef.current = null
+      setMarkupPreview(null)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+    window.addEventListener('pointercancel', onCancel)
+    return () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      window.removeEventListener('pointercancel', onCancel)
+    }
+  }, [active, changeAnnotation])
 
   // ---------- Chrome / fullscreen / keyboard ----------
 
@@ -4161,7 +4298,7 @@ export default function PdfViewer({
       const rects = resolveMatchRects(
         pageEl,
         texts[resolved.pageNumber - 1],
-        { ...resolved, snippet: '', snippetOffset: 0 },
+        { start: resolved.start, end: resolved.end },
         handle.scale()
       )
       if (!rects || rects.length === 0) return
@@ -4816,6 +4953,11 @@ export default function PdfViewer({
                     onShapeComplete={onShapeComplete}
                     onPlaceText={onPlaceText}
                     onResizeStart={onResizeStart}
+                    onMarkupEndStart={onMarkupEndStart}
+                    markupPreview={
+                      (markupPreview?.pane === 'a' && markupPreview.byPage.get(pageNumber)) ||
+                      EMPTY_RECTS
+                    }
                   />
                 )
               })}
@@ -4874,6 +5016,8 @@ export default function PdfViewer({
               onShapeComplete={onShapeComplete}
               onPlaceText={onPlaceText}
               onResizeStart={onResizeStart}
+              onMarkupEndStart={onMarkupEndStart}
+              markupPreview={markupPreview?.pane === 'b' ? markupPreview.byPage : null}
               onExternalLink={onExternalLink}
               onInternalLink={onPaneBInternalLink}
               onHandle={(h) => {
