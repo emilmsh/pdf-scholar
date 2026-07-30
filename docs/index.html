@@ -1,0 +1,426 @@
+<!doctype html>
+<!--
+  PDF Scholar — landing page. Served by GitHub Pages from master /docs, so a
+  push to master publishes it. Deliberately zero-maintenance:
+
+    * The download button, version, file size and release date come from the
+      GitHub Releases API at load time (see the script at the bottom). Nothing
+      here names a version. The no-JS/API-down path still works: the button's
+      static href is /releases/latest, which GitHub redirects for us.
+    * Screenshots are the shipped ones in docs/screenshots/, referenced
+      relatively — reshooting them updates this page too.
+    * Only the non-beta platform is offered (Windows: installer + Microsoft
+      Store). macOS, Linux and the extension get one line in the footer
+      pointing at the releases page. When one of them graduates out of beta,
+      that is a deliberate edit, not upkeep.
+
+  Colours are the app's own tokens from src/renderer/src/styles/app.css —
+  the Day palette, with the Night palette under prefers-color-scheme: dark.
+  Keep them in sync by hand if the palette is retuned; nothing here derives
+  from the stylesheet at build time.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF Scholar — a Windows PDF reader built for reading</title>
+<meta name="description" content="A polished Windows PDF reader and annotator for the documents you work through rather than skim. Split view, real PDF annotations, four reading themes, and an optional AI assistant that cites the sentence it used. Free and MIT-licensed.">
+<meta name="theme-color" content="#f7f7f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="logo.png">
+<link rel="canonical" href="https://emilmsh.github.io/pdf-scholar/">
+
+<!-- Absolute URLs: LinkedIn, Slack and the like resolve og: tags off-site. -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://emilmsh.github.io/pdf-scholar/">
+<meta property="og:title" content="PDF Scholar — a Windows PDF reader built for reading">
+<meta property="og:description" content="For the documents you work through rather than skim. Split view, real PDF annotations, four reading themes, and an AI assistant that cites the sentence it used. Free and MIT-licensed.">
+<meta property="og:image" content="https://emilmsh.github.io/pdf-scholar/screenshots/reading.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<style>
+  /* The wordmark only, so it echoes the serif "S" in the logo (SIL OFL 1.1,
+     licence alongside the file). */
+  @font-face {
+    font-family: 'Libertinus Serif';
+    src: url('web/LibertinusSerif-Semibold.woff2') format('woff2');
+    font-weight: 600;
+    font-display: swap;
+  }
+
+  :root {
+    --bg-chrome: #f7f7f9;
+    --bg-canvas: #eeeef2;
+    --bg-elevated: #ffffff;
+    --border: rgba(0, 0, 0, 0.08);
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --accent: #2f6f7b;
+    --accent-text: #ffffff;
+    --hover: rgba(0, 0, 0, 0.055);
+    --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.12), 0 4px 14px rgba(0, 0, 0, 0.1);
+    --shadow-shot: 0 1px 2px rgba(0, 0, 0, 0.1), 0 12px 40px rgba(0, 0, 0, 0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg-chrome: #262624;
+      --bg-canvas: #1c1c1b;
+      --bg-elevated: #30302e;
+      --border: rgba(255, 255, 255, 0.1);
+      --text: #eeece2;
+      --text-secondary: #a4a29a;
+      --accent: #8aa6ae;
+      --accent-text: #14262b;
+      --hover: rgba(255, 255, 255, 0.07);
+      --shadow-shot: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg-canvas);
+    color: var(--text);
+    font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  main { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  a { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+  a:hover { text-decoration-color: var(--accent); }
+
+  img { max-width: 100%; height: auto; display: block; }
+
+  .shot {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-shot);
+    background: var(--bg-elevated);
+  }
+
+  /* ---------- header ---------- */
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 28px 24px 0;
+  }
+  header img { width: 34px; height: 34px; }
+  .wordmark {
+    font-family: 'Libertinus Serif', 'Palatino Linotype', Cambria, Georgia, serif;
+    font-weight: 600;
+    font-size: 24px;
+    letter-spacing: 0.01em;
+  }
+  header nav { margin-left: auto; font-size: 15px; }
+  header nav a { color: var(--text-secondary); text-decoration: none; }
+  header nav a:hover { color: var(--text); }
+
+  /* ---------- hero ---------- */
+
+  .hero { padding: 72px 0 8px; max-width: 640px; }
+  h1 {
+    font-size: clamp(32px, 5vw, 46px);
+    line-height: 1.18;
+    letter-spacing: -0.02em;
+    font-weight: 650;
+    margin: 0 0 20px;
+  }
+  .lede { font-size: 19px; color: var(--text-secondary); margin: 0 0 32px; }
+  .lede strong { color: var(--text); font-weight: 600; }
+
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 12px 22px;
+    border-radius: 9px;
+    font-size: 16px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: background-color 120ms ease, border-color 120ms ease;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-text); }
+  .btn-primary:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
+  .btn-secondary { background: var(--bg-elevated); color: var(--text); border-color: var(--border); }
+  .btn-secondary:hover { background: var(--hover); }
+  .btn svg { width: 17px; height: 17px; flex: none; }
+
+  .dl-meta { margin: 16px 0 0; font-size: 14.5px; color: var(--text-secondary); }
+  .dl-meta .sep { opacity: 0.45; margin: 0 7px; }
+
+  .hero-shot { margin: 52px 0 0; }
+
+  /* ---------- feature sections ---------- */
+
+  section.feature { padding: 96px 0 0; }
+  section.feature h2 {
+    font-size: 27px;
+    letter-spacing: -0.01em;
+    font-weight: 650;
+    margin: 0 0 14px;
+  }
+  section.feature .body { max-width: 640px; }
+  section.feature p { margin: 0 0 16px; }
+  section.feature img { margin-top: 32px; }
+
+  ul.points { margin: 0; padding: 0; list-style: none; }
+  ul.points li { position: relative; padding-left: 20px; margin-bottom: 9px; }
+  ul.points li::before {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 0.62em;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  ul.points b { font-weight: 600; }
+
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 32px; }
+  @media (max-width: 720px) { .pair { grid-template-columns: 1fr; } }
+
+  /* ---------- privacy note ---------- */
+
+  .note {
+    margin: 96px 0 0;
+    padding: 28px 32px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .note h2 { font-size: 20px; margin: 0 0 12px; font-weight: 650; }
+  .note p { margin: 0 0 12px; max-width: 700px; }
+  .note p:last-child { margin-bottom: 0; }
+
+  /* ---------- closing download ---------- */
+
+  .closing { padding: 96px 0 0; text-align: center; }
+  .closing h2 { font-size: 27px; font-weight: 650; margin: 0 0 22px; letter-spacing: -0.01em; }
+  .closing .actions { justify-content: center; }
+
+  /* ---------- footer ---------- */
+
+  footer {
+    margin-top: 88px;
+    border-top: 1px solid var(--border);
+    padding: 32px 24px 56px;
+    font-size: 14.5px;
+    color: var(--text-secondary);
+  }
+  footer .inner { max-width: 1080px; margin: 0 auto; }
+  footer p { margin: 0 0 10px; max-width: 720px; }
+  footer p:last-child { margin-bottom: 0; }
+</style>
+</head>
+
+<header>
+  <img src="logo.png" alt="" width="34" height="34">
+  <span class="wordmark">PDF Scholar</span>
+  <nav><a href="https://github.com/emilmsh/pdf-scholar">GitHub</a></nav>
+</header>
+
+<main>
+
+  <div class="hero">
+    <h1>A Windows PDF reader built for reading.</h1>
+    <p class="lede">
+      For the documents you work through rather than skim: research articles, reports,
+      books. The window is nearly all page — one slim toolbar carries the tools you use
+      every hour, and everything else stays out of the way until you call it.
+      <strong>Free, MIT-licensed, and offline unless you ask a question.</strong>
+    </p>
+
+    <div class="actions">
+      <!-- href is the permanent GitHub redirect; the script below swaps in the
+           exact installer asset once the API answers. -->
+      <a class="btn btn-primary" id="dl" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></svg>
+        Download for Windows
+      </a>
+      <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.5 2.1 1 3v4.5h6.5V2.1Zm1 -.14V7.5H15V1l-6.5.96ZM1 8.5V13l6.5.9V8.5H1Zm7.5 0v5.54L15 15V8.5H8.5Z"/></svg>
+        Microsoft Store
+      </a>
+    </div>
+
+    <p class="dl-meta" id="dl-meta">Windows 10 and 11 <span class="sep">·</span> x64 and arm64 in one installer <span class="sep">·</span> no admin rights needed</p>
+  </div>
+
+  <img class="shot hero-shot" src="screenshots/reading.png" alt="PDF Scholar showing a research paper: a slim toolbar above a page that fills the window.">
+
+  <section class="feature">
+    <div class="body">
+      <h2>Two pages at once</h2>
+      <p>
+        Every paper eventually asks you to hold two pages in your head at the same time —
+        the argument on one, the table it rests on somewhere else. Press <b>S</b> and you
+        get both.
+      </p>
+      <ul class="points">
+        <li>Two columns of the <b>same document</b>, each with its own page, zoom and rotation, so a landscape table can sit upright beside portrait text.</li>
+        <li><b>Ctrl+click an internal link</b> to open its target in the other column and keep the page you are on.</li>
+        <li>Toggling the split away and back returns the column exactly as you left it — page, spot on the page, zoom and width.</li>
+      </ul>
+    </div>
+    <img class="shot" src="screenshots/dual-pane.png" alt="The same paper in two columns, each showing a different page.">
+  </section>
+
+  <section class="feature">
+    <div class="body">
+      <h2>Marks that survive the file</h2>
+      <p>
+        Highlight, underline, pen, shapes, sticky notes and free text — written as
+        <b>real PDF annotations with appearance streams</b>, so they open correctly in
+        Acrobat, SumatraPDF and anywhere else the file goes.
+      </p>
+      <ul class="points">
+        <li>Colour, thickness and opacity <b>per tool</b>, remembered between sessions.</li>
+        <li>A mark can be corrected rather than redrawn: drag either end of a highlight and it snaps to whole words, or a corner of a shape to resize it.</li>
+        <li><b>The file is only written when you save it.</b> Edits go to a draft until you press Ctrl+S, and unsaved work survives a crash.</li>
+        <li>A notes tab lists every annotation by page, and exports a summary — highlighted text included — to Word, Markdown, HTML or plain text.</li>
+      </ul>
+    </div>
+    <img class="shot" src="screenshots/annotations.png" alt="A highlight, an underline, a box around a paragraph and a sticky note on one page, the highlight selected with the knobs that drag its ends.">
+  </section>
+
+  <section class="feature">
+    <div class="body">
+      <h2>An assistant that shows its work</h2>
+      <p>
+        Optional, and it runs on your own API key. Every claim it makes carries a source
+        chip — click one and you land on the sentence the claim came from, so you can
+        check the answer rather than take it on trust.
+      </p>
+      <ul class="points">
+        <li>Ask about a dense passage, or for a structured summary: research question, method, data, findings, limitations.</li>
+        <li><b>Explain a figure:</b> drag a box around a chart or table and the region lands in the chat for you to ask about.</li>
+        <li>Search by meaning — describe a topic in your own words and get the passages that discuss it, ranked and clickable.</li>
+        <li>Ask about your own marks: <i>“summarize what I've highlighted.”</i></li>
+        <li>Anthropic, OpenAI or Azure OpenAI. Each answer shows the tokens the provider counted, so the cost stays visible.</li>
+      </ul>
+    </div>
+    <img class="shot" src="screenshots/assistant.png" alt="The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip.">
+  </section>
+
+  <section class="feature">
+    <div class="body">
+      <h2>A page you can stand to look at all day</h2>
+      <p>
+        Four reading themes — Day, Sepia on warm ivory, and two dark modes, the second
+        with higher contrast — plus Auto, which follows Windows. Contrast and brightness
+        are adjustable within each. The interface is available in Norwegian and English.
+      </p>
+    </div>
+    <div class="pair">
+      <img class="shot" src="screenshots/parchment.png" alt="Sepia theme: the page on warm ivory paper.">
+      <img class="shot" src="screenshots/night.png" alt="Night theme: light text on a near-black page.">
+    </div>
+  </section>
+
+  <div class="note">
+    <h2>Where your document goes</h2>
+    <p>
+      Nowhere, unless you ask a question. Reading, annotating and saving are entirely
+      local, and the app works with no network at all.
+    </p>
+    <p>
+      When you do use the assistant, the request goes <b>straight to the provider you
+      picked</b> — there is no server of ours in between. Your API key is kept in the
+      platform's own key store: DPAPI on Windows, Keychain on macOS, the system keyring
+      on Linux.
+      <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md">The
+      privacy notes</a> have the per-platform detail.
+    </p>
+  </div>
+
+  <div class="closing">
+    <h2>Get it</h2>
+    <div class="actions">
+      <a class="btn btn-primary" id="dl2" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></svg>
+        Download for Windows
+      </a>
+      <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">Microsoft Store</a>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <div class="inner">
+    <p>
+      <b>macOS, Linux and a browser extension</b> that puts the same reader inside
+      Edge or Chrome are in beta — they are on the
+      <a href="https://github.com/emilmsh/pdf-scholar/releases/latest">releases page</a>,
+      with what each platform supports today in
+      <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PLATFORMS.md">the
+      platform notes</a>.
+    </p>
+    <p>
+      Built by <a href="https://emilmsh.github.io/">Emil M. S. Halseth</a>, who reads PDFs
+      for a living. Source, issues and the road ahead on
+      <a href="https://github.com/emilmsh/pdf-scholar">GitHub</a> —
+      <a href="https://github.com/emilmsh/pdf-scholar/blob/master/LICENSE">MIT-licensed</a>,
+      rendering by pdf.js, annotations written by PDFium. Logo by Elisabeth Walle.
+    </p>
+  </div>
+</footer>
+
+<script>
+  // Fill the download button in from the newest published release. Everything
+  // this touches already reads correctly without it, so a rate-limited or
+  // blocked API leaves a working page rather than a broken one — the static
+  // href is /releases/latest, which lands on the same assets one click later.
+  (async () => {
+    const REPO = 'emilmsh/pdf-scholar';
+    try {
+      const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+      if (!res.ok) return;
+      const rel = await res.json();
+
+      // Asset-name contract, kept by .github/workflows/release.yml:
+      // PDF-Scholar-Setup-<version>.exe is the universal x64+arm64 installer.
+      const exe = (rel.assets || []).find(
+        (a) => /^PDF-Scholar-Setup-.*\.exe$/.test(a.name)
+      );
+      if (!exe) return;
+
+      for (const id of ['dl', 'dl2']) {
+        const el = document.getElementById(id);
+        if (el) el.href = exe.browser_download_url;
+      }
+
+      const version = String(rel.tag_name || '').replace(/^v/, '');
+      const mb = Math.round(exe.size / 1048576);
+      const date = new Date(rel.published_at).toLocaleDateString('en-GB', {
+        day: 'numeric', month: 'long', year: 'numeric',
+      });
+
+      const meta = document.getElementById('dl-meta');
+      if (meta) {
+        const sep = '<span class="sep">·</span>';
+        meta.innerHTML =
+          `Version ${version}, released ${date} ${sep} ${mb} MB ${sep} ` +
+          `Windows 10 and 11, x64 and arm64 in one installer ${sep} no admin rights needed`;
+      }
+    } catch {
+      /* offline, blocked or rate-limited — the static markup stands. */
+    }
+  })();
+</script>
+</html>
