@@ -1,0 +1,52 @@
+# Opens a monthly issue nudging the store channels (Microsoft Store, Edge
+# Add-ons, Chrome Web Store). GitHub releases ship continuously; the stores
+# move only on a "full release" — see docs/RELEASE.md for the vocabulary and
+# the steps the issue links to.
+#
+# Note: GitHub suspends scheduled workflows after ~60 days without repo
+# activity (it emails first). If a long development pause is planned, expect
+# to re-enable this from the Actions tab afterwards.
+
+name: Full-release reminder
+
+on:
+  schedule:
+    - cron: '0 7 1 * *' # 09:00 Oslo time on the 1st; bi-weekly would be '0 7 1,15 * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open the reminder issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BODY: |
+            Monthly nudge: GitHub ships continuously, but the stores only move on a **full release** ([docs/RELEASE.md](https://github.com/emilmsh/pdf-scholar/blob/master/docs/RELEASE.md), steps 4–5). If the releases since the last store push are worth batching out:
+
+            - [ ] **Dashboards first** — a submission still in review blocks a new push: [Partner Center (MS Store)](https://partner.microsoft.com/dashboard) · [Edge Add-ons](https://partner.microsoft.com/dashboard/microsoftedge/) · [Chrome Web Store](https://chrome.google.com/webstore/devconsole)
+            - [ ] `npm run check:shots` — re-shoot what recent releases made stale (step 0), and update the "What's new" block in `docs/STORE-LISTING-DESKTOP.md`
+            - [ ] GitHub release current? (steps 1–3)
+            - [ ] Microsoft Store: `gh workflow run store-publish.yml -f check_only=true`, review the diff, then run it for real (step 4)
+            - [ ] Edge + Chrome: run the **Extension publish** workflow (step 5). A 401 from Edge means the API key expired — renew it in Partner Center, the script is fine
+            - [ ] Screenshots changed? They never sync via API — upload by hand in each dashboard (`docs/store-screenshots/`, `docs/store-assets/`)
+
+            Nothing worth shipping this month? Close me.
+        run: |
+          gh label create full-release-reminder --repo "$REPO" \
+            --color FBCA04 --description "Monthly nudge to batch a full release to the stores" --force
+
+          open_count=$(gh issue list --repo "$REPO" --label full-release-reminder \
+            --state open --json number --jq length)
+          if [ "$open_count" != "0" ]; then
+            echo "An open reminder already exists - not filing another."
+            exit 0
+          fi
+
+          gh issue create --repo "$REPO" --label full-release-reminder \
+            --title "Full release — $(date -u '+%B %Y')" \
+            --body "$BODY"

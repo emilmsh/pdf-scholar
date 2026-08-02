@@ -10,7 +10,9 @@ the store channels: steps 4–5 (Microsoft Store, then the extension stores). Th
 distinction exists because the store channels routinely have submissions still
 sitting in review, and a new push there while one is pending is at best queued
 and at worst a conflict — so the stores are only touched on an explicit "full
-release" from Emil.
+release" from Emil. A monthly reminder issue
+(`.github/workflows/release-reminder.yml`, the 1st of each month) nudges that
+batch so the stores never silently fall a season behind.
 
 ## 0. Screenshots — by hand, Emil
 
