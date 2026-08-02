@@ -155,6 +155,18 @@ for (const doc of ['README.md', 'docs/index.html']) {
     }
   }
 }
+// And the reverse: a ships claim the document never honours. shots.json said
+// reading_tabs shipped to the README while the README had no such image — the
+// file existing in docs/screenshots/ is not the same as anything showing it.
+const SURFACE_DOC = { readme: 'README.md', landing: 'docs/index.html' }
+for (const [surface, doc] of Object.entries(SURFACE_DOC)) {
+  const text = readFileSync(resolve(ROOT, doc), 'utf8')
+  for (const [name, spec] of Object.entries(MAP.frames)) {
+    if (spec.ships.includes(surface) && !text.includes(`screenshots/${name}.png`)) {
+      drift.push(`${doc} never shows screenshots/${name}.png — shots.json says it ships there`)
+    }
+  }
+}
 if (drift.length) {
   console.log(`Coverage (scripts/lib/shots.json): ${drift.length} problem(s)`)
   for (const d of drift) console.log(`  ${d}`)

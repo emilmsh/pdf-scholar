@@ -98,14 +98,15 @@ block of bullets, the README the full account.
 
 - Smooth scrolling and pinch zoom that stays where you release it; fit width or
   whole page; the opening zoom follows the file's own setting, as Acrobat does
-- Four themes — Day, Sepia on warm ivory, Night and Night+ — plus Auto, which
-  follows Windows. Contrast and brightness adjustable within each
+- Four themes — Day, Sepia on warm ivory (the tone matches Apple Books), Night
+  and Night+ — plus Auto, which follows Windows. Contrast and brightness
+  adjustable within each
 - Rotate pages, two-page spread, full-screen presentation mode
 - Unpin the toolbar and it hides; hover an edge to bring back the toolbar, the
   contents or the assistant
 - Contents, thumbnails, bookmarks, and back/forward after following a
-  cross-reference — the difference between reading a paper and losing your place
-  in one
+  cross-reference (the mouse side-buttons work too) — the difference between
+  reading a paper and losing your place in one
 - Remembers reading positions and recent files; tabs and multiple windows, and a
   tab can be dragged out into its own window
 - Interface in Norwegian and English, which also sets the AI prompts, exports and
@@ -163,6 +164,8 @@ fargefilter, og ett klikk tar deg dit.
   Markdown, HTML or plain text
 - The file is only written when you save it: edits go to a draft, closing
   prompts, and unsaved work survives a crash
+- A save guard warns before overwriting a file another program has changed, and
+  "save a copy" continues in the copy
 - *Supporting, never the headline:* the marks are standard PDF annotations with
   appearance streams, so the file reads the same in Acrobat or anywhere else it
   goes
@@ -184,6 +187,9 @@ fargefilter, og ett klikk tar deg dit.
 - Ask about your own marks: "summarize what I've highlighted"
 - Scanned documents are named as such rather than answered about blindly; attach
   a page range as images and the assistant reads those
+- Optional web search, off by default: closed, on request, or always on
+  (Anthropic and OpenAI; Azure ignores it)
+- LaTeX/TeX renders properly in answers, so maths stays readable
 - Anthropic, OpenAI or Azure OpenAI, one model list across the three. Each
   answer shows the tokens the provider counted, so the cost stays visible
 

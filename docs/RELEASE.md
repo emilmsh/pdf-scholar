@@ -51,14 +51,12 @@ surface missing one it needs.
 | `tricolor` (composed) | ✓ | ✓ | 1 |
 | `reading` | hero | hero + `og:image` | — |
 | `annotations` | ✓ | ✓ | 2 |
-| `annotations_edit` | ✓ | — | — |
 | `assistant` | ✓ | ✓ | 3 |
 | `assistant_figure` | ✓ | — | 4 |
 | `assistant_snip` | ✓ | — | — |
 | `dual-pane` | ✓ | ✓ | 5 |
-| `reading_tabs` | ✓ | — | — |
 | `parchment`, `night` | — | — | — (tricolor's sources) |
-| `night+` | — | — | — |
+| `night+`, `annotations_edit`, `reading_tabs` | — | — | — (shot as smoke tests) |
 
 Shoot everything in one run when you re-shoot anything: the frames share a
 session, and a set mixed across runs shows the app at two different moments.

@@ -2,7 +2,7 @@
 
 A polished, native-feeling Windows PDF reader and annotator. Owner: Emil (communicates in Norwegian — respond in Norwegian). Product spec: `docs/SPEC.md`. Phased plan + architecture decisions: `docs/ROADMAP.md`. **Platform tiers + parity contract: `docs/PLATFORMS.md`** — Windows x64 is the reference; win-arm64/macOS/Linux and the extension are held to it, and any cross-platform divergence must be listed there. **Product copy: `docs/MESSAGING.md`** — the master for every user-facing claim; the README, `docs/index.html`, `docs/STORE-LISTING-DESKTOP.md` and `docs/STORE-LISTING.md` are renderings of it. Change a claim there first, never in one listing alone. **Release checklist: `docs/RELEASE.md`** — follow it for any release or large push. CI (`.github/workflows/ci.yml`) builds all three OSes on every push.
 
-**What ships is Emil's call.** Before a release or a big push, run `npm run check:shots`, then `npm run shoot` (keyless, English, all ten shots) and ask him which frames to ship — `shoot` writes to the gitignored `docs/screenshots/_auto/` and cannot overwrite the shipped set without `--out`. Cover shots must show the paper's title, authors and abstract, never the arXiv reproduction notice.
+**What ships is Emil's call.** Before a release or a big push, run `npm run check:shots`, then `npm run shoot` (keyless, English, every shot) and ask him which frames to ship — `shoot` writes to the gitignored `docs/screenshots/_auto/` and cannot overwrite the shipped set without `--out`. Cover shots must show the paper's title, authors and abstract, never the arXiv reproduction notice.
 
 ## Commands
 - `npm run dev` — full Electron app with HMR

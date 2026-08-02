@@ -206,9 +206,6 @@ clutter the page while you read.
 - Selected marks can be adjusted rather than redrawn: drag either end of a highlight to
   cover more or less text (it snaps to whole words), or a corner of a shape, text box or
   drawing to resize it
-
-![The same page with the menu gone and a highlight selected instead — a knob at each end, ready to drag](docs/screenshots/annotations_edit.png)
-
 - Comment and note bubbles can be dragged **and resized** — pull the corner for a long
   note, double-click the grip to restore the default size
 - **The selection menu drags aside too**, by the grip along its top: it is the tallest
@@ -254,6 +251,8 @@ the answer rather than take it on trust.
   assistant says so instead of answering about nothing. Pick a page range and those pages
   are attached as images for it to read — the chip names which ones, and it is told it can
   see only those
+- **Optional web search**, off by default: closed, on request, or always on (Anthropic
+  and OpenAI keys). LaTeX in answers renders properly, so maths stays readable
 - Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
   model list across all three, with per-model reasoning-effort control. Your key goes to
   the provider you picked and nowhere else — there is no server of ours in between — and
@@ -261,6 +260,10 @@ the answer rather than take it on trust.
 - **Cost stays visible**: each answer shows the tokens the provider counted, and the key
   settings link straight to your provider's console, where you set a spending cap and see
   what you have spent
+
+![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
+
+![Explain a figure — the region you marked sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
 
 **Where your key is kept**
 
@@ -271,10 +274,6 @@ out instead. The settings panel names the case that applies on your machine, and
 [docs/PRIVACY.md](docs/PRIVACY.md) has the per-platform detail. A spending cap in the
 provider's console is worth setting either way: no local storage can stop a program that
 is already running as you from asking for the key to be decrypted.
-
-![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
-
-![Explain a figure — the region you marked sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
 
 ## Development
 

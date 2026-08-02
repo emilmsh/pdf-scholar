@@ -244,4 +244,5 @@ AI-assistenten er valgfri og krever din egen tredjeparts API-nøkkel (Anthropic,
 1280×800 PNGs live in `docs/store-screenshots/`, and the captioned set in
 `docs/STORE-LISTING.md` applies to the desktop listing too: themes, annotation,
 assistant, snip-a-figure, split view. Which frame goes to which surface is
-listed once in `docs/RELEASE.md`. Store icon: `build/icon.png` (512×512).
+listed once in `scripts/lib/shots.json` (rendered as a table in
+`docs/RELEASE.md`). Store icon: `build/icon.png` (512×512).

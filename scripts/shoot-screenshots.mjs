@@ -95,9 +95,9 @@ const SHOTS = [
     `
   },
   {
-    // Historical name, kept so the file path stays stable for anything linking
-    // it; the shot is the outline sidebar (nothing references it in the README
-    // today — it is used in the store listings).
+    // Historical name, kept so the shot name stays stable; the shot is the
+    // outline sidebar. It ships nowhere today (scripts/lib/shots.json) and is
+    // kept as a smoke test of the sidebar.
     name: 'reading_tabs',
     caption: 'Outline sidebar open beside the page',
     setup: `
@@ -169,10 +169,10 @@ const SHOTS = [
   },
   {
     // The same page as `annotations`, framed on the other half of the story: a
-    // mark already made, selected, with the knobs that drag its ends. Kept as
-    // its own frame because the two states are mutually exclusive on screen —
-    // selecting text to open the menu drops the selected mark — and which one
-    // tells the better story is a judgement call made when picking frames.
+    // mark already made, selected, with the knobs that drag its ends. The two
+    // states are mutually exclusive on screen — selecting text to open the menu
+    // drops the selected mark. `annotations` (the menu) is the frame that ships;
+    // this one ships nowhere and stays as a smoke test of mark selection.
     name: 'annotations_edit',
     caption: 'A mark selected, with the knobs that drag its ends',
     setup: `
