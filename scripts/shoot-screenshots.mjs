@@ -144,10 +144,12 @@ const SHOTS = [
     // The shot carries the claim the annotation tools are sold on: they are
     // within reach without getting in the way. So it needs BOTH halves — marks
     // of several kinds already sitting on the page, and the menu that appears
-    // where you selected text, which is how they got there. An earlier version
-    // showed the menu and let it cover the marks; openSelectionMenu now searches
-    // for a sentence whose menu clears them, and fails rather than shoot a frame
-    // where the tools hide their own output.
+    // where you selected text, which is how they got there. One version let the
+    // menu cover the marks; the next overcorrected and parked it in the far
+    // margin, where it no longer looked like it belonged to the selection.
+    // openSelectionMenu now nudges it just far enough aside that the marks stay
+    // mostly visible, keeps it beside the selection, and fails rather than
+    // shoot a frame where the tools hide their own output.
     name: 'annotations',
     caption: 'Marks of several kinds on the page, and the menu that makes the next one',
     setup: `
@@ -158,7 +160,9 @@ const SHOTS = [
       ui.expectPage(0, 2)
       await ui.highlightSomeText()
       await ui.drawRectangleAround('Attention mechanisms have become')
-      await ui.placeNote('Same claim as Bahdanau (2015) — check the setup')
+      // Note bubble in the LEFT margin: the menu parks on the right, and the
+      // two of them in the same margin would stack.
+      await ui.placeNote('Same claim as Bahdanau (2015) — check the setup', 0.08, 0.3)
       await ui.openSelectionMenu()
       await ui.settle(400)
     `
@@ -722,11 +726,13 @@ const ui = {
    *  between them.
    *
    *  So the shot uses the menu's own drag handle, which is what a reader would
-   *  do: open it, then pull it into the margin. The target is searched for
-   *  rather than hard-coded (the one clear parking space is the left margin, and
-   *  it is 246px wide against a 247px menu — a fixed offset would go stale the
-   *  moment the zoom, the document or the menu's height changed), and the drag
-   *  is asserted: if the menu is still covering a mark afterwards, no picture. */
+   *  do: open it, then nudge it aside. Aside, not away: fully clear of every
+   *  mark means the far margin, where the menu stops looking like it belongs
+   *  to the selection. The parking search instead keeps it at the selection's
+   *  right end and accepts covering a sliver of a mark, as long as every mark
+   *  stays mostly visible. Searched, not hard-coded — a fixed offset would go
+   *  stale the moment the zoom, the document or the menu's height changed —
+   *  and asserted: if a mark ends up mostly hidden, no picture. */
   async openSelectionMenu() {
     const pages = document.querySelector('.pages[data-pane="a"]');
     const box = pages.getBoundingClientRect();
@@ -760,28 +766,37 @@ const ui = {
     sel.removeAllRanges();
     sel.addRange(range);
     await settle(200);
+    // Release at the END of the selection — where a left-to-right drag ends,
+    // and the point the parked menu should visibly hang from.
+    const anchor = { x: Math.round(r.right - 4), y: Math.round(r.bottom) };
     pages.dispatchEvent(new MouseEvent('mouseup', {
-      bubbles: true, button: 0,
-      clientX: Math.round(r.left + r.width * 0.6), clientY: Math.round(r.bottom)
+      bubbles: true, button: 0, clientX: anchor.x, clientY: anchor.y
     }));
     await settle(500);
     const menu = document.querySelector('.selection-menu');
     if (!menu) throw new Error('the selection menu did not open');
-    await this.parkMenuClearOfMarks(menu, marks, toolbar);
+    await this.parkMenuBySelection(menu, marks, toolbar, r, anchor);
   },
-  /** Drag a popup to somewhere it covers no mark, by its own grip — the gesture
-   *  a reader uses, so the frame stays a picture of the real app. */
-  async parkMenuClearOfMarks(menu, marks, toolbar) {
+  /** Drag the menu aside by its own grip — the gesture a reader uses, so the
+   *  frame stays a picture of the real app. Two masters, weighed rather than
+   *  one obeyed: the menu must stay where it plausibly opened (hanging off the
+   *  end of the selection), and the marks must stay legible. Demanding zero
+   *  coverage serves the second master only — the search then teleports the
+   *  menu to the far margin, orphaned from its selection. So partial cover is
+   *  allowed, bounded: every mark keeps at least ~two thirds of itself. */
+  async parkMenuBySelection(menu, marks, toolbar, selRect, anchor) {
     const grip = menu.querySelector('.menu-grip');
     if (!grip) throw new Error('the selection menu has no drag grip');
-    // Gap to the nearest mark, negative when they overlap. Maximised rather
-    // than merely satisfied: on the house document the menu is 247px wide and
-    // the page's left margin is 246, so the best available frame has the menu
-    // a hair from the text — asking for a fixed 8px of air finds nothing at all.
-    const gap = (rect) => Math.min(Infinity, ...marks.map((k) => Math.max(
-      k.left - rect.right, rect.left - k.right, k.top - rect.bottom, rect.top - k.bottom
-    )));
-    const clear = (rect) => gap(rect) >= 2;
+    const overlap = (a, b) =>
+      Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+      Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const area = (k) => Math.max(1, (k.right - k.left) * (k.bottom - k.top));
+    // The worst-covered mark's covered share, 0..1. The limit is per mark, not
+    // summed: hiding one mark entirely is not redeemed by leaving three alone.
+    const worstCover = (rect) => Math.max(...marks.map((k) => overlap(rect, k) / area(k)));
+    // The selection itself stays fully visible — a menu on top of the text it
+    // acts on is the muddle this whole dance exists to avoid.
+    const okay = (rect) => worstCover(rect) <= 0.34 && overlap(rect, selRect) === 0;
 
     const m = menu.getBoundingClientRect();
     const minX = 8, maxX = window.innerWidth - m.width - 8;
@@ -790,19 +805,25 @@ const ui = {
       throw new Error('the menu (' + Math.round(m.width) + 'x' + Math.round(m.height) +
         ') does not fit the window below the toolbar');
     }
-    // The roomiest clear spot, tie-broken towards where the menu already is so
-    // the drag reads as a nudge rather than a teleport.
+    // Nearest acceptable spot to the anchor: distance to the selection's end
+    // dominates, residual coverage breaks ties. dist/40 vs cover*10 means a
+    // fully clear spot is worth at most ~140px of extra distance — enough to
+    // step off a sliver, not enough to flee to the margin.
+    const distTo = (rect) => Math.hypot(
+      Math.max(rect.left - anchor.x, anchor.x - rect.right, 0),
+      Math.max(rect.top - anchor.y, anchor.y - rect.bottom, 0)
+    );
     let target = null, bestScore = -Infinity;
     for (let x = minX; x <= maxX; x += 6) {
       for (let y = minY; y <= maxY; y += 6) {
         const rect = { left: x, top: y, right: x + m.width, bottom: y + m.height };
-        if (!clear(rect)) continue;
-        const score = Math.min(gap(rect), 40) - Math.hypot(x - m.left, y - m.top) / 400;
+        if (!okay(rect)) continue;
+        const score = -distTo(rect) / 40 - worstCover(rect) * 10;
         if (score > bestScore) { bestScore = score; target = { x, y }; }
       }
     }
     if (!target) {
-      throw new Error('nowhere to park the menu clear of the marks. Menu ' +
+      throw new Error('nowhere to park the menu near the selection. Menu ' +
         Math.round(m.width) + 'x' + Math.round(m.height) + ', window ' +
         window.innerWidth + 'x' + window.innerHeight + ', marks at ' +
         marks.map((k) => Math.round(k.top) + '-' + Math.round(k.bottom) + '/' +
@@ -837,10 +858,11 @@ const ui = {
     await settle(350);
 
     const after = menu.getBoundingClientRect();
-    if (!clear(after)) {
-      throw new Error('the menu is still covering a mark after the drag: it sits at ' +
+    if (!okay(after)) {
+      throw new Error('a mark is mostly hidden after the drag: the menu sits at ' +
         Math.round(after.left) + ',' + Math.round(after.top) + ' and was aimed at ' +
-        target.x + ',' + target.y);
+        target.x + ',' + target.y + ' (worst cover ' +
+        Math.round(worstCover(after) * 100) + '%)');
     }
     if (window.getSelection()?.isCollapsed !== false) {
       throw new Error('dragging the menu dropped the text selection');
