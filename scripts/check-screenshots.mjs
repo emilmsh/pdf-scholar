@@ -17,7 +17,7 @@
 // cannot know whether a renderer commit actually changed anything visible. Read
 // what it says, then decide.
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -119,7 +119,49 @@ for (const set of SETS) {
   console.log('')
 }
 
-if (stale) {
+// Coverage, which is a different question from freshness: does every surface
+// have the frames it is supposed to have, and does every shipped file still
+// have a reader? Both have gone wrong — a new shot sat unused for a release,
+// and three frames were deleted while the README still pointed at them.
+const MAP = JSON.parse(readFileSync(resolve(ROOT, 'scripts/lib/shots.json'), 'utf8'))
+const SURFACE_DIR = { readme: 'docs/screenshots', store: 'docs/store-screenshots' }
+const drift = []
+for (const [name, spec] of Object.entries(MAP.frames)) {
+  for (const surface of spec.ships) {
+    const dir = SURFACE_DIR[surface]
+    if (!dir) continue // landing reads the readme set's files, checked below
+    if (!existsSync(resolve(ROOT, dir, `${name}.png`))) {
+      drift.push(`${dir}/${name}.png is missing — shots.json says it ships there`)
+    }
+  }
+}
+for (const [surface, dir] of Object.entries(SURFACE_DIR)) {
+  if (!existsSync(resolve(ROOT, dir))) continue
+  // filesIn is git ls-files, so this is about committed strays — a frame nobody
+  // reads that is nonetheless in the repo. An uncommitted one is not shipped yet.
+  for (const file of filesIn(dir)) {
+    const name = file.split('/').pop().replace(/\.png$/, '')
+    if (!MAP.frames[name]?.ships.includes(surface)) {
+      drift.push(`${file} ships to nobody — add it to shots.json or delete it`)
+    }
+  }
+}
+// A reference with no file behind it: the failure that survives a delete.
+for (const doc of ['README.md', 'docs/index.html']) {
+  const text = readFileSync(resolve(ROOT, doc), 'utf8')
+  for (const m of text.matchAll(/(?:docs\/)?screenshots\/([\w+-]+\.png)/g)) {
+    if (!existsSync(resolve(ROOT, 'docs/screenshots', m[1]))) {
+      drift.push(`${doc} points at screenshots/${m[1]}, which does not exist`)
+    }
+  }
+}
+if (drift.length) {
+  console.log(`Coverage (scripts/lib/shots.json): ${drift.length} problem(s)`)
+  for (const d of drift) console.log(`  ${d}`)
+  console.log('')
+}
+
+if (stale || drift.length) {
   // The point is not the verdict, it is this list: what visibly changed since.
   // Only a human can say whether any of it shows up in a screenshot.
   const oldest = allDates.length ? allDates.sort()[0] : null

@@ -241,6 +241,7 @@ AI-assistenten er valgfri og krever din egen tredjeparts API-nøkkel (Anthropic,
 `Emil Mathias Strøm Halseth`
 
 ## Screenshots
-1280×800 PNGs live in `docs/store-screenshots/` (see `docs/STORE-LISTING.md` for
-the captioned set — the reading / annotation / assistant / sepia / night shots
-apply to the desktop listing too). Store icon: `build/icon.png` (512×512).
+1280×800 PNGs live in `docs/store-screenshots/`, and the captioned set in
+`docs/STORE-LISTING.md` applies to the desktop listing too: themes, annotation,
+assistant, snip-a-figure, split view. Which frame goes to which surface is
+listed once in `docs/RELEASE.md`. Store icon: `build/icon.png` (512×512).

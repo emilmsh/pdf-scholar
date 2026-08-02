@@ -14,11 +14,13 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
 
-// Four of the listing's five, in the order docs/STORE-LISTING.md gives them —
-// the fifth is `tricolor`, composed from the three theme frames by
-// compose-tricolor.cjs, which this script runs at the end.
-// Name shots as positional arguments to scale a different set.
-const DEFAULT_SHOTS = ['annotations', 'assistant', 'assistant_figure', 'dual-pane']
+// What ships to the stores comes from scripts/lib/shots.json, the one list that
+// also tells check-screenshots.mjs and the listing docs which frame goes where.
+// The composed one (tricolor) is skipped here and made by compose-tricolor.cjs
+// at the end of this run. Name shots as positional arguments to scale a
+// different set.
+const MAP = JSON.parse(fs.readFileSync(path.join(__dirname, 'lib', 'shots.json'), 'utf8'))
+const DEFAULT_SHOTS = MAP.storeOrder.filter((n) => !MAP.frames[n]?.composed)
 const WIDTH = 1280
 const HEIGHT = 800
 

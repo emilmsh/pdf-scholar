@@ -177,7 +177,7 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 
 **Annotation**
 
-![A highlight, an underline, a box around a paragraph and a sticky note on the same page — the highlight selected, with the knobs that drag its ends](docs/screenshots/annotations.png)
+![A highlight, an underline, a box around a paragraph and a sticky note on the same page, with the selection menu open beside the text it acts on](docs/screenshots/annotations.png)
 
 Marking up a paper should not interrupt reading it. The tools come to the text you
 selected, what you have marked is one panel away, and neither the tools nor the marks
@@ -206,6 +206,9 @@ clutter the page while you read.
 - Selected marks can be adjusted rather than redrawn: drag either end of a highlight to
   cover more or less text (it snaps to whole words), or a corner of a shape, text box or
   drawing to resize it
+
+![The same page with the menu gone and a highlight selected instead — a knob at each end, ready to drag](docs/screenshots/annotations_edit.png)
+
 - Comment and note bubbles can be dragged **and resized** — pull the corner for a long
   note, double-click the grip to restore the default size
 - **The selection menu drags aside too**, by the grip along its top: it is the tallest

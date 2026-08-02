@@ -1,0 +1,36 @@
+{
+  "_comment": [
+    "Which frame from `npm run shoot` ships where. One list, because the same",
+    "frames feed four surfaces and they drifted apart: a new shot landed with no",
+    "home, a deleted frame stayed referenced, and the store set fell five weeks",
+    "behind the README set.",
+    "",
+    "surfaces: readme = docs/screenshots/ (2880x1800, README.md)",
+    "          landing = docs/index.html (reads the readme set's files)",
+    "          store = docs/store-screenshots/ (1280x800, both extension stores",
+    "                  and the Microsoft Store listing)",
+    "",
+    "`composed: true` means the frame is not photographed but built from others",
+    "(compose-tricolor.cjs), so the downscaler must not look for a source of the",
+    "same name. `sourceFor` names the frames a composed one is built from: they",
+    "are shot every run but ship nowhere themselves.",
+    "",
+    "Read by scale-store-shots.cjs (what to downscale) and check-screenshots.mjs",
+    "(what must exist where)."
+  ],
+  "frames": {
+    "reading": { "ships": ["readme", "landing"] },
+    "reading_tabs": { "ships": ["readme"] },
+    "tricolor": { "ships": ["readme", "landing", "store"], "composed": true, "sourceFor": ["reading", "parchment", "night"] },
+    "annotations": { "ships": ["readme", "landing", "store"] },
+    "annotations_edit": { "ships": ["readme"] },
+    "dual-pane": { "ships": ["readme", "landing", "store"] },
+    "assistant": { "ships": ["readme", "landing", "store"] },
+    "assistant_snip": { "ships": ["readme"] },
+    "assistant_figure": { "ships": ["readme", "store"] },
+    "parchment": { "ships": [] },
+    "night": { "ships": [] },
+    "night+": { "ships": [] }
+  },
+  "storeOrder": ["tricolor", "annotations", "assistant", "assistant_figure", "dual-pane"]
+}

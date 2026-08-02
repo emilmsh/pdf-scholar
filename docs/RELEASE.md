@@ -39,6 +39,30 @@ it into:
   requirement; the Microsoft Store takes the full-resolution files directly, and
   in fact the live listing already uses the README-sized ones.
 
+**Which frame goes where.** Four surfaces draw on the same shoot, and they drift:
+a shot has landed with no home, a deleted frame has stayed referenced, and the
+store set once fell five weeks behind the README set. The map lives in
+`scripts/lib/shots.json` — `npm run shoot:store` reads it to know what to
+downscale, and `npm run check:shots` fails on a frame that ships nowhere or a
+surface missing one it needs.
+
+| Frame | README | Landing page | Stores |
+|---|---|---|---|
+| `tricolor` (composed) | ✓ | ✓ | 1 |
+| `reading` | hero | hero + `og:image` | — |
+| `annotations` | ✓ | ✓ | 2 |
+| `annotations_edit` | ✓ | — | — |
+| `assistant` | ✓ | ✓ | 3 |
+| `assistant_figure` | ✓ | — | 4 |
+| `assistant_snip` | ✓ | — | — |
+| `dual-pane` | ✓ | ✓ | 5 |
+| `reading_tabs` | ✓ | — | — |
+| `parchment`, `night` | — | — | — (tricolor's sources) |
+| `night+` | — | — | — |
+
+Shoot everything in one run when you re-shoot anything: the frames share a
+session, and a set mixed across runs shows the app at two different moments.
+
 `npm run shoot:store` builds that set out of `_auto/`: it downscales the four
 frames listed in `docs/STORE-LISTING.md` and composes the fifth, `tricolor.png`
 — the cover wiped Day → Sepia → Night, so one slot carries the themes and the
