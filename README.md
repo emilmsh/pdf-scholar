@@ -132,6 +132,16 @@ the current desktop-vs-extension parity.
 - Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
   window** to put two documents side by side, or across the bar to reorder
 
+**Language and themes**
+
+![The same page in Day, Sepia and Night — one window, wiped across the three themes](docs/screenshots/tricolor.png)
+
+Above: the same page in Day, Sepia and Night, in one frame. Sepia puts the page on warm
+ivory with a terracotta accent; Night and Night+ are the two dark modes, the second with
+higher contrast for bright text on very dark grey. The interface itself is available in
+Norwegian and English, and the setting also controls the AI prompts, exported documents
+and date formats.
+
 **Split view**
 
 ![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)
@@ -262,19 +272,6 @@ is already running as you from asking for the key to be decrypted.
 ![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
 
 ![Explain a figure — the region you marked sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
-
-**Language and themes**
-
-![Sepia theme](docs/screenshots/parchment.png)
-
-The interface is available in Norwegian and English, and the setting also controls the AI
-prompts, exported documents and date formats. Sepia puts the page on warm ivory with a
-terracotta accent; Night and Night+ are the two dark modes, the second with higher
-contrast for bright text on very dark grey.
-
-![Night theme](docs/screenshots/night.png)
-
-![Night+ — the higher-contrast night mode](docs/screenshots/night+.png)
 
 ## Development
 
