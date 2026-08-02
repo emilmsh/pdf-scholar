@@ -715,19 +715,18 @@ const ui = {
    *  second way, not the first — so the annotations shot carries both halves:
    *  the marks a reader has already made, and the menu that makes the next one.
    *
-   *  The catch that sank the first attempt at this shot: the menu is tall, and
-   *  anchored to the wrong sentence it lands squarely on the marks, hiding the
-   *  very thing it produced.
+   *  The catch that sank the first attempt at this shot: the menu is tall
+   *  (247x537 in a 900px window on the house document) and lands on the marks
+   *  wherever it opens, hiding the very thing it produced. No choice of
+   *  sentence fixes that — the marks span y 333-786 and nothing that size fits
+   *  between them.
    *
-   *  It cannot be asked to touch nothing. Measured on the house document, the
-   *  menu is 247x537 in a 900px window while the marks span y 333-786 — no
-   *  placement clears them all, and requiring one only ever fails. What matters
-   *  for the picture is that no mark is HIDDEN, so this scores instead: it tries
-   *  each sentence at three release points (the menu follows the pointer), works
-   *  out how much of each mark the menu would cover, and keeps the best frame —
-   *  rejecting the shot outright if even that one buries a mark. Fixed sentence
-   *  positions were tried first and do not survive a change of document, zoom or
-   *  menu height. */
+   *  So the shot uses the menu's own drag handle, which is what a reader would
+   *  do: open it, then pull it into the margin. The target is searched for
+   *  rather than hard-coded (the one clear parking space is the left margin, and
+   *  it is 246px wide against a 247px menu — a fixed offset would go stale the
+   *  moment the zoom, the document or the menu's height changed), and the drag
+   *  is asserted: if the menu is still covering a mark afterwards, no picture. */
   async openSelectionMenu() {
     const pages = document.querySelector('.pages[data-pane="a"]');
     const box = pages.getBoundingClientRect();
@@ -749,84 +748,102 @@ const ui = {
       });
     if (candidates.length === 0) throw new Error('no sentence clear of the marks to select');
 
-    // How much of the most-covered mark the menu hides, 0..1. A wide highlight
-    // with a menu over a fifth of it still reads as a highlight; a note bubble
-    // under the menu is simply gone, which is the case this rules out.
-    const worstCovered = (m) => Math.max(0, ...marks.map((k) => {
-      const w = Math.min(m.right, k.right) - Math.max(m.left, k.left);
-      const h = Math.min(m.bottom, k.bottom) - Math.max(m.top, k.top);
-      if (w <= 0 || h <= 0) return 0;
-      return (w * h) / (k.width * k.height);
-    }));
-    const MOST = 0.35;
-
-    // Lowest sentences first: the menu opens downward from the selection, and
-    // anchored high it runs off the top of the window into the toolbar.
-    const ordered = candidates.sort((a, b) =>
-      b.getBoundingClientRect().top - a.getBoundingClientRect().top);
-    let why = 'no candidate reached the menu';
-    let best = null;
-    const tried = [];
-    for (const span of ordered.slice(0, 8)) {
-      const r = span.getBoundingClientRect();
-      // The menu follows the release point, so the same sentence offers three
-      // rather different frames — including one out in the margin, clear of the
-      // column the marks live in.
-      for (const fx of [0.95, 0.6, 0.2]) {
-        const range = document.createRange();
-        range.selectNodeContents(span);
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        await settle(150);
-        pages.dispatchEvent(new MouseEvent('mouseup', {
-          bubbles: true, button: 0, clientX: Math.round(r.left + r.width * fx), clientY: Math.round(r.bottom)
-        }));
-        await settle(400);
-        const menu = document.querySelector('.selection-menu');
-        const m = menu && menu.getBoundingClientRect();
-        if (!menu) { why = 'the menu did not open'; }
-        else if (m.top < toolbar.bottom) { why = 'the menu covers the toolbar'; }
-        else if (m.bottom > window.innerHeight - 4 || m.right > window.innerWidth - 4 || m.left < 4) {
-          why = 'the menu is partly off-screen';
-        } else {
-          const covered = worstCovered(m);
-          if (!best || covered < best.covered) best = { span, fx, covered };
-          why = 'the menu hides ' + Math.round(covered * 100) + '% of a mark';
-          if (covered === 0) break;
-        }
-        tried.push('sel@' + Math.round(r.top) + '/' + fx + (m
-          ? ' menu@' + Math.round(m.left) + ',' + Math.round(m.top) : '') + ': ' + why);
-        window.getSelection()?.removeAllRanges();
-        await settle(120);
-      }
-      if (best && best.covered === 0) break;
-    }
-    if (!best || best.covered > MOST) {
-      throw new Error('no sentence framed the selection menu without burying a mark' +
-        (best ? ' (best hid ' + Math.round(best.covered * 100) + '%, allowed ' +
-          Math.round(MOST * 100) + '%)' : '') +
-        '. Viewport ' + window.innerWidth + 'x' + window.innerHeight +
-        ', toolbar to ' + Math.round(toolbar.bottom) + ', marks at ' +
-        marks.map((k) => Math.round(k.top) + '-' + Math.round(k.bottom) + '/' +
-          Math.round(k.left) + '-' + Math.round(k.right)).join(' ') +
-        '. Tried: ' + tried.join(' | '));
-    }
-    // Re-open on the winner: the loop left the last candidate showing.
-    const r = best.span.getBoundingClientRect();
+    // The lowest sentence clear of the marks: selecting near the bottom of the
+    // column leaves the marks above it untouched by the selection highlight,
+    // and the menu is going to be dragged anyway.
+    const span = candidates.sort((a, b) =>
+      b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
+    const r = span.getBoundingClientRect();
     const range = document.createRange();
-    range.selectNodeContents(best.span);
+    range.selectNodeContents(span);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    await settle(150);
+    await settle(200);
     pages.dispatchEvent(new MouseEvent('mouseup', {
       bubbles: true, button: 0,
-      clientX: Math.round(r.left + r.width * best.fx), clientY: Math.round(r.bottom)
+      clientX: Math.round(r.left + r.width * 0.6), clientY: Math.round(r.bottom)
     }));
-    await settle(450);
-    if (!document.querySelector('.selection-menu')) {
-      throw new Error('the selection menu did not reopen on the chosen sentence');
+    await settle(500);
+    const menu = document.querySelector('.selection-menu');
+    if (!menu) throw new Error('the selection menu did not open');
+    await this.parkMenuClearOfMarks(menu, marks, toolbar);
+  },
+  /** Drag a popup to somewhere it covers no mark, by its own grip — the gesture
+   *  a reader uses, so the frame stays a picture of the real app. */
+  async parkMenuClearOfMarks(menu, marks, toolbar) {
+    const grip = menu.querySelector('.menu-grip');
+    if (!grip) throw new Error('the selection menu has no drag grip');
+    // Gap to the nearest mark, negative when they overlap. Maximised rather
+    // than merely satisfied: on the house document the menu is 247px wide and
+    // the page's left margin is 246, so the best available frame has the menu
+    // a hair from the text — asking for a fixed 8px of air finds nothing at all.
+    const gap = (rect) => Math.min(Infinity, ...marks.map((k) => Math.max(
+      k.left - rect.right, rect.left - k.right, k.top - rect.bottom, rect.top - k.bottom
+    )));
+    const clear = (rect) => gap(rect) >= 2;
+
+    const m = menu.getBoundingClientRect();
+    const minX = 8, maxX = window.innerWidth - m.width - 8;
+    const minY = Math.max(8, toolbar.bottom + 8), maxY = window.innerHeight - m.height - 8;
+    if (maxX < minX || maxY < minY) {
+      throw new Error('the menu (' + Math.round(m.width) + 'x' + Math.round(m.height) +
+        ') does not fit the window below the toolbar');
+    }
+    // The roomiest clear spot, tie-broken towards where the menu already is so
+    // the drag reads as a nudge rather than a teleport.
+    let target = null, bestScore = -Infinity;
+    for (let x = minX; x <= maxX; x += 6) {
+      for (let y = minY; y <= maxY; y += 6) {
+        const rect = { left: x, top: y, right: x + m.width, bottom: y + m.height };
+        if (!clear(rect)) continue;
+        const score = Math.min(gap(rect), 40) - Math.hypot(x - m.left, y - m.top) / 400;
+        if (score > bestScore) { bestScore = score; target = { x, y }; }
+      }
+    }
+    if (!target) {
+      throw new Error('nowhere to park the menu clear of the marks. Menu ' +
+        Math.round(m.width) + 'x' + Math.round(m.height) + ', window ' +
+        window.innerWidth + 'x' + window.innerHeight + ', marks at ' +
+        marks.map((k) => Math.round(k.top) + '-' + Math.round(k.bottom) + '/' +
+          Math.round(k.left) + '-' + Math.round(k.right)).join(' '));
+    }
+
+    const g = grip.getBoundingClientRect();
+    const from = { x: Math.round(g.left + g.width / 2), y: Math.round(g.top + g.height / 2) };
+    // A dispatched pointerdown reaches a handle no real finger could — v0.31.0
+    // shipped mark handles that were drawn but covered, and events aimed at them
+    // "worked" the whole time. Prove the grip is the topmost thing at its centre
+    // before trusting the drag below.
+    const top = document.elementFromPoint(from.x, from.y);
+    if (top !== grip && !grip.contains(top)) {
+      throw new Error('the menu grip is not reachable by a pointer at its centre — ' +
+        (top ? top.className || top.tagName : 'nothing') + ' is on top of it');
+    }
+    const to = { x: from.x + Math.round(target.x - m.left), y: from.y + Math.round(target.y - m.top) };
+    const at = (type, x, y, buttons) => grip.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 37, isPrimary: true, button: 0, buttons,
+      clientX: x, clientY: y
+    }));
+    at('pointerdown', from.x, from.y, 1);
+    await settle(80);
+    // A couple of intermediate moves: one jump would work, but this is also the
+    // only exercise the drag handler gets outside a real hand.
+    at('pointermove', Math.round((from.x + to.x) / 2), Math.round((from.y + to.y) / 2), 1);
+    await settle(60);
+    at('pointermove', to.x, to.y, 1);
+    await settle(60);
+    at('pointerup', to.x, to.y, 0);
+    await settle(350);
+
+    const after = menu.getBoundingClientRect();
+    if (!clear(after)) {
+      throw new Error('the menu is still covering a mark after the drag: it sits at ' +
+        Math.round(after.left) + ',' + Math.round(after.top) + ' and was aimed at ' +
+        target.x + ',' + target.y);
+    }
+    if (window.getSelection()?.isCollapsed !== false) {
+      throw new Error('dragging the menu dropped the text selection');
     }
   },
   /** Widest overflow of any maths block in the answer, in px (0 = all fit) */

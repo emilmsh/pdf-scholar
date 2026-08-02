@@ -198,6 +198,8 @@ clutter the page while you read.
   drawing to resize it
 - Comment and note bubbles can be dragged **and resized** — pull the corner for a long
   note, double-click the grip to restore the default size
+- **The selection menu drags aside too**, by the grip along its top: it is the tallest
+  popup in the app, and seeing what is under it should not cost you the selection
 - **The file is only written when you save it.** Edits go to a draft until you press
   Save (Ctrl+S); closing prompts you, and unsaved work survives a crash. What lands in
   the file is standard PDF annotations with appearance streams, so it reads the same in

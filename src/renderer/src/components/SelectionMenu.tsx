@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   addCustomColor,
   colorLabel,
@@ -219,35 +219,22 @@ interface MenuProps {
   onAction(action: MenuAction): void
 }
 
-/** Position a fixed popup at its anchor, measured after render: clamp
- *  horizontally, flip above the anchor when it would overflow the bottom. */
-function useMeasuredPosition(
-  x: number,
-  y: number
-): { ref: React.RefObject<HTMLDivElement | null>; style: React.CSSProperties } {
-  const ref = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState<{ left: number; top: number } | null>(null)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const { width, height } = el.getBoundingClientRect()
-    const left = Math.max(8, Math.min(x, window.innerWidth - width - 8))
-    let top = y + 10
-    if (top + height > window.innerHeight - 8) top = y - height - 10
-    top = Math.max(8, Math.min(top, window.innerHeight - height - 8))
-    setPos({ left, top })
-  }, [x, y])
-  return {
-    ref,
-    // Render invisibly at the anchor until measured — prevents a flicker jump
-    style: pos ?? { left: x, top: y, visibility: 'hidden' }
-  }
-}
-
 export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element {
   useLang()
   const isSelection = menu.mode === 'selection'
-  const { ref, style } = useMeasuredPosition(menu.x, menu.y)
+  // Draggable, like the note and comment bubbles: this menu is the tallest
+  // popup in the app, and a reader who wants to see what is under it should be
+  // able to pull it aside rather than close it and lose the selection.
+  //
+  // The anchor is passed as a ZERO-HEIGHT avoid rect, which reproduces exactly
+  // the placement this menu has always had — 10px below the pointer, flipped
+  // above it when that would overflow the bottom, then edge-clamped — so
+  // nothing about how it opens changes; only the drag is new.
+  const { ref, style, handleProps } = useDraggable<HTMLDivElement>(menu.x, menu.y, [], {
+    top: menu.y,
+    bottom: menu.y,
+    left: menu.x
+  })
   // Snapshot the selected text at mount — the menu preserves the live
   // selection (mousedown is prevented), so this is stable while it's open.
   const [selText] = useState(() => window.getSelection()?.toString() ?? '')
@@ -266,6 +253,10 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
+      {/* Every other row of this menu is a target, so the drag needs its own
+          strip rather than "anywhere on the chrome" — grabbing a colour dot to
+          move the menu would mark the text instead. */}
+      <span className="menu-grip" title={t('menu.dragTip')} {...handleProps} />
       {isSelection && (
         <>
           <div className="menu-color-group">

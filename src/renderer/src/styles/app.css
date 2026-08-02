@@ -2403,6 +2403,42 @@ button {
   }
 }
 
+/* Drag handle for the selection menu. The strip spans the menu so there is
+   something to catch with a finger (touch parity), while all that is drawn is a
+   quiet pill — the same restraint as .box-grip, which stays near-invisible
+   until the pointer is on the bubble. */
+.menu-grip {
+  display: block;
+  position: relative;
+  height: 12px;
+  margin: -2px 0 3px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.menu-grip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  width: 30px;
+  height: 3px;
+  transform: translateX(-50%);
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.16;
+  transition: opacity 0.12s ease;
+}
+
+.selection-menu:hover .menu-grip::after,
+.menu-grip:hover::after {
+  opacity: 0.45;
+}
+
+.menu-grip:active {
+  cursor: grabbing;
+}
+
 .color-row {
   display: flex;
   gap: 9px;

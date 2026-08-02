@@ -156,8 +156,9 @@ fargefilter, og ett klikk tar deg dit.
 - Colour, thickness and opacity per tool, remembered between sessions
 - A mark can be corrected rather than redrawn: drag either end of a highlight
   and it snaps to whole words, or a corner of a shape, text box or drawing
-- Comment and note bubbles can be dragged and resized, and close on Esc or a
-  click outside
+- Nothing that pops up has to be dismissed to see past it: the selection menu,
+  and the comment and note bubbles, all drag aside by their grip — and the
+  bubbles resize. They close on Esc or a click outside
 - The notes tab exports a summary — the highlighted text included — to Word,
   Markdown, HTML or plain text
 - The file is only written when you save it: edits go to a draft, closing
