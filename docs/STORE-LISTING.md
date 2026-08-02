@@ -153,7 +153,11 @@ same cover wiped Day → Sepia → Night, composed from the three theme shots
 rather than photographed. That buys the two assistant frames their own slots.
 
 Store icon: `src/extension/icons/icon-128.png` (128×128) is already in the
-package; the stores pull it automatically.
+package; the stores pull it automatically. The dashboards additionally ask for
+uploaded assets that do NOT come from the package — the 300×300 extension logo
+and the 440×280 promo tile, both in `docs/store-assets/` (`npm run
+icons:store`). Re-upload them after any icon change: they are the one branding
+surface no build refreshes.
 
 ---
 

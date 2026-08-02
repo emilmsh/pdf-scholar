@@ -232,7 +232,10 @@ own cancel does the same thing.
 
 ## Listing assets checklist (shared)
 
-- [ ] Screenshots 1280×800 (crop/re-shoot from `docs/screenshots/` as needed)
-- [ ] Chrome small promo tile 440×280 (optional but helps)
-- [ ] Store icon: `build/icon.png` (512×512) works everywhere
-- [ ] Short description (NO + EN) — reuse the README tagline
+- [x] Screenshots 1280×800: `docs/store-screenshots/` (built by `npm run shoot:store`)
+- [x] Extension logo 300×300 + small promo tile 440×280: `docs/store-assets/`
+  (regenerate with `npm run icons:store` after any icon change — these are
+  uploaded by hand in the dashboards, which is how the Edge listing kept the
+  pre-v0.25.4 scroll logo long after the shipped icons moved on)
+- [x] Store icon: `build/icon.png` (512×512) works everywhere
+- [x] Short description (NO + EN): `docs/STORE-LISTING.md`
