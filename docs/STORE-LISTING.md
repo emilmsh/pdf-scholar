@@ -7,6 +7,13 @@ release, or run `npm run pack:ext:store` to build it).
 See `docs/STORE.md` for the account setup. Privacy policy URL (both stores):
 `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`
 
+**The claims come from [`MESSAGING.md`](MESSAGING.md)** — the master for what we
+say about the product here, in the README, on the landing page and in the
+Microsoft Store listing. Change a claim there first; this file is one rendering
+of it, cut to the extension's audience. Neither store's API can set listing
+copy, so this is typed into the dashboards by hand — which is exactly why it
+goes stale between releases.
+
 Category: **Productivity**. Language: primary English, add Norwegian if the
 store supports a localized listing.
 
@@ -16,9 +23,9 @@ store supports a localized listing.
 PDF Scholar
 
 ## Short description (≤132 chars — Chrome limit)
-**EN:** Read and annotate PDFs in the browser: highlights, notes, drawing, split view and an optional AI assistant.
+**EN:** Read and annotate PDFs in the browser: annotation tools within reach, split view, and an optional AI assistant.
 
-**NO:** Les og annoter PDF-er i nettleseren: utheving, notater, tegning, delt visning og en valgfri AI-assistent.
+**NO:** Les og annoter PDF-er i nettleseren: annoteringsverktøy innen rekkevidde, delt visning og en valgfri AI-assistent.
 
 ## Single purpose (Chrome requires this)
 PDF Scholar replaces the browser's built-in PDF viewer with a full-featured reader and annotator, so PDFs opened in the browser can be read and marked up in one place.
@@ -38,19 +45,23 @@ READING
 • Day, Sepia and two Night themes, with contrast adjustable per theme
 • Rotate pages, two-page spread, and a full-screen presentation mode
 • Split view: two columns of the same document, each with its own page, zoom and rotation
-• Table of contents, thumbnails and search (match case / whole word)
+• Table of contents, thumbnails, bookmarks and search (match case / whole word)
 • Remembers your reading position and recent files
 
 ANNOTATION
-• Highlight, underline, strikeout and squiggly, with custom colours
-• Pen and marker with hold-to-straighten, shapes, sticky notes, free text
+Marking up a paper never interrupts reading it: the tools come to the text you selected, and everything you have marked is one panel away.
+• Select a passage and the menu comes to you — highlight, underline, a comment or a note, without a trip to the toolbar and back
+• A Notes panel keeps every mark one click away: grouped by page, searchable, colour-filtered, with export to Word, Markdown, HTML or text
+• Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes and free text
 • Colour, thickness and opacity per tool, remembered between sessions
-• Standard PDF annotations that open correctly in Acrobat and other viewers
-• A Notes panel that collects every mark by page, with export to Markdown, HTML or text
+• Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape
+• Marks are saved back into the PDF itself as standard annotations, so the file reads the same in Acrobat and every other viewer
 
 AI ASSISTANT (optional, bring your own key)
 • Ask questions about the open document; every answer links to the passage it came from
-• Structured article summaries; explain, simplify or define selected text
+• Structured article summaries; explain, simplify, critique or define selected text
+• Snip a figure or a region and ask the assistant to explain it
+• Search by meaning: describe a topic in your own words and get the passages that discuss it
 • Works with your own Anthropic, OpenAI or Azure OpenAI key. The document leaves your device only when you ask a question, and goes straight to the provider you chose
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
@@ -67,19 +78,23 @@ LESING
 • Dag-, Sepia- og to Natt-temaer, med kontrast som kan justeres per tema
 • Roter sider, tosiders oppslag og en fullskjerms presentasjonsmodus
 • Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
-• Innholdsfortegnelse, miniatyrer og søk (skill store/små, helord)
+• Innholdsfortegnelse, miniatyrer, bokmerker og søk (skill store/små, helord)
 • Husker leseposisjon og nylige filer
 
 ANNOTERING
-• Utheving, understreking, gjennomstreking og bølget strek, med egne farger
-• Penn og tusj med hold-for-å-rette, former, gule lapper, fritekst
+Å annotere en artikkel avbryter aldri lesingen: verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna.
+• Merk et avsnitt, og menyen kommer til deg — utheving, understreking, en kommentar eller et notat, uten en tur innom verktøylinja
+• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, med fargefilter og eksport til Word, Markdown, HTML eller tekst
+• Utheving, understreking, gjennomstreking og bølget strek; penn og tusj med hold-for-å-rette; former, gule lapper og fritekst
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
-• Standard PDF-annoteringer som åpnes riktig i Acrobat og andre lesere
-• Et Notater-panel som samler alle merker per side, med eksport til Markdown, HTML eller tekst
+• Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form
+• Merkene lagres inn i PDF-en selv som standard annoteringer, så filen ser lik ut i Acrobat og alle andre lesere
 
 AI-ASSISTENT (valgfri, egen nøkkel)
 • Still spørsmål om dokumentet du har åpent; hvert svar lenker til avsnittet det kom fra
-• Strukturerte artikkelsammendrag; forklar, forenkle eller definer merket tekst
+• Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
+• Klipp ut en figur eller et område og be assistenten forklare det
+• Søk etter mening: beskriv et tema med dine egne ord og få avsnittene som handler om det
 • Bruker din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel. Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
@@ -127,7 +142,7 @@ them in). Suggested order + captions:
 | File (`docs/store-screenshots/`) | Caption (EN) | Caption (NO) |
 |------|-------------|-------------|
 | `reading.png` | Distraction-free reading with themes | Distraksjonsfri lesing med temaer |
-| `annotations.png` | Highlight, draw and annotate | Uthev, tegn og annoter |
+| `annotations.png` | Annotation tools within reach, never in the way | Annoteringsverktøy innen rekkevidde, aldri i veien |
 | `assistant.png` | AI assistant grounded in the document | AI-assistent forankret i dokumentet |
 | `parchment.png` | Warm Sepia reading mode | Varm Sepia-lesemodus |
 | `night.png` | Two dark modes for late reading | To mørke moduser for sen lesing |

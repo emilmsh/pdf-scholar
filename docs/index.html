@@ -1,7 +1,13 @@
 <!doctype html>
 <!--
   PDF Scholar — landing page. Served by GitHub Pages from master /docs, so a
-  push to master publishes it. Deliberately zero-maintenance:
+  push to master publishes it.
+
+  The copy here derives from docs/MESSAGING.md, which is the master for what we
+  say about the product across the README, both store listings and this page.
+  Change the claim there first, or the four surfaces drift apart.
+
+  Deliberately zero-maintenance:
 
     * The download button, version, file size and release date come from the
       GitHub Releases API at load time (see the script at the bottom). Nothing
@@ -24,7 +30,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PDF Scholar — a Windows PDF reader built for reading</title>
-<meta name="description" content="A polished Windows PDF reader and annotator for the documents you work through rather than skim. Split view, real PDF annotations, four reading themes, and an optional AI assistant that cites the sentence it used. Free and MIT-licensed.">
+<meta name="description" content="A Windows PDF reader and annotator for the documents you work through rather than skim. Annotation tools that stay within reach, split view, four reading themes, and an optional AI assistant that cites the sentence it used. Free and MIT-licensed.">
 <meta name="theme-color" content="#f7f7f9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="logo.png">
@@ -34,7 +40,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://emilmsh.github.io/pdf-scholar/">
 <meta property="og:title" content="PDF Scholar — a Windows PDF reader built for reading">
-<meta property="og:description" content="For the documents you work through rather than skim. Split view, real PDF annotations, four reading themes, and an AI assistant that cites the sentence it used. Free and MIT-licensed.">
+<meta property="og:description" content="For the documents you work through rather than skim. Annotation tools that stay within reach, split view, four reading themes, and an AI assistant that cites the sentence it used. Free and MIT-licensed.">
 <meta property="og:image" content="https://emilmsh.github.io/pdf-scholar/screenshots/reading.png">
 <meta name="twitter:card" content="summary_large_image">
 
@@ -280,17 +286,18 @@
 
   <section class="feature">
     <div class="body">
-      <h2>Marks that survive the file</h2>
+      <h2>Marks within reach, never in the way</h2>
       <p>
-        Highlight, underline, pen, shapes, sticky notes and free text — written as
-        <b>real PDF annotations with appearance streams</b>, so they open correctly in
-        Acrobat, SumatraPDF and anywhere else the file goes.
+        Select a passage and <b>the menu comes to you</b> — highlight, underline, a
+        comment, or a question for the assistant — so marking up a paper never costs a
+        trip to the toolbar and back. Highlight, underline, pen, shapes, sticky notes
+        and free text, each in your own colours.
       </p>
       <ul class="points">
-        <li>Colour, thickness and opacity <b>per tool</b>, remembered between sessions.</li>
+        <li>Everything you have marked stays <b>one panel away</b>: a notes tab lists every mark by page, with search and a colour filter, and clicking one takes you to it. Export a summary — highlighted text included — to Word, Markdown, HTML or plain text.</li>
+        <li>Colour, thickness and opacity <b>per tool</b>, remembered between sessions. The toolbar carries the same tools for marking several passages in a row — and unpins entirely when you want nothing but the page.</li>
         <li>A mark can be corrected rather than redrawn: drag either end of a highlight and it snaps to whole words, or a corner of a shape to resize it.</li>
-        <li><b>The file is only written when you save it.</b> Edits go to a draft until you press Ctrl+S, and unsaved work survives a crash.</li>
-        <li>A notes tab lists every annotation by page, and exports a summary — highlighted text included — to Word, Markdown, HTML or plain text.</li>
+        <li><b>The file is only written when you save it.</b> Edits go to a draft until you press Ctrl+S, and unsaved work survives a crash. What you save is standard PDF annotations, so the file reads the same in Acrobat or anywhere else it goes.</li>
       </ul>
     </div>
     <img class="shot" src="screenshots/annotations.png" alt="A highlight, an underline, a box around a paragraph and a sticky note on one page, the highlight selected with the knobs that drag its ends.">

@@ -13,7 +13,8 @@ toggling fullscreen or the toolbar is always one click away, leaving the page an
 
 Everything a long document asks of you is here. A page you can stand to look at all day, in
 light, sepia or dark mode. Highlight, pen, shapes and notes, each with its own colour, thickness
-and opacity, remembered between sessions. A second reading pane, so a figure or table can sit beside the
+and opacity, remembered between sessions — the menu comes to the text you selected, and every
+mark you make stays one panel away. A second reading pane, so a figure or table can sit beside the
 passage that discusses it. Cross-references you can go to and return from, which is the
 difference between reading a paper and losing your place in one. And an optional AI-assistant
 that answers from the document, cites the sentence it used, explains snapshots of figures and images, 
@@ -168,10 +169,19 @@ one, the table it rests on somewhere else. Press **S** and you get both.
 
 ![A highlight, an underline, a box around a paragraph and a sticky note on the same page — the highlight selected, with the knobs that drag its ends](docs/screenshots/annotations.png)
 
+Marking up a paper should not interrupt reading it. The tools come to the text you
+selected, what you have marked is one panel away, and neither the tools nor the marks
+clutter the page while you read.
+
 - **Select text and the menu comes to you**: highlight, underline, strikeout and squiggly
   in one row each, a comment or a note, copy, dictionary, translate — and the assistant's
   actions on exactly what you selected. The toolbar carries the same tools for when you
-  want to mark several passages in a row
+  want to mark several passages in a row, and unpins entirely (V) when you want nothing
+  but the page
+- **Notes tab**: every annotation grouped by page, with search and a colour filter, and a
+  click takes you to the mark. Export a summary — including the highlighted text itself —
+  to Word, Markdown, HTML or plain text. Clearing them all is one confirmed step, and one
+  Ctrl+Z brings the lot back
 - Labeled colour rows and custom hex colours
 - Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
   straight
@@ -188,13 +198,10 @@ one, the table it rests on somewhere else. Press **S** and you get both.
   drawing to resize it
 - Comment and note bubbles can be dragged **and resized** — pull the corner for a long
   note, double-click the grip to restore the default size
-- **Real PDF annotations** with appearance streams, so they open correctly in Acrobat,
-  SumatraPDF and other viewers
 - **The file is only written when you save it.** Edits go to a draft until you press
-  Save (Ctrl+S); closing prompts you, and unsaved work survives a crash
-- **Notes tab**: every annotation grouped by page, with search and a colour filter.
-  Export a summary — including the highlighted text itself — to Word, Markdown, HTML or
-  plain text. Clearing them all is one confirmed step, and one Ctrl+Z brings the lot back
+  Save (Ctrl+S); closing prompts you, and unsaved work survives a crash. What lands in
+  the file is standard PDF annotations with appearance streams, so it reads the same in
+  Acrobat, SumatraPDF and anywhere else it goes
 - Preferences reset to their defaults, per tool or all at once from the settings menu
   (with a confirmation; API keys, library and annotations are left untouched)
 

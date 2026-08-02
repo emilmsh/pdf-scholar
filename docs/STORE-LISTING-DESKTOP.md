@@ -5,6 +5,13 @@ the *desktop* companion to `docs/STORE-LISTING.md` (which covers the browser
 extension). Kept in sync with the app; refresh the "What's new" block on every
 submission. Field limits noted per section.
 
+**The claims come from [`MESSAGING.md`](MESSAGING.md)** — the master for what we
+say about the product here, in the README, on the landing page and in the
+extension listing. Change a claim there first; this file is one rendering of it.
+Its shape is also machine-parsed (`scripts/lib/store-listing.ps1`), so keep the
+headings and the `**EN:**` / `**NO:**` fenced blocks exactly as they are, and run
+`npm run test:listing` after editing.
+
 Category: **Productivity**. Primary language: English; add Norwegian if the
 listing supports a localized variant. Privacy policy URL:
 `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`
@@ -19,9 +26,9 @@ listing supports a localized variant. Privacy policy URL:
 PDF Scholar
 
 ## Short / summary description (≤ ~250 chars)
-**EN:** A PDF reader and annotator for Windows, for people who read long documents for work. Standard PDF annotations that open in any viewer, split view, and an optional AI assistant that cites the passage it answered from. Free and open source.
+**EN:** A PDF reader and annotator for Windows, for people who read long documents for work. Annotation tools within reach and never in the way, split view, and an optional AI assistant that cites the passage it used. Free and open source.
 
-**NO:** En PDF-leser og -annotator for Windows, for folk som leser lange dokumenter i jobben. Standard PDF-annoteringer som åpnes i alle lesere, delt visning, og en valgfri AI-assistent som viser hvilket avsnitt svaret kom fra. Gratis og åpen kildekode.
+**NO:** En PDF-leser og -annotator for Windows, for folk som leser lange dokumenter i jobben. Annoteringsverktøy innen rekkevidde og aldri i veien, delt visning, og en valgfri AI-assistent som viser hvor svaret kom fra. Gratis og åpen kildekode.
 
 ---
 
@@ -29,7 +36,7 @@ PDF Scholar
 
 **EN:**
 ```
-PDF Scholar is a PDF reader and annotator for Windows, for the documents you have to work through rather than skim: research articles, reports, books. The annotation tools are one click away, the optional AI assistant answers from the document and shows which passage it used, and the toolbar can be hidden when you want the whole window showing the page.
+PDF Scholar is a PDF reader and annotator for Windows, for the documents you have to work through rather than skim: research articles, reports, books. Marking up a paper never interrupts reading it — the tools come to the text you selected and everything you have marked stays one panel away. The optional AI assistant answers from the document and shows which passage it used, and the toolbar can be hidden when you want the whole window showing the page.
 
 Free and open source (MIT). No account, no sign-in, no tracking, no ads. Everything works offline except the optional AI, which uses your own key. Native x64 and arm64, so Windows-on-ARM machines like the Surface run the arm64 build rather than x64 under emulation. The Store keeps it updated automatically.
 
@@ -37,7 +44,7 @@ READING
 • Smooth scrolling and pinch zoom that stays where you release it; fit width or page; opening zoom follows the file's own setting, as Acrobat does
 • Day, Sepia and two Night themes; the Sepia tone matches Apple Books
 • Rotate pages, two-page spread, and a full-screen presentation mode
-• Table of contents, thumbnails, and search (match case / whole word)
+• Table of contents, thumbnails, bookmarks, and search that marks every hit on the page while you look (match case / whole word)
 • Remembers your reading position and recent files; the mouse side-buttons move back and forward through your navigation history
 • Opens PDFs straight from File Explorer, with a "Recent" Jump List on the taskbar
 
@@ -48,18 +55,24 @@ SPLIT VIEW
 • Two windows on the same file work as well: they share one draft and sync as you annotate
 
 ANNOTATION
+• Select a passage and the menu comes to you — highlight, underline, a comment or a note, without a trip to the toolbar and back
+• A Notes panel keeps every mark one click away: grouped by page, searchable, colour-filtered, and a click takes you to the mark
+• The same tools sit in the toolbar for marking several passages in a row, and the toolbar unpins when you want nothing but the page
 • Highlight, underline, strikeout and a true-wave squiggly, in your own colours
 • Pen and marker with hold-to-straighten, shapes, sticky notes and free text
 • Colour, thickness and opacity per tool, remembered between sessions
+• Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape, text box or drawing
 • Comments anchored to the text they mark
+• Export a summary of every mark — the highlighted text included — to Word, Markdown, HTML or plain text
 • Standard PDF annotations that open correctly in Acrobat and every other viewer — not flattened images
-• A Notes panel that collects every mark by page, with export to Word, Markdown, HTML or plain text
 • A save guard that warns before overwriting a file another program has changed, and "save a copy" that continues in the copy
 
 AI ASSISTANT (optional — bring your own key)
 • Ask questions about the open document; every answer links to the passage it came from
 • Structured article summaries; explain, simplify, critique, define or ask about selected text
 • Snip a figure or region and ask the assistant to explain it
+• Search by meaning: describe a topic in your own words and get the passages that discuss it, ranked and clickable
+• A scanned PDF — pictures of words, with no text to search — is named as such rather than answered about blindly; attach a page range and the assistant reads those pages as images
 • LaTeX/TeX renders properly in answers, so maths stays readable
 • Optional web search, off by default: closed, on request, or always on
 • One model list across providers, using your own Anthropic, OpenAI or Azure OpenAI key. The document leaves your device only when you ask a question, and goes straight to the provider you chose, under your key and their terms. PDF Scholar runs no server of its own.
@@ -69,7 +82,7 @@ Source code: https://github.com/emilmsh/pdf-scholar
 
 **NO:**
 ```
-PDF Scholar er en PDF-leser og -annotator for Windows, for dokumentene du må jobbe deg gjennom og ikke bare skumme: forskningsartikler, rapporter, bøker. Annoteringsverktøyene er ett klikk unna, den valgfrie AI-assistenten svarer ut fra dokumentet og viser hvilket avsnitt den brukte, og verktøylinja kan skjules når du vil at hele vinduet skal vise siden.
+PDF Scholar er en PDF-leser og -annotator for Windows, for dokumentene du må jobbe deg gjennom og ikke bare skumme: forskningsartikler, rapporter, bøker. Å annotere en artikkel avbryter aldri lesingen — verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna. Den valgfrie AI-assistenten svarer ut fra dokumentet og viser hvilket avsnitt den brukte, og verktøylinja kan skjules når du vil at hele vinduet skal vise siden.
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel. Både x64 og arm64, så Windows-på-ARM-maskiner som Surface kjører arm64-varianten framfor x64 under emulering. Store holder appen automatisk oppdatert.
 
@@ -77,7 +90,7 @@ LESING
 • Jevn rulling og knip-zoom som blir stående der du slipper; tilpass bredde eller side; åpningszoom følger filens egen innstilling, slik Acrobat gjør
 • Dag-, Sepia- og to Natt-temaer; Sepia-tonen matcher Apple Books
 • Roter sider, tosiders oppslag og en fullskjerms presentasjonsmodus
-• Innholdsfortegnelse, miniatyrer og søk (skill store/små, helord)
+• Innholdsfortegnelse, miniatyrer, bokmerker og søk som markerer alle treff på siden mens du leter (skill store/små, helord)
 • Husker leseposisjon og nylige filer; museknappene på siden går fram og tilbake i navigasjonshistorikken
 • Åpner PDF-er rett fra Utforsker, med en «Nylig»-hurtigliste på oppgavelinjen
 
@@ -88,18 +101,24 @@ DELT VISNING
 • To vinduer på samme fil virker også: de deler ett utkast og synkroniseres mens du annoterer
 
 ANNOTERING
+• Merk et avsnitt, og menyen kommer til deg — utheving, understreking, en kommentar eller et notat, uten en tur innom verktøylinja
+• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, med fargefilter, og ett klikk tar deg til merket
+• De samme verktøyene ligger i verktøylinja når du skal merke flere avsnitt på rad, og linja kan løsnes når du bare vil ha siden
 • Utheving, understreking, gjennomstreking og en ekte bølget strek, i dine egne farger
 • Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
+• Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form, tekstboks eller tegning
 • Kommentarer forankret til teksten de merker
+• Eksporter en oppsummering av alle merker — den uthevede teksten inkludert — til Word, Markdown, HTML eller ren tekst
 • Standard PDF-annoteringer som åpnes riktig i Acrobat og alle andre lesere — ikke flate bilder
-• Et Notater-panel som samler alle merker per side, med eksport til Word, Markdown, HTML eller ren tekst
 • En lagringsvakt som varsler før den overskriver en fil et annet program har endret, og «lagre en kopi» som fortsetter i kopien
 
 AI-ASSISTENT (valgfri — egen nøkkel)
 • Still spørsmål om dokumentet du har åpent; hvert svar lenker til avsnittet det kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser, definer eller spør om merket tekst
 • Klipp ut en figur eller et område og be assistenten forklare det
+• Søk etter mening: beskriv et tema med dine egne ord og få avsnittene som handler om det, rangert og klikkbare
+• En skannet PDF — bilder av ord, uten tekst å søke i — sies det fra om i stedet for å svares på i blinde; legg ved et sideutvalg, så leser assistenten de sidene som bilder
 • LaTeX/TeX vises riktig i svar, så matematikk holder seg lesbar
 • Valgfritt nettsøk, av som standard: lukket, på forespørsel, eller alltid på
 • Én modelliste på tvers av leverandører, med din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel. Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte, under din nøkkel og deres vilkår. PDF Scholar kjører ingen egen server.
@@ -152,11 +171,13 @@ Day, Sepia and two Night themes for long reading sessions
 Two-page spread, page rotation and full-screen presentation mode
 Split view: two columns of one document, each with its own page, zoom and rotation
 Annotate in both columns at once, or in two windows on the same file
-Standard PDF annotations that open correctly in Acrobat
+Select text and the annotation menu comes to you — no trip to the toolbar and back
+Notes panel that keeps every mark one click away — export to Word, Markdown, HTML or text
 Highlight, underline, strikeout and true-wave squiggly, in your own colours
 Pen and marker, shapes, sticky notes, free text and text-anchored comments
 Colour, thickness and opacity per tool, remembered between sessions
-Notes panel that collects every mark by page — export to Word, Markdown, HTML or text
+Correct a mark instead of redrawing it: drag a highlight's end or a shape's corner
+Standard PDF annotations that open correctly in Acrobat
 Optional AI assistant that links every answer to the passage it came from
 Snip a figure and ask the assistant to explain it; LaTeX renders in answers
 Optional web search: off, on request or always on
@@ -173,11 +194,13 @@ Dag-, Sepia- og to Natt-temaer for lange leseøkter
 Tosiders oppslag, siderotasjon og fullskjerms presentasjonsmodus
 Delt visning: to kolonner av ett dokument, hver med egen side, zoom og rotasjon
 Annoter i begge kolonner samtidig, eller i to vinduer på samme fil
-Standard PDF-annoteringer som åpnes riktig i Acrobat
+Merk tekst, og annoteringsmenyen kommer til deg — uten en tur innom verktøylinja
+Notater-panel som holder hvert merke ett klikk unna — eksport til Word, Markdown, HTML eller tekst
 Utheving, understreking, gjennomstreking og ekte bølget strek, i egne farger
 Penn og tusj, former, gule lapper, fritekst og tekstforankrede kommentarer
 Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
-Notater-panel som samler alle merker per side — eksport til Word, Markdown, HTML eller tekst
+Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving eller hjørnet av en form
+Standard PDF-annoteringer som åpnes riktig i Acrobat
 Valgfri AI-assistent som lenker hvert svar til avsnittet det kom fra
 Klipp ut en figur og be assistenten forklare den; LaTeX vises i svar
 Valgfritt nettsøk: av, på forespørsel eller alltid på

@@ -60,6 +60,20 @@ npm run test:listing     # the Store copy still parses out of the doc
 `shoot` nor `test:windows` touches the extension — both drive Electron — and
 v0.27.1 shipped a broken recents-open there for exactly that reason.
 
+## 1b. Copy — `docs/MESSAGING.md` first
+
+If the release changes **what the app is** — a new pillar-level capability, a
+platform graduating out of beta, a store listing going live — update
+[`docs/MESSAGING.md`](MESSAGING.md) first, then the four surfaces it lists:
+`README.md`, `docs/index.html`, `docs/STORE-LISTING-DESKTOP.md` and
+`docs/STORE-LISTING.md`. It is the master for every product claim precisely
+because a change made in one listing is a change three other places do not know
+about.
+
+`npm run test:listing` (step 1) proves the Microsoft Store copy still parses and
+fits the field limits. Nothing proves the README and the landing page agree —
+that is a read-through, and it is short.
+
 ## 2. Version and tag
 
 Bump `version` in `package.json`, commit as `vX.Y.Z: <one-line summary>` (the
