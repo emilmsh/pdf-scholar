@@ -39,6 +39,13 @@ it into:
   requirement; the Microsoft Store takes the full-resolution files directly, and
   in fact the live listing already uses the README-sized ones.
 
+`npm run shoot:store` does the downscale: it reads the five listed in
+`docs/STORE-LISTING.md` out of `_auto/` and writes 1280×800 copies to
+`_auto/store/`. Both 2880×1800 and 1280×800 are 16:10, so nothing is cropped —
+a frame with any other aspect is refused rather than stretched. Same rule as
+`shoot`: reaching the shipped folder takes an explicit
+`-- --out docs/store-screenshots`.
+
 The house demo document is "Attention Is All You Need" (arXiv 1706.03762) at
 `docs/screenshots/attention.pdf` — gitignored, never committed. Keep it free of
 saved annotations, or they turn up as clutter in unrelated shots.
