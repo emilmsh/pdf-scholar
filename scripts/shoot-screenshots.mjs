@@ -141,12 +141,15 @@ const SHOTS = [
     `
   },
   {
-    // The point of this shot is how marks LOOK on the page, in both states:
-    // several kinds sitting there, and one of them selected with the knobs that
-    // let its ends be dragged. An earlier version left the selection menu open
-    // over the page, which demonstrated the way in but covered the marks.
+    // The shot carries the claim the annotation tools are sold on: they are
+    // within reach without getting in the way. So it needs BOTH halves — marks
+    // of several kinds already sitting on the page, and the menu that appears
+    // where you selected text, which is how they got there. An earlier version
+    // showed the menu and let it cover the marks; openSelectionMenu now searches
+    // for a sentence whose menu clears them, and fails rather than shoot a frame
+    // where the tools hide their own output.
     name: 'annotations',
-    caption: 'Marks of several kinds on the page, one selected with its end knobs',
+    caption: 'Marks of several kinds on the page, and the menu that makes the next one',
     setup: `
       await ui.closePanels()
       await ui.showAnnots(true)
@@ -156,8 +159,33 @@ const SHOTS = [
       await ui.highlightSomeText()
       await ui.drawRectangleAround('Attention mechanisms have become')
       await ui.placeNote('Same claim as Bahdanau (2015) — check the setup')
-      await ui.selectMark()
+      await ui.openSelectionMenu()
       await ui.settle(400)
+    `
+  },
+  {
+    // The same page as `annotations`, framed on the other half of the story: a
+    // mark already made, selected, with the knobs that drag its ends. Kept as
+    // its own frame because the two states are mutually exclusive on screen —
+    // selecting text to open the menu drops the selected mark — and which one
+    // tells the better story is a judgement call made when picking frames.
+    name: 'annotations_edit',
+    caption: 'A mark selected, with the knobs that drag its ends',
+    setup: `
+      await ui.closePanels()
+      await ui.showAnnots(true)
+      await ui.fitWidth()
+      await ui.goToPage(2)
+      ui.expectPage(0, 2)
+      // Usually the marks from the shot before are still there — the shots share
+      // one session and one draft. Run this one on its own (\`shoot annotations_edit\`)
+      // and there is nothing to select, so make something first.
+      if (ui.markRectsA().length === 0) await ui.highlightSomeText()
+      await ui.selectMark()
+      // Outlast the nav pills' 2.6 s idle fade — this setup is short enough that
+      // jumping to page 2 leaves a "back to p. 2" bubble in the corner of the
+      // frame. (The sibling shot spends longer making its marks and never sees it.)
+      await ui.settle(3400)
     `
   },
   {
@@ -661,44 +689,145 @@ const ui = {
     grip.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
     await settle(400);
   },
+  /** Every mark currently drawn on the visible page, as client rects. Used to
+   *  keep popovers off them.
+   *
+   *  Ink, squiggly and shapes are drawn into an SVG that spans the WHOLE PAGE
+   *  (viewBox 0 0 pageW pageH), so a rect measured off the <svg> reports the
+   *  page itself as one big mark — which made every sentence on it look
+   *  occupied. Measure the geometry inside those instead. The note marker is
+   *  also an <svg>, but a positioned, mark-sized one, so it is left alone. */
+  markRectsA() {
+    const pages = document.querySelector('.pages[data-pane="a"]');
+    const out = [];
+    for (const el of pages.querySelectorAll('.annot, .annot-ink-svg')) {
+      const spansPage = el.tagName.toLowerCase() === 'svg' &&
+        !el.classList.contains('annot-note-mark');
+      const parts = spansPage
+        ? [...el.querySelectorAll('path, rect, line, polyline, polygon, ellipse, circle')]
+        : [el];
+      for (const p of parts) out.push(p.getBoundingClientRect());
+    }
+    return out.filter((r) => r.width > 1 && r.height > 1);
+  },
   /** Select a sentence and leave the markup menu open over it. This is the
    *  gesture the annotation tools are actually reached by — the toolbar is the
-   *  second way, not the first. */
+   *  second way, not the first — so the annotations shot carries both halves:
+   *  the marks a reader has already made, and the menu that makes the next one.
+   *
+   *  The catch that sank the first attempt at this shot: the menu is tall, and
+   *  anchored to the wrong sentence it lands squarely on the marks, hiding the
+   *  very thing it produced.
+   *
+   *  It cannot be asked to touch nothing. Measured on the house document, the
+   *  menu is 247x537 in a 900px window while the marks span y 333-786 — no
+   *  placement clears them all, and requiring one only ever fails. What matters
+   *  for the picture is that no mark is HIDDEN, so this scores instead: it tries
+   *  each sentence at three release points (the menu follows the pointer), works
+   *  out how much of each mark the menu would cover, and keeps the best frame —
+   *  rejecting the shot outright if even that one buries a mark. Fixed sentence
+   *  positions were tried first and do not survive a change of document, zoom or
+   *  menu height. */
   async openSelectionMenu() {
     const pages = document.querySelector('.pages[data-pane="a"]');
     const box = pages.getBoundingClientRect();
-    // Well below the top edge so the menu opens over the page, not off it, and
-    // clear of the marks the previous step just made.
-    // The menu is tall. Anchored to a selection low on the page it flips upward
-    // and lands on top of the toolbar — true to the app, useless as a picture —
-    // so the sentence is chosen in the upper third, where the menu opens
-    // downward with room to spare.
-    const span = [...pages.querySelectorAll('.pdf-page .text-host .textLayer > span')]
+    const toolbar = document.querySelector('.toolbar').getBoundingClientRect();
+    const marks = this.markRectsA();
+    if (marks.length === 0) throw new Error('no marks on the page to frame the menu against');
+    const hits = (a, b, pad = 0) =>
+      a.left < b.right + pad && a.right > b.left - pad &&
+      a.top < b.bottom + pad && a.bottom > b.top - pad;
+
+    // Candidates: full lines of body text, on screen, not themselves sitting on
+    // a mark — selecting text that is already highlighted reads as a muddle.
+    const candidates = [...pages.querySelectorAll('.pdf-page .text-host .textLayer > span')]
       .filter((x) => (x.textContent || '').trim().length > 40)
-      .find((x) => {
+      .filter((x) => {
         const r = x.getBoundingClientRect();
-        return r.bottom > box.top + box.height * 0.22 && r.bottom < box.top + box.height * 0.40 && r.width > 200;
+        return r.width > 200 && r.top > box.top + 40 && r.bottom < box.bottom - 40 &&
+          !marks.some((m) => hits(r, m, 6));
       });
-    if (!span) throw new Error('no suitable sentence to select');
+    if (candidates.length === 0) throw new Error('no sentence clear of the marks to select');
+
+    // How much of the most-covered mark the menu hides, 0..1. A wide highlight
+    // with a menu over a fifth of it still reads as a highlight; a note bubble
+    // under the menu is simply gone, which is the case this rules out.
+    const worstCovered = (m) => Math.max(0, ...marks.map((k) => {
+      const w = Math.min(m.right, k.right) - Math.max(m.left, k.left);
+      const h = Math.min(m.bottom, k.bottom) - Math.max(m.top, k.top);
+      if (w <= 0 || h <= 0) return 0;
+      return (w * h) / (k.width * k.height);
+    }));
+    const MOST = 0.35;
+
+    // Lowest sentences first: the menu opens downward from the selection, and
+    // anchored high it runs off the top of the window into the toolbar.
+    const ordered = candidates.sort((a, b) =>
+      b.getBoundingClientRect().top - a.getBoundingClientRect().top);
+    let why = 'no candidate reached the menu';
+    let best = null;
+    const tried = [];
+    for (const span of ordered.slice(0, 8)) {
+      const r = span.getBoundingClientRect();
+      // The menu follows the release point, so the same sentence offers three
+      // rather different frames — including one out in the margin, clear of the
+      // column the marks live in.
+      for (const fx of [0.95, 0.6, 0.2]) {
+        const range = document.createRange();
+        range.selectNodeContents(span);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        await settle(150);
+        pages.dispatchEvent(new MouseEvent('mouseup', {
+          bubbles: true, button: 0, clientX: Math.round(r.left + r.width * fx), clientY: Math.round(r.bottom)
+        }));
+        await settle(400);
+        const menu = document.querySelector('.selection-menu');
+        const m = menu && menu.getBoundingClientRect();
+        if (!menu) { why = 'the menu did not open'; }
+        else if (m.top < toolbar.bottom) { why = 'the menu covers the toolbar'; }
+        else if (m.bottom > window.innerHeight - 4 || m.right > window.innerWidth - 4 || m.left < 4) {
+          why = 'the menu is partly off-screen';
+        } else {
+          const covered = worstCovered(m);
+          if (!best || covered < best.covered) best = { span, fx, covered };
+          why = 'the menu hides ' + Math.round(covered * 100) + '% of a mark';
+          if (covered === 0) break;
+        }
+        tried.push('sel@' + Math.round(r.top) + '/' + fx + (m
+          ? ' menu@' + Math.round(m.left) + ',' + Math.round(m.top) : '') + ': ' + why);
+        window.getSelection()?.removeAllRanges();
+        await settle(120);
+      }
+      if (best && best.covered === 0) break;
+    }
+    if (!best || best.covered > MOST) {
+      throw new Error('no sentence framed the selection menu without burying a mark' +
+        (best ? ' (best hid ' + Math.round(best.covered * 100) + '%, allowed ' +
+          Math.round(MOST * 100) + '%)' : '') +
+        '. Viewport ' + window.innerWidth + 'x' + window.innerHeight +
+        ', toolbar to ' + Math.round(toolbar.bottom) + ', marks at ' +
+        marks.map((k) => Math.round(k.top) + '-' + Math.round(k.bottom) + '/' +
+          Math.round(k.left) + '-' + Math.round(k.right)).join(' ') +
+        '. Tried: ' + tried.join(' | '));
+    }
+    // Re-open on the winner: the loop left the last candidate showing.
+    const r = best.span.getBoundingClientRect();
     const range = document.createRange();
-    range.selectNodeContents(span);
+    range.selectNodeContents(best.span);
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
-    await settle(200);
-    const r = span.getBoundingClientRect();
+    await settle(150);
     pages.dispatchEvent(new MouseEvent('mouseup', {
-      bubbles: true, button: 0, clientX: Math.round(r.left + r.width * 0.6), clientY: Math.round(r.bottom)
+      bubbles: true, button: 0,
+      clientX: Math.round(r.left + r.width * best.fx), clientY: Math.round(r.bottom)
     }));
-    await settle(500);
-    const menu = document.querySelector('.selection-menu');
-    if (!menu) throw new Error('the selection menu did not open');
-    const m = menu.getBoundingClientRect();
-    const toolbar = document.querySelector('.toolbar').getBoundingClientRect();
-    if (m.bottom > window.innerHeight || m.right > window.innerWidth) {
-      throw new Error('the selection menu is partly off-screen');
+    await settle(450);
+    if (!document.querySelector('.selection-menu')) {
+      throw new Error('the selection menu did not reopen on the chosen sentence');
     }
-    if (m.top < toolbar.bottom) throw new Error('the selection menu covers the toolbar');
   },
   /** Widest overflow of any maths block in the answer, in px (0 = all fit) */
   mathOverflow() {
