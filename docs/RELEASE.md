@@ -76,8 +76,10 @@ that is a read-through, and it is short.
 
 ## 2. Version and tag
 
-Bump `version` in `package.json`, commit as `vX.Y.Z: <one-line summary>` (the
-repo's convention: feature/fix commits first, then a version commit), then:
+Bump `version` in `package.json`, then `npm install --package-lock-only` so the
+lockfile carries the same version (nothing else re-syncs it, and it had silently
+fallen three releases behind by v0.31.3). Commit as `vX.Y.Z: <one-line summary>`
+(the repo's convention: feature/fix commits first, then a version commit), then:
 
 ```bash
 git tag -a vX.Y.Z -m "vX.Y.Z: <summary>" && git push origin master --follow-tags
