@@ -49,7 +49,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] Angre/gjør om for annotasjoner: Ctrl+Z / Ctrl+Shift+Z (også Ctrl+Y) som inverterbare motoroperasjoner — fungerer også på tvers av dokument-gjenåpninger (levert 2026-07-09, opprinnelig fase 5-punkt)
 - [x] «Armert verktøy»-flyt: tekstmarkeringsverktøyene armes fra verktøylinjen, merker utvalget ved museslipp og forblir aktive til neste utvalg (Esc slår av) (levert 2026-07-16)
 - [x] Egendefinert fargevelger + opasitetskontroll: fargehjul bak «+» i markeringsmenyen som husker de sist valgte fargene (levert 2026-07-12), opasitetsglider per verktøy i verktøyvalgene (levert 2026-07-25)
-- [ ] **Interop-port**: åpne PDFX-annoterte filer i Acrobat/SumatraPDF og verifiser identisk visning — Emils manuelle test gjenstår
+- [x] **Interop-port**: PDFX-annoterte filer åpner med identisk visning i Edges innebygde viser — Emils manuelle test, godkjent som tilstrekkelig 2026-08-02 (Acrobat/SumatraPDF-matrisen utgår som krav; Edge er uansett interop-baren, jf. plattformparitetsregelen)
 
 ## Fase 5 — Fullt annoteringsverktøysett
 - [x] Penn og gjennomskinnelig markeringstusj: frihåndstegning med coalesced pointer events, farge- og breddevalg per verktøy, skrives som standard Ink-annotasjoner (rundtur verifisert); Esc avslutter verktøyet (levert 2026-07-10)
@@ -96,7 +96,8 @@ Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 refera
 - [x] Skannede dokumenter kan leses (levert 2026-07-29) — appen sier først at dokumentet mangler tekstlag (varsel i panelet + egen status i KI-søket), og **leser sidene som bilder** når du ber om det: sidevelger over komponisten (fra/til, maks 4 om gangen — `MAX_IMAGES`), sidene rendres offscreen som JPEG ≤ 1400 px og stages som vedlegg med redigerbart spørsmål; brikken navngir sidene, og systemprompten sier at bare de vedlagte sidene er synlige og at modellen skal si det når svaret ville krevd andre. Det tomme dokumentet sløyfes i den saken. *Gjenstår:* page_location-siteringer (svaret viser til sidetall i prosa, ikke klikkbare sitater)
 - [ ] Nivå 3 (parkert): kryssdokument, forhør-meg-quiz, metodekritikk-modus, forklar figur
 
-## Fase 8 — Filhåndtering + sky (Emils prioritet nr. 4)
+## Fase 8 — Filhåndtering + sky (utgår for nå — Emils beslutning 2026-08-02)
+Synkmapper (OneDrive/Dropbox) dekker skybehovet implisitt allerede, og hjemskjerm/innholdssøk tas ikke opp igjen før appen har fått modne i drift. Punktene under står som tankegods, ikke plan.
 - Hjemskjerm: Nylige (20) + Favoritter med egendefinert rekkefølge og fargeetiketter
 - Innholdssøk på tvers av filer i valgt mappe
 - Sky: primært via synkmapper (OneDrive/Dropbox) + filovervåking; API-integrasjon bare hvis nødvendig
@@ -111,6 +112,16 @@ Besluttet med Emil 2026-07-10: prioritering 1→3→2→4→6 (deretter 5 refera
     (`src/main/incremental-appender.ts`, ren Node, ingen WASM — appends objekter + AP + xref direkte;
     verifisert av mupdf/EmbedPDF/pdf.js, 413 MB-fil annoteres på ~0,3–0,5 s). Under 150 MB: doc-cache
     med debounced flush. Test: `npm run test:appender`.
+
+## Neste bolk — penn og nettbrett (retning valgt 2026-08-02)
+Emil peker på Windows-nettbrett med penn (Surface-klassen) som neste satsing etter lanseringspausen. Kandidatene er eksisterende åpne punkter fra fasene over, samlet her:
+- Beskjær marger (fase 2)
+- Trykkfølsom penn (fase 5 — krever polygon-appearance for interop)
+- Lasso-multivalg for blekk (fase 5)
+- Stempler og signatur (fase 7)
+- Begrepshjelp (fase 9)
+
+Berøringsparitetsregelen gjelder hele bolken: hver mus/hover-interaksjon trenger en intuitiv berøringsekvivalent.
 
 ## Tankeboks (ikke planlagt, ikke glemt)
 - **Zotero-integrasjon** (Emils notat 2026-07-12): vurdere kobling mot referanseverktøy — import av PDF-er fra Zotero-bibliotek, eksport av annoteringer/notater tilbake, evt. Better BibTeX-nøkler i referanseoppslaget.
