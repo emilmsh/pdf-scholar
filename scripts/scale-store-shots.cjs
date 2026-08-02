@@ -12,9 +12,13 @@
 const { app, nativeImage } = require('electron')
 const fs = require('node:fs')
 const path = require('node:path')
+const { spawnSync } = require('node:child_process')
 
-// The store listing's five, in the order docs/STORE-LISTING.md gives them.
-const SHOTS = ['reading', 'annotations', 'assistant', 'parchment', 'night']
+// Four of the listing's five, in the order docs/STORE-LISTING.md gives them —
+// the fifth is `tricolor`, composed from the three theme frames by
+// compose-tricolor.cjs, which this script runs at the end.
+// Name shots as positional arguments to scale a different set.
+const DEFAULT_SHOTS = ['annotations', 'assistant', 'assistant_figure', 'dual-pane']
 const WIDTH = 1280
 const HEIGHT = 800
 
@@ -27,6 +31,13 @@ const flag = (name, fallback) => {
 const AUTO = path.join(ROOT, 'docs', 'screenshots', '_auto')
 const FROM = flag('--from', AUTO)
 const OUT = flag('--out', path.join(AUTO, 'store'))
+// Skip the VALUE of each flag, not args[0]: indexOf returns -1 for a flag that
+// was not passed, and -1 + 1 lands on the first positional shot name.
+const flagValues = new Set(
+  ['--from', '--out'].map((f) => args.indexOf(f)).filter((i) => i !== -1).map((i) => args[i + 1])
+)
+const named = args.filter((a) => !a.startsWith('-') && !flagValues.has(a))
+const SHOTS = named.length ? named : DEFAULT_SHOTS
 
 app.disableHardwareAcceleration()
 
@@ -63,6 +74,21 @@ app.whenReady().then(() => {
   if (failed) {
     console.error(`\n${failed} frame(s) not written.`)
     app.exit(1)
+    return
+  }
+  // The fifth frame is composed rather than scaled, but it belongs to the same
+  // set and the same --from/--out, so one command produces all five. Runs in
+  // this Electron binary (process.execPath), not a fresh `npx electron`.
+  if (!args.includes('--no-tricolor') && !named.length) {
+    const r = spawnSync(
+      process.execPath,
+      [path.join(__dirname, 'compose-tricolor.cjs'), '--from', FROM, '--out', OUT],
+      { stdio: 'inherit' }
+    )
+    if (r.status !== 0) {
+      app.exit(r.status ?? 1)
+      return
+    }
   }
   console.log(`\nDone — ${OUT}`)
   app.quit()

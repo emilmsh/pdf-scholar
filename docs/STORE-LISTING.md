@@ -137,15 +137,20 @@ Answer the stores' data questions as follows (all true — see `docs/PRIVACY.md`
 
 Store requirement: **1280×800** PNG. Ready-to-upload files are in
 **`docs/store-screenshots/`** (already scaled to exactly 1280×800 — just drag
-them in). Suggested order + captions:
+them in), produced from the shoot by `npm run shoot:store`. Suggested order +
+captions:
 
 | File (`docs/store-screenshots/`) | Caption (EN) | Caption (NO) |
 |------|-------------|-------------|
-| `reading.png` | Distraction-free reading with themes | Distraksjonsfri lesing med temaer |
+| `tricolor.png` | Reading themes: Day, Sepia and Night | Lesetemaer: Dag, Sepia og Natt |
 | `annotations.png` | Annotation tools within reach, never in the way | Annoteringsverktøy innen rekkevidde, aldri i veien |
 | `assistant.png` | AI assistant grounded in the document | AI-assistent forankret i dokumentet |
-| `parchment.png` | Warm Sepia reading mode | Varm Sepia-lesemodus |
-| `night.png` | Two dark modes for late reading | To mørke moduser for sen lesing |
+| `assistant_figure.png` | Snip a figure and ask what it shows | Klipp ut en figur og spør hva den viser |
+| `dual-pane.png` | Two pages side by side in one window | To sider side om side i ett vindu |
+
+Five slots is not many, so the themes share one frame: `tricolor.png` is the
+same cover wiped Day → Sepia → Night, composed from the three theme shots
+rather than photographed. That buys the two assistant frames their own slots.
 
 Store icon: `src/extension/icons/icon-128.png` (128×128) is already in the
 package; the stores pull it automatically.
