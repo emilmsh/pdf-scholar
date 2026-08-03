@@ -51,38 +51,31 @@ the same app as an MSIX package, x64 and arm64, although the installer is update
 
 ### Desktop app (macOS) — beta
 
-**With [Homebrew](https://brew.sh)** — the easy path, and the only one with
-updates:
+The build is **not signed with an Apple Developer certificate** (deliberate —
+the app has zero recurring costs), which shapes both paths below the same way:
+Gatekeeper needs one `xattr` command per installed version, and the app cannot
+update itself.
+
+**With [Homebrew](https://brew.sh)** — recommended, because `brew upgrade`
+then delivers new versions:
 
 ```sh
 brew install --cask emilmsh/tap/pdf-scholar
 xattr -cr "/Applications/PDF Scholar.app"
 ```
 
-The `xattr` line is the Gatekeeper step described below — Homebrew ≥ 5 no
-longer bypasses quarantine, so it is needed after every install *and*
-upgrade. `brew upgrade --cask pdf-scholar` delivers new versions — the cask
-in [emilmsh/homebrew-tap](https://github.com/emilmsh/homebrew-tap) is bumped
-automatically when a release is published.
+The second line is the Gatekeeper step — repeat it after each `brew upgrade`.
 
 **By hand:** download the `.dmg` from the
-[latest release](https://github.com/emilmsh/pdf-scholar/releases/latest) — the
-**`-arm64`** build for Apple Silicon (M1 and later), the **`-x64`** build for older
-Intel Macs. The build is **not signed with an Apple Developer certificate**, so
-Gatekeeper reports it as "damaged" or from an unverified developer on first launch.
-To open it:
+[latest release](https://github.com/emilmsh/pdf-scholar/releases/latest) —
+**`-arm64`** for Apple Silicon (M1 and later), **`-x64`** for Intel Macs. Drag
+**PDF Scholar.app** into **Applications** (not straight from the disk image),
+run the same `xattr` command, and open the app normally. New versions come
+from the releases page.
 
-1. Drag **PDF Scholar.app** from the disk image into **Applications** (don't try to
-   open it from inside the disk image).
-2. In Terminal, run: `xattr -cr "/Applications/PDF Scholar.app"` — then open the app
-   normally.
-
-If the dialog says *unverified developer* rather than "damaged", **Open Anyway**
-under **System Settings → Privacy & Security** works as well. The "damaged"
-message never offers that button, so use the Terminal command above.
-
-Unsigned builds cannot auto-update, so new macOS versions come from the releases
-page — or from `brew upgrade`, which is the point of the tap.
+If Gatekeeper's dialog says *unverified developer* rather than "damaged",
+**Open Anyway** under **System Settings → Privacy & Security** works as well;
+the "damaged" variant never offers that button, so use the Terminal command.
 
 > **The macOS build has not been tested on Apple hardware yet** — it is built in
 > CI. If you run it on a Mac, [open an

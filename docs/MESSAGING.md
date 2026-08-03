@@ -233,6 +233,10 @@ fargefilter, og ett klikk tar deg dit.
   superlative.
 - **Claims about untested platforms.** macOS has not run on Apple hardware; the
   README says so and nothing elsewhere may imply otherwise.
+- **A third macOS install path, or Gatekeeper explained twice.** Every surface
+  offers at most two ways in — Homebrew and by hand — sharing one explanation
+  of what the unsigned build costs (one `xattr` per version, no self-update).
+  A surface that explains quarantine per-path has grown too convoluted.
 
 ---
 
