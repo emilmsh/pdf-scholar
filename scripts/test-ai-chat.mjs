@@ -26,7 +26,11 @@ const BUNDLE = join(ROOT, 'scripts', '.ai-chat-test-bundle.mjs')
 // still resolves from node_modules at import time.
 await build({
   stdin: {
-    contents: `export * from './src/shared/ai-chat'\nexport * from './src/shared/ai-provider-profile'`,
+    contents: [
+      `export * from './src/shared/ai-chat'`,
+      `export * from './src/shared/ai-provider-profile'`,
+      `export * from './src/shared/ai-model-catalog'`
+    ].join('\n'),
     resolveDir: ROOT,
     loader: 'ts'
   },
@@ -37,7 +41,8 @@ await build({
   outfile: BUNDLE,
   logLevel: 'silent'
 })
-const { runProviderChat, PROVIDER_PROFILES } = await import(pathToFileURL(BUNDLE).href)
+const { runProviderChat, PROVIDER_PROFILES, fetchCompatModels, refreshCatalog, isLocalEndpoint } =
+  await import(pathToFileURL(BUNDLE).href)
 
 let failures = 0
 function ok(cond, msg) {
@@ -482,6 +487,88 @@ section('mock: keyless offline provider')
   ok(cits.some((c) => c.kind === 'char'), 'mock emits char citations (native-style)')
   ok(cits.some((c) => c.kind === 'web'), 'mock emits a web citation in webSearch on-mode')
   observed.mock = { quoteContract: false, nativeCitations: true, webTool: true, images: true }
+}
+
+// ---------- compat catalog fetcher (fase 10.2: Ollama enrichment) ----------
+
+section('catalog: plain /v1 server vs Ollama enrichment')
+{
+  // A plain OpenAI-compatible server: no /api/tags, ids from /models
+  calls.length = 0
+  responder = (call) =>
+    call.url.endsWith('/api/tags')
+      ? new Response('not found', { status: 404 })
+      : new Response(JSON.stringify({ data: [{ id: 'mixtral' }, { id: 'gemma' }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+  const plain = await fetchCompatModels('https://api.example.com/v1', 'sk-x')
+  ok(
+    plain.map((m) => m.id).join(',') === 'mixtral,gemma',
+    `plain server lists from /models (got ${plain.map((m) => m.id).join(',')})`
+  )
+  ok(plain.every((m) => m.contextTokens === undefined), 'no invented context data for plain servers')
+  ok(
+    calls.some((c) => c.url === 'https://api.example.com/v1/models' && c.headers.get('authorization') === 'Bearer sk-x'),
+    'listing carries the key when one exists'
+  )
+
+  // An Ollama behind the URL: /api/tags lists, /api/show enriches
+  calls.length = 0
+  const SHOW = {
+    'llama3.1:8b': {
+      capabilities: ['completion', 'tools'],
+      parameters: 'num_gpu 1\nnum_ctx 8192',
+      model_info: { 'general.architecture': 'llama', 'llama.context_length': 131072 }
+    },
+    'llava:13b': {
+      capabilities: ['completion', 'vision'],
+      model_info: { 'general.architecture': 'llama', 'llama.context_length': 4096 }
+    },
+    // The safety-critical case: a 128k-capable model with NO num_ctx set — the
+    // server truncates silently at its default, so WE must assume the default
+    'qwen3:32b': {
+      capabilities: ['completion'],
+      model_info: { 'general.architecture': 'qwen3', 'qwen3.context_length': 131072 }
+    }
+  }
+  responder = (call) => {
+    if (call.url === 'http://localhost:11434/api/tags')
+      return new Response(
+        JSON.stringify({ models: Object.keys(SHOW).map((name) => ({ name })) }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      )
+    if (call.url === 'http://localhost:11434/api/show')
+      return new Response(JSON.stringify(SHOW[call.body?.model] ?? {}), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    throw new Error('unexpected url ' + call.url)
+  }
+  const local = await fetchCompatModels('http://localhost:11434/v1')
+  const byId = Object.fromEntries(local.map((m) => [m.id, m]))
+  ok(local.length === 3, `Ollama lists from /api/tags (got ${local.length})`)
+  ok(byId['llama3.1:8b']?.contextTokens === 8192, 'explicit num_ctx wins')
+  ok(byId['llama3.1:8b']?.vision === false, 'no vision capability → vision false')
+  ok(byId['llava:13b']?.vision === true, 'vision capability recognised')
+  ok(byId['llava:13b']?.contextTokens === 4096, 'default capped by the architecture maximum')
+  ok(
+    byId['qwen3:32b']?.contextTokens === 4096,
+    `no num_ctx → the server DEFAULT is assumed, never the architecture max (got ${byId['qwen3:32b']?.contextTokens})`
+  )
+
+  // A moved base URL refetches immediately — a fresh snapshot from another
+  // endpoint must never satisfy this one
+  const moved = await refreshCatalog(
+    { compat: { fetchedAt: Date.now(), models: [{ id: 'old' }], baseUrl: 'http://other:9999/v1' } },
+    { compat: { baseUrl: 'http://localhost:11434/v1' } },
+    false
+  )
+  ok(moved.compat?.baseUrl === 'http://localhost:11434/v1', 'changed endpoint refetches despite fresh TTL')
+  ok(moved.compat?.models.some((m) => m.id === 'llava:13b'), 'new endpoint\'s models replace the old list')
+
+  ok(isLocalEndpoint('http://localhost:11434/v1') && isLocalEndpoint('http://127.0.0.1:1234/v1'), 'loopback hosts read as local')
+  ok(!isLocalEndpoint('https://openrouter.ai/api/v1'), 'hosted endpoints do not')
 }
 
 // ---------- profile conformance ----------

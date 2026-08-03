@@ -44,7 +44,7 @@ import { deleteConversation, loadConversations, newConversationId, saveConversat
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { AssistantBody, renderMarkdown } from './ai-markdown'
-import { prettyModelName, providerLabels } from './ai-models'
+import { modelSupportsImages, prettyModelName, providerLabels } from './ai-models'
 import { AiSettings } from './AiSettings'
 import { ModelQuickMenu } from './AiModelMenu'
 import type { AiSeed } from './AiQuickPopover'
@@ -417,7 +417,8 @@ export default function AiPanel({
               history
                 .filter((m) => m.role === 'user')
                 .map((m) => m.text)
-                .join('\n')
+                .join('\n'),
+              config.catalog
             )
           : { doc: ensured.doc, excerpt: null }
         : null
@@ -641,6 +642,17 @@ export default function AiPanel({
     void send(input, undefined, imgs.length > 0 ? imgs : undefined)
   }, [input, busy, pendingImages, annotsStaged, getAnnotationsText, send])
 
+  // Whether the selected model can read images. Per-model knowledge exists
+  // only for the compat catalog (Ollama reports capabilities); everything else
+  // stays permissive. Disabled-with-reason, not hidden: the buttons say why.
+  const visionOk =
+    !config || modelSupportsImages(config.provider, config.models[config.provider], config.catalog)
+  const noVisionTip = config
+    ? t('ai.noVisionTip', {
+        model: prettyModelName(config.provider, config.models[config.provider] ?? '')
+      })
+    : ''
+
   // One composer, reused in both layouts: centred on the empty "landing"
   // (ChatGPT-style) and pinned to the bottom once the chat has content.
   const composer = (
@@ -686,8 +698,8 @@ export default function AiPanel({
           </label>
           <button
             className="btn-primary"
-            disabled={pagesBusy}
-            title={t('ai.readPagesTip', { max: MAX_IMAGES })}
+            disabled={pagesBusy || !visionOk}
+            title={visionOk ? t('ai.readPagesTip', { max: MAX_IMAGES }) : noVisionTip}
             onClick={() => {
               const from = clampPage(readFrom, pageCount)
               const to = Math.max(from, clampPage(readTo, pageCount))
@@ -769,6 +781,7 @@ export default function AiPanel({
             e.stopPropagation()
           }}
           onPaste={(e) => {
+            if (!visionOk) return // model can't read images — leave the paste as text
             const files = [...e.clipboardData.items]
               .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
               .map((it) => it.getAsFile())
@@ -816,14 +829,16 @@ export default function AiPanel({
           )}
           <button
             className="ai-attach-add"
-            title={t('tb.snipTip')}
+            disabled={!visionOk}
+            title={visionOk ? t('tb.snipTip') : noVisionTip}
             onClick={onRequestSnip}
           >
             <IconSnip size={16} />
           </button>
           <button
             className="ai-attach-add"
-            title={t('ai.attachTip')}
+            disabled={!visionOk}
+            title={visionOk ? t('ai.attachTip') : noVisionTip}
             onClick={() => fileInputRef.current?.click()}
           >
             <IconImage size={16} />

@@ -7,7 +7,7 @@
 // Keys never reach this component: it posts plaintext to the main process once
 // on save and reads back only `hasKey` flags. Keep it that way — no key value
 // may be held in renderer state beyond the field the user is typing into.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { AiConfigView, AiProviderId } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
@@ -38,6 +38,28 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
   const [compatUrl, setCompatUrl] = useState(config.compat.baseUrl)
   const [compatModel, setCompatModel] = useState(config.models.compat)
   const [saving, setSaving] = useState(false)
+  const [ollamaFound, setOllamaFound] = useState(false)
+
+  // Auto-detection: when nothing is configured yet, one quiet probe of
+  // Ollama's default port. no-cors on purpose — we only need "is something
+  // listening", and an opaque response resolves in every context this
+  // component runs in (file://, extension page, dev server) while a refused
+  // connection rejects. Never runs against a configured setup.
+  useEffect(() => {
+    if (config.compat.baseUrl) return
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 1500)
+    fetch('http://localhost:11434/api/version', { mode: 'no-cors', signal: controller.signal })
+      .then(() => setOllamaFound(true))
+      .catch(() => {})
+      .finally(() => clearTimeout(timer))
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+    // mount-only probe; config.compat.baseUrl is fixed for this panel's lifetime
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const save = async (): Promise<void> => {
     setSaving(true)
@@ -165,6 +187,19 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
           )}
           {id === 'compat' && (
             <>
+              {ollamaFound && !compatUrl.trim() && (
+                <p className="ai-field-hint">
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setCompatUrl('http://localhost:11434/v1')
+                    }}
+                  >
+                    {t('ai.ollamaDetected')}
+                  </a>
+                </p>
+              )}
               <label className="ai-field">
                 <span>{t('ai.compatPreset')}</span>
                 {/* Prefills the URL field, nothing more — the field below stays

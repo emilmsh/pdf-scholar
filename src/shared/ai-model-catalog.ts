@@ -137,12 +137,95 @@ export async function fetchOpenAiModels(apiKey: string): Promise<AiRemoteModel[]
 
 // ---------- OpenAI-compatible endpoints (the compat provider) ----------
 
-/** GET {baseUrl}/models — the listing most compatible servers implement
- *  (OpenRouter, Mistral, Groq, Ollama's /v1, LM Studio). Ids only, no
- *  filtering: the server lists exactly what it serves, and a local list is
- *  short by nature. Throws on any HTTP failure. */
+/** Ollama's out-of-the-box context (OLLAMA_CONTEXT_LENGTH default). This is
+ *  the number that actually governs a default install: sending more does not
+ *  error, it silently drops the OLDEST tokens — which for us is the system
+ *  prompt and the document's start. So when /api/show reports no explicit
+ *  num_ctx, we assume this and let the BM25 excerpt mode do its job, rather
+ *  than trusting the architecture's maximum and getting silently truncated.
+ *  Verified against Ollama's docs on the monthly pass (docs/MAINTENANCE.md). */
+const OLLAMA_DEFAULT_NUM_CTX = 4096
+
+/** How many models get the per-model /api/show enrichment. Local lists are
+ *  short; this is a runaway guard for a hoarder's Ollama, not a limit. */
+const OLLAMA_SHOW_CAP = 30
+
+/** Ollama enrichment for one model: what /api/show knows that /v1/models
+ *  does not — the context the server will really serve, and vision support.
+ *  Every access is defensive (the tree varies by architecture); a missing
+ *  branch reads as "unknown", never breaks the refresh. */
+async function ollamaShow(
+  origin: string,
+  name: string
+): Promise<Pick<AiRemoteModel, 'contextTokens' | 'vision'>> {
+  const res = await fetch(`${origin}/api/show`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    // Older Ollama expects `name`, newer `model` — sending both is harmless
+    body: JSON.stringify({ model: name, name })
+  })
+  if (!res.ok) return {}
+  const body = (await res.json()) as {
+    capabilities?: string[]
+    parameters?: string
+    model_info?: Record<string, unknown>
+  }
+  const out: Pick<AiRemoteModel, 'contextTokens' | 'vision'> = {}
+  if (Array.isArray(body.capabilities)) out.vision = body.capabilities.includes('vision')
+  // The architecture's maximum lives under '<arch>.context_length'
+  const info = body.model_info ?? {}
+  const arch = typeof info['general.architecture'] === 'string' ? info['general.architecture'] : null
+  const maxRaw = arch ? info[`${arch}.context_length`] : Object.entries(info).find(([k]) => k.endsWith('.context_length'))?.[1]
+  const max = typeof maxRaw === 'number' && maxRaw > 0 ? maxRaw : undefined
+  // num_ctx in the modelfile parameters is the served context; without it the
+  // server uses its default regardless of what the architecture could do
+  const numCtx = Number(/(?:^|\n)\s*num_ctx\s+(\d+)/.exec(body.parameters ?? '')?.[1])
+  const served = numCtx > 0 ? numCtx : OLLAMA_DEFAULT_NUM_CTX
+  out.contextTokens = max ? Math.min(served, max) : served
+  return out
+}
+
+/** The model list for an OpenAI-compatible endpoint. Two shapes of server:
+ *
+ *  - An Ollama behind the base URL (detected by {origin}/api/tags answering):
+ *    list from /api/tags and enrich each model via /api/show with the REAL
+ *    served context and vision support — this is what makes local models
+ *    first-class instead of guessed-at (docs/ROADMAP.md fase 10.2).
+ *  - Anything else: GET {baseUrl}/models, the listing most compatible servers
+ *    implement (OpenRouter, Mistral, Groq, LM Studio). Ids only, no
+ *    filtering: the server lists exactly what it serves.
+ *
+ *  Throws on HTTP failure of the listing itself; enrichment failures degrade
+ *  to an id-only entry. */
 export async function fetchCompatModels(baseUrl: string, apiKey?: string): Promise<AiRemoteModel[]> {
   const base = baseUrl.trim().replace(/\/+$/, '')
+  let origin: string | null = null
+  try {
+    origin = new URL(base).origin
+  } catch {
+    /* not a parseable URL — let the /models fetch below produce the error */
+  }
+  if (origin) {
+    try {
+      const tags = await fetch(`${origin}/api/tags`)
+      if (tags.ok) {
+        const body = (await tags.json()) as { models?: { name?: string }[] }
+        const names = (body.models ?? [])
+          .map((m) => m.name)
+          .filter((n): n is string => !!n)
+        if (names.length > 0) {
+          return await Promise.all(
+            names.slice(0, OLLAMA_SHOW_CAP).map(async (name) => ({
+              id: name,
+              ...(await ollamaShow(origin, name).catch(() => ({})))
+            }))
+          )
+        }
+      }
+    } catch {
+      /* not an Ollama — fall through to the generic listing */
+    }
+  }
   const res = await fetch(`${base}/models`, {
     headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {}
   })
@@ -151,6 +234,18 @@ export async function fetchCompatModels(baseUrl: string, apiKey?: string): Promi
   return (body.data ?? [])
     .filter((m): m is { id: string } => !!m.id)
     .map((m) => ({ id: m.id }))
+}
+
+/** Loopback host = a local model server: no cost reminder applies, and the
+ *  model menu says «lokal». Host-based on purpose — it is true for any local
+ *  OpenAI-compatible server, not only a detected Ollama. */
+export function isLocalEndpoint(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl.trim()).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '::1'
+  } catch {
+    return false
+  }
 }
 
 /** What refreshCatalog needs per provider: the hosted providers are reachable

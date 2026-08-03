@@ -1,6 +1,6 @@
 // Renderer-side AI helpers: document text assembly for the API, mapping
 // citations back to page positions, and token accounting.
-import type { AiCitation, AiProviderId, AiUsage } from '../../shared/types'
+import type { AiCitation, AiModelCatalog, AiProviderId, AiUsage } from '../../shared/types'
 import { getLanguage } from './i18n'
 import type { PageText } from './search'
 import type { AiDocument, Bm25Index } from './ai-retrieval'
@@ -62,9 +62,10 @@ export function prepareDocumentForRequest(
   ensured: { pages: PageText[]; doc: AiDocument },
   provider: AiProviderId,
   modelId: string,
-  queryText: string
+  queryText: string,
+  catalog?: AiModelCatalog
 ): PreparedDocument {
-  const contextTokens = contextTokensFor(provider, modelId)
+  const contextTokens = contextTokensFor(provider, modelId, catalog)
   if (documentFits(ensured.doc.text.length, contextTokens)) {
     return { doc: ensured.doc, excerpt: null }
   }

@@ -267,6 +267,15 @@ export interface AiRemoteModel {
   id: string
   displayName?: string
   caps?: AiModelCaps
+  /** The context the server will actually serve for this model (tokens),
+   *  when the endpoint can tell us — today only Ollama via /api/show
+   *  (num_ctx if configured, else the server default, capped by the
+   *  architecture's maximum). Absent = unknown, use the provider floor. */
+  contextTokens?: number
+  /** Whether the model accepts images, when the endpoint reports it (Ollama's
+   *  capabilities array). Absent = unknown — treated as "allow and let the
+   *  degrade nets handle it". */
+  vision?: boolean
 }
 
 /** Cached snapshot of the providers' live model lists, fetched with the user's

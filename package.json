@@ -33,6 +33,7 @@
     "test:ai-chat": "node scripts/test-ai-chat.mjs",
     "test:viewer-url": "node scripts/test-viewer-url.mjs",
     "test:annot-edit": "node scripts/test-annot-edit.mjs",
+    "test:ai-settings": "node scripts/test-ai-settings.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
     "test:torn-read": "node scripts/test-torn-read.mjs",
     "test:listing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-store-listing.ps1",

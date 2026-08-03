@@ -131,7 +131,8 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
           state.document,
           config.provider,
           config.models[config.provider],
-          [asked ?? '', state.selection].filter(Boolean).join('\n')
+          [asked ?? '', state.selection].filter(Boolean).join('\n'),
+          config.catalog
         )
       }
       const result = await bridge.aiChat({

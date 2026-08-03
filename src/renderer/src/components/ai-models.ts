@@ -11,6 +11,7 @@
 // ones get flagged. Refresh workflow for the curated data: docs/MODEL-UPDATE.md
 // (`npm run check:models` reports the drift).
 import type { AiModelCatalog, AiProviderId, ThinkingLevel } from '../../../shared/types'
+import { isLocalEndpoint, remoteModel } from '../../../shared/ai-model-catalog'
 import { t } from '../i18n'
 import type { MsgKey } from '../i18n'
 
@@ -114,9 +115,15 @@ export function modelOptions(
     curated: true,
     missing: !remoteIds.has(m.id)
   }))
+  // «lokal»-merke: models served from a loopback endpoint say so in the list
+  // (the short chip name stays clean)
+  const localSuffix =
+    provider === 'compat' && catalog?.compat && isLocalEndpoint(catalog.compat.baseUrl)
+      ? ` · ${t('ai.localTag')}`
+      : ''
   for (const m of remote.models) {
     if (curated.some((c) => c.id === m.id)) continue
-    const label = m.displayName ?? prettyModelName(provider, m.id)
+    const label = (m.displayName ?? prettyModelName(provider, m.id)) + localSuffix
     options.push({ id: m.id, label, short: prettyModelName(provider, m.id), curated: false, missing: false })
   }
   return options
@@ -166,9 +173,34 @@ const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {
   mock: 200_000
 }
 
-/** Context-window floor for a model (tokens) */
-export function contextTokensFor(provider: AiProviderId, modelId: string): number {
+/** Context-window floor for a model (tokens). For compat models the live
+ *  catalog may know the REAL served context (Ollama /api/show) — that number
+ *  replaces the provider floor in both directions: an 8k local model stops
+ *  being silently truncated at 32k, and an explicitly configured 128k one
+ *  stops being excerpted early. */
+export function contextTokensFor(
+  provider: AiProviderId,
+  modelId: string,
+  catalog?: AiModelCatalog
+): number {
+  if (provider === 'compat') {
+    const live = remoteModel(catalog, 'compat', modelId)?.contextTokens
+    if (live) return live
+  }
   return MODEL_CONTEXT_TOKENS[modelId] ?? PROVIDER_CONTEXT_FLOOR[provider] ?? 120_000
+}
+
+/** Whether the selected model can read images, as far as we know. Only the
+ *  compat catalog carries a per-model answer (Ollama capabilities); every
+ *  hosted provider's curated models are vision-capable, and unknown stays
+ *  permissive — the degrade nets own the rest. */
+export function modelSupportsImages(
+  provider: AiProviderId,
+  modelId: string,
+  catalog?: AiModelCatalog
+): boolean {
+  if (provider !== 'compat') return true
+  return remoteModel(catalog, 'compat', modelId)?.vision !== false
 }
 
 // Where each provider lets you set a spending cap — linked from the key field

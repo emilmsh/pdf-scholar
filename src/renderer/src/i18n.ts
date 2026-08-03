@@ -461,6 +461,8 @@ const nb = {
   'ai.compatModelHint': 'f.eks. llama3.1 eller mistral-large-latest',
   'ai.compatHint':
     'Alle tjenester og lokale servere som snakker OpenAI-API-et: Ollama, LM Studio, OpenRouter m.fl. Base-URL-en peker på API-roten (vanligvis …/v1); modellisten hentes derfra når du lagrer.',
+  'ai.ollamaDetected': 'Ollama kjører på denne maskinen — klikk for å fylle inn adressen',
+  'ai.noVisionTip': 'Valgt modell ({model}) kan ikke lese bilder',
   'ai.keyCapHint': 'Sett et utgiftstak på nøkkelen — samme sted viser leverandøren hva du faktisk har brukt. Appen teller tokens, men bare leverandøren vet prisen.',
   'ai.model': 'Modell',
   'ai.reasoning': 'Tenkeinnsats',
@@ -987,6 +989,8 @@ const en: Dict = {
   'ai.compatModelHint': 'e.g. llama3.1 or mistral-large-latest',
   'ai.compatHint':
     'Any service or local server that speaks the OpenAI API: Ollama, LM Studio, OpenRouter and more. The base URL points at the API root (usually …/v1); the model list is fetched from there when you save.',
+  'ai.ollamaDetected': 'Ollama is running on this machine — click to fill in the address',
+  'ai.noVisionTip': 'The selected model ({model}) cannot read images',
   'ai.keyCapHint': 'Set a spending cap on the key — the same page shows what you have actually used. This app counts tokens; only the provider knows the price.',
   'ai.model': 'Model',
   'ai.reasoning': 'Reasoning effort',
