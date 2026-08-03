@@ -1,0 +1,87 @@
+# Publishing a release (the draft from release.yml made public) bumps the
+# Homebrew tap: this reads the new version and dmg checksums off the release,
+# runs the tap's own scripts/bump.sh, and pushes. The tap's audit workflow
+# then test-installs the bumped cask on a macOS runner, so a wrong checksum
+# goes red there — not on a user's machine.
+#
+# Needs TAP_GITHUB_TOKEN: a fine-grained PAT with contents read+write on
+# emilmsh/homebrew-tap only. Missing token fails loudly on the first step —
+# never silently, because a cask lagging a published release means brew
+# users stop getting updates without anyone noticing.
+name: Update Homebrew tap
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  bump-cask:
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require the tap token
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "::error::TAP_GITHUB_TOKEN is not set — the Homebrew cask was NOT bumped to ${{ github.event.release.tag_name }}. Add a fine-grained PAT (contents: read/write on emilmsh/homebrew-tap) as a repository secret."
+            exit 1
+          fi
+
+      - name: Read version and dmg checksums from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ github.event.release.tag_name }}'
+          VERSION="${TAG#v}"
+
+          # The API's digest field covers current uploads; hashing a
+          # downloaded copy is the fallback so nothing depends on it.
+          sha_of() {
+            local name="$1" digest
+            digest=$(gh api "repos/${{ github.repository }}/releases/tags/$TAG" \
+              --jq ".assets[] | select(.name == \"$name\") | .digest // empty")
+            if [ -n "$digest" ]; then
+              echo "${digest#sha256:}"
+            else
+              gh release download "$TAG" --repo '${{ github.repository }}' \
+                --pattern "$name" --output /tmp/asset >&2
+              sha256sum /tmp/asset | cut -d' ' -f1
+              rm -f /tmp/asset
+            fi
+          }
+
+          ARM_SHA=$(sha_of "PDF-Scholar-$VERSION-arm64.dmg")
+          INTEL_SHA=$(sha_of "PDF-Scholar-$VERSION-x64.dmg")
+          if [ -z "$ARM_SHA" ] || [ -z "$INTEL_SHA" ]; then
+            echo "::error::could not determine dmg checksums for $TAG"
+            exit 1
+          fi
+
+          {
+            echo "VERSION=$VERSION"
+            echo "ARM_SHA=$ARM_SHA"
+            echo "INTEL_SHA=$INTEL_SHA"
+          } >> "$GITHUB_ENV"
+
+      - name: Check out the tap
+        uses: actions/checkout@v4
+        with:
+          repository: emilmsh/homebrew-tap
+          token: ${{ secrets.TAP_GITHUB_TOKEN }}
+
+      - name: Bump, commit, push
+        run: |
+          bash scripts/bump.sh "$VERSION" "$ARM_SHA" "$INTEL_SHA"
+          if git diff --quiet; then
+            echo "cask already at $VERSION — nothing to push"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898270+github-actions[bot]@users.noreply.github.com'
+          git add Casks/pdf-scholar.rb
+          git commit -m "pdf-scholar $VERSION"
+          git push

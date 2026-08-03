@@ -12,6 +12,8 @@
 #                                       require
 #   latest.yml / latest-linux.yml     — electron-updater metadata (win/linux;
 #                                       macOS has no auto-update: unsigned)
+#   PDF-Scholar-<version>-<arch>.dmg  — update-tap.yml resolves these names
+#                                       on publish to bump the Homebrew cask
 name: Release
 
 on:

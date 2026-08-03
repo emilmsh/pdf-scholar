@@ -51,7 +51,19 @@ the same app as an MSIX package, x64 and arm64, although the installer is update
 
 ### Desktop app (macOS) — beta
 
-Download the `.dmg` from the
+**With [Homebrew](https://brew.sh)** — the easy path, and the only one with
+updates:
+
+```sh
+brew install --cask --no-quarantine emilmsh/tap/pdf-scholar
+```
+
+`--no-quarantine` skips the Gatekeeper friction described below, and
+`brew upgrade --cask pdf-scholar` delivers new versions — the cask in
+[emilmsh/homebrew-tap](https://github.com/emilmsh/homebrew-tap) is bumped
+automatically when a release is published.
+
+**By hand:** download the `.dmg` from the
 [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest) — the
 **`-arm64`** build for Apple Silicon (M1 and later), the **`-x64`** build for older
 Intel Macs. The build is **not signed with an Apple Developer certificate**, so
@@ -68,7 +80,7 @@ under **System Settings → Privacy & Security** works as well. The "damaged"
 message never offers that button, so use the Terminal command above.
 
 Unsigned builds cannot auto-update, so new macOS versions come from the releases
-page.
+page — or from `brew upgrade`, which is the point of the tap.
 
 > **The macOS build has not been tested on Apple hardware yet** — it is built in
 > CI. If you run it on a Mac, [open an

@@ -18,7 +18,7 @@ One-time fees (Microsoft Partner Center, Chrome Web Store) are acceptable.
 | Windows arm64 | 1 | same universal installer (arch picked at install) | electron-updater |
 | Microsoft Store (x64 + arm64) | 1 | `PDF-Scholar-<v>-x64.appx` + `-arm64.appx` (MSIX, signed by the Store on ingestion) | the Store; electron-updater self-disables via `process.windowsStore` (`src/main/updater.ts`) |
 | Extension (Edge/Chrome) | 1 | `pdf-scholar-extension.zip` | store auto-update; sideload = in-app notice |
-| macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | none (see below) |
+| macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | none — `brew upgrade` via the tap stands in (see below) |
 | Linux x64 | 2 | `PDF-Scholar-<v>.AppImage` + `.deb` | electron-updater |
 
 The Microsoft Store is a live release channel, not a plan: the same Windows build
@@ -43,7 +43,12 @@ not as acceptable platform lag.
    the workaround (copy to Applications, then `xattr -cr` — the "damaged"
    variant never offers System Settings → Open Anyway). Consequence:
    **no auto-update on macOS** — Squirrel.Mac refuses unsigned apps. Users
-   update by downloading the new dmg.
+   update by downloading the new dmg. The **Homebrew tap**
+   ([`emilmsh/homebrew-tap`](https://github.com/emilmsh/homebrew-tap),
+   auto-bumped by `.github/workflows/update-tap.yml` when a release is
+   published — needs the `TAP_GITHUB_TOKEN` secret) is the recommended
+   install: `--no-quarantine` sidesteps Gatekeeper entirely and
+   `brew upgrade` stands in for auto-update.
 2. **Window chrome**: Windows/Linux use the native window-controls overlay
    (right side, theme-colored via `setTitleBarOverlay`); macOS has traffic
    lights (left, colors fixed — the `window:titlebar-colors` IPC is a no-op

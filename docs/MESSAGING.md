@@ -41,7 +41,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | Landing page | <https://emilmsh.github.io/pdf-scholar/> |
 | Privacy policy URL | `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md` |
 | Windows | Tier 1. One installer carries x64 and native arm64; per-user install, no admin rights. Also on the **Microsoft Store**, `9N75CPC0G9M2` (live) |
-| macOS / Linux | **Beta.** Built in CI, feature-identical by construction, not verified on owner hardware. macOS is unsigned (Gatekeeper workaround in the README) and cannot auto-update |
+| macOS / Linux | **Beta.** Built in CI, feature-identical by construction, not verified on owner hardware. macOS is unsigned (Gatekeeper workaround in the README) and cannot auto-update; the recommended macOS install is the Homebrew tap — `brew install --cask --no-quarantine emilmsh/tap/pdf-scholar` — which skips Gatekeeper and makes `brew upgrade` the update channel |
 | Browser extension | **Beta**, Edge and Chrome. **Not in either store yet** — install is Load-unpacked from the release zip. Do not write otherwise until the listings are live |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI or Azure OpenAI. No server of ours in between |

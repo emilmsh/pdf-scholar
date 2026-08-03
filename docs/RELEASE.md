@@ -135,6 +135,11 @@ gh release edit vX.Y.Z --draft=false
 Only now does electron-updater see it. Prune `release/` locally so one current
 installer remains.
 
+Publishing also fires `update-tap.yml`, which bumps the Homebrew cask to the
+new dmgs (it needs the `TAP_GITHUB_TOKEN` secret and fails loudly without it).
+Check that run went green; the tap's own audit workflow then test-installs the
+bumped cask on a macOS runner.
+
 ## 4. Microsoft Store — full release only
 
 ```bash
