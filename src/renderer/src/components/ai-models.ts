@@ -134,6 +134,15 @@ export function contextTokensFor(provider: AiProviderId, modelId: string): numbe
   return MODEL_CONTEXT_TOKENS[modelId] ?? PROVIDER_CONTEXT_FLOOR[provider] ?? 120_000
 }
 
+// Where each provider lets you create an API key — linked from the key field
+// so "get a key" is one click, not a search. Azure has no single create page
+// (keys live on the resource's Keys-and-Endpoint blade); its field gets an
+// explanatory hint instead.
+export const KEY_CREATE_URLS: Partial<Record<AiProviderId, string>> = {
+  anthropic: 'https://console.anthropic.com/settings/keys',
+  openai: 'https://platform.openai.com/api-keys'
+}
+
 // Where each provider lets you set a spending cap — linked from the key field
 // so the reminder to cap a key is one click from acting on it.
 export const SPEND_CAP_URLS: Partial<Record<AiProviderId, string>> = {

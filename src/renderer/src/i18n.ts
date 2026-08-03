@@ -446,6 +446,10 @@ const nb = {
   'ai.keySaved': '•••••••• (lagret)',
   'ai.keyNew': 'Lim inn nøkkelen din',
   'ai.keyCapHint': 'Sett et utgiftstak på nøkkelen — samme sted viser leverandøren hva du faktisk har brukt. Appen teller tokens, men bare leverandøren vet prisen.',
+  'ai.keyCreate': 'Lag nøkkel',
+  'ai.keyCap': 'Sett utgiftstak',
+  'ai.azureKeyHint':
+    'Nøkkelen og endepunktet står under «Keys and Endpoint» på Azure OpenAI-ressursen i Azure-portalen; deployment er navnet modellutrulleringen fikk der (Azure AI Foundry). Bruker arbeidsplassen din Azure, er det gjerne den som forvalter ressursen som har disse.',
   'ai.model': 'Modell',
   'ai.reasoning': 'Tenkeinnsats',
   'ai.thinkOff': 'Av',
@@ -956,6 +960,10 @@ const en: Dict = {
   'ai.keySaved': '•••••••• (saved)',
   'ai.keyNew': 'Paste your key',
   'ai.keyCapHint': 'Set a spending cap on the key — the same page shows what you have actually used. This app counts tokens; only the provider knows the price.',
+  'ai.keyCreate': 'Create a key',
+  'ai.keyCap': 'Set a spending cap',
+  'ai.azureKeyHint':
+    'The key and endpoint are under “Keys and Endpoint” on the Azure OpenAI resource in the Azure portal; the deployment is the name the model deployment was given there (Azure AI Foundry). If your workplace runs Azure, whoever manages the resource will have these.',
   'ai.model': 'Model',
   'ai.reasoning': 'Reasoning effort',
   'ai.thinkOff': 'Off',

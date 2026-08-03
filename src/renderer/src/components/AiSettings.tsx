@@ -12,7 +12,7 @@ import type { AiConfigView, AiProviderId } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
-import { DEFAULT_MODELS, KEY_PROVIDERS, SPEND_CAP_URLS } from './ai-models'
+import { DEFAULT_MODELS, KEY_CREATE_URLS, KEY_PROVIDERS, SPEND_CAP_URLS } from './ai-models'
 
 interface SettingsProps {
   config: AiConfigView
@@ -84,23 +84,7 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
   return (
     <div className="ai-settings">
       <div className="ai-settings-heading">{t('ai.keysTitle')}</div>
-      <p className="ai-field-hint">
-        {t('ai.keyCapHint')}{' '}
-        {KEY_PROVIDERS.map(({ id }, i) => (
-          <span key={id}>
-            {i > 0 && ' · '}
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                bridge.openExternal(SPEND_CAP_URLS[id]!)
-              }}
-            >
-              {id === 'anthropic' ? 'Anthropic' : id === 'openai' ? 'OpenAI' : 'Azure'}
-            </a>
-          </span>
-        ))}
-      </p>
+      <p className="ai-field-hint">{t('ai.keyCapHint')}</p>
       {KEY_PROVIDERS.map(({ id, name }) => (
         <div className="ai-field-group" key={id}>
           <label className="ai-field">
@@ -113,6 +97,34 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
               spellCheck={false}
             />
           </label>
+          {/* Each provider's doors, right where they are needed: create the key,
+              then cap it. Azure has no create page — prose says where keys live. */}
+          <p className="ai-field-hint">
+            {id === 'azure' && <>{t('ai.azureKeyHint')} </>}
+            {KEY_CREATE_URLS[id] && (
+              <>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    bridge.openExternal(KEY_CREATE_URLS[id]!)
+                  }}
+                >
+                  {t('ai.keyCreate')}
+                </a>
+                {' · '}
+              </>
+            )}
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault()
+                bridge.openExternal(SPEND_CAP_URLS[id]!)
+              }}
+            >
+              {t('ai.keyCap')}
+            </a>
+          </p>
           {id === 'azure' && (
             <>
               <label className="ai-field">
