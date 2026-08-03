@@ -740,7 +740,9 @@ async function chatOpenAiCompatible(
     if (done) break
     const text = decoder.decode(value, { stream: true })
     buffer += text
-    raw += text
+    // Only kept while the answer might turn out to be one non-SSE JSON body;
+    // once real chunks flow there is no reason to hold the stream twice.
+    if (!sawChunk) raw += text
     const lines = buffer.split('\n')
     buffer = lines.pop() ?? ''
     for (const line of lines) {

@@ -190,10 +190,12 @@ fargefilter, og ett klikk tar deg dit.
 - Optional web search, off by default: closed, on request, or always on
   (Anthropic and OpenAI only — the toggle simply doesn't appear elsewhere)
 - LaTeX/TeX renders properly in answers, so maths stays readable
-- Anthropic, OpenAI, Azure OpenAI — or any OpenAI-compatible endpoint,
-  including local models via Ollama or LM Studio (local servers need no key).
-  One model list across them all. Each answer shows the tokens the provider
-  counted, so the cost stays visible
+- Anthropic, OpenAI, Azure OpenAI — or any OpenAI-compatible endpoint, with
+  presets for OpenRouter, Google Gemini, Grok (xAI), Mistral and Groq, and
+  local models via Ollama or LM Studio (local servers need no key). Setup is
+  pick-the-service, paste that service's key, save — the model list comes from
+  the endpoint itself. One model list across them all. Each answer shows the
+  tokens the provider counted, so the cost stays visible
 
 ### 5. Where your document goes
 

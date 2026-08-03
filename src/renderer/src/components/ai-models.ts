@@ -26,15 +26,19 @@ export const providerLabels = (): { id: AiProviderId; label: string }[] => [
 /** Base-URL presets for the compat provider — a dropdown that only prefills
  *  the URL field, so nobody has to hunt for an endpoint in someone's docs.
  *  The local entries are the point of the provider: Ollama and LM Studio both
- *  serve the OpenAI surface on localhost, keyless. Verified monthly
- *  (docs/MAINTENANCE.md row 4). */
-export const compatPresets = (): { label: string; url: string }[] => [
-  { label: 'OpenRouter', url: 'https://openrouter.ai/api/v1' },
-  { label: 'Mistral', url: 'https://api.mistral.ai/v1' },
-  { label: 'Groq', url: 'https://api.groq.com/openai/v1' },
-  { label: 'xAI (Grok)', url: 'https://api.x.ai/v1' },
-  { label: `Ollama (${t('ai.localTag')})`, url: 'http://localhost:11434/v1' },
-  { label: `LM Studio (${t('ai.localTag')})`, url: 'http://localhost:1234/v1' }
+ *  serve the OpenAI surface on localhost, keyless. Gemini rides on Google's
+ *  official OpenAI-compatible endpoint (the reason fase 3's native Gemini
+ *  path was dropped — docs/ROADMAP.md). `modelHint` is only a placeholder
+ *  example for the model-id field, never sent anywhere. URLs and examples
+ *  verified monthly (docs/MAINTENANCE.md row 4). */
+export const compatPresets = (): { label: string; url: string; modelHint: string }[] => [
+  { label: 'OpenRouter', url: 'https://openrouter.ai/api/v1', modelHint: 'anthropic/claude-sonnet-5' },
+  { label: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai', modelHint: 'gemini-2.5-flash' },
+  { label: 'xAI (Grok)', url: 'https://api.x.ai/v1', modelHint: 'grok-4' },
+  { label: 'Mistral', url: 'https://api.mistral.ai/v1', modelHint: 'mistral-large-latest' },
+  { label: 'Groq', url: 'https://api.groq.com/openai/v1', modelHint: 'llama-3.3-70b-versatile' },
+  { label: `Ollama (${t('ai.localTag')})`, url: 'http://localhost:11434/v1', modelHint: 'llama3.1' },
+  { label: `LM Studio (${t('ai.localTag')})`, url: 'http://localhost:1234/v1', modelHint: 'qwen2.5-7b-instruct' }
 ]
 
 // Curated, verified model lists (see docs/agent-notes/modeller-api.md),

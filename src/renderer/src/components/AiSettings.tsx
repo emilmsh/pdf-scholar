@@ -187,6 +187,10 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
           )}
           {id === 'compat' && (
             <>
+              {/* The explanation ABOVE the fields: a reader holding an
+                  OpenRouter/Gemini/Grok key should recognise this group before
+                  meeting three unfamiliar inputs */}
+              <p className="ai-field-hint">{t('ai.compatHint')}</p>
               {ollamaFound && !compatUrl.trim() && (
                 <p className="ai-field-hint">
                   <a
@@ -231,12 +235,18 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
                 <span>{t('ai.compatModelId')}</span>
                 <input
                   value={compatModel}
-                  placeholder={t('ai.compatModelHint')}
+                  placeholder={
+                    // A service-appropriate example when a preset is picked —
+                    // the id format differs per service (OpenRouter prefixes
+                    // vendor/, Gemini doesn't, …), and a wrong-shaped guess is
+                    // the likeliest way to stumble here
+                    compatPresets().find((p) => p.url === compatUrl.trim())?.modelHint ??
+                    t('ai.compatModelHint')
+                  }
                   onChange={(e) => setCompatModel(e.target.value)}
                   spellCheck={false}
                 />
               </label>
-              <p className="ai-field-hint">{t('ai.compatHint')}</p>
             </>
           )}
         </div>

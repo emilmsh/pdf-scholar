@@ -23,10 +23,12 @@ import type { AiModelCaps, AiModelCatalog, AiRemoteModel } from './types'
 /** How long a fetched snapshot counts as fresh. Model launches are rare enough
  *  that a day-old list is fine for the hosted providers, and the TTL keeps the
  *  refresh call free to sprinkle anywhere in the UI without hammering them.
- *  The compat entry is much shorter: a local Ollama's list changes whenever
- *  the user pulls a model, and asking localhost again costs nothing. */
+ *  A compat snapshot from a LOCAL endpoint is much shorter-lived: an Ollama's
+ *  list changes whenever the user pulls a model, and asking localhost again
+ *  costs nothing — while a hosted compat endpoint (OpenRouter's list is
+ *  hundreds of models) keeps the ordinary daily cadence. */
 export const CATALOG_TTL_MS = 24 * 60 * 60 * 1000
-const COMPAT_TTL_MS = 5 * 60 * 1000
+const LOCAL_TTL_MS = 5 * 60 * 1000
 
 /** Providers the catalog can be refreshed for (Azure is manual, mock is fake) */
 export type CatalogProviderId = 'anthropic' | 'openai' | 'compat'
@@ -34,8 +36,12 @@ export const CATALOG_PROVIDERS: CatalogProviderId[] = ['anthropic', 'openai', 'c
 
 export function catalogStale(catalog: AiModelCatalog, provider: CatalogProviderId): boolean {
   const entry = catalog[provider]
-  const ttl = provider === 'compat' ? COMPAT_TTL_MS : CATALOG_TTL_MS
-  return !entry || Date.now() - entry.fetchedAt > ttl
+  if (!entry) return true
+  const ttl =
+    provider === 'compat' && isLocalEndpoint((entry as { baseUrl?: string }).baseUrl ?? '')
+      ? LOCAL_TTL_MS
+      : CATALOG_TTL_MS
+  return Date.now() - entry.fetchedAt > ttl
 }
 
 /** The live entry for a model id, when that provider's list has been fetched */

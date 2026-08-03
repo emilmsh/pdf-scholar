@@ -41,7 +41,7 @@ await build({
   outfile: BUNDLE,
   logLevel: 'silent'
 })
-const { runProviderChat, PROVIDER_PROFILES, fetchCompatModels, refreshCatalog, isLocalEndpoint } =
+const { runProviderChat, PROVIDER_PROFILES, fetchCompatModels, refreshCatalog, isLocalEndpoint, catalogStale } =
   await import(pathToFileURL(BUNDLE).href)
 
 let failures = 0
@@ -569,6 +569,18 @@ section('catalog: plain /v1 server vs Ollama enrichment')
 
   ok(isLocalEndpoint('http://localhost:11434/v1') && isLocalEndpoint('http://127.0.0.1:1234/v1'), 'loopback hosts read as local')
   ok(!isLocalEndpoint('https://openrouter.ai/api/v1'), 'hosted endpoints do not')
+
+  // TTL follows locality: a local list changes when the user pulls a model
+  // (minutes), a hosted list keeps the ordinary daily cadence
+  const tenMinAgo = Date.now() - 10 * 60 * 1000
+  ok(
+    !catalogStale({ compat: { fetchedAt: tenMinAgo, models: [{ id: 'x' }], baseUrl: 'https://openrouter.ai/api/v1' } }, 'compat'),
+    'hosted compat snapshot keeps the daily TTL (10 min old = fresh)'
+  )
+  ok(
+    catalogStale({ compat: { fetchedAt: tenMinAgo, models: [{ id: 'x' }], baseUrl: 'http://localhost:11434/v1' } }, 'compat'),
+    'local compat snapshot goes stale in minutes (10 min old = stale)'
+  )
 }
 
 // ---------- profile conformance ----------

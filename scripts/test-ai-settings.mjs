@@ -66,8 +66,8 @@ try {
   ok(settings.groups === 4, `four provider groups render (got ${settings.groups})`)
   ok(settings.hasCompatGroup, 'compat group with the base-URL field renders')
   ok(
-    settings.presets.some((p) => /Ollama/.test(p)) && settings.presets.some((p) => /OpenRouter/.test(p)),
-    'preset menu lists Ollama + OpenRouter'
+    ['Ollama', 'OpenRouter', 'Gemini', 'Grok'].every((s) => settings.presets.some((p) => p.includes(s))),
+    'preset menu lists Ollama + OpenRouter + Gemini + Grok'
   )
   ok(/valgfri|optional/i.test(settings.keyPlaceholder), 'key field says the key is optional')
 
