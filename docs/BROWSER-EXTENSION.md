@@ -192,7 +192,7 @@ Then in `edge://extensions` (or `chrome://extensions`):
 | Reading position / recents / settings | JSON store | `chrome.storage.local` | Parity, different backend |
 | Annotation UI (draw, notes, shapes) | ✅ | ✅ | Overlay is renderer-side |
 | **Persist annotations to disk** | ✅ | ✅¹ | ¹ real EmbedPDF pdfium writes in-page (`annotation-engine-browser.ts`); files opened via the in-app picker save silently over the original, URL/`file://` PDFs prompt once for a location — see roadmap for silent-overwrite full parity |
-| AI chat / grounded citations | ✅ live | ✅ live¹ | ¹ real Anthropic/OpenAI/Azure, BYO key in `chrome.storage.local` (not encrypted — see roadmap); shares the provider core `src/shared/ai-chat.ts` |
+| AI chat / grounded citations | ✅ live | ✅ live¹ | ¹ real Anthropic/OpenAI/Azure + OpenAI-compatible endpoints, BYO key in `chrome.storage.local` (not encrypted — see roadmap); shares the provider core `src/shared/ai-chat.ts`. Compat endpoints are CORS-dependent here (docs/PLATFORMS.md pt. 14) |
 | New window / side-by-side | native window | `chrome.tabs.create` | Adapted |
 | Print | ✅ | ✅ | Browser print |
 
@@ -237,9 +237,13 @@ Refinements for full parity:
 Real Anthropic/OpenAI/Azure chat now runs directly from the viewer page
 (`src/renderer/src/extension-ai.ts`), sharing the provider core with the
 Electron app (`src/shared/ai-chat.ts` → `runProviderChat`). The CORS problem is
-moot inside an extension: the manifest `host_permissions` let the page fetch the
-provider origins directly, and the Anthropic SDK runs with
-`dangerouslyAllowBrowser`.
+moot inside an extension for the named providers: the manifest
+`host_permissions` let the page fetch those origins directly, and the Anthropic
+SDK runs with `dangerouslyAllowBrowser`. The compat provider (user-typed
+OpenAI-compatible endpoints) is the exception — its endpoints cannot be
+enumerated in the manifest, so the endpoint itself must allow browser origins
+(Ollama's defaults do; LM Studio has a CORS toggle). The upgrade path is
+`optional_host_permissions` + a runtime grant (docs/PLATFORMS.md pt. 14).
 
 **Key-at-rest safety** is a genuine divergence, not a gap that was left open.
 Keys are encrypted with AES-GCM under a non-extractable WebCrypto key held in

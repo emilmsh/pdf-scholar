@@ -23,7 +23,7 @@ import { AI_ERRORS } from '../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
 
-const PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'mock']
+const PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'compat', 'mock']
 
 // ---------- Recorded answers, for the screenshot run ----------
 //
@@ -182,10 +182,15 @@ function configView(): AiConfigView {
   // decryption must show as not-set so the user re-enters it, instead of the
   // settings claiming a key exists while every request fails.
   for (const p of PROVIDERS) hasKey[p] = PROVIDER_PROFILES[p].keyRequired ? keyFor(p) !== '' : true
+  // compat's key really is optional, so "has key" means "ready to use":
+  // endpoint + model id configured. Drives the same UI the key flags drive
+  // (model-menu enabling, the add-a-key callout, the settings auto-switch).
+  hasKey.compat = ai.compat.baseUrl.trim() !== '' && ai.models.compat.trim() !== ''
   return {
     provider: ai.provider,
     models: { ...ai.models },
     azure: { ...ai.azure },
+    compat: { ...ai.compat },
     thinking: ai.thinking,
     hasKey,
     keyStorage: keyStorageMode(),
@@ -231,6 +236,7 @@ export function registerAiIpc(): void {
         provider: patch.provider,
         models: patch.models,
         azure: patch.azure,
+        compat: patch.compat,
         thinking: patch.thinking,
         keys: encryptedKeys
       })
@@ -245,9 +251,14 @@ export function registerAiIpc(): void {
   // the previous snapshot and are invisible here by design.
   ipcMain.handle('ai:refresh-models', async (_e, force: boolean) => {
     const state = getState()
+    const compatBase = state.ai.compat.baseUrl.trim()
     const next = await refreshCatalog(
       state.modelCatalog,
-      { anthropic: keyFor('anthropic'), openai: keyFor('openai') },
+      {
+        anthropic: { key: keyFor('anthropic') },
+        openai: { key: keyFor('openai') },
+        ...(compatBase ? { compat: { baseUrl: compatBase, key: keyFor('compat') || undefined } } : {})
+      },
       force === true
     )
     if (CATALOG_PROVIDERS.some((p) => next[p] !== state.modelCatalog[p])) {
@@ -282,6 +293,7 @@ export function registerAiIpc(): void {
         key,
         models: ai.models,
         azure: ai.azure,
+        compat: ai.compat,
         thinking: ai.thinking,
         catalog: getState().modelCatalog,
         req,

@@ -37,6 +37,13 @@ export interface AiProviderProfile {
   keyRequired: boolean
 }
 
+/** Model ids that accept OpenAI-style reasoning_effort. One definition shared
+ *  by request shaping (ai-chat.ts) and the reasoning selector's visibility
+ *  (AiModelMenu), so what the UI offers and what the request sends can never
+ *  drift apart. Providers whose profile says thinking:'per-model' (Anthropic)
+ *  have their own capability logic and never consult this. */
+export const OPENAI_REASONING_RE = /gpt-5|o[0-9]/i
+
 export const PROVIDER_PROFILES: Record<AiProviderId, AiProviderProfile> = {
   anthropic: {
     citations: 'native',
@@ -60,6 +67,17 @@ export const PROVIDER_PROFILES: Record<AiProviderId, AiProviderProfile> = {
     thinking: 'effort',
     vision: true,
     keyRequired: true
+  },
+  // Any OpenAI-compatible /chat/completions server: OpenRouter, Mistral, Groq,
+  // or a local Ollama/LM Studio. Keyless local servers are the point, so no
+  // key requirement — readiness is base URL + model id, enforced per request
+  // (AI_ERRORS.compatUnconfigured) and in each platform's hasKey view.
+  compat: {
+    citations: 'contract',
+    webSearch: false,
+    thinking: 'effort',
+    vision: true,
+    keyRequired: false
   },
   // The mock mirrors the richest real provider so every chip and citation UI
   // stays testable offline; 'none' thinking because there is nothing to tune.

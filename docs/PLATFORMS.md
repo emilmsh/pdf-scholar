@@ -163,6 +163,18 @@ not as acceptable platform lag.
     `chrome.storage.local` (`extension-ai.ts`). The plain-web preview is
     keyless/mock-only, so it has no catalog to fetch (`aiRefreshModels` no-ops).
     Curated-list maintenance is platform-neutral: `docs/MODEL-UPDATE.md`.
+14. **The compat provider (any OpenAI-compatible endpoint, incl. local Ollama/
+    LM Studio) is CORS-dependent on the extension — a documented divergence.**
+    The desktop calls from the main process, where no origin rules apply, so
+    every endpoint works. The extension calls from the viewer page, and the
+    manifest's `host_permissions` cannot enumerate endpoints the user types in
+    — so there the endpoint itself must allow browser origins: Ollama's
+    defaults allow extension origins, LM Studio has a CORS toggle, OpenRouter
+    serves permissive CORS; providers that don't (e.g. Mistral, Groq direct)
+    fail with the named `ai-endpoint-unreachable` error rather than something
+    cryptic. Accepted for fase 10.1; the upgrade path is
+    `optional_host_permissions` + a runtime grant from the settings panel
+    (open point in docs/ROADMAP.md fase 10).
 
 ## Maintenance rules
 

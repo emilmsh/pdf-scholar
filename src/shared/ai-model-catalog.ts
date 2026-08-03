@@ -21,17 +21,21 @@
 import type { AiModelCaps, AiModelCatalog, AiRemoteModel } from './types'
 
 /** How long a fetched snapshot counts as fresh. Model launches are rare enough
- *  that a day-old list is fine, and the TTL keeps the refresh call free to
- *  sprinkle anywhere in the UI without hammering the providers. */
+ *  that a day-old list is fine for the hosted providers, and the TTL keeps the
+ *  refresh call free to sprinkle anywhere in the UI without hammering them.
+ *  The compat entry is much shorter: a local Ollama's list changes whenever
+ *  the user pulls a model, and asking localhost again costs nothing. */
 export const CATALOG_TTL_MS = 24 * 60 * 60 * 1000
+const COMPAT_TTL_MS = 5 * 60 * 1000
 
 /** Providers the catalog can be refreshed for (Azure is manual, mock is fake) */
-export type CatalogProviderId = 'anthropic' | 'openai'
-export const CATALOG_PROVIDERS: CatalogProviderId[] = ['anthropic', 'openai']
+export type CatalogProviderId = 'anthropic' | 'openai' | 'compat'
+export const CATALOG_PROVIDERS: CatalogProviderId[] = ['anthropic', 'openai', 'compat']
 
 export function catalogStale(catalog: AiModelCatalog, provider: CatalogProviderId): boolean {
   const entry = catalog[provider]
-  return !entry || Date.now() - entry.fetchedAt > CATALOG_TTL_MS
+  const ttl = provider === 'compat' ? COMPAT_TTL_MS : CATALOG_TTL_MS
+  return !entry || Date.now() - entry.fetchedAt > ttl
 }
 
 /** The live entry for a model id, when that provider's list has been fetched */
@@ -131,22 +135,61 @@ export async function fetchOpenAiModels(apiKey: string): Promise<AiRemoteModel[]
     .map((m) => ({ id: m.id }))
 }
 
-/** Fetch fresh lists for every provider that has a key and a stale (or absent)
+// ---------- OpenAI-compatible endpoints (the compat provider) ----------
+
+/** GET {baseUrl}/models — the listing most compatible servers implement
+ *  (OpenRouter, Mistral, Groq, Ollama's /v1, LM Studio). Ids only, no
+ *  filtering: the server lists exactly what it serves, and a local list is
+ *  short by nature. Throws on any HTTP failure. */
+export async function fetchCompatModels(baseUrl: string, apiKey?: string): Promise<AiRemoteModel[]> {
+  const base = baseUrl.trim().replace(/\/+$/, '')
+  const res = await fetch(`${base}/models`, {
+    headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {}
+  })
+  if (!res.ok) throw new Error(`Compat models: HTTP ${res.status}`)
+  const body = (await res.json()) as { data?: { id?: string }[] }
+  return (body.data ?? [])
+    .filter((m): m is { id: string } => !!m.id)
+    .map((m) => ({ id: m.id }))
+}
+
+/** What refreshCatalog needs per provider: the hosted providers are reachable
+ *  with a key alone; compat needs the endpoint too (key optional there). An
+ *  absent entry means "cannot refresh this one right now". */
+export interface CatalogSources {
+  anthropic?: { key: string }
+  openai?: { key: string }
+  compat?: { baseUrl: string; key?: string | undefined }
+}
+
+/** Fetch fresh lists for every reachable provider with a stale (or absent)
  *  snapshot. Returns the updated catalog; a provider whose fetch fails keeps
- *  its previous entry. Both platforms' refresh endpoints are this + their own
- *  persistence. */
+ *  its previous entry. The compat snapshot is keyed to its base URL — a
+ *  changed endpoint refetches regardless of TTL, so the menu never shows one
+ *  server's models against another server's config. Both platforms' refresh
+ *  endpoints are this + their own persistence. */
 export async function refreshCatalog(
   catalog: AiModelCatalog,
-  keys: { [K in CatalogProviderId]?: string | undefined },
+  sources: CatalogSources,
   force: boolean
 ): Promise<AiModelCatalog> {
   const next: AiModelCatalog = { ...catalog }
   await Promise.all(
     CATALOG_PROVIDERS.map(async (provider) => {
-      const key = keys[provider]?.trim()
-      if (!key) return
-      if (!force && !catalogStale(catalog, provider)) return
       try {
+        if (provider === 'compat') {
+          const src = sources.compat
+          const baseUrl = src?.baseUrl.trim().replace(/\/+$/, '')
+          if (!src || !baseUrl) return
+          const moved = catalog.compat?.baseUrl !== baseUrl
+          if (!force && !moved && !catalogStale(catalog, provider)) return
+          const models = await fetchCompatModels(baseUrl, src.key?.trim() || undefined)
+          if (models.length > 0) next.compat = { fetchedAt: Date.now(), models, baseUrl }
+          return
+        }
+        const key = sources[provider]?.key.trim()
+        if (!key) return
+        if (!force && !catalogStale(catalog, provider)) return
         const models =
           provider === 'anthropic' ? await fetchAnthropicModels(key) : await fetchOpenAiModels(key)
         // An empty list is a provider hiccup, not "all models retired"

@@ -44,7 +44,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | macOS / Linux | **Beta.** Built in CI, feature-identical by construction, not verified on owner hardware. macOS is unsigned (Gatekeeper workaround in the README) and cannot auto-update; the recommended macOS install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
 | Browser extension | **Beta**, Edge and Chrome. **Not in either store yet** — install is Load-unpacked from the release zip. Do not write otherwise until the listings are live |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
-| AI | Optional, bring your own key: Anthropic, OpenAI or Azure OpenAI. No server of ours in between |
+| AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
 | Author | Emil Mathias Strøm Halseth, who reads PDFs for a living |
 | Logo | Elisabeth Walle — credit her wherever the logo appears |
 
@@ -188,10 +188,12 @@ fargefilter, og ett klikk tar deg dit.
 - Scanned documents are named as such rather than answered about blindly; attach
   a page range as images and the assistant reads those
 - Optional web search, off by default: closed, on request, or always on
-  (Anthropic and OpenAI; Azure ignores it)
+  (Anthropic and OpenAI only — the toggle simply doesn't appear elsewhere)
 - LaTeX/TeX renders properly in answers, so maths stays readable
-- Anthropic, OpenAI or Azure OpenAI, one model list across the three. Each
-  answer shows the tokens the provider counted, so the cost stays visible
+- Anthropic, OpenAI, Azure OpenAI — or any OpenAI-compatible endpoint,
+  including local models via Ollama or LM Studio (local servers need no key).
+  One model list across them all. Each answer shows the tokens the provider
+  counted, so the cost stays visible
 
 ### 5. Where your document goes
 
@@ -203,6 +205,8 @@ fargefilter, og ett klikk tar deg dit.
 - When you do use the assistant, the request goes straight to the provider you
   picked — there is no server of ours in between — under your key and their
   terms
+- Point it at a local model (Ollama, LM Studio) and even your questions stay
+  on your own machine
 - The key is kept in the platform's own key store; the exact mode differs per
   platform and the settings panel names the one in force. See "Wording we do not
   use" below before writing anything shorter than that

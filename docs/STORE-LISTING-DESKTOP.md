@@ -75,7 +75,7 @@ AI ASSISTANT (optional — bring your own key)
 • A scanned PDF — pictures of words, with no text to search — is named as such rather than answered about blindly; attach a page range and the assistant reads those pages as images
 • LaTeX/TeX renders properly in answers, so maths stays readable
 • Optional web search, off by default: closed, on request, or always on
-• One model list across providers, using your own Anthropic, OpenAI or Azure OpenAI key. The document leaves your device only when you ask a question, and goes straight to the provider you chose, under your key and their terms. PDF Scholar runs no server of its own.
+• One model list across providers, using your own Anthropic, OpenAI or Azure OpenAI key — or any OpenAI-compatible endpoint, including local models via Ollama or LM Studio (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose, under your key and their terms; with a local model it never leaves at all. PDF Scholar runs no server of its own.
 
 Source code: https://github.com/emilmsh/pdf-scholar
 ```
@@ -121,7 +121,7 @@ AI-ASSISTENT (valgfri — egen nøkkel)
 • En skannet PDF — bilder av ord, uten tekst å søke i — sies det fra om i stedet for å svares på i blinde; legg ved et sideutvalg, så leser assistenten de sidene som bilder
 • LaTeX/TeX vises riktig i svar, så matematikk holder seg lesbar
 • Valgfritt nettsøk, av som standard: lukket, på forespørsel, eller alltid på
-• Én modelliste på tvers av leverandører, med din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel. Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte, under din nøkkel og deres vilkår. PDF Scholar kjører ingen egen server.
+• Én modelliste på tvers av leverandører, med din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel — eller et hvilket som helst OpenAI-kompatibelt endepunkt, inkludert lokale modeller via Ollama eller LM Studio (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte, under din nøkkel og deres vilkår; med en lokal modell forlater det aldri maskinen. PDF Scholar kjører ingen egen server.
 
 Kildekode: https://github.com/emilmsh/pdf-scholar
 ```
@@ -181,7 +181,7 @@ Standard PDF annotations that open correctly in Acrobat
 Optional AI assistant that links every answer to the passage it came from
 Snip a figure and ask the assistant to explain it; LaTeX renders in answers
 Optional web search: off, on request or always on
-Bring your own Anthropic, OpenAI or Azure OpenAI key — we run no server
+Bring your own AI key — or run a local model via Ollama/LM Studio, no key at all
 Native x64 and arm64; the Store keeps it updated automatically
 Free and open source (MIT) — no account, no tracking, no ads
 ```
@@ -204,7 +204,7 @@ Standard PDF-annoteringer som åpnes riktig i Acrobat
 Valgfri AI-assistent som lenker hvert svar til avsnittet det kom fra
 Klipp ut en figur og be assistenten forklare den; LaTeX vises i svar
 Valgfritt nettsøk: av, på forespørsel eller alltid på
-Bruk din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel — vi kjører ingen server
+Bruk din egen AI-nøkkel — eller kjør en lokal modell via Ollama/LM Studio, helt uten nøkkel
 Både x64 og arm64; Store holder appen automatisk oppdatert
 Gratis og åpen kildekode (MIT) — ingen konto, ingen sporing, ingen reklame
 ```
@@ -227,14 +227,14 @@ Gratis og åpen kildekode (MIT) — ingen konto, ingen sporing, ingen reklame
 ```
 PDF Scholar is free and open-source software, licensed under the MIT License: https://github.com/emilmsh/pdf-scholar/blob/master/LICENSE
 
-The AI assistant is optional and requires your own third-party API key (Anthropic, OpenAI or Azure OpenAI). When you use it, the relevant document text is sent from your device directly to the provider you chose, under your key and that provider's terms. PDF Scholar operates no server and collects no data. See the privacy policy: https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md
+The AI assistant is optional and runs on your own third-party API key (Anthropic, OpenAI, Azure OpenAI or another OpenAI-compatible service) or on a local model server (e.g. Ollama or LM Studio, no key needed). When you use it, the relevant document text is sent from your device directly to the provider you chose, under your key and that provider's terms — with a local model it stays on your device. PDF Scholar operates no server and collects no data. See the privacy policy: https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md
 ```
 
 **NO:**
 ```
 PDF Scholar er gratis og åpen kildekode, lisensiert under MIT-lisensen: https://github.com/emilmsh/pdf-scholar/blob/master/LICENSE
 
-AI-assistenten er valgfri og krever din egen tredjeparts API-nøkkel (Anthropic, OpenAI eller Azure OpenAI). Når du bruker den, sendes relevant dokumenttekst fra maskinen din direkte til leverandøren du valgte, under din nøkkel og deres vilkår. PDF Scholar kjører ingen egen server og samler ikke inn data. Se personvernerklæringen: https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md
+AI-assistenten er valgfri og bruker din egen tredjeparts API-nøkkel (Anthropic, OpenAI, Azure OpenAI eller en annen OpenAI-kompatibel tjeneste) eller en lokal modellserver (f.eks. Ollama eller LM Studio, uten nøkkel). Når du bruker den, sendes relevant dokumenttekst fra maskinen din direkte til leverandøren du valgte, under din nøkkel og deres vilkår — med en lokal modell blir den på maskinen. PDF Scholar kjører ingen egen server og samler ikke inn data. Se personvernerklæringen: https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md
 ```
 
 ### Developed by (≤ 255 chars)

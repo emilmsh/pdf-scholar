@@ -78,6 +78,25 @@ export const AI_ERRORS = {
     code: 'ai-azure-unconfigured',
     error: 'Azure-endepunkt og deployment må fylles ut i KI-innstillingene.'
   },
+  compatUnconfigured: {
+    code: 'ai-compat-unconfigured',
+    error: 'Base-URL og modell-id for det OpenAI-kompatible endepunktet må fylles ut i KI-innstillingene.'
+  },
+  /** The fetch itself failed — nothing is listening, DNS failed, or (in the
+   *  extension) the browser blocked the cross-origin call. The host and the
+   *  runtime's own sentence ride in `error` for the log; the renderer shows
+   *  its translation of the code. */
+  endpointUnreachable: (host: string, detail: string): FileError => ({
+    code: 'ai-endpoint-unreachable',
+    error: `Fikk ikke kontakt med ${host} (${detail})`
+  }),
+  /** The endpoint answered but never produced anything we recognise as a
+   *  Chat Completions stream or response — probably not an OpenAI-compatible
+   *  API root (wrong path, a web page, a bare Ollama root without /v1). */
+  endpointIncompatible: {
+    code: 'ai-endpoint-incompatible',
+    error: 'Endepunktet svarte, men ikke som et OpenAI-kompatibelt API (sjekk at base-URL-en peker på API-roten, vanligvis …/v1).'
+  },
   /** The provider refused the request as too big for the model's context window.
    *  The provider's own wording is kept as `error` — it names the token counts,
    *  which is the only part worth reading in a log. */

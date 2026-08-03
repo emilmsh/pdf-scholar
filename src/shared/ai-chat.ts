@@ -27,6 +27,7 @@ import type {
   ThinkingLevel
 } from './types'
 import { remoteModel } from './ai-model-catalog'
+import { OPENAI_REASONING_RE } from './ai-provider-profile'
 import { DEFAULT_AZURE_API_VERSION } from './defaults'
 import { AI_ERRORS } from './engine-errors'
 
@@ -518,7 +519,7 @@ async function chatOpenAiResponses(
     stream: true
   }
   if (webSearchEnabled(req)) body.tools = [{ type: 'web_search' }]
-  if (/gpt-5|o[0-9]/i.test(model)) body.reasoning = { effort: openAiEffort(thinking) }
+  if (OPENAI_REASONING_RE.test(model)) body.reasoning = { effort: openAiEffort(thinking) }
 
   // Same degrade-on-400 idea as the Anthropic path: when the model rejects a
   // parameter we added on a heuristic (reasoning effort, the web-search tool),
@@ -629,8 +630,13 @@ async function chatOpenAiResponses(
   }
 }
 
-/** Chat Completions fallback — used by Azure deployments only (OpenAI proper
- *  goes through chatOpenAiResponses). No server-side web search here. */
+/** Chat Completions path — Azure deployments and the compat provider (any
+ *  OpenAI-compatible server: OpenRouter, Mistral, Groq, local Ollama/LM
+ *  Studio); OpenAI proper goes through chatOpenAiResponses. No server-side
+ *  web search here. Transport failures and non-SSE answers are handled in
+ *  full because arbitrary endpoints fail in ways the hosted providers never
+ *  do: nothing listening, a web page instead of an API, a server that
+ *  ignores `stream: true` and answers with one JSON body. */
 async function chatOpenAiCompatible(
   url: string,
   headers: Record<string, string>,
@@ -673,18 +679,32 @@ async function chatOpenAiCompatible(
   const body: Record<string, unknown> = { messages, stream: true }
   if (model) body.model = model
   // gpt-5.6 reasoning control (harmless on models that ignore it)
-  if (/gpt-5|o[0-9]/i.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking)
+  if (OPENAI_REASONING_RE.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking)
 
   // Deployments name models we cannot inspect, so the reasoning heuristic can
   // misfire — a 400 blaming it gets one retry without, same net as the other paths.
   let response: Response
   for (let attempt = 0; ; attempt++) {
-    response = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...headers },
-      body: JSON.stringify(body),
-      signal
-    })
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+        signal
+      })
+    } catch (err) {
+      // Aborts belong to the dispatcher's net (→ AI_ERRORS.aborted); anything
+      // else here is transport-level — nothing listening, DNS, CORS — and
+      // deserves its own name instead of a bare "fetch failed".
+      if (signal.aborted) throw err
+      let host = url
+      try {
+        host = new URL(url).host
+      } catch {
+        /* keep the raw url */
+      }
+      return AI_ERRORS.endpointUnreachable(host, err instanceof Error ? err.message : String(err))
+    }
     if (response.ok && response.body) break
     const detail = await response.text().catch(() => '')
     if (
@@ -703,16 +723,30 @@ async function chatOpenAiCompatible(
   const decoder = new TextDecoder()
   let buffer = ''
   let fullText = ''
+  let raw = ''
+  let sawChunk = false
   const usage: AiUsage = { ...EMPTY_USAGE }
+  const readUsage = (u: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    prompt_tokens_details?: { cached_tokens?: number }
+  }): void => {
+    usage.inputTokens = u.prompt_tokens ?? 0
+    usage.outputTokens = u.completion_tokens ?? 0
+    usage.cacheReadTokens = u.prompt_tokens_details?.cached_tokens ?? 0
+  }
   for (;;) {
     const { done, value } = await reader.read()
     if (done) break
-    buffer += decoder.decode(value, { stream: true })
+    const text = decoder.decode(value, { stream: true })
+    buffer += text
+    raw += text
     const lines = buffer.split('\n')
     buffer = lines.pop() ?? ''
     for (const line of lines) {
       const trimmed = line.trim()
       if (!trimmed.startsWith('data:')) continue
+      sawChunk = true
       const payload = trimmed.slice(5).trim()
       if (payload === '[DONE]') continue
       try {
@@ -722,15 +756,29 @@ async function chatOpenAiCompatible(
           fullText += delta
           emit(delta)
         }
-        if (parsed.usage) {
-          usage.inputTokens = parsed.usage.prompt_tokens ?? 0
-          usage.outputTokens = parsed.usage.completion_tokens ?? 0
-          usage.cacheReadTokens = parsed.usage.prompt_tokens_details?.cached_tokens ?? 0
-        }
+        if (parsed.usage) readUsage(parsed.usage)
       } catch {
         /* ignore malformed keep-alives */
       }
     }
+  }
+  if (!sawChunk) {
+    // No SSE at all. Some minimal servers ignore `stream: true` and answer
+    // with one complete Chat Completions JSON — accept that quietly. Anything
+    // else (a web page, an unrecognisable body) gets the named code.
+    try {
+      const parsed = JSON.parse(raw)
+      const text: unknown = parsed.choices?.[0]?.message?.content
+      if (typeof text === 'string' && text) {
+        emit(text)
+        if (parsed.usage) readUsage(parsed.usage)
+        return { ok: true, parts: parseQuoteContract(text), usage, model: parsed.model ?? model ?? 'azure' }
+      }
+      if (typeof parsed?.error?.message === 'string') return providerFailure(parsed.error.message)
+    } catch {
+      /* not JSON either */
+    }
+    return AI_ERRORS.endpointIncompatible
   }
   return { ok: true, parts: parseQuoteContract(fullText), usage, model: model ?? 'azure' }
 }
@@ -800,10 +848,12 @@ async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Pr
 
 export interface ProviderChatParams {
   provider: AiProviderId
-  /** Decrypted/plaintext key for the chosen provider (empty for mock) */
+  /** Decrypted/plaintext key for the chosen provider (empty for mock, and
+   *  allowed empty for compat — local servers have no keys) */
   key: string
   models: Record<AiProviderId, string>
   azure: { endpoint: string; deployment: string; apiVersion: string }
+  compat: { baseUrl: string }
   thinking: ThinkingLevel
   /** Live model catalog (capability data for request shaping); absent or empty
    *  falls back to the per-family heuristics */
@@ -818,7 +868,7 @@ export interface ProviderChatParams {
  *  missing-key case in its own words); this only validates provider-specific
  *  extras (Azure endpoint/deployment). Aborts surface as AI_ERRORS.aborted. */
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
-  const { provider, key, models, azure, thinking, catalog, req, emit, signal } = params
+  const { provider, key, models, azure, compat, thinking, catalog, req, emit, signal } = params
   try {
     switch (provider) {
       case 'anthropic': {
@@ -837,6 +887,23 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
           `${endpoint}/openai/deployments/${azure.deployment}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`,
           { 'api-key': key },
           null,
+          thinking,
+          req,
+          emit,
+          signal
+        )
+      }
+      case 'compat': {
+        // Any OpenAI-compatible server. Key optional (local servers have
+        // none); base URL + model id are the readiness bar, mirrored by the
+        // hasKey views on both platforms.
+        const baseUrl = compat.baseUrl.trim().replace(/\/+$/, '')
+        const model = models.compat.trim()
+        if (!baseUrl || !model) return AI_ERRORS.compatUnconfigured
+        return await chatOpenAiCompatible(
+          `${baseUrl}/chat/completions`,
+          key ? { authorization: `Bearer ${key}` } : {},
+          model,
           thinking,
           req,
           emit,

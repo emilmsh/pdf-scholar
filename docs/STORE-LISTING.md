@@ -62,7 +62,7 @@ AI ASSISTANT (optional, bring your own key)
 • Structured article summaries; explain, simplify, critique or define selected text
 • Snip a figure or a region and ask the assistant to explain it
 • Search by meaning: describe a topic in your own words and get the passages that discuss it
-• Works with your own Anthropic, OpenAI or Azure OpenAI key. The document leaves your device only when you ask a question, and goes straight to the provider you chose
+• Works with your own Anthropic, OpenAI or Azure OpenAI key — or an OpenAI-compatible endpoint such as a local Ollama (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose; with a local model it never leaves at all
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
 ```
@@ -95,7 +95,7 @@ AI-ASSISTENT (valgfri, egen nøkkel)
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • Klipp ut en figur eller et område og be assistenten forklare det
 • Søk etter mening: beskriv et tema med dine egne ord og få avsnittene som handler om det
-• Bruker din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel. Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte
+• Bruker din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel — eller et OpenAI-kompatibelt endepunkt som en lokal Ollama (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte; med en lokal modell forlater det aldri maskinen
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
 ```
@@ -121,7 +121,7 @@ Answer the stores' data questions as follows (all true — see `docs/PRIVACY.md`
 
 - **Does this extension collect or use user data?** The extension itself collects and transmits **nothing** — no analytics, no telemetry, no accounts.
 - **Website content:** the extension processes PDF content **locally, on the device**, only to render and annotate it. It is not sent anywhere by the reader.
-- **The optional AI assistant** only runs when the user has entered **their own** API key and explicitly asks a question. It then sends the relevant document text **directly from the user's browser to the AI provider the user chose** (Anthropic / OpenAI / Azure OpenAI), under the user's key and that provider's terms. PDF Scholar operates **no server** and receives none of this data.
+- **The optional AI assistant** only runs when the user has configured **their own** AI provider and explicitly asks a question. It then sends the relevant document text **directly from the user's browser to the AI provider the user chose** (Anthropic / OpenAI / Azure OpenAI / an OpenAI-compatible endpoint of the user's choice, incl. a local model server), under the user's key and that provider's terms. PDF Scholar operates **no server** and receives none of this data.
 - **Not sold or transferred** to third parties, except the user-directed AI call above.
 - **No remote code:** all executable code ships inside the package; nothing is fetched and run at runtime. (The AI calls are data requests to the user's provider, not code.)
 - **Privacy policy URL:** `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`

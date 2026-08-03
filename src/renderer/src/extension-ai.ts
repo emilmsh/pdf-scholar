@@ -41,12 +41,13 @@ const DEFAULT_CONFIG: AiConfig = {
   provider: 'mock',
   models: { ...DEFAULT_AI_MODELS },
   azure: { endpoint: '', deployment: '', apiVersion: '' },
+  compat: { baseUrl: '' },
   thinking: 'medium'
 }
 
 type Keys = Partial<Record<AiProviderId, string>>
 
-const PROVIDER_IDS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'mock']
+const PROVIDER_IDS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'compat', 'mock']
 
 async function loadConfig(): Promise<AiConfig> {
   const stored = await store.get<Partial<AiConfig>>(K_AI_CONFIG, {})
@@ -54,7 +55,8 @@ async function loadConfig(): Promise<AiConfig> {
     ...DEFAULT_CONFIG,
     ...stored,
     models: { ...DEFAULT_CONFIG.models, ...stored.models },
-    azure: { ...DEFAULT_CONFIG.azure, ...stored.azure }
+    azure: { ...DEFAULT_CONFIG.azure, ...stored.azure },
+    compat: { ...DEFAULT_CONFIG.compat, ...stored.compat }
   }
 }
 
@@ -83,10 +85,14 @@ async function toView(config: AiConfig, keys: Keys, catalog: AiModelCatalog): Pr
   for (const p of PROVIDER_IDS) {
     hasKey[p] = PROVIDER_PROFILES[p].keyRequired ? (usable[p]?.trim() ?? '') !== '' : true
   }
+  // Same rule as the desktop: compat's key is optional, so "has key" means
+  // "ready to use" — endpoint + model id configured.
+  hasKey.compat = config.compat.baseUrl.trim() !== '' && config.models.compat.trim() !== ''
   return {
     provider: config.provider,
     models: { ...config.models },
     azure: { ...config.azure },
+    compat: { ...config.compat },
     thinking: config.thinking,
     hasKey,
     keyStorage: (await sealingAvailable()) ? 'browser-nonextractable' : 'session-only',
@@ -150,6 +156,7 @@ export function createExtensionAi(): Pick<
         provider: patch.provider ?? current.provider,
         models: { ...current.models, ...patch.models },
         azure: { ...current.azure, ...patch.azure },
+        compat: { ...current.compat, ...patch.compat },
         thinking: patch.thinking ?? current.thinking
       }
       store.set(K_AI_CONFIG, next)
@@ -185,9 +192,14 @@ export function createExtensionAi(): Pick<
         loadCatalog()
       ])
       const usable = await usableKeys(stored)
+      const compatBase = config.compat.baseUrl.trim()
       const next = await refreshCatalog(
         catalog,
-        { anthropic: usable.anthropic, openai: usable.openai },
+        {
+          anthropic: { key: usable.anthropic ?? '' },
+          openai: { key: usable.openai ?? '' },
+          ...(compatBase ? { compat: { baseUrl: compatBase, key: usable.compat || undefined } } : {})
+        },
         force === true
       )
       if (CATALOG_PROVIDERS.some((p) => next[p] !== catalog[p])) store.set(K_AI_CATALOG, next)
@@ -214,6 +226,7 @@ export function createExtensionAi(): Pick<
           key,
           models: config.models,
           azure: config.azure,
+          compat: config.compat,
           thinking: config.thinking,
           catalog: await loadCatalog(),
           req: request,

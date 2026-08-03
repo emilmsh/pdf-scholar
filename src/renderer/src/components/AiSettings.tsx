@@ -12,7 +12,7 @@ import type { AiConfigView, AiProviderId } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
-import { DEFAULT_MODELS, KEY_PROVIDERS, SPEND_CAP_URLS } from './ai-models'
+import { compatPresets, DEFAULT_MODELS, keyProviders, SPEND_CAP_URLS } from './ai-models'
 
 interface SettingsProps {
   config: AiConfigView
@@ -29,20 +29,27 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
     anthropic: '',
     openai: '',
     azure: '',
+    compat: '',
     mock: ''
   })
   const [endpoint, setEndpoint] = useState(config.azure.endpoint)
   const [deployment, setDeployment] = useState(config.azure.deployment)
   const [apiVersion, setApiVersion] = useState(config.azure.apiVersion)
+  const [compatUrl, setCompatUrl] = useState(config.compat.baseUrl)
+  const [compatModel, setCompatModel] = useState(config.models.compat)
   const [saving, setSaving] = useState(false)
 
   const save = async (): Promise<void> => {
     setSaving(true)
+    const compatChanged =
+      compatUrl.trim() !== config.compat.baseUrl || compatModel.trim() !== config.models.compat
     const patch: Parameters<typeof bridge.aiSetConfig>[0] = {
       // apiVersion '' = use the app's built-in default (placeholder shows it)
-      azure: { endpoint: endpoint.trim(), deployment: deployment.trim(), apiVersion: apiVersion.trim() }
+      azure: { endpoint: endpoint.trim(), deployment: deployment.trim(), apiVersion: apiVersion.trim() },
+      compat: { baseUrl: compatUrl.trim() },
+      models: { ...config.models, compat: compatModel.trim() }
     }
-    for (const { id } of KEY_PROVIDERS) {
+    for (const { id } of keyProviders()) {
       if (keys[id].trim()) (patch.keys ??= {})[id] = keys[id].trim()
     }
     let next = await bridge.aiSetConfig(patch)
@@ -50,9 +57,11 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
     // provider still without a key — switch to the first real provider that now
     // has a key, so the chat is usable right after saving the very first key.
     // (mock's hasKey is always true, so it must be handled explicitly here or
-    // saving a key while on the default mock provider would never switch away.)
+    // saving a key while on the default mock provider would never switch away.
+    // compat's hasKey means "endpoint + model configured", so an unconfigured
+    // compat can never win this pick.)
     if (next.provider === 'mock' || !next.hasKey[next.provider]) {
-      const first = KEY_PROVIDERS.find((p) => next.hasKey[p.id])?.id
+      const first = keyProviders().find((p) => next.hasKey[p.id])?.id
       if (first) {
         next = await bridge.aiSetConfig({
           provider: first,
@@ -60,9 +69,10 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
         })
       }
     }
-    // A new key is the moment the live model list becomes fetchable — refresh
-    // now so the model menu is current the first time it opens.
-    if (patch.keys) next = await bridge.aiRefreshModels(true)
+    // A new key — or a changed compat endpoint — is the moment the live model
+    // list becomes fetchable — refresh now so the model menu is current the
+    // first time it opens.
+    if (patch.keys || compatChanged) next = await bridge.aiRefreshModels(true)
     setSaving(false)
     onSaved(next)
   }
@@ -86,29 +96,39 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
       <div className="ai-settings-heading">{t('ai.keysTitle')}</div>
       <p className="ai-field-hint">
         {t('ai.keyCapHint')}{' '}
-        {KEY_PROVIDERS.map(({ id }, i) => (
-          <span key={id}>
-            {i > 0 && ' · '}
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault()
-                bridge.openExternal(SPEND_CAP_URLS[id]!)
-              }}
-            >
-              {id === 'anthropic' ? 'Anthropic' : id === 'openai' ? 'OpenAI' : 'Azure'}
-            </a>
-          </span>
-        ))}
+        {keyProviders()
+          .filter(({ id }) => SPEND_CAP_URLS[id])
+          .map(({ id }, i) => (
+            <span key={id}>
+              {i > 0 && ' · '}
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  bridge.openExternal(SPEND_CAP_URLS[id]!)
+                }}
+              >
+                {id === 'anthropic' ? 'Anthropic' : id === 'openai' ? 'OpenAI' : 'Azure'}
+              </a>
+            </span>
+          ))}
       </p>
-      {KEY_PROVIDERS.map(({ id, name }) => (
+      {keyProviders().map(({ id, name }) => (
         <div className="ai-field-group" key={id}>
           <label className="ai-field">
             <span>{name}</span>
             <input
               type="password"
               value={keys[id]}
-              placeholder={config.hasKey[id] ? t('ai.keySaved') : t('ai.keyNew')}
+              placeholder={
+                // compat's hasKey means "ready", not "key stored" — its key is
+                // genuinely optional, so the field always says exactly that
+                id === 'compat'
+                  ? t('ai.keyOptional')
+                  : config.hasKey[id]
+                    ? t('ai.keySaved')
+                    : t('ai.keyNew')
+              }
               onChange={(e) => setKeys((k) => ({ ...k, [id]: e.target.value }))}
               spellCheck={false}
             />
@@ -141,6 +161,47 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
                   spellCheck={false}
                 />
               </label>
+            </>
+          )}
+          {id === 'compat' && (
+            <>
+              <label className="ai-field">
+                <span>{t('ai.compatPreset')}</span>
+                {/* Prefills the URL field, nothing more — the field below stays
+                    the single source of truth and is freely editable */}
+                <select
+                  value={compatPresets().find((p) => p.url === compatUrl.trim())?.url ?? ''}
+                  onChange={(e) => {
+                    if (e.target.value) setCompatUrl(e.target.value)
+                  }}
+                >
+                  <option value="">{t('ai.compatPresetPick')}</option>
+                  {compatPresets().map((p) => (
+                    <option key={p.url} value={p.url}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="ai-field">
+                <span>{t('ai.baseUrl')}</span>
+                <input
+                  value={compatUrl}
+                  placeholder="http://localhost:11434/v1"
+                  onChange={(e) => setCompatUrl(e.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+              <label className="ai-field">
+                <span>{t('ai.compatModelId')}</span>
+                <input
+                  value={compatModel}
+                  placeholder={t('ai.compatModelHint')}
+                  onChange={(e) => setCompatModel(e.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+              <p className="ai-field-hint">{t('ai.compatHint')}</p>
             </>
           )}
         </div>

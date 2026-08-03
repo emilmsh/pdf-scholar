@@ -59,6 +59,12 @@ const nb = {
   'aierr.ai-key-session-only':
     'Nøkkelen lagres bare for denne økta på denne maskinen (ingen nøkkelring er tilgjengelig). Legg den inn på nytt i KI-innstillingene.',
   'aierr.ai-azure-unconfigured': 'Azure-endepunkt og deployment må fylles ut i KI-innstillingene.',
+  'aierr.ai-compat-unconfigured':
+    'Base-URL og modell-id for det OpenAI-kompatible endepunktet må fylles ut i KI-innstillingene.',
+  'aierr.ai-endpoint-unreachable':
+    'Fikk ikke kontakt med endepunktet. Kjører serveren, og er base-URL-en riktig?',
+  'aierr.ai-endpoint-incompatible':
+    'Endepunktet svarte, men ikke som et OpenAI-kompatibelt API. Sjekk at base-URL-en peker på API-roten (vanligvis …/v1).',
   'aierr.ai-context-overflow':
     'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Start en ny samtale, eller bytt til en modell med større kontekstvindu.',
   'aierr.ai-refusal':
@@ -443,8 +449,18 @@ const nb = {
   'ai.sourceChip': 'kilde',
   'ai.chipTip': 'Hopp til kilden i dokumentet',
   'ai.providerMock': 'Test uten nøkkel (mock)',
+  'ai.providerCompat': 'Egendefinert / lokal (OpenAI-kompatibel)',
+  'ai.localTag': 'lokal',
   'ai.keySaved': '•••••••• (lagret)',
   'ai.keyNew': 'Lim inn nøkkelen din',
+  'ai.keyOptional': 'API-nøkkel (valgfri — lokale servere trenger ingen)',
+  'ai.compatPreset': 'Tjeneste',
+  'ai.compatPresetPick': 'Velg tjeneste eller skriv inn selv …',
+  'ai.baseUrl': 'Base-URL',
+  'ai.compatModelId': 'Modell-id',
+  'ai.compatModelHint': 'f.eks. llama3.1 eller mistral-large-latest',
+  'ai.compatHint':
+    'Alle tjenester og lokale servere som snakker OpenAI-API-et: Ollama, LM Studio, OpenRouter m.fl. Base-URL-en peker på API-roten (vanligvis …/v1); modellisten hentes derfra når du lagrer.',
   'ai.keyCapHint': 'Sett et utgiftstak på nøkkelen — samme sted viser leverandøren hva du faktisk har brukt. Appen teller tokens, men bare leverandøren vet prisen.',
   'ai.model': 'Modell',
   'ai.reasoning': 'Tenkeinnsats',
@@ -590,6 +606,12 @@ const en: Dict = {
   'aierr.ai-key-session-only':
     'The key is only kept for this session on this machine (no keyring is available). Enter it again in the AI settings.',
   'aierr.ai-azure-unconfigured': 'The Azure endpoint and deployment must be filled in under AI settings.',
+  'aierr.ai-compat-unconfigured':
+    'The base URL and model id for the OpenAI-compatible endpoint must be filled in under AI settings.',
+  'aierr.ai-endpoint-unreachable':
+    'Could not reach the endpoint. Is the server running, and is the base URL correct?',
+  'aierr.ai-endpoint-incompatible':
+    'The endpoint answered, but not like an OpenAI-compatible API. Check that the base URL points at the API root (usually …/v1).',
   'aierr.ai-context-overflow':
     'The document (or the conversation) is too large for the model’s context window, so the request was refused. Start a new conversation, or switch to a model with a larger context window.',
   'aierr.ai-refusal':
@@ -953,8 +975,18 @@ const en: Dict = {
   'ai.sourceChip': 'source',
   'ai.chipTip': 'Jump to the source in the document',
   'ai.providerMock': 'Test without a key (mock)',
+  'ai.providerCompat': 'Custom / local (OpenAI-compatible)',
+  'ai.localTag': 'local',
   'ai.keySaved': '•••••••• (saved)',
   'ai.keyNew': 'Paste your key',
+  'ai.keyOptional': 'API key (optional — local servers need none)',
+  'ai.compatPreset': 'Service',
+  'ai.compatPresetPick': 'Pick a service or type your own …',
+  'ai.baseUrl': 'Base URL',
+  'ai.compatModelId': 'Model id',
+  'ai.compatModelHint': 'e.g. llama3.1 or mistral-large-latest',
+  'ai.compatHint':
+    'Any service or local server that speaks the OpenAI API: Ollama, LM Studio, OpenRouter and more. The base URL points at the API root (usually …/v1); the model list is fetched from there when you save.',
   'ai.keyCapHint': 'Set a spending cap on the key — the same page shows what you have actually used. This app counts tokens; only the provider knows the price.',
   'ai.model': 'Model',
   'ai.reasoning': 'Reasoning effort',

@@ -183,7 +183,7 @@ export const webApi: PdfxApi = {
   // so the chat UI (streaming, citation chips, jump+highlight) can be tested.
   aiGetConfig: async () => ({
     ...loadWebAiConfig(),
-    hasKey: { anthropic: false, openai: false, azure: false, mock: true },
+    hasKey: { anthropic: false, openai: false, azure: false, compat: false, mock: true },
     // Mock-only preview: no key is ever stored, so there is nothing to protect
     keyStorage: 'session-only' as const,
     keysSupported: false,
@@ -195,12 +195,13 @@ export const webApi: PdfxApi = {
       provider: patch.provider ?? current.provider,
       models: { ...current.models, ...patch.models },
       azure: { ...current.azure, ...patch.azure },
+      compat: { ...current.compat, ...patch.compat },
       thinking: patch.thinking ?? current.thinking
     }
     localStorage.setItem('pdfx-web-ai', JSON.stringify(next))
     return {
       ...next,
-      hasKey: { anthropic: false, openai: false, azure: false, mock: true },
+      hasKey: { anthropic: false, openai: false, azure: false, compat: false, mock: true },
       keyStorage: 'session-only' as const,
       keysSupported: false,
       catalog: {}
@@ -311,6 +312,7 @@ function loadWebAiConfig(): AiConfig {
     provider: 'mock',
     models: { ...DEFAULT_AI_MODELS },
     azure: { endpoint: '', deployment: '', apiVersion: '' },
+    compat: { baseUrl: '' },
     thinking: 'medium'
   }
   try {
@@ -319,7 +321,8 @@ function loadWebAiConfig(): AiConfig {
       ...fallback,
       ...parsed,
       models: { ...fallback.models, ...parsed.models },
-      azure: { ...fallback.azure, ...parsed.azure }
+      azure: { ...fallback.azure, ...parsed.azure },
+      compat: { ...fallback.compat, ...parsed.compat }
     }
   } catch {
     return fallback

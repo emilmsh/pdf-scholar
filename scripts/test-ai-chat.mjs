@@ -140,8 +140,9 @@ function baseParams(overrides) {
   return {
     provider: 'anthropic',
     key: 'sk-test',
-    models: { anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-terra', azure: '', mock: 'mock-1' },
+    models: { anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-terra', azure: '', compat: 'llama3.1', mock: 'mock-1' },
     azure: { endpoint: 'https://unit.openai.azure.com', deployment: 'dep1', apiVersion: '' },
+    compat: { baseUrl: 'http://localhost:11434/v1/' },
     thinking: 'medium',
     req: {
       requestId: 1,
@@ -375,6 +376,96 @@ section('azure: config gate + shaping + quote contract + overflow')
   const overflow = await run({ provider: 'azure' })
   ok(overflow.result.code === 'ai-context-overflow', 'provider overflow rejection gets the named code')
   ok(/128000/.test(overflow.result.error ?? ''), 'provider sentence (with the counts) is kept')
+}
+
+// ---------- compat (OpenAI-compatible endpoint, keyless local server) ----------
+
+section('compat: config gate + keyless request + URL join')
+{
+  const unconfigured = await run({ provider: 'compat', compat: { baseUrl: '' } })
+  ok(unconfigured.result.code === 'ai-compat-unconfigured', 'missing base URL is a named error')
+  const noModel = await run({
+    provider: 'compat',
+    models: { anthropic: '', openai: '', azure: '', compat: '', mock: '' }
+  })
+  ok(noModel.result.code === 'ai-compat-unconfigured', 'missing model id is the same named error')
+
+  const answer = 'Modellen svarer. [KILDE s.2: "Metoden er enkel"] Slutt.'
+  responder = () => chatCompletionsSse({
+    deltas: [answer],
+    usage: { prompt_tokens: 7, completion_tokens: 2 }
+  })
+  // key: '' — the keyless local-server case is the whole point of the provider
+  const { result } = await run({ provider: 'compat', key: '' })
+  const body = calls[0]?.body
+  ok(
+    calls[0]?.url === 'http://localhost:11434/v1/chat/completions',
+    `trailing slash normalised in the URL join (got ${calls[0]?.url})`
+  )
+  ok(!calls[0]?.headers.get('authorization'), 'no auth header without a key')
+  ok(body?.model === 'llama3.1', 'model id from models.compat')
+  ok(body?.tools === undefined, 'no web-search tool even when requested')
+  ok(body?.reasoning_effort === undefined, 'no reasoning_effort for a non-reasoning id')
+  ok(/CITATION RULES/.test(body?.messages?.[0]?.content ?? ''), 'quote contract in the system turn')
+  const compatUser = body?.messages?.find((m) => Array.isArray(m.content))
+  ok(compatUser?.content?.some((p) => p.type === 'image_url'), 'image as image_url part')
+  ok(result.ok === true && result.model === 'llama3.1', 'answers with no key at all')
+  const cits = (result.parts ?? []).flatMap((p) => p.citations)
+  ok(cits.some((c) => c.kind === 'quote' && c.pageNumber === 2), 'quote-contract citation parsed')
+  observed.compat = {
+    quoteContract: /CITATION RULES/.test(body?.messages?.[0]?.content ?? ''),
+    nativeCitations: false,
+    webTool: (body?.tools ?? []).length > 0,
+    images: compatUser?.content?.some((p) => p.type === 'image_url') === true
+  }
+
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'compat' })
+  ok(calls[0]?.headers.get('authorization') === 'Bearer sk-test', 'key (when given) travels as Bearer')
+
+  await run({
+    provider: 'compat',
+    models: { anthropic: '', openai: '', azure: '', compat: 'gpt-5.6-terra', mock: '' }
+  })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'reasoning_effort for an OpenAI-style reasoning id')
+}
+
+section('compat: transport failures get their names')
+{
+  responder = () => {
+    throw new TypeError('fetch failed')
+  }
+  const down = await run({ provider: 'compat', key: '' })
+  ok(down.result.code === 'ai-endpoint-unreachable', `nothing listening → ai-endpoint-unreachable (got ${down.result.code})`)
+  ok(/localhost:11434/.test(down.result.error ?? ''), 'the host rides in the log sentence')
+
+  responder = () =>
+    new Response('<!doctype html><html><body>Not an API</body></html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' }
+    })
+  const wrong = await run({ provider: 'compat', key: '' })
+  ok(wrong.result.code === 'ai-endpoint-incompatible', `HTML answer → ai-endpoint-incompatible (got ${wrong.result.code})`)
+
+  // A minimal server that ignores `stream: true` and answers with one
+  // complete Chat Completions JSON — accepted quietly, not an error.
+  responder = () =>
+    new Response(
+      JSON.stringify({
+        model: 'llama3.1',
+        choices: [{ message: { role: 'assistant', content: 'Alt i ett svar. [KILDE s.1: "Innledningen setter rammen"]' } }],
+        usage: { prompt_tokens: 5, completion_tokens: 3 }
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    )
+  const single = await run({ provider: 'compat', key: '' })
+  ok(single.result.ok === true, 'non-streaming JSON body still answers')
+  ok(single.streamed.includes('Alt i ett svar.'), 'the one-shot answer still reaches emit')
+  ok(
+    (single.result.parts ?? []).flatMap((p) => p.citations).some((c) => c.kind === 'quote' && c.pageNumber === 1),
+    'quote contract parsed from the one-shot body'
+  )
+  ok(single.result.usage?.inputTokens === 5, 'usage mapped from the one-shot body')
 }
 
 // ---------- mock ----------

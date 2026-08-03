@@ -92,6 +92,9 @@ export type AiErrorCode =
   | 'ai-key-undecryptable'
   | 'ai-key-session-only'
   | 'ai-azure-unconfigured'
+  | 'ai-compat-unconfigured'
+  | 'ai-endpoint-unreachable'
+  | 'ai-endpoint-incompatible'
   | 'ai-context-overflow'
   | 'ai-refusal'
   | 'ai-stream-aborted'
@@ -224,7 +227,7 @@ export interface DeleteAnnotationRequest {
 
 // ---------- AI (BYO API key, multi-provider) ----------
 
-export type AiProviderId = 'anthropic' | 'openai' | 'azure' | 'mock'
+export type AiProviderId = 'anthropic' | 'openai' | 'azure' | 'compat' | 'mock'
 
 /** How hard the model should reason; mapped per provider/model in main */
 export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
@@ -236,6 +239,11 @@ export interface AiConfig {
   /** apiVersion '' means "use the app's built-in default" — stored empty so the
    *  default can move with app updates without touching saved config */
   azure: { endpoint: string; deployment: string; apiVersion: string }
+  /** The OpenAI-compatible provider: any server speaking /chat/completions —
+   *  OpenRouter, Mistral, Groq, or a local Ollama/LM Studio. baseUrl is the
+   *  API root (usually ending in /v1); the model id lives in models.compat
+   *  and the (optional) key in the ordinary key store. */
+  compat: { baseUrl: string }
   /** Reasoning effort (default 'medium') */
   thinking: ThinkingLevel
 }
@@ -269,6 +277,9 @@ export interface AiRemoteModel {
 export interface AiModelCatalog {
   anthropic?: { fetchedAt: number; models: AiRemoteModel[] }
   openai?: { fetchedAt: number; models: AiRemoteModel[] }
+  /** Also remembers WHICH endpoint the list came from, so a changed base URL
+   *  never shows another server's models */
+  compat?: { fetchedAt: number; models: AiRemoteModel[]; baseUrl: string }
 }
 
 /** What is actually protecting a stored API key right now.

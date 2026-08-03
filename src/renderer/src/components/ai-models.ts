@@ -18,7 +18,22 @@ export const providerLabels = (): { id: AiProviderId; label: string }[] => [
   { id: 'anthropic', label: 'Claude (Anthropic)' },
   { id: 'openai', label: 'OpenAI' },
   { id: 'azure', label: 'Azure OpenAI' },
+  { id: 'compat', label: t('ai.providerCompat') },
   { id: 'mock', label: t('ai.providerMock') }
+]
+
+/** Base-URL presets for the compat provider — a dropdown that only prefills
+ *  the URL field, so nobody has to hunt for an endpoint in someone's docs.
+ *  The local entries are the point of the provider: Ollama and LM Studio both
+ *  serve the OpenAI surface on localhost, keyless. Verified monthly
+ *  (docs/MAINTENANCE.md row 4). */
+export const compatPresets = (): { label: string; url: string }[] => [
+  { label: 'OpenRouter', url: 'https://openrouter.ai/api/v1' },
+  { label: 'Mistral', url: 'https://api.mistral.ai/v1' },
+  { label: 'Groq', url: 'https://api.groq.com/openai/v1' },
+  { label: 'xAI (Grok)', url: 'https://api.x.ai/v1' },
+  { label: `Ollama (${t('ai.localTag')})`, url: 'http://localhost:11434/v1' },
+  { label: `LM Studio (${t('ai.localTag')})`, url: 'http://localhost:1234/v1' }
 ]
 
 // Curated, verified model lists (see docs/agent-notes/modeller-api.md),
@@ -43,6 +58,9 @@ export const MODELS: Record<
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
   ],
   azure: [],
+  // compat has no curated list either: the endpoint decides what exists, and
+  // the live /models fetch fills the menu
+  compat: [],
   mock: [{ id: 'mock-1', label: 'Testmodell (mock)', short: 'Testmodell' }]
 }
 
@@ -70,11 +88,25 @@ export interface ModelOption {
 /** The dropdown list for a provider: curated entries first (flagged when the
  *  live catalog no longer lists them), then live-discovered models the curated
  *  list does not know yet, in the provider's own (newest-first) order. With no
- *  fetched catalog this degrades to exactly the curated list. */
-export function modelOptions(provider: AiProviderId, catalog?: AiModelCatalog): ModelOption[] {
+ *  fetched catalog this degrades to exactly the curated list.
+ *
+ *  For compat, pass the configured base URL: the snapshot remembers which
+ *  endpoint it came from, and a list fetched from another server must not
+ *  show against this one. */
+export function modelOptions(
+  provider: AiProviderId,
+  catalog?: AiModelCatalog,
+  compatBaseUrl?: string
+): ModelOption[] {
   const curated = MODELS[provider] ?? []
   const remote =
-    provider === 'anthropic' || provider === 'openai' ? catalog?.[provider] : undefined
+    provider === 'anthropic' || provider === 'openai'
+      ? catalog?.[provider]
+      : provider === 'compat' &&
+          catalog?.compat &&
+          catalog.compat.baseUrl === (compatBaseUrl ?? '').trim().replace(/\/+$/, '')
+        ? catalog.compat
+        : undefined
   if (!remote) return curated.map((m) => ({ ...m, curated: true, missing: false }))
   const remoteIds = new Set(remote.models.map((m) => m.id))
   const options: ModelOption[] = curated.map((m) => ({
@@ -126,6 +158,11 @@ const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {
   anthropic: 200_000,
   openai: 200_000,
   azure: 120_000,
+  // Deliberately the lowest floor: an unknown compat endpoint may be a hosted
+  // frontier model (≥128k) or a local model configured with a few thousand
+  // tokens of context. 32k excerpts early rather than erroring mid-question;
+  // fase 2 (Ollama /api/show) replaces the guess with the model's real number.
+  compat: 32_000,
   mock: 200_000
 }
 
@@ -149,9 +186,12 @@ export const THINKING_LEVELS: { id: ThinkingLevel; key: MsgKey }[] = [
   { id: 'high', key: 'ai.thinkHigh' }
 ]
 
-/** Key-holding providers, in display order (mock is not key-based) */
-export const KEY_PROVIDERS: { id: AiProviderId; name: string }[] = [
+/** Configurable providers in display order, for the key manager and the model
+ *  menu (mock is not listed — it needs no setup). A function, not a constant,
+ *  because the compat label is translated. */
+export const keyProviders = (): { id: AiProviderId; name: string }[] => [
   { id: 'anthropic', name: 'Claude (Anthropic)' },
   { id: 'openai', name: 'OpenAI' },
-  { id: 'azure', name: 'Azure OpenAI' }
+  { id: 'azure', name: 'Azure OpenAI' },
+  { id: 'compat', name: t('ai.providerCompat') }
 ]

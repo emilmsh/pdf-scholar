@@ -41,8 +41,9 @@ install, so it needs no admin rights. It registers as a PDF handler in Explorer 
 a "Recent" Jump List to the taskbar. The installer contains both **x64 and native arm64**
 builds and picks the right one, so Windows-on-ARM machines (Surface and similar) run the
 arm64 build rather than x64 under emulation. Everything works offline. The AI features
-need your own API key (Anthropic, OpenAI or Azure OpenAI), entered in the assistant
-settings.
+need your own API key (Anthropic, OpenAI or Azure OpenAI) — or any OpenAI-compatible
+endpoint, including local models via Ollama or LM Studio, which need no key at all —
+entered in the assistant settings.
 
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-PDF%20Scholar-2f6f7b?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9N75CPC0G9M2)
 
@@ -261,10 +262,12 @@ the answer rather than take it on trust.
   see only those
 - **Optional web search**, off by default: closed, on request, or always on (Anthropic
   and OpenAI keys). LaTeX in answers renders properly, so maths stays readable
-- Providers: Anthropic (Claude, with native citations), OpenAI and Azure OpenAI — one
-  model list across all three, with per-model reasoning-effort control. Your key goes to
-  the provider you picked and nowhere else — there is no server of ours in between — and
-  the document leaves your machine only when you ask a question
+- Providers: Anthropic (Claude, with native citations), OpenAI, Azure OpenAI — or any
+  OpenAI-compatible endpoint, including local models via Ollama or LM Studio (no key
+  needed) — one model list across them all, with per-model reasoning-effort control.
+  Your key goes to the provider you picked and nowhere else — there is no server of ours
+  in between — and the document leaves your machine only when you ask a question. With
+  a local model, even your questions stay on your own machine
 - **Cost stays visible**: each answer shows the tokens the provider counted, and the key
   settings link straight to your provider's console, where you set a spending cap and see
   what you have spent

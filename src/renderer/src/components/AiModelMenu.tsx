@@ -9,11 +9,11 @@
 // and this menu can never disagree about the active model.
 import { useEffect, useRef } from 'react'
 import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/types'
-import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
+import { OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { useDismissable } from '../useDismissable'
-import { KEY_PROVIDERS, MODELS, modelOptions, THINKING_LEVELS } from './ai-models'
+import { keyProviders, MODELS, modelOptions, THINKING_LEVELS } from './ai-models'
 
 interface ModelMenuProps {
   config: AiConfigView
@@ -36,10 +36,15 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
 
   const provider = config.provider
   const model = config.models[provider] ?? ''
-  const anyKey = KEY_PROVIDERS.some((p) => config.hasKey[p.id])
+  const anyKey = keyProviders().some((p) => config.hasKey[p.id])
   // The provider profile decides whether a reasoning control exists at all;
-  // Haiku is the model-level exception (ignores effort) within Anthropic
-  const thinkingApplies = PROVIDER_PROFILES[provider].thinking !== 'none' && !/haiku/i.test(model)
+  // within that, model-level exceptions keep the selector honest: Haiku
+  // ignores effort, and on a compat endpoint only OpenAI-style reasoning ids
+  // get the parameter at all (same regex request shaping uses).
+  const thinkingApplies =
+    PROVIDER_PROFILES[provider].thinking !== 'none' &&
+    !/haiku/i.test(model) &&
+    (provider !== 'compat' || OPENAI_REASONING_RE.test(model))
 
   const patch = (p: Parameters<typeof bridge.aiSetConfig>[0]): void => {
     void bridge.aiSetConfig(p).then(onSaved)
@@ -65,10 +70,10 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
     patch(p === 'azure' ? { provider: p } : { provider: p, models: { ...config.models, [p]: id } })
   }
 
-  const groups = KEY_PROVIDERS.map(({ id, name }) => {
+  const groups = keyProviders().map(({ id, name }) => {
     // Curated list merged with the live catalog: new provider models appear on
     // their own; entries the provider no longer lists get a warning marker.
-    const merged = modelOptions(id, config.catalog)
+    const merged = modelOptions(id, config.catalog, config.compat.baseUrl)
     const options = merged.map((m) => ({
       value: `${id}:${m.id}`,
       label: m.missing ? `${m.label} ⚠` : m.label,
@@ -80,10 +85,18 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
         label: config.azure.deployment,
         hint: undefined
       })
+    // The configured compat model id stays pickable even when the live list
+    // does not know it (server offline, or an id typed by hand)
+    if (id === 'compat' && config.models.compat && !merged.some((m) => m.id === config.models.compat))
+      options.push({ value: `compat:${config.models.compat}`, label: config.models.compat, hint: undefined })
     // A custom model id typed in an older version still shows up
-    if (id === provider && id !== 'azure' && model && !merged.some((m) => m.id === model))
+    if (id === provider && id !== 'azure' && model && !options.some((o) => o.value === `${id}:${model}`))
       options.push({ value: `${id}:${model}`, label: model, hint: undefined })
-    return { id: id as string, name, options, enabled: config.hasKey[id] }
+    // compat opens on the base URL alone: the model that completes the setup
+    // is picked from exactly this list once the endpoint's models are fetched
+    const enabled =
+      config.hasKey[id] || (id === 'compat' && config.compat.baseUrl.trim() !== '')
+    return { id: id as string, name, options, enabled }
     // Platforms that cannot store keys (plain-web preview) hide the keyless
     // real providers instead of greying them — there is no way to enable them
   }).filter((g) => g.options.length > 0 && (config.keysSupported || g.enabled))
@@ -104,7 +117,7 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
           <select
             value={value}
             title={(() => {
-              const cur = modelOptions(provider, config.catalog).find((m) => m.id === model)
+              const cur = modelOptions(provider, config.catalog, config.compat.baseUrl).find((m) => m.id === model)
               if (cur?.missing) return t('ai.modelMissing')
               return cur?.hint ? t(cur.hint) : undefined
             })()}

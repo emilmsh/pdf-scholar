@@ -43,8 +43,9 @@ const DEFAULT_AI: StoredAiConfig = {
   provider: 'anthropic',
   models: { ...DEFAULT_AI_MODELS },
   azure: { endpoint: '', deployment: '', apiVersion: '' },
+  compat: { baseUrl: '' },
   thinking: 'medium',
-  keys: { anthropic: '', openai: '', azure: '', mock: '' }
+  keys: { anthropic: '', openai: '', azure: '', compat: '', mock: '' }
 }
 
 const DEFAULTS: AppState = {
@@ -65,6 +66,7 @@ export function mergeAiConfig(
     provider: patch.provider ?? base.provider,
     models: { ...base.models, ...patch.models },
     azure: { ...base.azure, ...patch.azure },
+    compat: { ...base.compat, ...patch.compat },
     thinking: patch.thinking ?? base.thinking,
     keys: { ...base.keys, ...patch.keys }
   }
