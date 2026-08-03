@@ -47,8 +47,9 @@ not as acceptable platform lag.
    ([`emilmsh/homebrew-tap`](https://github.com/emilmsh/homebrew-tap),
    auto-bumped by `.github/workflows/update-tap.yml` when a release is
    published — needs the `TAP_GITHUB_TOKEN` secret) is the recommended
-   install: `--no-quarantine` sidesteps Gatekeeper entirely and
-   `brew upgrade` stands in for auto-update.
+   install: `brew upgrade` stands in for auto-update. It does NOT ease the
+   Gatekeeper step — Homebrew ≥ 5 removed `--no-quarantine`, so the `xattr`
+   command recurs after every install/upgrade (the cask's caveats print it).
 2. **Window chrome**: Windows/Linux use the native window-controls overlay
    (right side, theme-colored via `setTitleBarOverlay`); macOS has traffic
    lights (left, colors fixed — the `window:titlebar-colors` IPC is a no-op

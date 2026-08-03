@@ -55,12 +55,14 @@ the same app as an MSIX package, x64 and arm64, although the installer is update
 updates:
 
 ```sh
-brew install --cask --no-quarantine emilmsh/tap/pdf-scholar
+brew install --cask emilmsh/tap/pdf-scholar
+xattr -cr "/Applications/PDF Scholar.app"
 ```
 
-`--no-quarantine` skips the Gatekeeper friction described below, and
-`brew upgrade --cask pdf-scholar` delivers new versions — the cask in
-[emilmsh/homebrew-tap](https://github.com/emilmsh/homebrew-tap) is bumped
+The `xattr` line is the Gatekeeper step described below — Homebrew ≥ 5 no
+longer bypasses quarantine, so it is needed after every install *and*
+upgrade. `brew upgrade --cask pdf-scholar` delivers new versions — the cask
+in [emilmsh/homebrew-tap](https://github.com/emilmsh/homebrew-tap) is bumped
 automatically when a release is published.
 
 **By hand:** download the `.dmg` from the
