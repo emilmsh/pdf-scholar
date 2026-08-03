@@ -1,0 +1,57 @@
+# Opens a monthly issue for the staleness audit — the slice of the app that
+# points at the outside world (AI model catalogues, provider params, tokens,
+# dependency advisories) and goes stale on other people's schedules. The
+# checklist itself lives in docs/MAINTENANCE.md; this only nudges.
+#
+# Deliberately offset from the full-release reminder (1st): the 15th, so the
+# two monthly passes never compete for the same sitting.
+#
+# Note: GitHub suspends scheduled workflows after ~60 days without repo
+# activity (it emails first). Re-enable from the Actions tab afterwards —
+# checklist row 7 covers noticing this for the sibling workflow.
+
+name: Maintenance reminder
+
+on:
+  schedule:
+    - cron: '0 7 15 * *' # 09:00 Oslo time on the 15th
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open the reminder issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BODY: |
+            Monthly staleness audit — the ~20-minute pass over everything that expires on other people's schedules. Full checklist with commands and fix guides: [docs/MAINTENANCE.md](https://github.com/emilmsh/pdf-scholar/blob/master/docs/MAINTENANCE.md).
+
+            - [ ] AI model catalogue + request rules: `npm run check:models` (keys in env) → MODEL-UPDATE.md; `npm run test:ai-chat` after rule changes
+            - [ ] One real question per keyed provider, devtools open — a retried 400 means a heuristic went stale
+            - [ ] Azure api-version default still current?
+            - [ ] Compat preset URLs + spend-cap links still point at the right pages?
+            - [ ] `npm audit` / `npm outdated` — advisories only; respect the deliberate pins
+            - [ ] Tokens: `TAP_GITHUB_TOKEN` expiry, Edge Add-ons API key
+            - [ ] Actions tab: scheduled workflows still enabled?
+            - [ ] `npm run check:shots` — anything shipped now stale?
+
+            All rows fine? Close me.
+        run: |
+          gh label create maintenance-reminder --repo "$REPO" \
+            --color 1D76DB --description "Monthly staleness audit (docs/MAINTENANCE.md)" --force
+
+          open_count=$(gh issue list --repo "$REPO" --label maintenance-reminder \
+            --state open --json number --jq length)
+          if [ "$open_count" != "0" ]; then
+            echo "An open reminder already exists - not filing another."
+            exit 0
+          fi
+
+          gh issue create --repo "$REPO" --label maintenance-reminder \
+            --title "Staleness audit — $(date -u '+%B %Y')" \
+            --body "$BODY"
