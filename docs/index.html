@@ -15,10 +15,11 @@
       static href is /releases/latest, which GitHub redirects for us.
     * Screenshots are the shipped ones in docs/screenshots/, referenced
       relatively — reshooting them updates this page too.
-    * Only the non-beta platform is offered (Windows: installer + Microsoft
-      Store). macOS, Linux and the extension get one line in the footer
-      pointing at the releases page. When one of them graduates out of beta,
-      that is a deliberate edit, not upkeep.
+    * Windows (installer + Microsoft Store) is the hero offer. The closing
+      "Get it" section also carries the macOS and Linux downloads, labelled
+      beta, resolved from the same API call; the extension keeps its one
+      footer line. Promoting a platform out of beta is a deliberate edit,
+      not upkeep.
 
   Colours are the app's own tokens from src/renderer/src/styles/app.css —
   the Day palette, with the Night palette under prefers-color-scheme: dark.
@@ -166,6 +167,18 @@
   .dl-meta { margin: 16px 0 0; font-size: 14.5px; color: var(--text-secondary); }
   .dl-meta .sep { opacity: 0.45; margin: 0 7px; }
 
+  .actions-beta { margin-top: 14px; }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 1px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+  }
+
   .hero-shot { margin: 52px 0 0; }
 
   /* ---------- feature sections ---------- */
@@ -260,7 +273,7 @@
       </a>
     </div>
 
-    <p class="dl-meta" id="dl-meta">Windows 10 and 11 <span class="sep">·</span> x64 and arm64 in one installer <span class="sep">·</span> no admin rights needed</p>
+    <p class="dl-meta" id="dl-meta">Windows 10 and 11 <span class="sep">·</span> x64 and arm64 in one installer <span class="sep">·</span> no admin rights needed <span class="sep">·</span> <a href="#get">macOS and Linux betas</a></p>
   </div>
 
   <img class="shot hero-shot" src="screenshots/reading.png" alt="PDF Scholar showing a research paper: a slim toolbar above a page that fills the window.">
@@ -348,7 +361,7 @@
     </p>
   </div>
 
-  <div class="closing">
+  <div class="closing" id="get">
     <h2>Get it</h2>
     <div class="actions">
       <a class="btn btn-primary" id="dl2" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
@@ -357,6 +370,22 @@
       </a>
       <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">Microsoft Store</a>
     </div>
+    <div class="actions actions-beta">
+      <a class="btn btn-secondary" id="dl-mac" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
+        macOS <span class="badge">beta</span>
+      </a>
+      <a class="btn btn-secondary" id="dl-linux" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
+        Linux <span class="badge">beta</span>
+      </a>
+    </div>
+    <p class="dl-meta">
+      macOS is the Apple Silicon dmg — Intel Macs take
+      <a id="dl-mac-intel" href="https://github.com/emilmsh/pdf-scholar/releases/latest">this one</a>.
+      The build is unsigned, so the first launch takes
+      <a href="https://github.com/emilmsh/pdf-scholar#desktop-app-macos--beta">one Terminal command</a>.<br>
+      Linux is the deb for Ubuntu and Debian; other distros take the
+      <a id="dl-linux-appimage" href="https://github.com/emilmsh/pdf-scholar/releases/latest">AppImage</a>.
+    </p>
   </div>
 
 </main>
@@ -364,10 +393,11 @@
 <footer>
   <div class="inner">
     <p>
-      <b>macOS, Linux and a browser extension</b> that puts the same reader inside
-      Edge or Chrome are in beta — they are on the
-      <a href="https://github.com/emilmsh/pdf-scholar/releases/latest">releases page</a>,
-      with what each platform supports today in
+      <b>A browser extension</b> that puts the same reader inside Edge or Chrome is
+      in beta — it is on the
+      <a href="https://github.com/emilmsh/pdf-scholar/releases/latest">releases page</a>.
+      The macOS and Linux betas above are built in CI on every release; what each
+      platform supports today is in
       <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PLATFORMS.md">the
       platform notes</a>.
     </p>
@@ -396,16 +426,22 @@
       const rel = await res.json();
 
       // Asset-name contract, kept by .github/workflows/release.yml:
-      // PDF-Scholar-Setup-<version>.exe is the universal x64+arm64 installer.
-      const exe = (rel.assets || []).find(
-        (a) => /^PDF-Scholar-Setup-.*\.exe$/.test(a.name)
-      );
-      if (!exe) return;
-
-      for (const id of ['dl', 'dl2']) {
+      // PDF-Scholar-Setup-<version>.exe is the universal x64+arm64 installer;
+      // the dmgs are per-arch, Linux ships a deb and an AppImage.
+      const asset = (re) => (rel.assets || []).find((a) => re.test(a.name));
+      const point = (id, a) => {
         const el = document.getElementById(id);
-        if (el) el.href = exe.browser_download_url;
-      }
+        if (el && a) el.href = a.browser_download_url;
+      };
+
+      const exe = asset(/^PDF-Scholar-Setup-.*\.exe$/);
+      point('dl', exe);
+      point('dl2', exe);
+      point('dl-mac', asset(/^PDF-Scholar-.*-arm64\.dmg$/));
+      point('dl-mac-intel', asset(/^PDF-Scholar-.*-x64\.dmg$/));
+      point('dl-linux', asset(/^PDF-Scholar-.*\.deb$/));
+      point('dl-linux-appimage', asset(/^PDF-Scholar-.*\.AppImage$/));
+      if (!exe) return;
 
       const version = String(rel.tag_name || '').replace(/^v/, '');
       const mb = Math.round(exe.size / 1048576);
@@ -418,7 +454,8 @@
         const sep = '<span class="sep">·</span>';
         meta.innerHTML =
           `Version ${version}, released ${date} ${sep} ${mb} MB ${sep} ` +
-          `Windows 10 and 11, x64 and arm64 in one installer ${sep} no admin rights needed`;
+          `Windows 10 and 11, x64 and arm64 in one installer ${sep} no admin rights needed ` +
+          `${sep} <a href="#get">macOS and Linux betas</a>`;
       }
     } catch {
       /* offline, blocked or rate-limited — the static markup stands. */
