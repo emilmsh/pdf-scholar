@@ -15,6 +15,7 @@ docs/screenshots/_auto/
 # Throwaway esbuild output from the engine tests
 scripts/.engine-test-bundle.mjs
 scripts/.engine-cache-test-embed.mjs
+scripts/.ai-chat-test-bundle.mjs
 # Local Claude config stays untracked, but shared skills ship with the repo
 .claude/*
 !.claude/skills/

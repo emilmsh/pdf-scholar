@@ -9,6 +9,7 @@
 // and this menu can never disagree about the active model.
 import { useEffect, useRef } from 'react'
 import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/types'
+import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { useDismissable } from '../useDismissable'
@@ -36,8 +37,9 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
   const provider = config.provider
   const model = config.models[provider] ?? ''
   const anyKey = KEY_PROVIDERS.some((p) => config.hasKey[p.id])
-  // Haiku ignores reasoning effort; mock has none — mirror AiSettings
-  const thinkingApplies = !/haiku/i.test(model) && provider !== 'mock'
+  // The provider profile decides whether a reasoning control exists at all;
+  // Haiku is the model-level exception (ignores effort) within Anthropic
+  const thinkingApplies = PROVIDER_PROFILES[provider].thinking !== 'none' && !/haiku/i.test(model)
 
   const patch = (p: Parameters<typeof bridge.aiSetConfig>[0]): void => {
     void bridge.aiSetConfig(p).then(onSaved)

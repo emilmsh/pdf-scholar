@@ -26,6 +26,7 @@ import type {
   PdfxApi
 } from '../../shared/types'
 import { runProviderChat } from '../../shared/ai-chat'
+import { PROVIDER_PROFILES } from '../../shared/ai-provider-profile'
 import { AI_ERRORS } from '../../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../../shared/ai-model-catalog'
 import { store } from './extension-store'
@@ -80,7 +81,7 @@ async function toView(config: AiConfig, keys: Keys, catalog: AiModelCatalog): Pr
   const usable = await usableKeys(keys)
   const hasKey = {} as Record<AiProviderId, boolean>
   for (const p of PROVIDER_IDS) {
-    hasKey[p] = p === 'mock' ? true : (usable[p]?.trim() ?? '') !== ''
+    hasKey[p] = PROVIDER_PROFILES[p].keyRequired ? (usable[p]?.trim() ?? '') !== '' : true
   }
   return {
     provider: config.provider,
@@ -197,7 +198,7 @@ export function createExtensionAi(): Pick<
       const [config, stored] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
       const usable = await usableKeys(stored)
       const key = usable[config.provider]?.trim() ?? ''
-      if (config.provider !== 'mock' && !key) {
+      if (PROVIDER_PROFILES[config.provider].keyRequired && !key) {
         // A sealed value that will not open reads as no key at all, so say what
         // to do about it rather than only that it is missing.
         return stored[config.provider] ? AI_ERRORS.keyUndecryptable : AI_ERRORS.keyMissing

@@ -19,6 +19,7 @@ import type {
   AiImage,
   AiWebSearchMode
 } from '../../../shared/types'
+import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { bridge } from '../bridge'
 import {
   annotationsDefaultQuestion,
@@ -790,9 +791,7 @@ export default function AiPanel({
               e.target.value = ''
             }}
           />
-          {(config?.provider === 'anthropic' ||
-            config?.provider === 'openai' ||
-            config?.provider === 'mock') && (
+          {config && PROVIDER_PROFILES[config.provider].webSearch && (
             <button
               className={`ai-attach-add${webSearch === 'off' ? '' : ` ${webSearch}`}`}
               title={t(

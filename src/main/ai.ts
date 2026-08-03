@@ -18,6 +18,7 @@ import type {
   KeyStorageMode
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
+import { PROVIDER_PROFILES } from '../shared/ai-provider-profile'
 import { AI_ERRORS } from '../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
@@ -180,7 +181,7 @@ function configView(): AiConfigView {
   // "Has a key" means the key is actually usable — a blob that fails DPAPI
   // decryption must show as not-set so the user re-enters it, instead of the
   // settings claiming a key exists while every request fails.
-  for (const p of PROVIDERS) hasKey[p] = p === 'mock' ? true : keyFor(p) !== ''
+  for (const p of PROVIDERS) hasKey[p] = PROVIDER_PROFILES[p].keyRequired ? keyFor(p) !== '' : true
   return {
     provider: ai.provider,
     models: { ...ai.models },
@@ -268,7 +269,7 @@ export function registerAiIpc(): void {
       if (recorded) return await replay(recorded, emit)
       const ai = getState().ai
       const key = keyFor(ai.provider)
-      if (ai.provider !== 'mock' && !key) {
+      if (PROVIDER_PROFILES[ai.provider].keyRequired && !key) {
         // Three different reasons, three different remedies: a stored blob that
         // will not decrypt (DPAPI ties encryption to the OS user, so credential
         // changes or a copied profile invalidate it), a session-only key that

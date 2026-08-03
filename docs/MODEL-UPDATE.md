@@ -54,11 +54,14 @@ gate — every `!` line maps to a row in the table below.
 ## Step 3 — verify
 
 1. `npm run typecheck`
-2. One real question per provider you touched (desktop or extension — same
+2. `npm run test:ai-chat` — the mocked conformance suite catches request-shaping
+   regressions (thinking/effort params, quote contract, tool variants) without
+   spending a token; update its expectations alongside any rule you changed.
+3. One real question per provider you touched (desktop or extension — same
    shared core), with thinking on and off, and one with web search, watching
    for the degrade net in devtools (a retried 400 means a heuristic is still
    wrong).
-3. If the **default** model changed: the assistant screenshots replay recorded
+4. If the **default** model changed: the assistant screenshots replay recorded
    answers (`docs/ai-fixtures/`) — consider `npm run shoot -- --with-ai
    --record` so the recorded answer matches what the shipped default would say,
    then ask Emil which frames to ship (never commit screenshots yourself).

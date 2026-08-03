@@ -39,6 +39,10 @@ jobs:
       # BM25 excerpt fallback for documents beyond the model's context window:
       # budget bounds, real-page markers, char→quote citation conversion
       - run: npm run test:retrieval
+      # The shared AI provider core against mocked HTTP: request shaping per
+      # provider, SSE parsing, the degrade-on-400 nets, and that each path
+      # matches its capability-profile row (no keys, no network)
+      - run: npm run test:ai-chat
       # The extension's redirect-rule → viewer-page URL handoff: a regression is
       # invisible until one specific kind of link (signed, tracker-tagged) breaks
       - run: npm run test:viewer-url
