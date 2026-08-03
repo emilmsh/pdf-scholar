@@ -74,12 +74,12 @@ kildekode.
 
 **EN:** For the documents you work through rather than skim: research articles,
 reports, books. The window is nearly all page — one slim toolbar carries the
-tools you use every hour, and everything else stays out of the way until you
+tools you use frequently, and everything else stays out of the way until you
 call it. Free, MIT-licensed, and offline unless you ask a question.
 
 **NO:** For dokumentene du jobber deg gjennom og ikke bare skummer:
 forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank
-verktøylinje bærer verktøyene du bruker hver time, og alt annet holder seg unna
+verktøylinje bærer verktøyene du bruker ofte, og alt annet holder seg unna
 til du henter det fram. Gratis, MIT-lisensiert, og offline med mindre du stiller
 et spørsmål.
 

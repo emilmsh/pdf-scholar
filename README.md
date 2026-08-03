@@ -8,7 +8,7 @@
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
 reports, books. The window is nearly all page: one slim toolbar carries the tools you use
-every hour, the contents and assistant panels stay out of the way until you call them, and 
+frequently, the contents and assistant panels stay out of the way until you call them, and 
 toggling fullscreen or the toolbar is always one click away, leaving the page and nothing else.
 
 Everything a long document asks of you is here. A page you can stand to look at all day, in
@@ -160,8 +160,9 @@ and date formats.
 
 ![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)
 
-Every paper eventually asks you to hold two pages in your head at once — the argument on
-one, the table it rests on somewhere else. Press **S** and you get both.
+Research papers and reports often ask you to hold two pages in your head at the same
+time — for example, a table or figure on one, the relevant text somewhere else. Press
+**S** and you get both.
 
 - **Two columns of the same document**, each with its own page and its own zoom. Keep a
   figure or a table in view while you read the passage that discusses it
