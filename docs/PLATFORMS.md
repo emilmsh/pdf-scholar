@@ -163,18 +163,17 @@ not as acceptable platform lag.
     `chrome.storage.local` (`extension-ai.ts`). The plain-web preview is
     keyless/mock-only, so it has no catalog to fetch (`aiRefreshModels` no-ops).
     Curated-list maintenance is platform-neutral: `docs/MODEL-UPDATE.md`.
-14. **The compat provider (any OpenAI-compatible endpoint, incl. local Ollama/
-    LM Studio) is CORS-dependent on the extension — a documented divergence.**
-    The desktop calls from the main process, where no origin rules apply, so
-    every endpoint works. The extension calls from the viewer page, and the
-    manifest's `host_permissions` cannot enumerate endpoints the user types in
-    — so there the endpoint itself must allow browser origins: Ollama's
-    defaults allow extension origins, LM Studio has a CORS toggle, OpenRouter
-    serves permissive CORS; providers that don't (e.g. Mistral, Groq direct)
-    fail with the named `ai-endpoint-unreachable` error rather than something
-    cryptic. Accepted for fase 10.1; the upgrade path is
-    `optional_host_permissions` + a runtime grant from the settings panel
-    (open point in docs/ROADMAP.md fase 10).
+14. **The compat family (the five hosted services + custom/local endpoints)
+    has FULL parity on the extension — a correction.** An earlier version of
+    this point claimed user-typed endpoints were CORS-dependent there; that
+    was wrong: the manifest already carries `host_permissions` for
+    `http://*/*` + `https://*/*` (required for the PDF-viewer takeover), and
+    host permissions exempt extension-page fetches from CORS for every host —
+    typed-in ones included. The one residual seam is server-side: a server
+    that itself rejects foreign `Origin` headers (Ollama honors
+    `OLLAMA_ORIGINS`, but its defaults allow extension origins; LM Studio has
+    a CORS toggle for browser use). Such a rejection surfaces as the named
+    `ai-endpoint-unreachable` error, never something cryptic.
 
 ## Maintenance rules
 

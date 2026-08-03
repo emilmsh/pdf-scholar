@@ -44,7 +44,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | macOS / Linux | **Beta.** Built in CI, feature-identical by construction, not verified on owner hardware. macOS is unsigned (Gatekeeper workaround in the README) and cannot auto-update; the recommended macOS install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
 | Browser extension | **Beta**, Edge and Chrome. **Not in either store yet** — install is Load-unpacked from the release zip. Do not write otherwise until the listings are live |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
-| AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
+| AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
 | Author | Emil Mathias Strøm Halseth, who reads PDFs for a living |
 | Logo | Elisabeth Walle — credit her wherever the logo appears |
 
@@ -190,12 +190,14 @@ fargefilter, og ett klikk tar deg dit.
 - Optional web search, off by default: closed, on request, or always on
   (Anthropic and OpenAI only — the toggle simply doesn't appear elsewhere)
 - LaTeX/TeX renders properly in answers, so maths stays readable
-- Anthropic, OpenAI, Azure OpenAI — or any OpenAI-compatible endpoint, with
-  presets for OpenRouter, Google Gemini, Grok (xAI), Mistral and Groq, and
-  local models via Ollama or LM Studio (local servers need no key). Setup is
-  pick-the-service, paste that service's key, save — the model list comes from
-  the endpoint itself. One model list across them all. Each answer shows the
-  tokens the provider counted, so the cost stays visible
+- Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI),
+  Mistral and Groq — one key field each, entered once — plus any
+  OpenAI-compatible endpoint and local models via Ollama or LM Studio (local
+  servers need no key). Setup is paste-the-key-and-save; each provider's model
+  list is fetched live, and the model menu keeps every keyed provider one
+  click apart. Big lists (OpenRouter) are sectioned by vendor with a filter
+  field. Each answer shows the tokens the provider counted, so the cost stays
+  visible
 
 ### 5. Where your document goes
 

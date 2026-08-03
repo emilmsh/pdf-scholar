@@ -7,13 +7,33 @@
 // It writes config straight through to the main process and hands the result
 // back via onSaved; it holds no config state of its own, so the panel header
 // and this menu can never disagree about the active model.
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/types'
-import { OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
+import { isCompatService, OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { useDismissable } from '../useDismissable'
 import { keyProviders, MODELS, modelOptions, THINKING_LEVELS } from './ai-models'
+
+/** Show the filter field once the combined list gets this big (an OpenRouter
+ *  key alone brings hundreds of models) */
+const FILTER_THRESHOLD = 25
+
+/** Aggregator ids carry a vendor prefix (anthropic/claude-…): group by it so
+ *  a huge list reads as sections, not soup. Known vendors get their proper
+ *  casing; the rest are capitalised mechanically. */
+const VENDOR_NAMES: Record<string, string> = {
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
+  google: 'Google',
+  'meta-llama': 'Meta',
+  mistralai: 'Mistral',
+  deepseek: 'DeepSeek',
+  qwen: 'Qwen',
+  'x-ai': 'xAI',
+  nvidia: 'NVIDIA'
+}
+const vendorLabel = (v: string): string => VENDOR_NAMES[v] ?? v.charAt(0).toUpperCase() + v.slice(1)
 
 interface ModelMenuProps {
   config: AiConfigView
@@ -39,12 +59,14 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
   const anyKey = keyProviders().some((p) => config.hasKey[p.id])
   // The provider profile decides whether a reasoning control exists at all;
   // within that, model-level exceptions keep the selector honest: Haiku
-  // ignores effort, and on a compat endpoint only OpenAI-style reasoning ids
-  // get the parameter at all (same regex request shaping uses).
+  // ignores effort, and across the compat family (hosted services + custom
+  // endpoints) only OpenAI-style reasoning ids get the parameter at all
+  // (same regex request shaping uses).
   const thinkingApplies =
     PROVIDER_PROFILES[provider].thinking !== 'none' &&
     !/haiku/i.test(model) &&
-    (provider !== 'compat' || OPENAI_REASONING_RE.test(model))
+    (!(provider === 'compat' || isCompatService(provider)) || OPENAI_REASONING_RE.test(model))
+  const [filter, setFilter] = useState('')
 
   const patch = (p: Parameters<typeof bridge.aiSetConfig>[0]): void => {
     void bridge.aiSetConfig(p).then(onSaved)
@@ -70,11 +92,11 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
     patch(p === 'azure' ? { provider: p } : { provider: p, models: { ...config.models, [p]: id } })
   }
 
-  const groups = keyProviders().map(({ id, name }) => {
+  const groups = keyProviders().flatMap(({ id, name }) => {
     // Curated list merged with the live catalog: new provider models appear on
     // their own; entries the provider no longer lists get a warning marker.
     const merged = modelOptions(id, config.catalog, config.compat.baseUrl)
-    const options = merged.map((m) => ({
+    let options = merged.map((m) => ({
       value: `${id}:${m.id}`,
       label: m.missing ? `${m.label} ⚠` : m.label,
       hint: m.missing ? t('ai.modelMissing') : m.hint ? t(m.hint) : undefined
@@ -96,10 +118,46 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
     // is picked from exactly this list once the endpoint's models are fetched
     const enabled =
       config.hasKey[id] || (id === 'compat' && config.compat.baseUrl.trim() !== '')
-    return { id: id as string, name, options, enabled }
+    if (filter.trim()) {
+      const f = filter.trim().toLowerCase()
+      options = options.filter(
+        (o) => o.label.toLowerCase().includes(f) || o.value.toLowerCase().includes(f)
+      )
+    }
+    // Aggregator lists (OpenRouter) are sectioned by their vendor/ prefix so
+    // hundreds of models read as sections, not soup. Native selects cannot
+    // nest optgroups, but flat sibling groups with a shared name prefix carry
+    // the same structure.
+    const vendorOf = (value: string): string => {
+      const modelId = value.slice(id.length + 1)
+      return modelId.includes('/') ? modelId.slice(0, modelId.indexOf('/')) : ''
+    }
+    const vendors = new Set(options.map((o) => vendorOf(o.value)))
+    if (options.length > 12 && vendors.size > 2) {
+      const byVendor = new Map<string, typeof options>()
+      for (const o of options) {
+        const vendor = vendorOf(o.value)
+        const list = byVendor.get(vendor) ?? []
+        list.push(o)
+        byVendor.set(vendor, list)
+      }
+      return [...byVendor.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([vendor, opts]) => ({
+          id: `${id}:${vendor}`,
+          name: vendor ? `${name} — ${vendorLabel(vendor)}` : name,
+          options: opts,
+          enabled
+        }))
+    }
+    return [{ id: id as string, name, options, enabled }]
     // Platforms that cannot store keys (plain-web preview) hide the keyless
     // real providers instead of greying them — there is no way to enable them
   }).filter((g) => g.options.length > 0 && (config.keysSupported || g.enabled))
+  // The filter field appears only once the combined list is big enough to
+  // drown in (an OpenRouter key alone brings hundreds of models)
+  const totalOptions = groups.reduce((n, g) => n + g.options.length, 0)
+  const showFilter = filter.trim() !== '' || totalOptions > FILTER_THRESHOLD
   if (provider === 'mock' || !config.keysSupported)
     groups.push({
       id: 'mock',
@@ -113,6 +171,14 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
       {anyKey || provider === 'mock' || !config.keysSupported ? (
         <label className="ai-field">
           <span>{t('ai.model')}</span>
+          {showFilter && (
+            <input
+              value={filter}
+              placeholder={t('ai.modelFilter')}
+              onChange={(e) => setFilter(e.target.value)}
+              spellCheck={false}
+            />
+          )}
           {/* The closed select echoes the selected model's hint on hover */}
           <select
             value={value}

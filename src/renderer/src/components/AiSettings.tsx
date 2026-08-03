@@ -12,7 +12,7 @@ import type { AiConfigView, AiProviderId } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
-import { compatPresets, DEFAULT_MODELS, keyProviders, SPEND_CAP_URLS } from './ai-models'
+import { compatPresets, DEFAULT_MODELS, keyProviders, SPEND_CAP_LABELS, SPEND_CAP_URLS } from './ai-models'
 
 interface SettingsProps {
   config: AiConfigView
@@ -29,6 +29,11 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
     anthropic: '',
     openai: '',
     azure: '',
+    openrouter: '',
+    gemini: '',
+    xai: '',
+    mistral: '',
+    groq: '',
     compat: '',
     mock: ''
   })
@@ -130,7 +135,7 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
                   bridge.openExternal(SPEND_CAP_URLS[id]!)
                 }}
               >
-                {id === 'anthropic' ? 'Anthropic' : id === 'openai' ? 'OpenAI' : 'Azure'}
+                {SPEND_CAP_LABELS[id] ?? id}
               </a>
             </span>
           ))}

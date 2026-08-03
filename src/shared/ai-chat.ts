@@ -27,7 +27,7 @@ import type {
   ThinkingLevel
 } from './types'
 import { remoteModel } from './ai-model-catalog'
-import { OPENAI_REASONING_RE } from './ai-provider-profile'
+import { COMPAT_SERVICES, isCompatService, OPENAI_REASONING_RE } from './ai-provider-profile'
 import { DEFAULT_AZURE_API_VERSION } from './defaults'
 import { AI_ERRORS } from './engine-errors'
 
@@ -872,6 +872,23 @@ export interface ProviderChatParams {
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
   const { provider, key, models, azure, compat, thinking, catalog, req, emit, signal } = params
   try {
+    // The first-class hosted services (OpenRouter, Gemini, xAI, Mistral,
+    // Groq): fixed base URL, Bearer key, shared Chat Completions path. Their
+    // model lists are live-fetched, so an empty model means "not picked yet"
+    // — a named, one-click-fixable state, not a config failure.
+    if (isCompatService(provider)) {
+      const model = models[provider].trim()
+      if (!model) return AI_ERRORS.modelUnchosen
+      return await chatOpenAiCompatible(
+        `${COMPAT_SERVICES[provider].baseUrl}/chat/completions`,
+        { authorization: `Bearer ${key}` },
+        model,
+        thinking,
+        req,
+        emit,
+        signal
+      )
+    }
     switch (provider) {
       case 'anthropic': {
         const caps = remoteModel(catalog, 'anthropic', models.anthropic)?.caps

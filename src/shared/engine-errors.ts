@@ -82,6 +82,12 @@ export const AI_ERRORS = {
     code: 'ai-compat-unconfigured',
     error: 'Base-URL og modell-id for det OpenAI-kompatible endepunktet må fylles ut i KI-innstillingene.'
   },
+  /** A first-class service has its key but no model picked yet — the model
+   *  list is live-fetched, so the fix is one click away in the model menu. */
+  modelUnchosen: {
+    code: 'ai-model-unchosen',
+    error: 'Ingen modell er valgt for denne leverandøren ennå. Velg modell i modellmenyen.'
+  },
   /** The fetch itself failed — nothing is listening, DNS failed, or (in the
    *  extension) the browser blocked the cross-origin call. The host and the
    *  runtime's own sentence ride in `error` for the log; the renderer shows

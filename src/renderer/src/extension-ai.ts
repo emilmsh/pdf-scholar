@@ -47,7 +47,18 @@ const DEFAULT_CONFIG: AiConfig = {
 
 type Keys = Partial<Record<AiProviderId, string>>
 
-const PROVIDER_IDS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'compat', 'mock']
+const PROVIDER_IDS: AiProviderId[] = [
+  'anthropic',
+  'openai',
+  'azure',
+  'openrouter',
+  'gemini',
+  'xai',
+  'mistral',
+  'groq',
+  'compat',
+  'mock'
+]
 
 async function loadConfig(): Promise<AiConfig> {
   const stored = await store.get<Partial<AiConfig>>(K_AI_CONFIG, {})
@@ -198,6 +209,11 @@ export function createExtensionAi(): Pick<
         {
           anthropic: { key: usable.anthropic ?? '' },
           openai: { key: usable.openai ?? '' },
+          openrouter: { key: usable.openrouter ?? '' },
+          gemini: { key: usable.gemini ?? '' },
+          xai: { key: usable.xai ?? '' },
+          mistral: { key: usable.mistral ?? '' },
+          groq: { key: usable.groq ?? '' },
           ...(compatBase ? { compat: { baseUrl: compatBase, key: usable.compat || undefined } } : {})
         },
         force === true

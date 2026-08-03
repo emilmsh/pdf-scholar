@@ -19,6 +19,7 @@
 // the previous snapshot, so a flaky network can never make the app dumber than
 // the shipped curated list.
 import type { AiModelCaps, AiModelCatalog, AiRemoteModel } from './types'
+import { COMPAT_SERVICES, isCompatService } from './ai-provider-profile'
 
 /** How long a fetched snapshot counts as fresh. Model launches are rare enough
  *  that a day-old list is fine for the hosted providers, and the TTL keeps the
@@ -30,9 +31,29 @@ import type { AiModelCaps, AiModelCatalog, AiRemoteModel } from './types'
 export const CATALOG_TTL_MS = 24 * 60 * 60 * 1000
 const LOCAL_TTL_MS = 5 * 60 * 1000
 
-/** Providers the catalog can be refreshed for (Azure is manual, mock is fake) */
-export type CatalogProviderId = 'anthropic' | 'openai' | 'compat'
-export const CATALOG_PROVIDERS: CatalogProviderId[] = ['anthropic', 'openai', 'compat']
+/** Providers the catalog can be refreshed for (Azure is manual, mock is fake).
+ *  The hosted compat services live-fetch exactly like OpenAI: ids from
+ *  /models with the user's key, plus context_length where the service
+ *  reports it (OpenRouter does). */
+export type CatalogProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'openrouter'
+  | 'gemini'
+  | 'xai'
+  | 'mistral'
+  | 'groq'
+  | 'compat'
+export const CATALOG_PROVIDERS: CatalogProviderId[] = [
+  'anthropic',
+  'openai',
+  'openrouter',
+  'gemini',
+  'xai',
+  'mistral',
+  'groq',
+  'compat'
+]
 
 export function catalogStale(catalog: AiModelCatalog, provider: CatalogProviderId): boolean {
   const entry = catalog[provider]
@@ -203,7 +224,11 @@ async function ollamaShow(
  *
  *  Throws on HTTP failure of the listing itself; enrichment failures degrade
  *  to an id-only entry. */
-export async function fetchCompatModels(baseUrl: string, apiKey?: string): Promise<AiRemoteModel[]> {
+export async function fetchCompatModels(
+  baseUrl: string,
+  apiKey?: string,
+  opts?: { probeOllama?: boolean }
+): Promise<AiRemoteModel[]> {
   const base = baseUrl.trim().replace(/\/+$/, '')
   let origin: string | null = null
   try {
@@ -211,6 +236,9 @@ export async function fetchCompatModels(baseUrl: string, apiKey?: string): Promi
   } catch {
     /* not a parseable URL — let the /models fetch below produce the error */
   }
+  // The Ollama probe only makes sense for user-typed endpoints; the known
+  // hosted services (COMPAT_SERVICES) skip straight to /models.
+  if (opts?.probeOllama === false) origin = null
   if (origin) {
     try {
       const tags = await fetch(`${origin}/api/tags`)
@@ -236,10 +264,20 @@ export async function fetchCompatModels(baseUrl: string, apiKey?: string): Promi
     headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {}
   })
   if (!res.ok) throw new Error(`Compat models: HTTP ${res.status}`)
-  const body = (await res.json()) as { data?: { id?: string }[] }
+  const body = (await res.json()) as {
+    data?: { id?: string; name?: string; context_length?: number }[]
+  }
   return (body.data ?? [])
-    .filter((m): m is { id: string } => !!m.id)
-    .map((m) => ({ id: m.id }))
+    .filter((m): m is { id: string; name?: string; context_length?: number } => !!m.id)
+    .map((m) => ({
+      id: m.id,
+      // OpenRouter ships a human name and the model's real context window in
+      // its listing — both are strictly better than guessing
+      ...(m.name ? { displayName: m.name } : {}),
+      ...(typeof m.context_length === 'number' && m.context_length > 0
+        ? { contextTokens: m.context_length }
+        : {})
+    }))
 }
 
 /** Loopback host = a local model server: no cost reminder applies, and the
@@ -260,6 +298,11 @@ export function isLocalEndpoint(baseUrl: string): boolean {
 export interface CatalogSources {
   anthropic?: { key: string }
   openai?: { key: string }
+  openrouter?: { key: string }
+  gemini?: { key: string }
+  xai?: { key: string }
+  mistral?: { key: string }
+  groq?: { key: string }
   compat?: { baseUrl: string; key?: string | undefined }
 }
 
@@ -291,8 +334,11 @@ export async function refreshCatalog(
         const key = sources[provider]?.key.trim()
         if (!key) return
         if (!force && !catalogStale(catalog, provider)) return
-        const models =
-          provider === 'anthropic' ? await fetchAnthropicModels(key) : await fetchOpenAiModels(key)
+        const models = isCompatService(provider)
+          ? await fetchCompatModels(COMPAT_SERVICES[provider].baseUrl, key, { probeOllama: false })
+          : provider === 'anthropic'
+            ? await fetchAnthropicModels(key)
+            : await fetchOpenAiModels(key)
         // An empty list is a provider hiccup, not "all models retired"
         if (models.length > 0) next[provider] = { fetchedAt: Date.now(), models }
       } catch {

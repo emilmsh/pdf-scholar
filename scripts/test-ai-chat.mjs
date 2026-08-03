@@ -41,8 +41,15 @@ await build({
   outfile: BUNDLE,
   logLevel: 'silent'
 })
-const { runProviderChat, PROVIDER_PROFILES, fetchCompatModels, refreshCatalog, isLocalEndpoint, catalogStale } =
-  await import(pathToFileURL(BUNDLE).href)
+const {
+  runProviderChat,
+  PROVIDER_PROFILES,
+  COMPAT_SERVICES,
+  fetchCompatModels,
+  refreshCatalog,
+  isLocalEndpoint,
+  catalogStale
+} = await import(pathToFileURL(BUNDLE).href)
 
 let failures = 0
 function ok(cond, msg) {
@@ -145,7 +152,18 @@ function baseParams(overrides) {
   return {
     provider: 'anthropic',
     key: 'sk-test',
-    models: { anthropic: 'claude-sonnet-5', openai: 'gpt-5.6-terra', azure: '', compat: 'llama3.1', mock: 'mock-1' },
+    models: {
+      anthropic: 'claude-sonnet-5',
+      openai: 'gpt-5.6-terra',
+      azure: '',
+      openrouter: 'anthropic/claude-sonnet-5',
+      gemini: 'gemini-2.5-flash',
+      xai: 'grok-4',
+      mistral: 'mistral-large-latest',
+      groq: 'llama-3.3-70b-versatile',
+      compat: 'llama3.1',
+      mock: 'mock-1'
+    },
     azure: { endpoint: 'https://unit.openai.azure.com', deployment: 'dep1', apiVersion: '' },
     compat: { baseUrl: 'http://localhost:11434/v1/' },
     thinking: 'medium',
@@ -489,6 +507,54 @@ section('mock: keyless offline provider')
   observed.mock = { quoteContract: false, nativeCitations: true, webTool: true, images: true }
 }
 
+// ---------- first-class hosted services (fase 10.3) ----------
+
+section('services: one key each, fixed base URL, shared Chat Completions path')
+for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
+  responder = () => chatCompletionsSse({
+    deltas: ['Svar. [KILDE s.1: "Innledningen setter rammen"]'],
+    usage: { prompt_tokens: 4, completion_tokens: 2 }
+  })
+  const { result } = await run({ provider: svc })
+  const body = calls[0]?.body
+  ok(
+    calls[0]?.url === `${info.baseUrl}/chat/completions`,
+    `${svc}: fixed base URL (got ${calls[0]?.url})`
+  )
+  ok(calls[0]?.headers.get('authorization') === 'Bearer sk-test', `${svc}: key as Bearer`)
+  ok(/CITATION RULES/.test(body?.messages?.[0]?.content ?? ''), `${svc}: quote contract attached`)
+  ok(body?.tools === undefined, `${svc}: no web-search tool`)
+  const svcUser = body?.messages?.find((m) => Array.isArray(m.content))
+  ok(svcUser?.content?.some((p) => p.type === 'image_url'), `${svc}: image as image_url part`)
+  ok(result.ok === true, `${svc}: answers`)
+  ok(
+    (result.parts ?? []).flatMap((p) => p.citations).some((c) => c.kind === 'quote'),
+    `${svc}: quote citation parsed`
+  )
+  observed[svc] = {
+    quoteContract: /CITATION RULES/.test(body?.messages?.[0]?.content ?? ''),
+    nativeCitations: false,
+    webTool: (body?.tools ?? []).length > 0,
+    images: svcUser?.content?.some((p) => p.type === 'image_url') === true
+  }
+}
+{
+  // Key present but no model picked yet: a named, one-click-fixable state
+  const unchosen = await run({
+    provider: 'openrouter',
+    models: { anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: '', mistral: '', groq: '', compat: '', mock: '' }
+  })
+  ok(unchosen.result.code === 'ai-model-unchosen', `no model picked → ai-model-unchosen (got ${unchosen.result.code})`)
+
+  // OpenRouter forwards OpenAI-style reasoning ids — the shared regex decides
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({
+    provider: 'openrouter',
+    models: { anthropic: '', openai: '', azure: '', openrouter: 'openai/gpt-5.2', gemini: '', xai: '', mistral: '', groq: '', compat: '', mock: '' }
+  })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'vendor-prefixed reasoning id gets reasoning_effort')
+}
+
 // ---------- compat catalog fetcher (fase 10.2: Ollama enrichment) ----------
 
 section('catalog: plain /v1 server vs Ollama enrichment')
@@ -498,16 +564,25 @@ section('catalog: plain /v1 server vs Ollama enrichment')
   responder = (call) =>
     call.url.endsWith('/api/tags')
       ? new Response('not found', { status: 404 })
-      : new Response(JSON.stringify({ data: [{ id: 'mixtral' }, { id: 'gemma' }] }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' }
-        })
+      : new Response(
+          JSON.stringify({
+            data: [
+              { id: 'mixtral', name: 'Mixtral', context_length: 131072 },
+              { id: 'gemma' }
+            ]
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
   const plain = await fetchCompatModels('https://api.example.com/v1', 'sk-x')
   ok(
     plain.map((m) => m.id).join(',') === 'mixtral,gemma',
     `plain server lists from /models (got ${plain.map((m) => m.id).join(',')})`
   )
-  ok(plain.every((m) => m.contextTokens === undefined), 'no invented context data for plain servers')
+  ok(
+    plain[0]?.contextTokens === 131072 && plain[0]?.displayName === 'Mixtral',
+    'context_length + name from the listing survive (OpenRouter-style)'
+  )
+  ok(plain[1]?.contextTokens === undefined, 'no invented context data where the listing is silent')
   ok(
     calls.some((c) => c.url === 'https://api.example.com/v1/models' && c.headers.get('authorization') === 'Bearer sk-x'),
     'listing carries the key when one exists'

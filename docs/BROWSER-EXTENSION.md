@@ -239,11 +239,12 @@ Real Anthropic/OpenAI/Azure chat now runs directly from the viewer page
 Electron app (`src/shared/ai-chat.ts` → `runProviderChat`). The CORS problem is
 moot inside an extension for the named providers: the manifest
 `host_permissions` let the page fetch those origins directly, and the Anthropic
-SDK runs with `dangerouslyAllowBrowser`. The compat provider (user-typed
-OpenAI-compatible endpoints) is the exception — its endpoints cannot be
-enumerated in the manifest, so the endpoint itself must allow browser origins
-(Ollama's defaults do; LM Studio has a CORS toggle). The upgrade path is
-`optional_host_permissions` + a runtime grant (docs/PLATFORMS.md pt. 14).
+SDK runs with `dangerouslyAllowBrowser`. This covers the compat family too —
+the manifest's `http(s)://*/*` host permissions (already required for the
+viewer takeover) exempt fetches to ANY host from CORS, user-typed endpoints
+included; only a server that itself rejects foreign Origin headers can still
+refuse, and that surfaces as the named `ai-endpoint-unreachable` error
+(docs/PLATFORMS.md pt. 14).
 
 **Key-at-rest safety** is a genuine divergence, not a gap that was left open.
 Keys are encrypted with AES-GCM under a non-extractable WebCrypto key held in

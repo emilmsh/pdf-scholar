@@ -12,31 +12,39 @@
 // (`npm run check:models` reports the drift).
 import type { AiModelCatalog, AiProviderId, ThinkingLevel } from '../../../shared/types'
 import { isLocalEndpoint, remoteModel } from '../../../shared/ai-model-catalog'
+import type { CatalogProviderId } from '../../../shared/ai-model-catalog'
+import { isCompatService } from '../../../shared/ai-provider-profile'
 import { t } from '../i18n'
 import type { MsgKey } from '../i18n'
 
+/** The catalog id for a provider, or null for the two that have no live list
+ *  (Azure is per-account, mock is fake). Everything else live-fetches. */
+const catalogId = (p: AiProviderId): CatalogProviderId | null =>
+  p === 'azure' || p === 'mock' ? null : p
+
+// Display order is RANKED by likelihood of preferred use (general global
+// usage patterns — Emil's call 2026-08-03), NOT alphabetical and NOT the
+// order the providers were added. The app's default provider is a separate
+// product decision and does not move with this list.
 export const providerLabels = (): { id: AiProviderId; label: string }[] => [
-  { id: 'anthropic', label: 'Claude (Anthropic)' },
   { id: 'openai', label: 'OpenAI' },
+  { id: 'anthropic', label: 'Claude (Anthropic)' },
+  { id: 'gemini', label: 'Google Gemini' },
   { id: 'azure', label: 'Azure OpenAI' },
+  { id: 'openrouter', label: 'OpenRouter' },
+  { id: 'xai', label: 'xAI (Grok)' },
+  { id: 'mistral', label: 'Mistral' },
+  { id: 'groq', label: 'Groq' },
   { id: 'compat', label: t('ai.providerCompat') },
   { id: 'mock', label: t('ai.providerMock') }
 ]
 
-/** Base-URL presets for the compat provider — a dropdown that only prefills
- *  the URL field, so nobody has to hunt for an endpoint in someone's docs.
- *  The local entries are the point of the provider: Ollama and LM Studio both
- *  serve the OpenAI surface on localhost, keyless. Gemini rides on Google's
- *  official OpenAI-compatible endpoint (the reason fase 3's native Gemini
- *  path was dropped — docs/ROADMAP.md). `modelHint` is only a placeholder
- *  example for the model-id field, never sent anywhere. URLs and examples
- *  verified monthly (docs/MAINTENANCE.md row 4). */
+/** Base-URL presets for the compat provider — since the hosted services
+ *  became first-class key slots (fase 10.3) only the LOCAL servers live
+ *  here, plus whatever URL the user types. `modelHint` is only a placeholder
+ *  example for the model-id field, never sent anywhere. Verified monthly
+ *  (docs/MAINTENANCE.md row 4). */
 export const compatPresets = (): { label: string; url: string; modelHint: string }[] => [
-  { label: 'OpenRouter', url: 'https://openrouter.ai/api/v1', modelHint: 'anthropic/claude-sonnet-5' },
-  { label: 'Google Gemini', url: 'https://generativelanguage.googleapis.com/v1beta/openai', modelHint: 'gemini-2.5-flash' },
-  { label: 'xAI (Grok)', url: 'https://api.x.ai/v1', modelHint: 'grok-4' },
-  { label: 'Mistral', url: 'https://api.mistral.ai/v1', modelHint: 'mistral-large-latest' },
-  { label: 'Groq', url: 'https://api.groq.com/openai/v1', modelHint: 'llama-3.3-70b-versatile' },
   { label: `Ollama (${t('ai.localTag')})`, url: 'http://localhost:11434/v1', modelHint: 'llama3.1' },
   { label: `LM Studio (${t('ai.localTag')})`, url: 'http://localhost:1234/v1', modelHint: 'qwen2.5-7b-instruct' }
 ]
@@ -63,8 +71,13 @@ export const MODELS: Record<
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
   ],
   azure: [],
-  // compat has no curated list either: the endpoint decides what exists, and
-  // the live /models fetch fills the menu
+  // The compat family (hosted services + custom/local) has no curated lists:
+  // the endpoint decides what exists, and the live /models fetch fills the menu
+  openrouter: [],
+  gemini: [],
+  xai: [],
+  mistral: [],
+  groq: [],
   compat: [],
   mock: [{ id: 'mock-1', label: 'Testmodell (mock)', short: 'Testmodell' }]
 }
@@ -105,12 +118,13 @@ export function modelOptions(
 ): ModelOption[] {
   const curated = MODELS[provider] ?? []
   const remote =
-    provider === 'anthropic' || provider === 'openai'
-      ? catalog?.[provider]
-      : provider === 'compat' &&
-          catalog?.compat &&
-          catalog.compat.baseUrl === (compatBaseUrl ?? '').trim().replace(/\/+$/, '')
+    provider === 'compat'
+      ? catalog?.compat &&
+        catalog.compat.baseUrl === (compatBaseUrl ?? '').trim().replace(/\/+$/, '')
         ? catalog.compat
+        : undefined
+      : provider === 'anthropic' || provider === 'openai' || isCompatService(provider)
+        ? catalog?.[provider]
         : undefined
   if (!remote) return curated.map((m) => ({ ...m, curated: true, missing: false }))
   const remoteIds = new Set(remote.models.map((m) => m.id))
@@ -140,6 +154,9 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
   const found = MODELS[provider]?.find((m) => m.id === id)
   if (found) return found.short
   if (!id) return ''
+  // Aggregator ids carry a vendor prefix (anthropic/claude-sonnet-5) — the
+  // vendor belongs in the menu's group label, never in the header chip
+  if (id.includes('/')) id = id.slice(id.lastIndexOf('/') + 1)
   return id
     .replace(/^claude-/i, 'Claude ')
     .replace(/^gpt-/i, 'GPT-')
@@ -169,10 +186,18 @@ const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {
   anthropic: 200_000,
   openai: 200_000,
   azure: 120_000,
+  // Conservative floors for the hosted services — the live catalog's
+  // per-model context_length (OpenRouter reports it) overrides these, so the
+  // floor only decides for models the listing did not describe.
+  openrouter: 32_000,
+  gemini: 200_000,
+  xai: 128_000,
+  mistral: 32_000,
+  groq: 32_000,
   // Deliberately the lowest floor: an unknown compat endpoint may be a hosted
   // frontier model (≥128k) or a local model configured with a few thousand
   // tokens of context. 32k excerpts early rather than erroring mid-question;
-  // fase 2 (Ollama /api/show) replaces the guess with the model's real number.
+  // the Ollama enrichment (/api/show) replaces the guess with the real number.
   compat: 32_000,
   mock: 200_000
 }
@@ -187,24 +212,25 @@ export function contextTokensFor(
   modelId: string,
   catalog?: AiModelCatalog
 ): number {
-  if (provider === 'compat') {
-    const live = remoteModel(catalog, 'compat', modelId)?.contextTokens
+  const cat = catalogId(provider)
+  if (cat) {
+    const live = remoteModel(catalog, cat, modelId)?.contextTokens
     if (live) return live
   }
   return MODEL_CONTEXT_TOKENS[modelId] ?? PROVIDER_CONTEXT_FLOOR[provider] ?? 120_000
 }
 
-/** Whether the selected model can read images, as far as we know. Only the
- *  compat catalog carries a per-model answer (Ollama capabilities); every
- *  hosted provider's curated models are vision-capable, and unknown stays
- *  permissive — the degrade nets own the rest. */
+/** Whether the selected model can read images, as far as we know. Per-model
+ *  answers exist only where a listing reports them (Ollama capabilities);
+ *  unknown stays permissive — the degrade nets own the rest. */
 export function modelSupportsImages(
   provider: AiProviderId,
   modelId: string,
   catalog?: AiModelCatalog
 ): boolean {
-  if (provider !== 'compat') return true
-  return remoteModel(catalog, 'compat', modelId)?.vision !== false
+  const cat = catalogId(provider)
+  if (!cat) return true
+  return remoteModel(catalog, cat, modelId)?.vision !== false
 }
 
 // Where each provider lets you set a spending cap — linked from the key field
@@ -212,7 +238,25 @@ export function modelSupportsImages(
 export const SPEND_CAP_URLS: Partial<Record<AiProviderId, string>> = {
   anthropic: 'https://console.anthropic.com/settings/limits',
   openai: 'https://platform.openai.com/settings/organization/limits',
-  azure: 'https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview'
+  azure: 'https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview',
+  openrouter: 'https://openrouter.ai/settings/credits',
+  gemini: 'https://aistudio.google.com/usage',
+  xai: 'https://console.x.ai/',
+  mistral: 'https://console.mistral.ai/billing/',
+  groq: 'https://console.groq.com/settings/billing'
+}
+
+/** Short names for the spend-cap link row (the full keyProviders names are
+ *  too long to sit inline in one sentence) */
+export const SPEND_CAP_LABELS: Partial<Record<AiProviderId, string>> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  azure: 'Azure',
+  openrouter: 'OpenRouter',
+  gemini: 'Google',
+  xai: 'xAI',
+  mistral: 'Mistral',
+  groq: 'Groq'
 }
 
 export const THINKING_LEVELS: { id: ThinkingLevel; key: MsgKey }[] = [
@@ -222,12 +266,17 @@ export const THINKING_LEVELS: { id: ThinkingLevel; key: MsgKey }[] = [
   { id: 'high', key: 'ai.thinkHigh' }
 ]
 
-/** Configurable providers in display order, for the key manager and the model
- *  menu (mock is not listed — it needs no setup). A function, not a constant,
- *  because the compat label is translated. */
+/** Configurable providers for the key manager and the model menu (mock is
+ *  not listed — it needs no setup). Same RANKED order as providerLabels; a
+ *  function, not a constant, because the compat label is translated. */
 export const keyProviders = (): { id: AiProviderId; name: string }[] => [
-  { id: 'anthropic', name: 'Claude (Anthropic)' },
   { id: 'openai', name: 'OpenAI' },
+  { id: 'anthropic', name: 'Claude (Anthropic)' },
+  { id: 'gemini', name: 'Google Gemini' },
   { id: 'azure', name: 'Azure OpenAI' },
+  { id: 'openrouter', name: 'OpenRouter' },
+  { id: 'xai', name: 'xAI (Grok)' },
+  { id: 'mistral', name: 'Mistral' },
+  { id: 'groq', name: 'Groq' },
   { id: 'compat', name: t('ai.providerCompat') }
 ]

@@ -269,12 +269,13 @@ the answer rather than take it on trust.
   in between — and the document leaves your machine only when you ask a question. With
   a local model, even your questions stay on your own machine
 - **Using an OpenRouter, Gemini, Grok, Mistral or Groq key**: open the assistant
-  settings, and under *Custom / local (OpenAI-compatible)* pick the service (the
-  base URL fills itself in — Gemini's is Google's official OpenAI-compatible
-  endpoint), paste that service's key, and save. The model list is fetched from the
-  endpoint, so pick your model from the model menu afterwards. For a local model,
-  start Ollama or LM Studio and skip the key — a running Ollama is detected and
-  offered with one click
+  settings, paste the key next to that service's name, and save — every provider
+  has its own key field, entered once. Each keyed provider's models are fetched
+  live and appear in the model menu, one click apart, so switching between (say)
+  a Gemini model and an OpenRouter model happens mid-chat. Big lists are
+  sectioned by vendor, with a filter field when needed. For a local model, start
+  Ollama or LM Studio and use *Custom / local* — no key at all, and a running
+  Ollama is detected and offered with one click
 - **Cost stays visible**: each answer shows the tokens the provider counted, and the key
   settings link straight to your provider's console, where you set a spending cap and see
   what you have spent

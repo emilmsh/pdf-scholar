@@ -93,6 +93,7 @@ export type AiErrorCode =
   | 'ai-key-session-only'
   | 'ai-azure-unconfigured'
   | 'ai-compat-unconfigured'
+  | 'ai-model-unchosen'
   | 'ai-endpoint-unreachable'
   | 'ai-endpoint-incompatible'
   | 'ai-context-overflow'
@@ -227,7 +228,20 @@ export interface DeleteAnnotationRequest {
 
 // ---------- AI (BYO API key, multi-provider) ----------
 
-export type AiProviderId = 'anthropic' | 'openai' | 'azure' | 'compat' | 'mock'
+export type AiProviderId =
+  | 'anthropic'
+  | 'openai'
+  | 'azure'
+  // First-class hosted OpenAI-compatible services (one key each; base URLs in
+  // shared/ai-provider-profile.ts COMPAT_SERVICES)
+  | 'openrouter'
+  | 'gemini'
+  | 'xai'
+  | 'mistral'
+  | 'groq'
+  // Custom OpenAI-compatible endpoint / local servers (Ollama, LM Studio)
+  | 'compat'
+  | 'mock'
 
 /** How hard the model should reason; mapped per provider/model in main */
 export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
@@ -286,6 +300,11 @@ export interface AiRemoteModel {
 export interface AiModelCatalog {
   anthropic?: { fetchedAt: number; models: AiRemoteModel[] }
   openai?: { fetchedAt: number; models: AiRemoteModel[] }
+  openrouter?: { fetchedAt: number; models: AiRemoteModel[] }
+  gemini?: { fetchedAt: number; models: AiRemoteModel[] }
+  xai?: { fetchedAt: number; models: AiRemoteModel[] }
+  mistral?: { fetchedAt: number; models: AiRemoteModel[] }
+  groq?: { fetchedAt: number; models: AiRemoteModel[] }
   /** Also remembers WHICH endpoint the list came from, so a changed base URL
    *  never shows another server's models */
   compat?: { fetchedAt: number; models: AiRemoteModel[]; baseUrl: string }

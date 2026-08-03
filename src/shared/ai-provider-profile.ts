@@ -44,6 +44,30 @@ export interface AiProviderProfile {
  *  have their own capability logic and never consult this. */
 export const OPENAI_REASONING_RE = /gpt-5|o[0-9]/i
 
+/** The first-class hosted OpenAI-compatible services (fase 10.3): a FINITE,
+ *  curated set — one key field each, entered once, stored exactly like the
+ *  Anthropic/OpenAI keys — instead of a free-form endpoint manager. The set
+ *  is deliberately short: these five cover practically everyone (OpenRouter
+ *  is itself an aggregator of hundreds of models), and anything else fits
+ *  the compat provider's custom base URL. All five ride the shared Chat
+ *  Completions path with the quote contract. URLs verified on the monthly
+ *  pass (docs/MAINTENANCE.md row 4). */
+export type CompatServiceId = 'openrouter' | 'gemini' | 'xai' | 'mistral' | 'groq'
+
+export const COMPAT_SERVICES: Record<CompatServiceId, { baseUrl: string }> = {
+  openrouter: { baseUrl: 'https://openrouter.ai/api/v1' },
+  // Google's official OpenAI-compatible endpoint — the reason the native
+  // Gemini path (old fase 3) was dropped
+  gemini: { baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai' },
+  xai: { baseUrl: 'https://api.x.ai/v1' },
+  mistral: { baseUrl: 'https://api.mistral.ai/v1' },
+  groq: { baseUrl: 'https://api.groq.com/openai/v1' }
+}
+
+export function isCompatService(provider: AiProviderId): provider is CompatServiceId {
+  return provider in COMPAT_SERVICES
+}
+
 export const PROVIDER_PROFILES: Record<AiProviderId, AiProviderProfile> = {
   anthropic: {
     citations: 'native',
@@ -68,10 +92,19 @@ export const PROVIDER_PROFILES: Record<AiProviderId, AiProviderProfile> = {
     vision: true,
     keyRequired: true
   },
-  // Any OpenAI-compatible /chat/completions server: OpenRouter, Mistral, Groq,
-  // or a local Ollama/LM Studio. Keyless local servers are the point, so no
-  // key requirement — readiness is base URL + model id, enforced per request
-  // (AI_ERRORS.compatUnconfigured) and in each platform's hasKey view.
+  // The five hosted services share one row shape: Chat Completions + quote
+  // contract, no server-side web-search tool, OpenAI-style effort where the
+  // model id says so, images passed through (the model errors honestly when
+  // it cannot read them), ordinary key requirement.
+  openrouter: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
+  gemini: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
+  xai: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
+  mistral: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
+  groq: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
+  // Custom OpenAI-compatible endpoints and local servers (Ollama/LM Studio).
+  // Keyless local servers are the point, so no key requirement — readiness is
+  // base URL + model id, enforced per request (AI_ERRORS.compatUnconfigured)
+  // and in each platform's hasKey view.
   compat: {
     citations: 'contract',
     webSearch: false,

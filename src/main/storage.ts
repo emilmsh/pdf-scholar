@@ -45,7 +45,18 @@ const DEFAULT_AI: StoredAiConfig = {
   azure: { endpoint: '', deployment: '', apiVersion: '' },
   compat: { baseUrl: '' },
   thinking: 'medium',
-  keys: { anthropic: '', openai: '', azure: '', compat: '', mock: '' }
+  keys: {
+    anthropic: '',
+    openai: '',
+    azure: '',
+    openrouter: '',
+    gemini: '',
+    xai: '',
+    mistral: '',
+    groq: '',
+    compat: '',
+    mock: ''
+  }
 }
 
 const DEFAULTS: AppState = {

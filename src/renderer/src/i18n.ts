@@ -61,6 +61,8 @@ const nb = {
   'aierr.ai-azure-unconfigured': 'Azure-endepunkt og deployment må fylles ut i KI-innstillingene.',
   'aierr.ai-compat-unconfigured':
     'Base-URL og modell-id for det OpenAI-kompatible endepunktet må fylles ut i KI-innstillingene.',
+  'aierr.ai-model-unchosen':
+    'Ingen modell er valgt for denne leverandøren ennå. Velg modell i modellmenyen øverst i panelet.',
   'aierr.ai-endpoint-unreachable':
     'Fikk ikke kontakt med endepunktet. Kjører serveren, og er base-URL-en riktig?',
   'aierr.ai-endpoint-incompatible':
@@ -460,7 +462,8 @@ const nb = {
   'ai.compatModelId': 'Modell-id',
   'ai.compatModelHint': 'f.eks. llama3.1 eller mistral-large-latest',
   'ai.compatHint':
-    'For nøkler fra OpenRouter, Gemini, Grok (xAI), Mistral, Groq m.fl. — og lokale servere som Ollama og LM Studio (uten nøkkel). Velg tjeneste, lim inn tjenestens egen nøkkel, og lagre: modellisten hentes fra endepunktet, så modellen kan velges i modellmenyen etterpå.',
+    'For lokale modeller (Ollama og LM Studio kjører uten nøkkel — velg dem i listen) og alle andre OpenAI-kompatible endepunkter. Modellisten hentes fra endepunktet når du lagrer.',
+  'ai.modelFilter': 'Filtrer modeller …',
   'ai.ollamaDetected': 'Ollama kjører på denne maskinen — klikk for å fylle inn adressen',
   'ai.noVisionTip': 'Valgt modell ({model}) kan ikke lese bilder',
   'ai.keyCapHint': 'Sett et utgiftstak på nøkkelen — samme sted viser leverandøren hva du faktisk har brukt. Appen teller tokens, men bare leverandøren vet prisen.',
@@ -610,6 +613,8 @@ const en: Dict = {
   'aierr.ai-azure-unconfigured': 'The Azure endpoint and deployment must be filled in under AI settings.',
   'aierr.ai-compat-unconfigured':
     'The base URL and model id for the OpenAI-compatible endpoint must be filled in under AI settings.',
+  'aierr.ai-model-unchosen':
+    'No model is picked for this provider yet. Pick one from the model menu at the top of the panel.',
   'aierr.ai-endpoint-unreachable':
     'Could not reach the endpoint. Is the server running, and is the base URL correct?',
   'aierr.ai-endpoint-incompatible':
@@ -988,7 +993,8 @@ const en: Dict = {
   'ai.compatModelId': 'Model id',
   'ai.compatModelHint': 'e.g. llama3.1 or mistral-large-latest',
   'ai.compatHint':
-    'For keys from OpenRouter, Gemini, Grok (xAI), Mistral, Groq and more — and local servers like Ollama and LM Studio (no key). Pick the service, paste that service\'s own key, and save: the model list is fetched from the endpoint, so the model can be picked from the model menu afterwards.',
+    'For local models (Ollama and LM Studio run without a key — pick them in the list) and any other OpenAI-compatible endpoint. The model list is fetched from the endpoint when you save.',
+  'ai.modelFilter': 'Filter models …',
   'ai.ollamaDetected': 'Ollama is running on this machine — click to fill in the address',
   'ai.noVisionTip': 'The selected model ({model}) cannot read images',
   'ai.keyCapHint': 'Set a spending cap on the key — the same page shows what you have actually used. This app counts tokens; only the provider knows the price.',

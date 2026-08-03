@@ -23,7 +23,18 @@ import { AI_ERRORS } from '../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
 
-const PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'azure', 'compat', 'mock']
+const PROVIDERS: AiProviderId[] = [
+  'anthropic',
+  'openai',
+  'azure',
+  'openrouter',
+  'gemini',
+  'xai',
+  'mistral',
+  'groq',
+  'compat',
+  'mock'
+]
 
 // ---------- Recorded answers, for the screenshot run ----------
 //
@@ -257,6 +268,11 @@ export function registerAiIpc(): void {
       {
         anthropic: { key: keyFor('anthropic') },
         openai: { key: keyFor('openai') },
+        openrouter: { key: keyFor('openrouter') },
+        gemini: { key: keyFor('gemini') },
+        xai: { key: keyFor('xai') },
+        mistral: { key: keyFor('mistral') },
+        groq: { key: keyFor('groq') },
         ...(compatBase ? { compat: { baseUrl: compatBase, key: keyFor('compat') || undefined } } : {})
       },
       force === true

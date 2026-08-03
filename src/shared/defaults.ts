@@ -29,8 +29,14 @@ export const DEFAULT_AI_MODELS: Record<AiProviderId, string> = {
   anthropic: 'claude-sonnet-5',
   openai: 'gpt-5.6-terra',
   azure: '',
-  // compat has no default either: the model id belongs to whatever server the
-  // user points the base URL at
+  // The compat-family providers have no defaults: their model lists are
+  // live-fetched, and picking one is a product decision the USER makes from
+  // the model menu (an empty model gives the named ai-model-unchosen error)
+  openrouter: '',
+  gemini: '',
+  xai: '',
+  mistral: '',
+  groq: '',
   compat: '',
   mock: 'mock-1'
 }

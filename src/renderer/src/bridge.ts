@@ -183,7 +183,7 @@ export const webApi: PdfxApi = {
   // so the chat UI (streaming, citation chips, jump+highlight) can be tested.
   aiGetConfig: async () => ({
     ...loadWebAiConfig(),
-    hasKey: { anthropic: false, openai: false, azure: false, compat: false, mock: true },
+    hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
     // Mock-only preview: no key is ever stored, so there is nothing to protect
     keyStorage: 'session-only' as const,
     keysSupported: false,
@@ -201,7 +201,7 @@ export const webApi: PdfxApi = {
     localStorage.setItem('pdfx-web-ai', JSON.stringify(next))
     return {
       ...next,
-      hasKey: { anthropic: false, openai: false, azure: false, compat: false, mock: true },
+      hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
       keyStorage: 'session-only' as const,
       keysSupported: false,
       catalog: {}

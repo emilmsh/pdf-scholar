@@ -54,20 +54,31 @@ try {
 
   const settings = await evaluate(send, `
     const g = compatGroup()
+    const groupNames = [...document.querySelectorAll('.ai-field-group > .ai-field > span')]
+      .map((s) => s.textContent)
     return {
       settingsShown: !!document.querySelector('.ai-settings'),
       groups: document.querySelectorAll('.ai-field-group').length,
+      groupNames,
       hasCompatGroup: !!g,
       presets: g ? [...g.querySelectorAll('select option')].map((o) => o.textContent) : [],
       keyPlaceholder: g?.querySelector('input[type="password"]')?.placeholder ?? ''
     }
   `, PRELUDE)
   ok(settings.settingsShown, 'keyless start lands in the AI settings')
-  ok(settings.groups === 4, `four provider groups render (got ${settings.groups})`)
+  ok(settings.groups === 9, `nine provider groups render, ranked (got ${settings.groups})`)
+  ok(
+    settings.groupNames[0] === 'OpenAI' && /Gemini/.test(settings.groupNames[2] ?? ''),
+    `ranked order: OpenAI first, Gemini third (got ${settings.groupNames.slice(0, 3).join(' | ')})`
+  )
+  ok(
+    ['OpenRouter', 'xAI (Grok)', 'Mistral', 'Groq'].every((n) => settings.groupNames.includes(n)),
+    'the hosted services each have their own key row'
+  )
   ok(settings.hasCompatGroup, 'compat group with the base-URL field renders')
   ok(
-    ['Ollama', 'OpenRouter', 'Gemini', 'Grok'].every((s) => settings.presets.some((p) => p.includes(s))),
-    'preset menu lists Ollama + OpenRouter + Gemini + Grok'
+    ['Ollama', 'LM Studio'].every((s) => settings.presets.some((p) => p.includes(s))),
+    'compat presets are the local servers'
   )
   ok(/valgfri|optional/i.test(settings.keyPlaceholder), 'key field says the key is optional')
 
