@@ -75,7 +75,7 @@ AI ASSISTANT (optional — bring your own key)
 • A scanned PDF — pictures of words, with no text to search — is named as such rather than answered about blindly; attach a page range and the assistant reads those pages as images
 • LaTeX/TeX renders properly in answers, so maths stays readable
 • Optional web search, off by default: closed, on request, or always on
-• One model list across providers, using your own Anthropic, OpenAI or Azure OpenAI key — or any OpenAI-compatible endpoint, including local models via Ollama or LM Studio (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose, under your key and their terms; with a local model it never leaves at all. PDF Scholar runs no server of its own.
+• Eight providers, one key field each: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose, under your key and their terms; with a local model it never leaves at all. PDF Scholar runs no server of its own.
 
 Source code: https://github.com/emilmsh/pdf-scholar
 ```
@@ -121,33 +121,31 @@ AI-ASSISTENT (valgfri — egen nøkkel)
 • En skannet PDF — bilder av ord, uten tekst å søke i — sies det fra om i stedet for å svares på i blinde; legg ved et sideutvalg, så leser assistenten de sidene som bilder
 • LaTeX/TeX vises riktig i svar, så matematikk holder seg lesbar
 • Valgfritt nettsøk, av som standard: lukket, på forespørsel, eller alltid på
-• Én modelliste på tvers av leverandører, med din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel — eller et hvilket som helst OpenAI-kompatibelt endepunkt, inkludert lokale modeller via Ollama eller LM Studio (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte, under din nøkkel og deres vilkår; med en lokal modell forlater det aldri maskinen. PDF Scholar kjører ingen egen server.
+• Åtte leverandører, ett nøkkelfelt hver: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — pluss et hvilket som helst OpenAI-kompatibelt endepunkt og lokale modeller via Ollama eller LM Studio (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte, under din nøkkel og deres vilkår; med en lokal modell forlater det aldri maskinen. PDF Scholar kjører ingen egen server.
 
 Kildekode: https://github.com/emilmsh/pdf-scholar
 ```
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.31.x
+## What's new in this version (≤ 1 500 chars) — v0.32.x
 
 **EN:**
 ```
-• Marks can be corrected instead of redrawn: drag either end of a highlight to cover more or less text, or a corner of a shape, text box or drawing to resize it
-• Scanned documents can be read: a PDF that is pictures of words says so, and the assistant reads the pages you attach as images
-• Search marks every hit on the page while you look, and offers your last ten searches
-• Bookmarks: press B to mark a page, name it, and come back to it from the sidebar
-• Clear every annotation in one step, and one Ctrl+Z brings them all back
-• Drag tabs to reorder them; right-click one to close the others
+• The assistant now works with eight AI providers, one key field each: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — paste a key once and that provider's models appear in the model menu
+• Local models: point the assistant at Ollama or LM Studio and it runs with no key at all — a running Ollama is detected and offered with one click, and with a local model the document never leaves your machine
+• Every keyed provider's model list is fetched live, so new models appear without an app update; big lists are sectioned by vendor with a filter field
+• The assistant knows each local model's real context window and whether it can read images, and adapts instead of failing
+• Clear, plain-language errors when an endpoint is unreachable or a model is not picked yet
 ```
 
 **NO:**
 ```
-• Merknader kan rettes i stedet for å tegnes på nytt: dra i enden av en utheving for å dekke mer eller mindre tekst, eller i hjørnet av en form, tekstboks eller tegning for å endre størrelsen
-• Skannede dokumenter kan leses: en PDF som er bilder av ord sier det, og assistenten leser sidene du legger ved som bilder
-• Søket markerer alle treff på siden mens du leter, og tilbyr de ti siste søkene dine
-• Bokmerker: trykk B for å merke en side, gi den navn, og kom tilbake til den fra sidepanelet
-• Tøm alle merknader i én handling, og én Ctrl+Z henter alt tilbake
-• Dra faner for å endre rekkefølge; høyreklikk én for å lukke de andre
+• Assistenten virker nå med åtte AI-leverandører, ett nøkkelfelt hver: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — lim inn en nøkkel én gang, og leverandørens modeller dukker opp i modellmenyen
+• Lokale modeller: pek assistenten på Ollama eller LM Studio, helt uten nøkkel — en kjørende Ollama oppdages og tilbys med ett klikk, og med en lokal modell forlater dokumentet aldri maskinen
+• Modellistene hentes live per leverandør, så nye modeller dukker opp uten appoppdatering; store lister deles inn per produsent med et filterfelt
+• Assistenten kjenner lokale modellers reelle kontekstvindu og om de kan lese bilder, og tilpasser seg i stedet for å feile
+• Klare feilmeldinger i vanlig språk når et endepunkt ikke svarer eller modell ikke er valgt ennå
 ```
 
 ---

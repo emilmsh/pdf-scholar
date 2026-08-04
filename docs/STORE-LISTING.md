@@ -62,7 +62,7 @@ AI ASSISTANT (optional, bring your own key)
 • Structured article summaries; explain, simplify, critique or define selected text
 • Snip a figure or a region and ask the assistant to explain it
 • Search by meaning: describe a topic in your own words and get the passages that discuss it
-• Works with your own Anthropic, OpenAI or Azure OpenAI key — or an OpenAI-compatible endpoint such as a local Ollama (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose; with a local model it never leaves at all
+• Eight providers, one key each: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — or an OpenAI-compatible endpoint such as a local Ollama (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose; with a local model it never leaves at all
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
 ```
@@ -95,7 +95,7 @@ AI-ASSISTENT (valgfri, egen nøkkel)
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • Klipp ut en figur eller et område og be assistenten forklare det
 • Søk etter mening: beskriv et tema med dine egne ord og få avsnittene som handler om det
-• Bruker din egen Anthropic-, OpenAI- eller Azure OpenAI-nøkkel — eller et OpenAI-kompatibelt endepunkt som en lokal Ollama (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte; med en lokal modell forlater det aldri maskinen
+• Åtte leverandører, én nøkkel hver: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — eller et OpenAI-kompatibelt endepunkt som en lokal Ollama (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte; med en lokal modell forlater det aldri maskinen
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
 ```
