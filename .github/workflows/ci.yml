@@ -28,6 +28,10 @@ jobs:
       # Engine round-trip test (EmbedPDF writes, mupdf independently verifies) —
       # pure Node + WASM, runs identically on every OS
       - run: npm run test:engine
+      # «Eksporter med kommentarer i margen»: the margin-export transform widens
+      # every page box and bakes cards in as real annotations — mupdf verifies
+      # the copy (incl. /Rotate 90 pages and the link-AP guard)
+      - run: npm run test:margin
       # The >150 MB path takes the incremental appender instead of the engine —
       # a separate write implementation, so it needs its own gate
       - run: npm run test:appender
