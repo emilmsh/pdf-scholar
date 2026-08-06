@@ -51,7 +51,8 @@ READING
 ANNOTATION
 Marking up a paper never interrupts reading it: the tools come to the text you selected, and everything you have marked is one panel away.
 • Select a passage and the menu comes to you — highlight, underline, a comment or a note, without a trip to the toolbar and back
-• A Notes panel keeps every mark one click away: grouped by page, searchable, colour-filtered, with export to Word, Markdown, HTML or text
+• A Notes panel keeps every mark one click away: grouped by page, searchable, filtered by colour and type, comments editable right in the list — with export to Word, Markdown or HTML
+• Comments in the margin: one switch shows every note and comment as visible text beside the page, and an export sets them in a real widened margin, numbered at their anchors, ready to print
 • Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes and free text
 • Colour, thickness and opacity per tool, remembered between sessions
 • Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape
@@ -84,7 +85,8 @@ LESING
 ANNOTERING
 Å annotere en artikkel avbryter aldri lesingen: verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna.
 • Merk et avsnitt, og menyen kommer til deg — utheving, understreking, en kommentar eller et notat, uten en tur innom verktøylinja
-• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, med fargefilter og eksport til Word, Markdown, HTML eller tekst
+• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, filtrert på farge og type, kommentarene redigerbare rett i lista — med eksport til Word, Markdown eller HTML
+• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden, og en eksport setter dem i en ekte, bredere marg, nummerert ved ankrene — klar til utskrift
 • Utheving, understreking, gjennomstreking og bølget strek; penn og tusj med hold-for-å-rette; former, gule lapper og fritekst
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
 • Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form

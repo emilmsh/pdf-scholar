@@ -141,27 +141,44 @@ tools nor the marks clutter the page while you read.
 **EN body:** Select a passage and the menu comes to you — highlight, underline,
 a comment, or a question for the assistant — so marking a paper never costs a
 trip to the toolbar and back. Everything you have marked stays one panel away:
-the notes tab lists every mark by page, with search and a colour filter, and
-clicking one takes you to it.
+the notes tab lists every mark by page, with search and colour and type filters,
+comments edit right in the list, and clicking one takes you to it. And when the
+comments should be *seen* rather than found — feedback on a draft, a marked-up
+student paper — the margin view lays them out as visible text beside the page,
+and the export prints them that way.
 
 **NO body:** Merk et avsnitt, og menyen kommer til deg — utheving,
 understreking, en kommentar, eller et spørsmål til assistenten — så det å
 annotere en artikkel aldri koster en tur innom verktøylinja. Alt du har merket
 ligger ett panel unna: Notater-fanen lister hvert merke per side, med søk og
-fargefilter, og ett klikk tar deg dit.
+farge- og typefilter, kommentarene redigeres rett i lista, og ett klikk tar deg
+dit. Og når kommentarene skal *ses* og ikke letes fram — tilbakemelding på et
+utkast, en rettet elevbesvarelse — legger margvisningen dem som synlig tekst ved
+siden av siden, og eksporten printer dem slik.
 
 - The toolbar carries the same tools for when you mark several passages in a
   row, and unpins entirely when you want nothing but the page
 - Highlight, underline, strikeout and a true-wave squiggly; pen and marker with
-  hold-to-straighten; shapes, sticky notes, free text and text-anchored comments
+  hold-to-straighten; shapes, sticky notes, free text typed on the page in the
+  colour and size you pick, and text-anchored comments
 - Colour, thickness and opacity per tool, remembered between sessions
 - A mark can be corrected rather than redrawn: drag either end of a highlight
   and it snaps to whole words, or a corner of a shape, text box or drawing
 - Nothing that pops up has to be dismissed to see past it: the selection menu,
   and the comment and note bubbles, all drag aside by their grip — and the
   bubbles resize. They close on Esc or a click outside
+- Comments in the margin: every note and comment as an always-visible card
+  beside the page — left or right — colour-keyed to its mark, with a leader
+  line to the passage it belongs to; when none is in view, quiet arrows fetch
+  the nearest. Comments edit right in the cards
+- Export with comments in the margin: a copy of the document with every page
+  widened and the comments set in the new margin as real annotations, a
+  numbered chip at each anchor tying text to comment on paper. The original is
+  untouched
 - The notes tab exports a summary — the highlighted text included — to Word,
-  Markdown, HTML or plain text
+  Markdown or HTML
+- An optional name in settings signs new annotations — the standard PDF author
+  field other readers show; left empty, they stay unsigned
 - The file is only written when you save it: edits go to a draft, closing
   prompts, and unsaved work survives a crash
 - A save guard warns before overwriting a file another program has changed, and
