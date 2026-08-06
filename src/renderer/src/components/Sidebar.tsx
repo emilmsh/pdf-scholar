@@ -4,11 +4,22 @@ import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import type { DocBookmark } from '../../../shared/types'
 import { t, useLang } from '../i18n'
+import { shortcutLabel } from '../keymap'
 import { bridge } from '../bridge'
 import { IconBookmark, IconChevronDown, IconCopy, IconDocument, IconFolderOpen } from './icons'
 import { useDismissable } from '../useDismissable'
 
 const THUMB_WIDTH = 132
+
+/** The clear-all warning names the key that brings the annotations back, so it
+ *  has to read the LIVE binding — and fall back to a keyless wording when the
+ *  reader unbound undo, because the reassurance is the point of the sentence. */
+function clearAllDetail(): string {
+  const keys = shortcutLabel('edit.undo')
+  return keys
+    ? t('side.clearAllConfirmDetail', { keys })
+    : t('side.clearAllConfirmDetailNoKey')
+}
 
 /** Render a source path/URL as something a human recognises: a Windows file://
  *  URL becomes `C:\Users\…\paper.pdf`, a picked file shows just its name, an
@@ -552,12 +563,12 @@ function AnnotationList({
       })}
 
       {/* Same modal treatment as reset-to-defaults: it throws away work, and the
-          detail line says both how much and that Ctrl+Z takes it back. */}
+          detail line says both how much and which key takes it back. */}
       {clearAsk && (
         <div className="confirm-overlay">
           <div className="confirm-dialog" role="alertdialog" aria-modal="true" ref={clearAskRef}>
             <p className="confirm-message">{t('side.clearAllConfirm', { count: flat.length })}</p>
-            <p className="confirm-detail">{t('side.clearAllConfirmDetail')}</p>
+            <p className="confirm-detail">{clearAllDetail()}</p>
             <div className="confirm-actions">
               <button className="btn-secondary" onClick={() => setClearAsk(false)}>
                 {t('app.cancel')}

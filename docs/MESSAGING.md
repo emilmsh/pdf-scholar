@@ -109,6 +109,8 @@ block of bullets, the README the full account.
   reading a paper and losing your place in one
 - Remembers reading positions and recent files; tabs and multiple windows, and a
   tab can be dragged out into its own window
+- Every keyboard shortcut is listed in one map in settings, and any of them can
+  be rebound or reset. Keep this to a line: it is a nice-to-have, not a pillar
 - Interface in Norwegian and English, which also sets the AI prompts, exports and
   date formats
 

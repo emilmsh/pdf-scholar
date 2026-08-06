@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
 import { clearSearchHistory, loadSearchHistory } from '../search-history'
 import { t, useLang } from '../i18n'
-import { isFindHotkey } from '../platform'
+import { bubblesWhileTyping } from '../keymap'
 
 export interface SemanticHitView {
   label: string
@@ -159,7 +159,7 @@ export default function SearchBar({
               setHistoryIndex(-1)
             }}
             onKeyDown={(e) => {
-              if (isFindHotkey(e)) return // bubbles to the window handler: reselect
+              if (bubblesWhileTyping(e)) return // an app shortcut (find reselects, F3 steps)
               e.stopPropagation()
               if (isAi) {
                 if (e.key === 'Enter') onAiSearch()

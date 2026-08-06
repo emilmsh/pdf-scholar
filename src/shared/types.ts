@@ -16,6 +16,16 @@ export interface Settings {
   autoDark: 'night' | 'nightHc'
   keepAwake: boolean
   language: LanguagePreference
+  /** Rebound keyboard shortcuts: command id → its chords, where an entry
+   *  REPLACES that command's shipped bindings (an empty array means the user
+   *  unbound it) and an absent one means defaults. Only commands the user
+   *  actually changed are stored, so the shipped map stays free to evolve.
+   *
+   *  Deliberately typed loosely here: the command ids and the chord grammar are
+   *  the renderer's business (`src/renderer/src/keymap.ts`), main only persists
+   *  the object, and a stored id that no longer exists is dropped on load
+   *  rather than failing a build in main. */
+  keymap: Record<string, string[]>
 }
 
 export interface RecentFile {

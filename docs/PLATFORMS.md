@@ -55,11 +55,15 @@ not as acceptable platform lag.
    lights (left, colors fixed — the `window:titlebar-colors` IPC is a no-op
    there by design). The tab strip insets itself via `env(titlebar-area-*)` on
    all platforms.
-3. **Keyboard**: Cmd replaces Ctrl on macOS for shortcuts
-   (`src/renderer/src/platform.ts` → `primaryMod`). Two deliberate exceptions:
-   Ctrl+Tab cycles tabs on every platform (Cmd+Tab is the macOS app switcher),
-   and ctrl+wheel zoom tests `ctrlKey` everywhere (trackpad pinch arrives as
-   ctrl+wheel, also on macOS).
+3. **Keyboard**: every binding is declared once in
+   `src/renderer/src/keymap.ts`, where the modifier is written `mod` and
+   resolves to Cmd on macOS, Ctrl elsewhere (`parseChord` is the only place that
+   decides). Two deliberate exceptions: tab cycling is a literal `ctrl+tab` on
+   every platform (Cmd+Tab is the macOS app switcher), and ctrl+wheel zoom tests
+   `ctrlKey` everywhere via `platform.ts` → `primaryMod` (trackpad pinch arrives
+   as ctrl+wheel, also on macOS). The user can rebind anything from the gear
+   menu's **Hurtigtaster** map; overrides live in `Settings.keymap` and are
+   stored as `mod`, so one keymap means the same thing on either platform.
 4. **File open plumbing**: Windows/Linux get paths via argv + `second-instance`;
    macOS via `app.on('open-file')`. Same renderer behavior (`open-path` event).
 5. **Windows-only cosmetics**: taskbar Jump List. macOS-only: Dock + app menu,
@@ -182,8 +186,10 @@ not as acceptable platform lag.
   non-Windows job is release-blocking, same as Windows.
 - Releases are built by `.github/workflows/release.yml` (tag `v*` → draft
   release with all artifacts). Local `npm run dist` stays Windows-only for dev.
-- New keyboard shortcuts must use `primaryMod()` unless the Ctrl-on-mac
-  exception applies — then document why at the call site.
+- New keyboard shortcuts are registered in `src/renderer/src/keymap.ts` (never
+  as a fresh `e.key` branch): a command id, a label key, and default chords
+  written with `mod`. Use a literal `ctrl` only where the Ctrl-on-mac exception
+  applies, and say why at the entry.
 - `process.platform` checks live in the main process; the renderer uses
   `src/renderer/src/platform.ts`.
 - **No new native Node modules** — pure JS/WASM is what makes free

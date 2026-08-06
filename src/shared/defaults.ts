@@ -17,7 +17,11 @@ export const DEFAULT_SETTINGS: Settings = {
   autoLight: 'day',
   autoDark: 'night',
   keepAwake: false,
-  language: 'auto'
+  language: 'auto',
+  // Empty = every command sits on the bindings keymap.ts ships. The defaults
+  // themselves live there, next to the commands they belong to, so this stays
+  // "nothing rebound" rather than a second copy of the map.
+  keymap: {}
 }
 
 /** Model per provider when nothing is stored yet. Azure has no default — its

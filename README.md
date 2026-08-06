@@ -139,6 +139,8 @@ the current desktop-vs-extension parity.
   you have been reading
 - Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
   window** to put two documents side by side, or across the bar to reorder
+- Every key named above is a default. **Settings → Keyboard shortcuts** lists them all in
+  one map and lets you rebind or reset any of them, one key or all at once
 
 **Language and themes**
 

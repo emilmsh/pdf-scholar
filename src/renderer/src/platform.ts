@@ -11,10 +11,8 @@ export function primaryMod(e: { ctrlKey: boolean; metaKey: boolean }): boolean {
   return isMac ? e.metaKey : e.ctrlKey
 }
 
-/** Ctrl/Cmd+F. Text fields that stop keydown propagation (composer, popovers,
- *  the search field itself) must let this one bubble: the viewer's window
- *  handler opens/focuses document search from anywhere, and its preventDefault
- *  is what keeps the browser's own find bar shut in the web/extension targets. */
-export function isFindHotkey(e: { ctrlKey: boolean; metaKey: boolean; key: string }): boolean {
-  return primaryMod(e) && (e.key === 'f' || e.key === 'F')
-}
+// Text fields that stop keydown propagation (composer, popovers, the search
+// field itself) must still let the app's own shortcuts bubble — that used to be
+// an isFindHotkey() test for Ctrl+F alone. It now lives in keymap.ts as
+// `bubblesWhileTyping`, which asks the CURRENT bindings, so a rebound find (or
+// save, or zoom) gets through too.

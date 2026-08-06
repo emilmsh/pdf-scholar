@@ -16,7 +16,7 @@ import type {
   ViewRotation
 } from '../../../shared/types'
 import { bridge, isElectron, isExtension } from '../bridge'
-import { primaryMod } from '../platform'
+import { bubblesWhileTyping, commandForEvent, isKeyboardCaptured, shortcutLabel } from '../keymap'
 import { READ_ALOUD } from '../flags'
 import {
   FREETEXT_COLOR,
@@ -2391,10 +2391,15 @@ export default function PdfViewer({
       if (outcome.failed) failed += 1
       if (outcome.wasFilePainted) needsReload = true
     }
+    // The toast names the undo key, which the reader may have rebound (or
+    // unbound — then a variant says the same thing without naming a key)
+    const undoKeys = shortcutLabel('edit.undo')
     showToast(
-      failed === 0
-        ? t('viewer.annotsCleared', { count: handles.length })
-        : t('viewer.annotsClearedPartly', { failed, total: handles.length })
+      failed !== 0
+        ? t('viewer.annotsClearedPartly', { failed, total: handles.length })
+        : undoKeys
+          ? t('viewer.annotsCleared', { count: handles.length, keys: undoKeys })
+          : t('viewer.annotsClearedNoKey', { count: handles.length })
     )
     if (needsReload) void reloadDocument()
   }, [pushUndo, deleteOneAnnotation, showToast, reloadDocument])
@@ -4499,6 +4504,28 @@ export default function PdfViewer({
     setAnnotsAskId((n) => n + 1)
   }, [])
 
+  /** Print the document as it stands. Browser parity: print the LIVE document
+   *  (annotation edits included) via a blob in Chromium's viewer — the desktop
+   *  prints the draft file the same way through a hidden window. */
+  const printDocument = useCallback(() => {
+    void (async () => {
+      if (!isElectron) {
+        const bytes = await browserCurrentBytes(payload.path)
+        if (bytes) {
+          const url = URL.createObjectURL(
+            new Blob([bytes as BlobPart], { type: 'application/pdf' })
+          )
+          window.open(url, '_blank', 'noopener')
+          window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+          return
+        }
+      }
+      const result = await bridge.printFile(payload.path)
+      if (result && 'error' in result)
+        showToast(t('viewer.printFailed', { error: errorText(result) }))
+    })()
+  }, [payload.path, showToast])
+
   // The two window-level input handlers below read ~35 pieces of state
   // between them. As a dependency array that meant detaching and re-attaching
   // both listeners on every search step, annotation click and first mark. They
@@ -4510,53 +4537,19 @@ export default function PdfViewer({
   const onMouseNavRef = useRef<(e: MouseEvent) => void>(() => {})
 
   onKeyDownRef.current = (e: KeyboardEvent): void => {
+    // The shortcuts dialog is recording a chord — every key belongs to it, or
+    // binding 'T' would also toggle the panel behind the dialog
+    if (isKeyboardCaptured()) return
     const tag = (e.target as HTMLElement | null)?.tagName
     const isTyping = tag === 'INPUT' || tag === 'TEXTAREA'
     // The presentation overlay owns the keyboard while it is open
     if (presentationRef.current) return
-    if (e.key === 'F11') {
-      e.preventDefault()
-      toggleFullscreen()
-    } else if (!isTyping && primaryMod(e) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
-      e.preventDefault()
-      void performUndoRedo('undo')
-    } else if (
-      !isTyping &&
-      primaryMod(e) &&
-      ((e.shiftKey && (e.key === 'z' || e.key === 'Z')) || e.key === 'y' || e.key === 'Y')
-    ) {
-      e.preventDefault()
-      void performUndoRedo('redo')
-    } else if (!isTyping && e.altKey && e.key === 'ArrowLeft') {
-      e.preventDefault()
-      goBack()
-    } else if (!isTyping && e.altKey && e.key === 'ArrowRight') {
-      e.preventDefault()
-      goForward()
-    } else if (primaryMod(e) && !e.shiftKey && (e.key === 's' || e.key === 'S')) {
-      e.preventDefault()
-      // Save over the current file when there is something to save. Desktop
-      // and the extension both write in place (the extension via a retained
-      // File System Access handle — its first save may prompt once for write
-      // access); the plain-web fallback bakes annotations and downloads.
-      //
-      // With nothing to save, an unchanged LOCAL file is already on disk in the
-      // state on screen — Ctrl+S does nothing, same as the desktop app. A PDF
-      // fetched from the web has no local copy at all, so there the key means
-      // "get this file", and since we swallow the browser's own Ctrl+S (which
-      // would offer to save the viewer PAGE, never the PDF) it has to: it does
-      // exactly what the Save-a-copy button does — one Save dialog, or a
-      // download where pickers are missing. Edge's built-in viewer sets that bar.
-      if (dirty || (!isElectron && !isExtension)) void saveDocument()
-      else if (isExtension && isRemoteSource(payload.path)) void saveDocumentAs()
-    } else if (!isTyping && (e.key === 'Delete' || e.key === 'Backspace') && (selected ?? annotPopover)) {
-      e.preventDefault()
-      const target = selected ?? annotPopover!
-      const record = (annotsRef.current.get(target.pageNumber) ?? []).find(
-        (r) => r.id === target.localId
-      )
-      if (record) removeAnnotation(target.pageNumber, record)
-    } else if (e.key === 'Escape') {
+
+    // Escape is deliberately NOT a rebindable command: it is the way out of
+    // every state the viewer can be in, and this order IS the nesting order —
+    // innermost thing first. Only bare Escape, so a chord like Ctrl+Escape can
+    // still be bound to something below.
+    if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.metaKey) {
       if (freeTextDraft) setFreeTextDraft(null)
       else if (noteDraft) setNoteDraft(null)
       else if (menu) setMenu(null)
@@ -4570,73 +4563,194 @@ export default function PdfViewer({
       else if (searchHits) setSearchHits(null)
       else if (aiPinned) setAiPinned(false)
       else if (fullscreen) toggleFullscreen()
-    } else if (primaryMod(e) && (e.key === 'f' || e.key === 'F')) {
-      e.preventDefault()
-      openSearch()
-    } else if (e.key === 'F3') {
-      e.preventDefault()
-      searchStep(e.shiftKey ? -1 : 1)
-    } else if (primaryMod(e) && (e.key === '+' || e.key === '=')) {
-      e.preventDefault()
-      manualZoom(scaleRef.current * 1.15)
-    } else if (primaryMod(e) && e.key === '-') {
-      e.preventDefault()
-      manualZoom(scaleRef.current / 1.15)
-    } else if (primaryMod(e) && e.key === '0') {
-      // Actual size (100%), matching standard PDF-reader convention
-      e.preventDefault()
-      manualZoom(1)
-    } else if (!isTyping && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      // Single-key reading shortcuts (never fire while typing)
-      const k = e.key.toLowerCase()
-      // Rotation MUST be checked before the k==='r' read-aloud branch below
-      // (Shift+R rotates; bracket keys rotate too)
-      if (e.shiftKey && k === 'r') {
+      return
+    }
+
+    const command = commandForEvent(e, isTyping)
+    if (!command) return
+    // Every case below preventDefaults: reaching here means the keypress WAS a
+    // bound command, and letting the browser also act on it (Ctrl+S offering to
+    // save the viewer page, Ctrl+F opening its own find bar) is never wanted.
+    // The two exceptions return early instead, before consuming the key.
+    switch (command) {
+      case 'view.fullscreen':
+        e.preventDefault()
+        toggleFullscreen()
+        break
+      case 'edit.undo':
+        e.preventDefault()
+        void performUndoRedo('undo')
+        break
+      case 'edit.redo':
+        e.preventDefault()
+        void performUndoRedo('redo')
+        break
+      case 'nav.back':
+        e.preventDefault()
+        goBack()
+        break
+      case 'nav.forward':
+        e.preventDefault()
+        goForward()
+        break
+      case 'file.save':
+        e.preventDefault()
+        // Save over the current file when there is something to save. Desktop
+        // and the extension both write in place (the extension via a retained
+        // File System Access handle — its first save may prompt once for write
+        // access); the plain-web fallback bakes annotations and downloads.
+        //
+        // With nothing to save, an unchanged LOCAL file is already on disk in the
+        // state on screen — Ctrl+S does nothing, same as the desktop app. A PDF
+        // fetched from the web has no local copy at all, so there the key means
+        // "get this file", and since we swallow the browser's own Ctrl+S (which
+        // would offer to save the viewer PAGE, never the PDF) it has to: it does
+        // exactly what the Save-a-copy button does — one Save dialog, or a
+        // download where pickers are missing. Edge's built-in viewer sets that bar.
+        if (dirty || (!isElectron && !isExtension)) void saveDocument()
+        else if (isExtension && isRemoteSource(payload.path)) void saveDocumentAs()
+        break
+      case 'file.saveAs':
+        e.preventDefault()
+        void saveDocumentAs()
+        break
+      case 'file.print':
+        e.preventDefault()
+        printDocument()
+        break
+      case 'annot.delete': {
+        // With nothing selected the key is not ours — Backspace must stay
+        // whatever the browser makes of it.
+        const target = selected ?? annotPopover
+        if (!target) return
+        e.preventDefault()
+        const record = (annotsRef.current.get(target.pageNumber) ?? []).find(
+          (r) => r.id === target.localId
+        )
+        if (record) removeAnnotation(target.pageNumber, record)
+        break
+      }
+      case 'search.open':
+        e.preventDefault()
+        openSearch()
+        break
+      case 'search.next':
+        e.preventDefault()
+        searchStep(1)
+        break
+      case 'search.prev':
+        e.preventDefault()
+        searchStep(-1)
+        break
+      case 'zoom.in':
+        e.preventDefault()
+        manualZoom(scaleRef.current * 1.15)
+        break
+      case 'zoom.out':
+        e.preventDefault()
+        manualZoom(scaleRef.current / 1.15)
+        break
+      case 'zoom.actual':
+        // Actual size (100%), matching standard PDF-reader convention
+        e.preventDefault()
+        manualZoom(1)
+        break
+      case 'zoom.fitToggle':
+        e.preventDefault()
+        if (fitTarget === 'page') fitPage()
+        else fitWidth()
+        break
+      case 'zoom.fitWidth':
+        e.preventDefault()
+        fitWidth()
+        break
+      case 'zoom.fitPage':
+        e.preventDefault()
+        fitPage()
+        break
+      case 'view.rotateRight':
         e.preventDefault()
         rotateView(1)
-      } else if (k === ']') {
-        e.preventDefault()
-        rotateView(1)
-      } else if (k === '[') {
+        break
+      case 'view.rotateLeft':
         e.preventDefault()
         rotateView(-1)
-      } else if (k === 'p') {
+        break
+      case 'view.spread':
+        e.preventDefault()
+        toggleSpread()
+        break
+      case 'view.present':
         e.preventDefault()
         enterPresentation()
-      } else if (k === 't') {
-        e.preventDefault()
-        setTocPinned((o) => !o)
-      } else if (k === 'a') {
-        e.preventDefault()
-        setAiPinned((o) => !o)
-      } else if (k === 's') {
-        // Splitt / split — the plain letter, like the other view toggles.
-        // Ctrl+S is save and stays save; this never fires while typing.
+        break
+      case 'view.split':
         e.preventDefault()
         toggleSplit()
-      } else if (k === 'v') {
+        break
+      case 'view.togglePin':
         e.preventDefault()
         togglePin()
-      } else if (k === 'h') {
+        break
+      case 'view.readAloud':
+        if (!READ_ALOUD) return
+        e.preventDefault()
+        if (readAloud === 'closed') void startReadAloud()
+        else stopReadAloud()
+        break
+      case 'panel.toc':
+        e.preventDefault()
+        setTocPinned((o) => !o)
+        break
+      case 'panel.ai':
+        e.preventDefault()
+        setAiPinned((o) => !o)
+        break
+      case 'annot.toggleHidden':
         e.preventDefault()
         setAnnotsHidden((h) => !h)
-      } else if (k === 'b') {
+        break
+      case 'doc.bookmark':
         // Bokmerke / bookmark the page you are reading. Also reachable from the
         // sidebar tab, which is where the shortcut is advertised.
         e.preventDefault()
         toggleBookmark(currentPageRef.current)
-      } else if (k === 'r' && READ_ALOUD) {
+        break
+      // Tools toggle: the bound key arms the tool, and pressing it again puts it
+      // down — the same thing clicking its toolbar button twice does.
+      case 'tool.pen':
+      case 'tool.marker':
+      case 'tool.eraser':
+      case 'tool.text':
+      case 'tool.square':
+      case 'tool.circle':
+      case 'tool.line':
+      case 'tool.arrow': {
         e.preventDefault()
-        if (readAloud === 'closed') void startReadAloud()
-        else stopReadAloud()
-      } else if (k === 'f') {
-        e.preventDefault()
-        toggleFullscreen()
-      } else if (k === 'w') {
-        e.preventDefault()
-        if (fitTarget === 'page') fitPage()
-        else fitWidth()
+        const tool = command.slice('tool.'.length) as DrawToolType
+        selectTool(activeTool === tool ? null : tool)
+        break
       }
+      case 'tool.highlight':
+      case 'tool.underline':
+      case 'tool.strikeout':
+      case 'tool.squiggly': {
+        e.preventDefault()
+        const tool = command.slice('tool.'.length) as MarkupToolType
+        selectMarkupTool(markupTool === tool ? null : tool)
+        break
+      }
+      case 'tool.note':
+        e.preventDefault()
+        setNotePlacing((v) => !v)
+        break
+      case 'tool.snip':
+        e.preventDefault()
+        setSnip((s) => (s ? null : { target: 'quick' }))
+        break
+      default:
+        // A shell command (tabs, windows, opening a file) — App owns those
+        break
     }
   }
 
@@ -4774,9 +4888,9 @@ export default function PdfViewer({
             ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
           }}
           onKeyDown={(e) => {
-            // Ctrl/Cmd+F bubbles to the window handler: search steals focus and
-            // the onBlur below commits (or discards an empty) draft
-            if (primaryMod(e) && (e.key === 'f' || e.key === 'F')) return
+            // App shortcuts bubble to the window handler (find steals focus and
+            // the onBlur below commits, or discards, an empty draft)
+            if (bubblesWhileTyping(e)) return
             e.stopPropagation()
             if (e.key === 'Escape') setFreeTextDraft(null)
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -4905,24 +5019,7 @@ export default function PdfViewer({
           canRedo={undoDepths.redo > 0}
           onUndo={() => void performUndoRedo('undo')}
           onRedo={() => void performUndoRedo('redo')}
-          onPrint={() => {
-            void (async () => {
-              // Browser parity: print the live document (annotation edits
-              // included) via a blob in Chromium's viewer — the desktop prints
-              // the draft file the same way through a hidden window.
-              if (!isElectron) {
-                const bytes = await browserCurrentBytes(payload.path)
-                if (bytes) {
-                  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }))
-                  window.open(url, '_blank', 'noopener')
-                  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
-                  return
-                }
-              }
-              const result = await bridge.printFile(payload.path)
-              if (result && 'error' in result) showToast(t('viewer.printFailed', { error: errorText(result) }))
-            })()
-          }}
+          onPrint={printDocument}
           readAloudOpen={readAloud !== 'closed'}
           onToggleReadAloud={() => {
             if (readAloud === 'closed') void startReadAloud()
