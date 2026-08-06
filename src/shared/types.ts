@@ -16,6 +16,10 @@ export interface Settings {
   autoDark: 'night' | 'nightHc'
   keepAwake: boolean
   language: LanguagePreference
+  /** Name written into new annotations' author field (/T) — the standard PDF
+   *  metadata other readers show as the commenter. Empty (the default, since
+   *  the app has no accounts) writes no author at all. */
+  annotAuthor: string
 }
 
 export interface RecentFile {
@@ -179,6 +183,12 @@ export interface AnnotateRequest {
   width?: number | undefined
   /** freetext only */
   fontSize?: number | undefined
+  /** freetext only: opaque fill behind the text (rgb 0–1). Used by the
+   *  margin export's numbered anchor chips, which sit over page content and
+   *  must stay readable there. */
+  background?: [number, number, number] | undefined
+  /** freetext only: box border (the chips carry the anchor's colour here) */
+  border?: { color: [number, number, number]; width: number } | undefined
   /** ink (marker): bake the appearance with /BM Multiply so text under the
    *  stroke stays legible — the freehand twin of a text highlight */
   blend?: 'multiply' | undefined

@@ -17,7 +17,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoLight: 'day',
   autoDark: 'night',
   keepAwake: false,
-  language: 'auto'
+  language: 'auto',
+  annotAuthor: ''
 }
 
 /** Model per provider when nothing is stored yet. Azure has no default — its

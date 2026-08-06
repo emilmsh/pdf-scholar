@@ -14,6 +14,8 @@
 // written with, so a change reintroduces an old-vs-new mismatch on the page.
 // The user-facing sliders exist precisely so nobody has to touch these.
 import {
+  FREETEXT_COLOR,
+  FREETEXT_SIZE,
   HIGHLIGHT_COLORS,
   HIGHLIGHT_FILL_ALPHA,
   MARKER_DEFAULT,
@@ -40,6 +42,13 @@ export interface MarkupPref {
   opacity: number
 }
 
+/** The FreeText tool's look: text colour + font size (no width/opacity —
+ *  translucent text reads as a rendering bug, not a style) */
+export interface TextPref {
+  color: [number, number, number]
+  fontSize: number
+}
+
 /** What the eraser is allowed to remove. 'draw' (default) keeps it to marks
  *  you drew by hand — the historical behaviour the tooltip promised; 'all'
  *  extends it to highlights, notes and text boxes. */
@@ -48,6 +57,7 @@ export type EraserScope = 'draw' | 'all'
 export interface ToolPrefs {
   tools: Record<DrawPrefKey, ToolPref>
   markup: Record<MarkupToolType, MarkupPref>
+  text: TextPref
   eraserScope: EraserScope
 }
 
@@ -70,6 +80,12 @@ export const OPACITY_MIN = 0.1
 export const OPACITY_MAX = 1
 export const OPACITY_STEP = 0.05
 
+/** Font-size slider bounds for the FreeText tool. 8 pt is the smallest that
+ *  stays legible on paper; 36 pt covers a shouted margin verdict. */
+export const FONT_SIZE_MIN = 8
+export const FONT_SIZE_MAX = 36
+export const FONT_SIZE_STEP = 1
+
 export const DEFAULT_TOOL_PREFS: ToolPrefs = {
   tools: {
     pen: { ...PEN_DEFAULT, opacity: 1 },
@@ -82,6 +98,7 @@ export const DEFAULT_TOOL_PREFS: ToolPrefs = {
     strikeout: { color: UNDERLINE_COLOR, opacity: 1 },
     squiggly: { color: UNDERLINE_COLOR, opacity: 1 }
   },
+  text: { color: FREETEXT_COLOR, fontSize: FREETEXT_SIZE },
   eraserScope: 'draw'
 }
 
@@ -107,6 +124,19 @@ function mergeTool(key: DrawPrefKey, raw: unknown): ToolPref {
       typeof r.opacity === 'number' && Number.isFinite(r.opacity)
         ? clamp(r.opacity, OPACITY_MIN, OPACITY_MAX)
         : base.opacity
+  }
+}
+
+function mergeText(raw: unknown): TextPref {
+  const base = DEFAULT_TOOL_PREFS.text
+  if (!raw || typeof raw !== 'object') return { ...base }
+  const r = raw as Partial<TextPref>
+  return {
+    color: isRgb(r.color) ? r.color : base.color,
+    fontSize:
+      typeof r.fontSize === 'number' && Number.isFinite(r.fontSize)
+        ? clamp(Math.round(r.fontSize), FONT_SIZE_MIN, FONT_SIZE_MAX)
+        : base.fontSize
   }
 }
 
@@ -138,6 +168,7 @@ export function loadToolPrefs(): ToolPrefs {
         strikeout: mergeMarkup('strikeout', parsed?.markup?.strikeout),
         squiggly: mergeMarkup('squiggly', parsed?.markup?.squiggly)
       },
+      text: mergeText(parsed?.text),
       eraserScope: parsed?.eraserScope === 'all' ? 'all' : 'draw'
     }
   } catch {
@@ -176,5 +207,10 @@ export function toolPrefIsDefault(key: DrawPrefKey, pref: ToolPref): boolean {
 export function markupPrefIsDefault(type: MarkupToolType, pref: MarkupPref): boolean {
   const d = DEFAULT_TOOL_PREFS.markup[type]
   return sameRgb(pref.color, d.color) && pref.opacity === d.opacity
+}
+
+export function textPrefIsDefault(pref: TextPref): boolean {
+  const d = DEFAULT_TOOL_PREFS.text
+  return sameRgb(pref.color, d.color) && pref.fontSize === d.fontSize
 }
 

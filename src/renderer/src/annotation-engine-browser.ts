@@ -28,6 +28,7 @@ import {
   WASM_SAFE_LIMIT
 } from '../../shared/pdfium-annot-ops'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
+import type { WrappedPdfiumModule } from '@embedpdf/pdfium'
 import wasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
 
 // Mirrors the desktop WASM_SAFE_LIMIT rationale: an oversize doc would accept
@@ -44,18 +45,28 @@ const OVERSIZE: FileError = {
  *  create one, while here the bytes only exist while the viewer is mounted. */
 const NOT_OPEN: FileError = { code: 'doc-not-open', error: 'Dokumentet er ikke åpent for redigering' }
 
-let enginePromise: Promise<PdfiumNative> | null = null
+let enginePromise: Promise<{ native: PdfiumNative; wrapped: WrappedPdfiumModule }> | null = null
 
-async function getEngine(): Promise<PdfiumNative> {
+/** Engine wrapper AND the raw wrapped module it wraps. The raw module exists
+ *  for the margin-export transform (page-box mutation has no wrapper API);
+ *  ordinary annotation writes never touch it. */
+export async function getEngineWithRaw(): Promise<{
+  native: PdfiumNative
+  wrapped: WrappedPdfiumModule
+}> {
   return (enginePromise ??= (async () => {
     const [{ init }, { PdfiumNative: Native }] = await Promise.all([
       import('@embedpdf/pdfium'),
       import('@embedpdf/engines/pdfium')
     ])
     const wasmBinary = await (await fetch(wasmUrl)).arrayBuffer()
-    const pdfium = await init({ wasmBinary })
-    return new Native(pdfium)
+    const wrapped = await init({ wasmBinary })
+    return { native: new Native(wrapped), wrapped }
   })())
+}
+
+async function getEngine(): Promise<PdfiumNative> {
+  return (await getEngineWithRaw()).native
 }
 
 interface BrowserDoc {
@@ -162,6 +173,20 @@ if (import.meta.env.DEV) {
     apply: browserApplyAnnotation,
     update: browserUpdateAnnotation,
     remove: browserDeleteAnnotation,
-    currentBytes: browserCurrentBytes
+    currentBytes: browserCurrentBytes,
+    // The margin-export transform, end to end minus the save dialog
+    exportMargin: async (
+      path: string,
+      cards: unknown[],
+      side?: 'left' | 'right'
+    ): Promise<Uint8Array | FileError | null> => {
+      const bytes = await browserCurrentBytes(path)
+      if (!bytes) return null
+      const [{ buildMarginCopy }, { native, wrapped }] = await Promise.all([
+        import('../../shared/margin-export'),
+        getEngineWithRaw()
+      ])
+      return buildMarginCopy(native, wrapped, bytes, cards as never, undefined, side)
+    }
   }
 }

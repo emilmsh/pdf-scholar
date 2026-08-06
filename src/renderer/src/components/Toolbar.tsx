@@ -10,6 +10,7 @@ import { bridge, isElectron } from '../bridge'
 import {
   annotTypeLabel,
   colorLabel,
+  FREETEXT_COLORS,
   HIGHLIGHT_COLORS,
   MARKUP_TOOL_TYPES,
   SHAPE_TOOL_TYPES,
@@ -17,16 +18,20 @@ import {
 } from '../annotations'
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
 import {
+  FONT_SIZE_MAX,
+  FONT_SIZE_MIN,
+  FONT_SIZE_STEP,
   markupPrefIsDefault,
   OPACITY_MAX,
   OPACITY_MIN,
   OPACITY_STEP,
+  textPrefIsDefault,
   TOOL_WIDTH_MAX,
   TOOL_WIDTH_MIN,
   TOOL_WIDTH_STEP,
   toolPrefIsDefault
 } from '../tool-prefs'
-import type { DrawPrefKey, EraserScope, MarkupPref, ToolPref } from '../tool-prefs'
+import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import { READ_ALOUD } from '../flags'
@@ -45,6 +50,7 @@ import {
   IconGear,
   IconComment,
   IconHeart,
+  IconMarginNotes,
   IconMarker,
   IconMarkupHighlight,
   IconMarkupSquiggly,
@@ -140,6 +146,10 @@ interface Props {
   onToggleSpread(): void
   onToolPrefChange(tool: DrawPrefKey, patch: Partial<ToolPref>): void
   onToolPrefReset(tool: DrawPrefKey): void
+  /** FreeText tool look (text colour + font size) */
+  textPref: TextPref
+  onTextPrefChange(patch: Partial<TextPref>): void
+  onTextPrefReset(): void
   onNavBack(): void
   onNavForward(): void
   onToggleSidebar(): void
@@ -167,6 +177,11 @@ interface Props {
   /** All annotations temporarily hidden (clean reading view) */
   annotsHidden: boolean
   onToggleAnnots(): void
+  /** Margin view: notes + comments as visible cards beside the page. The
+   *  toolbar only toggles it — side + PDF export live in the Merknader tab,
+   *  the one home for everything comment-related. */
+  marginNotes: boolean
+  onToggleMarginNotes(): void
   /** Annotation undo/redo (mirrors Ctrl+Z/Y — needed for pen/touch use) */
   canUndo: boolean
   canRedo: boolean
@@ -272,6 +287,9 @@ export default function Toolbar({
   onToggleSpread,
   onToolPrefChange,
   onToolPrefReset,
+  textPref,
+  onTextPrefChange,
+  onTextPrefReset,
   onNavBack,
   onNavForward,
   onToggleSidebar,
@@ -291,6 +309,8 @@ export default function Toolbar({
   canSaveInPlace,
   annotsHidden,
   onToggleAnnots,
+  marginNotes,
+  onToggleMarginNotes,
   canUndo,
   canRedo,
   onUndo,
@@ -349,7 +369,7 @@ export default function Toolbar({
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
-  const [toolMenu, setToolMenu] = useState<DrawPrefKey | 'markup' | 'eraser' | null>(null)
+  const [toolMenu, setToolMenu] = useState<DrawPrefKey | 'markup' | 'eraser' | 'text' | null>(null)
   // Last markup type the user activated, so the split button's main click
   // re-arms that type rather than always defaulting to highlight
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
@@ -663,6 +683,7 @@ export default function Toolbar({
       active: !toolbarPinned
     },
     { key: 'split', icon: <IconSplit size={15} />, label: t('tb.split'), onClick: onToggleSplit, active: splitOpen },
+    { key: 'margin', icon: <IconMarginNotes size={15} />, label: t('tb.marginNotes'), onClick: onToggleMarginNotes, active: marginNotes },
     { key: 'snip', icon: <IconSnip size={15} />, label: t('tb.snip'), onClick: onToggleSnip, active: snipActive },
     // Annotation tools fold as single activation rows (their colour/width
     // popovers aren't in the menu — reachable again by widening the window).
@@ -887,13 +908,25 @@ export default function Toolbar({
             </button>
           )}
           {inline('text') && (
-            <button
-              className={`tb-btn${activeTool === 'text' ? ' is-active' : ''}`}
-              onClick={() => onToolSelect(activeTool === 'text' ? null : 'text')}
-              title={t('tb.textTip')}
-            >
-              <IconText />
-            </button>
+            <span className="tb-split">
+              <button
+                className={`tb-btn${activeTool === 'text' ? ' is-active' : ''}`}
+                onClick={() => onToolSelect(activeTool === 'text' ? null : 'text')}
+                title={t('tb.textTip')}
+              >
+                <IconText />
+              </button>
+              <button
+                className={`tb-chevron${toolMenu === 'text' ? ' is-active' : ''}`}
+                title={t('tb.textOptionsTip')}
+                onClick={() => {
+                  if (activeTool !== 'text') onToolSelect('text')
+                  setToolMenu((m) => (m === 'text' ? null : 'text'))
+                }}
+              >
+                <IconChevronDown size={11} />
+              </button>
+            </span>
           )}
           {inline('note') && (
             <button
@@ -998,6 +1031,36 @@ export default function Toolbar({
                 hidden={markupPrefIsDefault(markupType, markupPrefs[markupType])}
                 onClick={() => onMarkupPrefReset(markupType)}
               />
+            </div>
+          ) : toolMenu === 'text' ? (
+            <div className="tool-menu">
+              <div className="theme-menu-label">{t('tb.textTool')}</div>
+              <div className="color-row">
+                {FREETEXT_COLORS.map((c) => (
+                  <button
+                    key={c.hex}
+                    className={`color-dot${textPref.color.join() === c.rgb.join() ? ' selected' : ''}`}
+                    style={{ background: c.hex }}
+                    title={colorLabel(c)}
+                    onClick={() => onTextPrefChange({ color: c.rgb })}
+                  />
+                ))}
+              </div>
+              <div className="theme-menu-label slider-label">
+                {t('tb.fontSize')}
+                <output>{textPref.fontSize} pt</output>
+              </div>
+              <input
+                type="range"
+                min={FONT_SIZE_MIN}
+                max={FONT_SIZE_MAX}
+                step={FONT_SIZE_STEP}
+                value={textPref.fontSize}
+                onChange={(e) => onTextPrefChange({ fontSize: Number(e.target.value) })}
+                aria-label={t('tb.fontSize')}
+              />
+              <div className="menu-hint">{t('tb.textMoveHint')}</div>
+              <ResetLink hidden={textPrefIsDefault(textPref)} onClick={onTextPrefReset} />
             </div>
           ) : toolMenu === 'eraser' ? (
             <div className="tool-menu">
@@ -1256,6 +1319,15 @@ export default function Toolbar({
           )}
         </div>
 
+        {inline('margin') && (
+          <button
+            className={`tb-btn${marginNotes ? ' is-active' : ''}`}
+            onClick={onToggleMarginNotes}
+            title={t('tb.marginNotesTip')}
+          >
+            <IconMarginNotes />
+          </button>
+        )}
         {inline('split') && (
           <button
             className={`tb-btn${splitOpen ? ' is-active' : ''}`}
@@ -1309,6 +1381,33 @@ export default function Toolbar({
                   </button>
                 ))}
               </div>
+
+              <div className="theme-menu-sep" />
+
+              {/* Author (/T) written into new annotations — the standard PDF
+                  field other readers show as the commenter. No accounts, so
+                  the name is simply typed once; empty = unsigned. The detail
+                  lives in the hover title, not a permanent paragraph — the
+                  label + placeholder carry enough on their own (standing
+                  hover-hints preference). */}
+              <div className="theme-menu-label" title={t('settings.annotAuthorHint')}>
+                {t('settings.annotAuthor')}
+              </div>
+              <input
+                className="annot-author-input"
+                defaultValue={settings.annotAuthor}
+                placeholder={t('settings.annotAuthorPlaceholder')}
+                title={t('settings.annotAuthorHint')}
+                spellCheck={false}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
+                }}
+                onBlur={(e) => {
+                  const name = e.target.value.trim()
+                  if (name !== settings.annotAuthor) onSettingsChange({ annotAuthor: name })
+                }}
+              />
 
               <div className="theme-menu-sep" />
 

@@ -29,14 +29,18 @@ import type { RowLayout } from '../rotation'
 import {
   buildRows,
   GESTURE_SETTLE,
+  MARGIN_NOTES_W,
   PAD_BOTTOM,
   PAD_TOP,
   PAGE_GAP,
   RENDER_MARGIN,
+  shiftLayoutX,
   SIDE_PAD,
   SPREAD_GAP,
   viewSize
 } from '../rotation'
+import { MarginJumpArrows } from './MarginNotes'
+import type { MarginViewConfig } from './MarginNotes'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
 import { clampZoom } from '../zoom'
@@ -107,6 +111,13 @@ interface Props {
   ): void
   /** Page -> rects a markup-end drag would commit, for THIS column */
   markupPreview: ReadonlyMap<number, PageRect[]> | null
+  /** Margin view (comments beside the page) — same setting as the main column */
+  marginView: MarginViewConfig | null
+  onMarginCommit(pageNumber: number, localId: string, text: string): void
+  onMarginSelect(pageNumber: number, localId: string): void
+  onMarginDelete(pageNumber: number, localId: string): void
+  /** Margin jump arrow clicked in THIS column: select + scroll it here */
+  onMarginJump(pageNumber: number, record: PageAnnotation): void
   onExternalLink(url: string): void
   /** Internal link followed inside THIS column. The viewer decides where it
    *  lands — by default the other column, so following a cross-reference never
@@ -151,6 +162,11 @@ export default function PagesPane({
   onResizeStart,
   onMarkupEndStart,
   markupPreview,
+  marginView,
+  onMarginCommit,
+  onMarginSelect,
+  onMarginDelete,
+  onMarginJump,
   onExternalLink,
   onInternalLink,
   onHandle,
@@ -210,17 +226,25 @@ export default function PagesPane({
     return () => ro.disconnect()
   }, [])
 
+  // Same rule as the main column: the margin-view card column is reserved from
+  // every width the layout and the fit modes see, and a left-hand margin
+  // shifts the pages right so the column has its space.
+  const marginGutter = marginView ? MARGIN_NOTES_W : 0
+  const marginGutterRef = useRef(marginGutter)
+  marginGutterRef.current = marginGutter
+
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
-    return buildRows(sizes, scale, rotation, spread, {
-      containerWidth,
+    const lay = buildRows(sizes, scale, rotation, spread, {
+      containerWidth: Math.max(containerWidth - marginGutter, 120),
       pageGap: PAGE_GAP,
       padTop: PAD_TOP,
       padBottom: PAD_BOTTOM,
       sidePad: SIDE_PAD,
       spreadGap: SPREAD_GAP
     })
-  }, [sizes, scale, containerWidth, rotation, spread])
+    return shiftLayoutX(lay, marginView?.side === 'left' ? marginGutter : 0)
+  }, [sizes, scale, containerWidth, rotation, spread, marginGutter, marginView?.side])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -276,10 +300,10 @@ export default function PagesPane({
   useEffect(() => {
     if (scale > 0 || sizes.length === 0 || containerWidth === 0) return
     onZoomRef.current(
-      clampZoom((containerWidth - SIDE_PAD) / fitDenom(currentPageRef.current).w),
+      clampZoom((containerWidth - SIDE_PAD - marginGutter) / fitDenom(currentPageRef.current).w),
       'width'
     )
-  }, [scale, sizes, containerWidth, fitDenom])
+  }, [scale, sizes, containerWidth, fitDenom, marginGutter])
 
   /** Capture the page point under (fx, fy) in this column's viewport */
   const makeAnchor = useCallback((fx: number, fy: number) => {
@@ -374,13 +398,11 @@ export default function PagesPane({
     const mode = fitModeRef.current
     if (!el || mode === 'custom' || sizes.length === 0 || el.clientWidth === 0) return
     const denom = fitDenom(currentPageRef.current)
+    const usable = el.clientWidth - SIDE_PAD - marginGutterRef.current
     const next = clampZoom(
       mode === 'width'
-        ? (el.clientWidth - SIDE_PAD) / denom.w
-        : Math.min(
-            (el.clientWidth - SIDE_PAD) / denom.w,
-            (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
-          )
+        ? usable / denom.w
+        : Math.min(usable / denom.w, (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h)
     )
     const prev = scaleRef.current
     if (prev <= 0 || Math.abs(next - prev) / prev < 0.002) return
@@ -397,7 +419,7 @@ export default function PagesPane({
   // Safe against loops: refit is a no-op once the scale already matches.
   useEffect(() => {
     if (fitMode !== 'custom') refitRef.current()
-  }, [fitMode, rotation, spread])
+  }, [fitMode, rotation, spread, marginGutter])
 
   /** Commit a pinch: swap the cheap CSS transform for a crisp re-render at the
    *  accumulated scale. The transform is dropped by the layout effect above,
@@ -584,7 +606,7 @@ export default function PagesPane({
           <div
             className="pages-inner"
             ref={innerRef}
-            style={{ height: layout.total, width: layout.contentWidth }}
+            style={{ height: layout.total, width: layout.contentWidth + marginGutter }}
           >
             {sizes.map((size, i) => {
               const pageNumber = i + 1
@@ -624,6 +646,10 @@ export default function PagesPane({
                   onResizeStart={onResizeStart}
                   onMarkupEndStart={onMarkupEndStart}
                   markupPreview={markupPreview?.get(pageNumber) ?? EMPTY_RECTS}
+                  marginView={marginView}
+                  onMarginCommit={onMarginCommit}
+                  onMarginSelect={onMarginSelect}
+                  onMarginDelete={onMarginDelete}
                 />
               )
             })}
@@ -635,6 +661,18 @@ export default function PagesPane({
           </div>
         )}
       </div>
+      {marginView && !annotsHidden && (
+        <MarginJumpArrows
+          scrollRef={containerRef}
+          layout={layout}
+          annots={annots}
+          sizes={sizes}
+          scale={scale}
+          rotation={rotation}
+          side={marginView.side}
+          onJump={onMarginJump}
+        />
+      )}
       <OverlayScrollbars
         scrollRef={containerRef}
         layoutKey={layout ? `${layout.total}:${layout.contentWidth}` : 'none'}

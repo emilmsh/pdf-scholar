@@ -1,12 +1,25 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import type { DocBookmark } from '../../../shared/types'
 import { t, useLang } from '../i18n'
 import { bridge } from '../bridge'
-import { IconBookmark, IconChevronDown, IconCopy, IconDocument, IconFolderOpen } from './icons'
+import {
+  IconBookmark,
+  IconChevronDown,
+  IconCopy,
+  IconDocument,
+  IconFolderOpen,
+  IconMarginNotes,
+  IconNote,
+  IconPen,
+  IconShapes,
+  IconText,
+  IconTextMarkup
+} from './icons'
 import { useDismissable } from '../useDismissable'
+import { MarginCard } from './MarginNotes'
 
 const THUMB_WIDTH = 132
 
@@ -56,6 +69,17 @@ interface Props {
   onDeleteAnnot(pageNumber: number, record: PageAnnotation): void
   /** Delete every annotation in the document (one undoable action) */
   onDeleteAllAnnots(): void
+  /** Selected annotation — its card gets the ring and is scrolled into view */
+  selectedAnnotId: string | null
+  /** Commit a comment edited in a card (the margin view's own handler) */
+  onCommentChange(pageNumber: number, localId: string, text: string): void
+  // ---------- Margin view controls (this tab is their one home) ----------
+  marginOn: boolean
+  marginSide: 'left' | 'right'
+  onToggleMargin(): void
+  onMarginSideChange(side: 'left' | 'right'): void
+  /** Export a copy with wider pages and the comments baked into the margin */
+  onExportMargin(): void
   /** Page bookmarks for the open file, already in page order */
   bookmarks: readonly DocBookmark[]
   /** Bookmark the page, or remove the bookmark it already has */
@@ -90,6 +114,13 @@ function Sidebar({
   onJumpToAnnot,
   onDeleteAnnot,
   onDeleteAllAnnots,
+  selectedAnnotId,
+  onCommentChange,
+  marginOn,
+  marginSide,
+  onToggleMargin,
+  onMarginSideChange,
+  onExportMargin,
   bookmarks,
   onToggleBookmark,
   onRenameBookmark,
@@ -304,6 +335,13 @@ function Sidebar({
           onDeleteAll={onDeleteAllAnnots}
           onExport={onExport}
           onAskAi={onAskAi}
+          selectedAnnotId={selectedAnnotId}
+          onCommentChange={onCommentChange}
+          marginOn={marginOn}
+          marginSide={marginSide}
+          onToggleMargin={onToggleMargin}
+          onMarginSideChange={onMarginSideChange}
+          onExportMargin={onExportMargin}
         />
       )}
     </div>
@@ -313,6 +351,31 @@ function Sidebar({
 function colorDistance(a: [number, number, number], b: [number, number, number]): number {
   return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
 }
+
+/** Type filter for the Merknader list — grouped the way the toolbar groups
+ *  the tools, so the chips read as "the thing I made with that button". */
+const TYPE_FILTERS: {
+  key: string
+  types: ReadonlySet<PageAnnotation['type']>
+  Icon: (p: { size?: number }) => React.JSX.Element
+  labelKey: 'tb.markup' | 'tb.note' | 'tb.textTool' | 'tb.pen' | 'tb.shapes'
+}[] = [
+  {
+    key: 'markup',
+    types: new Set(['highlight', 'underline', 'strikeout', 'squiggly']),
+    Icon: IconTextMarkup,
+    labelKey: 'tb.markup'
+  },
+  { key: 'note', types: new Set(['note']), Icon: IconNote, labelKey: 'tb.note' },
+  { key: 'text', types: new Set(['freetext']), Icon: IconText, labelKey: 'tb.textTool' },
+  { key: 'draw', types: new Set(['ink']), Icon: IconPen, labelKey: 'tb.pen' },
+  {
+    key: 'shape',
+    types: new Set(['square', 'circle', 'line', 'arrow']),
+    Icon: IconShapes,
+    labelKey: 'tb.shapes'
+  }
+]
 
 function BookmarkList({
   bookmarks,
@@ -409,7 +472,14 @@ function AnnotationList({
   onDelete,
   onDeleteAll,
   onExport,
-  onAskAi
+  onAskAi,
+  selectedAnnotId,
+  onCommentChange,
+  marginOn,
+  marginSide,
+  onToggleMargin,
+  onMarginSideChange,
+  onExportMargin
 }: {
   annotations: ReadonlyMap<number, PageAnnotation[]>
   excerpts: ReadonlyMap<string, string>
@@ -418,13 +488,44 @@ function AnnotationList({
   onDeleteAll(): void
   onExport(format: ExportFormat): void
   onAskAi(): void
+  selectedAnnotId: string | null
+  onCommentChange(pageNumber: number, localId: string, text: string): void
+  marginOn: boolean
+  marginSide: 'left' | 'right'
+  onToggleMargin(): void
+  onMarginSideChange(side: 'left' | 'right'): void
+  onExportMargin(): void
 }): React.JSX.Element {
   const [query, setQuery] = useState('')
   const [colorFilter, setColorFilter] = useState<[number, number, number] | null>(null)
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
+  /** null = everything; true = only rows with a comment; false = only without */
+  const [withComment, setWithComment] = useState<boolean | null>(null)
   const [clearAsk, setClearAsk] = useState(false)
   const clearAskRef = useRef<HTMLDivElement | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
   const closeClearAsk = useCallback(() => setClearAsk(false), [])
   useDismissable(clearAskRef, clearAsk, closeClearAsk)
+
+  // The comment fields grow to their text after every render (edits, undo,
+  // new annotations) — cards never scroll internally.
+  useLayoutEffect(() => {
+    const host = listRef.current
+    if (!host) return
+    for (const ta of host.querySelectorAll('textarea')) {
+      ta.style.height = 'auto'
+      ta.style.height = `${ta.scrollHeight}px`
+    }
+  })
+
+  // Selecting an annotation on the page brings its card into view here — the
+  // same wayfinding as clicking a card, in the other direction.
+  useEffect(() => {
+    if (!selectedAnnotId) return
+    listRef.current
+      ?.querySelector(`[data-card="${CSS.escape(selectedAnnotId)}"]`)
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [selectedAnnotId])
 
   const flat = useMemo(() => {
     const rows: { pageNumber: number; record: PageAnnotation }[] = []
@@ -440,49 +541,98 @@ function AnnotationList({
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
+    const typeGroup = TYPE_FILTERS.find((g) => g.key === typeFilter)
     return flat.filter(({ record }) => {
       if (colorFilter && colorDistance(record.color, colorFilter) > 0.06) return false
+      if (typeGroup && !typeGroup.types.has(record.type)) return false
+      if (withComment !== null && !!(record.contents ?? '').trim() !== withComment) return false
       if (!needle) return true
       const haystack = `${record.contents ?? ''} ${excerpts.get(record.id) ?? ''}`.toLowerCase()
       return haystack.includes(needle)
     })
-  }, [flat, query, colorFilter, excerpts])
+  }, [flat, query, colorFilter, typeFilter, withComment, excerpts])
 
-  if (flat.length === 0) {
-    return <p className="sidebar-empty">{t('side.noAnnots')}</p>
-  }
+  // The margin VIEW controls live HERE — the tab is the one home for
+  // everything comment-related (toolbar keeps only the quick on/off toggle).
+  // Rendered even with zero annotations: turning the margin on first is a
+  // valid start. Exports — both kinds — live together in the export section.
+  const marginControls = (
+    <div className="annot-margin">
+      <label className="theme-menu-toggle">
+        <input type="checkbox" checked={marginOn} onChange={onToggleMargin} />
+        <IconMarginNotes size={15} />
+        {t('tb.marginNotes')}
+      </label>
+      {marginOn && (
+        <div className="theme-auto-row">
+          <span className="theme-auto-label">{t('margin.sideLabel')}</span>
+          <div className="theme-auto-choices">
+            {(['left', 'right'] as const).map((s) => (
+              <button
+                key={s}
+                className={`theme-chip${marginSide === s ? ' selected' : ''}`}
+                onClick={() => onMarginSideChange(s)}
+              >
+                {t(s === 'left' ? 'margin.sideLeft' : 'margin.sideRight')}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+
+  // With zero annotations everything still RENDERS — a new user learns what
+  // the tab can do by seeing it — but the actions that need marks to act on
+  // are disabled rather than gone.
+  const empty = flat.length === 0
 
   let lastPage = 0
   return (
-    <div className="annot-list">
+    <div className="annot-list" ref={listRef}>
+      {marginControls}
       <div className="annot-export">
-        <button className="annot-ask-ai" onClick={onAskAi} title={t('side.askAiTip')}>
-          <span className="annot-ask-ai-glyph">✦</span>
-          {t('ai.annotsBtn')}
-        </button>
+        {/* Exports first (the tab's most-wanted actions), then the AI helper,
+            then the destructive odd-one-out. Four buttons under one heading —
+            «PDF (marg)» says the difference itself. TXT was dropped: Markdown
+            IS plain text, and Word covers the paste-into-a-document case. */}
         <div className="annot-export-head">
           <span>{t('side.export')}</span>
         </div>
         <div className="annot-export-row">
-          <button onClick={() => onExport('markdown')} title={t('side.exportMdTip')}>
+          <button disabled={empty} onClick={() => onExport('markdown')}>
             MD
           </button>
-          <button onClick={() => onExport('html')} title={t('side.exportHtmlTip')}>
+          <button disabled={empty} onClick={() => onExport('html')}>
             HTML
           </button>
-          <button onClick={() => onExport('text')} title={t('side.exportTxtTip')}>
-            TXT
-          </button>
-          <button onClick={() => onExport('docx')} title={t('side.exportDocxTip')}>
+          <button disabled={empty} onClick={() => onExport('docx')}>
             Word
           </button>
         </div>
-        <button className="annot-clear-all" onClick={() => setClearAsk(true)} title={t('side.clearAllTip')}>
+        <div className="annot-export-row">
+          <button disabled={empty} onClick={onExportMargin}>
+            {t('side.exportMarginBtn')}
+          </button>
+        </div>
+        <button className="annot-ask-ai" disabled={empty} onClick={onAskAi} title={t('side.askAiTip')}>
+          <span className="annot-ask-ai-glyph">✦</span>
+          {t('ai.annotsBtn')}
+        </button>
+        <button
+          className="annot-clear-all"
+          disabled={empty}
+          onClick={() => setClearAsk(true)}
+          title={t('side.clearAllTip')}
+        >
           {t('side.clearAll', { count: flat.length })}
         </button>
       </div>
 
       <div className="annot-filter">
+        <div className="annot-export-head">
+          <span>{t('side.filterHead')}</span>
+        </div>
         <input
           value={query}
           placeholder={t('side.searchAnnots')}
@@ -505,48 +655,63 @@ function AnnotationList({
               }
             />
           ))}
+          {/* Type chips share the row's grammar: click to show only, click
+              again to clear */}
+          <span className="annot-filter-sep" />
+          {TYPE_FILTERS.map(({ key, Icon, labelKey }) => (
+            <button
+              key={key}
+              className={`annot-filter-type${typeFilter === key ? ' active' : ''}`}
+              title={t('side.showOnly', { color: t(labelKey).toLowerCase() })}
+              onClick={() => setTypeFilter((prev) => (prev === key ? null : key))}
+            >
+              <Icon size={14} />
+            </button>
+          ))}
+        </div>
+        <div className="annot-filter-content">
+          {([true, false] as const).map((wants) => (
+            <button
+              key={String(wants)}
+              className={`theme-chip${withComment === wants ? ' selected' : ''}`}
+              onClick={() => setWithComment((prev) => (prev === wants ? null : wants))}
+            >
+              {t(wants ? 'side.filterWithComment' : 'side.filterWithoutComment')}
+            </button>
+          ))}
         </div>
       </div>
 
-      {filtered.length === 0 && <p className="sidebar-empty">{t('side.noMatches')}</p>}
+      {empty ? (
+        <p className="sidebar-empty">{t('side.noAnnots')}</p>
+      ) : (
+        filtered.length === 0 && <p className="sidebar-empty">{t('side.noMatches')}</p>
+      )}
       {filtered.map(({ pageNumber, record }) => {
         const header = pageNumber !== lastPage
         lastPage = pageNumber
         const excerpt = excerpts.get(record.id)
-        const primary =
+        // Context line: what the card is anchored to — the marked text when
+        // there is one, else the type. Notes carry no excerpt (the comment IS
+        // the content). The comment itself lives in the card's editable field.
+        const context =
           record.type === 'note'
-            ? record.contents || annotTypeLabel('note')
-            : excerpt
-              ? `«${excerpt}»`
-              : annotTypeLabel(record.type)
-        const comment = record.type !== 'note' ? record.contents : undefined
+            ? `${annotTypeLabel('note')}${record.author ? ` — ${record.author}` : ''}`
+            : `${excerpt ? `«${excerpt}»` : annotTypeLabel(record.type)}${record.author ? ` — ${record.author}` : ''}`
         return (
           <div key={record.id}>
             {header && <div className="annot-list-page">{t('side.page', { page: pageNumber })}</div>}
-            <div className="annot-list-row">
-              <button className="annot-list-main" onClick={() => onJump(pageNumber, record)}>
-                <span
-                  className="annot-list-dot"
-                  style={{
-                    background: `rgb(${record.color.map((v) => Math.round(v * 255)).join(',')})`
-                  }}
-                />
-                <span className="annot-list-body">
-                  <span className="annot-list-text">
-                    {primary}
-                    {record.author && <em> — {record.author}</em>}
-                  </span>
-                  {comment && <span className="annot-list-comment">{comment}</span>}
-                </span>
-              </button>
-              <button
-                className="annot-list-delete"
-                title={t('side.deleteAnnot')}
-                onClick={() => onDelete(pageNumber, record)}
-              >
-                ✕
-              </button>
-            </div>
+            <MarginCard
+              key={`${record.id}:${record.contents ?? ''}`}
+              a={record}
+              pageNumber={pageNumber}
+              context={context}
+              selected={selectedAnnotId === record.id}
+              onCommit={onCommentChange}
+              onSelect={() => onJump(pageNumber, record)}
+              onDelete={() => onDelete(pageNumber, record)}
+              extraProps={{ onClick: () => onJump(pageNumber, record) }}
+            />
           </div>
         )
       })}
