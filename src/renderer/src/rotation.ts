@@ -147,6 +147,14 @@ export const PAD_BOTTOM = 10
 export const SIDE_PAD = 8
 /** Pages within this many px of the viewport get rendered */
 export const RENDER_MARGIN = 800
+/** Margin view (comments beside the page): card column + its gap from the page
+ *  edge, in CSS px — fixed, never zoomed, so the comments stay readable at any
+ *  scale. Reserved from the usable width in every layout/fit computation, the
+ *  same way SIDE_PAD is, so page + cards centre together and fit-width still
+ *  fits with the column open. */
+export const MARGIN_NOTES_CARD_W = 200
+export const MARGIN_NOTES_GAP = 14
+export const MARGIN_NOTES_W = MARGIN_NOTES_CARD_W + MARGIN_NOTES_GAP + 8
 /** ms of wheel silence before a pinch/ctrl-wheel gesture commits a re-render */
 export const GESTURE_SETTLE = 160
 
@@ -176,6 +184,21 @@ export interface RowLayout {
   heights: number[]
   total: number
   contentWidth: number
+}
+
+/** Shift a finished layout horizontally (margin view on the LEFT reserves its
+ *  gutter before the pages). Both the per-page lefts and the row boxes move —
+ *  they describe the same geometry and must not disagree. */
+export function shiftLayoutX(lay: RowLayout, dx: number): RowLayout {
+  if (dx === 0) return lay
+  return {
+    ...lay,
+    lefts: lay.lefts.map((l) => l + dx),
+    rows: lay.rows.map((row) => ({
+      ...row,
+      pages: row.pages.map((p) => ({ ...p, left: p.left + dx }))
+    }))
+  }
 }
 
 export interface LayoutOpts {

@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS: Settings = {
   autoDark: 'night',
   keepAwake: false,
   language: 'auto',
+  annotAuthor: '',
   // Empty = every command sits on the bindings keymap.ts ships. The defaults
   // themselves live there, next to the commands they belong to, so this stays
   // "nothing rebound" rather than a second copy of the map.

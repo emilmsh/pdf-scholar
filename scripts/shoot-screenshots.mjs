@@ -193,6 +193,30 @@ const SHOTS = [
     `
   },
   {
+    // The release's headline, shot as its own frame: the comments stand in the
+    // margin as visible text — the way a corrected draft reads on paper. Notes
+    // carry their text into cards on the tinted strip; the highlight from the
+    // annotations scene stays on the page as the thing being commented on.
+    // Leader lines are hover-only, so a static frame stays calm by design.
+    name: 'margin',
+    caption: 'Comments in the margin: notes as visible text beside the page',
+    setup: `
+      await ui.closePanels()
+      await ui.showAnnots(true)
+      await ui.goToPage(2)
+      ui.expectPage(0, 2)
+      // Standalone run (\`shoot margin\`) starts from a bare page — make the
+      // mark the comments belong with. In a full run the annotations scene
+      // already left its marks here.
+      if (ui.markRectsA().length === 0) await ui.highlightSomeText()
+      await ui.placeNote('Tie this back to the RNN baseline in §2', 0.08, 0.24)
+      await ui.placeNote('Strong claim — soften it, or cite the ablation', 0.06, 0.52)
+      await ui.toggle(L.margin)
+      await ui.fitWidth()
+      await ui.settle(3400)
+    `
+  },
+  {
     name: 'parchment',
     caption: 'Sepia reading mode',
     setup: `
@@ -317,7 +341,8 @@ const L = {
   theme: ['Lesemodus', 'Reading mode'],
   shapes: ['Former', 'Shapes'],
   rectangle: ['Rektangel', 'Rectangle'],
-  note: ['Notat', 'Note']
+  note: ['Notat', 'Note'],
+  margin: ['Vis kommentarer i margen', 'Show comments in the margin']
 };
 const titleOf = (el) => el.title || '';
 const startsAny = (el, names) => names.some((n) => titleOf(el).startsWith(n));
@@ -412,6 +437,10 @@ const ui = {
     }
     const split = btn(L.split);
     if (split && split.classList.contains('is-active')) { click(split); await settle(500); }
+    // The margin view persists in localStorage — a scene that turned it on
+    // must not leak its strip into every frame that follows.
+    const margin = btn(L.margin);
+    if (margin && margin.classList.contains('is-active')) { click(margin); await settle(500); }
     // Disarm any tool a previous shot armed — the shots share one app session,
     // so the annotations shot's highlighter was still lit (and its button
     // outlined) in every theme shot that followed it.

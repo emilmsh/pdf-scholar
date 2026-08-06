@@ -284,6 +284,16 @@ export const IconComment = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** Margin view: a page with a comment block standing in its own column to the
+ *  right — the text visibly OUTSIDE the page, which is the whole feature. */
+export const IconMarginNotes = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="2.5" y="4" width="12" height="16" rx="2" />
+    <path d="M5.5 8.5h6M5.5 12h6M5.5 15.5h4" />
+    <path d="M18 8.5h3.5M18 12h3.5M18 15.5h2.5" />
+  </Svg>
+)
+
 export const IconCopy = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="9" y="9" width="11" height="11" rx="2" />

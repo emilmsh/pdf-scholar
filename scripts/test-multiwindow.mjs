@@ -64,9 +64,11 @@ const ui = {
     click(notes);
     await settle(400);
   },
-  /** One row per annotation the app knows about, file-painted or session */
+  /** One card per annotation the app knows about, file-painted or session.
+   *  The Merknader tab renders the shared margin cards since the samkjøring
+   *  (was .annot-list-row before that). */
   markCount() {
-    return document.querySelectorAll('.annot-list-row').length;
+    return document.querySelectorAll('.annot-list .margin-note-card').length;
   },
   /** Poll until the list shows n marks (the sync is debounced by 250 ms, and a
    *  reload has to re-parse the document before the list can grow) */

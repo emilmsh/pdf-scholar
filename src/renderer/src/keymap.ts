@@ -50,6 +50,7 @@ export type CommandId =
   | 'view.rotateLeft'
   | 'view.spread'
   | 'view.split'
+  | 'view.marginNotes'
   | 'view.togglePin'
   | 'view.readAloud'
   // Zoom
@@ -175,6 +176,10 @@ const REGISTRY: readonly Command[] = [
   { id: 'view.rotateLeft', category: 'view', labelKey: 'keys.viewRotateLeft', defaults: ['['] },
   { id: 'view.spread', category: 'view', labelKey: 'keys.viewSpread', defaults: [] },
   { id: 'view.split', category: 'view', labelKey: 'keys.viewSplit', defaults: ['s'] },
+  // Unbound as shipped, like the tools: the margin view arrived after the
+  // reading letters were spoken for, and 'm' is the kind of key a reader should
+  // get to spend themselves.
+  { id: 'view.marginNotes', category: 'view', labelKey: 'keys.viewMarginNotes', defaults: [] },
   { id: 'view.togglePin', category: 'view', labelKey: 'keys.viewTogglePin', defaults: ['v'] },
   { id: 'view.readAloud', category: 'view', labelKey: 'keys.viewReadAloud', defaults: ['r'], flagged: true },
 

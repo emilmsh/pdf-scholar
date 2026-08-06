@@ -19,7 +19,6 @@ import { bridge, isElectron, isExtension } from '../bridge'
 import { bubblesWhileTyping, commandForEvent, isKeyboardCaptured, shortcutLabel } from '../keymap'
 import { READ_ALOUD } from '../flags'
 import {
-  FREETEXT_COLOR,
   FREETEXT_SIZE,
   MIN_SHAPE_SIZE,
   NOTE_COLOR,
@@ -29,6 +28,7 @@ import {
   annotationAtPoint,
   annotationHitTest,
   clearCustomColors,
+  freetextMinSize,
   fromPdfJsAnnotation,
   inkHitTest,
   inkPad,
@@ -38,6 +38,7 @@ import {
   lineQuad,
   nextAnnotationId,
   quadsUnion,
+  rgbCss,
   selectionRectsForPage,
   strokesBox
 } from '../annotations'
@@ -47,7 +48,7 @@ import {
   loadToolPrefs,
   saveToolPrefs
 } from '../tool-prefs'
-import type { DrawPrefKey, EraserScope, MarkupPref, ToolPref } from '../tool-prefs'
+import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
 import type { BoxSize } from '../useResizable'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
@@ -65,11 +66,13 @@ import type {
 import {
   buildRows,
   GESTURE_SETTLE,
+  MARGIN_NOTES_W,
   PAD_BOTTOM,
   PAD_TOP,
   PAGE_GAP,
   pageRectToView,
   RENDER_MARGIN,
+  shiftLayoutX,
   SIDE_PAD,
   SPREAD_GAP,
   viewDeltaToPage,
@@ -82,9 +85,15 @@ import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
 import {
   browserCurrentBytes,
+  getEngineWithRaw,
   registerBrowserDoc,
   releaseBrowserDoc
 } from '../annotation-engine-browser'
+import { buildMarginCopy } from '../../../shared/margin-export'
+import type { MarginExportCard } from '../../../shared/margin-export'
+import { WASM_SAFE_LIMIT } from '../../../shared/pdfium-annot-ops'
+import { marginCardAnnotations, MarginJumpArrows } from './MarginNotes'
+import type { MarginViewConfig } from './MarginNotes'
 import { registerPdfiumDoc, releasePdfiumDoc } from '../pdfium-renderer'
 import {
   buildAiDocument,
@@ -239,6 +248,38 @@ function loadToolbarPinned(): boolean {
   }
 }
 
+const MARGIN_VIEW_LS_KEY = 'pdfx-margin-view'
+
+interface MarginViewState {
+  on: boolean
+  side: 'left' | 'right'
+}
+
+/** Margin view starts off, right side; a reader's choices persist across
+ *  sessions. Tolerates both older shapes: the v1 boolean key and the v2
+ *  object that still carried a flow/stack mode (the stack list now lives in
+ *  the Merknader tab, so the mode is simply dropped). */
+function loadMarginView(): MarginViewState {
+  try {
+    const raw = localStorage.getItem(MARGIN_VIEW_LS_KEY)
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<MarginViewState>
+      return { on: p.on === true, side: p.side === 'left' ? 'left' : 'right' }
+    }
+    return { on: localStorage.getItem('pdfx-margin-notes') === '1', side: 'right' }
+  } catch {
+    return { on: false, side: 'right' }
+  }
+}
+
+function saveMarginView(v: MarginViewState): void {
+  try {
+    localStorage.setItem(MARGIN_VIEW_LS_KEY, JSON.stringify(v))
+  } catch {
+    /* view preference only */
+  }
+}
+
 function saveToolbarPinned(pinned: boolean): void {
   try {
     localStorage.setItem(TOOLBAR_PIN_LS_KEY, pinned ? '1' : '0')
@@ -369,11 +410,45 @@ export default function PdfViewer({
   // bookmark shortcut needs the live page rather than a captured one.
   const currentPageRef = useRef(currentPage)
   currentPageRef.current = currentPage
+  /** Read by stable callbacks (annotation author) without re-creating them */
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
   const [error, setError] = useState<string | null>(null)
   /** Edge-style toolbar auto-hide. Pinned (default) = always visible; unpinned
    *  = tucks away and reveals on top-edge hover. Persisted across sessions. */
   const [toolbarPinned, setToolbarPinned] = useState(loadToolbarPinned)
   const [toolbarPeek, setToolbarPeek] = useState(false)
+  /** Margin view: notes + annotation comments as always-visible cards in a
+   *  column beside each page (both panes). The gutter it needs is reserved
+   *  in every layout/fit computation below via `marginGutter`. */
+  const [marginView, setMarginView] = useState(loadMarginView)
+  const patchMarginView = useCallback((patch: Partial<MarginViewState>) => {
+    setMarginView((v) => {
+      const next = { ...v, ...patch }
+      saveMarginView(next)
+      return next
+    })
+  }, [])
+  const toggleMarginNotes = useCallback(() => {
+    setMarginView((v) => {
+      const next = { ...v, on: !v.on }
+      saveMarginView(next)
+      return next
+    })
+  }, [])
+  const marginNotes = marginView.on
+  /** What PdfPage needs, or null when the view is off — memoised so the
+   *  object identity is stable for the memoised pages */
+  const marginViewConfig = useMemo<MarginViewConfig | null>(
+    () => (marginView.on ? { side: marginView.side } : null),
+    [marginView]
+  )
+  const setMarginSide = useCallback(
+    (side: 'left' | 'right') => patchMarginView({ side }),
+    [patchMarginView]
+  )
+  const marginViewRef = useRef(marginView)
+  marginViewRef.current = marginView
   /** Acrobat-style one-page-at-a-time slideshow (own fullscreen overlay) */
   const [presentation, setPresentation] = useState(false)
   const presentationRef = useRef(presentation)
@@ -713,6 +788,13 @@ export default function PdfViewer({
   const setEraserScope = useCallback((eraserScope: EraserScope) => {
     setPrefs((p) => ({ ...p, eraserScope }))
   }, [])
+  const textPref = prefs.text
+  const patchTextPref = useCallback((patch: Partial<TextPref>) => {
+    setPrefs((p) => ({ ...p, text: { ...p.text, ...patch } }))
+  }, [])
+  const resetTextPref = useCallback(() => {
+    setPrefs((p) => ({ ...p, text: { ...DEFAULT_TOOL_PREFS.text } }))
+  }, [])
   /** The floating text-box editor. Carries its own box size (page points) so it
    *  is drag-resizable before commit; `editingId` is set when re-opening an
    *  existing FreeText annotation (double-click) so commit resizes/edits it in
@@ -727,6 +809,12 @@ export default function PdfViewer({
     h: number
     editingId?: string
     text?: string
+    /** Set when editing an existing box, so the editor shows ITS colour/size
+     *  rather than the tool preference (a re-opened red 18 pt box must not
+     *  preview in the tool's current black 12 pt). New drafts leave these
+     *  unset and follow the live tool preference instead. */
+    color?: [number, number, number]
+    fontSize?: number
     /** The editor is positioned inside this pane's page layout, at its zoom */
     pane: PaneId
   } | null>(null)
@@ -735,7 +823,7 @@ export default function PdfViewer({
     if (!activeTool) return null
     if (activeTool === 'eraser') return { type: 'eraser', color: [0, 0, 0], width: 0, opacity: 0 }
     if (activeTool === 'text') {
-      return { type: 'text', color: FREETEXT_COLOR, width: 0, opacity: 1 }
+      return { type: 'text', color: prefs.text.color, width: 0, opacity: 1 }
     }
     if (activeTool === 'pen' || activeTool === 'marker') {
       const p = toolPrefs[activeTool]
@@ -747,7 +835,7 @@ export default function PdfViewer({
       width: toolPrefs.shape.width,
       opacity: toolPrefs.shape.opacity
     }
-  }, [activeTool, toolPrefs])
+  }, [activeTool, toolPrefs, prefs.text])
   const drawToolRef = useRef(drawTool)
   drawToolRef.current = drawTool
   const [pillEditing, setPillEditing] = useState(false)
@@ -1154,6 +1242,13 @@ export default function PdfViewer({
     return { w: v0.w, h: v0.h }
   }, [sizes, rotation, spread, currentPage])
 
+  // Margin view reserves its card column the same way SIDE_PAD reserves its
+  // edges: subtracted from the width every layout/fit computation sees, so the
+  // page centres in what is left and the cards own the difference.
+  const marginGutter = marginNotes ? MARGIN_NOTES_W : 0
+  const marginGutterRef = useRef(marginGutter)
+  marginGutterRef.current = marginGutter
+
   // Pick an initial zoom if none was restored: Acrobat-style "Automatic" —
   // fit-width capped at 100% (actual size). Normal pages open readable at
   // actual size; oversized pages (posters, drawings) still scale down to fit
@@ -1161,7 +1256,7 @@ export default function PdfViewer({
   // panels toggle or the window resizes, same as a hand-picked zoom.
   useEffect(() => {
     if (scale > 0 || sizes.length === 0 || containerWidth === 0) return
-    const fitW = (containerWidth - SIDE_PAD) / fitDenom().w
+    const fitW = (containerWidth - SIDE_PAD - marginGutter) / fitDenom().w
     if (fitW < 1) {
       setFitMode('width')
       setScale(clamp(fitW, ZOOM_MIN, ZOOM_MAX))
@@ -1169,21 +1264,24 @@ export default function PdfViewer({
       setFitMode('custom')
       setScale(1)
     }
-  }, [sizes, scale, containerWidth, fitDenom])
+  }, [sizes, scale, containerWidth, fitDenom, marginGutter])
 
   // ---------- Layout ----------
 
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
-    return buildRows(sizes, scale, rotation, spread, {
-      containerWidth,
+    const lay = buildRows(sizes, scale, rotation, spread, {
+      containerWidth: Math.max(containerWidth - marginGutter, 120),
       pageGap: PAGE_GAP,
       padTop: PAD_TOP,
       padBottom: PAD_BOTTOM,
       sidePad: SIDE_PAD,
       spreadGap: SPREAD_GAP
     })
-  }, [sizes, scale, containerWidth, rotation, spread])
+    // A left-hand margin means the gutter sits BEFORE the pages: shift every
+    // page right by the reserved width so the column has its space.
+    return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0)
+  }, [sizes, scale, containerWidth, rotation, spread, marginGutter, marginView.side])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -1437,8 +1535,8 @@ export default function PdfViewer({
   const fitWidth = useCallback(() => {
     if (sizes.length === 0 || containerWidth === 0) return
     setFitMode('width')
-    zoomTo((containerWidth - SIDE_PAD) / fitDenom().w)
-  }, [sizes, containerWidth, zoomTo, fitDenom])
+    zoomTo((containerWidth - SIDE_PAD - marginGutter) / fitDenom().w)
+  }, [sizes, containerWidth, zoomTo, fitDenom, marginGutter])
 
   /** Whole page visible (Edge-style toggle companion to fit-width) */
   const fitPage = useCallback(() => {
@@ -1446,7 +1544,7 @@ export default function PdfViewer({
     if (!el || sizes.length === 0 || el.clientWidth === 0) return
     setFitMode('page')
     const denom = fitDenom()
-    const fitW = (el.clientWidth - SIDE_PAD) / denom.w
+    const fitW = (el.clientWidth - SIDE_PAD - marginGutterRef.current) / denom.w
     const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
     zoomTo(Math.min(fitW, fitH))
   }, [sizes, zoomTo, fitDenom])
@@ -1463,7 +1561,7 @@ export default function PdfViewer({
     const ch = el.clientHeight
     if (cw === 0) return
     const denom = fitDenom()
-    const fitW = (cw - SIDE_PAD) / denom.w
+    const fitW = (cw - SIDE_PAD - marginGutterRef.current) / denom.w
     const fitH = (ch - PAD_TOP - PAD_BOTTOM) / denom.h
     const next = clamp(mode === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
     const prev = scaleRef.current
@@ -1475,17 +1573,19 @@ export default function PdfViewer({
   const refitRef = useRef(refit)
   refitRef.current = refit
 
+  // Toggling the margin column changes the usable width exactly like a side
+  // panel does, so it re-fits through the same path.
   useEffect(() => {
     refitRef.current()
-  }, [containerWidth])
+  }, [containerWidth, marginGutter])
 
   /** Which fit the toggle button should offer next: 'page' when we are at
    *  (or near) fit-width, otherwise 'width' */
   const fitTarget: 'width' | 'page' = useMemo(() => {
     if (sizes.length === 0 || containerWidth === 0) return 'page'
-    const fitW = (containerWidth - SIDE_PAD) / fitDenom().w
+    const fitW = (containerWidth - SIDE_PAD - marginGutter) / fitDenom().w
     return Math.abs(scale - fitW) / fitW < 0.02 ? 'page' : 'width'
-  }, [scale, sizes, containerWidth, fitDenom])
+  }, [scale, sizes, containerWidth, fitDenom, marginGutter])
 
   /** Snap a pinch-commit scale to fit-width/fit-height/fit-page when close.
    *  Tight threshold: the snap adjusts the committed scale away from what the
@@ -1495,7 +1595,7 @@ export default function PdfViewer({
       const el = containerRef.current
       if (!el || sizes.length === 0 || el.clientWidth === 0) return raw
       const { w, h } = sizes[clamp(currentPage - 1, 0, sizes.length - 1)]
-      const fitW = (el.clientWidth - SIDE_PAD) / w
+      const fitW = (el.clientWidth - SIDE_PAD - marginGutterRef.current) / w
       const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / h
       for (const candidate of [fitW, fitH, Math.min(fitW, fitH)]) {
         if (
@@ -2042,6 +2142,68 @@ export default function PdfViewer({
   // the same reading position, because saving a copy almost always means
   // "keep the original untouched, continue working in the copy". The browser
   // cannot reopen a file it just downloaded, so it keeps the toast-only flow.
+  /** «Eksporter med kommentarer i margen»: a copy where every page is widened
+   *  and the margin view's cards are baked in as real annotations (see
+   *  src/shared/margin-export.ts). Runs the wasm engine in the renderer on all
+   *  platforms — an explicit export may pay the cost the annotate path avoids
+   *  on desktop. The original document is untouched. */
+  const exportMarginNotes = useCallback(async () => {
+    const cards: MarginExportCard[] = []
+    for (const [pageNumber, list] of annotsRef.current) {
+      for (const a of marginCardAnnotations(list)) {
+        const text = (a.contents ?? '').trim()
+        if (!text) continue // an empty note has nothing to print
+        const anchor = quadsUnion(a.quads)
+        cards.push({ pageIndex: pageNumber - 1, anchorY: anchor.y, anchor, text, color: a.color })
+      }
+    }
+    if (cards.length === 0) {
+      showToast(t('margin.exportEmpty'))
+      return
+    }
+    if (payload.data.byteLength > WASM_SAFE_LIMIT) {
+      showToast(t(isElectron ? 'engine.doc-too-large' : 'engine.doc-too-large-browser'))
+      return
+    }
+    // Current bytes, draft included: main resolves the draft behind readFile
+    // on desktop; browser/extension serialize the live in-memory doc.
+    let bytes: Uint8Array | null
+    if (isElectron) {
+      const res = await bridge.readFile(payload.path)
+      bytes = 'error' in res ? null : res.data
+    } else {
+      bytes = (await browserCurrentBytes(payload.path)) ?? payload.data.slice()
+    }
+    if (!bytes) {
+      showToast(t('viewer.saveFailed', { error: t('margin.exportReadFailed') }))
+      return
+    }
+    const { native, wrapped } = await getEngineWithRaw()
+    // The copy's margin lands on the side the margin VIEW uses — one setting,
+    // one mental model, chosen in the same menu as the export itself.
+    const out = await buildMarginCopy(
+      native,
+      wrapped,
+      bytes,
+      cards,
+      undefined,
+      marginViewRef.current.side,
+      settingsRef.current.annotAuthor.trim() || undefined
+    )
+    if (!(out instanceof Uint8Array)) {
+      showToast(t('viewer.saveFailed', { error: errorText(out) }))
+      return
+    }
+    const base = payload.name.replace(/\.pdf$/i, '')
+    const result = await bridge.saveFileAs(`${base}${t('margin.exportSuffix')}.pdf`, out)
+    if (!result) return // user cancelled the dialog
+    if ('error' in result) {
+      showToast(t('viewer.saveFailed', { error: errorText(result) }))
+      return
+    }
+    showToast(t('margin.exportDone'))
+  }, [payload.name, payload.path, payload.data, showToast])
+
   const saveDocumentAs = useCallback(async () => {
     const bytes = isElectron ? payload.data.slice() : ((await browserCurrentBytes(payload.path)) ?? payload.data.slice())
     const result = await bridge.saveFileAs(payload.name, bytes, payload.path)
@@ -2311,6 +2473,10 @@ export default function PdfViewer({
       }
     ): AnnotHandle => {
       const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
+      // Author = the user's own name from settings; empty writes no /T at all
+      // (the app has no accounts, so a made-up default would just be noise in
+      // other readers and in the exports)
+      const author = settingsRef.current.annotAuthor.trim() || undefined
       const snapshot: PageAnnotation = {
         id: handle.localId,
         fileId: null,
@@ -2320,7 +2486,7 @@ export default function PdfViewer({
         color,
         opacity,
         contents,
-        author: 'PDF Scholar',
+        author,
         strokes: extras?.strokes,
         width: extras?.width,
         fontSize: extras?.fontSize,
@@ -2488,6 +2654,8 @@ export default function PdfViewer({
       h: q.h,
       editingId: record.id,
       text: record.contents ?? '',
+      color: record.color,
+      fontSize: record.fontSize ?? FREETEXT_SIZE,
       pane: activePaneRef.current
     })
   }, [])
@@ -2532,8 +2700,16 @@ export default function PdfViewer({
   const saveFreeText = useCallback(
     (text: string, wPt?: number, hPt?: number) => {
       if (!freeTextDraft) return
-      const w = wPt && wPt > 24 ? wPt : freeTextDraft.w
-      const h = hPt && hPt > 14 ? hPt : freeTextDraft.h
+      const wDrag = wPt && wPt > 24 ? wPt : freeTextDraft.w
+      const hDrag = hPt && hPt > 14 ? hPt : freeTextDraft.h
+      // The editor can be drag-shrunk below its own text — commit a box that
+      // shows every letter instead (same floor the resize handles enforce)
+      const fontSize = freeTextDraft.editingId
+        ? freeTextDraft.fontSize ?? FREETEXT_SIZE
+        : prefsRef.current.text.fontSize
+      const min = freetextMinSize(text, fontSize, wDrag)
+      const w = Math.max(wDrag, min.w)
+      const h = Math.max(hDrag, min.h)
       const rect = { x: freeTextDraft.x, y: freeTextDraft.y, w, h }
       if (freeTextDraft.editingId) {
         const record = (annotsRef.current.get(freeTextDraft.pageNumber) ?? []).find(
@@ -2543,13 +2719,18 @@ export default function PdfViewer({
         setFreeTextDraft(null)
         return
       }
-      void persistAnnotation(freeTextDraft.pageNumber, 'freetext', [rect], FREETEXT_COLOR, 1, text, {
-        fontSize: FREETEXT_SIZE
+      const pref = prefsRef.current.text
+      const handle = persistAnnotation(freeTextDraft.pageNumber, 'freetext', [rect], pref.color, 1, text, {
+        fontSize: pref.fontSize
       })
       setFreeTextDraft(null)
       // Text boxes are one-shot: unlike pen strokes, nobody places several in
       // a row, and a lingering armed tool blocks selecting/moving the new box
       setActiveTool((tool) => (tool === 'text' ? null : tool))
+      // Select the fresh box so the frame + corner handles appear at once —
+      // the affordance that says "this can be moved and resized" (Fredrik
+      // never discovered it when the box just sat there as flat text)
+      setSelected({ pageNumber: freeTextDraft.pageNumber, localId: handle.localId })
     },
     [freeTextDraft, persistAnnotation, changeAnnotation]
   )
@@ -2586,6 +2767,23 @@ export default function PdfViewer({
       drawActionsRef.current.text(pageNumber, x, y, clientX, clientY),
     []
   )
+
+  // Margin-view card actions — same stable-identity pattern as the draw
+  // actions above (PdfPage is memoised; churn re-renders page canvases).
+  const marginActionsRef = useRef({ change: changeAnnotation, remove: removeAnnotation })
+  marginActionsRef.current = { change: changeAnnotation, remove: removeAnnotation }
+  const onMarginCommit = useCallback((pageNumber: number, localId: string, text: string) => {
+    const record = (annotsRef.current.get(pageNumber) ?? []).find((r) => r.id === localId)
+    if (record) marginActionsRef.current.change(pageNumber, record, { contents: text })
+  }, [])
+  const onMarginSelect = useCallback((pageNumber: number, localId: string) => {
+    setAnnotPopover(null)
+    setSelected({ pageNumber, localId })
+  }, [])
+  const onMarginDelete = useCallback((pageNumber: number, localId: string) => {
+    const record = (annotsRef.current.get(pageNumber) ?? []).find((r) => r.id === localId)
+    if (record) marginActionsRef.current.remove(pageNumber, record)
+  }, [])
 
   /** Selection rects per page, for every rendered page the selection touches.
    *  Walks BOTH panes — a selection lives in whichever pane the user dragged in,
@@ -3474,12 +3672,26 @@ export default function PdfViewer({
       const anchorY = top ? box.y + box.h : box.y
       const movedX = clamp((left ? box.x : box.x + box.w) + dx, 0, maxW)
       const movedY = clamp((top ? box.y : box.y + box.h) + dy, 0, maxH)
-      const w = Math.max(MIN_SHAPE_SIZE, Math.abs(movedX - anchorX))
-      const h = Math.max(MIN_SHAPE_SIZE, Math.abs(movedY - anchorY))
-      // Math.min keeps a box that hit the minimum from sticking out of the page
+      let w = Math.max(MIN_SHAPE_SIZE, Math.abs(movedX - anchorX))
+      let h = Math.max(MIN_SHAPE_SIZE, Math.abs(movedY - anchorY))
+      if (rs.record.type === 'freetext') {
+        // A text box may never shrink below its own letters: the widest word
+        // sets the width floor, the wrap at the candidate width sets the
+        // height floor. The ghost simply stops following the cursor there.
+        const min = freetextMinSize(
+          rs.record.contents ?? '',
+          rs.record.fontSize ?? FREETEXT_SIZE,
+          w
+        )
+        w = Math.max(w, min.w)
+        h = Math.max(h, min.h)
+      }
+      // The box grows away from the anchored corner when a minimum kicks in,
+      // so that corner stays exactly put; the upper clamp keeps a box that
+      // hit the page edge from sticking out.
       const rect: PageRect = {
-        x: Math.min(Math.min(anchorX, movedX), Math.max(0, maxW - w)),
-        y: Math.min(Math.min(anchorY, movedY), Math.max(0, maxH - h)),
+        x: clamp(movedX < anchorX ? anchorX - w : anchorX, 0, Math.max(0, maxW - w)),
+        y: clamp(movedY < anchorY ? anchorY - h : anchorY, 0, Math.max(0, maxH - h)),
         w,
         h
       }
@@ -4005,10 +4217,21 @@ export default function PdfViewer({
     // A third of the way down, so the mark has its context above it
     handle.scrollToPageY(pageNumber, q?.y ?? 0, el.clientHeight * 0.3)
   }, [pushBack])
-  const jumpToAnnot = useCallback(
-    (pageNumber: number, record: PageAnnotation) =>
-      jumpToAnnotIn(activePaneRef.current, pageNumber, record),
+  /** Select an annotation and bring it into view in the given column — the
+   *  navigation behind the Merknader tab's cards and the margin's arrows. */
+  const jumpSelectAnnotIn = useCallback(
+    (pane: PaneId, pageNumber: number, record: PageAnnotation) => {
+      setAnnotPopover(null)
+      setSelected({ pageNumber, localId: record.id })
+      jumpToAnnotIn(pane, pageNumber, record)
+    },
     [jumpToAnnotIn]
+  )
+  /** The tab serves whichever column is being worked in */
+  const jumpSelectAnnot = useCallback(
+    (pageNumber: number, record: PageAnnotation) =>
+      jumpSelectAnnotIn(activePaneRef.current, pageNumber, record),
+    [jumpSelectAnnotIn]
   )
 
   /** Resolve a pdf.js destination and scroll the given column to it. */
@@ -4688,6 +4911,10 @@ export default function PdfViewer({
         e.preventDefault()
         toggleSplit()
         break
+      case 'view.marginNotes':
+        e.preventDefault()
+        toggleMarginNotes()
+        break
       case 'view.togglePin':
         e.preventDefault()
         togglePin()
@@ -4884,7 +5111,10 @@ export default function PdfViewer({
             top: lay.tops[freeTextDraft.pageNumber - 1] + freeTextDraft.y * paneScale,
             width: freeTextDraft.w * paneScale,
             height: freeTextDraft.h * paneScale,
-            fontSize: FREETEXT_SIZE * paneScale,
+            // An edited box previews in ITS stored look; a new draft follows
+            // the tool preference live, so what you type is what commits
+            color: rgbCss(freeTextDraft.color ?? textPref.color, 1),
+            fontSize: (freeTextDraft.fontSize ?? textPref.fontSize) * paneScale,
             ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
           }}
           onKeyDown={(e) => {
@@ -4998,6 +5228,9 @@ export default function PdfViewer({
           onToggleSpread={toggleSpread}
           onToolPrefChange={patchToolPref}
           onToolPrefReset={resetToolPref}
+          textPref={textPref}
+          onTextPrefChange={patchTextPref}
+          onTextPrefReset={resetTextPref}
           onToggleSidebar={() => setTocPinned((o) => !o)}
           onGoToPage={jumpToPage}
           onZoomIn={() => manualZoom(scaleRef.current * 1.15)}
@@ -5015,6 +5248,8 @@ export default function PdfViewer({
           canSaveInPlace={isElectron || isExtension}
           annotsHidden={annotsHidden}
           onToggleAnnots={() => setAnnotsHidden((h) => !h)}
+          marginNotes={marginNotes}
+          onToggleMarginNotes={toggleMarginNotes}
           canUndo={undoDepths.undo > 0}
           canRedo={undoDepths.redo > 0}
           onUndo={() => void performUndoRedo('undo')}
@@ -5128,9 +5363,16 @@ export default function PdfViewer({
           excerpts={excerpts}
           onJumpToPage={jumpToPage}
           onJumpToDest={jumpToDest}
-          onJumpToAnnot={jumpToAnnot}
+          onJumpToAnnot={jumpSelectAnnot}
           onDeleteAnnot={removeAnnotation}
           onDeleteAllAnnots={() => void removeAllAnnotations()}
+          selectedAnnotId={selected?.localId ?? null}
+          onCommentChange={onMarginCommit}
+          marginOn={marginNotes}
+          marginSide={marginView.side}
+          onToggleMargin={toggleMarginNotes}
+          onMarginSideChange={setMarginSide}
+          onExportMargin={() => void exportMarginNotes()}
           bookmarks={bookmarks}
           onToggleBookmark={toggleBookmark}
           onRenameBookmark={renameBookmark}
@@ -5171,7 +5413,7 @@ export default function PdfViewer({
             <div
               className="pages-inner"
               ref={innerRef}
-              style={{ height: layout.total, width: layout.contentWidth }}
+              style={{ height: layout.total, width: layout.contentWidth + marginGutter }}
             >
               {sizes.map((size, i) => {
                 const pageNumber = i + 1
@@ -5220,6 +5462,10 @@ export default function PdfViewer({
                       (markupPreview?.pane === 'a' && markupPreview.byPage.get(pageNumber)) ||
                       EMPTY_RECTS
                     }
+                    marginView={marginViewConfig}
+                    onMarginCommit={onMarginCommit}
+                    onMarginSelect={onMarginSelect}
+                    onMarginDelete={onMarginDelete}
                   />
                 )
               })}
@@ -5232,6 +5478,19 @@ export default function PdfViewer({
             </div>
           )}
         </div>
+        {/* Margin on + nothing in sight: quiet arrows to the nearest comment */}
+        {marginViewConfig && !annotsHidden && (
+          <MarginJumpArrows
+            scrollRef={containerRef}
+            layout={layout}
+            annots={annots}
+            sizes={sizes}
+            scale={scale}
+            rotation={rotation}
+            side={marginViewConfig.side}
+            onJump={(p, r) => jumpSelectAnnotIn('a', p, r)}
+          />
+        )}
         <OverlayScrollbars
           scrollRef={containerRef}
           layoutKey={layout ? `${layout.total}:${layout.contentWidth}` : 'none'}
@@ -5277,6 +5536,11 @@ export default function PdfViewer({
               onErase={onEraseAt}
               onShapeComplete={onShapeComplete}
               onPlaceText={onPlaceText}
+              marginView={marginViewConfig}
+              onMarginCommit={onMarginCommit}
+              onMarginSelect={onMarginSelect}
+              onMarginDelete={onMarginDelete}
+              onMarginJump={(p, r) => jumpSelectAnnotIn('b', p, r)}
               onResizeStart={onResizeStart}
               onMarkupEndStart={onMarkupEndStart}
               markupPreview={markupPreview?.pane === 'b' ? markupPreview.byPage : null}
@@ -5426,6 +5690,12 @@ export default function PdfViewer({
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
       {snip && <SnipOverlay onDone={onSnipDone} onCancel={() => setSnip(null)} />}
+      {/* Armed text tool: the same pill the note tool shows, and it says out
+          loud that the box stays movable/resizable — the part of the tool
+          nobody discovered on their own */}
+      {activeTool === 'text' && !freeTextDraft && (
+        <div className="snip-hint tool-arm-hint">{t('text.hint')}</div>
+      )}
       {notePlacing && (
         <div
           className="note-place-overlay"

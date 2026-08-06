@@ -56,14 +56,17 @@ SPLIT VIEW
 
 ANNOTATION
 • Select a passage and the menu comes to you — highlight, underline, a comment or a note, without a trip to the toolbar and back
-• A Notes panel keeps every mark one click away: grouped by page, searchable, colour-filtered, and a click takes you to the mark
+• A Notes panel keeps every mark one click away: grouped by page, searchable, filtered by colour and type, and a click takes you to the mark. Comments edit right in the list
+• Comments in the margin: one switch shows every note and comment as visible text beside the page — left or right — with a leader line to the passage it belongs to
+• Export a copy with the comments set in a real widened margin, numbered at their anchors — ready to print, the original untouched
 • The same tools sit in the toolbar for marking several passages in a row, and the toolbar unpins when you want nothing but the page
 • Highlight, underline, strikeout and a true-wave squiggly, in your own colours
-• Pen and marker with hold-to-straighten, shapes, sticky notes and free text
+• Pen and marker with hold-to-straighten, shapes, sticky notes and free text in the colour and size you pick
 • Colour, thickness and opacity per tool, remembered between sessions
 • Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape, text box or drawing
 • Comments anchored to the text they mark
-• Export a summary of every mark — the highlighted text included — to Word, Markdown, HTML or plain text
+• Export a summary of every mark — the highlighted text included — to Word, Markdown or HTML
+• An optional name in settings signs new annotations — the standard PDF author field other readers show
 • Standard PDF annotations that open correctly in Acrobat and every other viewer — not flattened images
 • A save guard that warns before overwriting a file another program has changed, and "save a copy" that continues in the copy
 
@@ -102,14 +105,17 @@ DELT VISNING
 
 ANNOTERING
 • Merk et avsnitt, og menyen kommer til deg — utheving, understreking, en kommentar eller et notat, uten en tur innom verktøylinja
-• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, med fargefilter, og ett klikk tar deg til merket
+• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, filtrert på farge og type, og ett klikk tar deg til merket. Kommentarene redigeres rett i lista
+• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden — venstre eller høyre — med en strek til avsnittet den hører til
+• Eksporter en kopi med kommentarene satt i en ekte, bredere marg, nummerert ved ankrene — klar til utskrift, originalen urørt
 • De samme verktøyene ligger i verktøylinja når du skal merke flere avsnitt på rad, og linja kan løsnes når du bare vil ha siden
 • Utheving, understreking, gjennomstreking og en ekte bølget strek, i dine egne farger
-• Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst
+• Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst i farge og størrelse du velger
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
 • Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form, tekstboks eller tegning
 • Kommentarer forankret til teksten de merker
-• Eksporter en oppsummering av alle merker — den uthevede teksten inkludert — til Word, Markdown, HTML eller ren tekst
+• Eksporter en oppsummering av alle merker — den uthevede teksten inkludert — til Word, Markdown eller HTML
+• Et valgfritt navn i innstillingene signerer nye merknader — det standard forfatterfeltet andre lesere viser
 • Standard PDF-annoteringer som åpnes riktig i Acrobat og alle andre lesere — ikke flate bilder
 • En lagringsvakt som varsler før den overskriver en fil et annet program har endret, og «lagre en kopi» som fortsetter i kopien
 
@@ -128,24 +134,26 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.32.x
+## What's new in this version (≤ 1 500 chars) — v0.33.x
 
 **EN:**
 ```
-• The assistant now works with eight AI providers, one key field each: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — paste a key once and that provider's models appear in the model menu
-• Local models: point the assistant at Ollama or LM Studio and it runs with no key at all — a running Ollama is detected and offered with one click, and with a local model the document never leaves your machine
-• Every keyed provider's model list is fetched live, so new models appear without an app update; big lists are sectioned by vendor with a filter field
-• The assistant knows each local model's real context window and whether it can read images, and adapts instead of failing
-• Clear, plain-language errors when an endpoint is unreachable or a model is not picked yet
+• Comments in the margin: one switch shows every note and comment as visible text beside the page — left or right — with a leader line to the passage it belongs to, and arrows to the nearest comment when none is in view
+• Export with comments in the margin: a copy of the document with every page widened and the comments set in the new margin, numbered at their anchors — ready to print, the original untouched
+• The Notes panel grew up: comments edit right in the list (even on marks that have none yet), with type and with/without-comment filters beside the colour dots
+• The text tool picks up colour and size — red teacher's pen included — and a text box can no longer be shrunk below its own words
+• An optional name in settings signs new annotations — the standard PDF author field other readers show
+• The assistant works with eight AI providers, one key field each — or local models via Ollama/LM Studio, no key at all
 ```
 
 **NO:**
 ```
-• Assistenten virker nå med åtte AI-leverandører, ett nøkkelfelt hver: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — lim inn en nøkkel én gang, og leverandørens modeller dukker opp i modellmenyen
-• Lokale modeller: pek assistenten på Ollama eller LM Studio, helt uten nøkkel — en kjørende Ollama oppdages og tilbys med ett klikk, og med en lokal modell forlater dokumentet aldri maskinen
-• Modellistene hentes live per leverandør, så nye modeller dukker opp uten appoppdatering; store lister deles inn per produsent med et filterfelt
-• Assistenten kjenner lokale modellers reelle kontekstvindu og om de kan lese bilder, og tilpasser seg i stedet for å feile
-• Klare feilmeldinger i vanlig språk når et endepunkt ikke svarer eller modell ikke er valgt ennå
+• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden — venstre eller høyre — med en strek til avsnittet den hører til, og piler til nærmeste kommentar når ingen er i synsfeltet
+• Eksport med kommentarer i margen: en kopi av dokumentet med bredere sider og kommentarene satt i den nye margen, nummerert ved ankrene — klar til utskrift, originalen urørt
+• Notater-panelet har vokst: kommentarene redigeres rett i lista (også på merker som ikke har noen ennå), med type- og med/uten-kommentar-filter ved siden av fargeprikkene
+• Tekstverktøyet har fått farge og størrelse — rød rettepenn inkludert — og en tekstboks kan ikke lenger krympes under sine egne ord
+• Et valgfritt navn i innstillingene signerer nye merknader — det standard forfatterfeltet andre lesere viser
+• Assistenten virker med åtte AI-leverandører, ett nøkkelfelt hver — eller lokale modeller via Ollama/LM Studio, helt uten nøkkel
 ```
 
 ---
@@ -170,7 +178,9 @@ Two-page spread, page rotation and full-screen presentation mode
 Split view: two columns of one document, each with its own page, zoom and rotation
 Annotate in both columns at once, or in two windows on the same file
 Select text and the annotation menu comes to you — no trip to the toolbar and back
-Notes panel that keeps every mark one click away — export to Word, Markdown, HTML or text
+Notes panel that keeps every mark one click away — comments edit right in the list
+Comments in the margin: notes as visible text beside the page, left or right
+Export a print-ready copy with the comments in a real widened margin, numbered at their anchors
 Highlight, underline, strikeout and true-wave squiggly, in your own colours
 Pen and marker, shapes, sticky notes, free text and text-anchored comments
 Colour, thickness and opacity per tool, remembered between sessions
@@ -178,7 +188,6 @@ Correct a mark instead of redrawing it: drag a highlight's end or a shape's corn
 Standard PDF annotations that open correctly in Acrobat
 Optional AI assistant that links every answer to the passage it came from
 Snip a figure and ask the assistant to explain it; LaTeX renders in answers
-Optional web search: off, on request or always on
 Bring your own AI key — or run a local model via Ollama/LM Studio, no key at all
 Native x64 and arm64; the Store keeps it updated automatically
 Free and open source (MIT) — no account, no tracking, no ads
@@ -193,7 +202,9 @@ Tosiders oppslag, siderotasjon og fullskjerms presentasjonsmodus
 Delt visning: to kolonner av ett dokument, hver med egen side, zoom og rotasjon
 Annoter i begge kolonner samtidig, eller i to vinduer på samme fil
 Merk tekst, og annoteringsmenyen kommer til deg — uten en tur innom verktøylinja
-Notater-panel som holder hvert merke ett klikk unna — eksport til Word, Markdown, HTML eller tekst
+Notater-panel som holder hvert merke ett klikk unna — kommentarene redigeres rett i lista
+Kommentarer i margen: notater som synlig tekst ved siden av siden, venstre eller høyre
+Eksporter en utskriftsklar kopi med kommentarene i en ekte, bredere marg, nummerert ved ankrene
 Utheving, understreking, gjennomstreking og ekte bølget strek, i egne farger
 Penn og tusj, former, gule lapper, fritekst og tekstforankrede kommentarer
 Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
@@ -201,7 +212,6 @@ Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving ell
 Standard PDF-annoteringer som åpnes riktig i Acrobat
 Valgfri AI-assistent som lenker hvert svar til avsnittet det kom fra
 Klipp ut en figur og be assistenten forklare den; LaTeX vises i svar
-Valgfritt nettsøk: av, på forespørsel eller alltid på
 Bruk din egen AI-nøkkel — eller kjør en lokal modell via Ollama/LM Studio, helt uten nøkkel
 Både x64 og arm64; Store holder appen automatisk oppdatert
 Gratis og åpen kildekode (MIT) — ingen konto, ingen sporing, ingen reklame

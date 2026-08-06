@@ -8,6 +8,8 @@ import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from 
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
+import MarginNotes from './MarginNotes'
+import type { MarginViewConfig } from './MarginNotes'
 
 /** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
  *  only place that gesture is advertised. */
@@ -110,6 +112,13 @@ interface Props {
   /** While an end is being dragged, the rects the release would commit (page
    *  space) — painted in the mark's own colour instead of the mark itself. */
   markupPreview: PageRect[]
+  /** Margin view: notes + annotation comments as visible cards beside the
+   *  page; null when the view is off. Memoised by the viewer — this component
+   *  is memo()d on shallow prop equality. */
+  marginView: MarginViewConfig | null
+  onMarginCommit(pageNumber: number, localId: string, text: string): void
+  onMarginSelect(pageNumber: number, localId: string): void
+  onMarginDelete(pageNumber: number, localId: string): void
 }
 
 interface Cancellable {
@@ -145,7 +154,11 @@ function PdfPage({
   onPlaceText,
   onResizeStart,
   onMarkupEndStart,
-  markupPreview
+  markupPreview,
+  marginView,
+  onMarginCommit,
+  onMarginSelect,
+  onMarginDelete
 }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
@@ -853,6 +866,23 @@ function PdfPage({
             preserveAspectRatio="none"
           />
         </div>
+      )}
+      {/* File AND session annotations get cards — a student's own comments and
+          the teacher's fresh ones belong in the same column */}
+      {marginView && !hideAnnots && (
+        <MarginNotes
+          pageNumber={pageNumber}
+          annotations={annotations}
+          scale={scale}
+          rotation={rotation}
+          pageW={pageW}
+          pageH={pageH}
+          view={marginView}
+          selectedId={selectedId}
+          onCommit={onMarginCommit}
+          onSelect={onMarginSelect}
+          onDelete={onMarginDelete}
+        />
       )}
     </div>
   )

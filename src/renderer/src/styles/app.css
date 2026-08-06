@@ -1029,6 +1029,240 @@ button {
   pointer-events: none;
 }
 
+/* ---------- Margin view: comment cards beside the page ---------- */
+
+/* Host column beside the page (side set by .side-left/.side-right).
+   pointer-events: none on the host (the rule every full-page overlay inside
+   .pdf-page follows — anything else silently kills text selection); the cards
+   opt back in. Card geometry is CSS px, not page points: comments are chrome
+   and stay readable at any zoom. The strip carries the page's own paper with
+   a thin accent tint — a preview of the margin the export will add. */
+.margin-notes {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 222px; /* MARGIN_NOTES_W (rotation.ts) */
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 4%, var(--page-bg));
+  box-shadow: var(--shadow-page);
+}
+
+.margin-notes.side-right {
+  left: 100%;
+  border-left: 1px dashed var(--border);
+  border-radius: 0 2px 2px 0;
+}
+
+.margin-notes.side-left {
+  right: 100%;
+  border-right: 1px dashed var(--border);
+  border-radius: 2px 0 0 2px;
+}
+
+/* Leader lines + anchor outline for hovered/selected cards. Reaches INTO the
+   page (negative x / beyond the width), so overflow must stay visible. */
+.margin-note-leads {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.margin-note-card {
+  position: absolute;
+  left: 14px; /* MARGIN_NOTES_GAP */
+  width: 200px; /* MARGIN_NOTES_CARD_W */
+  pointer-events: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border); /* colour set inline per anchor */
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+  padding: 5px 7px;
+}
+
+/* Left margin: the gap belongs on the page side, so the cards hug the outer
+   edge instead (222 − 14 − 200 = 8). */
+.margin-notes.side-left .margin-note-card {
+  left: 8px;
+}
+
+/* ---------- The Merknader tab hosts the same cards ---------- */
+
+/* In the sidebar list the cards flow in document order instead of hanging at
+   anchors; relative so the delete button's absolute corner still works. */
+.annot-list .margin-note-card {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: auto;
+  margin: 0 0 8px;
+  cursor: pointer;
+}
+
+/* Context line above the comment: the marked text («…») or the type, plus
+   the author — what the card is anchored to. */
+.margin-card-context {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  padding-right: 16px; /* clear of the delete corner */
+  margin-bottom: 2px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Margin on, nothing in sight: quiet round arrows on the margin's side that
+   jump to the nearest comment above/below. Inside .pages-host (relative);
+   above the pages (z 6), clear of the overlay scroll pill at the very edge. */
+.margin-jump {
+  position: absolute;
+  z-index: 6;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-menu);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.margin-jump:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.margin-jump.up {
+  top: 14px;
+}
+
+.margin-jump.down {
+  bottom: 14px;
+}
+
+/* Horizontal position is set inline: centred on the margin strip, computed
+   from the live layout so it follows zoom and horizontal scroll. */
+
+.margin-jump .flip {
+  transform: rotate(180deg);
+}
+
+/* Margin controls at the top of the Merknader tab — the one home for
+   everything comment-related (the toolbar only mirrors the on/off toggle). */
+.annot-margin {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* With zero annotations the whole machinery stays VISIBLE (a new user learns
+   the tab by seeing it) — only the actions that need marks to act on grey out */
+.annot-export-row button:disabled,
+.annot-ask-ai:disabled,
+.annot-clear-all:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Type chips continue the colour-dot row; the separator keeps the two
+   families readable as one "show only …" toolbar */
+.annot-filter-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.annot-filter-type {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--text-secondary);
+}
+
+.annot-filter-type:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.annot-filter-type.active {
+  color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.annot-filter-content {
+  display: flex;
+  gap: 6px;
+}
+
+.margin-note-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 1px 6px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.margin-note-card textarea {
+  display: block;
+  width: 100%;
+  min-height: 19px;
+  border: 0;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 0;
+}
+
+.margin-note-card textarea::placeholder {
+  color: var(--text-secondary);
+}
+
+/* Delete: hidden until the card is hovered OR focused — focus-within is the
+   touch path (tap the card, the control appears), per the touch-parity rule. */
+.margin-note-delete {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.margin-note-card:hover .margin-note-delete,
+.margin-note-card:focus-within .margin-note-delete {
+  opacity: 1;
+}
+
+.margin-note-delete:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+
 .draw-layer {
   position: absolute;
   inset: 0;
@@ -2671,61 +2905,8 @@ button {
   padding: 10px 6px 3px;
 }
 
-.annot-list-row {
-  display: flex;
-  align-items: center;
-  border-radius: 7px;
-}
-
-.annot-list-row:hover {
-  background: var(--hover);
-}
-
-.annot-list-main {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 6px;
-  min-width: 0;
-  text-align: left;
-}
-
-.annot-list-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-}
-
-.annot-list-body {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 1px;
-}
-
-.annot-list-text {
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.annot-list-text em {
-  color: var(--text-secondary);
-  font-style: normal;
-  font-size: 11px;
-}
-
-.annot-list-comment {
-  font-size: 11px;
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+/* The rows themselves are the shared .margin-note-card (see the margin-view
+   section) — one card component, two hosts, zero drift. */
 
 .annot-filter {
   padding: 7px 6px 6px;
@@ -2772,26 +2953,6 @@ button {
 .annot-filter-dot.active {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-}
-
-.annot-list-delete {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  margin-right: 4px;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  opacity: 0;
-}
-
-.annot-list-row:hover .annot-list-delete {
-  opacity: 1;
-}
-
-.annot-list-delete:hover {
-  background: rgb(var(--danger-rgb) / 0.12);
-  color: var(--danger);
 }
 
 /* ---- Bookmarks tab ---- */
@@ -4303,6 +4464,24 @@ button {
   touch-action: none;
 }
 
+/* «Navn på merknader» in the gear menu — same input grammar as the
+   annotation-list search field */
+.annot-author-input {
+  width: 100%;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  outline: none;
+}
+
+.annot-author-input:focus {
+  border-color: var(--accent);
+}
+
 .snip-hint {
   position: absolute;
   top: 16px;
@@ -4317,6 +4496,14 @@ button {
   color: var(--text);
   white-space: nowrap;
   pointer-events: none;
+}
+
+/* Armed text tool: the note tool's pill, repositioned to hang below the
+   toolbar (which must stay reachable — colour/size live in it) instead of
+   inside a full-screen overlay. */
+.tool-arm-hint {
+  top: 62px;
+  z-index: 29;
 }
 
 .snip-marquee {

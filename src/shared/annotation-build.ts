@@ -74,7 +74,9 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | Fil
   const base = {
     id: crypto.randomUUID(),
     pageIndex: req.pageIndex,
-    author: req.author ?? 'PDFX',
+    // No author unless the user set one (settings «Navn på merknader») — a
+    // made-up app-name author is exactly the noise Acrobat/Word users notice
+    author: req.author ?? '',
     contents: req.contents,
     created: new Date()
   }
@@ -170,7 +172,11 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | Fil
         fontColor: color,
         textAlign: PdfTextAlignment.Left,
         verticalAlign: PdfVerticalAlignment.Top,
-        opacity: req.opacity
+        opacity: req.opacity,
+        ...(req.background ? { backgroundColor: rgbToHex(req.background) } : {}),
+        ...(req.border
+          ? { strokeColor: rgbToHex(req.border.color), strokeWidth: req.border.width }
+          : {})
       } as PdfAnnotationObject
     }
     default:

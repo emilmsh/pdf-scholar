@@ -199,17 +199,31 @@ clutter the page while you read.
   actions on exactly what you selected. The toolbar carries the same tools for when you
   want to mark several passages in a row, and unpins entirely (V) when you want nothing
   but the page
-- **Notes tab**: every annotation grouped by page, with search and a colour filter, and a
-  click takes you to the mark. Export a summary — including the highlighted text itself —
-  to Word, Markdown, HTML or plain text. Clearing them all is one confirmed step, and one
-  Ctrl+Z brings the lot back
+- **Notes tab**: every annotation grouped by page, with search plus colour, type and
+  with/without-comment filters. Comments edit right in the list — even on a mark that has
+  none yet — and a click takes you to the mark. Export a summary — including the
+  highlighted text itself — to Word, Markdown or HTML. Clearing them all is one confirmed
+  step, and one Ctrl+Z brings the lot back
+- **Comments in the margin**: flip one switch and every note and comment becomes an
+  always-visible card beside the page — left or right margin, your choice — colour-keyed
+  to its mark, with a leader line to the passage it belongs to. When no comment is in
+  view, quiet arrows fetch the nearest one above or below
+- **Export with comments in the margin**: a copy of the document with every page widened
+  and the comments set in the new margin as real PDF annotations — a small numbered chip
+  at each anchor ties text to comment on paper, so the printout reads like a corrected
+  manuscript. The original file is untouched
+
+![The margin view: two comments as visible cards on a tinted strip beside the page, colour-keyed to the marks they belong to](docs/screenshots/margin.png)
 - Labeled colour rows and custom hex colours
 - Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
   straight
 - **Colour, thickness and opacity per tool**, remembered between sessions. A «Standard»
   link appears next to any tool you have changed from its default
 - Shapes (rectangle, ellipse, line, arrow), draggable sticky notes, and free text typed
-  directly on the page
+  directly on the page — in the colour and size you pick, red teacher's pen included, and
+  the box can never be shrunk below its own words
+- An optional name in the settings signs new annotations — the standard PDF author field
+  other readers show. Left empty, your marks stay unsigned
 - An eraser that removes whole strokes, and can be set to remove every kind of
   annotation instead
 - Click any annotation to select it, drag to move it, and add a comment to it. Full

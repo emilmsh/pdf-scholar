@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { annotTypeLabel, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
+import { annotTypeLabel, FREETEXT_COLORS, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import { t, useLang } from '../i18n'
 import { bubblesWhileTyping } from '../keymap'
@@ -98,8 +98,14 @@ export default function AnnotPopover({
       </div>
 
       <MarkupColorRow
-        palette={annotation.type === 'highlight' || annotation.type === 'note' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS}
-        swatch={annotation.type === 'highlight' || annotation.type === 'note' ? 'dot' : 'bar'}
+        palette={
+          annotation.type === 'freetext'
+            ? FREETEXT_COLORS
+            : annotation.type === 'highlight' || annotation.type === 'note'
+              ? HIGHLIGHT_COLORS
+              : UNDERLINE_COLORS
+        }
+        swatch={annotation.type === 'highlight' || annotation.type === 'note' || annotation.type === 'freetext' ? 'dot' : 'bar'}
         tipKey="popover.colorTip"
         onPick={(c) => onColor(c.rgb)}
       />

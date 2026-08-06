@@ -42,7 +42,7 @@ export interface PageAnnotation {
   blend?: 'multiply' | undefined
 }
 
-export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange' | 'custom'
+export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange' | 'black' | 'custom'
 
 export interface HighlightColor {
   key: ColorKey
@@ -145,6 +145,17 @@ export const SHAPE_DEFAULT: { color: [number, number, number]; width: number } =
 }
 export const FREETEXT_COLOR: [number, number, number] = [0.11, 0.11, 0.13]
 export const FREETEXT_SIZE = 12
+
+/** Text colours for the FreeText tool: ink first (the default), then the
+ *  saturated markup palette — red up front because a teacher's correction pen
+ *  is the tool's signature use (Fredrik's Notability reference). */
+export const FREETEXT_COLORS: HighlightColor[] = [
+  { key: 'black', hex: '#1c1c21', rgb: FREETEXT_COLOR },
+  { key: 'red', hex: '#e2494a', rgb: [0.886, 0.286, 0.29] },
+  { key: 'blue', hex: '#327cf6', rgb: [0.196, 0.486, 0.965] },
+  { key: 'green', hex: '#2f9e58', rgb: [0.184, 0.62, 0.345] },
+  { key: 'orange', hex: '#f5920b', rgb: [0.96, 0.573, 0.043] }
+]
 
 export const PEN_DEFAULT: { color: [number, number, number]; width: number } = {
   color: [0.16, 0.35, 0.75],
@@ -601,6 +612,54 @@ export function resizeKindOf(a: PageAnnotation): ResizeKind | null {
 /** Smallest box a resize may produce, in PDF points — below this a shape is
  *  invisible and impossible to grab again. */
 export const MIN_SHAPE_SIZE = 8
+
+// ---------- FreeText minimum size (no letter may ever be clipped) ----------
+
+let freetextMeasureCtx: CanvasRenderingContext2D | null = null
+
+/** The smallest box that shows EVERY letter of a FreeText at (or near) the
+ *  candidate width: the width floor is the widest unbreakable word, the
+ *  height is the greedy-wrapped line count at the effective width. Mirrors
+ *  .annot-freetext exactly — Helvetica stack, line-height 1.35, pre-wrap, no
+ *  padding — so what the clamp allows is what the overlay shows. A resize (or
+ *  an editor commit) below this clips letters, which reads as data loss. */
+export function freetextMinSize(
+  text: string,
+  fontSize: number,
+  candidateW: number
+): { w: number; h: number } {
+  const content = text.length > 0 ? text : ' '
+  const ctx = (freetextMeasureCtx ??= document.createElement('canvas').getContext('2d'))
+  if (!ctx) return { w: MIN_SHAPE_SIZE, h: MIN_SHAPE_SIZE }
+  ctx.font = `${fontSize}px Helvetica, Arial, sans-serif`
+  const measure = (s: string): number => ctx.measureText(s).width
+  // pre-wrap keeps words whole: the widest word is the honest width floor
+  let maxWord = 0
+  for (const word of content.split(/\s+/)) maxWord = Math.max(maxWord, measure(word))
+  const w = Math.max(MIN_SHAPE_SIZE, maxWord + 1)
+  const effW = Math.max(candidateW, w)
+  let lines = 0
+  for (const paragraph of content.split('\n')) {
+    const words = paragraph.split(' ').filter((s) => s.length > 0)
+    if (words.length === 0) {
+      lines += 1
+      continue
+    }
+    let current = ''
+    let paragraphLines = 1
+    for (const word of words) {
+      const next = current === '' ? word : `${current} ${word}`
+      if (measure(next) > effW && current !== '') {
+        paragraphLines += 1
+        current = word
+      } else {
+        current = next
+      }
+    }
+    lines += paragraphLines
+  }
+  return { w, h: Math.max(MIN_SHAPE_SIZE, lines * fontSize * 1.35 + 1) }
+}
 
 /** The four corners, named as in the selection frame's CSS classes */
 export const BOX_HANDLES = ['tl', 'tr', 'bl', 'br'] as const
