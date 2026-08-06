@@ -26,6 +26,7 @@
     "tricolor": { "ships": ["readme", "landing", "store"], "composed": true, "sourceFor": ["reading", "parchment", "night"] },
     "annotations": { "ships": ["readme", "landing", "store"] },
     "annotations_edit": { "ships": [] },
+    "margin": { "ships": ["readme"] },
     "dual-pane": { "ships": ["readme", "landing", "store"] },
     "assistant": { "ships": ["readme", "landing", "store"] },
     "assistant_snip": { "ships": ["readme"] },

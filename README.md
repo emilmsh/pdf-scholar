@@ -210,6 +210,8 @@ clutter the page while you read.
   and the comments set in the new margin as real PDF annotations — a small numbered chip
   at each anchor ties text to comment on paper, so the printout reads like a corrected
   manuscript. The original file is untouched
+
+![The margin view: two comments as visible cards on a tinted strip beside the page, colour-keyed to the marks they belong to](docs/screenshots/margin.png)
 - Labeled colour rows and custom hex colours
 - Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
   straight
