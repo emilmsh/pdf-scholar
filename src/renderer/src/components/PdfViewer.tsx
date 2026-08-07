@@ -49,6 +49,7 @@ import {
   saveToolPrefs
 } from '../tool-prefs'
 import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
+import { notePenEvent, PEN_NEAR_MS } from '../pen-input'
 import type { BoxSize } from '../useResizable'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
@@ -788,6 +789,47 @@ export default function PdfViewer({
   const setEraserScope = useCallback((eraserScope: EraserScope) => {
     setPrefs((p) => ({ ...p, eraserScope }))
   }, [])
+  const setFingerDraws = useCallback((fingerDraws: boolean) => {
+    setPrefs((p) => ({ ...p, input: { ...p.input, fingerDraws } }))
+  }, [])
+  const setPenPressure = useCallback((penPressure: boolean) => {
+    setPrefs((p) => ({ ...p, input: { ...p.input, penPressure } }))
+  }, [])
+  // Pen proximity → html.pen-near. touch-action cannot tell a pen from a
+  // finger (both are direct-manipulation pointers on Windows), so the draw
+  // layer allows finger panning by default and this class flips it to `none`
+  // while a pen is in hover range — the pen draws, the finger scrolls, and a
+  // palm landing next to a hovering pen can neither draw nor scroll. Also the
+  // one-time penSeen flip: the first pen this machine ever sees turns finger
+  // drawing off (the tablet-app convention; the tool menus can turn it back).
+  useEffect(() => {
+    let timer = 0
+    const el = document.documentElement
+    const onPen = (e: PointerEvent): void => {
+      if (e.pointerType !== 'pen') return
+      notePenEvent()
+      el.classList.add('pen-near')
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => el.classList.remove('pen-near'), PEN_NEAR_MS)
+      setPrefs((p) =>
+        p.input.penSeen ? p : { ...p, input: { ...p.input, fingerDraws: false, penSeen: true } }
+      )
+    }
+    window.addEventListener('pointermove', onPen, { capture: true, passive: true })
+    window.addEventListener('pointerdown', onPen, { capture: true, passive: true })
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointermove', onPen, { capture: true })
+      window.removeEventListener('pointerdown', onPen, { capture: true })
+      el.classList.remove('pen-near')
+    }
+  }, [])
+  // The finger-draw routing rides on <html> so the CSS reaches every pane (and
+  // the extension viewer) without threading a class through the tree.
+  useEffect(() => {
+    document.documentElement.classList.toggle('finger-draw', prefs.input.fingerDraws)
+    return () => document.documentElement.classList.remove('finger-draw')
+  }, [prefs.input.fingerDraws])
   const textPref = prefs.text
   const patchTextPref = useCallback((patch: Partial<TextPref>) => {
     setPrefs((p) => ({ ...p, text: { ...p.text, ...patch } }))
@@ -2295,6 +2337,7 @@ export default function PdfViewer({
           contents: snapshot.contents,
           author: snapshot.author,
           strokes: snapshot.strokes,
+          pressures: snapshot.pressures,
           width: snapshot.width,
           fontSize: snapshot.fontSize,
           blend: snapshot.blend
@@ -2357,7 +2400,8 @@ export default function PdfViewer({
 
   const engineChange = useCallback(
     async (handle: AnnotHandle, patch: AnnotPatch) => {
-      const wasFilePainted = findRecord(handle)?.source === 'file'
+      const record = findRecord(handle)
+      const wasFilePainted = record?.source === 'file'
       mutatePage(handle.pageNumber, (list) =>
         list.map((r) => (matchesHandle(r, handle) ? { ...r, ...patch } : r))
       )
@@ -2365,6 +2409,13 @@ export default function PdfViewer({
         showToast(t('viewer.annotStillSaving'))
         return
       }
+      // How a reshape's geometry travels is per-subtype (mirrors updateOn):
+      // text markup sends the whole quad list (→ /QuadPoints); ink/line/arrow
+      // send strokes (→ /InkList, /L); box types send quads[0] as the new rect.
+      // A translate sends only the delta — the engine shifts its own geometry.
+      const markup = record ? isTextMarkup(record) : false
+      const reshapeQuads = patch.translate ? undefined : patch.quads
+      const reshapeStrokes = patch.translate ? undefined : patch.strokes
       pendingWritesRef.current += 1
       const result = await bridge
         .updateAnnotation({
@@ -2373,7 +2424,9 @@ export default function PdfViewer({
           id: handle.fileId,
           color: patch.color,
           contents: patch.contents,
-          rect: patch.translate ? undefined : patch.quads?.[0],
+          rect: markup ? undefined : reshapeQuads?.[0],
+          quads: markup ? reshapeQuads : undefined,
+          strokes: reshapeStrokes,
           translate: patch.translate
         })
         .catch(asWriteError)
@@ -2467,6 +2520,7 @@ export default function PdfViewer({
       // indistinguishable from absent — see the note on PageAnnotation.
       extras?: {
         strokes?: [number, number][][] | undefined
+        pressures?: number[][] | undefined
         width?: number | undefined
         fontSize?: number | undefined
         blend?: 'multiply' | undefined
@@ -2488,6 +2542,7 @@ export default function PdfViewer({
         contents,
         author,
         strokes: extras?.strokes,
+        pressures: extras?.pressures,
         width: extras?.width,
         fontSize: extras?.fontSize,
         blend: extras?.blend
@@ -2568,12 +2623,16 @@ export default function PdfViewer({
   // ---------- Freehand drawing ----------
 
   const completeStroke = useCallback(
-    (pageNumber: number, points: [number, number][]) => {
+    (pageNumber: number, points: [number, number][], pressures?: number[]) => {
       const tool = drawToolRef.current
       if (!tool || tool.type === 'eraser') return
       const quads = [inkQuad([points], tool.width)]
       void persistAnnotation(pageNumber, 'ink', quads, tool.color, tool.opacity, undefined, {
         strokes: [points],
+        // Pen pressures (captured only for a real pen with the pen tool) ride
+        // the whole way into the file — the engine bakes the varying width as
+        // the appearance stream, or refuses rather than save it uniform.
+        pressures: pressures && tool.type === 'pen' ? [pressures] : undefined,
         width: tool.width,
         // The marker is the freehand twin of a text highlight: multiply keeps
         // the text under the stroke black, live and in the saved file alike
@@ -2744,8 +2803,8 @@ export default function PdfViewer({
     text: placeFreeText
   }
   const onStrokeComplete = useCallback(
-    (pageNumber: number, points: [number, number][]) =>
-      drawActionsRef.current.stroke(pageNumber, points),
+    (pageNumber: number, points: [number, number][], pressures?: number[]) =>
+      drawActionsRef.current.stroke(pageNumber, points, pressures),
     []
   )
   const onEraseAt = useCallback(
@@ -5105,6 +5164,11 @@ export default function PdfViewer({
           onMarkupPrefReset={resetMarkupPref}
           eraserScope={prefs.eraserScope}
           onEraserScopeChange={setEraserScope}
+          fingerDraws={prefs.input.fingerDraws}
+          onFingerDrawsChange={setFingerDraws}
+          penSeen={prefs.input.penSeen}
+          penPressure={prefs.input.penPressure}
+          onPenPressureChange={setPenPressure}
           spread={splitOpen && activePane === 'b' ? paneBSpread : spread}
           onRotate={rotateView}
           onToggleSpread={toggleSpread}
@@ -5349,6 +5413,8 @@ export default function PdfViewer({
                         : undefined
                     }
                     drawTool={drawTool}
+                    fingerDraws={prefs.input.fingerDraws}
+                    penPressure={prefs.input.penPressure}
                     onInternalLink={onInternalLink}
                     onExternalLink={onExternalLink}
                     onStrokeComplete={onStrokeComplete}
@@ -5421,6 +5487,8 @@ export default function PdfViewer({
               onPageChange={setPaneBPage}
               flash={paneFlash === 'b'}
               drawTool={drawTool}
+              fingerDraws={prefs.input.fingerDraws}
+              penPressure={prefs.input.penPressure}
               selected={selected}
               searchHits={searchHits}
               searchAllHits={searchAllHits?.pane === 'b' ? searchAllHits.byPage : null}

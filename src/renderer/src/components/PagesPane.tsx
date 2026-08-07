@@ -73,6 +73,10 @@ interface Props {
    *  persistent active-column signal is the toolbar's column switcher. */
   flash: boolean
   drawTool: DrawTool | null
+  /** Whether a finger may draw when a tool is armed — see tool-prefs InputPrefs */
+  fingerDraws: boolean
+  /** Pen tool + real pen: stylus pressure varies the stroke width */
+  penPressure: boolean
   selected: { pageNumber: number; localId: string } | null
   searchHits: { pageNumber: number; rects: PageRect[]; flash?: boolean; flashId?: number } | null
   /** Highlight-all rects per page, already scoped to THIS column by the viewer
@@ -88,7 +92,7 @@ interface Props {
   onMouseMove(e: React.MouseEvent): void
   onMouseLeave(): void
   onScroll(): void
-  onStrokeComplete(pageNumber: number, points: [number, number][]): void
+  onStrokeComplete(pageNumber: number, points: [number, number][], pressures?: number[]): void
   onErase(pageNumber: number, x: number, y: number): void
   onShapeComplete(
     pageNumber: number,
@@ -145,6 +149,8 @@ export default function PagesPane({
   onPageChange,
   flash,
   drawTool,
+  fingerDraws,
+  penPressure,
   selected,
   searchHits,
   searchAllHits,
@@ -637,6 +643,8 @@ export default function PagesPane({
                       : undefined
                   }
                   drawTool={drawTool}
+                  fingerDraws={fingerDraws}
+                  penPressure={penPressure}
                   onInternalLink={handleInternalLink}
                   onExternalLink={onExternalLink}
                   onStrokeComplete={onStrokeComplete}

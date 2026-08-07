@@ -78,6 +78,7 @@ export type EngineErrorCode =
   | 'annot-update-rejected'
   | 'annot-list-asymmetric'
   | 'annot-empty-stroke'
+  | 'annot-pressure-bake'
   | 'annot-line-endpoints'
   | 'annot-unknown-type'
   | 'pdf-password-protected'
@@ -179,6 +180,11 @@ export interface AnnotateRequest {
   author?: string | undefined
   /** ink: freehand strokes; line/arrow: [[start, end]] — in page space */
   strokes?: [number, number][][] | undefined
+  /** ink (pen): per-point pen pressure (0–1), parallel to `strokes`. Presence
+   *  makes the engine bake a variable-width appearance stream (the stroke's
+   *  calligraphy) instead of PDFium's uniform one; the InkList keeps the
+   *  centerline so other editors still see a standard Ink. */
+  pressures?: number[][] | undefined
   /** ink/shapes: stroke width in PDF points */
   width?: number | undefined
   /** freetext only */
@@ -228,6 +234,11 @@ export interface ModifyAnnotationRequest {
   quads?: PageRect[] | undefined
   /** line/arrow: one pair of endpoints. ink: the whole new stroke list. */
   strokes?: [number, number][][] | undefined
+  /** ink (pen): pressures parallel to `strokes`, when the caller holds them.
+   *  The engines re-bake a moved/re-shaped pressure stroke's appearance either
+   *  way (stored pressures are read back from the annotation itself); sending
+   *  them here just skips that read. */
+  pressures?: number[][] | undefined
 }
 
 export interface DeleteAnnotationRequest {

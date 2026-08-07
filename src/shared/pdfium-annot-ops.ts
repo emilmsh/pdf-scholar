@@ -26,9 +26,10 @@ import type {
 import type { PdfAnnotationObject, PdfDocumentObject } from '@embedpdf/models'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
-import { buildAnnotation, linePad, quadsBBox, rgbToHex, strokesBBox, toRect } from './annotation-build'
+import { buildAnnotation, hexToRgb, linePad, quadsBBox, rgbToHex, strokesBBox, toRect } from './annotation-build'
 import { ENGINE_ERRORS } from './engine-errors'
 import { snapshotApLessLinks, stripGeneratedLinkAPs } from './link-ap-guard'
+import { decodePressures, encodePressures, inkPressureApContent } from './ink-outline'
 
 /** wasm32 heap exhaustion: every open/serialize round-trips the whole file
  *  through the WASM heap, so very large documents can exceed what it can grow to
@@ -53,8 +54,18 @@ export interface RawPdfium {
   FPDFAnnot_GetSubtype(annotPtr: number): number
   FPDFAnnot_HasKey(annotPtr: number, key: string): boolean
   FPDFAnnot_SetAP(annotPtr: number, appearanceMode: number, value: number): boolean
+  FPDFAnnot_GetRect(annotPtr: number, rectPtr: number): boolean
+  FPDFAnnot_SetStringValue(annotPtr: number, key: string, valuePtr: number): boolean
+  FPDFAnnot_GetStringValue(annotPtr: number, key: string, bufPtr: number, buflen: number): number
   EPDFAnnot_GetObjectNumber(annotPtr: number): number
   EPDFPage_RemoveAnnotByObjectNumber(pagePtr: number, objNum: number): boolean
+  /** The underlying emscripten module — heap access for wide-string params */
+  pdfium: {
+    wasmExports: { malloc(size: number): number; free(ptr: number): void }
+    stringToUTF16(str: string, outPtr: number, maxBytes: number): void
+    UTF16ToString(ptr: number): string
+    getValue(ptr: number, type: 'float' | 'i32'): number
+  }
 }
 
 /** An open document, as both callers hold it */
@@ -121,6 +132,140 @@ export function rawObjectNumbers(engine: PdfiumNative, docId: string, pageIndex:
   })
 }
 
+/** Allocate a UTF-16LE copy of `s` on the wasm heap for the duration of `fn` —
+ *  FPDF_WIDESTRING parameters (SetAP, SetStringValue) take a raw pointer. */
+function withWideString<T>(raw: RawPdfium, s: string, fn: (ptr: number) => T): T {
+  const bytes = (s.length + 1) * 2
+  const ptr = raw.pdfium.wasmExports.malloc(bytes)
+  raw.pdfium.stringToUTF16(s, ptr, bytes)
+  try {
+    return fn(ptr)
+  } finally {
+    raw.pdfium.wasmExports.free(ptr)
+  }
+}
+
+/** Run `fn` with the open annot handle for a PDF object number; null if absent. */
+function withAnnotByObjNum<T>(
+  pagePtr: number,
+  raw: RawPdfium,
+  objNum: number,
+  fn: (annotPtr: number) => T
+): T | null {
+  const count = raw.FPDFPage_GetAnnotCount(pagePtr)
+  for (let i = 0; i < count; i++) {
+    const annotPtr = raw.FPDFPage_GetAnnot(pagePtr, i)
+    if (raw.EPDFAnnot_GetObjectNumber(annotPtr) === objNum) {
+      try {
+        return fn(annotPtr)
+      } finally {
+        raw.FPDFPage_CloseAnnot(annotPtr)
+      }
+    }
+    raw.FPDFPage_CloseAnnot(annotPtr)
+  }
+  return null
+}
+
+/** The annotation-dict key holding per-stroke pen pressures (encodePressures
+ *  format). PDFX-private; other readers render the baked /AP and ignore it. */
+const PRESSURES_KEY = 'PDFX_Pressures'
+
+/** Overwrite an Ink annotation's /AP with the variable-width filled outline a
+ *  pressure-sensitive pen stroke really has, and store the pressures so a
+ *  later move/reshape can re-bake. The InkList centerline (written by the
+ *  normal create/update path) stays untouched, so other editors still see a
+ *  standard Ink.
+ *
+ *  Coordinates: model space is top-left y-down and otherwise identical to PDF
+ *  space, so the AP content (PDF space, y-up) is a pure flip about the page
+ *  height (verified against FPDFAnnot_GetRect in the 2026-08-07 spike). The
+ *  appearance BBox is the annot's /Rect (SetAP copies it), which carries ≥ a
+ *  full stroke-width of padding — the create/reshape paths bbox with
+ *  strokesBBox(strokes, width) and EmbedPDF pads another width/2 — while the
+ *  outline never needs more than 0.7 × width, so the fill cannot clip. The
+ *  guard below re-checks that instead of trusting it.
+ *
+ *  Returns false when the annot is missing or the fill would clip — the
+ *  caller must not pretend the calligraphy was saved. */
+export function bakeInkPressureAP(
+  open: OpenDoc,
+  pageIndex: number,
+  id: number,
+  strokes: [number, number][][],
+  pressures: number[][],
+  baseWidth: number,
+  color: [number, number, number],
+  opacity: number
+): boolean {
+  const { engine, doc, docId } = open
+  const pageH = doc.pages[pageIndex]?.size.height
+  if (!pageH) return false
+  return withPageHandle(engine, docId, pageIndex, (pagePtr, raw) => {
+    const ok = withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
+      // FS_RECTF: 4 × float32 — left, top, right, bottom (PDF space, y-up)
+      const rectPtr = raw.pdfium.wasmExports.malloc(16)
+      let rect: { left: number; top: number; right: number; bottom: number }
+      try {
+        if (!raw.FPDFAnnot_GetRect(annotPtr, rectPtr)) return false
+        rect = {
+          left: raw.pdfium.getValue(rectPtr, 'float'),
+          top: raw.pdfium.getValue(rectPtr + 4, 'float'),
+          right: raw.pdfium.getValue(rectPtr + 8, 'float'),
+          bottom: raw.pdfium.getValue(rectPtr + 12, 'float')
+        }
+      } finally {
+        raw.pdfium.wasmExports.free(rectPtr)
+      }
+      // Would the widest part of the outline (max half-width 0.7 × width, caps
+      // included) fall outside the appearance BBox? Then it would clip.
+      const reach = 0.7 * baseWidth + 0.1
+      const bbox = strokesBBox(strokes, reach)
+      if (
+        bbox.x < rect.left - 0.01 ||
+        bbox.x + bbox.w > rect.right + 0.01 ||
+        pageH - bbox.y > rect.top + 0.01 ||
+        pageH - (bbox.y + bbox.h) < rect.bottom - 0.01
+      ) {
+        return false
+      }
+      const map = (x: number, y: number): [number, number] => [x, pageH - y]
+      const content = inkPressureApContent(strokes, pressures, baseWidth, color, opacity, map)
+      const set = withWideString(raw, content, (ptr) =>
+        raw.FPDFAnnot_SetAP(annotPtr, 0 /* FPDF_ANNOT_APPEARANCEMODE_NORMAL */, ptr)
+      )
+      if (!set) return false
+      withWideString(raw, encodePressures(pressures), (ptr) =>
+        raw.FPDFAnnot_SetStringValue(annotPtr, PRESSURES_KEY, ptr)
+      )
+      return true
+    })
+    return ok === true
+  })
+}
+
+/** Pressures stored on an Ink annotation, or null when it never had any. */
+export function readInkPressures(
+  open: OpenDoc,
+  pageIndex: number,
+  id: number
+): number[][] | null {
+  const { engine, docId } = open
+  return withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
+    withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
+      const bytes = raw.FPDFAnnot_GetStringValue(annotPtr, PRESSURES_KEY, 0, 0)
+      if (bytes <= 2) return null // empty or absent (2 = bare terminator)
+      const bufPtr = raw.pdfium.wasmExports.malloc(bytes)
+      try {
+        raw.FPDFAnnot_GetStringValue(annotPtr, PRESSURES_KEY, bufPtr, bytes)
+        return decodePressures(raw.pdfium.UTF16ToString(bufPtr))
+      } finally {
+        raw.pdfium.wasmExports.free(bufPtr)
+      }
+    })
+  )
+}
+
 /** Find the high-level model for a PDF object number. Uses /Annots-order index
  *  alignment between the raw annot list and getPageAnnotations, guarded by a
  *  count check so silent misalignment is impossible. */
@@ -161,6 +306,27 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
     const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
     const id = objNums[objNums.length - 1]
     if (!id) return ENGINE_ERRORS.noObjectNumber
+    // A pressure stroke's whole point is the varying width — if that can't be
+    // baked into the file, the honest outcome is no annotation, not a uniform
+    // one that silently loses the calligraphy the user saw while drawing.
+    if (req.type === 'ink' && req.pressures && req.strokes) {
+      const baked = bakeInkPressureAP(
+        open,
+        req.pageIndex,
+        id,
+        req.strokes,
+        req.pressures,
+        req.width ?? 2,
+        req.color,
+        req.opacity
+      )
+      if (!baked) {
+        withPageHandle(engine, docId, req.pageIndex, (pagePtr, raw) =>
+          raw.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, id)
+        )
+        return ENGINE_ERRORS.pressureBakeFailed
+      }
+    }
     return { ok: true, id }
   })
 }
@@ -226,8 +392,32 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
       }
     }
     ;(m as { modified?: Date }).modified = new Date()
+    // A pressure ink's pressures are read BEFORE the engine update: the update
+    // rewrites the annotation from the model, and a private dictionary key has
+    // no seat in that model.
+    const pressures =
+      m.type === PdfAnnotationSubtype.INK
+        ? req.pressures ?? readInkPressures(open, req.pageIndex, req.id)
+        : null
     const ok = await engine.updatePageAnnotation(doc, doc.pages[req.pageIndex], m).toPromise()
-    return ok ? { ok: true, id: req.id } : ENGINE_ERRORS.updateRejected
+    if (!ok) return ENGINE_ERRORS.updateRejected
+    // The engine regenerated the appearance uniformly — re-bake the varying
+    // width from the (possibly shifted/re-shaped) centerline.
+    if (pressures && m.type === PdfAnnotationSubtype.INK && m.inkList) {
+      const strokes = m.inkList.map((s) => s.points.map((p) => [p.x, p.y] as [number, number]))
+      const baked = bakeInkPressureAP(
+        open,
+        req.pageIndex,
+        req.id,
+        strokes,
+        pressures,
+        m.strokeWidth ?? 2,
+        hexToRgb(m.strokeColor ?? '#000000'),
+        (m as { opacity?: number }).opacity ?? 1
+      )
+      if (!baked) return ENGINE_ERRORS.pressureBakeFailed
+    }
+    return { ok: true, id: req.id }
   })
 }
 

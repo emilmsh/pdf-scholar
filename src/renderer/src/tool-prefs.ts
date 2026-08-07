@@ -54,11 +54,27 @@ export interface TextPref {
  *  extends it to highlights, notes and text boxes. */
 export type EraserScope = 'draw' | 'all'
 
+/** How touch input meets an armed draw tool. `fingerDraws` on (the default —
+ *  the only workable mode on pen-less touch devices) lets a finger draw like
+ *  any pointer; off, fingers scroll and zoom while only the pen draws — the
+ *  tablet-app convention. The first time a real pen is observed, `penSeen`
+ *  flips permanently and `fingerDraws` defaults off; the toggle in the tool
+ *  menus overrides either way. */
+export interface InputPrefs {
+  fingerDraws: boolean
+  penSeen: boolean
+  /** Pen tool: stylus pressure varies the stroke width (SPEC's
+   *  pressure-sensitive preset). Only a real pen produces pressure; mouse,
+   *  touch, marker and shapes are untouched by this. */
+  penPressure: boolean
+}
+
 export interface ToolPrefs {
   tools: Record<DrawPrefKey, ToolPref>
   markup: Record<MarkupToolType, MarkupPref>
   text: TextPref
   eraserScope: EraserScope
+  input: InputPrefs
 }
 
 /** Upper bound of each tool's width slider. The owner asked for headroom above
@@ -99,7 +115,8 @@ export const DEFAULT_TOOL_PREFS: ToolPrefs = {
     squiggly: { color: UNDERLINE_COLOR, opacity: 1 }
   },
   text: { color: FREETEXT_COLOR, fontSize: FREETEXT_SIZE },
-  eraserScope: 'draw'
+  eraserScope: 'draw',
+  input: { fingerDraws: true, penSeen: false, penPressure: true }
 }
 
 const LS_KEY = 'pdfx-tool-prefs'
@@ -169,7 +186,15 @@ export function loadToolPrefs(): ToolPrefs {
         squiggly: mergeMarkup('squiggly', parsed?.markup?.squiggly)
       },
       text: mergeText(parsed?.text),
-      eraserScope: parsed?.eraserScope === 'all' ? 'all' : 'draw'
+      eraserScope: parsed?.eraserScope === 'all' ? 'all' : 'draw',
+      input: {
+        fingerDraws:
+          typeof parsed?.input?.fingerDraws === 'boolean'
+            ? parsed.input.fingerDraws
+            : !(parsed?.input?.penSeen === true),
+        penSeen: parsed?.input?.penSeen === true,
+        penPressure: parsed?.input?.penPressure !== false
+      }
     }
   } catch {
     return structuredClone(DEFAULT_TOOL_PREFS)

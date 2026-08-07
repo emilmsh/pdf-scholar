@@ -305,6 +305,45 @@ for (const objectStreams of [false, true]) {
     check('reshaped annots still have /AP', !!(hl2?.hasAp && byId.get(ids.ink)?.hasAp && byId.get(ids.arrow)?.hasAp))
     pdf.destroy()
   }
+
+  // -- pressure ink: the varying width must survive through the appender too —
+  // filled outline AP (with the alpha ExtGState), centerline /InkList, and the
+  // PDFX_Pressures key that lets a later move re-bake. Same contract as the
+  // WASM engine (test-engine-embedpdf.mjs section 9): a pen stroke in a 200 MB
+  // file must keep its calligraphy exactly like one in a small file.
+  {
+    const N = 30
+    const stroke = Array.from({ length: N }, (_, i) => [80 + (220 * i) / (N - 1), 500])
+    const pressures = Array.from({ length: N }, (_, i) => 0.15 + (0.85 * i) / (N - 1))
+    const created = await applyAnnotation({
+      ...base, type: 'ink', quads: [], opacity: 0.45, width: 6,
+      strokes: [stroke], pressures: [pressures]
+    })
+    check('pressure: create through appender', 'ok' in created, 'error' in created ? created.error : `obj#${created.id}`)
+    const moved = await updateAnnotation({
+      path: FILE, pageIndex: 1, id: created.id, translate: { dx: 10, dy: -30 }
+    })
+    check('pressure: translate through appender', 'ok' in moved, 'error' in moved ? moved.error : '')
+
+    const { pdf, out } = mupdfAnnots(FILE, 1)
+    const a = out.find((x) => 'ok' in created && x.id === created.id)
+    check('pressure: annot present (mupdf)', !!a)
+    if (a) {
+      const obj = a.annot.getObject()
+      const ap = obj.get('AP')?.get('N')
+      const content = ap && !ap.isNull() ? new TextDecoder('latin1').decode(ap.readStream().asUint8Array()) : ''
+      check('pressure: AP is a filled outline with alpha',
+        content.includes('/G0 gs') && content.includes('f') && !/\bS\b/.test(content),
+        `${content.length} bytes`)
+      const inkList = obj.get('InkList')
+      check('pressure: InkList centerline intact', !!inkList && !inkList.isNull() && inkList.get(0).length === 2 * N,
+        inkList && !inkList.isNull() ? `${inkList.get(0).length / 2} points` : 'missing')
+      const stored = obj.get('PDFX_Pressures')
+      check('pressure: pressures survive translate', !!stored && !stored.isNull() && stored.asString().split(' ').length === N,
+        stored && !stored.isNull() ? `${stored.asString().split(' ').length} values` : 'missing')
+    }
+    pdf.destroy()
+  }
 }
 
 // =============================================================================

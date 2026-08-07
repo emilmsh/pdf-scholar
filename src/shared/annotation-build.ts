@@ -17,6 +17,15 @@ import {
 export const rgbToHex = (c: [number, number, number]): string =>
   '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('')
 
+export const hexToRgb = (hex: string): [number, number, number] => {
+  const h = hex.replace('#', '')
+  return [
+    parseInt(h.slice(0, 2), 16) / 255,
+    parseInt(h.slice(2, 4), 16) / 255,
+    parseInt(h.slice(4, 6), 16) / 255
+  ]
+}
+
 export const toRect = (
   r: PageRect
 ): { origin: { x: number; y: number }; size: { width: number; height: number } } => ({

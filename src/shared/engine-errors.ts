@@ -24,6 +24,13 @@ export const ENGINE_ERRORS = {
   },
   updateRejected: { code: 'annot-update-rejected', error: 'Oppdateringen ble avvist av motoren' },
   emptyStroke: { code: 'annot-empty-stroke', error: 'Streken er tom' },
+  /** A pressure stroke's varying width could not be baked into the file's
+   *  appearance stream. The annotation is not kept: a uniform stroke standing
+   *  in for the calligraphy the user drew would be silent data loss. */
+  pressureBakeFailed: {
+    code: 'annot-pressure-bake',
+    error: 'Fikk ikke lagret strekens trykkvariasjon i filen — streken ble ikke lagt til'
+  },
   lineNoEndpoints: { code: 'annot-line-endpoints', error: 'Linjen mangler endepunkter' },
   /** The type name is the diagnostic and cannot be reconstructed from a code,
    *  so it rides along in `error` the way the asymmetric counts do. */

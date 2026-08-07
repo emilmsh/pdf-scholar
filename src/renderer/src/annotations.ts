@@ -34,6 +34,10 @@ export interface PageAnnotation {
   author?: string | undefined
   /** ink: strokes; line/arrow: [[start, end]] — page space */
   strokes?: [number, number][][] | undefined
+  /** ink (pen): per-point pen pressures (0–1), parallel to `strokes` — the
+   *  mark renders as a variable-width filled outline (shared/ink-outline)
+   *  instead of a constant-width stroked path */
+  pressures?: number[][] | undefined
   /** ink/shapes: stroke width in points */
   width?: number | undefined
   /** freetext only */

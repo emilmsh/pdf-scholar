@@ -8,6 +8,14 @@ import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from 
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
+import { penNear } from '../pen-input'
+import {
+  outlineSvgPath,
+  PRESSURE_EMA_ALPHA,
+  PRESSURE_NEUTRAL,
+  pressureHalfWidths,
+  strokeOutline
+} from '../../../shared/ink-outline'
 import MarginNotes from './MarginNotes'
 import type { MarginViewConfig } from './MarginNotes'
 
@@ -83,13 +91,20 @@ interface Props {
   searchFlashId?: number | undefined
   /** Active freehand tool (pen/marker/eraser), or null when not drawing */
   drawTool: DrawTool | null
+  /** Whether a finger may draw when a tool is armed. Off, a touch is left to
+   *  the layer's touch-action (native pan/zoom) — only the pen draws. */
+  fingerDraws: boolean
+  /** Pen tool + real pen: stylus pressure varies the stroke width */
+  penPressure: boolean
   /** Stable callbacks (identity must not change with viewer state) */
   /** In-document destination. `toOtherPane` is true when the reader held
    *  Ctrl/Cmd, i.e. "show this over there" — the viewer decides what that means
    *  (and opens the split if it is not open yet). */
   onInternalLink(dest: unknown, toOtherPane: boolean): void
   onExternalLink(url: string): void
-  onStrokeComplete(pageNumber: number, points: [number, number][]): void
+  /** pressures: EMA-smoothed pen pressures parallel to points — present only
+   *  for a pressure-sensitive pen stroke */
+  onStrokeComplete(pageNumber: number, points: [number, number][], pressures?: number[]): void
   onErase(pageNumber: number, x: number, y: number): void
   onShapeComplete(
     pageNumber: number,
@@ -146,6 +161,8 @@ function PdfPage({
   searchFlash,
   searchFlashId,
   drawTool,
+  fingerDraws,
+  penPressure,
   onInternalLink,
   onExternalLink,
   onStrokeComplete,
@@ -193,11 +210,26 @@ function PdfPage({
     /** Snapped to a straight line (hold still while drawing, or Shift) */
     straight: boolean
     holdTimer: number
+    /** Pen pressures parallel to points (EMA-smoothed), or null when the
+     *  stroke is uniform (mouse/touch/marker, or pressure turned off) */
+    pressures: number[] | null
+    /** The smoothing accumulator behind `pressures` */
+    ema: number
   } | null>(null)
 
   /** Redraw the active stroke as a straight start→current line */
   const snapStrokeStraight = (stroke: NonNullable<typeof strokeRef.current>): void => {
     stroke.straight = true
+    // A straightened line is uniform by definition: drop the pressure trace
+    // and give the path its stroked look back (the live outline was a fill)
+    if (stroke.pressures && drawTool) {
+      stroke.pressures = null
+      stroke.path.setAttribute('fill', 'none')
+      stroke.path.setAttribute('stroke', rgbCss(drawTool.color, 1))
+      stroke.path.setAttribute('stroke-width', String(drawTool.width))
+      stroke.path.setAttribute('stroke-linecap', 'round')
+      stroke.path.setAttribute('stroke-linejoin', 'round')
+    }
     const first = stroke.points[0]
     const last = stroke.points[stroke.points.length - 1]
     stroke.path.setAttribute('d', strokePathData([first, last]))
@@ -604,7 +636,22 @@ function PdfPage({
   }
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>): void => {
-    if (!drawTool || e.button !== 0) return
+    if (!drawTool) return
+    // The pen's eraser end erases whatever tool is armed — that is what the
+    // physical end means. buttons bit 32; its `button` is 5, so this runs
+    // before the primary-button check.
+    if (e.pointerType === 'pen' && (e.buttons & 32) !== 0) {
+      e.preventDefault()
+      const [ex, ey] = pagePointOf(e.clientX, e.clientY, e.currentTarget)
+      onErase(pageNumber, ex, ey)
+      return
+    }
+    // Touch routing: with finger drawing off a finger is for navigation (the
+    // layer's touch-action lets it pan and pinch natively), and while the pen
+    // is in hover range a touch is a resting palm whatever that preference
+    // says — the OS suppresses most palm contacts, this catches the rest.
+    if (e.pointerType === 'touch' && (!fingerDraws || penNear())) return
+    if (e.button !== 0) return
     e.preventDefault()
     const [x, y] = pagePointOf(e.clientX, e.clientY, e.currentTarget)
     if (drawTool.type === 'eraser') {
@@ -635,23 +682,67 @@ function PdfPage({
       }
       return
     }
+    // Pressure is captured only where it exists AND matters: a real pen, the
+    // pen tool, and the preference on. The marker keeps its uniform band and
+    // mouse/touch report no real pressure.
+    const withPressure = drawTool.type === 'pen' && e.pointerType === 'pen' && penPressure
     const path = document.createElementNS(SVG_NS, 'path')
-    path.setAttribute('fill', 'none')
-    path.setAttribute('stroke', rgbCss(drawTool.color, 1))
-    path.setAttribute('stroke-width', String(drawTool.width))
-    path.setAttribute('stroke-linecap', 'round')
-    path.setAttribute('stroke-linejoin', 'round')
+    if (withPressure) {
+      path.setAttribute('fill', rgbCss(drawTool.color, 1))
+    } else {
+      path.setAttribute('fill', 'none')
+      path.setAttribute('stroke', rgbCss(drawTool.color, 1))
+      path.setAttribute('stroke-width', String(drawTool.width))
+      path.setAttribute('stroke-linecap', 'round')
+      path.setAttribute('stroke-linejoin', 'round')
+    }
     path.setAttribute('opacity', String(drawTool.opacity))
-    path.setAttribute('d', strokePathData([[x, y]]))
     svg.append(path)
-    strokeRef.current = { pointerId: e.pointerId, points: [[x, y]], path, straight: false, holdTimer: 0 }
+    const p0 = withPressure && e.pressure > 0 ? e.pressure : PRESSURE_NEUTRAL
+    strokeRef.current = {
+      pointerId: e.pointerId,
+      points: [[x, y]],
+      path,
+      straight: false,
+      holdTimer: 0,
+      pressures: withPressure ? [Math.round(p0 * 100) / 100] : null,
+      ema: p0
+    }
+    redrawStroke(strokeRef.current)
     armStrokeHold(strokeRef.current)
+  }
+
+  /** Live preview of the in-progress stroke: a filled variable-width outline
+   *  for a pressure stroke, the plain stroked centerline otherwise. `predicted`
+   *  is the browser's extrapolated tail — drawn, never stored. */
+  const redrawStroke = (
+    stroke: NonNullable<typeof strokeRef.current>,
+    predicted: [number, number][] = []
+  ): void => {
+    const points = predicted.length > 0 ? [...stroke.points, ...predicted] : stroke.points
+    if (stroke.pressures && drawTool) {
+      // The predicted tail keeps the current pressure — strokeOutline reuses
+      // the last half-width for points beyond the pressure array
+      stroke.path.setAttribute(
+        'd',
+        outlineSvgPath(strokeOutline(points, pressureHalfWidths(stroke.pressures, drawTool.width)))
+      )
+    } else {
+      stroke.path.setAttribute('d', strokePathData(points))
+    }
   }
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (!drawTool) return
+    // Dragging the pen's eraser end keeps erasing, whatever tool is armed
+    if (e.pointerType === 'pen' && (e.buttons & 32) !== 0) {
+      const [x, y] = pagePointOf(e.clientX, e.clientY, e.currentTarget)
+      onErase(pageNumber, x, y)
+      return
+    }
     if (drawTool.type === 'eraser') {
       if (e.buttons === 1) {
+        if (e.pointerType === 'touch' && (!fingerDraws || penNear())) return
         const [x, y] = pagePointOf(e.clientX, e.clientY, e.currentTarget)
         onErase(pageNumber, x, y)
       }
@@ -684,6 +775,13 @@ function PdfPage({
       const last = stroke.points[stroke.points.length - 1]
       if (Math.hypot(x - last[0], y - last[1]) < 0.4) continue
       stroke.points.push([x, y])
+      if (stroke.pressures) {
+        // EMA over the raw samples: pen pressure is noisy point-to-point and
+        // an unsmoothed trace ripples the outline's edge
+        const p = ev.pressure > 0 ? ev.pressure : stroke.ema
+        stroke.ema += PRESSURE_EMA_ALPHA * (p - stroke.ema)
+        stroke.pressures.push(Math.round(stroke.ema * 100) / 100)
+      }
       moved = true
     }
     if (e.shiftKey && !stroke.straight) snapStrokeStraight(stroke)
@@ -694,7 +792,14 @@ function PdfPage({
       return
     }
     if (moved) armStrokeHold(stroke)
-    stroke.path.setAttribute('d', strokePathData(stroke.points))
+    // Predicted events (pen only, Chromium extrapolates) shave the perceived
+    // lag off the wet end of the stroke: drawn this frame, REPLACED by real
+    // points the next — they are never stored.
+    const predicted =
+      'getPredictedEvents' in native
+        ? native.getPredictedEvents().map((ev): [number, number] => pagePointOf(ev.clientX, ev.clientY, el))
+        : []
+    redrawStroke(stroke, predicted)
   }
 
   const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>): void => {
@@ -716,8 +821,27 @@ function PdfPage({
       const points = stroke.straight
         ? [stroke.points[0], stroke.points[stroke.points.length - 1]]
         : stroke.points
-      onStrokeComplete(pageNumber, points)
+      // straight ⇒ pressures were dropped in snapStrokeStraight
+      onStrokeComplete(pageNumber, points, stroke.pressures ?? undefined)
     }
+  }
+
+  /** pointercancel means the browser took the pointer for something else —
+   *  usually a pan/pinch it decided to run (touch-action allows finger panning
+   *  while a tool is armed). Committing the half-stroke would leave a stub
+   *  annotation UNDER the scroll the user actually asked for — discard it. */
+  const onPointerCancelDiscard = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const shape = shapeRef.current
+    if (shape && shape.pointerId === e.pointerId) {
+      shapeRef.current = null
+      shape.group.remove()
+      return
+    }
+    const stroke = strokeRef.current
+    if (!stroke || stroke.pointerId !== e.pointerId) return
+    strokeRef.current = null
+    window.clearTimeout(stroke.holdTimer)
+    stroke.path.remove()
   }
 
   const style = {
@@ -858,7 +982,7 @@ function PdfPage({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerEnd}
-          onPointerCancel={onPointerEnd}
+          onPointerCancel={onPointerCancelDiscard}
         >
           <svg
             ref={drawSvgRef}
@@ -1039,18 +1163,34 @@ function AnnotationMarks({
         style={annotation.blend === 'multiply' ? { mixBlendMode: 'multiply' } : undefined}
       >
         <g transform={gTransform}>
-          {annotation.strokes.map((stroke, i) => (
-            <path
-              key={i}
-              d={strokePathData(stroke)}
-              fill="none"
-              stroke={rgbCss(annotation.color, 1)}
-              strokeWidth={annotation.width ?? 2}
-              opacity={annotation.opacity}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
+          {annotation.strokes.map((stroke, i) =>
+            annotation.pressures?.[i] ? (
+              // Pressure stroke: the same filled variable-width outline the
+              // engines bake into the file (shared/ink-outline)
+              <path
+                key={i}
+                d={outlineSvgPath(
+                  strokeOutline(
+                    stroke,
+                    pressureHalfWidths(annotation.pressures[i], annotation.width ?? 2)
+                  )
+                )}
+                fill={rgbCss(annotation.color, 1)}
+                opacity={annotation.opacity}
+              />
+            ) : (
+              <path
+                key={i}
+                d={strokePathData(stroke)}
+                fill="none"
+                stroke={rgbCss(annotation.color, 1)}
+                strokeWidth={annotation.width ?? 2}
+                opacity={annotation.opacity}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )
+          )}
         </g>
       </svg>
     )

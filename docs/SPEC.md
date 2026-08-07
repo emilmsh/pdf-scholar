@@ -29,7 +29,8 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 
 ## 4. Annotation Tools
 - **Text markup**: Highlight, Underline, Strikeout (+ Squiggly). Two flows: (a) select text → context-menu action; (b) arm the tool from the toolbar, then drag across text — tool stays armed. A finished mark is **adjustable**: select it and drag either end to cover more or less text (snapping to whole words), rather than deleting it and marking again.
-- **Pen**: presets — fixed-width and pressure-sensitive (stylus pressure → line width); adjustable color, thickness, opacity. Pen is opaque; **Marker** is a translucent freehand highlighter. **Eraser** removes ink.
+- **Pen**: presets — fixed-width and pressure-sensitive (stylus pressure → line width, **baked into the saved file** as a variable-width appearance stream; the InkList centerline stays standard). Adjustable color, thickness, opacity. Pen is opaque; **Marker** is a translucent freehand highlighter (always uniform width). **Eraser** removes ink — and the pen's physical eraser end erases whatever tool is armed.
+- **Pen/finger routing**: with a tool armed, the pen draws while a finger scrolls and pinches (a touch near a hovering pen is treated as a resting palm). «Tegn med finger» in the tool menus turns finger drawing back on — the default until a pen has been seen on the machine.
 - **Shapes**: rectangle, ellipse, line, arrow; border color/thickness, fill color, opacity. Move by drag, resize via corner handles.
 - **Text comment** (typed on page) and **Pop-up Note** (sticky note; click to place, type in popup; color picker inside; can be attached to selected text via context menu → Note).
 - **Stamps**: built-in collection; custom text stamps with auto-updating date/time; custom image stamps with white-to-transparent + tolerance slider.

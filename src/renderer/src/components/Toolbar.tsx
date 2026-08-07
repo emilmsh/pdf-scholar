@@ -119,6 +119,11 @@ const SHAPE_LABEL_KEYS: Record<ShapeToolType, MsgKey> = {
  *  Ctrl+0 plus the typed zoom field already cover it. */
 const ZOOM_PRESETS = [50, 75, 100, 125, 150, 200, 400] as const
 
+/** Any touch digitizer at all — gates the finger-routing option so it never
+ *  shows on a plain desktop. maxTouchPoints, not (pointer: coarse): a Surface
+ *  with its keyboard attached has a fine primary pointer AND a touch screen. */
+const HAS_TOUCH = navigator.maxTouchPoints > 0
+
 interface Props {
   page: number
   pageCount: number
@@ -140,6 +145,14 @@ interface Props {
   /** What the eraser removes: hand-drawn marks only, or every annotation */
   eraserScope: EraserScope
   onEraserScopeChange(scope: EraserScope): void
+  /** Touch routing while a tool is armed: finger draws vs finger navigates
+   *  (pen-only drawing). Offered only on devices that have touch at all. */
+  fingerDraws: boolean
+  onFingerDrawsChange(fingerDraws: boolean): void
+  /** Pen tool: pressure-sensitive vs fixed width — offered once a pen exists */
+  penSeen: boolean
+  penPressure: boolean
+  onPenPressureChange(penPressure: boolean): void
   /** View rotation + two-page spread (live in the Visning menu) */
   spread: boolean
   onRotate(dir: 1 | -1): void
@@ -282,6 +295,11 @@ export default function Toolbar({
   onMarkupPrefReset,
   eraserScope,
   onEraserScopeChange,
+  fingerDraws,
+  onFingerDrawsChange,
+  penSeen,
+  penPressure,
+  onPenPressureChange,
   spread,
   onRotate,
   onToggleSpread,
@@ -753,6 +771,27 @@ export default function Toolbar({
 
   useDismissable(overflowMenuRef, overflowMenuOpen, closeOverflowMenu, NO_ESCAPE)
 
+  /** Touch routing while a tool is armed — «fingeren tegner» vs «fingeren
+   *  blar». One global setting, offered in every tool menu (the decision is
+   *  about the hand, not the tool) and only on devices that have touch. */
+  const fingerRow = !HAS_TOUCH ? null : (
+    <>
+      <div className="theme-menu-label">{t('tb.finger')}</div>
+      <div className="scope-options">
+        {([true, false] as const).map((draws) => (
+          <button
+            key={String(draws)}
+            className={`scope-option${fingerDraws === draws ? ' selected' : ''}`}
+            onClick={() => onFingerDrawsChange(draws)}
+          >
+            <strong>{t(draws ? 'tb.fingerDraws' : 'tb.fingerNavigates')}</strong>
+            <span>{t(draws ? 'tb.fingerDrawsHint' : 'tb.fingerNavigatesHint')}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  )
+
   /** Colour + width + opacity for pen/marker/shape, with a quiet reset */
   const drawToolMenu = (tool: DrawPrefKey): React.JSX.Element => {
     const pref = toolPrefs[tool]
@@ -815,6 +854,26 @@ export default function Toolbar({
           onChange={(e) => onToolPrefChange(tool, { opacity: Number(e.target.value) })}
           aria-label={t('tb.opacity')}
         />
+        {/* SPEC's two pen presets — fixed width and pressure-sensitive. Only
+            offered once a pen has actually been seen on this machine. */}
+        {tool === 'pen' && penSeen && (
+          <>
+            <div className="theme-menu-label">{t('tb.penPressureLabel')}</div>
+            <div className="scope-options">
+              {([true, false] as const).map((sensitive) => (
+                <button
+                  key={String(sensitive)}
+                  className={`scope-option${penPressure === sensitive ? ' selected' : ''}`}
+                  onClick={() => onPenPressureChange(sensitive)}
+                >
+                  <strong>{t(sensitive ? 'tb.penPressureOn' : 'tb.penPressureOff')}</strong>
+                  <span>{t(sensitive ? 'tb.penPressureOnHint' : 'tb.penPressureOffHint')}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {fingerRow}
         <ResetLink
           hidden={toolPrefIsDefault(tool, pref)}
           onClick={() => onToolPrefReset(tool)}
@@ -1079,6 +1138,7 @@ export default function Toolbar({
                   </button>
                 ))}
               </div>
+              {fingerRow}
               <ResetLink
                 hidden={eraserScope === 'draw'}
                 onClick={() => onEraserScopeChange('draw')}

@@ -1268,6 +1268,18 @@ button {
   inset: 0;
   z-index: 5;
   cursor: crosshair;
+  /* Fingers pan and pinch natively while a tool is armed; drawing touches are
+     the exception, not the rule. touch-action cannot tell a pen from a finger
+     (both are direct-manipulation pointers on Windows), so the two html-level
+     classes flip the layer to `none`: finger-draw when a finger is allowed to
+     draw (the pen-less default), pen-near while a pen is in hover range — the
+     pen must draw, and a palm beside it must neither draw nor scroll. Both
+     are set by PdfViewer (see pen-input.ts). */
+  touch-action: pan-x pan-y;
+}
+
+html.finger-draw .draw-layer,
+html.pen-near .draw-layer {
   touch-action: none;
 }
 
@@ -5536,91 +5548,95 @@ button {
 }
 
 /* ============================================================
-   Touch (coarse pointer): finger-sized targets + always-visible
-   affordances for everything hover normally gates. The tight
-   mouse aesthetics are untouched on fine pointers.
+   Touch UI: finger-sized targets + always-visible affordances for
+   everything hover normally gates. The tight mouse aesthetics are
+   untouched while a fine pointer is in use.
+
+   Gated on html.touch-ui, NOT on @media (pointer: coarse): a Surface
+   with its keyboard attached reports a fine PRIMARY pointer, so the
+   media query never fires there even while the screen is being used
+   by finger. touch-ui.ts sets the class — on from the start when the
+   primary pointer really is coarse, and after that it follows the
+   input actually in use (touch turns it on, mouse/pen turn it off).
    ============================================================ */
-@media (pointer: coarse) {
-  /* Resize grips: no hover to reveal them, and a fingertip needs more than
-     15 px — keep them faintly visible and give them a real target. */
-  .box-grip {
-    width: 26px;
-    height: 26px;
-    opacity: 0.45;
-    background-size: 15px 15px;
-    background-position: bottom right;
-    background-repeat: no-repeat;
-  }
+/* Resize grips: no hover to reveal them, and a fingertip needs more than
+   15 px — keep them faintly visible and give them a real target. */
+html.touch-ui .box-grip {
+  width: 26px;
+  height: 26px;
+  opacity: 0.45;
+  background-size: 15px 15px;
+  background-position: bottom right;
+  background-repeat: no-repeat;
+}
 
-  .ai-composer-grip {
-    height: 18px;
-    margin: -2px 0 1px;
-  }
+html.touch-ui .ai-composer-grip {
+  height: 18px;
+  margin: -2px 0 1px;
+}
 
-  .ai-composer-grip i {
-    width: 40px;
-    height: 4px;
-    opacity: 0.3;
-  }
+html.touch-ui .ai-composer-grip i {
+  width: 40px;
+  height: 4px;
+  opacity: 0.3;
+}
 
-  .tb-btn,
-  .tb-chevron {
-    min-width: 38px;
-    height: 38px;
-  }
+html.touch-ui .tb-btn,
+html.touch-ui .tb-chevron {
+  min-width: 38px;
+  height: 38px;
+}
 
-  /* Finger-sized column switcher: it is the touch route between the two
-     columns (tapping the page itself works too, but not when the half you
-     want is showing a figure you would rather not poke). */
-  .pane-switch-btn {
-    min-width: 34px;
-    height: 32px;
-  }
+/* Finger-sized column switcher: it is the touch route between the two
+   columns (tapping the page itself works too, but not when the half you
+   want is showing a figure you would rather not poke). */
+html.touch-ui .pane-switch-btn {
+  min-width: 34px;
+  height: 32px;
+}
 
-  .cluster-close {
-    width: 28px;
-    height: 28px;
-    /* No hover on glass — the close would otherwise be invisible until tapped */
-    opacity: 0.75;
-  }
+html.touch-ui .cluster-close {
+  width: 28px;
+  height: 28px;
+  /* No hover on glass — the close would otherwise be invisible until tapped */
+  opacity: 0.75;
+}
 
-  .toolbar {
-    height: 54px;
-  }
+html.touch-ui .toolbar {
+  height: 54px;
+}
 
-  /* Side-panel handles: no hover to hint them — keep them faintly visible
-     and always tappable (tap = pin/unpin; edge swipe opens the panel too) */
-  .edge-rail-handle {
-    pointer-events: auto;
-    opacity: 0.55;
-  }
+/* Side-panel handles: no hover to hint them — keep them faintly visible
+   and always tappable (tap = pin/unpin; edge swipe opens the panel too) */
+html.touch-ui .edge-rail-handle {
+  pointer-events: auto;
+  opacity: 0.55;
+}
 
-  /* Widen the resizer's hit area without thickening the visible line */
-  .panel-resizer {
-    flex-basis: 9px;
-  }
+/* Widen the resizer's hit area without thickening the visible line */
+html.touch-ui .panel-resizer {
+  flex-basis: 9px;
+}
 
-  .panel-resizer::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: -9px;
-    right: -9px;
-  }
+html.touch-ui .panel-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -9px;
+  right: -9px;
+}
 
-  /* Hover-revealed icons must be visible before you can aim at them */
-  .tab-close,
-  .annot-delete,
-  .ai-history-delete {
-    opacity: 0.6;
-  }
+/* Hover-revealed icons must be visible before you can aim at them */
+html.touch-ui .tab-close,
+html.touch-ui .annot-delete,
+html.touch-ui .ai-history-delete {
+  opacity: 0.6;
+}
 
-  /* The compact assistant chips need finger-sized targets on touch */
-  .menu-ai-chip {
-    padding: 8px 10px;
-  }
-
+/* The compact assistant chips need finger-sized targets on touch */
+html.touch-ui .menu-ai-chip {
+  padding: 8px 10px;
 }
 
 /* ============================================================

@@ -24,6 +24,7 @@ import type {
   PageRect
 } from '../shared/types'
 import { ENGINE_ERRORS } from '../shared/engine-errors'
+import { decodePressures, encodePressures, pressureHalfWidths, strokeOutline } from '../shared/ink-outline'
 
 // ---------------------------------------------------------------------------
 // User-facing errors. Every one of these carries a CODE from the shared set
@@ -1134,6 +1135,9 @@ interface ShapeSpec {
   // these have to accept that too. Every reader below uses `??` or a truthiness
   // check, so undefined and absent take the same branch.
   strokes?: [number, number][][] | undefined
+  /** ink (pen): per-point pressures parallel to strokes — bakes the appearance
+   *  as a variable-width filled outline instead of a stroked centerline */
+  pressures?: number[][] | undefined
   width?: number | undefined
   contents?: string | undefined
   fontSize?: number | undefined
@@ -1191,13 +1195,30 @@ function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
     }
     case 'ink': {
       const w = s.width ?? 2
-      ops.push(`${fmtRgb(s.color)} RG`, `${fmtNum(w)} w`, '1 J 1 j')
-      for (const stroke of s.strokes ?? []) {
-        if (stroke.length === 0) continue
-        ops.push(`${up(g, stroke[0][0], stroke[0][1])} m`)
-        for (let i = 1; i < stroke.length; i++) ops.push(`${up(g, stroke[i][0], stroke[i][1])} l`)
-        if (stroke.length === 1) ops.push(`${up(g, stroke[0][0] + 0.1, stroke[0][1])} l`) // dot
-        ops.push('S')
+      if (s.pressures && s.pressures.length > 0) {
+        // Pressure stroke: filled variable-width outline — the same polygon
+        // the overlay draws and the WASM engine bakes (shared/ink-outline).
+        // toUser() maps each vertex, so the shape stays right under rotation.
+        ops.push(`${fmtRgb(s.color)} rg`)
+        const strokes = s.strokes ?? []
+        for (let i = 0; i < strokes.length; i++) {
+          if (strokes[i].length === 0) continue
+          const poly = strokeOutline(strokes[i], pressureHalfWidths(s.pressures[i] ?? [], w))
+          if (poly.length === 0) continue
+          ops.push(`${up(g, poly[0][0], poly[0][1])} m`)
+          for (let k = 1; k < poly.length; k++) ops.push(`${up(g, poly[k][0], poly[k][1])} l`)
+          ops.push('h')
+        }
+        ops.push('f')
+      } else {
+        ops.push(`${fmtRgb(s.color)} RG`, `${fmtNum(w)} w`, '1 J 1 j')
+        for (const stroke of s.strokes ?? []) {
+          if (stroke.length === 0) continue
+          ops.push(`${up(g, stroke[0][0], stroke[0][1])} m`)
+          for (let i = 1; i < stroke.length; i++) ops.push(`${up(g, stroke[i][0], stroke[i][1])} l`)
+          if (stroke.length === 1) ops.push(`${up(g, stroke[0][0] + 0.1, stroke[0][1])} l`) // dot
+          ops.push('S')
+        }
       }
       const pts = (s.strokes ?? []).flat()
       rect = pad(unionRects(pts.map(([x, y]) => rectToUser(g, { x, y, w: 0, h: 0 }))), w)
@@ -1411,6 +1432,11 @@ function buildAnnotDict(
       )
     ))
     dict.set('BS', DICT([['W', N(req.width ?? 2)], ['S', NAME('S')]]))
+    // Pen pressures ride along (PDFX-private key) so a later move/reshape can
+    // re-bake the variable-width appearance — same key the WASM engine writes.
+    if (req.pressures && req.pressures.length > 0) {
+      dict.set('PDFX_Pressures', textString(encodePressures(req.pressures)))
+    }
   } else if (req.type === 'square' || req.type === 'circle') {
     dict.set('BS', DICT([['W', N(req.width ?? 2)], ['S', NAME('S')]]))
   } else if (req.type === 'line' || req.type === 'arrow') {
@@ -1786,7 +1812,10 @@ async function shapeFromDict(
       for (let i = 0; i + 1 < nums.length; i += 2) pts.push(fromUser(g, nums[i], nums[i + 1]))
       strokes.push(pts)
     }
-    return { type, quads: [rectD], color, opacity, strokes, width }
+    const pv = dict.get('PDFX_Pressures')
+    const pressures =
+      pv && (pv.t === 'str' || pv.t === 'hex') ? decodePressures(decodePdfString(pv)) : null
+    return { type, quads: [rectD], color, opacity, strokes, width, ...(pressures ? { pressures } : {}) }
   }
   if (type === 'line' || type === 'arrow') {
     const l = await numArray(pdf, dict.get('L'))

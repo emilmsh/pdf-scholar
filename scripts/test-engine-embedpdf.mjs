@@ -250,5 +250,81 @@ for (const req of reqs) {
   fs.rmSync(LINKFILE, { force: true })
 }
 
+// 9. pressure ink: a pen stroke's varying width must survive INTO the file —
+// custom /AP (filled variable-width outline via FPDFAnnot_SetAP), centerline
+// /InkList intact, pressures stored (PDFX_Pressures) so moves re-bake, and
+// translucency carried INSIDE the appearance (annot-dict /CA alone is not
+// honoured over an /AP by e.g. mupdf). Pixels are the proof for all of it.
+{
+  const PFILE = path.join(os.tmpdir(), 'pdfx-pressure-test.pdf')
+  fs.copyFileSync(SAMPLE, PFILE)
+  const N = 40
+  const stroke = Array.from({ length: N }, (_, i) => [80 + (240 * i) / (N - 1), 400])
+  const pressures = Array.from({ length: N }, (_, i) => 0.15 + (0.85 * i) / (N - 1))
+  const pbase = { path: PFILE, pageIndex: 1, quads: [], color: [0.89, 0.29, 0.29], width: 6, author: 'test' }
+
+  const p1 = await applyAnnotation({ ...pbase, type: 'ink', opacity: 1, strokes: [stroke], pressures: [pressures] })
+  check('pressure: create', 'ok' in p1, 'error' in p1 ? p1.error : `obj#${p1.id}`)
+  const p2 = await applyAnnotation({
+    ...pbase, type: 'ink', opacity: 0.45,
+    strokes: [stroke.map(([x, y]) => [x, y + 60])], pressures: [pressures]
+  })
+  check('pressure: create @45%', 'ok' in p2, 'error' in p2 ? p2.error : '')
+  // Moves re-bake the appearance from the stored pressures
+  const m1 = await updateAnnotation({ path: PFILE, pageIndex: 1, id: p1.id, translate: { dx: 0, dy: -120 } })
+  check('pressure: translate', 'ok' in m1, 'error' in m1 ? m1.error : '')
+  const m2 = await updateAnnotation({ path: PFILE, pageIndex: 1, id: p2.id, translate: { dx: 0, dy: 40 } })
+  check('pressure: translate @45%', 'ok' in m2, 'error' in m2 ? m2.error : '')
+  await flushAnnotations(PFILE)
+
+  const pdf = mupdf.Document.openDocument(fs.readFileSync(PFILE), 'application/pdf').asPDF()
+  const page = pdf.loadPage(1)
+  const a1 = page.getAnnotations().find((a) => a.getObject().asIndirect() === p1.id)
+  check('pressure: annot present after flush', !!a1)
+  if (a1) {
+    const obj = a1.getObject()
+    const ap = obj.get('AP')?.get('N')
+    const content = ap && !ap.isNull() ? new TextDecoder('latin1').decode(ap.readStream().asUint8Array()) : ''
+    check('pressure: AP is our filled outline', content.includes(' rg') && content.includes('f\n') && !/\bS\b/.test(content),
+      `${content.length} bytes`)
+    const inkList = obj.get('InkList')
+    check('pressure: InkList centerline intact', !!inkList && !inkList.isNull() && inkList.get(0).length === 2 * N,
+      inkList && !inkList.isNull() ? `${inkList.get(0).length / 2} points` : 'missing')
+    const stored = obj.get('PDFX_Pressures')
+    check('pressure: pressures survive translate', !!stored && !stored.isNull() && stored.asString().split(' ').length === N,
+      stored && !stored.isNull() ? `${stored.asString().split(' ').length} values` : 'missing')
+  }
+  // Pixel proof: rendered thickness grows with pressure; 45% renders lighter.
+  const SCALE = 4
+  const pix = page.toPixmap(mupdf.Matrix.scale(SCALE, SCALE), mupdf.ColorSpace.DeviceRGB, false, true)
+  const W = pix.getWidth()
+  const px = pix.getPixels()
+  const isReddish = (i) => px[i] > 150 && px[i] - px[i + 1] > 40 && px[i] - px[i + 2] > 40
+  const thickness = (xPt, y0, y1) => {
+    const x = Math.round(xPt * SCALE)
+    let n = 0
+    for (let y = Math.round(y0 * SCALE); y < Math.round(y1 * SCALE); y++) if (isReddish((y * W + x) * 3)) n++
+    return n
+  }
+  const thin = thickness(90, 240, 320)
+  const thick = thickness(290, 240, 320)
+  check('pressure: thick end ≥ 1.5× thin end', thin > 0 && thick / thin >= 1.5, `${thin}px vs ${thick}px`)
+  const coreGreen = (xPt, y0, y1) => {
+    const x = Math.round(xPt * SCALE)
+    let sum = 0, n = 0
+    for (let y = Math.round(y0 * SCALE); y < Math.round(y1 * SCALE); y++) {
+      const i = (y * W + x) * 3
+      if (px[i] > px[i + 1] && px[i] - px[i + 1] > 15) { sum += px[i + 1]; n++ }
+    }
+    return n ? sum / n : -1
+  }
+  const gOpaque = coreGreen(290, 240, 320)
+  const gTrans = coreGreen(290, 460, 540)
+  check('pressure: 45% stays translucent after move', gOpaque >= 0 && gTrans > gOpaque + 25,
+    `green ${Math.round(gOpaque)} vs ${Math.round(gTrans)}`)
+  pdf.destroy()
+  fs.rmSync(PFILE, { force: true })
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)
