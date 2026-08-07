@@ -587,8 +587,15 @@ const nb = {
   'update.checkReady': 'Oppdatering til {version} er klar — installeres når du avslutter.',
   'update.checkError': 'Kunne ikke se etter oppdateringer. Er du tilkoblet internett?',
   'update.unsupportedDev': 'Oppdateringer er avslått i utviklingsmodus.',
-  'update.unsupportedMac': 'macOS-utgaven oppdateres manuelt fra GitHub Releases.',
   'update.unsupportedStore': 'Oppdateringer leveres automatisk via Microsoft Store.',
+  // macOS: vi oppdager oppdateringen, men kan ikke installere den selv
+  'update.manualBrewBody': 'PDF Scholar {version} er ute. Oppdater med:',
+  'update.manualDownloadBody': 'PDF Scholar {version} er ute. Last ned den nye versjonen fra GitHub.',
+  'update.manualOpen': 'Åpne nedlasting',
+  'update.copy': 'Kopier',
+  'update.copied': 'Kopiert',
+  'update.checkManualBrew': 'Ny versjon {version} er ute — kjør {command}.',
+  'update.checkManualDownload': 'Ny versjon {version} er ute — last den ned fra GitHub Releases.',
 
   // Update notice (sideloaded extension only — store installs auto-update)
   'update.extAvailable': 'Ny versjon tilgjengelig',
@@ -1145,8 +1152,14 @@ const en: Dict = {
   'update.checkReady': 'The update to {version} is ready — it installs when you quit.',
   'update.checkError': 'Could not check for updates. Are you online?',
   'update.unsupportedDev': 'Updates are disabled in development mode.',
-  'update.unsupportedMac': 'The macOS build is updated manually from GitHub Releases.',
   'update.unsupportedStore': 'Updates are delivered automatically by the Microsoft Store.',
+  'update.manualBrewBody': 'PDF Scholar {version} is out. Update with:',
+  'update.manualDownloadBody': 'PDF Scholar {version} is out. Download the new version from GitHub.',
+  'update.manualOpen': 'Open download',
+  'update.copy': 'Copy',
+  'update.copied': 'Copied',
+  'update.checkManualBrew': 'Version {version} is out — run {command}.',
+  'update.checkManualDownload': 'Version {version} is out — download it from GitHub Releases.',
 
   'update.extAvailable': 'New version available',
   'update.extBody': 'PDF Scholar extension {version} is out. Download and reload the extension to update.',

@@ -5,6 +5,7 @@ import type {
   AiProviderId,
   AnnotateRequest,
   DeleteAnnotationRequest,
+  ManualUpdateChannel,
   ModifyAnnotationRequest,
   PdfxApi,
   DocBookmark,
@@ -107,6 +108,14 @@ const api: PdfxApi = {
     ipcRenderer.on('update:ready', listener)
     return () => {
       ipcRenderer.removeListener('update:ready', listener)
+    }
+  },
+  onUpdateManual: (cb: (version: string, channel: ManualUpdateChannel) => void) => {
+    const listener = (_e: unknown, version: string, channel: ManualUpdateChannel): void =>
+      cb(version, channel)
+    ipcRenderer.on('update:manual', listener)
+    return () => {
+      ipcRenderer.removeListener('update:manual', listener)
     }
   },
   updateSupport: () => ipcRenderer.invoke('update:support'),

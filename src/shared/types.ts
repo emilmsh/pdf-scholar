@@ -434,26 +434,35 @@ export type AiChatResult =
   | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string }
   | FileError
 
+/** Why a build can't self-update: developer run, unsigned macOS, or a
+ *  Microsoft Store/MSIX package (the Store owns the update cycle). `null`
+ *  means self-update is supported. Note that 'mac' bars INSTALLING an update,
+ *  not detecting one — that build still checks and reports 'manual'. */
+export type UpdateUnsupportedReason = 'dev' | 'mac' | 'store'
+
+/** How a build that can't self-update gets the new version: `brew` when it was
+ *  installed from the Homebrew cask, `download` for a hand-installed dmg. */
+export type ManualUpdateChannel = 'brew' | 'download'
+
 /** Result of a manual "check for updates".
  *  - available: newer version detected, not downloaded (offer a download)
  *  - ready: an update is already downloaded and installs on quit/restart
+ *  - manual: newer version detected, but this build can't install it itself
+ *    (macOS) — `channel` says how the user does it
  *  - none: this is the latest version
- *  - unsupported: this build doesn't self-update (dev run, unsigned macOS,
- *    or Microsoft Store — the Store owns the update cycle there)
+ *  - unsupported: no check was even attempted (dev run, or Microsoft Store —
+ *    the Store owns the update cycle there)
  *  - error: the check itself failed (offline, rate-limited, …) */
-/** Why a build can't self-update: developer run, unsigned macOS, or a
- *  Microsoft Store/MSIX package (the Store owns the update cycle). `null`
- *  means self-update is supported. */
-export type UpdateUnsupportedReason = 'dev' | 'mac' | 'store'
-
 export interface UpdateCheckOutcome {
-  status: 'available' | 'ready' | 'none' | 'unsupported' | 'error'
-  /** Version on offer (available/ready) */
+  status: 'available' | 'ready' | 'manual' | 'none' | 'unsupported' | 'error'
+  /** Version on offer (available/ready/manual) */
   version?: string
   /** Currently running app version */
   current: string
   /** Why self-update is unsupported, when status = 'unsupported' */
   reason?: UpdateUnsupportedReason
+  /** How to install it by hand, when status = 'manual' */
+  channel?: ManualUpdateChannel
 }
 
 export interface PdfxApi {
@@ -573,6 +582,9 @@ export interface PdfxApi {
   onUpdateProgress(cb: (percent: number) => void): () => void
   /** Fires when an update has been downloaded and will install on quit */
   onUpdateReady(cb: (version: string) => void): () => void
+  /** Fires when a newer version exists that this build can't install itself
+   *  (macOS) — the UI shows how to update by hand instead of a download button */
+  onUpdateManual(cb: (version: string, channel: ManualUpdateChannel) => void): () => void
   /** Whether this build can self-update, resolved locally (no network). Lets
    *  the UI hide the "check for updates" control on builds where it's moot —
    *  notably Store/MSIX. `null` = self-update supported. */

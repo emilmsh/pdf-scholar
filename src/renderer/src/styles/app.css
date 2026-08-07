@@ -3203,6 +3203,46 @@ html.pen-near .draw-layer {
   color: var(--text-secondary);
 }
 
+/* macOS detects updates but can't install them, so the notice hands over the
+   command instead of a download button. The command needs the room a button
+   would not have. */
+.update-toast:has(.update-toast-cmd) {
+  max-width: 480px;
+}
+
+.update-toast-cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+}
+
+.update-toast-cmd code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--hover);
+  font-family: Consolas, ui-monospace, monospace;
+  font-size: 11.5px;
+  color: var(--text);
+}
+
+.update-toast-copy {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.update-toast-copy:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
 .update-toast .btn-primary {
   padding: 7px 14px;
   font-size: 13px;
