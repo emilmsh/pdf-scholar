@@ -5,6 +5,7 @@ import type {
   UpdateCheckOutcome,
   UpdateUnsupportedReason
 } from '../../../shared/types'
+import { BREW_UPGRADE_COMMAND } from '../../../shared/update-channel'
 import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
 import { AppMark, IconDocument, IconFolderOpen, IconHeart, IconSparkle } from './icons'
@@ -28,9 +29,17 @@ export function updateOutcomeText(outcome: UpdateCheckOutcome): string {
       return t('update.checkAvailable', { version: outcome.version ?? '' })
     case 'ready':
       return t('update.checkReady', { version: outcome.version ?? '' })
+    case 'manual':
+      // The notice raised alongside this carries the copyable command; this
+      // line is the one-liner for the toolbar menu and the welcome screen.
+      return outcome.channel === 'brew'
+        ? t('update.checkManualBrew', {
+            version: outcome.version ?? '',
+            command: BREW_UPGRADE_COMMAND
+          })
+        : t('update.checkManualDownload', { version: outcome.version ?? '' })
     case 'unsupported':
       if (outcome.reason === 'store') return t('update.unsupportedStore')
-      if (outcome.reason === 'mac') return t('update.unsupportedMac')
       return t('update.unsupportedDev')
     case 'error':
       return t('update.checkError')

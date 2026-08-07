@@ -18,7 +18,7 @@ One-time fees (Microsoft Partner Center, Chrome Web Store) are acceptable.
 | Windows arm64 | 1 | same universal installer (arch picked at install) | electron-updater |
 | Microsoft Store (x64 + arm64) | 1 | `PDF-Scholar-<v>-x64.appx` + `-arm64.appx` (MSIX, signed by the Store on ingestion) | the Store; electron-updater self-disables via `process.windowsStore` (`src/main/updater.ts`) |
 | Extension (Edge/Chrome) | 1 | `pdf-scholar-extension.zip` | store auto-update; sideload = in-app notice |
-| macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | none — `brew upgrade` via the tap stands in (see below) |
+| macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | detect-only: in-app notice with the `brew upgrade` command (see below); no self-install |
 | Linux x64 | 2 | `PDF-Scholar-<v>.AppImage` + `.deb` | electron-updater |
 
 The Microsoft Store is a live release channel, not a plan: the same Windows build
@@ -42,8 +42,17 @@ not as acceptable platform lag.
    the "damaged / unverified developer" flow on first launch; README documents
    the workaround (copy to Applications, then `xattr -cr` — the "damaged"
    variant never offers System Settings → Open Anyway). Consequence:
-   **no auto-update on macOS** — Squirrel.Mac refuses unsigned apps. Users
-   update by downloading the new dmg. The **Homebrew tap**
+   **no auto-INSTALL on macOS** — Squirrel.Mac validates the update against the
+   running app's designated requirement, and an ad-hoc signature's DR is
+   cdhash-based, so it changes every build and can never match. (There is no
+   free way around this: a free Apple account issues Development certificates,
+   not the Developer ID that distribution outside the App Store requires.)
+   **Detection is not affected** — it is an HTTPS GET against the releases API,
+   no signature involved — so the mac build DOES check on the same cadence as
+   the others (`initManualUpdates` in `src/main/updater.ts`) and shows a notice
+   carrying the way out: the `brew upgrade` command with a copy button when the
+   app was installed from the cask (a `Caskroom/pdf-scholar` directory exists),
+   a "download" button to the releases page otherwise. The **Homebrew tap**
    ([`emilmsh/homebrew-tap`](https://github.com/emilmsh/homebrew-tap),
    auto-bumped by `.github/workflows/update-tap.yml` when a release is
    published — needs the `TAP_GITHUB_TOKEN` secret) is the recommended

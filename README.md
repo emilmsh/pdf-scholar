@@ -55,7 +55,9 @@ the same app as an MSIX package, x64 and arm64, although the installer is update
 The build is **not signed with an Apple Developer certificate** (deliberate —
 the app has zero recurring costs), which shapes both paths below the same way:
 Gatekeeper needs one `xattr` command per installed version, and the app cannot
-update itself.
+install its own updates. It does still watch for them — when a new version
+appears, PDF Scholar says so and hands you the command or the download link,
+whichever matches how you installed it.
 
 **With [Homebrew](https://brew.sh)** — recommended, because `brew upgrade`
 then delivers new versions:

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   CloseOutcome,
   FilePayload,
+  ManualUpdateChannel,
   ReadingPosition,
   RecentFile,
   Settings,
   ThemeName
 } from '../../shared/types'
+import { BREW_UPGRADE_COMMAND, RELEASES_PAGE_URL } from '../../shared/update-channel'
 import { bridge, isElectron } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { primaryMod } from './platform'
@@ -27,6 +29,34 @@ interface OpenTab {
 
 
 let tabCounter = 0
+
+/** A copyable shell command inside the update notice. macOS only in practice:
+ *  that build detects updates but can't install them (docs/PLATFORMS.md §1), so
+ *  the command IS the action — it stays selectable as well as one-click copyable. */
+function UpdateCommand({ command }: { command: string }): React.JSX.Element {
+  const [copied, setCopied] = useState(false)
+  useEffect(() => {
+    if (!copied) return
+    const id = window.setTimeout(() => setCopied(false), 1600)
+    return () => window.clearTimeout(id)
+  }, [copied])
+  return (
+    <div className="update-toast-cmd">
+      <code>{command}</code>
+      <button
+        className="update-toast-copy"
+        onClick={() => {
+          navigator.clipboard?.writeText(command).then(
+            () => setCopied(true),
+            () => {} // clipboard denied — the text is still there to select
+          )
+        }}
+      >
+        {copied ? t('update.copied') : t('update.copy')}
+      </button>
+    </div>
+  )
+}
 
 export default function App(): React.JSX.Element {
   useLang()
@@ -98,10 +128,13 @@ export default function App(): React.JSX.Element {
   // progress) → ready → "Start på nytt nå" (or it installs on quit).
   // Dismissing the toast changes nothing about that flow — a completed
   // download still announces itself, and install-on-quit still happens.
+  // 'manual' is the macOS terminus: detected, but we can't install it, so the
+  // notice hands over the command instead of a button that would do nothing.
   const [update, setUpdate] = useState<
     | { phase: 'available'; version: string }
     | { phase: 'downloading'; version: string; percent: number }
     | { phase: 'ready'; version: string }
+    | { phase: 'manual'; version: string; channel: ManualUpdateChannel }
     | null
   >(null)
   useEffect(() => bridge.onUpdateAvailable((version) => {
@@ -113,6 +146,9 @@ export default function App(): React.JSX.Element {
     )
   }), [])
   useEffect(() => bridge.onUpdateReady((version) => setUpdate({ phase: 'ready', version })), [])
+  useEffect(() => bridge.onUpdateManual((version, channel) =>
+    setUpdate({ phase: 'manual', version, channel })
+  ), [])
 
   // Keep the i18n store in sync with the language setting
   useEffect(() => {
@@ -627,7 +663,26 @@ export default function App(): React.JSX.Element {
                 <span>{t('update.body', { version: update.version })}</span>
               </>
             )}
+            {update.phase === 'manual' && (
+              <>
+                <strong>{t('update.available')}</strong>
+                <span>
+                  {update.channel === 'brew'
+                    ? t('update.manualBrewBody', { version: update.version })
+                    : t('update.manualDownloadBody', { version: update.version })}
+                </span>
+                {update.channel === 'brew' && <UpdateCommand command={BREW_UPGRADE_COMMAND} />}
+              </>
+            )}
           </div>
+          {update.phase === 'manual' && update.channel === 'download' && (
+            <button
+              className="btn-primary"
+              onClick={() => bridge.openExternal(RELEASES_PAGE_URL)}
+            >
+              {t('update.manualOpen')}
+            </button>
+          )}
           {update.phase === 'available' && (
             <button
               className="btn-primary"

@@ -175,6 +175,7 @@ export const webApi: PdfxApi = {
   onUpdateAvailable: () => () => {},
   onUpdateProgress: () => () => {},
   onUpdateReady: () => () => {},
+  onUpdateManual: () => () => {},
   updateSupport: async () => 'dev' as const,
   updateCheck: async () => ({ status: 'unsupported' as const, current: '', reason: 'dev' as const }),
   updateDownload: () => {},
