@@ -183,7 +183,7 @@ export const webApi: PdfxApi = {
   // so the chat UI (streaming, citation chips, jump+highlight) can be tested.
   aiGetConfig: async () => ({
     ...loadWebAiConfig(),
-    hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
+    hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, ollama: false, lmstudio: false, compat: false, mock: true },
     // Mock-only preview: no key is ever stored, so there is nothing to protect
     keyStorage: 'session-only' as const,
     keysSupported: false,
@@ -196,12 +196,13 @@ export const webApi: PdfxApi = {
       models: { ...current.models, ...patch.models },
       azure: { ...current.azure, ...patch.azure },
       compat: { ...current.compat, ...patch.compat },
+      local: { ...current.local, ...patch.local },
       thinking: patch.thinking ?? current.thinking
     }
     localStorage.setItem('pdfx-web-ai', JSON.stringify(next))
     return {
       ...next,
-      hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
+      hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, ollama: false, lmstudio: false, compat: false, mock: true },
       keyStorage: 'session-only' as const,
       keysSupported: false,
       catalog: {}
@@ -313,6 +314,7 @@ function loadWebAiConfig(): AiConfig {
     models: { ...DEFAULT_AI_MODELS },
     azure: { endpoint: '', deployment: '', apiVersion: '' },
     compat: { baseUrl: '' },
+    local: { ollama: '', lmstudio: '' },
     thinking: 'medium'
   }
   try {
@@ -322,7 +324,8 @@ function loadWebAiConfig(): AiConfig {
       ...parsed,
       models: { ...fallback.models, ...parsed.models },
       azure: { ...fallback.azure, ...parsed.azure },
-      compat: { ...fallback.compat, ...parsed.compat }
+      compat: { ...fallback.compat, ...parsed.compat },
+      local: { ...fallback.local, ...parsed.local }
     }
   } catch {
     return fallback

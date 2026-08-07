@@ -15,13 +15,16 @@ import type {
   AiConfig,
   AiConfigView,
   AiProviderId,
-  KeyStorageMode
+  KeyStorageMode,
+  LocalServiceId
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
-import { PROVIDER_PROFILES } from '../shared/ai-provider-profile'
+import { localBaseUrl, LOCAL_SERVICES, PROVIDER_PROFILES } from '../shared/ai-provider-profile'
 import { AI_ERRORS } from '../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
+
+const LOCAL_IDS = Object.keys(LOCAL_SERVICES) as LocalServiceId[]
 
 const PROVIDERS: AiProviderId[] = [
   'anthropic',
@@ -32,6 +35,8 @@ const PROVIDERS: AiProviderId[] = [
   'xai',
   'mistral',
   'groq',
+  'ollama',
+  'lmstudio',
   'compat',
   'mock'
 ]
@@ -193,15 +198,19 @@ function configView(): AiConfigView {
   // decryption must show as not-set so the user re-enters it, instead of the
   // settings claiming a key exists while every request fails.
   for (const p of PROVIDERS) hasKey[p] = PROVIDER_PROFILES[p].keyRequired ? keyFor(p) !== '' : true
-  // compat's key really is optional, so "has key" means "ready to use":
-  // endpoint + model id configured. Drives the same UI the key flags drive
-  // (model-menu enabling, the add-a-key callout, the settings auto-switch).
+  // The endpoint-backed providers take no key, so "has key" means "ready to
+  // use" for them. Drives the same UI the key flags drive (model-menu
+  // enabling, the add-a-key callout, the settings auto-switch). The local
+  // servers always have an endpoint (ours, or the user's), so a picked model
+  // is the whole bar; the custom one needs its URL typed in first.
   hasKey.compat = ai.compat.baseUrl.trim() !== '' && ai.models.compat.trim() !== ''
+  for (const p of LOCAL_IDS) hasKey[p] = ai.models[p].trim() !== ''
   return {
     provider: ai.provider,
     models: { ...ai.models },
     azure: { ...ai.azure },
     compat: { ...ai.compat },
+    local: { ...ai.local },
     thinking: ai.thinking,
     hasKey,
     keyStorage: keyStorageMode(),
@@ -248,6 +257,7 @@ export function registerAiIpc(): void {
         models: patch.models,
         azure: patch.azure,
         compat: patch.compat,
+        local: patch.local,
         thinking: patch.thinking,
         keys: encryptedKeys
       })
@@ -263,6 +273,14 @@ export function registerAiIpc(): void {
   ipcMain.handle('ai:refresh-models', async (_e, force: boolean) => {
     const state = getState()
     const compatBase = state.ai.compat.baseUrl.trim()
+    // The local servers are always reachable in principle — ask them every
+    // refresh; an unreachable one just keeps its previous (or empty) list.
+    const localSources = Object.fromEntries(
+      LOCAL_IDS.map((p) => [
+        p,
+        { baseUrl: localBaseUrl(p, state.ai.local[p]), key: keyFor(p) || undefined }
+      ])
+    )
     const next = await refreshCatalog(
       state.modelCatalog,
       {
@@ -273,6 +291,7 @@ export function registerAiIpc(): void {
         xai: { key: keyFor('xai') },
         mistral: { key: keyFor('mistral') },
         groq: { key: keyFor('groq') },
+        ...localSources,
         ...(compatBase ? { compat: { baseUrl: compatBase, key: keyFor('compat') || undefined } } : {})
       },
       force === true
@@ -310,6 +329,7 @@ export function registerAiIpc(): void {
         models: ai.models,
         azure: ai.azure,
         compat: ai.compat,
+        local: ai.local,
         thinking: ai.thinking,
         catalog: getState().modelCatalog,
         req,

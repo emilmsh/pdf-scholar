@@ -249,9 +249,17 @@ export type AiProviderId =
   | 'xai'
   | 'mistral'
   | 'groq'
-  // Custom OpenAI-compatible endpoint / local servers (Ollama, LM Studio)
+  // The local model servers, one row each (base URLs in LOCAL_SERVICES)
+  | 'ollama'
+  | 'lmstudio'
+  // Any other OpenAI-compatible endpoint: a non-default port, a server on
+  // another machine, vLLM/llama.cpp, a gateway at work
   | 'compat'
   | 'mock'
+
+/** The local servers we support by name. Kept as a literal here rather than
+ *  imported from ai-provider-profile so the type layer stays leaf-level. */
+export type LocalServiceId = 'ollama' | 'lmstudio'
 
 /** How hard the model should reason; mapped per provider/model in main */
 export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
@@ -263,11 +271,16 @@ export interface AiConfig {
   /** apiVersion '' means "use the app's built-in default" — stored empty so the
    *  default can move with app updates without touching saved config */
   azure: { endpoint: string; deployment: string; apiVersion: string }
-  /** The OpenAI-compatible provider: any server speaking /chat/completions —
-   *  OpenRouter, Mistral, Groq, or a local Ollama/LM Studio. baseUrl is the
-   *  API root (usually ending in /v1); the model id lives in models.compat
-   *  and the (optional) key in the ordinary key store. */
+  /** The OpenAI-compatible provider: any server speaking /chat/completions
+   *  that is not one of the named ones. baseUrl is the API root (usually
+   *  ending in /v1); the model id lives in models.compat and the (optional)
+   *  key in the ordinary key store. */
   compat: { baseUrl: string }
+  /** Where each local server answers. Prefilled from LOCAL_SERVICES and
+   *  editable, so a non-default port or a machine on the network is still
+   *  reachable; '' means "use the shipped default". Model id and optional key
+   *  live where every other provider's do (models[id], the key store). */
+  local: Record<LocalServiceId, string>
   /** Reasoning effort (default 'medium') */
   thinking: ThinkingLevel
 }
@@ -315,9 +328,11 @@ export interface AiModelCatalog {
   xai?: { fetchedAt: number; models: AiRemoteModel[] }
   mistral?: { fetchedAt: number; models: AiRemoteModel[] }
   groq?: { fetchedAt: number; models: AiRemoteModel[] }
-  /** Also remembers WHICH endpoint the list came from, so a changed base URL
-   *  never shows another server's models */
+  /** The endpoint-backed providers also remember WHICH endpoint the list came
+   *  from, so a changed base URL never shows another server's models */
   compat?: { fetchedAt: number; models: AiRemoteModel[]; baseUrl: string }
+  ollama?: { fetchedAt: number; models: AiRemoteModel[]; baseUrl: string }
+  lmstudio?: { fetchedAt: number; models: AiRemoteModel[]; baseUrl: string }
 }
 
 /** What is actually protecting a stored API key right now.

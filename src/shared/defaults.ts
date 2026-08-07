@@ -38,6 +38,10 @@ export const DEFAULT_AI_MODELS: Record<AiProviderId, string> = {
   xai: '',
   mistral: '',
   groq: '',
+  // Same for the local servers: what is installed differs per machine, so the
+  // list is fetched from the server and the user picks
+  ollama: '',
+  lmstudio: '',
   compat: '',
   mock: 'mock-1'
 }

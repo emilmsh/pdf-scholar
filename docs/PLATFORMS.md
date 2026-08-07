@@ -163,8 +163,9 @@ not as acceptable platform lag.
     `chrome.storage.local` (`extension-ai.ts`). The plain-web preview is
     keyless/mock-only, so it has no catalog to fetch (`aiRefreshModels` no-ops).
     Curated-list maintenance is platform-neutral: `docs/MODEL-UPDATE.md`.
-14. **The compat family (the five hosted services + custom/local endpoints)
-    has FULL parity on the extension — a correction.** An earlier version of
+14. **The compat family (the five hosted services, Ollama and LM Studio as
+    providers of their own, and a custom endpoint) has FULL parity on the
+    extension — a correction.** An earlier version of
     this point claimed user-typed endpoints were CORS-dependent there; that
     was wrong: the manifest already carries `host_permissions` for
     `http://*/*` + `https://*/*` (required for the PDF-viewer takeover), and

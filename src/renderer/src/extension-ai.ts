@@ -23,10 +23,15 @@ import type {
   AiConfigView,
   AiModelCatalog,
   AiProviderId,
+  LocalServiceId,
   PdfxApi
 } from '../../shared/types'
 import { runProviderChat } from '../../shared/ai-chat'
-import { PROVIDER_PROFILES } from '../../shared/ai-provider-profile'
+import {
+  localBaseUrl,
+  LOCAL_SERVICES,
+  PROVIDER_PROFILES
+} from '../../shared/ai-provider-profile'
 import { AI_ERRORS } from '../../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../../shared/ai-model-catalog'
 import { store } from './extension-store'
@@ -42,10 +47,13 @@ const DEFAULT_CONFIG: AiConfig = {
   models: { ...DEFAULT_AI_MODELS },
   azure: { endpoint: '', deployment: '', apiVersion: '' },
   compat: { baseUrl: '' },
+  local: { ollama: '', lmstudio: '' },
   thinking: 'medium'
 }
 
 type Keys = Partial<Record<AiProviderId, string>>
+
+const LOCAL_IDS = Object.keys(LOCAL_SERVICES) as LocalServiceId[]
 
 const PROVIDER_IDS: AiProviderId[] = [
   'anthropic',
@@ -56,6 +64,8 @@ const PROVIDER_IDS: AiProviderId[] = [
   'xai',
   'mistral',
   'groq',
+  'ollama',
+  'lmstudio',
   'compat',
   'mock'
 ]
@@ -67,7 +77,8 @@ async function loadConfig(): Promise<AiConfig> {
     ...stored,
     models: { ...DEFAULT_CONFIG.models, ...stored.models },
     azure: { ...DEFAULT_CONFIG.azure, ...stored.azure },
-    compat: { ...DEFAULT_CONFIG.compat, ...stored.compat }
+    compat: { ...DEFAULT_CONFIG.compat, ...stored.compat },
+    local: { ...DEFAULT_CONFIG.local, ...stored.local }
   }
 }
 
@@ -96,14 +107,17 @@ async function toView(config: AiConfig, keys: Keys, catalog: AiModelCatalog): Pr
   for (const p of PROVIDER_IDS) {
     hasKey[p] = PROVIDER_PROFILES[p].keyRequired ? (usable[p]?.trim() ?? '') !== '' : true
   }
-  // Same rule as the desktop: compat's key is optional, so "has key" means
-  // "ready to use" — endpoint + model id configured.
+  // Same rule as the desktop: the endpoint-backed providers take no key, so
+  // "has key" means "ready to use" — a picked model, plus (for the custom
+  // endpoint, which ships no address) a base URL.
   hasKey.compat = config.compat.baseUrl.trim() !== '' && config.models.compat.trim() !== ''
+  for (const p of LOCAL_IDS) hasKey[p] = config.models[p].trim() !== ''
   return {
     provider: config.provider,
     models: { ...config.models },
     azure: { ...config.azure },
     compat: { ...config.compat },
+    local: { ...config.local },
     thinking: config.thinking,
     hasKey,
     keyStorage: (await sealingAvailable()) ? 'browser-nonextractable' : 'session-only',
@@ -168,6 +182,7 @@ export function createExtensionAi(): Pick<
         models: { ...current.models, ...patch.models },
         azure: { ...current.azure, ...patch.azure },
         compat: { ...current.compat, ...patch.compat },
+        local: { ...current.local, ...patch.local },
         thinking: patch.thinking ?? current.thinking
       }
       store.set(K_AI_CONFIG, next)
@@ -204,6 +219,12 @@ export function createExtensionAi(): Pick<
       ])
       const usable = await usableKeys(stored)
       const compatBase = config.compat.baseUrl.trim()
+      const localSources = Object.fromEntries(
+        LOCAL_IDS.map((p) => [
+          p,
+          { baseUrl: localBaseUrl(p, config.local[p]), key: usable[p] || undefined }
+        ])
+      )
       const next = await refreshCatalog(
         catalog,
         {
@@ -214,6 +235,7 @@ export function createExtensionAi(): Pick<
           xai: { key: usable.xai ?? '' },
           mistral: { key: usable.mistral ?? '' },
           groq: { key: usable.groq ?? '' },
+          ...localSources,
           ...(compatBase ? { compat: { baseUrl: compatBase, key: usable.compat || undefined } } : {})
         },
         force === true
@@ -243,6 +265,7 @@ export function createExtensionAi(): Pick<
           models: config.models,
           azure: config.azure,
           compat: config.compat,
+          local: config.local,
           thinking: config.thinking,
           catalog: await loadCatalog(),
           req: request,

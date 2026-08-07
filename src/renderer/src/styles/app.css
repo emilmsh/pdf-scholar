@@ -1165,9 +1165,14 @@ button {
   border-bottom: 1px solid var(--border);
 }
 
+/* Venstre/Høyre carry two words each — they need the width, not the height */
+.annot-margin .theme-chip {
+  padding-block: 2px;
+}
+
 /* With zero annotations the whole machinery stays VISIBLE (a new user learns
    the tab by seeing it) — only the actions that need marks to act on grey out */
-.annot-export-row button:disabled,
+.annot-export-grid button:disabled,
 .annot-ask-ai:disabled,
 .annot-clear-all:disabled {
   opacity: 0.45;
@@ -2856,23 +2861,24 @@ button {
   margin-right: auto;
 }
 
-.annot-export-row {
-  display: flex;
-  align-items: center;
+/* Four formats, 2×2 — four equal targets instead of three squeezed on one row
+   and a lone wide one under them. Each carries its own tooltip. */
+.annot-export-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 5px;
 }
 
-.annot-export-row button {
-  flex: 1;
+.annot-export-grid button {
   font-size: 10.5px;
   font-weight: 600;
   color: var(--accent);
-  padding: 3px 7px;
+  padding: 4px 7px;
   border-radius: 6px;
   border: 1px solid var(--border);
 }
 
-.annot-export-row button:hover {
+.annot-export-grid button:hover {
   background: var(--hover);
 }
 
@@ -4021,6 +4027,82 @@ button {
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+}
+
+/* Heading line: title left, the «hide empty» filter right — the filter is a
+   view control over the list below, not a setting, so it sits on the heading
+   rather than among the fields. */
+.ai-settings-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-settings-filter {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  flex: none;
+}
+
+/* The control for a provider that needs more than one input (Azure, the local
+   servers). It stands exactly where the key field stands for everyone else —
+   same box, same height, same column — and carries the state of the setup
+   where a key field carries its placeholder. Folded shut it keeps the list at
+   one block per provider; open, the fields drop straight below it, flush left
+   with every other field. */
+.ai-provider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-provider-row:hover,
+.ai-provider-row.is-open {
+  border-color: var(--accent);
+}
+
+.ai-provider-row:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.ai-provider-caret {
+  flex: none;
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.ai-provider-row.is-open .ai-provider-caret {
+  transform: rotate(0deg);
+}
+
+.ai-provider-state {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* One notch in, so the opened fields read as belonging to the row above —
+   the provider's own name stays flush left with every other provider's */
+.ai-provider-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 12px;
 }
 
 /* "No key yet" note inside the model chip's menu */

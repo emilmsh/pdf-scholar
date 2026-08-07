@@ -17,7 +17,7 @@
 // `npm run test:ai-chat` holds each provider's request path to its row here —
 // a profile that disagrees with what the path actually sends is a test failure,
 // not a latent UI lie.
-import type { AiProviderId } from './types'
+import type { AiProviderId, LocalServiceId } from './types'
 
 export interface AiProviderProfile {
   /** How grounded citations travel: 'native' = the provider emits citation
@@ -68,6 +68,39 @@ export function isCompatService(provider: AiProviderId): provider is CompatServi
   return provider in COMPAT_SERVICES
 }
 
+/** The local model servers, each a provider in its own right (Emil, 2026-08-07)
+ *  — not two presets hiding behind a «custom endpoint» row. These are the two
+ *  anyone actually runs on a laptop, so they sit in the list beside the hosted
+ *  services, with the same shape: one row, its own model id, its own optional
+ *  key. `baseUrl` here is the DEFAULT; the user's own value (a different port,
+ *  a server on the network) is stored in AiConfig.local and wins. Anything
+ *  else OpenAI-compatible is still the `compat` provider.
+ *
+ *  Both speak the OpenAI wire format on /v1 — Ollama since 0.1.x, LM Studio
+ *  from its server tab. Verified on the monthly pass (docs/MAINTENANCE.md). */
+export const LOCAL_SERVICES: Record<LocalServiceId, { baseUrl: string; modelHint: string }> = {
+  ollama: { baseUrl: 'http://localhost:11434/v1', modelHint: 'llama3.1' },
+  lmstudio: { baseUrl: 'http://localhost:1234/v1', modelHint: 'qwen2.5-7b-instruct' }
+}
+
+export function isLocalService(provider: AiProviderId): provider is LocalServiceId {
+  return provider in LOCAL_SERVICES
+}
+
+/** Every provider whose endpoint is configurable rather than fixed — the two
+ *  local servers and the custom one. Their model lists are keyed to the URL
+ *  they came from, and their readiness is "endpoint + model id", not a key. */
+export type EndpointProviderId = LocalServiceId | 'compat'
+export const ENDPOINT_PROVIDERS: EndpointProviderId[] = ['ollama', 'lmstudio', 'compat']
+
+export function isEndpointProvider(provider: AiProviderId): provider is EndpointProviderId {
+  return ENDPOINT_PROVIDERS.includes(provider as EndpointProviderId)
+}
+
+/** The endpoint actually in force for a local server: the user's, or ours */
+export const localBaseUrl = (id: LocalServiceId, configured: string | undefined): string =>
+  (configured ?? '').trim() || LOCAL_SERVICES[id].baseUrl
+
 export const PROVIDER_PROFILES: Record<AiProviderId, AiProviderProfile> = {
   anthropic: {
     citations: 'native',
@@ -101,10 +134,24 @@ export const PROVIDER_PROFILES: Record<AiProviderId, AiProviderProfile> = {
   xai: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
   mistral: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
   groq: { citations: 'contract', webSearch: false, thinking: 'effort', vision: true, keyRequired: true },
-  // Custom OpenAI-compatible endpoints and local servers (Ollama/LM Studio).
-  // Keyless local servers are the point, so no key requirement — readiness is
-  // base URL + model id, enforced per request (AI_ERRORS.compatUnconfigured)
-  // and in each platform's hasKey view.
+  // The local servers and the custom endpoint share one row shape: keyless is
+  // the point, so no key requirement — readiness is endpoint + model id,
+  // enforced per request (AI_ERRORS.compatUnconfigured) and in each platform's
+  // hasKey view. A key is still accepted, for a server behind a proxy.
+  ollama: {
+    citations: 'contract',
+    webSearch: false,
+    thinking: 'effort',
+    vision: true,
+    keyRequired: false
+  },
+  lmstudio: {
+    citations: 'contract',
+    webSearch: false,
+    thinking: 'effort',
+    vision: true,
+    keyRequired: false
+  },
   compat: {
     citations: 'contract',
     webSearch: false,

@@ -19,7 +19,7 @@
 // the previous snapshot, so a flaky network can never make the app dumber than
 // the shipped curated list.
 import type { AiModelCaps, AiModelCatalog, AiRemoteModel } from './types'
-import { COMPAT_SERVICES, isCompatService } from './ai-provider-profile'
+import { COMPAT_SERVICES, isCompatService, isEndpointProvider } from './ai-provider-profile'
 
 /** How long a fetched snapshot counts as fresh. Model launches are rare enough
  *  that a day-old list is fine for the hosted providers, and the TTL keeps the
@@ -43,6 +43,9 @@ export type CatalogProviderId =
   | 'xai'
   | 'mistral'
   | 'groq'
+  // The endpoint-backed ones: two named local servers and the custom endpoint
+  | 'ollama'
+  | 'lmstudio'
   | 'compat'
 export const CATALOG_PROVIDERS: CatalogProviderId[] = [
   'anthropic',
@@ -52,16 +55,17 @@ export const CATALOG_PROVIDERS: CatalogProviderId[] = [
   'xai',
   'mistral',
   'groq',
+  'ollama',
+  'lmstudio',
   'compat'
 ]
 
 export function catalogStale(catalog: AiModelCatalog, provider: CatalogProviderId): boolean {
   const entry = catalog[provider]
   if (!entry) return true
-  const ttl =
-    provider === 'compat' && isLocalEndpoint((entry as { baseUrl?: string }).baseUrl ?? '')
-      ? LOCAL_TTL_MS
-      : CATALOG_TTL_MS
+  const ttl = isLocalEndpoint((entry as { baseUrl?: string }).baseUrl ?? '')
+    ? LOCAL_TTL_MS
+    : CATALOG_TTL_MS
   return Date.now() - entry.fetchedAt > ttl
 }
 
@@ -303,6 +307,9 @@ export interface CatalogSources {
   xai?: { key: string }
   mistral?: { key: string }
   groq?: { key: string }
+  /** The endpoint-backed providers: reachable with a URL, key optional */
+  ollama?: { baseUrl: string; key?: string | undefined }
+  lmstudio?: { baseUrl: string; key?: string | undefined }
   compat?: { baseUrl: string; key?: string | undefined }
 }
 
@@ -321,14 +328,14 @@ export async function refreshCatalog(
   await Promise.all(
     CATALOG_PROVIDERS.map(async (provider) => {
       try {
-        if (provider === 'compat') {
-          const src = sources.compat
+        if (isEndpointProvider(provider)) {
+          const src = sources[provider]
           const baseUrl = src?.baseUrl.trim().replace(/\/+$/, '')
           if (!src || !baseUrl) return
-          const moved = catalog.compat?.baseUrl !== baseUrl
+          const moved = catalog[provider]?.baseUrl !== baseUrl
           if (!force && !moved && !catalogStale(catalog, provider)) return
           const models = await fetchCompatModels(baseUrl, src.key?.trim() || undefined)
-          if (models.length > 0) next.compat = { fetchedAt: Date.now(), models, baseUrl }
+          if (models.length > 0) next[provider] = { fetchedAt: Date.now(), models, baseUrl }
           return
         }
         const key = sources[provider]?.key.trim()

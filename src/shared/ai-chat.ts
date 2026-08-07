@@ -24,10 +24,17 @@ import type {
   AiProviderId,
   AiUsage,
   FileError,
+  LocalServiceId,
   ThinkingLevel
 } from './types'
 import { remoteModel } from './ai-model-catalog'
-import { COMPAT_SERVICES, isCompatService, OPENAI_REASONING_RE } from './ai-provider-profile'
+import {
+  COMPAT_SERVICES,
+  isCompatService,
+  isLocalService,
+  localBaseUrl,
+  OPENAI_REASONING_RE
+} from './ai-provider-profile'
 import { DEFAULT_AZURE_API_VERSION } from './defaults'
 import { AI_ERRORS } from './engine-errors'
 
@@ -856,6 +863,8 @@ export interface ProviderChatParams {
   models: Record<AiProviderId, string>
   azure: { endpoint: string; deployment: string; apiVersion: string }
   compat: { baseUrl: string }
+  /** Per local server: the user's own endpoint, '' for the shipped default */
+  local: Record<LocalServiceId, string>
   thinking: ThinkingLevel
   /** Live model catalog (capability data for request shaping); absent or empty
    *  falls back to the per-family heuristics */
@@ -870,8 +879,27 @@ export interface ProviderChatParams {
  *  missing-key case in its own words); this only validates provider-specific
  *  extras (Azure endpoint/deployment). Aborts surface as AI_ERRORS.aborted. */
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
-  const { provider, key, models, azure, compat, thinking, catalog, req, emit, signal } = params
+  const { provider, key, models, azure, compat, local, thinking, catalog, req, emit, signal } =
+    params
   try {
+    // The local servers (Ollama, LM Studio): fixed-by-default endpoint the
+    // user may override, no key unless their server wants one. Same Chat
+    // Completions path as everything else compatible; an unpicked model is
+    // the named one-click-fixable state, not a config failure.
+    if (isLocalService(provider)) {
+      const baseUrl = localBaseUrl(provider, local[provider]).replace(/\/+$/, '')
+      const model = models[provider].trim()
+      if (!model) return AI_ERRORS.modelUnchosen
+      return await chatOpenAiCompatible(
+        `${baseUrl}/chat/completions`,
+        key ? { authorization: `Bearer ${key}` } : {},
+        model,
+        thinking,
+        req,
+        emit,
+        signal
+      )
+    }
     // The first-class hosted services (OpenRouter, Gemini, xAI, Mistral,
     // Groq): fixed base URL, Bearer key, shared Chat Completions path. Their
     // model lists are live-fetched, so an empty model means "not picked yet"

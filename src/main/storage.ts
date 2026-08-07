@@ -44,6 +44,8 @@ const DEFAULT_AI: StoredAiConfig = {
   models: { ...DEFAULT_AI_MODELS },
   azure: { endpoint: '', deployment: '', apiVersion: '' },
   compat: { baseUrl: '' },
+  // '' = the shipped default endpoint for that server (LOCAL_SERVICES)
+  local: { ollama: '', lmstudio: '' },
   thinking: 'medium',
   keys: {
     anthropic: '',
@@ -54,6 +56,8 @@ const DEFAULT_AI: StoredAiConfig = {
     xai: '',
     mistral: '',
     groq: '',
+    ollama: '',
+    lmstudio: '',
     compat: '',
     mock: ''
   }
@@ -78,6 +82,7 @@ export function mergeAiConfig(
     models: { ...base.models, ...patch.models },
     azure: { ...base.azure, ...patch.azure },
     compat: { ...base.compat, ...patch.compat },
+    local: { ...base.local, ...patch.local },
     thinking: patch.thinking ?? base.thinking,
     keys: { ...base.keys, ...patch.keys }
   }

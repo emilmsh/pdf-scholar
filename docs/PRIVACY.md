@@ -60,7 +60,7 @@ None of these stop a program already running as your user: it can ask for the ke
 to be decrypted, exactly as the app does. That is the ceiling for anything that
 remembers a credential without asking you for a master password every time, so
 set a spending cap in the provider's console as well — the app's key settings link
-straight to it.
+straight to that console.
 
 ## Automatic updates (desktop app)
 

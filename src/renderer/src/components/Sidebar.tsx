@@ -497,8 +497,11 @@ function AnnotationList({
   onExportMargin(): void
 }): React.JSX.Element {
   const [query, setQuery] = useState('')
-  const [colorFilter, setColorFilter] = useState<[number, number, number] | null>(null)
-  const [typeFilter, setTypeFilter] = useState<string | null>(null)
+  // Colours and types are MULTI-select: any of the picked colours, any of the
+  // picked types (pen AND text is a real thing to want). Empty = no filter.
+  // Across the two rows they still narrow together, as does the search field.
+  const [colorFilter, setColorFilter] = useState<[number, number, number][]>([])
+  const [typeFilter, setTypeFilter] = useState<string[]>([])
   /** null = everything; true = only rows with a comment; false = only without */
   const [withComment, setWithComment] = useState<boolean | null>(null)
   const [clearAsk, setClearAsk] = useState(false)
@@ -541,10 +544,11 @@ function AnnotationList({
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    const typeGroup = TYPE_FILTERS.find((g) => g.key === typeFilter)
+    const typeGroups = TYPE_FILTERS.filter((g) => typeFilter.includes(g.key))
     return flat.filter(({ record }) => {
-      if (colorFilter && colorDistance(record.color, colorFilter) > 0.06) return false
-      if (typeGroup && !typeGroup.types.has(record.type)) return false
+      if (colorFilter.length && !colorFilter.some((c) => colorDistance(record.color, c) <= 0.06))
+        return false
+      if (typeGroups.length && !typeGroups.some((g) => g.types.has(record.type))) return false
       if (withComment !== null && !!(record.contents ?? '').trim() !== withComment) return false
       if (!needle) return true
       const haystack = `${record.contents ?? ''} ${excerpts.get(record.id) ?? ''}`.toLowerCase()
@@ -593,25 +597,26 @@ function AnnotationList({
       {marginControls}
       <div className="annot-export">
         {/* Exports first (the tab's most-wanted actions), then the AI helper,
-            then the destructive odd-one-out. Four buttons under one heading —
-            «PDF (marg)» says the difference itself. TXT was dropped: Markdown
-            IS plain text, and Word covers the paste-into-a-document case. */}
+            then the destructive odd-one-out. Four equal formats in a 2×2 grid,
+            each with a one-line tooltip — the labels are file formats, and
+            «PDF (marg)» in particular is a different KIND of export (the
+            document itself, with the comments printed beside it), which no
+            three-word label can carry. TXT was dropped: Markdown IS plain
+            text, and Word covers the paste-into-a-document case. */}
         <div className="annot-export-head">
           <span>{t('side.export')}</span>
         </div>
-        <div className="annot-export-row">
-          <button disabled={empty} onClick={() => onExport('markdown')}>
+        <div className="annot-export-grid">
+          <button disabled={empty} onClick={() => onExport('markdown')} title={t('side.exportMdTip')}>
             MD
           </button>
-          <button disabled={empty} onClick={() => onExport('html')}>
+          <button disabled={empty} onClick={() => onExport('html')} title={t('side.exportHtmlTip')}>
             HTML
           </button>
-          <button disabled={empty} onClick={() => onExport('docx')}>
+          <button disabled={empty} onClick={() => onExport('docx')} title={t('side.exportDocxTip')}>
             Word
           </button>
-        </div>
-        <div className="annot-export-row">
-          <button disabled={empty} onClick={onExportMargin}>
+          <button disabled={empty} onClick={onExportMargin} title={t('side.exportMarginTip')}>
             {t('side.exportMarginBtn')}
           </button>
         </div>
@@ -644,26 +649,32 @@ function AnnotationList({
             <button
               key={c.hex}
               className={`annot-filter-dot${
-                colorFilter && colorDistance(c.rgb, colorFilter) < 0.001 ? ' active' : ''
+                colorFilter.some((p) => colorDistance(c.rgb, p) < 0.001) ? ' active' : ''
               }`}
               style={{ background: c.hex }}
-              title={t('side.showOnly', { color: colorLabel(c).toLowerCase() })}
+              title={t('side.filterOn', { name: colorLabel(c).toLowerCase() })}
               onClick={() =>
                 setColorFilter((prev) =>
-                  prev && colorDistance(c.rgb, prev) < 0.001 ? null : c.rgb
+                  prev.some((p) => colorDistance(c.rgb, p) < 0.001)
+                    ? prev.filter((p) => colorDistance(c.rgb, p) >= 0.001)
+                    : [...prev, c.rgb]
                 )
               }
             />
           ))}
-          {/* Type chips share the row's grammar: click to show only, click
-              again to clear */}
+          {/* Type chips share the row's grammar: click to add to the filter,
+              click again to take it back out */}
           <span className="annot-filter-sep" />
           {TYPE_FILTERS.map(({ key, Icon, labelKey }) => (
             <button
               key={key}
-              className={`annot-filter-type${typeFilter === key ? ' active' : ''}`}
-              title={t('side.showOnly', { color: t(labelKey).toLowerCase() })}
-              onClick={() => setTypeFilter((prev) => (prev === key ? null : key))}
+              className={`annot-filter-type${typeFilter.includes(key) ? ' active' : ''}`}
+              title={t('side.filterOn', { name: t(labelKey).toLowerCase() })}
+              onClick={() =>
+                setTypeFilter((prev) =>
+                  prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+                )
+              }
             >
               <Icon size={14} />
             </button>

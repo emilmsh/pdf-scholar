@@ -1,5 +1,5 @@
 // The provider/model catalogue: which providers exist, which models each one
-// offers, what a model is called in the UI, and where its spending cap lives.
+// offers, what a model is called in the UI, and where its API key is issued.
 // Pure data plus formatting/merge helpers — no JSX, no state.
 //
 // Its own file because three separate surfaces read it (the key manager, the
@@ -10,10 +10,10 @@
 // (modelOptions below), so new models appear without an app update and retired
 // ones get flagged. Refresh workflow for the curated data: docs/MODEL-UPDATE.md
 // (`npm run check:models` reports the drift).
-import type { AiModelCatalog, AiProviderId, ThinkingLevel } from '../../../shared/types'
+import type { AiModelCatalog, AiProviderId, LocalServiceId, ThinkingLevel } from '../../../shared/types'
 import { isLocalEndpoint, remoteModel } from '../../../shared/ai-model-catalog'
 import type { CatalogProviderId } from '../../../shared/ai-model-catalog'
-import { isCompatService } from '../../../shared/ai-provider-profile'
+import { isCompatService, isEndpointProvider } from '../../../shared/ai-provider-profile'
 import { t } from '../i18n'
 import type { MsgKey } from '../i18n'
 
@@ -35,19 +35,23 @@ export const providerLabels = (): { id: AiProviderId; label: string }[] => [
   { id: 'xai', label: 'xAI (Grok)' },
   { id: 'mistral', label: 'Mistral' },
   { id: 'groq', label: 'Groq' },
+  { id: 'ollama', label: LOCAL_LABELS.ollama },
+  { id: 'lmstudio', label: LOCAL_LABELS.lmstudio },
   { id: 'compat', label: t('ai.providerCompat') },
   { id: 'mock', label: t('ai.providerMock') }
 ]
 
-/** Base-URL presets for the compat provider — since the hosted services
- *  became first-class key slots (fase 10.3) only the LOCAL servers live
- *  here, plus whatever URL the user types. `modelHint` is only a placeholder
- *  example for the model-id field, never sent anywhere. Verified monthly
- *  (docs/MAINTENANCE.md row 4). */
-export const compatPresets = (): { label: string; url: string; modelHint: string }[] => [
-  { label: `Ollama (${t('ai.localTag')})`, url: 'http://localhost:11434/v1', modelHint: 'llama3.1' },
-  { label: `LM Studio (${t('ai.localTag')})`, url: 'http://localhost:1234/v1', modelHint: 'qwen2.5-7b-instruct' }
-]
+/** What the two local servers are called in the UI. The «(lokal)» tag is the
+ *  whole point of the name — it is what separates them from the hosted rows
+ *  at a glance — so it is translated, and the product names are not. */
+export const LOCAL_LABELS: Record<LocalServiceId, string> = {
+  get ollama() {
+    return `Ollama (${t('ai.localTag')})`
+  },
+  get lmstudio() {
+    return `LM Studio (${t('ai.localTag')})`
+  }
+}
 
 // Curated, verified model lists (see docs/agent-notes/modeller-api.md),
 // ordered by capability (heaviest first) with clean names only — the
@@ -78,6 +82,8 @@ export const MODELS: Record<
   xai: [],
   mistral: [],
   groq: [],
+  ollama: [],
+  lmstudio: [],
   compat: [],
   mock: [{ id: 'mock-1', label: 'Testmodell (mock)', short: 'Testmodell' }]
 }
@@ -108,24 +114,23 @@ export interface ModelOption {
  *  list does not know yet, in the provider's own (newest-first) order. With no
  *  fetched catalog this degrades to exactly the curated list.
  *
- *  For compat, pass the configured base URL: the snapshot remembers which
- *  endpoint it came from, and a list fetched from another server must not
- *  show against this one. */
+ *  For the endpoint-backed providers (Ollama, LM Studio, custom), pass the
+ *  configured base URL: the snapshot remembers which endpoint it came from,
+ *  and a list fetched from another server must not show against this one. */
 export function modelOptions(
   provider: AiProviderId,
   catalog?: AiModelCatalog,
-  compatBaseUrl?: string
+  endpointUrl?: string
 ): ModelOption[] {
   const curated = MODELS[provider] ?? []
-  const remote =
-    provider === 'compat'
-      ? catalog?.compat &&
-        catalog.compat.baseUrl === (compatBaseUrl ?? '').trim().replace(/\/+$/, '')
-        ? catalog.compat
-        : undefined
-      : provider === 'anthropic' || provider === 'openai' || isCompatService(provider)
-        ? catalog?.[provider]
-        : undefined
+  const snapshot = isEndpointProvider(provider) ? catalog?.[provider] : undefined
+  const remote = isEndpointProvider(provider)
+    ? snapshot && snapshot.baseUrl === (endpointUrl ?? '').trim().replace(/\/+$/, '')
+      ? snapshot
+      : undefined
+    : provider === 'anthropic' || provider === 'openai' || isCompatService(provider)
+      ? catalog?.[provider]
+      : undefined
   if (!remote) return curated.map((m) => ({ ...m, curated: true, missing: false }))
   const remoteIds = new Set(remote.models.map((m) => m.id))
   const options: ModelOption[] = curated.map((m) => ({
@@ -134,7 +139,8 @@ export function modelOptions(
     missing: !remoteIds.has(m.id)
   }))
   // «lokal»-merke: models served from a loopback endpoint say so in the list
-  // (the short chip name stays clean)
+  // (the short chip name stays clean). The named local servers carry it in
+  // their provider name already, so only the custom endpoint needs it here.
   const localSuffix =
     provider === 'compat' && catalog?.compat && isLocalEndpoint(catalog.compat.baseUrl)
       ? ` · ${t('ai.localTag')}`
@@ -198,6 +204,8 @@ const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {
   // frontier model (≥128k) or a local model configured with a few thousand
   // tokens of context. 32k excerpts early rather than erroring mid-question;
   // the Ollama enrichment (/api/show) replaces the guess with the real number.
+  ollama: 32_000,
+  lmstudio: 32_000,
   compat: 32_000,
   mock: 200_000
 }
@@ -233,22 +241,26 @@ export function modelSupportsImages(
   return remoteModel(catalog, cat, modelId)?.vision !== false
 }
 
-// Where each provider lets you set a spending cap — linked from the key field
-// so the reminder to cap a key is one click from acting on it.
-export const SPEND_CAP_URLS: Partial<Record<AiProviderId, string>> = {
-  anthropic: 'https://console.anthropic.com/settings/limits',
-  openai: 'https://platform.openai.com/settings/organization/limits',
-  azure: 'https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview',
-  openrouter: 'https://openrouter.ai/settings/credits',
-  gemini: 'https://aistudio.google.com/usage',
+// Where each provider hands out an API key — linked from the key field, since
+// an empty field is useless until you have been there. The spending cap and the
+// usage page live in the same console, one click from these, which is why the
+// hint above the row can say «set a cap while you are there» and mean it.
+// (Azure is the odd one: the key belongs to the resource, not the account, so
+// this lands on the Foundry portal that lists them.)
+export const KEY_CONSOLE_URLS: Partial<Record<AiProviderId, string>> = {
+  anthropic: 'https://console.anthropic.com/settings/keys',
+  openai: 'https://platform.openai.com/api-keys',
+  azure: 'https://ai.azure.com/',
+  openrouter: 'https://openrouter.ai/settings/keys',
+  gemini: 'https://aistudio.google.com/apikey',
   xai: 'https://console.x.ai/',
-  mistral: 'https://console.mistral.ai/billing/',
-  groq: 'https://console.groq.com/settings/billing'
+  mistral: 'https://console.mistral.ai/api-keys/',
+  groq: 'https://console.groq.com/keys'
 }
 
-/** Short names for the spend-cap link row (the full keyProviders names are
+/** Short names for the key-console link row (the full keyProviders names are
  *  too long to sit inline in one sentence) */
-export const SPEND_CAP_LABELS: Partial<Record<AiProviderId, string>> = {
+export const KEY_CONSOLE_LABELS: Partial<Record<AiProviderId, string>> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   azure: 'Azure',
@@ -278,5 +290,7 @@ export const keyProviders = (): { id: AiProviderId; name: string }[] => [
   { id: 'xai', name: 'xAI (Grok)' },
   { id: 'mistral', name: 'Mistral' },
   { id: 'groq', name: 'Groq' },
+  { id: 'ollama', name: LOCAL_LABELS.ollama },
+  { id: 'lmstudio', name: LOCAL_LABELS.lmstudio },
   { id: 'compat', name: t('ai.providerCompat') }
 ]

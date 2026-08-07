@@ -45,6 +45,7 @@ const {
   runProviderChat,
   PROVIDER_PROFILES,
   COMPAT_SERVICES,
+  LOCAL_SERVICES,
   fetchCompatModels,
   refreshCatalog,
   isLocalEndpoint,
@@ -161,11 +162,14 @@ function baseParams(overrides) {
       xai: 'grok-4',
       mistral: 'mistral-large-latest',
       groq: 'llama-3.3-70b-versatile',
+      ollama: 'llama3.1',
+      lmstudio: 'qwen2.5-7b-instruct',
       compat: 'llama3.1',
       mock: 'mock-1'
     },
     azure: { endpoint: 'https://unit.openai.azure.com', deployment: 'dep1', apiVersion: '' },
     compat: { baseUrl: 'http://localhost:11434/v1/' },
+    local: { ollama: '', lmstudio: '' },
     thinking: 'medium',
     req: {
       requestId: 1,
@@ -553,6 +557,55 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
     models: { anthropic: '', openai: '', azure: '', openrouter: 'openai/gpt-5.2', gemini: '', xai: '', mistral: '', groq: '', compat: '', mock: '' }
   })
   ok(calls[0]?.body?.reasoning_effort === 'medium', 'vendor-prefixed reasoning id gets reasoning_effort')
+}
+
+// ---------- the named local servers (Ollama, LM Studio) ----------
+
+section('local servers: shipped endpoint, overridable, keyless by default')
+for (const [svc, info] of Object.entries(LOCAL_SERVICES)) {
+  responder = () => chatCompletionsSse({
+    deltas: ['Svar. [KILDE s.1: "Innledningen setter rammen"]'],
+    usage: { prompt_tokens: 4, completion_tokens: 2 }
+  })
+  const { result } = await run({ provider: svc, key: '' })
+  const body = calls[0]?.body
+  ok(
+    calls[0]?.url === `${info.baseUrl}/chat/completions`,
+    `${svc}: ships a working endpoint (got ${calls[0]?.url})`
+  )
+  ok(calls[0]?.headers.get('authorization') === null, `${svc}: no key, no Authorization header`)
+  ok(/CITATION RULES/.test(body?.messages?.[0]?.content ?? ''), `${svc}: quote contract attached`)
+  ok(body?.tools === undefined, `${svc}: no web-search tool`)
+  const localUser = body?.messages?.find((m) => Array.isArray(m.content))
+  ok(localUser?.content?.some((p) => p.type === 'image_url'), `${svc}: image as image_url part`)
+  ok(result.ok === true, `${svc}: answers`)
+  observed[svc] = {
+    quoteContract: /CITATION RULES/.test(body?.messages?.[0]?.content ?? ''),
+    nativeCitations: false,
+    webTool: (body?.tools ?? []).length > 0,
+    images: localUser?.content?.some((p) => p.type === 'image_url') === true
+  }
+}
+{
+  // The user's own address wins over ours, and a key is still sent when the
+  // server sits behind something that wants one
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({
+    provider: 'ollama',
+    key: 'sk-proxy',
+    local: { ollama: 'http://box.local:11500/v1/', lmstudio: '' }
+  })
+  ok(calls[0]?.url === 'http://box.local:11500/v1/chat/completions', 'own endpoint wins, trailing slash trimmed')
+  ok(calls[0]?.headers.get('authorization') === 'Bearer sk-proxy', 'a key is sent when there is one')
+
+  // Nothing picked yet: the same named, one-click-fixable state the hosted
+  // services give — never a config error, the server list decides
+  const unchosen = await run({
+    provider: 'lmstudio',
+    key: '',
+    models: { anthropic: '', openai: '', azure: '', ollama: '', lmstudio: '', compat: '', mock: '' }
+  })
+  ok(unchosen.result.code === 'ai-model-unchosen', `no model picked → ai-model-unchosen (got ${unchosen.result.code})`)
 }
 
 // ---------- compat catalog fetcher (fase 10.2: Ollama enrichment) ----------
