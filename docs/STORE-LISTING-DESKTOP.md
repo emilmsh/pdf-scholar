@@ -149,7 +149,6 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Handwritten notes are written in a new hand — slanted and joined-up, the way a pen actually moves, instead of the upright printing they used before
 • The handwriting font is smaller too, so a document carrying handwritten notes is smaller than it used to be
 • Pinch-zoom lands where you meant it to on a rotated page or in a two-page spread: releasing near fit-width now snaps to the same fit the toolbar button gives
-• Settings can send you straight to Windows' own "Default apps" page, if and when you want to choose which app opens your PDFs
 ```
 
 **NO:**
@@ -157,7 +156,6 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Håndskrevne notater skrives med en ny hånd — skrå og sammenbundet, slik en penn faktisk beveger seg, i stedet for den loddrette blokkskriften de hadde før
 • Håndskriftfonten er også mindre, så et dokument med håndskrevne notater blir mindre enn det pleide
 • Knip-zoom lander der du mente på en rotert side eller i tosiders oppslag: slipper du nær tilpass-bredde, snapper den nå til samme tilpasning som knappen i verktøylinja gir
-• Innstillingene kan sende deg rett til Windows' egen «Standardapper»-side, hvis og når du vil velge hvilken app som åpner PDF-ene dine
 ```
 
 ---

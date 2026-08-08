@@ -140,9 +140,6 @@ the current desktop-vs-extension parity.
   navigation (Alt+← / Alt+→) after following internal links
 - Remembers your reading position and recent files; a **library** home screen lists what
   you have been reading
-- Settings can open Windows' own **Default apps** page, if and when you want to choose
-  which application opens your PDFs. It never asks — Windows has not let an app make
-  itself the default since Windows 8, and which reader opens your files is your call
 - Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
   window** to put two documents side by side, or across the bar to reorder
 
