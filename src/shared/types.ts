@@ -551,6 +551,11 @@ export interface PdfxApi {
   deleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult>
   /** Open an http(s) URL in the system browser */
   openExternal(url: string): void
+  /** Open Windows' "Default apps" settings page. Takes no URL on purpose —
+   *  `openExternal` is restricted to http(s), and this is the one other target
+   *  we want, so it is a named action with the address held in the main
+   *  process. A no-op off Windows and outside Electron. */
+  openDefaultAppsSettings(): void
   /** Open a new app window, optionally loading a document (side-by-side use) */
   newWindow(path?: string): void
   /** A tab was dragged out and released. Main hit-tests the cursor against

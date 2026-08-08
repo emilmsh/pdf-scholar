@@ -72,8 +72,20 @@ regressions are treated as bugs, not as acceptable platform lag.
    ctrl+wheel, also on macOS).
 4. **File open plumbing**: Windows/Linux get paths via argv + `second-instance`;
    macOS via `app.on('open-file')`. Same renderer behavior (`open-path` event).
-5. **Windows-only cosmetics**: taskbar Jump List. macOS-only: Dock + app menu,
-   app stays alive on window-all-closed.
+5. **Windows-only cosmetics**: taskbar Jump List, and the **«Velg standardapp
+   for PDF-filer»** entry in the settings menu, which opens
+   `ms-settings:defaultapps` (`app:open-default-apps`, a named IPC whose target
+   is a constant in main — `shell:open-external` stays restricted to http(s),
+   and widening it for one link would hand the renderer every URL scheme the OS
+   knows). No macOS or Linux equivalent is planned: neither offers a settings
+   deep link an app can rely on, and in the browser/extension the question does
+   not arise, since the browser is already the thing opening PDFs. The entry is
+   hidden off Windows rather than shown inert. Deliberately it makes **no claim
+   about whether we are the default** — an app that says that unprompted is
+   nagging, and Windows has not let an application make itself the default since
+   Windows 8, so opening the page is the whole of what any app can do (Emil's
+   decision 2026-08-08: the user chooses, and we do not pester).
+   macOS-only: Dock + app menu, app stays alive on window-all-closed.
 6. **Linux packaging reality**: the AppImage gets no menu entry / PDF
    association without AppImageLauncher, and Ubuntu 24.04+'s AppArmor default
    blocks the Chromium sandbox inside AppImages — the **deb is the recommended

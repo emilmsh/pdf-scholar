@@ -891,6 +891,21 @@ function registerIpc(): void {
     if (/^https?:\/\//i.test(url)) shell.openExternal(url)
   })
 
+  // Windows' own "Default apps" page. A NAMED action rather than a URL the
+  // renderer supplies, deliberately: shell:open-external above is restricted to
+  // http(s), and widening it to let one ms-settings: link through would hand the
+  // renderer every URL scheme the OS knows. The target is a constant here, so
+  // the only thing the renderer can ask for is this exact page.
+  //
+  // We open the list rather than deep-linking to our own entry: the documented
+  // per-app parameters are for packaged (MSIX) apps, and guessing at an
+  // undocumented one for the NSIS build would fail silently on some machines.
+  // Windows has not let an app make itself the default since Windows 8; this is
+  // the whole of what any application can do.
+  ipcMain.on('app:open-default-apps', () => {
+    if (process.platform === 'win32') shell.openExternal('ms-settings:defaultapps')
+  })
+
   ipcMain.on('shell:show-in-folder', (_e, path: string) => {
     if (typeof path === 'string' && existsSync(path)) shell.showItemInFolder(path)
   })

@@ -2,6 +2,11 @@
  *  targets alike (Electron reports MacIntel on Apple Silicon too). */
 export const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform)
 
+/** True on Windows, by the same navigator sniff. Only for gating things that
+ *  are genuinely Windows-shaped — the Settings deep link below, the Jump List —
+ *  never for keyboard behaviour, which goes through primaryMod. */
+export const isWindows = /Win/.test(navigator.platform)
+
 /** The platform's primary command modifier: Cmd on macOS, Ctrl elsewhere.
  *  Use for keyboard SHORTCUTS only — ctrl+wheel zoom must keep testing
  *  ctrlKey on every platform (trackpad pinch arrives as ctrl+wheel, also

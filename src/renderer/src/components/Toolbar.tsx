@@ -7,6 +7,7 @@ import type {
   UpdateUnsupportedReason
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
+import { isWindows } from '../platform'
 import {
   annotTypeLabel,
   colorLabel,
@@ -50,6 +51,7 @@ import {
   IconFullscreen,
   IconGear,
   IconComment,
+  IconExternal,
   IconHeart,
   IconMarginNotes,
   IconMarker,
@@ -1638,6 +1640,26 @@ export default function Toolbar({
                 </button>
               )}
               {updOutcome && <div className="menu-hint">{updateOutcomeText(updOutcome)}</div>}
+
+              {/* Windows will not let an application make itself the default —
+                  it has not since Windows 8 — so this opens the Settings page
+                  and stops there. It says nothing about whether we ARE the
+                  default: an app that volunteers that is nagging, and not
+                  nagging is the whole point of the entry (Emil, 2026-08-08).
+                  It never appears on its own; you have to open this menu. */}
+              {isElectron && isWindows && (
+                <button
+                  className="menu-action"
+                  title={t('settings.defaultAppTip')}
+                  onClick={() => {
+                    setSettingsMenuOpen(false)
+                    bridge.openDefaultAppsSettings()
+                  }}
+                >
+                  <IconExternal size={15} />
+                  {t('settings.defaultApp')}
+                </button>
+              )}
 
               <div className="theme-menu-sep" />
 

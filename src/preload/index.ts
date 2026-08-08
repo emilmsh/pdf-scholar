@@ -30,6 +30,7 @@ const api: PdfxApi = {
   updateAnnotation: (req: ModifyAnnotationRequest) => ipcRenderer.invoke('annotation:update', req),
   deleteAnnotation: (req: DeleteAnnotationRequest) => ipcRenderer.invoke('annotation:delete', req),
   openExternal: (url: string) => ipcRenderer.send('shell:open-external', url),
+  openDefaultAppsSettings: () => ipcRenderer.send('app:open-default-apps'),
   newWindow: (path?: string) => ipcRenderer.send('window:new', path),
   tabDropAtCursor: (path: string) => ipcRenderer.invoke('tab:drop-at-cursor', path),
   docOpened: (path: string) => ipcRenderer.send('doc:opened', path),
