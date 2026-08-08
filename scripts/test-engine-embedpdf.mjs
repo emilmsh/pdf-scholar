@@ -373,7 +373,7 @@ for (const req of reqs) {
 
   const raw = fs.readFileSync(HFILE)
   check('handnote: the font is EMBEDDED (/FontFile2)', raw.includes(Buffer.from('FontFile2')))
-  check('handnote: it is the handwriting font', raw.includes(Buffer.from('PatrickHand')))
+  check('handnote: it is the handwriting font', raw.includes(Buffer.from('Caveat')))
 
   const pdf = mupdf.Document.openDocument(raw, 'application/pdf').asPDF()
   const page = pdf.loadPage(1)
@@ -388,6 +388,10 @@ for (const req of reqs) {
       c && !c.isNull() ? JSON.stringify(c.asString()) : 'missing')
     const mark = obj.get('PDFX_Hand')
     check('handnote: marked as ours, not a foreign image stamp', !!mark && !mark.isNull())
+    const pen = obj.get('PDFX_HandFont')
+    check('handnote: the pen it was written with is recorded',
+      !!pen && !pen.isNull() && pen.asString() === 'Caveat',
+      pen && !pen.isNull() ? pen.asString() : 'missing')
     const ap = obj.get('AP')?.get('N')
     const content = ap && !ap.isNull()
       ? new TextDecoder('latin1').decode(ap.readStream().asUint8Array()) : ''
@@ -443,6 +447,34 @@ for (const req of reqs) {
     check('handnote: the redraw state travels with it', !!stored && !stored.isNull(),
       stored && !stored.isNull() ? `${stored.asString().split('\n').length} lines` : 'missing')
     p2.destroy()
+  }
+
+  // A note keeps the PEN it was written with. Every change to a handnote
+  // re-bakes its glyphs, so a recolour of a note written in the old font would
+  // otherwise re-set it in whatever font the app writes with today — a file
+  // whose words change typeface because the user picked another colour. The
+  // font is recorded on the annotation, and the re-bake reads it back.
+  const h3 = await applyAnnotation({
+    ...hbase, type: 'handnote', quads: q(300, 400, 150, 70), fontSize: 15,
+    lines, contents: lines.join(' '), handFont: 'patrickhand'
+  })
+  check('handnote: an old-pen note can be written', 'ok' in h3, 'error' in h3 ? h3.error : '')
+  const rec3 = await updateAnnotation({
+    path: HFILE, pageIndex: 1, id: h3.id, color: [0.1, 0.4, 0.2]
+  })
+  check('handnote: recolouring one works', 'ok' in rec3, 'error' in rec3 ? rec3.error : '')
+  await flushAnnotations(HFILE)
+  {
+    const raw3 = fs.readFileSync(HFILE)
+    check('handnote: the old pen is still embedded after a recolour',
+      raw3.includes(Buffer.from('PatrickHand')))
+    const p3 = mupdf.Document.openDocument(raw3, 'application/pdf').asPDF()
+    const a3 = p3.loadPage(1).getAnnotations().find((x) => x.getObject().asIndirect() === h3.id)
+    const pen3 = a3?.getObject().get('PDFX_HandFont')
+    check('handnote: and the annotation still names it',
+      !!pen3 && !pen3.isNull() && pen3.asString() === 'Patrick Hand',
+      pen3 && !pen3.isNull() ? pen3.asString() : 'missing')
+    p3.destroy()
   }
   fs.rmSync(HFILE, { force: true })
 }

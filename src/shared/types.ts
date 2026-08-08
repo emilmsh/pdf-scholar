@@ -1,4 +1,5 @@
 // Types shared between the Electron main process, preload bridge and renderer.
+import type { HandFontId } from './hand-note'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one */
 export type ThemeName = 'day' | 'sepia' | 'night' | 'nightHc'
@@ -213,6 +214,10 @@ export interface AnnotateRequest {
    *  with the very same embedded font, so wrapping there and baking here is
    *  what makes the screen and the saved page break lines identically. */
   lines?: string[] | undefined
+  /** handnote only: the pen the lines above were MEASURED with, embedded and
+   *  recorded on the annotation so a later re-bake uses the same one. Omitted
+   *  means today's pen (see src/shared/hand-note.ts). */
+  handFont?: HandFontId | undefined
   /** freetext only: opaque fill behind the text (rgb 0–1). Used by the
    *  margin export's numbered anchor chips, which sit over page content and
    *  must stay readable there. */
@@ -292,6 +297,11 @@ export interface ModifyAnnotationRequest {
         box: PageRect
         fontSize: number
         color: [number, number, number]
+        /** The pen `lines` were measured with. Set ONLY by an edit that
+         *  re-wrapped the words on screen; leaving it out keeps the note in
+         *  the font it was written with, which is what a move, a resize and a
+         *  recolour must do. */
+        font?: HandFontId | undefined
       }
     | undefined
   /** ink (pen): pressures parallel to `strokes`, when the caller holds them.

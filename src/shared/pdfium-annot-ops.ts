@@ -36,7 +36,14 @@ import { buildAnnotation, hexToRgb, linePad, quadsBBox, rgbToHex, strokesBBox, t
 import { ENGINE_ERRORS } from './engine-errors'
 import { snapshotApLessLinks, stripGeneratedLinkAPs } from './link-ap-guard'
 import { decodePressures, encodePressures, inkPressureApContent } from './ink-outline'
-import { HAND_ASCENT, HAND_LINE_HEIGHT, HAND_NOTE_KEY, handFontBytes } from './hand-note'
+import {
+  HAND_LINE_HEIGHT,
+  HAND_NOTE_KEY,
+  handFont,
+  handFontBytes,
+  handFontFromAnnotation
+} from './hand-note'
+import type { HandFont } from './hand-note'
 
 /** wasm32 heap exhaustion: every open/serialize round-trips the whole file
  *  through the WASM heap, so very large documents can exceed what it can grow to
@@ -359,20 +366,22 @@ function drawHandLines(
   box: PageRect,
   fontSize: number,
   color: [number, number, number],
+  /** Which pen — its ascent places the first baseline */
+  font: HandFont,
   /** Awaited by the caller before entering the raw bridge — the font is loaded
    *  on demand and nothing may await under a borrowed page handle. */
   bytes: Uint8Array
 ): boolean {
   const fontData = raw.pdfium.wasmExports.malloc(bytes.length)
   raw.pdfium.HEAPU8.set(bytes, fontData)
-  const font = raw.FPDFText_LoadFont(docPtr, fontData, bytes.length, FPDF_FONT_TRUETYPE, true)
+  const fontPtr = raw.FPDFText_LoadFont(docPtr, fontData, bytes.length, FPDF_FONT_TRUETYPE, true)
   raw.pdfium.wasmExports.free(fontData)
-  if (!font) return false
+  if (!fontPtr) return false
   const [r, g, b] = color.map((v) => Math.round(v * 255))
   try {
     for (let i = 0; i < lines.length; i++) {
       if (lines[i] === '') continue
-      const obj = raw.FPDFPageObj_CreateTextObj(docPtr, font, fontSize)
+      const obj = raw.FPDFPageObj_CreateTextObj(docPtr, fontPtr, fontSize)
       if (!obj) return false
       const ok = withWideString(raw, lines[i], (ptr) => raw.FPDFText_SetText(obj, ptr))
       if (!ok) {
@@ -382,7 +391,7 @@ function drawHandLines(
       raw.FPDFPageObj_SetFillColor(obj, r, g, b, 255)
       // Distance of this baseline BELOW the box's top, flipped into the
       // form's y-up space
-      const down = fontSize * (HAND_ASCENT + i * HAND_LINE_HEIGHT)
+      const down = fontSize * (font.ascent + i * HAND_LINE_HEIGHT)
       raw.FPDFPageObj_Transform(obj, 1, 0, 0, 1, 0, box.h - down)
       if (!raw.FPDFAnnot_AppendObject(annotPtr, obj)) {
         raw.FPDFPageObj_Destroy(obj)
@@ -390,7 +399,7 @@ function drawHandLines(
       }
     }
   } finally {
-    raw.FPDFFont_Close(font)
+    raw.FPDFFont_Close(fontPtr)
   }
   return true
 }
@@ -404,6 +413,12 @@ function drawHandLines(
 const HAND_LINES_KEY = 'PDFX_HandLines'
 const HAND_SIZE_KEY = 'PDFX_HandSize'
 const HAND_COLOR_KEY = 'PDFX_HandColor'
+/** Which pen the words are in. A note without this key predates it, and every
+ *  note written back then was Patrick Hand — so its absence is not "unknown",
+ *  it is an answer (see handFontFromAnnotation). Re-baking reads it: a
+ *  recolour must not silently re-set the note in whatever font the app writes
+ *  with today, in a file that already carries the old one. */
+const HAND_FONT_KEY = 'PDFX_HandFont'
 
 /** Stamp the note as ours AND record what it takes to draw it again. */
 function writeHandState(
@@ -411,7 +426,8 @@ function writeHandState(
   annotPtr: number,
   lines: string[],
   fontSize: number,
-  color: [number, number, number]
+  color: [number, number, number],
+  font: HandFont
 ): void {
   withWideString(raw, '1', (p) => raw.FPDFAnnot_SetStringValue(annotPtr, HAND_NOTE_KEY, p))
   withWideString(raw, lines.join('\n'), (p) =>
@@ -423,6 +439,7 @@ function writeHandState(
   withWideString(raw, rgbToHex(color), (p) =>
     raw.FPDFAnnot_SetStringValue(annotPtr, HAND_COLOR_KEY, p)
   )
+  withWideString(raw, font.name, (p) => raw.FPDFAnnot_SetStringValue(annotPtr, HAND_FONT_KEY, p))
 }
 
 function readAnnotString(raw: RawPdfium, annotPtr: number, key: string): string | null {
@@ -442,6 +459,7 @@ interface HandState {
   fontSize: number
   color: [number, number, number]
   box: PageRect
+  font: HandFont
 }
 
 /** The stored state of a handwritten note, or null if this annotation is not
@@ -473,7 +491,8 @@ function readHandNote(open: OpenDoc, pageIndex: number, id: number): HandState |
         lines: linesRaw.split('\n'),
         fontSize: Number.isFinite(size) && size > 0 ? size : 14,
         color: hex ? hexToRgb(hex) : [0, 0, 0],
-        box
+        box,
+        font: handFontFromAnnotation(readAnnotString(raw, annotPtr, HAND_FONT_KEY))
       }
     })
   )
@@ -523,15 +542,18 @@ async function createHandNote(open: OpenDoc, req: AnnotateRequest): Promise<Anno
   if (!id) return ENGINE_ERRORS.noObjectNumber
 
   // Load the font BEFORE the raw bridge: borrowPage is synchronous and nothing
-  // may await while a page handle is held.
-  const fontBytes = await handFontBytes()
+  // may await while a page handle is held. The renderer names the font it
+  // measured the wrapping with, so screen and file cannot disagree about it.
+  const font = handFont(req.handFont)
+  const fontBytes = await handFontBytes(font.id)
   const drawn = withDocAndPage(engine, docId, req.pageIndex, (docPtr, pagePtr, raw) => {
     const ok = withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
       setAnnotRect(raw, annotPtr, box, pageH)
-      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, req.fontSize ?? 14, req.color, fontBytes)) {
+      const size = req.fontSize ?? 14
+      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, size, req.color, font, fontBytes)) {
         return false
       }
-      writeHandState(raw, annotPtr, lines, req.fontSize ?? 14, req.color)
+      writeHandState(raw, annotPtr, lines, size, req.color, font)
       return true
     })
     if (ok === true) raw.FPDFPage_GenerateContent(pagePtr)
@@ -560,23 +582,28 @@ async function rebakeHandNote(
   box: PageRect,
   fontSize: number,
   color: [number, number, number],
+  /** The note's own pen, unless the caller re-measured the wrapping in
+   *  another one (a text edit does; a move, a resize and a recolour do not) */
+  font: HandFont,
   contents: string | undefined
 ): Promise<boolean> {
   const { engine, doc, docId } = open
   const pageH = doc.pages[pageIndex]?.size.height
   if (!pageH) return false
-  const fontBytes = await handFontBytes()
+  const fontBytes = await handFontBytes(font.id)
   return withDocAndPage(engine, docId, pageIndex, (docPtr, pagePtr, raw) => {
     const ok = withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
       for (let i = raw.FPDFAnnot_GetObjectCount(annotPtr) - 1; i >= 0; i--) {
         raw.FPDFAnnot_RemoveObject(annotPtr, i)
       }
       setAnnotRect(raw, annotPtr, box, pageH)
-      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, fontSize, color, fontBytes)) return false
+      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, fontSize, color, font, fontBytes)) {
+        return false
+      }
       if (contents !== undefined) {
         withWideString(raw, contents, (p) => raw.FPDFAnnot_SetStringValue(annotPtr, 'Contents', p))
       }
-      writeHandState(raw, annotPtr, lines, fontSize, color)
+      writeHandState(raw, annotPtr, lines, fontSize, color, font)
       return true
     })
     if (ok === true) raw.FPDFPage_GenerateContent(pagePtr)
@@ -703,7 +730,8 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
         lines: req.hand!.lines,
         fontSize: req.hand!.fontSize,
         color: req.hand!.color,
-        box: req.hand!.box
+        box: req.hand!.box,
+        font: handFont(req.hand!.font)
       }
       let box = req.hand?.box ?? req.rect ?? req.quads?.[0] ?? base.box
       if (!req.hand && !req.rect && !req.quads && req.translate) {
@@ -717,6 +745,11 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
         box,
         req.hand?.fontSize ?? base.fontSize,
         req.hand?.color ?? req.color ?? base.color,
+        // The note keeps the pen it was written with. Only an edit that
+        // re-wrapped the words on screen may change it, and then only because
+        // the lines it sends were MEASURED in that font — anything else would
+        // bake widths from one font as glyphs from another.
+        req.hand?.font ? handFont(req.hand.font) : base.font,
         req.contents
       )
       return done ? { ok: true, id: req.id } : ENGINE_ERRORS.handNoteFailed

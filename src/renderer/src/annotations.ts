@@ -6,6 +6,7 @@
 // engine and reads the geometry back with an independent library.
 import type { CSSProperties } from 'react'
 import type { AnnotationType, PageRect, ViewRotation } from '../../shared/types'
+import type { HandFontId } from '../../shared/hand-note'
 import { pagePointToView, pageRectToView } from './rotation'
 import { t } from './i18n'
 
@@ -41,6 +42,12 @@ export interface PageAnnotation {
   /** handnote: the text already wrapped, so the overlay breaks lines exactly
    *  where the baked appearance stream does */
   lines?: string[] | undefined
+  /** handnote: the pen the words were written (and measured) with, so the
+   *  overlay paints the note in the font the file actually carries. Absent on
+   *  a record read back from a file — those are painted by pdf.js from the
+   *  appearance stream, and the engine reads the pen off the annotation
+   *  itself. See src/shared/hand-note.ts. */
+  handFont?: HandFontId | undefined
   /** ink/shapes: stroke width in points */
   width?: number | undefined
   /** freetext only */

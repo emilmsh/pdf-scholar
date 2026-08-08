@@ -10,6 +10,7 @@ import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
 import { penNear } from '../pen-input'
 import { HAND_LINE_HEIGHT } from '../../../shared/hand-note'
+import { handFontCss } from '../hand-font'
 import {
   outlineSvgPath,
   PRESSURE_EMA_ALPHA,
@@ -1268,6 +1269,10 @@ function AnnotationMarks({
         className="annot annot-handnote"
         style={{
           ...css,
+          // The pen this note was WRITTEN with, not the one the app writes
+          // with today: a note keeps its font in the file, so the overlay has
+          // to keep it on screen or the two would show different letters.
+          fontFamily: handFontCss(annotation.handFont),
           fontSize: size * scale,
           lineHeight: `${size * HAND_LINE_HEIGHT * scale}px`
         }}

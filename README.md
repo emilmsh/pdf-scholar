@@ -390,6 +390,11 @@ rendering by [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0), plus
 [Electron](https://www.electronjs.org/) (MIT), [React](https://react.dev/) (MIT), the
 [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (MIT) and the
 [Libertinus](https://github.com/alerque/libertinus) wordmark font (SIL OFL 1.1).
+Handwritten notes are written in [Caveat](https://github.com/googlefonts/caveat)
+(SIL OFL 1.1), and notes made before v0.36 keep
+[Patrick Hand](https://github.com/google/fonts/tree/main/ofl/patrickhand)
+(SIL OFL 1.1), the font they were written with — both travel inside the PDFs you
+save, which is what makes a note look the same in every reader.
 ([mupdf](https://mupdf.com/), AGPL, is used only as a development-time test
 verifier and ships with no release build.)
 
