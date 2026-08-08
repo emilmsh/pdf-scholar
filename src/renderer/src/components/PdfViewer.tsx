@@ -1743,14 +1743,17 @@ export default function PdfViewer({
 
   /** Snap a pinch-commit scale to fit-width/fit-height/fit-page when close.
    *  Tight threshold: the snap adjusts the committed scale away from what the
-   *  gesture showed on screen, so anything above ~2.5% reads as a jump. */
+   *  gesture showed on screen, so anything above ~2.5% reads as a jump.
+   *  The candidates come from fitDenom() — the same view-space denominator
+   *  fit-width/fit-page zoom to — so a rotated column or a two-page spread
+   *  snaps to the fit the buttons would give, not to a raw-page phantom. */
   const snapScale = useCallback(
     (raw: number): number => {
       const el = containerRef.current
       if (!el || sizes.length === 0 || el.clientWidth === 0) return raw
-      const { w, h } = sizes[clamp(currentPage - 1, 0, sizes.length - 1)]
-      const fitW = (el.clientWidth - SIDE_PAD - marginGutterRef.current) / w
-      const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / h
+      const denom = fitDenom()
+      const fitW = (el.clientWidth - SIDE_PAD - marginGutterRef.current) / denom.w
+      const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
       for (const candidate of [fitW, fitH, Math.min(fitW, fitH)]) {
         if (
           candidate >= ZOOM_MIN &&
@@ -1762,7 +1765,7 @@ export default function PdfViewer({
       }
       return raw
     },
-    [sizes, currentPage]
+    [sizes, fitDenom]
   )
 
   // Commit a pinch/ctrl-wheel gesture: swap the cheap CSS transform for a
