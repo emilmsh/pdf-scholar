@@ -130,7 +130,89 @@ Synkmapper (OneDrive/Dropbox) dekker skybehovet implisitt allerede, og hjemskjer
     verifisert av mupdf/EmbedPDF/pdf.js, 413 MB-fil annoteres på ~0,3–0,5 s). Under 150 MB: doc-cache
     med debounced flush. Test: `npm run test:appender`.
 
-## Neste bolk — penn og nettbrett (retning valgt 2026-08-02)
+## Fase 11 — Stabil release (v1.0) — plan lagt 2026-08-08
+Mål (Emils formulering): et punkt der ingen manglende funksjon hindrer noen i å ta
+appen i bruk, der appen er testet og ryddet nok til å tåle drift, og der alle
+kanaler viser samme versjon — slik at vedlikeholdet kan krympe til månedsauditen
+og appen kan annonseres på Emils LinkedIn.
+
+**Porten er distribusjon, ikke kode.** Ved v0.35.0 er alle fem søylene i
+`docs/MESSAGING.md` levert, og det som står igjen i fasene over er dybde
+(lasso, verktøysett-system, begrepshjelp, KI-nivå 3) — ikke noe som stopper
+adopsjon. Det som faktisk stopper adopsjon er tre hull i bolk 1 og at Edge- og
+Chrome-listingene ennå ikke er publisert. **LinkedIn-posten går først når GitHub,
+MS Store, Edge, Chrome og Homebrew alle viser samme versjon** — ellers sender
+posten folk til en butikk som ligger to versjoner bak.
+
+Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas etter v1.0.
+
+### Bolk 1 — adopsjonshullene (v0.36)
+- [ ] **Utfylling av skjemaer (AcroForm).** Appen tegner ikke feltwidgets i det
+  hele tatt i dag, så en skjema-PDF ser tom og død ut — det leses som en feil,
+  ikke som en manglende funksjon. Edge fyller ut skjemaer, og Edge er
+  interop-/paritetsbaren vår (fase 4-porten, `docs/PLATFORMS.md`). PDFium kan
+  det allerede, så kostnaden er UI + lagringssti, ikke en ny motor. Merk at
+  **skjema-OPPRETTELSE** forblir utenfor omfang (`docs/SPEC.md` §10) — bare
+  utfylling kommer inn.
+- [ ] **«Sett som standard PDF-leser» + førstegangsoppsett.** Installeren kaprer
+  bevisst ikke standardappen (fase 1), men appen sier heller ingenting — så folk
+  installerer, dobbeltklikker en PDF, og Edge åpner den. Knapp som deep-linker
+  til `ms-settings:defaultapps`, pluss en kort førstegangsflate som peker på
+  markeringsmenyen, at verktøylinja kan løsnes, og at KI-en trenger egen nøkkel.
+  Billigst per ny bruker av alt på lista. Paritet: utvidelsen har sin egen
+  variant av spørsmålet («gjør nettleseren til standard PDF-app»).
+- [ ] **Sidebehandling: slett, omorganiser, hent ut, slå sammen.** Emils
+  beslutning 2026-08-08 — dette forlater «utenfor omfang»-lista i `SPEC.md` §10
+  (som «page editing UI»), fordi det er den ene tingen PDF Expert-brukere
+  forventer og ikke finner. Klart størst byggejobb i bolken; skyves til etter
+  v1.0 hvis den truer porten.
+- [ ] **Beskjær marger** (åpent fase 2-punkt) — reell verdi for skannede og
+  bredmargede artikler på en laptopskjerm.
+- [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
+  (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
+  knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som
+  avgjør om fase 3 forblir sløyfet.
+
+### Bolk 2 — robusthet og refaktorering (v0.37, ingen nye funksjoner)
+- [ ] **Splitt `PdfViewer.tsx`.** 6 155 linjer, 18 % av kodebasen i én fil — og
+  den er blitt stedet der koordinatmapping, scroll-virtualisering, split view,
+  utkast-håndtering og tastaturruting bor samtidig. Det er nøyaktig de områdene
+  risikolista nederst i dette dokumentet peker på, så filen er der en feil er
+  dyrest å finne.
+- [ ] **Skrevet QA-matrise** (`docs/QA.md`) — den manuelle runden vi i dag gjør
+  etter hukommelse før hver release, skrevet ned én gang.
+- [ ] **Soak-test:** 1000+ siders dokument, 15 faner, timesvis, med øye på
+  minnet. Ingen av testene våre kjører over tid, og risiko 3 i lista under
+  handler nettopp om store dokumenter.
+- [ ] **Skitne PDF-er:** trunkerte filer, ødelagt xref, blandede sider-rotasjoner,
+  låst + over 150 MB, skannet uten tekstlag. `test:torn-read` dekker én av dem.
+- [ ] **En full runde i utvidelsen.** Den er divergensrisikoen (v0.27.1 sendte en
+  ødelagt nylig-åpning der), og verken `shoot` eller `test:windows` rører den.
+- [ ] `npm run check:css`, `npm audit`, og `platform-parity`-skillen over hele
+  diffen fra v0.35.0.
+
+### Bolk 3 — porten
+- [ ] Edge- og Chrome-listingene publisert (den eneste gjenstående
+  distribusjonssperren — `docs/STORE.md`).
+- [ ] Full release i Emils forstand: GitHub + MS Store + begge utvidelsesbutikkene,
+  med Homebrew-tappen auto-bumpet. Alle fem kanaler på samme versjon.
+- [ ] **v1.0** — Windows x64/arm64 er «stable»; **macOS og Linux blir stående som
+  beta** (Linux har fortsatt aldri kjørt på ekte maskinvare, og `MESSAGING.md`
+  forbyr enhver flate å antyde noe annet).
+- [ ] LinkedIn.
+
+### Vedlikeholdsautomasjonen (Emils valg 2026-08-08)
+`maintenance-reminder.yml` åpner i dag en tom issue og lar Emil gjøre alt
+arbeidet. Den skal i stedet **kjøre** sjekkene den 15. — `check:models`,
+`npm audit`, `npm outdated`, `check:shots`, og en liveness-sjekk av
+`COMPAT_SERVICES`-base-URL-ene og `SPEND_CAP_URLS` (rad 4 i `MAINTENANCE.md`,
+den mest bærende) — og lime funnene inn i issuen. Da åpnes en issue som allerede
+sier hva som er galt. **Ingen API-nøkkel i repoet, ingen kostnad.** Et
+`claude-code-action`-steg som åpner PR for det mekaniske ble vurdert og
+**utsatt**: det krever `ANTHROPIC_API_KEY` som repo-secret, og gevinsten er liten
+før vi vet hvor mange funn en typisk måned faktisk gir.
+
+## Neste bolk — penn og nettbrett (retning valgt 2026-08-02, gjenopptas etter v1.0)
 Emil peker på Windows-nettbrett med penn (Surface-klassen) som neste satsing etter lanseringspausen. Kandidatene er eksisterende åpne punkter fra fasene over, samlet her:
 - Beskjær marger (fase 2)
 - Trykkfølsom penn (fase 5 — krever polygon-appearance for interop)
