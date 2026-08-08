@@ -136,12 +136,18 @@ const SHOTS = [
       // Past the page's top margin, so the frame opens on text rather than on
       // an inch of blank paper — the whole point is a window full of page.
       await ui.scrollTextToTop('Multi-head attention allows', 40)
+      // Fullscreen AND unpinned, which are two different things: unpinning
+      // takes the toolbar, fullscreen takes the tab strip. Neither alone is
+      // chrome-free. Presentation mode (P) also clears both, but it fits the
+      // WHOLE page into 16:10 — photographed, that is a small slab of paper in
+      // a wide black surround with unreadable text, so it is not this frame.
+      await ui.enterFullscreen()
       await ui.unpinToolbar()
       // Two 2.6 s timers have to run out, not one: the "toolbar unpinned" toast,
       // and the reading HUD's own idle fade, which takes the page-number pill
       // with it. Anything shorter photographs a toast.
       await ui.settle(3400)
-      ui.expectNoToolbar()
+      ui.expectNoChrome()
     `
   },
   {
@@ -464,7 +470,10 @@ const L = {
   // and they are not interchangeable — see pinToolbar/unpinToolbar.
   unpin: ['Løsne verktøylinjen', 'Unpin the toolbar'],
   pin: ['Fest verktøylinjen', 'Pin the toolbar'],
-  more: ['Flere verktøy', 'More tools']
+  more: ['Flere verktøy', 'More tools'],
+  // Sidebar tabs carry their label as TEXT and no title — addressed by content.
+  annotsTab: ['Merknader', 'Annotations'],
+  fullscreen: ['Fullskjerm', 'Full screen']
 };
 const titleOf = (el) => el.title || '';
 const startsAny = (el, names) => names.some((n) => titleOf(el).startsWith(n));
@@ -574,6 +583,37 @@ const ui = {
     // annotating turn them back on.
     await this.showAnnots(false);
     await settle(200);
+  },
+  /** Delete every mark in the document, via the Notes tab's own "delete all".
+   *
+   *  The shots share ONE app session and ONE draft, so marks accumulate: the
+   *  margin frame — ninth in the running order — was photographed carrying the
+   *  annotations scene's sticky note and red box AND the feedback scene's
+   *  handwriting, three scenes stacked in one picture. Every shot that wants
+   *  marks already makes its own (and the two that used to lean on inheritance
+   *  have a fallback), so the fix is to hand each one an empty document.
+   *
+   *  Delete-all rather than repeated undo because the app records it as a
+   *  single batch step: one engine operation, one reload, instead of twenty.
+   *  Leaves the sidebar however it found it. */
+  async clearAnnots() {
+    const side = btn(L.sidebar);
+    if (!side) return;
+    const wasOpen = side.classList.contains('is-active');
+    if (!wasOpen) { click(side); await settle(450); }
+    const tab = [...document.querySelectorAll('.sidebar-tabs button')]
+      .find((b) => L.annotsTab.some((n) => (b.textContent || '').trim().startsWith(n)));
+    if (tab) { click(tab); await settle(350); }
+    const clear = document.querySelector('.annot-clear-all');
+    if (clear && !clear.disabled) {
+      click(clear);
+      await settle(300);
+      const go = document.querySelector('.confirm-dialog .btn-primary');
+      if (!go) throw new Error('delete-all asked for confirmation and the dialog never appeared');
+      click(go);
+      await settle(1200);   // the batch delete reloads the document
+    }
+    if (!wasOpen) { click(side); await settle(400); }
   },
   /** H toggles annotation visibility. Nothing in the DOM reports the state — the
    *  toggle is a checkbox inside the reading-mode menu, and an unannotated page
@@ -738,6 +778,35 @@ const ui = {
     if (!b) throw new Error('no unpin-toolbar button');
     click(b);
     await settle(500);
+  },
+  /** OS fullscreen (F / F11). Unpinning the toolbar alone leaves the tab strip
+   *  behind; fullscreen takes that too — App.tsx renders the strip with
+   *  hidden={presenting || fullscreen}. The two together are the app with no
+   *  chrome at all, still at the reading zoom. Idempotent. */
+  async enterFullscreen() {
+    if (this.tabStripGone()) return;
+    const b = btn(L.fullscreen);
+    if (!b) throw new Error('no fullscreen button in the toolbar');
+    click(b);
+    await settle(900);
+    if (!this.tabStripGone())
+      throw new Error('the tab strip is still there — fullscreen did not take');
+  },
+  async exitFullscreen() {
+    if (!this.tabStripGone()) return;
+    const b = btn(L.fullscreen);
+    if (b) { click(b); await settle(900); }
+  },
+  tabStripGone() {
+    const tabs = document.querySelector('.tab-bar');
+    return !tabs || tabs.classList.contains('tucked');
+  },
+  /** Nothing but the page: no tab strip, no toolbar. Asserted rather than
+   *  assumed — the toolbar peeks back on a top-edge hover, and a frame with
+   *  either of them up says the opposite of what it means. */
+  expectNoChrome() {
+    if (!this.tabStripGone()) throw new Error('the tab strip is still showing');
+    this.expectNoToolbar();
   },
   /** The counterpart, and the reason it exists: the pin state is written to
    *  localStorage and the shots share ONE profile, so an unpinned toolbar would
@@ -1950,7 +2019,7 @@ try {
     // frame taken after it.
     await runSetup(
       send,
-      `await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
+      `await ui.exitFullscreen(); await ui.clearAnnots(); await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
     ).catch(() => {})
   }
   ws.close()
