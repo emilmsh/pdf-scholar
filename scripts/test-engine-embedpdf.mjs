@@ -10,7 +10,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as mupdf from 'mupdf'
 import { signaturePng } from './lib/tiny-png.mjs'
-import { applyAnnotation, updateAnnotation, deleteAnnotation, flushAnnotations } from './.engine-test-bundle.mjs'
+import { applyAnnotation, updateAnnotation, deleteAnnotation, flushAnnotations, setFormField } from './.engine-test-bundle.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SAMPLE = path.join(__dirname, '..', 'src', 'renderer', 'public', 'sample.pdf')
@@ -445,6 +445,189 @@ for (const req of reqs) {
     p2.destroy()
   }
   fs.rmSync(HFILE, { force: true })
+}
+
+// 11. AcroForm field filling (engine slice — no UI yet). sample.pdf has no form
+// fields, so the fixture is hand-built the way test-signatures.mjs builds its
+// /Sig fixtures: one page carrying a text field, a read-only text field, a
+// check box, a two-widget radio GROUP, a combo box, a list box — and a
+// border-only hyperref Link, because merely OPENING a form-fill environment
+// makes PDFium synthesize /AP for AP-less annotations on the page (measured),
+// which is the same leak src/shared/link-ap-guard.ts exists for.
+{
+  // Object numbers are fixed up front rather than accumulated: the dictionaries
+  // reference each other in both directions (a page lists its widgets, a radio
+  // kid points back at its parent field).
+  const N = {
+    catalog: 1, pages: 2, page: 3, contents: 4, helv: 5,
+    cbOn: 6, cbOff: 7, rbOn: 8, rbOff: 9,
+    text: 10, wide: 11, readOnly: 12, checkbox: 13,
+    radioParent: 14, radio1: 15, radio2: 16,
+    combo: 17, list: 18, link: 19
+  }
+  const stream = (dict, content) =>
+    `<< ${dict} /Length ${content.length} >>\nstream\n${content}\nendstream`
+  const widget = (body) => `<< /Type /Annot /Subtype /Widget /F 4 /P ${N.page} 0 R ${body} >>`
+  const DA = '/DA (/Helv 12 Tf 0 g)'
+
+  const objs = [
+    `<< /Type /Catalog /Pages ${N.pages} 0 R /AcroForm << /Fields [${N.text} 0 R ${N.wide} 0 R ` +
+      `${N.readOnly} 0 R ${N.checkbox} 0 R ${N.radioParent} 0 R ${N.combo} 0 R ${N.list} 0 R] ` +
+      `/DA (/Helv 0 Tf 0 g) /DR << /Font << /Helv ${N.helv} 0 R >> >> >> >>`,
+    `<< /Type /Pages /Kids [${N.page} 0 R] /Count 1 >>`,
+    `<< /Type /Page /Parent ${N.pages} 0 R /MediaBox [0 0 612 792] /Contents ${N.contents} 0 R ` +
+      `/Resources << /Font << /Helv ${N.helv} 0 R >> >> ` +
+      `/Annots [${N.text} 0 R ${N.wide} 0 R ${N.readOnly} 0 R ${N.checkbox} 0 R ` +
+      `${N.radio1} 0 R ${N.radio2} 0 R ${N.combo} 0 R ${N.list} 0 R ${N.link} 0 R] >>`,
+    stream('', ''),
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    // The two button states each need a real appearance: PDFium reads the /AP
+    // /N dictionary's KEY to learn what this widget's "on" state is called.
+    stream('/Type /XObject /Subtype /Form /BBox [0 0 14 14]', '0 0 0 RG 1 w 2 2 m 12 12 l S 2 12 m 12 2 l S'),
+    stream('/Type /XObject /Subtype /Form /BBox [0 0 14 14]', '0 0 0 RG 1 w 0.5 0.5 13 13 re S'),
+    stream('/Type /XObject /Subtype /Form /BBox [0 0 14 14]', '0 0 0 rg 4 4 6 6 re f'),
+    stream('/Type /XObject /Subtype /Form /BBox [0 0 14 14]', '0 0 0 RG 1 w 0.5 0.5 13 13 re S'),
+    widget(`/FT /Tx /T (navn) /Rect [72 700 300 720] ${DA} /V ()`),
+    widget(`/FT /Tx /T (bred) /Rect [72 730 300 750] ${DA} /V ()`),
+    widget(`/FT /Tx /Ff 1 /T (fast) /Rect [72 670 300 690] ${DA} /V (uroert)`),
+    widget(
+      `/FT /Btn /T (samtykke) /Rect [72 640 86 654] /V /Off /AS /Off ` +
+        `/AP << /N << /Ja ${N.cbOn} 0 R /Off ${N.cbOff} 0 R >> >> /MK << /BC [0 0 0] >>`
+    ),
+    // /Ff 32768 = the Radio flag. The VALUE lives on this parent; the two kids
+    // below are the widgets on the page — which is exactly why the object
+    // number of a widget, not the field's /T name, is the address we fill by.
+    `<< /FT /Btn /Ff 32768 /T (valg) /V /Off /Kids [${N.radio1} 0 R ${N.radio2} 0 R] >>`,
+    widget(
+      `/Parent ${N.radioParent} 0 R /Rect [72 610 86 624] /AS /Off ` +
+        `/AP << /N << /A ${N.rbOn} 0 R /Off ${N.rbOff} 0 R >> >> /MK << /BC [0 0 0] >>`
+    ),
+    widget(
+      `/Parent ${N.radioParent} 0 R /Rect [102 610 116 624] /AS /Off ` +
+        `/AP << /N << /B ${N.rbOn} 0 R /Off ${N.rbOff} 0 R >> >> /MK << /BC [0 0 0] >>`
+    ),
+    // /Ff 131072 = Combo
+    widget(`/FT /Ch /Ff 131072 /T (land) /Rect [72 570 300 590] ${DA} /Opt [(Norge) (Sverige) (Danmark)] /V ()`),
+    widget(`/FT /Ch /T (farge) /Rect [72 500 300 560] ${DA} /Opt [(Rod) (Gronn) (Bla)] /V ()`),
+    `<< /Type /Annot /Subtype /Link /Rect [72 460 200 476] /Border [0 0 1] /C [0 1 0] ` +
+      `/A << /S /URI /URI (https://example.org) >> >>`
+  ]
+  let out = '%PDF-1.7\n'
+  const offsets = []
+  for (let i = 0; i < objs.length; i++) {
+    offsets.push(out.length)
+    out += `${i + 1} 0 obj\n${objs[i]}\nendobj\n`
+  }
+  const xref = out.length
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`
+  for (const off of offsets) out += `${String(off).padStart(10, '0')} 00000 n \n`
+  out += `trailer\n<< /Size ${objs.length + 1} /Root ${N.catalog} 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+
+  const FFILE = path.join(os.tmpdir(), 'pdfx-form-test.pdf')
+  fs.writeFileSync(FFILE, Buffer.from(out, 'latin1'))
+
+  const set = (id, value) => setFormField({ path: FFILE, pageIndex: 0, id, value })
+  // Norwegian letters on purpose: a PDF text string is PDFDocEncoding (a
+  // single byte per character) unless it opens with the UTF-16BE BOM, and
+  // «æøå» is where a writer that guessed wrong falls over.
+  const NAME = 'Åse Bjørk Ægir æøå'
+  /** Beyond PDFDocEncoding entirely — this is the string that FORCES UTF-16. */
+  const WIDE = 'Sun Tzu 孫子 → ✓'
+
+  const rText = await set(N.text, { kind: 'text', text: NAME })
+  check('form: fill text field', 'ok' in rText && rText.id === N.text,
+    'error' in rText ? rText.code : `obj#${rText.id}`)
+  const rWide = await set(N.wide, { kind: 'text', text: WIDE })
+  check('form: fill text field beyond PDFDocEncoding', 'ok' in rWide,
+    'error' in rWide ? rWide.code : '')
+  const rCheck = await set(N.checkbox, { kind: 'checked', checked: true })
+  check('form: tick check box', 'ok' in rCheck, 'error' in rCheck ? rCheck.code : '')
+  // The SECOND kid of the radio group — per-widget addressing is the whole
+  // point of using object numbers: both kids share the field name «valg».
+  const rRadio = await set(N.radio2, { kind: 'checked', checked: true })
+  check('form: select the 2nd radio kid', 'ok' in rRadio, 'error' in rRadio ? rRadio.code : '')
+  const rCombo = await set(N.combo, { kind: 'choice-index', index: 1 })
+  check('form: pick combo option', 'ok' in rCombo, 'error' in rCombo ? rCombo.code : '')
+  const rList = await set(N.list, { kind: 'choice-index', index: 2 })
+  check('form: pick list option', 'ok' in rList, 'error' in rList ? rList.code : '')
+
+  // PDFium does NOT enforce /Ff ReadOnly — measured: it returns success and
+  // writes the value. The refusal is ours, at this boundary.
+  const rRo = await set(N.readOnly, { kind: 'text', text: 'skulle ikke gå inn' })
+  check('form: read-only field is refused by CODE', 'error' in rRo && rRo.code === 'form-field-read-only',
+    'error' in rRo ? rRo.code : 'accepted!')
+  // Not a form field at all: the link's object number names a real annotation.
+  const rLink = await set(N.link, { kind: 'text', text: 'nei' })
+  check('form: a non-widget id is refused', 'error' in rLink && rLink.code === 'form-field-not-found',
+    'error' in rLink ? rLink.code : 'accepted!')
+  // PDFium reports SUCCESS for this and leaves /V alone (correct PDF semantics
+  // — a radio group is only unset by picking a sibling — dishonest return
+  // value). We read the field back instead of echoing the engine's ok.
+  const rUncheck = await set(N.radio2, { kind: 'checked', checked: false })
+  check('form: unchecking a radio is reported honestly, not as ok',
+    'error' in rUncheck && rUncheck.code === 'form-field-not-written',
+    'error' in rUncheck ? rUncheck.code : 'claimed ok!')
+
+  await flushAnnotations(FFILE)
+
+  // ---- independent verification with mupdf ----
+  const raw = fs.readFileSync(FFILE)
+  const pdf = mupdf.Document.openDocument(raw, 'application/pdf').asPDF()
+  const page = pdf.findPage(0)
+  const arr = page.get('Annots')
+  const byNum = new Map()
+  for (let i = 0; i < arr.length; i++) byNum.set(arr.get(i).asIndirect(), arr.get(i))
+  const str = (num, key) => {
+    const o = byNum.get(num)?.get(key)
+    return o && !o.isNull() ? String(o) : ''
+  }
+  const text = (num, key) => {
+    const o = byNum.get(num)?.get(key)
+    return o && !o.isNull() ? o.asString() : ''
+  }
+
+  check('form: object numbers survived the fill + saveAsCopy',
+    [N.text, N.wide, N.readOnly, N.checkbox, N.radio1, N.radio2, N.combo, N.list, N.link]
+      .every((n) => byNum.has(n)),
+    `${byNum.size} annots`)
+  check('form: text /V round-trips byte-identical (æøå included)', text(N.text, 'V') === NAME,
+    JSON.stringify(text(N.text, 'V')))
+  check('form: a value beyond PDFDocEncoding round-trips too', text(N.wide, 'V') === WIDE,
+    JSON.stringify(text(N.wide, 'V')))
+  // Which ENCODING PDFium picks, read out of the file's own bytes rather than
+  // through a parser that would hide the difference. Measured 2026-08-08: æøå
+  // fits PDFDocEncoding and is written one byte per character; 孫 does not, and
+  // that string gets the UTF-16BE BOM. Both are correct PDF text strings and
+  // both survive — what this pins down is that neither is mangled into the
+  // other, which is exactly how a value comes back as "Ã¦Ã¸Ã¥".
+  check('form: æøå is written as a plain one-byte-per-char PDF string',
+    raw.includes(Buffer.from(`/V(${NAME})`, 'latin1')))
+  const utf16be = Buffer.concat([
+    Buffer.from([0xfe, 0xff]),
+    Buffer.from(WIDE, 'utf16le').swap16()
+  ])
+  check('form: a wider string is escalated to UTF-16BE with a BOM', raw.includes(utf16be))
+  check('form: the filled text got an /AP (visible, not just parseable)',
+    !byNum.get(N.text)?.get('AP').isNull())
+  check('form: check box is on', str(N.checkbox, 'V') === '/Ja' && str(N.checkbox, 'AS') === '/Ja',
+    `${str(N.checkbox, 'V')} / ${str(N.checkbox, 'AS')}`)
+  // /V lives on the shared parent; /AS is what says WHICH kid.
+  const parentV = String(byNum.get(N.radio2)?.get('Parent')?.get('V') ?? '')
+  check('form: the 2nd radio kid is the one selected',
+    parentV === '/B' && str(N.radio2, 'AS') === '/B' && str(N.radio1, 'AS') === '/Off',
+    `V=${parentV} kid1=${str(N.radio1, 'AS')} kid2=${str(N.radio2, 'AS')}`)
+  check('form: combo picked option 1', text(N.combo, 'V') === 'Sverige', JSON.stringify(text(N.combo, 'V')))
+  check('form: list picked option 2', text(N.list, 'V') === 'Bla', JSON.stringify(text(N.list, 'V')))
+  check('form: the read-only field kept its own value', text(N.readOnly, 'V') === 'uroert',
+    JSON.stringify(text(N.readOnly, 'V')))
+  // The guard's whole reason for existing, reached through the FORM door:
+  // opening a form-fill environment synthesizes /AP for AP-less annots.
+  check('form: the border-only link is still AP-less', byNum.get(N.link)?.get('AP').isNull() !== false)
+  check('form: the link kept /Border + /C',
+    str(N.link, 'Border') === '[0 0 1]' && str(N.link, 'C') === '[0 1 0]',
+    `${str(N.link, 'Border')} ${str(N.link, 'C')}`)
+  pdf.destroy()
+  fs.rmSync(FFILE, { force: true })
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)

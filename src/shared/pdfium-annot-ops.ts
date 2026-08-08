@@ -23,7 +23,8 @@ import type {
   DocSignature,
   FileError,
   ModifyAnnotationRequest,
-  PageRect
+  PageRect,
+  SetFormFieldRequest
 } from './types'
 import type {
   PdfAnnotationObject,
@@ -98,6 +99,31 @@ export interface RawPdfium {
   FPDFPageObj_Transform(objPtr: number, a: number, b: number, c: number, d: number, e: number, f: number): void
   FPDFPageObj_Destroy(objPtr: number): void
   FPDFPage_GenerateContent(pagePtr: number): boolean
+  // ---- AcroForm field filling; every one of these needs the FORM HANDLE that
+  // PageContext.withFormHandle opens, not the document or the page ----
+  FORM_SetFocusedAnnot(formHandle: number, annotPtr: number): boolean
+  FORM_ForceToKillFocus(formHandle: number): boolean
+  FORM_SelectAllText(formHandle: number, pagePtr: number): boolean
+  FORM_ReplaceSelection(formHandle: number, pagePtr: number, textPtr: number): void
+  FORM_OnChar(formHandle: number, pagePtr: number, charCode: number, modifier: number): boolean
+  FORM_SetIndexSelected(
+    formHandle: number,
+    pagePtr: number,
+    index: number,
+    selected: boolean
+  ): boolean
+  FPDFAnnot_GetFormFieldFlags(formHandle: number, annotPtr: number): number
+  FPDFAnnot_GetFormFieldValue(
+    formHandle: number,
+    annotPtr: number,
+    bufPtr: number,
+    buflen: number
+  ): number
+  FPDFAnnot_IsChecked(formHandle: number, annotPtr: number): boolean
+  FPDFAnnot_IsOptionSelected(formHandle: number, annotPtr: number, index: number): boolean
+  /** The EmbedPDF fork's own: re-bake the field's appearance stream after a
+   *  value change, so the new text/tick is VISIBLE in other readers too. */
+  EPDFAnnot_GenerateFormFieldAP(annotPtr: number): boolean
   /** The underlying emscripten module — heap access for wide-string params,
    *  FS_RECTF structs and the font bytes we hand to FPDFText_LoadFont */
   pdfium: {
@@ -124,11 +150,19 @@ export interface OpenDoc {
   docId: string
 }
 
+/** The page context borrowPage hands out. `withFormHandle` really is on it —
+ *  it opens a form-fill environment, runs `fn`, and always tears it down —
+ *  it was simply missing from this type until form filling needed it. */
+interface PageCtx {
+  pagePtr: number
+  withFormHandle<T>(fn: (formHandle: number) => T): T
+}
+
 interface EngineInternals {
   cache: {
     getContext(id: string): {
       docPtr: number
-      borrowPage<R>(idx: number, f: (ctx: { pagePtr: number }) => R): R
+      borrowPage<R>(idx: number, f: (ctx: PageCtx) => R): R
     }
   }
   pdfiumModule: RawPdfium
@@ -159,6 +193,28 @@ function withDocAndPage<T>(
   const raw = anyEngine.pdfiumModule
   const ctx = anyEngine.cache.getContext(docId)
   return ctx.borrowPage(pageIndex, (p) => fn(ctx.docPtr, p.pagePtr, raw))
+}
+
+/** The same, plus a form-fill handle — everything about AcroForm fields is
+ *  addressed through one (the flags, the value, the tick state, the edit
+ *  control). The handle is opened and torn down around `fn`, never cached.
+ *
+ *  MUST be called inside withLinkApGuard: merely opening the environment makes
+ *  PDFium synthesize /AP for AP-less annotations on the page, border-only
+ *  hyperref Links included — measured with an empty callback, and the generated
+ *  appearance survived into the saved file. Same failure the guard exists for,
+ *  reached by a different door. */
+function withFormAndPage<T>(
+  engine: PdfiumNative,
+  docId: string,
+  pageIndex: number,
+  fn: (pagePtr: number, formHandle: number, raw: RawPdfium) => T
+): T {
+  const anyEngine = engine as unknown as EngineInternals
+  const raw = anyEngine.pdfiumModule
+  return anyEngine.cache
+    .getContext(docId)
+    .borrowPage(pageIndex, (p) => p.withFormHandle((h) => fn(p.pagePtr, h, raw)))
 }
 
 /** Bracket an engine op so it can't leak PDFium-synthesized link borders:
@@ -816,4 +872,99 @@ export function deleteOn(open: OpenDoc, req: DeleteAnnotationRequest): Promise<A
     )
     return removed ? { ok: true, id: req.id } : ENGINE_ERRORS.notFound
   })
+}
+
+// ---------- AcroForm field filling ----------
+
+const FPDF_ANNOT_WIDGET = 20
+/** /Ff bit 1 — the ReadOnly field flag */
+const FPDF_FORMFLAG_READONLY = 1
+/** The character PDFium's form-fill environment reads as "toggle this button".
+ *  There is no set-to-true call: a check box and a radio button are flipped by
+ *  a keystroke on the focused widget, exactly as a user would. */
+const FORM_CHAR_TOGGLE = 13 // Return
+
+/** The field's /V as PDFium hands it back, '' when absent or unreadable. */
+function formFieldValue(raw: RawPdfium, formHandle: number, annotPtr: number): string {
+  const bytes = raw.FPDFAnnot_GetFormFieldValue(formHandle, annotPtr, 0, 0)
+  if (bytes <= 2) return '' // empty or absent (2 = bare terminator)
+  const buf = raw.pdfium.wasmExports.malloc(bytes)
+  try {
+    raw.FPDFAnnot_GetFormFieldValue(formHandle, annotPtr, buf, bytes)
+    return raw.pdfium.UTF16ToString(buf)
+  } finally {
+    raw.pdfium.wasmExports.free(buf)
+  }
+}
+
+/** Put a value in one AcroForm field, addressed by the widget's PDF object
+ *  number. The whole document is untouched apart from that field.
+ *
+ *  Three deliberate departures from the engine's own setFormFieldValue:
+ *
+ *  1. The RAW path, not the high-level one. `getPageAnnoWidgets` MINTS an /NM
+ *     uuid into every widget that lacks one (measured) — dirtying a document
+ *     the user only wanted to read, and setting up a second identity space
+ *     beside the object numbers every other write here uses.
+ *  2. The read-only refusal. PDFium does not enforce /Ff bit 1: setting a value
+ *     on a locked field returns success and writes it. The gate has to be at
+ *     this boundary, not in a UI that could be bypassed by any other caller.
+ *  3. The value is READ BACK. PDFium reports success for writes it did not
+ *     make — unchecking a radio button returns true and leaves /V alone, which
+ *     is right for PDF (a radio group is only ever unset by picking a sibling)
+ *     and wrong as a return value. Verifying is preferred over special-casing
+ *     radios: it also catches a comb field truncating text, a maxlen, a
+ *     read-only parent, and whatever the next engine version decides to lie
+ *     about. */
+export function setFormFieldOn(open: OpenDoc, req: SetFormFieldRequest): Promise<AnnotateResult> {
+  const { engine, docId } = open
+  return withLinkApGuard(engine, docId, req.pageIndex, async () =>
+    withFormAndPage(engine, docId, req.pageIndex, (pagePtr, formHandle, raw) => {
+      const outcome = withAnnotByObjNum(pagePtr, raw, req.id, (annotPtr): AnnotateResult => {
+        if (raw.FPDFAnnot_GetSubtype(annotPtr) !== FPDF_ANNOT_WIDGET) {
+          return ENGINE_ERRORS.formFieldNotFound
+        }
+        if (raw.FPDFAnnot_GetFormFieldFlags(formHandle, annotPtr) & FPDF_FORMFLAG_READONLY) {
+          return ENGINE_ERRORS.formFieldReadOnly
+        }
+        if (!raw.FORM_SetFocusedAnnot(formHandle, annotPtr)) {
+          return ENGINE_ERRORS.formFieldNotWritten
+        }
+        const v = req.value
+        try {
+          if (v.kind === 'text') {
+            // Select-all + replace, i.e. what a user does. There is no
+            // "set the text" call — the field is an edit control.
+            if (!raw.FORM_SelectAllText(formHandle, pagePtr)) return ENGINE_ERRORS.formFieldNotWritten
+            withWideString(raw, v.text, (ptr) => raw.FORM_ReplaceSelection(formHandle, pagePtr, ptr))
+          } else if (v.kind === 'checked') {
+            // A toggle, so only send it when the state actually differs —
+            // otherwise the keystroke would flip it the wrong way.
+            if (!!raw.FPDFAnnot_IsChecked(formHandle, annotPtr) !== v.checked) {
+              raw.FORM_OnChar(formHandle, pagePtr, FORM_CHAR_TOGGLE, 0)
+            }
+          } else {
+            raw.FORM_SetIndexSelected(formHandle, pagePtr, v.index, v.selected ?? true)
+          }
+        } finally {
+          // Killing focus is what COMMITS the edit into /V; without it the
+          // value lives only in the form-fill environment we are about to
+          // tear down. In `finally` so an early return can't skip it.
+          raw.FORM_ForceToKillFocus(formHandle)
+        }
+        // Re-bake the appearance, or the field would read correctly in a parser
+        // and show blank in every viewer.
+        raw.EPDFAnnot_GenerateFormFieldAP(annotPtr)
+        const landed =
+          v.kind === 'text'
+            ? formFieldValue(raw, formHandle, annotPtr) === v.text
+            : v.kind === 'checked'
+              ? !!raw.FPDFAnnot_IsChecked(formHandle, annotPtr) === v.checked
+              : !!raw.FPDFAnnot_IsOptionSelected(formHandle, annotPtr, v.index) ===
+                (v.selected ?? true)
+        return landed ? { ok: true, id: req.id } : ENGINE_ERRORS.formFieldNotWritten
+      })
+      return outcome ?? ENGINE_ERRORS.formFieldNotFound
+    })
+  )
 }
