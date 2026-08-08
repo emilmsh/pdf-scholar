@@ -59,11 +59,21 @@ export interface HandFont {
    *  Hand 0.980 em. (Chrome derives it from the font's own ascent and the
    *  half-leading, so the two differ by exactly their ascent difference.)
    *
-   *  Patrick Hand's is deliberately NOT its measured 0.98: notes already
-   *  written with it were baked at 0.75, and re-baking one on a recolour must
-   *  not shift its words. 0.75 is the eyeballed constant this file used to
-   *  carry for every note — its comment claimed it came from the font's hhea,
-   *  which was never true. */
+   *  Both values are DERIVED, not eyeballed: with the font's own ascent a and
+   *  descent d (per em), the browser's half-leading puts the first baseline at
+   *  (LINE_HEIGHT - (a + d)) / 2 + a. That formula reproduces the measured
+   *  Caveat number exactly, and `npm run test:engine` checks both constants
+   *  against the shipped font files so a future swap cannot forget to retune
+   *  one. The comment this file used to carry claimed the constant came from
+   *  the font's hhea ascender, which was never true of the value beside it.
+   *
+   *  Patrick Hand was 0.75 until 2026-08-08, which put every note it baked
+   *  about 0.23 em higher in its box than the editor had just drawn it. Emil's
+   *  call to correct it. The cost, stated because it is real: an existing note
+   *  keeps its old position until something re-bakes it — a recolour, a drag,
+   *  an edit — and then its words drop into place. That is a correction rather
+   *  than damage (they were never where the writer put them), but it lands at
+   *  a moment nobody asked for it. */
   ascent: number
 }
 
@@ -73,7 +83,7 @@ export const HAND_FONTS: Record<HandFontId, HandFont> = {
     id: 'patrickhand',
     name: 'Patrick Hand',
     cssFamily: 'PDFX Hand Patrick',
-    ascent: 0.75
+    ascent: 0.985
   }
 }
 

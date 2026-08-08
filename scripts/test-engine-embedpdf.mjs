@@ -479,5 +479,42 @@ for (const req of reqs) {
   fs.rmSync(HFILE, { force: true })
 }
 
+// ---- the handwriting ascents are derived, and this is where that is proved --
+//
+// HAND_FONTS carries one `ascent` per font: where the browser puts a block's
+// FIRST baseline, which is what the baked appearance stream has to match or the
+// words land somewhere other than the editor drew them. It looks like two magic
+// numbers. It is not — with the font's own ascent a and descent d, the browser's
+// half-leading puts that baseline at (LINE_HEIGHT - (a + d)) / 2 + a.
+//
+// This reads the metrics straight out of the shipped TTFs and checks the
+// constants against them, because the file used to carry ONE eyeballed number
+// with a comment claiming it came from the font's hhea. It did not, and Patrick
+// Hand's notes were baked 0.23 em high for it. A future font swap that forgets
+// to retune fails here instead of shipping crooked notes.
+{
+  const HAND_LINE_HEIGHT = 1.24
+  const EXPECTED = {
+    'Caveat-Regular-subset.ttf': 0.95,
+    'PatrickHand-Regular-subset.ttf': 0.985
+  }
+  for (const [file, declared] of Object.entries(EXPECTED)) {
+    const b = fs.readFileSync(path.join(__dirname, '..', 'assets', 'fonts', file))
+    const tables = {}
+    for (let i = 0; i < b.readUInt16BE(4); i++) {
+      tables[b.toString('ascii', 12 + i * 16, 16 + i * 16).trim()] = b.readUInt32BE(20 + i * 16)
+    }
+    const upem = b.readUInt16BE(tables['head'] + 18)
+    const asc = b.readInt16BE(tables['hhea'] + 4) / upem
+    const desc = -b.readInt16BE(tables['hhea'] + 6) / upem
+    const baseline = (HAND_LINE_HEIGHT - (asc + desc)) / 2 + asc
+    check(
+      `handfont: ${file.split('-')[0]} ascent matches the font's own metrics`,
+      Math.abs(baseline - declared) < 0.005,
+      `declared ${declared}, derived ${baseline.toFixed(3)}`
+    )
+  }
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)
