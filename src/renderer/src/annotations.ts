@@ -207,8 +207,11 @@ export const FREETEXT_COLORS: HighlightColor[] = [
   { key: 'orange', hex: '#f5920b', rgb: [0.96, 0.573, 0.043] }
 ]
 
+/** Black, on Emil's call (2026-08-09) — the colour a pen is unless it is
+ *  something else. It was a blue that appeared in no palette, so the pen menu
+ *  used to open with nothing selected and drew a colour you could not pick. */
 export const PEN_DEFAULT: { color: [number, number, number]; width: number } = {
-  color: INK_BLUE,
+  color: INK_BLACK,
   width: 2.2
 }
 export const MARKER_DEFAULT: { color: [number, number, number]; width: number } = {
