@@ -9,9 +9,10 @@ repository-code: https://github.com/emilmsh/pdf-scholar
 url: https://emilmsh.github.io/pdf-scholar/
 license: MIT
 abstract: >-
-  A reading-first PDF reader and annotator for Windows, built for people who
-  read to work — annotation tools that stay within reach without interrupting
-  the reading, grounded AI assistance with clickable citations, and
+  A PDF reader and annotator for Windows whose window is nearly all page, built
+  for people who read to work — one slim toolbar and everything else out of the
+  way until you call it, annotation tools that stay within reach without
+  interrupting the reading, grounded AI assistance with clickable citations, and
   Norwegian/English UI. Available as a desktop app and a browser extension.
 keywords:
   - pdf
