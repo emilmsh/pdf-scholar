@@ -193,6 +193,23 @@ const SHOTS = [
     `
   },
   {
+    // Freehand pen with pressure (beta), on its own page so the marks read as
+    // one hand's work: a ring, a wavy underline, an exclamation mark in the
+    // margin. Ships nowhere yet — a proposal frame for Emil to judge
+    // (scripts/lib/shots.json flips it on if it earns a surface).
+    name: 'pen',
+    caption: 'Freehand pen: pressure-varied strokes around and under the text (beta)',
+    setup: `
+      await ui.closePanels()
+      await ui.showAnnots(true)
+      await ui.fitWidth()
+      await ui.goToPage(4)
+      ui.expectPage(0, 4)
+      await ui.penScrawl()
+      await ui.settle(3400)   // outlast the nav pills' idle fade
+    `
+  },
+  {
     // The release's headline, shot as its own frame: the comments stand in the
     // margin as visible text — the way a corrected draft reads on paper. Notes
     // carry their text into cards on the tinted strip; the highlight from the
@@ -341,6 +358,7 @@ const L = {
   theme: ['Lesemodus', 'Reading mode'],
   shapes: ['Former', 'Shapes'],
   rectangle: ['Rektangel', 'Rectangle'],
+  pen: ['Penn', 'Pen'],
   note: ['Notat', 'Note'],
   margin: ['Vis kommentarer i margen', 'Show comments in the margin']
 };
@@ -1198,6 +1216,89 @@ const ui = {
     if (box.top < host.top + 4 || box.bottom > host.bottom - 4) {
       throw new Error('the rectangle would be clipped by the window — frame it elsewhere');
     }
+  },
+  /** Freehand pen gestures with pressure, the way a hand actually marks a
+   *  paper: a ring around a phrase, a wavy underline under another, and an
+   *  exclamation mark in the margin. Hand-authored paths with a little wobble
+   *  and a pressure curve — honest about being *marks*, not fake handwriting
+   *  (words are where synthetic strokes start to look uncanny). */
+  async penScrawl() {
+    const pen = btn(L.pen);
+    if (!pen) throw new Error('no pen button in the toolbar');
+    if (!pen.classList.contains('is-active')) { click(pen); await settle(400); }
+    const pageEl = this.pageElA();
+    const layer = pageEl.querySelector('.draw-layer');
+    if (!layer) throw new Error('the pen tool did not arm (no draw layer)');
+    const host = document.querySelector('.pages[data-pane="a"]').getBoundingClientRect();
+    const spans = [...pageEl.querySelectorAll('.text-host .textLayer > span')]
+      .filter((s) => (s.textContent || '').trim().length > 25)
+      .filter((s) => {
+        const r = s.getBoundingClientRect();
+        return r.top > host.top + 260 && r.bottom < host.bottom - 120 && r.width > 160;
+      });
+    if (spans.length < 2) throw new Error('no on-screen text to scrawl at');
+    const stroke = async (pts, pid) => {
+      const at = (t, [x, y, p], buttons) => layer.dispatchEvent(new PointerEvent(t, {
+        bubbles: true, cancelable: true, pointerId: pid, isPrimary: true, pointerType: 'pen',
+        button: 0, buttons, clientX: x, clientY: y, pressure: p
+      }));
+      at('pointerdown', pts[0], 1);
+      for (let i = 1; i < pts.length; i++) {
+        at('pointermove', pts[i], 1);
+        if (i % 5 === 0) await settle(16);
+      }
+      at('pointerup', [pts[pts.length - 1][0], pts[pts.length - 1][1], 0], 0);
+      await settle(450);
+    };
+    // 1. Ring around the first words of one span — slight overshoot past the
+    // start, like a hand actually circling something.
+    const r1 = spans[0].getBoundingClientRect();
+    const cx = r1.left + 80;
+    const cy = (r1.top + r1.bottom) / 2;
+    const rx = 96;
+    const ry = Math.max(17, r1.height * 1.35);
+    const ring = [];
+    for (let i = 0; i <= 46; i++) {
+      const t = -0.6 + (i / 46) * (2 * Math.PI + 1.0);
+      ring.push([
+        cx + rx * Math.cos(t) + 2 * Math.sin(7 * t),
+        cy + ry * Math.sin(t) + 1.5 * Math.sin(5 * t + 1),
+        Math.min(0.85, Math.max(0.25, 0.5 + 0.28 * Math.sin(t * 1.3 + 1)))
+      ]);
+    }
+    await stroke(ring, 71);
+    // 2. Wavy underline under a span further down, pressing harder mid-stroke
+    const r2 = spans[Math.min(7, spans.length - 1)].getBoundingClientRect();
+    const w = Math.min(250, r2.width);
+    const wave = [];
+    for (let i = 0; i <= 36; i++) {
+      const f = i / 36;
+      wave.push([
+        r2.left + w * f,
+        r2.bottom + 3.5 + 1.8 * Math.sin(f * 26),
+        Math.min(0.85, 0.35 + 0.45 * Math.sin(f * Math.PI))
+      ]);
+    }
+    await stroke(wave, 72);
+    // 3. An exclamation mark in the margin beside the ring: a tapering
+    // downstroke (pressure easing off) and a firm dot.
+    const ex = cx - rx - 26;
+    if (ex > host.left + 12) {
+      const bar = [];
+      for (let i = 0; i <= 14; i++) {
+        const f = i / 14;
+        bar.push([ex + 2.2 * Math.sin(f * 2.6), cy - 24 + 30 * f, 0.8 - 0.5 * f]);
+      }
+      await stroke(bar, 73);
+      const dot = [];
+      for (let i = 0; i <= 8; i++) {
+        const t = (i / 8) * 2 * Math.PI;
+        dot.push([ex + 1.6 * Math.cos(t), cy + 14 + 1.6 * Math.sin(t), 0.7]);
+      }
+      await stroke(dot, 74);
+    }
+    const marks = pageEl.querySelectorAll('.annot-marks path');
+    if (marks.length < 2) throw new Error('the pen produced ' + marks.length + ' mark(s) on this page');
   },
   /** Place a sticky note in the margin and write in it. */
   async placeNote(text, fx = 0.92, fy = 0.3) {
