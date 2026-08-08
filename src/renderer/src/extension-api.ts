@@ -27,6 +27,8 @@ import type {
   RecentFile,
   Settings
 } from '../../shared/types'
+import type { FetchFailure } from '../../shared/insecure-retry'
+import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
@@ -135,8 +137,20 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       const first = await fetchDocument(path, 'same-origin')
       if (!('error' in first)) return first
       if (!/^https?:/i.test(path)) return first // no cookies to add for file://
-      const retry = await fetchDocument(path, 'include')
-      return 'error' in retry ? first : retry
+      // A connection that never happened cannot be fixed with a cookie, so that
+      // rung is skipped rather than spent waiting for the same wall twice.
+      if (first.failure === 'response') {
+        const retry = await fetchDocument(path, 'include')
+        if (!('error' in retry)) return retry
+      }
+      // The site never answered at all, and it was reachable in the clear on the
+      // same host — name that, so the shell can offer the plaintext retry instead
+      // of quoting "Failed to fetch" and handing the tab to a reader that will
+      // hit the very same wall. See shared/insecure-retry.ts for why this is an
+      // offer and not another rung above.
+      return offersInsecureRetry(path, first.failure)
+        ? { error: first.error, code: 'doc-unreachable' }
+        : first
     },
 
     openFileDialog: async (): Promise<FilePayload | FileError | null> => {
@@ -311,28 +325,36 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
 }
 
 /** One fetch attempt for a document URL, in the platform's payload/error shape.
- *  `credentials` is the axis readFile retries on. */
+ *  `credentials` is the axis readFile retries on. A failure also says which KIND
+ *  it was: whether the server answered decides both whether a cookie could help
+ *  and whether the plaintext retry is worth offering (see shared/insecure-retry). */
 async function fetchDocument(
   path: string,
   credentials: RequestCredentials
-): Promise<FilePayload | FileError> {
+): Promise<FilePayload | (FileError & { failure: FetchFailure })> {
   try {
     const res = await fetch(path, { credentials })
-    if (!res.ok) return { error: t('doc.httpError', { status: String(res.status) }) }
+    if (!res.ok) {
+      return { error: t('doc.httpError', { status: String(res.status) }), failure: 'response' }
+    }
     const data = new Uint8Array(await res.arrayBuffer())
     // A host that refuses the extension usually answers with a login, consent or
     // bot-check PAGE — sometimes with 200. Passing that to pdf.js surfaces much
     // later as an unrelated "invalid PDF", so name it here instead. Narrow on
     // purpose: it takes BOTH a missing PDF header and markup in the body, so a
     // real document served under a wrong content type still opens.
-    if (!hasPdfHeader(data) && looksLikeWebPage(res, data)) return { error: t('doc.notPdf') }
+    if (!hasPdfHeader(data) && looksLikeWebPage(res, data)) {
+      return { error: t('doc.notPdf'), failure: 'response' }
+    }
     // The server's own name beats anything the URL can tell us — remember it so
     // every later use of this path agrees (see `names`).
     const name = pdfDisplayName(path, res.headers.get('content-disposition'))
     names.set(path, name)
     return { path, name, data }
   } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) }
+    // `fetch` only rejects when there was no response at all — the network layer
+    // gave up (DNS, TLS, a reset). Everything the server said is handled above.
+    return { error: err instanceof Error ? err.message : String(err), failure: 'transport' }
   }
 }
 

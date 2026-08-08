@@ -3,6 +3,7 @@ import type { FilePayload, ReadingPosition, RecentFile, Settings, ThemeName } fr
 import { bridge } from './bridge'
 import { buildViewerUrl } from '../../shared/viewer-url'
 import { openInBrowserViewer } from './extension-api'
+import { insecureRetryUrl } from '../../shared/insecure-retry'
 import { errorText, setLanguage, t } from './i18n'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import {
@@ -36,6 +37,9 @@ export default function ExtensionApp(): React.JSX.Element {
   /** The URL an open failed on, when the browser's own reader can still take it
    *  (see openPath) — drives the escape-hatch button in the error banner. */
   const [errorFallback, setErrorFallback] = useState<string | null>(null)
+  /** The plaintext twin of a URL whose https side never answered — the second,
+   *  deliberately manual escape hatch (see shared/insecure-retry.ts). */
+  const [insecureRetry, setInsecureRetry] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   /** Bumped when the open document is replaced with fresh bytes in place
    *  (external-update conflict) — forces PdfViewer to remount, matching
@@ -88,6 +92,7 @@ export default function ExtensionApp(): React.JSX.Element {
     setPayload(p)
     setError(null)
     setErrorFallback(null)
+    setInsecureRetry(null)
     document.title = `${p.name} — PDF Scholar`
     // Reflect the document in the address bar: a reopenable URL goes into the
     // encoded ?file= param (so a reload restores the document, and the raw param
@@ -107,6 +112,13 @@ export default function ExtensionApp(): React.JSX.Element {
     async (path: string, opts?: { handOffOnFailure?: boolean }) => {
       const result = await bridge.readFile(path)
       if ('error' in result) {
+        // `doc-unreachable` means the site never answered and it is an https URL,
+        // so the hand-off is a dead end BY CONSTRUCTION: the browser's own
+        // https→http fallback only fires for an upgrade the browser itself made,
+        // and our hand-off navigates to an explicit https URL. Handing over would
+        // trade our banner for the browser's error page and lose the one thing
+        // that still works — the plaintext retry we can offer below.
+        const insecure = result.code === 'doc-unreachable' ? insecureRetryUrl(path) : null
         // The parity bar is the browser's own reader: if it would have rendered
         // the navigation we intercepted, an error banner from us IS the
         // regression, so hand the tab back and let the user read the document.
@@ -116,6 +128,7 @@ export default function ExtensionApp(): React.JSX.Element {
         // one-time toggle the user can fix ("Allow access to file URLs"), and
         // silently routing around it would hide the fix forever.
         if (
+          !insecure &&
           opts?.handOffOnFailure &&
           /^https?:/i.test(path) &&
           (await openInBrowserViewer(path, result.error))
@@ -125,6 +138,7 @@ export default function ExtensionApp(): React.JSX.Element {
         setError(t('app.openFailed', { error: errorText(result) }))
         // Still offer the hand-off by hand for the cases above.
         if (/^(https?|file):/i.test(path)) setErrorFallback(path)
+        setInsecureRetry(insecure)
         return
       }
       await openPayload(result)
@@ -228,10 +242,23 @@ export default function ExtensionApp(): React.JSX.Element {
               {t('app.openInBrowser')}
             </button>
           )}
+          {/* Dropping the encryption is the reader's call, never ours — so it is
+              a button, and what it costs is on the button rather than in prose
+              nobody reads. */}
+          {insecureRetry && (
+            <button
+              className="btn-secondary"
+              title={t('app.retryInsecureHint')}
+              onClick={() => void openPath(insecureRetry)}
+            >
+              {t('app.retryInsecure')}
+            </button>
+          )}
           <button
             onClick={() => {
               setError(null)
               setErrorFallback(null)
+              setInsecureRetry(null)
             }}
             aria-label="Lukk"
           >

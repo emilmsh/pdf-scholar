@@ -33,6 +33,9 @@ const nb = {
     'Visningen stoppet uventet. Ulagrede merknader ligger trygt lagret, og hentes opp igjen når du laster inn på nytt.',
   'crash.reload': 'Last inn på nytt',
   'app.openInBrowser': 'Åpne i nettleserens leser',
+  'app.retryInsecure': 'Prøv uten HTTPS',
+  'app.retryInsecureHint':
+    'Nettstedet svarer ikke på https. Henter dokumentet over http i stedet — ukryptert, så noen på veien kan i prinsippet bytte det ut. Ingen informasjonskapsler sendes.',
   'app.saveFailed': 'Kunne ikke lagre: {error}',
   // One per EngineErrorCode. These ride inside the {error} slot of the toasts
   // above, so they are lowercase sentence fragments with no full stop.
@@ -56,6 +59,7 @@ const nb = {
   'engine.doc-too-large': 'dokumentet er for stort til å annoteres (minnegrense i skrivemotoren)',
   'engine.doc-too-large-browser': 'dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren)',
   'engine.doc-not-open': 'dokumentet er ikke åpent for redigering',
+  'engine.doc-unreachable': 'nettstedet svarte ikke på https',
   'engine.append-unsupported':
     'PDF-en har en struktur denne skrivemåten ikke støtter ennå — filen er urørt',
   'engine.append-objstm-edit': 'denne merknaden kan ikke endres i så store dokumenter ennå',
@@ -678,6 +682,9 @@ const en: Dict = {
     'The view stopped unexpectedly. Unsaved annotations are safely stored and will be picked up again when you reload.',
   'crash.reload': 'Reload',
   'app.openInBrowser': 'Open in the browser’s reader',
+  'app.retryInsecure': 'Try without HTTPS',
+  'app.retryInsecureHint':
+    'The site does not answer on https. Fetches the document over http instead — unencrypted, so someone on the way could in principle swap it out. No cookies are sent.',
   'app.saveFailed': 'Could not save: {error}',
   'engine.annot-not-found': 'the annotation was not found in the file',
   'engine.annot-no-position': 'the annotation has no position',
@@ -699,6 +706,7 @@ const en: Dict = {
   'engine.doc-too-large': 'the document is too large to annotate (write-engine memory limit)',
   'engine.doc-too-large-browser': 'the document is too large to annotate in the browser (write-engine memory limit)',
   'engine.doc-not-open': 'the document is not open for editing',
+  'engine.doc-unreachable': 'the site did not answer on https',
   'engine.append-unsupported':
     'this PDF has a structure that write path does not support yet — the file is untouched',
   'engine.append-objstm-edit': 'this annotation cannot be changed in documents this large yet',

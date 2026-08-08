@@ -55,6 +55,9 @@ jobs:
       # The extension's redirect-rule → viewer-page URL handoff: a regression is
       # invisible until one specific kind of link (signed, tracker-tagged) breaks
       - run: npm run test:viewer-url
+      # The one place the app proposes dropping encryption: which failures earn
+      # the offer at all, and that the rewrite touches the scheme and nothing else
+      - run: npm run test:insecure-retry
       # Version arithmetic behind the macOS update notice — that build detects
       # updates it cannot install, and getting this wrong either nags every four
       # hours or never speaks at all, on hardware we don't own

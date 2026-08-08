@@ -353,6 +353,14 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* The banner is centred from a fixed position, so it has no container to be
+     bounded by: at its widest it carries a message plus BOTH escape hatches
+     (browser's reader, plaintext retry) plus the close button, which without a
+     ceiling runs off either edge of a narrow window rather than wrapping. The
+     ceiling clears that widest row on one line — measured at 674px in bokmål and
+     729px in English, so a shorter number silently wraps the English banner. */
+  max-width: min(780px, calc(100vw - 24px));
+  flex-wrap: wrap;
   padding: 10px 14px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
@@ -364,6 +372,8 @@ button {
   color: var(--text-secondary);
   padding: 2px 6px;
   border-radius: 6px;
+  /* The message wraps; a button that breaks mid-label reads as a bug. */
+  white-space: nowrap;
 }
 
 .error-banner button:hover {

@@ -118,6 +118,29 @@ surfacing later as a pdf.js parse error, and the server's own
 `Content-Disposition` name wins over anything the URL can suggest, so an arXiv
 link is `2401.12345.pdf` and not a bare number in the library.
 
+**When the site never answers.** A `fetch` that rejects outright — DNS, TLS, a
+reset — is a different failure from a 403, and the two get different treatment
+(`src/shared/insecure-retry.ts`, gated by `npm run test:insecure-retry`). A cookie
+cannot fix a connection that never happened, so that retry is skipped; and if the
+URL was `https:`, the error banner grows a second button, **«Prøv uten HTTPS»**,
+which reopens the same URL over plaintext http.
+
+The genre this exists for: an academic homepage on Plesk/IIS whose certificate
+expired or was never bound, where port 443 resets the handshake and port 80 serves
+the paper fine (`aguirregabiria.net`, 2026-08-08). Chrome and Edge silently
+upgrade an http navigation to https and fall back when https will not connect —
+but only for an upgrade *the browser itself* made, so a link written `https://`
+just fails there too, and our redirect rule cannot tell the two apart by the time
+it sees the URL.
+
+That is exactly why this is an offer and never automatic. Retrying on our own
+would put us below the browser on security — an attacker able to reset a
+handshake could force plaintext — and above it on behaviour, invisibly. Dropping
+the encryption is the reader's call; the button says what it costs, and no cookies
+go with it. Note that the automatic hand-off below is *suppressed* for this case:
+it navigates to an explicit https URL, so it is a dead end by construction, and
+taking it would trade our banner for the browser's error page.
+
 **The hand-off.** When even that fails, the tab goes back to the browser's own
 reader: a session-scoped `allow` rule at a higher priority than both redirect
 rules — Chrome re-applies matching `allow` rules in the response phase too —
