@@ -30,6 +30,7 @@ import type {
 import { buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
+import { fileAccessGranted } from './extension-file-access'
 import {
   ensureReadPermission,
   ensureWritePermission,
@@ -134,7 +135,17 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       // otherwise serve.
       const first = await fetchDocument(path, 'same-origin')
       if (!('error' in first)) return first
-      if (!/^https?:/i.test(path)) return first // no cookies to add for file://
+      if (!/^https?:/i.test(path)) {
+        // A file:// fetch that failed while the browser is withholding local
+        // files has exactly one cause, and it is fixable in two clicks — name
+        // it so the shell can show the switch instead of «Failed to fetch».
+        // Only when the browser CONFIRMS the switch is off: with access
+        // granted, the same failure means what it says (file moved, renamed).
+        if (/^file:/i.test(path) && (await fileAccessGranted()) === false) {
+          return { error: first.error, code: 'ext-file-access' }
+        }
+        return first // no cookies to add for file://
+      }
       const retry = await fetchDocument(path, 'include')
       return 'error' in retry ? first : retry
     },

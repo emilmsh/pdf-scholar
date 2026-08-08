@@ -115,8 +115,34 @@ async function installRedirectRules(): Promise<void> {
   }
 }
 
-chrome?.runtime.onInstalled.addListener(() => {
+/** The install-time ask for «Gi tilgang til URL-adresser for fil».
+ *
+ *  A store install arrives with file:// access OFF and no way to request it:
+ *  the toggle lives on the extension's own details page and only the user may
+ *  flip it, so it appears in no install dialog and in no permission prompt. The
+ *  File Explorer story — double-click a PDF, read it here — is therefore
+ *  silently dead until someone says so out loud. One tab, once, at install:
+ *  the welcome screen, whose access card is that sentence (Welcome.tsx).
+ *
+ *  Only when the browser confirms the access is missing — a re-load of an
+ *  unpacked build that already has it gets no tab. If the probe is unavailable
+ *  we ask anyway: a card the user can wave away beats a feature they never
+ *  learn about. */
+async function openInstallOnboarding(): Promise<void> {
+  if (!chrome?.tabs) return
+  try {
+    if (await chrome.extension?.isAllowedFileSchemeAccess?.()) return
+  } catch {
+    // Older browser without the probe — fall through and show the card.
+  }
+  await chrome.tabs.create({ url: chrome.runtime.getURL('viewer.html'), active: true })
+}
+
+chrome?.runtime.onInstalled.addListener((details) => {
   void installRedirectRules()
+  // 'install' only: an update fires here too, and a tab on every auto-update
+  // would be the extension talking over the user's work.
+  if (details.reason === 'install') void openInstallOnboarding()
 })
 
 // Dynamic rules persist across service-worker restarts, but re-asserting on

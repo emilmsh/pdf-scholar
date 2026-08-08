@@ -165,6 +165,40 @@ would have used anyway.
   extension cannot grant it to itself. Rule 2 is http(s)-only, so a local PDF
   without a `.pdf` name stays with the browser.
 
+### Asking for "Allow access to file URLs"
+
+A **store** install always arrives with that toggle off, and there is no way to
+ask for it the way a permission is asked for: it appears in no install dialog and
+in no prompt, because it is not a manifest permission at all. Left alone, the
+File Explorer story is simply dead for every store user, silently — and the only
+symptom is a PDF that opens in the browser's own reader, or an error banner
+saying `Failed to fetch`. So the extension says it out loud, in three places
+(`src/renderer/src/extension-file-access.ts` + `components/FileAccessNotice.tsx`):
+
+1. **At install.** `onInstalled` with `reason === 'install'` opens one tab on the
+   welcome screen — and only when `chrome.extension.isAllowedFileSchemeAccess()`
+   says the access is missing, so re-loading an unpacked build that already has it
+   opens nothing. Never on an update: a tab on every auto-update is the extension
+   talking over the user's work.
+2. **On the welcome screen**, as a dismissible card, for as long as the toggle is
+   off. Nothing is broken yet at that point, so it stays quiet, and a dismissal is
+   remembered in `chrome.storage.local['pdfx-file-access-dismissed']`.
+3. **When a local PDF actually fails to open**, as the whole screen. `readFile`
+   returns the named code `ext-file-access` (only when the browser *confirms* the
+   toggle is off — with access granted, the same failure means what it says), and
+   the shell shows the fix instead of the error, keeping the hand-off to the
+   browser's own reader as an escape hatch. The tab re-probes on focus and opens
+   the document by itself the moment the switch is flipped.
+
+Two details the test (`npm run test:file-access`) pins, because both are
+invisible until they are wrong in someone else's browser: the settings address is
+`edge://extensions/?id=…` on Edge and `chrome://extensions/?id=…` everywhere else
+(and the page can only be reached through `chrome.tabs.create` — Chromium blocks
+extension pages from *linking* into its own UI, so when even that is refused the
+notice prints the address to paste); and a probe that answers `null` means
+"cannot tell", never "no access" — the same renderer runs on the desktop, where a
+card about a browser toggle would be nonsense.
+
 ## Build & load
 
 ```

@@ -10,6 +10,8 @@ import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
 import { AppMark, IconDocument, IconFolderOpen, IconHeart, IconSparkle } from './icons'
 import { AiSettings } from './AiPanel'
+import FileAccessNotice from './FileAccessNotice'
+import { dismissFileAccessNotice, fileAccessGranted, fileAccessNoticeDismissed } from '../extension-file-access'
 
 interface Props {
   recents: RecentFile[]
@@ -57,9 +59,28 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
   // updates there, so the control would only ever say "nothing to do").
   const [updSupport, setUpdSupport] = useState<UpdateUnsupportedReason | null | undefined>(undefined)
 
+  // The browser-extension target only: ask for «Gi tilgang til URL-adresser for
+  // fil» when the browser says we do not have it. A store install never does,
+  // and nothing in the install flow can say so — this card is the whole ask
+  // (see extension-file-access.ts). Dismissible, because until the user opens a
+  // local PDF nothing is actually broken.
+  const [needsFileAccess, setNeedsFileAccess] = useState(false)
+
   useEffect(() => {
     void bridge.getVersion().then(setVersion)
     void bridge.updateSupport().then(setUpdSupport)
+  }, [])
+
+  useEffect(() => {
+    let stale = false
+    void (async () => {
+      if ((await fileAccessGranted()) !== false) return
+      if (await fileAccessNoticeDismissed()) return
+      if (!stale) setNeedsFileAccess(true)
+    })()
+    return () => {
+      stale = true
+    }
   }, [])
 
   const showUpdateCheck = isElectron && updSupport !== undefined && updSupport !== 'store'
@@ -105,6 +126,16 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
           </button>
         </div>
         <p className="welcome-hint">{t('welcome.dragHint')}</p>
+
+        {needsFileAccess && (
+          <FileAccessNotice
+            variant="welcome"
+            onDismiss={() => {
+              dismissFileAccessNotice()
+              setNeedsFileAccess(false)
+            }}
+          />
+        )}
 
         {config && !hasKey && (
           <div className="welcome-ai-card">

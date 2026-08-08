@@ -46,6 +46,10 @@ jobs:
       # The extension's redirect-rule → viewer-page URL handoff: a regression is
       # invisible until one specific kind of link (signed, tracker-tagged) breaks
       - run: npm run test:viewer-url
+      # «Allow access to file URLs»: the browser-specific settings address and
+      # the "cannot tell" ≠ "no access" distinction — wrong either way, a store
+      # user is sent to a dead page or every desktop user gets a pointless card
+      - run: npm run test:file-access
       # Version arithmetic behind the macOS update notice — that build detects
       # updates it cannot install, and getting this wrong either nags every four
       # hours or never speaks at all, on hardware we don't own
