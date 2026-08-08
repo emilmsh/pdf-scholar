@@ -1976,11 +1976,18 @@ try {
         console.log(`  ${name} … not composed (this run has no ${missing.join(', ')})`)
       continue
     }
+    // Captured, not inherited: the composer signs off with its own "Done — <dir>"
+    // footer, and printed here that lands above ours, so the run ends by naming
+    // the same directory twice as if two things had finished.
     const r = spawnSync(
       electronBinary(ROOT),
       [join(ROOT, 'scripts', 'compose-tricolor.cjs'), '--full', '--from', OUT_DIR, '--out', OUT_DIR],
-      { stdio: 'inherit' }
+      { encoding: 'utf8' }
     )
+    for (const line of (r.stdout ?? '').split('\n')) {
+      if (line.trim() && !line.startsWith('Done —')) console.log(line)
+    }
+    if (r.stderr?.trim()) console.error(r.stderr.trim())
     if (r.status !== 0) {
       failed++
       console.log(`  ${name} … FAILED to compose`)
