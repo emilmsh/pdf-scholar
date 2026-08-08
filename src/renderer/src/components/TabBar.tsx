@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { t, useLang } from '../i18n'
-import { IconChevronLeft } from './icons'
+import { IconChevronDown } from './icons'
 
 export interface TabInfo {
   id: string
@@ -31,8 +31,6 @@ interface Props {
   onMoveToNewWindow(id: string, path: string): void
   /** Re-read the file from disk and remount the viewer (external updates) */
   onReload(id: string, path: string): void
-  /** Back to the library (closes the active document) */
-  onLibrary(): void
 }
 
 /** Tiny scroll glyph shown at the left of the titlebar (matches the app icon) */
@@ -58,11 +56,12 @@ export default function TabBar({
   onReorder,
   onCloseMany,
   onMoveToNewWindow,
-  onReload,
-  onLibrary
+  onReload
 }: Props): React.JSX.Element {
   useLang()
   const [menu, setMenu] = useState<{ x: number; y: number; tab: TabInfo } | null>(null)
+  /** The "all tabs" list, opened from the chevron at the end of the strip */
+  const [allOpen, setAllOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   /** Where the right-clicked tab currently sits — the move/close-to-the-right
    *  items are all relative to it, and it moves while the menu is open. */
@@ -79,6 +78,22 @@ export default function TabBar({
     }
   }, [menu])
 
+  useEffect(() => {
+    if (!allOpen) return
+    const close = (): void => setAllOpen(false)
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setAllOpen(false)
+    }
+    window.addEventListener('mousedown', close)
+    window.addEventListener('resize', close)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('resize', close)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [allOpen])
+
   // The strip lives inside the frameless window's titlebar: the row is a
   // window-drag region, every interactive child opts out (CSS app-region),
   // and the content is inset to the OS-reported titlebar area so it never
@@ -86,12 +101,7 @@ export default function TabBar({
   return (
     <div className={`tab-bar${hidden ? ' tucked' : ''}`}>
       <div className="tab-bar-inner">
-      {tabs.length > 0 ? (
-        <button className="tab-library" onClick={onLibrary} title={t('tb.libraryTip')}>
-          <IconChevronLeft size={15} />
-          <span>{t('tb.library')}</span>
-        </button>
-      ) : (
+      {tabs.length > 0 ? null : (
         <>
           <span className="tab-app-glyph" aria-hidden="true">
             <AppGlyph />
@@ -150,7 +160,42 @@ export default function TabBar({
       <button className="tab-new-window" onClick={onNewWindow} title={t('tabs.newWindow')}>
         ⧉
       </button>
+      {/* Every open tab as a list. The strip compresses titles as it fills up,
+          and past a handful they stop being readable — this is the browsers'
+          answer to the same problem, in the same place. Only offered once the
+          strip actually holds enough to be worth listing. */}
+      {tabs.length > 2 && (
+        <button
+          className={`tab-all${allOpen ? ' is-open' : ''}`}
+          title={t('tabs.allTip')}
+          aria-expanded={allOpen}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={() => setAllOpen((o) => !o)}
+        >
+          <IconChevronDown size={12} />
+        </button>
+      )}
       </div>
+
+      {allOpen && (
+        <div className="tab-all-menu" onMouseDown={(e) => e.stopPropagation()}>
+          <div className="theme-menu-label">{t('tabs.allLabel')}</div>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`menu-item${tab.id === activeId ? ' is-active' : ''}`}
+              title={tab.path}
+              onClick={() => {
+                onSelect(tab.id)
+                setAllOpen(false)
+              }}
+            >
+              {tab.dirty && <span className="tab-dirty-dot">•</span>}
+              {tab.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {menu && menuIndex !== null && (
         <div

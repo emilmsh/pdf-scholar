@@ -111,6 +111,8 @@ const nb = {
   'tabs.moveRight': 'Flytt til høyre',
   'tabs.new': 'Åpne PDF (Ctrl+O)',
   'tabs.newWindow': 'Nytt vindu (Ctrl+Shift+N)',
+  'tabs.allTip': 'Alle åpne faner',
+  'tabs.allLabel': 'Åpne faner',
   'tabs.openInNewWindow': 'Åpne i nytt vindu',
   'tabs.reload': 'Last inn på nytt',
   'tabs.moveToNewWindow': 'Flytt til nytt vindu',
@@ -119,6 +121,7 @@ const nb = {
   // Toolbar
   'tb.library': 'Bibliotek',
   'tb.libraryTip': 'Tilbake til biblioteket',
+  'tb.leaveDocTip': 'Lukk dokumentet',
   // Document button (browser/extension only — replaces the desktop tab bar's
   // file identity: shows the open file's path and opens another file)
   'doc.copyPath': 'Kopier sti',
@@ -752,6 +755,8 @@ const en: Dict = {
   'tabs.moveRight': 'Move right',
   'tabs.new': 'Open PDF (Ctrl+O)',
   'tabs.newWindow': 'New window (Ctrl+Shift+N)',
+  'tabs.allTip': 'All open tabs',
+  'tabs.allLabel': 'Open tabs',
   'tabs.openInNewWindow': 'Open in new window',
   'tabs.reload': 'Reload',
   'tabs.moveToNewWindow': 'Move to new window',
@@ -759,6 +764,7 @@ const en: Dict = {
 
   'tb.library': 'Library',
   'tb.libraryTip': 'Back to the library',
+  'tb.leaveDocTip': 'Close this document',
   'doc.copyPath': 'Copy path',
   'doc.copied': 'Copied',
   'doc.openFile': 'Open another file …',

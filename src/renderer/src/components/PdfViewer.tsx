@@ -382,6 +382,13 @@ interface Props {
   /** Presentation-mode state of the ACTIVE viewer — the app shell tucks the
    *  tab bar so the slideshow overlay owns the whole window */
   onPresentationChange(presenting: boolean): void
+  /** The top chrome is being reached for — the toolbar is pinned, or it is
+   *  tucked and the pointer is peeking it back. The app shell brings the TAB
+   *  STRIP back with it in fullscreen: the strip sits directly above the
+   *  toolbar, so sliding them down as one block is one gesture and one mental
+   *  model («the chrome comes back when I reach for it») rather than two
+   *  affordances a hair apart. */
+  onChromeVisible(visible: boolean): void
   /** Unsaved-changes state (save model) — App needs it for close prompts */
   onDirtyChange(dirty: boolean): void
   /** «Save a copy» wrote the current document (edits included) to `path` —
@@ -395,6 +402,9 @@ interface Props {
    *  and the other two verdicts leave nothing left to save in place). */
   onExternalSaveConflict(path: string, name: string): Promise<'save' | 'discard' | 'cancel'>
   onClose(): void
+  /** Documents open in this window — the leave button's tooltip depends on
+   *  whether closing this one lands you in the library or in the next tab. */
+  tabCount: number
   /** Browser/extension only: open another file (the shell handles the picker).
    *  When supplied, the toolbar shows a left-most file button that surfaces the
    *  current file's path and this action. Desktop leaves it undefined — the tab
@@ -410,10 +420,12 @@ export default function PdfViewer({
   resolvedTheme,
   onSettingsChange,
   onPresentationChange,
+  onChromeVisible,
   onDirtyChange,
   onSavedAs,
   onExternalSaveConflict,
   onClose,
+  tabCount,
   onOpenFile
 }: Props): React.JSX.Element {
   useLang()
@@ -4277,6 +4289,13 @@ export default function PdfViewer({
     if (active) onPresentationChange(presentation)
   }, [active, presentation, onPresentationChange])
 
+  // …and only the active tab's chrome. An inactive tab-view is display:none,
+  // so its reveal zone can never be hovered anyway — but a tab SWITCH would
+  // otherwise leave the shell holding the old tab's answer.
+  useEffect(() => {
+    if (active) onChromeVisible(toolbarPinned || toolbarPeek)
+  }, [active, toolbarPinned, toolbarPeek, onChromeVisible])
+
   // Pin / unpin the toolbar (Edge-style). Unpinned, it hides itself and
   // reveals on top-edge hover; the choice is remembered across sessions.
   // Unpinning is treated as "immersive reading": the side panels collapse to
@@ -5445,6 +5464,8 @@ export default function PdfViewer({
           onTextPrefChange={patchTextPref}
           onTextPrefReset={resetTextPref}
           onToggleSidebar={() => setTocPinned((o) => !o)}
+          onLeaveDocument={onClose}
+          tabCount={tabCount}
           onGoToPage={jumpToPage}
           onZoomIn={() => manualZoom(scaleRef.current * 1.15)}
           onZoomOut={() => manualZoom(scaleRef.current / 1.15)}

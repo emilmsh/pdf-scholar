@@ -252,6 +252,12 @@ export default function ExtensionApp(): React.JSX.Element {
               resolvedTheme={resolvedTheme}
               onSettingsChange={updateSettings}
               onPresentationChange={() => {}}
+              // The extension has no tab strip of its own to reveal — the
+              // browser's is right there above it.
+              onChromeVisible={() => {}}
+              // The extension viewer owns the whole page — there is no library
+              // to go back to, and no second tab of ours to land in.
+              tabCount={1}
               onDirtyChange={() => {}}
               onSavedAs={() => {}} // extension: «save a copy» is a plain export (PLATFORMS.md §9)
               onExternalSaveConflict={handleSaveExternalConflict}

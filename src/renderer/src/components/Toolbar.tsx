@@ -87,6 +87,7 @@ import {
   IconShapeLine,
   IconShapeSquare,
   IconShapes,
+  IconChevronLeft,
   IconSidebar,
   IconSignature,
   IconSnip,
@@ -174,6 +175,11 @@ interface Props {
   onNavBack(): void
   onNavForward(): void
   onToggleSidebar(): void
+  /** Leave this document. With other tabs open the next one takes over; with
+   *  none, the library is what is left — which is why the tooltip says which. */
+  onLeaveDocument(): void
+  /** How many documents this window holds, for that tooltip */
+  tabCount: number
   onGoToPage(page: number): void
   onZoomIn(): void
   onZoomOut(): void
@@ -333,6 +339,8 @@ export default function Toolbar({
   onNavBack,
   onNavForward,
   onToggleSidebar,
+  onLeaveDocument,
+  tabCount,
   onGoToPage,
   onZoomIn,
   onZoomOut,
@@ -975,13 +983,30 @@ export default function Toolbar({
   return (
     <div className="toolbar" ref={toolbarRef}>
       <div className="toolbar-group">
+        {/* Back to the library. It moved here from the tab strip (Emil,
+            2026-08-09) so the strip holds nothing but tabs — and so it is
+            reachable in fullscreen, where the strip is tucked but the toolbar
+            comes back on hover. Icon-only with a tooltip that says what it
+            actually does: with other tabs open this closes ONE document and
+            lands you in the next, and calling that "back to the library" was
+            the label's old lie. */}
         <button
-          className={`tb-btn tb-labeled${sidebarOpen ? ' is-active' : ''}`}
+          className="tb-btn"
+          onClick={onLeaveDocument}
+          title={t(tabCount > 1 ? 'tb.leaveDocTip' : 'tb.libraryTip')}
+        >
+          <IconChevronLeft size={17} />
+        </button>
+        {/* «Innhold» lost its label: the panel holds thumbnails, contents,
+            bookmarks AND notes, so the word described a quarter of it (Emil's
+            observation). The left edge rail is already an icon for the same
+            panel, which made the label doubly redundant. */}
+        <button
+          className={`tb-btn${sidebarOpen ? ' is-active' : ''}`}
           onClick={onToggleSidebar}
           title={t('tb.sidebarTip')}
         >
           <IconSidebar />
-          <span className="tb-label">{t('side.contents')}</span>
         </button>
         <div className="toolbar-sep" />
         {inline('back') && (

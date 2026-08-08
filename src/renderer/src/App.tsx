@@ -122,6 +122,10 @@ export default function App(): React.JSX.Element {
   // OS fullscreen hides the titlebar strip (the native controls hide too)
   const [fullscreen, setFullscreen] = useState(false)
   useEffect(() => bridge.onFullScreen(setFullscreen), [])
+  /** Is the active viewer showing its toolbar? In fullscreen the tab strip
+   *  rides along with it, so reaching for the top brings the whole of the
+   *  chrome back at once instead of half of it. */
+  const [chromeVisible, setChromeVisible] = useState(true)
 
   // Auto-update (Electron only). Checks run quietly in main, but downloading
   // is the user's decision: available → "Last ned" button → downloading (with
@@ -604,7 +608,11 @@ export default function App(): React.JSX.Element {
           dirty: dirtyTabs.has(t.id)
         }))}
         activeId={activeId}
-        hidden={presenting || fullscreen}
+        // Fullscreen tucks the strip — but reaching for the top brings it
+        // back with the toolbar. Only worth it with MORE THAN ONE tab: with a
+        // single document open the strip is a title bar, and revealing it adds
+        // nothing to a reader who went fullscreen to be rid of exactly that.
+        hidden={presenting || (fullscreen && (tabs.length < 2 || !chromeVisible))}
         onSelect={setActiveId}
         onClose={closeTab}
         onNewTab={() => void openDialog()}
@@ -616,7 +624,6 @@ export default function App(): React.JSX.Element {
         onCloseMany={(ids) => void closeTabs(ids)}
         onMoveToNewWindow={moveToNewWindow}
         onReload={(id, path) => void reloadTab(id, path)}
-        onLibrary={() => activeId && closeTab(activeId)}
       />
 
       {tabs.length > 0 ? (
@@ -631,10 +638,12 @@ export default function App(): React.JSX.Element {
                 resolvedTheme={resolvedTheme}
                 onSettingsChange={updateSettings}
                 onPresentationChange={setPresenting}
+                onChromeVisible={setChromeVisible}
                 onDirtyChange={(dirty) => setTabDirty(tab.id, dirty)}
                 onSavedAs={(path) => void adoptSavedCopy(tab.id, path)}
                 onExternalSaveConflict={handleSaveExternalConflict}
                 onClose={() => closeTab(tab.id)}
+                tabCount={tabs.length}
               />
             </div>
           ))}
