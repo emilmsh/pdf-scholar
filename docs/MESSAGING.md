@@ -169,6 +169,13 @@ siden av siden, og eksporten printer dem slik.
   zooms; pen pressure varies the line **(beta)**, and the saved file keeps the
   varying width — other readers render it the same. A toggle in the tool menus
   hands drawing back to the finger
+- Sign without leaving the app: draw your signature once — with a mouse, a pen
+  or a finger — and stamp it wherever it is needed, on any document. It is kept
+  on your machine, never uploaded, and lands in the file as a standard stamp
+  annotation. *(Placing a signature is not the same as digitally signing a
+  document, and no surface may blur the two. Where a document already carries
+  digital signatures the app says so and says plainly that it does not check
+  whether they are valid.)*
 - Colour, thickness and opacity per tool, remembered between sessions
 - A mark can be corrected rather than redrawn: drag either end of a highlight
   and it snaps to whole words, or a corner of a shape, text box or drawing
@@ -250,6 +257,11 @@ siden av siden, og eksporten printer dem slik.
   not an achievement.
 - **"AI-powered".** The assistant is optional, off without a key, and never the
   first thing said about the app.
+- **Anything that reads as "digitally signed" or "signature verified".** The
+  signature tool stamps a picture on the page — legally an ordinary annotation,
+  not a cryptographic signature — and the signature *reader* deliberately makes
+  no claim about validity. Say "sign" only in the sense a pen signs paper, and
+  never let a badge or a bullet suggest the app has checked a certificate.
 - **"Encrypted" on its own, about the API key.** `docs/PLATFORMS.md` §12 lists
   four distinct storage modes and the settings panel states the active one; copy
   that flattens them into one promise is wrong on at least one platform. Say

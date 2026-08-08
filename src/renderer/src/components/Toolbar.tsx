@@ -34,6 +34,7 @@ import {
 import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
+import type { SavedSignature } from '../signatures'
 import { READ_ALOUD } from '../flags'
 import { useDismissable } from '../useDismissable'
 import { updateOutcomeText } from './Welcome'
@@ -82,11 +83,13 @@ import {
   IconShapeSquare,
   IconShapes,
   IconSidebar,
+  IconSignature,
   IconSnip,
   IconSparkle,
   IconSplit,
   IconNote,
   IconText,
+  IconTrash,
   IconTextSettings,
   IconView
 } from './icons'
@@ -211,6 +214,20 @@ interface Props {
   /** Note placement: armed = click-to-place overlay is up */
   noteActive: boolean
   onToggleNote(): void
+  /** A signature is armed and waiting for a click on the page */
+  signatureActive: boolean
+  /** Saved signatures, newest first — the menu lists them as pictures */
+  signatures: SavedSignature[]
+  /** Main button: arm the only signature, or open the pad when there are none */
+  onSignaturePrimary(): void
+  /** Arm this saved signature for placement (null disarms) */
+  onSignaturePick(id: string | null): void
+  onSignatureDraw(): void
+  onSignatureDelete(id: string): void
+  /** The «Signert»-indicator, when the document carries digital signatures.
+   *  Passed in rather than built here: it is about the DOCUMENT, and the
+   *  toolbar has no business reading the file. */
+  signatureInfo?: React.ReactNode
   /** Open the assistant panel showing its key settings (gear-menu shortcut) */
   onOpenAiSettings(): void
   /** Toolbar auto-hide: pinned = always shown, unpinned = reveals on hover */
@@ -342,6 +359,13 @@ export default function Toolbar({
   onToggleSnip,
   noteActive,
   onToggleNote,
+  signatureActive,
+  signatures,
+  onSignaturePrimary,
+  onSignaturePick,
+  onSignatureDraw,
+  onSignatureDelete,
+  signatureInfo,
   onOpenAiSettings,
   toolbarPinned,
   onTogglePin,
@@ -387,7 +411,9 @@ export default function Toolbar({
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
-  const [toolMenu, setToolMenu] = useState<DrawPrefKey | 'markup' | 'eraser' | 'text' | null>(null)
+  const [toolMenu, setToolMenu] = useState<
+    DrawPrefKey | 'markup' | 'eraser' | 'text' | 'signature' | null
+  >(null)
   // Last markup type the user activated, so the split button's main click
   // re-arms that type rather than always defaulting to highlight
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
@@ -708,6 +734,7 @@ export default function Toolbar({
     { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser' },
     { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => onToolSelect('square'), active: shapeActive },
     { key: 'note', icon: <IconNote size={15} />, label: t('tb.note'), onClick: onToggleNote, active: noteActive },
+    { key: 'signature', icon: <IconSignature size={15} />, label: t('tb.signature'), onClick: onSignaturePrimary, active: signatureActive },
     { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text' },
     { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup },
     { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker' },
@@ -882,6 +909,50 @@ export default function Toolbar({
     )
   }
 
+  /** The signature menu: the saved signatures as pictures (you recognise your
+   *  own handwriting far faster than any label), plus a way to draw another. */
+  const signatureMenu = (
+    <div className="tool-menu signature-menu">
+      {signatures.length === 0 ? (
+        <p className="signature-menu-empty">{t('sig.none')}</p>
+      ) : (
+        <div className="signature-list">
+          {signatures.map((s) => (
+            <div key={s.id} className="signature-row">
+              <button
+                className="signature-choice"
+                onClick={() => {
+                  onSignaturePick(s.id)
+                  setToolMenu(null)
+                }}
+                title={t('sig.place')}
+              >
+                <img src={s.dataUrl} alt={t('sig.saved')} />
+              </button>
+              <button
+                className="signature-delete"
+                onClick={() => onSignatureDelete(s.id)}
+                title={t('sig.delete')}
+                aria-label={t('sig.delete')}
+              >
+                <IconTrash size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        className="signature-draw"
+        onClick={() => {
+          onSignatureDraw()
+          setToolMenu(null)
+        }}
+      >
+        {t('sig.drawNew')}
+      </button>
+    </div>
+  )
+
   return (
     <div className="toolbar" ref={toolbarRef}>
       <div className="toolbar-group">
@@ -996,6 +1067,27 @@ export default function Toolbar({
               <IconNote />
             </button>
           )}
+          {inline('signature') && (
+            <span className="tb-split">
+              {/* One click does the obvious thing: arm the signature you have,
+                  or open the pad if you have none yet. The chevron is for
+                  choosing between several, and for drawing another. */}
+              <button
+                className={`tb-btn${signatureActive ? ' is-active' : ''}`}
+                onClick={onSignaturePrimary}
+                title={t('tb.signatureTip')}
+              >
+                <IconSignature />
+              </button>
+              <button
+                className={`tb-chevron${toolMenu === 'signature' ? ' is-active' : ''}`}
+                title={t('tb.signatureOptionsTip')}
+                onClick={() => setToolMenu((m) => (m === 'signature' ? null : 'signature'))}
+              >
+                <IconChevronDown size={11} />
+              </button>
+            </span>
+          )}
 
           {/* Eraser + undo/redo share one section: all three are "take that
               mark back again", so they belong between the same dividers. */}
@@ -1030,7 +1122,9 @@ export default function Toolbar({
             </button>
           )}
 
-          {toolMenu === 'markup' ? (
+          {toolMenu === 'signature' ? (
+            signatureMenu
+          ) : toolMenu === 'markup' ? (
             <div className="tool-menu">
               <div className="theme-menu-label">{t('tb.markup')}</div>
               <div className="markup-grid">
@@ -1149,6 +1243,11 @@ export default function Toolbar({
           ) : null}
         </div>
       </div>
+
+      {/* Only rendered for the rare document that IS signed — see
+          SignatureInfo. Sits before the spacer so it reads as a property of the
+          document rather than one more tool. */}
+      {signatureInfo}
 
       {/* Centre (freed by moving the file name to the tab strip) holds the
           reading controls: page number + zoom, flanked by flex spacers */}

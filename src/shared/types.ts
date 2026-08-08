@@ -81,6 +81,7 @@ export type EngineErrorCode =
   | 'annot-pressure-bake'
   | 'annot-line-endpoints'
   | 'annot-unknown-type'
+  | 'annot-stamp-no-image'
   | 'pdf-password-protected'
   | 'pdf-password-wrong'
   | 'pdf-print-encrypted'
@@ -90,6 +91,7 @@ export type EngineErrorCode =
   | 'append-unsupported'
   | 'append-objstm-edit'
   | 'append-encrypted'
+  | 'append-no-image'
 
 /** The same idea for the AI request path, which fails for its own set of named
  *  reasons. Kept a separate union because these are whole sentences shown in a
@@ -154,6 +156,10 @@ export type AnnotationType =
   | 'line'
   | 'arrow'
   | 'freetext'
+  /** An image placed on the page — the signature the user drew once and stamps
+   *  wherever it is needed. A standard /Stamp annotation with the image in its
+   *  appearance stream, so every other reader shows it. */
+  | 'stamp'
 
 /** Rect in PDF points, origin at the page's top-left, y growing downward —
  *  the same direction as pdf.js viewport space and as what the write engine
@@ -201,6 +207,31 @@ export interface AnnotateRequest {
   /** ink (marker): bake the appearance with /BM Multiply so text under the
    *  stroke stays legible — the freehand twin of a text highlight */
   blend?: 'multiply' | undefined
+  /** stamp only: the PNG bytes to embed. PDFium decodes these itself and stores
+   *  the image in the appearance stream, so nothing here re-encodes pixels.
+   *  Travels over IPC as a Uint8Array (structured clone handles it). */
+  image?: Uint8Array | undefined
+}
+
+/** A digital signature found in the document.
+ *
+ *  Deliberately says nothing about VALIDITY. Verifying a signature means
+ *  parsing the PKCS#7 blob and walking a certificate chain to a trust store —
+ *  a crypto dependency this app does not carry, and the kind of claim that is
+ *  worse than useless if it is wrong. What we can honestly report is that the
+ *  document carries signatures, when they were made and why; the UI says the
+ *  rest in words. */
+export interface DocSignature {
+  /** /M — when it was signed, as the PDF recorded it. May be empty. */
+  time: string
+  /** /Reason — free text the signer typed, when they typed one */
+  reason: string
+  /** The signature handler, e.g. `adbe.pkcs7.detached` or `ETSI.CAdES.detached`
+   *  (the latter is what makes a signature PAdES). Empty when unreadable. */
+  subFilter: string
+  /** True when the signature declares a DocMDP transform — "no changes allowed
+   *  after this point", the certification signature rather than an approval. */
+  certifying: boolean
 }
 
 /** On success carries the PDF object number of the (new) annotation */
@@ -513,6 +544,10 @@ export interface PdfxApi {
    *  to disk. A no-op on the platforms whose write engine is already in the
    *  renderer (browser, extension). */
   docUnlock(path: string, password: string): Promise<void>
+  /** The digital signatures the document carries, if any. Read once per open —
+   *  a signature cannot appear while the file sits there. Never reports whether
+   *  a signature is VALID; see DocSignature. */
+  docSignatures(path: string): Promise<DocSignature[] | FileError>
   /** True when the document has unsaved annotation changes (a draft exists) */
   docIsDirty(path: string): Promise<boolean>
   /** True when the original file changed outside the app since this session

@@ -4963,6 +4963,204 @@ html.pen-near .draw-layer {
   gap: 8px;
 }
 
+/* ---------- Signature pad + saved-signature menu ---------- */
+
+.signature-dialog {
+  width: min(680px, calc(100vw - 48px));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  padding: 20px;
+}
+
+/* The ruled line is the whole affordance: it says "sign here" without a label.
+   A fixed aspect keeps the pad the same shape as the PNG it produces. */
+.signature-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1000 / 360;
+  margin: 0 0 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  /* Nothing scrolls under the pad, so a pen may draw freely here — unlike the
+     page draw-layer, which has to leave finger panning alone. */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.signature-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.signature-actions-right {
+  display: flex;
+  gap: 8px;
+}
+
+.signature-menu {
+  min-width: 220px;
+}
+
+.signature-menu-empty {
+  margin: 2px 4px 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.signature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.signature-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The signature itself is the label — you know your own hand at a glance. */
+.signature-choice {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.signature-choice:hover {
+  background: var(--hover);
+  border-color: var(--border);
+}
+
+.signature-choice img {
+  max-width: 100%;
+  max-height: 34px;
+  object-fit: contain;
+  /* Signatures are drawn in near-black. On the dark themes that would vanish
+     against the menu, so the preview borrows the same inversion the page
+     recolouring uses — the SAVED image is untouched, this is display only. */
+  filter: var(--page-filter);
+}
+
+.signature-delete {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.signature-delete:hover {
+  color: var(--danger);
+  background: var(--hover);
+}
+
+.signature-draw {
+  width: 100%;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.signature-draw:hover {
+  background: var(--hover);
+}
+
+/* ---------- "Signed" indicator (only when the document actually is) ------- */
+
+.signature-info {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.signature-info-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 60;
+  width: 320px;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+}
+
+.signature-info-list {
+  margin: 8px 0 12px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signature-info-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+}
+
+.signature-info-when {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.signature-info-reason {
+  color: var(--text-secondary);
+}
+
+.signature-info-tag {
+  align-self: flex-start;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+/* The caveat is the reason this panel exists — it gets a rule above it and the
+   full text width, not a whispered footnote. */
+.signature-info-caveat {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* A placed stamp, while it is still a session mark (once saved, pdf.js paints
+   it from the file's appearance stream instead). */
+.annot-stamp {
+  position: absolute;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 /* The unlock field, in the same dialog shell (PasswordPrompt.tsx) */
 .password-input {
   width: 100%;

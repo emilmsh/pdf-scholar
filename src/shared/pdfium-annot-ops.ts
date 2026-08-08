@@ -20,10 +20,15 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  DocSignature,
   FileError,
   ModifyAnnotationRequest
 } from './types'
-import type { PdfAnnotationObject, PdfDocumentObject } from '@embedpdf/models'
+import type {
+  PdfAnnotationObject,
+  PdfDocumentObject,
+  PdfSignatureObject
+} from '@embedpdf/models'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import { buildAnnotation, hexToRgb, linePad, quadsBBox, rgbToHex, strokesBBox, toRect } from './annotation-build'
@@ -84,6 +89,13 @@ export interface RawPdfium {
     UTF16ToString(ptr: number): string
     getValue(ptr: number, type: 'float' | 'i32'): number
   }
+}
+
+/** A view's bytes as a standalone ArrayBuffer. A Uint8Array that came over IPC
+ *  (or out of a larger pool) can be a WINDOW onto a bigger buffer, and handing
+ *  `.buffer` straight to the engine would embed everything around it. */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 }
 
 /** An open document, as both callers hold it */
@@ -318,7 +330,16 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
   return withLinkApGuard(engine, docId, req.pageIndex, async () => {
     const spec = buildAnnotation(req)
     if ('error' in spec) return spec
-    await engine.createPageAnnotation(doc, doc.pages[req.pageIndex], spec).toPromise()
+    // A stamp's pixels ride in the CONTEXT argument, not the annotation model:
+    // PDFium decodes the PNG itself and writes it into the appearance stream as
+    // an image XObject. buildAnnotation has already refused an imageless stamp.
+    const context =
+      req.type === 'stamp' && req.image
+        ? { data: toArrayBuffer(req.image), mimeType: 'image/png' as const }
+        : undefined
+    await engine
+      .createPageAnnotation(doc, doc.pages[req.pageIndex], spec, context as never)
+      .toPromise()
     // The new annotation is last in /Annots order (covered by test:engine's
     // create-then-recolor-by-id case).
     const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
@@ -347,6 +368,31 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
     }
     return { ok: true, id }
   })
+}
+
+/** ASCII out of one of PDFium's raw signature buffers, trimmed of the NULs and
+ *  padding PDF strings routinely carry. Returns '' for anything unreadable —
+ *  a garbled field must not become a garbled sentence in the UI. */
+function bufferText(buf: ArrayBuffer | undefined): string {
+  if (!buf || buf.byteLength === 0) return ''
+  let out = ''
+  for (const byte of new Uint8Array(buf)) {
+    if (byte >= 0x20 && byte < 0x7f) out += String.fromCharCode(byte)
+  }
+  return out.trim()
+}
+
+/** The document's digital signatures, as much as can be read without doing any
+ *  cryptography. See DocSignature: this reports PRESENCE, never validity. */
+export async function readSignaturesOn(open: OpenDoc): Promise<DocSignature[]> {
+  const found = await open.engine.getSignatures(open.doc).toPromise()
+  return (found as PdfSignatureObject[]).map((s) => ({
+    time: typeof s.time === 'string' ? s.time.trim() : bufferText(s.time as never),
+    reason: typeof s.reason === 'string' ? s.reason.trim() : bufferText(s.reason as never),
+    subFilter: bufferText(s.subFilter),
+    // Any non-zero DocMDP means the signature also locks the document.
+    certifying: typeof s.docMDP === 'number' && s.docMDP > 0
+  }))
 }
 
 /** Recolour / retext / move an existing annotation, addressed by object number */

@@ -1145,7 +1145,9 @@ function AnnotationMarks({
   pageW: number
   pageH: number
   rotation: ViewRotation
-}): React.JSX.Element {
+  // Nullable since the stamp branch: a stamp whose image is not in hand has
+  // nothing to paint here (pdf.js draws the saved one from its /AP).
+}): React.JSX.Element | null {
   // Ink/shape SVGs keep their page-space geometry and rotate it with a single
   // group transform into a view-sized viewBox (no per-point maths).
   const view = viewSize(pageW, pageH, rotation)
@@ -1250,6 +1252,22 @@ function AnnotationMarks({
       >
         {annotation.contents}
       </div>
+    )
+  }
+  if (annotation.type === 'stamp') {
+    // Only session stamps get here with an image: once the write lands and the
+    // document reloads, the stamp is a 'file' annotation and pdf.js paints it
+    // from the appearance stream (drawing it here too would double it up).
+    if (!annotation.imageUrl) return null
+    const css = annotationCss(annotation, annotation.quads[0], scale, { w: pageW, h: pageH }, rotation)
+    return (
+      <img
+        className="annot annot-stamp"
+        style={css}
+        src={annotation.imageUrl}
+        alt=""
+        draggable={false}
+      />
     )
   }
   if (annotation.type === 'note') {

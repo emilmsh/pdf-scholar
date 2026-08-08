@@ -14,6 +14,7 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  DocSignature,
   FileError,
   ModifyAnnotationRequest
 } from '../../shared/types'
@@ -25,6 +26,7 @@ import {
   hasNoPosition,
   isPasswordError,
   OOM_RE,
+  readSignaturesOn,
   updateOn,
   WASM_SAFE_LIMIT
 } from '../../shared/pdfium-annot-ops'
@@ -171,6 +173,24 @@ export function browserUpdateAnnotation(req: ModifyAnnotationRequest): Promise<A
 
 export function browserDeleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult> {
   return withDoc(req.path, (open) => deleteOn(open, req))
+}
+
+/** The document's digital signatures (browser/extension twin of the desktop's
+ *  readSignatures). Opening the document for a pure read is the same lazy open
+ *  the first write would do — cheap after that. */
+export async function browserReadSignatures(path: string): Promise<DocSignature[] | FileError> {
+  const entry = docs.get(path)
+  if (!entry) return NOT_OPEN
+  try {
+    return await readSignaturesOn(await openEntry(entry))
+  } catch (err) {
+    if (isPasswordError(err)) {
+      return entry.password === undefined
+        ? ENGINE_ERRORS.passwordProtected
+        : ENGINE_ERRORS.passwordWrong
+    }
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 /** Serialize the live document — original bytes plus every annotation edit.

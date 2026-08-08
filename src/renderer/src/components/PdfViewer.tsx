@@ -7,6 +7,7 @@ import type {
   AiImage,
   AnnotationType,
   DocBookmark,
+  DocSignature,
   FileError,
   FilePayload,
   PageRect,
@@ -110,6 +111,16 @@ import type { AiDocument, ResolvedCitation } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import AnnotPopover from './AnnotPopover'
 import { PasswordPrompt } from './PasswordPrompt'
+import { SignaturePad } from './SignaturePad'
+import { SignatureInfo } from './SignatureInfo'
+import {
+  addSignature,
+  dataUrlToBytes,
+  loadSignatures,
+  removeSignature,
+  stampRectAt
+} from '../signatures'
+import type { SavedSignature } from '../signatures'
 import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
 import { OverlayScrollbars } from './OverlayScrollbars'
 import PdfPage from './PdfPage'
@@ -2415,7 +2426,10 @@ export default function PdfViewer({
           pressures: snapshot.pressures,
           width: snapshot.width,
           fontSize: snapshot.fontSize,
-          blend: snapshot.blend
+          blend: snapshot.blend,
+          // A stamp's picture goes to the engine as raw PNG bytes; the record
+          // keeps the data URL, which is what the overlay can paint.
+          image: snapshot.imageUrl ? dataUrlToBytes(snapshot.imageUrl) : undefined
         })
         .catch(asWriteError)
         .finally(() => {
@@ -2599,6 +2613,7 @@ export default function PdfViewer({
         width?: number | undefined
         fontSize?: number | undefined
         blend?: 'multiply' | undefined
+        imageUrl?: string | undefined
       }
     ): AnnotHandle => {
       const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
@@ -2620,7 +2635,8 @@ export default function PdfViewer({
         pressures: extras?.pressures,
         width: extras?.width,
         fontSize: extras?.fontSize,
-        blend: extras?.blend
+        blend: extras?.blend,
+        imageUrl: extras?.imageUrl
       }
       pushUndo({ kind: 'create', handle, snapshot })
       // engineCreate puts the record in state synchronously and persists in
@@ -3305,6 +3321,132 @@ export default function PdfViewer({
     },
     [renderPagesAsImages]
   )
+
+  // ---------- Digital signatures already in the document ----------
+
+  /** Read once per document. Empty for the overwhelming majority of files, and
+   *  the indicator only exists when it is not — a permanently visible badge for
+   *  something that is almost never there is clutter. */
+  const [docSignatures, setDocSignatures] = useState<DocSignature[]>([])
+  const [signatureInfoOpen, setSignatureInfoOpen] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setDocSignatures([])
+    setSignatureInfoOpen(false)
+    if (!pdf) return
+    void (async () => {
+      try {
+        // CHEAP GATE FIRST. Reading the signatures themselves means opening the
+        // document a second time in the WASM engine — on desktop that happens in
+        // main, and paying it on every open, for a badge that stays hidden for
+        // all but a handful of documents, is exactly the kind of cost that is
+        // invisible until it is not (it was: it blocked main long enough to
+        // stall input). pdf.js already has the document parsed, and its form
+        // field list answers "is there a signature field at all" for free.
+        const fields = (await pdf.getFieldObjects()) as Record<
+          string,
+          { type?: string }[]
+        > | null
+        const hasSignatureField = fields
+          ? Object.values(fields).some((group) =>
+              group.some((f) => f?.type === 'signature')
+            )
+          : false
+        if (!hasSignatureField || cancelled) return
+        const res = await bridge.docSignatures(payload.path)
+        if (!cancelled && Array.isArray(res)) setDocSignatures(res)
+      } catch {
+        // A document we cannot ask about is reported as unsigned rather than as
+        // an error: this is an informational badge, not something the user
+        // asked for, and a toast about it would be noise.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [payload.path, pdf])
+
+  // ---------- Signature stamps ----------
+
+  const [signatures, setSignatures] = useState<SavedSignature[]>(() => loadSignatures())
+  /** The signature armed for placement, if any — the next click on a page
+   *  stamps it. Held as the id so a deletion can disarm cleanly. */
+  const [armedSignature, setArmedSignature] = useState<string | null>(null)
+  const [signaturePadOpen, setSignaturePadOpen] = useState(false)
+
+  const armedSignatureRef = useRef<string | null>(null)
+  armedSignatureRef.current = armedSignature
+  const signaturesRef = useRef<SavedSignature[]>(signatures)
+  signaturesRef.current = signatures
+
+  /** Toolbar's main signature button: do the obvious thing. Nothing saved yet →
+   *  open the pad. Exactly one → arm it. Several → let the menu decide. */
+  const onSignaturePrimary = useCallback(() => {
+    if (armedSignatureRef.current) {
+      setArmedSignature(null)
+      return
+    }
+    const list = signaturesRef.current
+    if (list.length === 0) setSignaturePadOpen(true)
+    else if (list.length === 1) setArmedSignature(list[0].id)
+    else setArmedSignature(list[0].id) // newest first — the menu picks another
+  }, [])
+
+  const onSignatureSaved = useCallback((sig: Omit<SavedSignature, 'id'>) => {
+    const saved: SavedSignature = { ...sig, id: `sig-${Date.now().toString(36)}` }
+    setSignatures((list) => addSignature(list, saved))
+    setSignaturePadOpen(false)
+    // Straight into placement: drawing one is always a prelude to using it.
+    setArmedSignature(saved.id)
+  }, [])
+
+  const onSignatureDelete = useCallback((id: string) => {
+    setSignatures((list) => removeSignature(list, id))
+    setArmedSignature((cur) => (cur === id ? null : cur))
+  }, [])
+
+  /** Place the armed signature at a page point, centred on the click. */
+  const placeSignatureAt = useCallback(
+    (clientX: number, clientY: number) => {
+      const sig = signaturesRef.current.find((s) => s.id === armedSignatureRef.current)
+      if (!sig) return
+      for (const el of allPageElsRef.current()) {
+        const r = el.getBoundingClientRect()
+        if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue
+        const [px, py] = pagePointFromClientRef.current?.(clientX, clientY, el) ?? [0, 0]
+        const rect = stampRectAt(sig, px, py)
+        persistAnnotation(
+          Number(el.dataset.page),
+          'stamp',
+          [rect],
+          // A stamp has no colour of its own — the image carries it. Black at
+          // full opacity keeps the record shape uniform with every other type.
+          [0, 0, 0],
+          1,
+          undefined,
+          { imageUrl: sig.dataUrl }
+        )
+        setArmedSignature(null)
+        return
+      }
+    },
+    [persistAnnotation]
+  )
+
+  // Esc disarms the signature, like the note tool
+  useEffect(() => {
+    if (!armedSignature) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setArmedSignature(null)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [armedSignature])
 
   /** Toolbar note tool: click a page point, open the note draft there */
   const placeNoteAt = useCallback(
@@ -5318,6 +5460,21 @@ export default function PdfViewer({
           onToggleSnip={() => setSnip((s) => (s ? null : { target: 'quick' }))}
           noteActive={notePlacing}
           onToggleNote={() => setNotePlacing((v) => !v)}
+          signatureActive={armedSignature !== null}
+          signatures={signatures}
+          onSignaturePrimary={onSignaturePrimary}
+          onSignaturePick={setArmedSignature}
+          onSignatureDraw={() => setSignaturePadOpen(true)}
+          onSignatureDelete={onSignatureDelete}
+          signatureInfo={
+            <SignatureInfo
+              signatures={docSignatures}
+              open={signatureInfoOpen}
+              onToggle={() => setSignatureInfoOpen((v) => !v)}
+              onClose={() => setSignatureInfoOpen(false)}
+              locale={locale()}
+            />
+          }
           onOpenAiSettings={() => {
             setAiPinned(true)
             setAiSettingsAskId((n) => n + 1)
@@ -5762,6 +5919,22 @@ export default function PdfViewer({
         >
           <div className="snip-hint">{t('note.hint')}</div>
         </div>
+      )}
+      {/* Armed signature: same click-to-place overlay as the note tool, with a
+          preview riding the cursor so the drop point is never a guess. */}
+      {armedSignature && (
+        <div
+          className="note-place-overlay"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            placeSignatureAt(e.clientX, e.clientY)
+          }}
+        >
+          <div className="snip-hint">{t('sig.armed')}</div>
+        </div>
+      )}
+      {signaturePadOpen && (
+        <SignaturePad onSave={onSignatureSaved} onCancel={() => setSignaturePadOpen(false)} />
       )}
       {aiQuick && (
         <AiQuickPopover

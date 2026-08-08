@@ -188,6 +188,19 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | Fil
           : {})
       } as PdfAnnotationObject
     }
+    case 'stamp': {
+      if (!req.image || req.image.length === 0) return ENGINE_ERRORS.stampNoImage
+      const q = req.quads[0]
+      // No colour, no stroke: the image IS the appearance. PDFium builds the
+      // stream from the bytes handed to createPageAnnotation as its context —
+      // see applyOn in ./pdfium-annot-ops.
+      return {
+        ...base,
+        type: PdfAnnotationSubtype.STAMP,
+        rect: toRect(q),
+        opacity: req.opacity
+      } as PdfAnnotationObject
+    }
     default:
       return ENGINE_ERRORS.unknownType(req.type)
   }

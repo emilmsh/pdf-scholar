@@ -9,6 +9,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as mupdf from 'mupdf'
+import { signaturePng } from './lib/tiny-png.mjs'
 import { applyAnnotation, updateAnnotation, deleteAnnotation, flushAnnotations } from './.engine-test-bundle.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -23,6 +24,7 @@ const check = (label, cond, detail = '') => {
 }
 
 const q = (x, y, w, h) => [{ x, y, w, h }]
+const SIGNATURE = new Uint8Array(signaturePng())
 const base = { path: FILE, pageIndex: 1, opacity: 1, color: [0.89, 0.29, 0.29], author: 'test' }
 
 // 1. create all 11 types through the production applyAnnotation
@@ -37,7 +39,11 @@ const reqs = [
   { ...base, type: 'circle', quads: q(200, 230, 110, 60), width: 2 },
   { ...base, type: 'line', quads: q(70, 310, 160, 40), strokes: [[[72, 345], [225, 315]]], width: 2 },
   { ...base, type: 'arrow', quads: q(70, 360, 160, 40), strokes: [[[72, 395], [225, 365]]], width: 2 },
-  { ...base, type: 'freetext', quads: q(300, 310, 200, 48), contents: 'Fri tekst ÆØÅ', fontSize: 12, color: [0.11, 0.11, 0.13] }
+  { ...base, type: 'freetext', quads: q(300, 310, 200, 48), contents: 'Fri tekst ÆØÅ', fontSize: 12, color: [0.11, 0.11, 0.13] },
+  // The signature stamp: real PNG bytes, embedded by PDFium into the appearance
+  // stream as an image XObject. Unlike every other type here the pixels ride in
+  // createPageAnnotation's CONTEXT argument, not the annotation model.
+  { ...base, type: 'stamp', quads: q(320, 420, 180, 68), image: SIGNATURE }
 ]
 const ids = {}
 for (const req of reqs) {
@@ -166,6 +172,16 @@ for (const req of reqs) {
     try { const o = a.getObject().get('AP'); if (o && !o.isNull()) ap++ } catch { /* skip */ }
   }
   check('all annots have /AP', ap === annots.length, `${ap}/${annots.length}`)
+  // The stamp is only worth anything if the PICTURE went in. Check the box it
+  // landed in, and that the file really carries an image XObject — an /AP that
+  // draws nothing would satisfy the check above while showing blank everywhere.
+  const stamp = byId.get(ids.stamp)
+  check('stamp is a /Stamp', stamp?.getType() === 'Stamp', stamp ? stamp.getType() : 'missing')
+  const stampBox = rectOf(stamp)
+  check('stamp keeps its box', !!stampBox && Math.abs(stampBox.w - 180) <= 1 && Math.abs(stampBox.h - 68) <= 1,
+    stampBox ? `${stampBox.w.toFixed(1)}×${stampBox.h.toFixed(1)}` : 'no /Rect')
+  const bytes = fs.readFileSync(FILE).toString('latin1')
+  check('file carries an image XObject', /\/Subtype\s*\/Image/.test(bytes))
   pdf.destroy()
 }
 

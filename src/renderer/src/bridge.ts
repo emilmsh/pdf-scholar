@@ -18,6 +18,7 @@ import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 import {
   browserApplyAnnotation,
   browserDeleteAnnotation,
+  browserReadSignatures,
   browserUpdateAnnotation
 } from './annotation-engine-browser'
 
@@ -120,6 +121,7 @@ export const webApi: PdfxApi = {
   // Nothing to hand over: outside Electron the annotation engine is in this same
   // renderer and already holds the password (registerBrowserDoc took it).
   docUnlock: async () => {},
+  docSignatures: (path) => browserReadSignatures(path),
   docIsDirty: async () => false,
   docWasModifiedExternally: async () => false,
   docSave: async () => ({ ok: true }),

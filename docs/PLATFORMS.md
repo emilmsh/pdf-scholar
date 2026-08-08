@@ -203,6 +203,21 @@ regressions are treated as bugs, not as acceptable platform lag.
     cipher. Reading a locked file of any size works everywhere. Covered by
     `npm run test:password` on all three OSes.
 
+16. **Signature stamps work everywhere; over 150 MB they do not.** The saved
+    signature lives in the renderer (`src/renderer/src/signatures.ts`,
+    localStorage, same as the tool preferences), so all three targets behave
+    identically — including the pad, which accepts mouse, pen and finger. The
+    one divergence is by document SIZE, not platform: above 150 MB writes route
+    to the incremental appender, which builds annotation dictionaries by hand
+    and has no image encoder, so a stamp is refused there with
+    `append-no-image` while every other mark still works. Reading a document's
+    EXISTING digital signatures is likewise uniform — and uniformly limited: we
+    report that signatures are present and what they say about themselves
+    (`getSignatures`), and never whether they are valid, which would need a
+    PKCS#7 parser and a trust store. The UI says so in words rather than
+    implying a check we did not do. Covered by `npm run test:signatures` (CI,
+    all three OSes) and `npm run test:signature-stamp` (desktop session).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

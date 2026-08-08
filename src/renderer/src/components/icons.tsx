@@ -278,6 +278,23 @@ export const IconNote = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** A signed line: the flourish above, the rule it sits on below. Reads as
+ *  "signature" at 15px in a way a pen nib does not (that is IconPen's job). */
+export const IconSignature = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M3 16c2.5 0 3-9 5-9s1.5 7 3.5 7 2-4 3.5-4 1.5 3 3 3 2-1 3-1" />
+    <path d="M3 20h18" />
+  </Svg>
+)
+
+export const IconTrash = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4 7h16" />
+    <path d="M9.5 7V5.5a1.5 1.5 0 0 1 1.5-1.5h2a1.5 1.5 0 0 1 1.5 1.5V7" />
+    <path d="M6.5 7l.8 12a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-12" />
+  </Svg>
+)
+
 export const IconComment = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-6.5L7 19.5V16H6a2 2 0 0 1 -2 -2z" />

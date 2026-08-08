@@ -38,6 +38,10 @@ jobs:
       # message), and that saving an unlocked one KEEPS the encryption — if that
       # ever regressed we would publish protected documents in the clear
       - run: npm run test:password
+      # Reading the digital signatures a document already carries. The engine
+      # reports what the /Sig dictionary claims; we never verify it, and the
+      # test pins that boundary (approval vs certifying, PAdES sub-filter)
+      - run: npm run test:signatures
       # Pure-function rotation/spread transforms: a wrong one writes corrupted
       # coordinates into the file, so it is cheap insurance
       - run: npm run test:rotation

@@ -20,6 +20,7 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  DocSignature,
   FileError,
   ModifyAnnotationRequest
 } from '../shared/types'
@@ -34,6 +35,7 @@ import {
   hasNoPosition,
   isPasswordError,
   OOM_RE,
+  readSignaturesOn,
   updateOn,
   WASM_SAFE_LIMIT
 } from '../shared/pdfium-annot-ops'
@@ -157,6 +159,25 @@ async function withPdf(
         : ENGINE_ERRORS.passwordWrong
     }
     if (OOM_RE.test(msg)) return OVERSIZE
+    return { error: msg }
+  }
+}
+
+/** The document's digital signatures. Goes through the same cache as the
+ *  writes — it reuses an already-open document, and inherits the unlock
+ *  password for free — but reports NOT dirty, so a pure read can never schedule
+ *  a flush and mark an untouched file as changed. */
+export async function readSignatures(path: string): Promise<DocSignature[] | FileError> {
+  try {
+    if ((await stat(path)).size > WASM_SAFE_LIMIT) return OVERSIZE
+    return await cache.mutate(path, (open) => readSignaturesOn(open), () => false)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    if (isPasswordError(err)) {
+      return passwordFor(path) === undefined
+        ? ENGINE_ERRORS.passwordProtected
+        : ENGINE_ERRORS.passwordWrong
+    }
     return { error: msg }
   }
 }

@@ -32,6 +32,9 @@ export const ENGINE_ERRORS = {
     error: 'Fikk ikke lagret strekens trykkvariasjon i filen — streken ble ikke lagt til'
   },
   lineNoEndpoints: { code: 'annot-line-endpoints', error: 'Linjen mangler endepunkter' },
+  /** A stamp with no image is nothing at all — an empty annotation the user
+   *  could never see, select or remove. */
+  stampNoImage: { code: 'annot-stamp-no-image', error: 'Stempelet mangler bilde' },
   /** The type name is the diagnostic and cannot be reconstructed from a code,
    *  so it rides along in `error` the way the asymmetric counts do. */
   unknownType: (type: string): FileError => ({
@@ -62,6 +65,14 @@ export const ENGINE_ERRORS = {
     code: 'append-encrypted',
     error:
       'Passordbeskyttede dokumenter av denne størrelsen kan leses, men ikke annoteres — endringen ble ikke lagret.'
+  },
+  /** A stamp (signature) in a file too large for the WASM engine. The appender
+   *  writes annotation dictionaries by hand and has no image encoder, so the
+   *  picture could never be embedded. Every other mark works at this size. */
+  appendNoImage: {
+    code: 'append-no-image',
+    error:
+      'Signaturer kan ikke settes inn i dokumenter over 150 MB ennå — alle andre merknader fungerer.'
   },
   /** The appender met a PDF construct it will not rewrite. The `detail` argument
    *  at the throw site says which one; it is logged, never shown. */

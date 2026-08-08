@@ -33,6 +33,7 @@ import {
   flushAnnotations,
   forgetPassword,
   passwordFor,
+  readSignatures,
   rememberPassword,
   updateAnnotation
 } from './annotation-engine-embedpdf'
@@ -755,8 +756,21 @@ function registerIpc(): void {
   // will ask for. draftPathFor is pure string arithmetic: no draft is created
   // here, and none needs to exist yet.
   ipcMain.handle('doc:unlock', (_e, path: string, password: string) => {
+    // Under BOTH names the engine may be asked to open this document by: the
+    // draft (every annotation write) and the original (a signature read before
+    // anything has been annotated). Same file, same encryption, and remembering
+    // one but not the other fails whichever call happens to come first.
     rememberPassword(draftPathFor(path), password)
+    rememberPassword(path, password)
   })
+
+  // Read from the DRAFT when there is one: the draft is what the viewer shows,
+  // and a signature the user is about to invalidate by annotating is still a
+  // signature that is in the document in front of them.
+  // readPathFor, not draftPathFor: a document with no unsaved changes has no
+  // draft file at all, and reading signatures must not depend on the user
+  // having annotated first.
+  ipcMain.handle('doc:signatures', (_e, path: string) => readSignatures(readPathFor(path)))
 
   ipcMain.handle('doc:is-dirty', (_e, path: string) => hasDraft(path))
 
@@ -870,6 +884,7 @@ function registerIpc(): void {
     // The draft this password belonged to is gone. Re-opening the document
     // asks for it again, which is the right amount of memory for a secret.
     forgetPassword(draftPathFor(path))
+    forgetPassword(path)
   })
 
   ipcMain.on('shell:open-external', (_e, url: string) => {

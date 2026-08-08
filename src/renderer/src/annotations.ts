@@ -44,6 +44,11 @@ export interface PageAnnotation {
   fontSize?: number | undefined
   /** ink (marker): drawn AND baked with multiply so text stays legible */
   blend?: 'multiply' | undefined
+  /** stamp: the PNG as a data URL, for painting the mark while it is still a
+   *  session one. Once the write lands and the document reloads, pdf.js paints
+   *  the stamp from the file's appearance stream and this is not needed —
+   *  which is why a 'file' stamp read back from the PDF has no image here. */
+  imageUrl?: string | undefined
 }
 
 export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange' | 'black' | 'custom'
@@ -370,6 +375,11 @@ export function annotationCss(
     }
     case 'freetext':
       return { ...toCss(q), color: rgbCss(a.color, 1) }
+    case 'stamp':
+      // The image fills the box; opacity is the record's. Painted as an <img>
+      // in AnnotationMarks while the mark is still a session one — once it is
+      // in the file, pdf.js paints it from the appearance stream like any other.
+      return { ...toCss(q), opacity: a.opacity }
     case 'ink':
     case 'square':
     case 'circle':
@@ -500,7 +510,11 @@ const SUBTYPE_MAP: Record<string, AnnotationType> = {
   Square: 'square',
   Circle: 'circle',
   Line: 'line',
-  FreeText: 'freetext'
+  FreeText: 'freetext',
+  // Read back so a stamp already in the file can be selected, moved, resized and
+  // deleted like any other mark. pdf.js paints it from the appearance stream, so
+  // the overlay only needs its box — the image bytes stay in the file.
+  Stamp: 'stamp'
 }
 
 /** Raw pdf.js annotation data (the fields we consume) */
@@ -590,7 +604,8 @@ export const MOVABLE_TYPES = new Set<AnnotationType>([
   'circle',
   'line',
   'arrow',
-  'ink'
+  'ink',
+  'stamp'
 ])
 
 export function isMovableAnnotation(a: PageAnnotation): boolean {
@@ -607,7 +622,14 @@ export type ResizeKind = 'box' | 'endpoints'
 
 export function resizeKindOf(a: PageAnnotation): ResizeKind | null {
   if (a.type === 'line' || a.type === 'arrow') return a.strokes?.[0]?.length === 2 ? 'endpoints' : null
-  if (a.type === 'square' || a.type === 'circle' || a.type === 'freetext' || a.type === 'ink') {
+  if (
+    a.type === 'square' ||
+    a.type === 'circle' ||
+    a.type === 'freetext' ||
+    a.type === 'ink' ||
+    // A signature is almost never the right size on the first try
+    a.type === 'stamp'
+  ) {
     return a.quads.length > 0 ? 'box' : null
   }
   return null

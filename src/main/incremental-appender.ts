@@ -1368,7 +1368,12 @@ const SUBTYPE_NAME: Record<AnnotateRequest['type'], string> = {
   circle: 'Circle',
   line: 'Line',
   arrow: 'Line',
-  freetext: 'FreeText'
+  freetext: 'FreeText',
+  // Present so the map stays total, but never reached: appendAnnotation refuses
+  // stamps before this, because embedding the image would mean writing an image
+  // XObject (and its /Resources) — a whole second encoder this writer does not
+  // have. See ENGINE_ERRORS.appendNoImage.
+  stamp: 'Stamp'
 }
 const TYPE_OF_SUBTYPE: Record<string, AnnotateRequest['type']> = {
   Highlight: 'highlight',
@@ -1893,7 +1898,13 @@ function withFile(path: string, op: (pdf: PdfFile) => Promise<AnnotateResult>): 
 
 /** Create an annotation via incremental append. Returns the PDF object number. */
 export const appendAnnotation = (req: AnnotateRequest): Promise<AnnotateResult> =>
-  withFile(req.path, (pdf) => opCreate(pdf, req))
+  // Refused before the file is even opened: a stamp's appearance is an image
+  // XObject with its own stream, filter and /Resources entry, and nothing in
+  // this hand-rolled writer produces one. Better to say so than to append an
+  // annotation whose appearance would be blank in every reader.
+  req.type === 'stamp'
+    ? Promise.resolve(ENGINE_ERRORS.appendNoImage)
+    : withFile(req.path, (pdf) => opCreate(pdf, req))
 
 /** Patch an existing annotation (color/opacity/contents/rect/translate). */
 export const appendUpdateAnnotation = (req: ModifyAnnotationRequest): Promise<AnnotateResult> =>
