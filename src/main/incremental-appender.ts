@@ -1055,9 +1055,45 @@ function winAnsiLiteral(s: string): string {
   return out + ')'
 }
 
+/** The Standard-14 face a FreeText is set in, as this writer needs it: the
+ *  resource name it gets inside the appearance stream, and the /BaseFont that
+ *  name points at. PDFium picks these itself in the normal write path; here
+ *  they have to be spelled out, because this writer builds the appearance
+ *  stream by hand.
+ *
+ *  Only the twelve text faces exist here — Symbol and ZapfDingbats are never
+ *  offered by the text tool (see TEXT_FONT_FAMILIES). An unknown value falls
+ *  back to Helvetica rather than writing a /BaseFont no reader knows. */
+const STANDARD_FACES: Record<number, { res: string; base: string; mono: boolean }> = {
+  0: { res: 'Cour', base: 'Courier', mono: true },
+  1: { res: 'CourB', base: 'Courier-Bold', mono: true },
+  2: { res: 'CourBI', base: 'Courier-BoldOblique', mono: true },
+  3: { res: 'CourI', base: 'Courier-Oblique', mono: true },
+  4: { res: 'Helv', base: 'Helvetica', mono: false },
+  5: { res: 'HelvB', base: 'Helvetica-Bold', mono: false },
+  6: { res: 'HelvBI', base: 'Helvetica-BoldOblique', mono: false },
+  7: { res: 'HelvI', base: 'Helvetica-Oblique', mono: false },
+  8: { res: 'Times', base: 'Times-Roman', mono: false },
+  9: { res: 'TimesB', base: 'Times-Bold', mono: false },
+  10: { res: 'TimesBI', base: 'Times-BoldItalic', mono: false },
+  11: { res: 'TimesI', base: 'Times-Italic', mono: false }
+}
+
+const faceOf = (font: number | undefined): { res: string; base: string; mono: boolean } =>
+  STANDARD_FACES[font ?? 4] ?? STANDARD_FACES[4]
+
+/** Every Courier glyph is 600/1000 — a monospaced face needs no table. */
+const COURIER_W = 600
+
 // Helvetica advance widths (per mille) for naive FreeText wrapping — WinAnsi
 // subset from the AFM. Only used to ESTIMATE line breaks; never written to
 // the file (base-14 font, no embedding). Unlisted chars fall back to 556.
+//
+// Also used for TIMES, deliberately: Times is narrower than Helvetica almost
+// everywhere, so estimating with these widths breaks a Times line EARLY. That
+// leaves the text a little short of the box, which is invisible; the other
+// direction would overflow it, which is not. A second AFM table would buy
+// tighter wrapping in the one path that only runs past 150 MB.
 const HELV_DEFAULT_W = 556
 const HELV_W: Record<string, number> = {
   ' ': 278, '!': 278, '"': 355, '#': 556, $: 556, '%': 889, '&': 667, "'": 191, '(': 333,
@@ -1070,14 +1106,16 @@ const HELV_W: Record<string, number> = {
   q: 556, r: 333, s: 500, t: 278, u: 556, v: 500, w: 722, x: 500, y: 500, z: 500, '{': 334,
   '|': 260, '}': 334, '~': 584, æ: 889, ø: 611, å: 556, Æ: 1000, Ø: 778, Å: 667
 }
-const helvWidth = (s: string, size: number): number => {
+const faceWidth = (s: string, size: number, mono: boolean): number => {
   let w = 0
-  for (const ch of s) w += HELV_W[ch] ?? HELV_DEFAULT_W
+  if (mono) w = COURIER_W * [...s].length
+  else for (const ch of s) w += HELV_W[ch] ?? HELV_DEFAULT_W
   return (w / 1000) * size
 }
 
 /** Naive word wrap at `maxW` points; hard-breaks overlong words by char. */
-function wrapText(text: string, size: number, maxW: number): string[] {
+function wrapText(text: string, size: number, maxW: number, mono = false): string[] {
+  const helvWidth = (str: string, sz: number): number => faceWidth(str, sz, mono)
   const lines: string[] = []
   for (const para of text.split(/\r\n|\r|\n/)) {
     let line = ''
@@ -1116,7 +1154,9 @@ interface Appearance {
   content: string
   /** ExtGState needed (opacity < 1 or highlight blend) */
   gs: { blend: boolean; alpha: number } | null
-  needsFont: boolean
+  /** Resource name + /BaseFont for the face this appearance writes in, or null
+   *  when it has no text at all. */
+  needsFont: { res: string; base: string } | null
 }
 
 /** Point operand in user space. */
@@ -1146,6 +1186,8 @@ interface ShapeSpec {
   width?: number | undefined
   contents?: string | undefined
   fontSize?: number | undefined
+  /** freetext: which Standard-14 face (see STANDARD_FACES) */
+  font?: number | undefined
 }
 
 function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
@@ -1153,7 +1195,7 @@ function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
   const alpha = s.opacity ?? 1
   let gs: Appearance['gs'] = alpha < 1 ? { blend: false, alpha } : null
   let rect: [number, number, number, number]
-  let needsFont = false
+  let needsFont: { res: string; base: string } | null = null
 
   switch (s.type) {
     case 'highlight': {
@@ -1288,20 +1330,21 @@ function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
       const q = s.quads[0]
       const size = s.fontSize ?? 12
       const inset = 2
-      const lines = wrapText(s.contents ?? '', size, Math.max(size, q.w - 2 * inset))
+      const face = faceOf(s.font)
+      const lines = wrapText(s.contents ?? '', size, Math.max(size, q.w - 2 * inset), face.mono)
       const leading = size * 1.18
       // Text matrix carries the /Rotate so glyphs stay upright in display
       // space; the translation lands the first baseline at the box top-left.
       const [tx, ty] = toUser(g, q.x + inset, q.y + inset + size * 0.75)
       const TM: Record<Geom['rot'], string> = { 0: '1 0 0 1', 90: '0 1 -1 0', 180: '-1 0 0 -1', 270: '0 -1 1 0' }
-      ops.push('BT', `/Helv ${fmtNum(size)} Tf`, `${fmtRgb(s.color)} rg`,
+      ops.push('BT', `/${face.res} ${fmtNum(size)} Tf`, `${fmtRgb(s.color)} rg`,
         `${TM[g.rot]} ${fmtNum(tx)} ${fmtNum(ty)} Tm`, `${fmtNum(leading)} TL`)
       lines.forEach((line, i) => {
         if (i > 0) ops.push('T*')
         if (line !== '') ops.push(`${winAnsiLiteral(line)} Tj`)
       })
       ops.push('ET')
-      needsFont = true
+      needsFont = { res: face.res, base: face.base }
       rect = rectToUser(g, q)
       break
     }
@@ -1328,10 +1371,10 @@ function appearanceObject(num: number, ap: Appearance): Buffer {
   }
   if (ap.needsFont) {
     resources.push(['Font', DICT([
-      ['Helv', DICT([
+      [ap.needsFont.res, DICT([
         ['Type', NAME('Font')],
         ['Subtype', NAME('Type1')],
-        ['BaseFont', NAME('Helvetica')],
+        ['BaseFont', NAME(ap.needsFont.base)],
         ['Encoding', NAME('WinAnsiEncoding')]
       ])]
     ])])
@@ -1370,12 +1413,9 @@ const SUBTYPE_NAME: Record<AnnotateRequest['type'], string> = {
   line: 'Line',
   arrow: 'Line',
   freetext: 'FreeText',
-  // Both are /Stamp in the file and NEITHER is written by this path: opCreate
-  // refuses a handwritten note (it would need an embedded font) and a signature
-  // stamp (it would need an image XObject and its /Resources — a second
-  // encoder this writer does not have). They sit here only so the map stays
-  // exhaustive over AnnotationType.
-  handnote: 'Stamp',
+  // Not written by this path: a stamp needs an image XObject and its
+  // /Resources — a second encoder this writer does not have (opCreate refuses
+  // it by name). It sits here only so the map stays exhaustive.
   stamp: 'Stamp'
 }
 const TYPE_OF_SUBTYPE: Record<string, AnnotateRequest['type']> = {
@@ -1404,8 +1444,9 @@ function quadPoints(g: Geom, quads: PageRect[]): PdfValue {
   return ARR(nums.map(N))
 }
 
-const daString = (color: Rgb, size: number): PdfValue =>
-  ({ t: 'str', raw: Buffer.from(`${fmtRgb(color)} rg /Helv ${fmtNum(size)} Tf`, 'latin1') })
+const daString = (color: Rgb, size: number, font?: number | undefined): PdfValue =>
+  ({ t: 'str', raw: Buffer.from(
+    `${fmtRgb(color)} rg /${faceOf(font).res} ${fmtNum(size)} Tf`, 'latin1') })
 
 /** Build the complete annotation dict for a create request. */
 function buildAnnotDict(
@@ -1462,7 +1503,7 @@ function buildAnnotDict(
       dict.set('IC', ARR(req.color.map(N))) // arrowhead fill
     }
   } else if (req.type === 'freetext') {
-    dict.set('DA', daString(req.color, req.fontSize ?? 12))
+    dict.set('DA', daString(req.color, req.fontSize ?? 12, req.font))
     dict.set('Q', N(0))
     if (req.contents === undefined) dict.set('Contents', textString(''))
   }
@@ -1597,11 +1638,6 @@ async function annotsHolderRewrite(
 }
 
 async function opCreate(pdf: PdfFile, req: AnnotateRequest): Promise<AnnotateResult> {
-  // A handwritten note needs an embedded TrueType font — a font file, a font
-  // descriptor and a widths array written by hand — which this path does not
-  // build. Refusing is the honest outcome: the alternative is a note that
-  // silently comes out in Helvetica, which is not the thing the user made.
-  if (req.type === 'handnote') return ENGINE_ERRORS.handNoteTooLarge
   if (req.quads.length === 0 && req.type !== 'ink' && req.type !== 'line' && req.type !== 'arrow') {
     return ENGINE_ERRORS.noPosition
   }
@@ -1688,12 +1724,16 @@ async function opUpdate(pdf: PdfFile, req: ModifyAnnotationRequest): Promise<Ann
   // ---- apply the patch to the dict (all geometry in USER space) ----
   if (req.color) {
     if (type === 'freetext') {
-      // font color lives in /DA — keep the existing size
+      // font colour lives in /DA — keep the existing size AND face. The face
+      // is carried over by resource NAME rather than re-derived: a recolour
+      // must not silently re-set the box in Helvetica.
       const oldDa = dict.get('DA')
-      const sizeM = oldDa && (oldDa.t === 'str' || oldDa.t === 'hex')
-        ? /\/\S+\s+([\d.]+)\s+Tf/.exec(decodePdfString(oldDa))
-        : null
-      dict.set('DA', daString(req.color, sizeM ? Number(sizeM[1]) : 12))
+      const da = oldDa && (oldDa.t === 'str' || oldDa.t === 'hex') ? decodePdfString(oldDa) : ''
+      const m = /\/(\S+)\s+([\d.]+)\s+Tf/.exec(da)
+      const size = m ? Number(m[2]) : 12
+      const res = m?.[1]
+      dict.set('DA', { t: 'str', raw: Buffer.from(
+        `${fmtRgb(req.color)} rg /${res ?? 'Helv'} ${fmtNum(size)} Tf`, 'latin1') })
     } else {
       dict.set('C', ARR(req.color.map(N)))
       if (dict.has('IC')) dict.set('IC', ARR(req.color.map(N)))
@@ -1930,7 +1970,7 @@ export const appendDeleteAnnotation = (req: DeleteAnnotationRequest): Promise<An
  *  does not embed and text metrics it does not have. A /V with no /AP shows
  *  blank in most readers (only NeedAppearances-honouring ones would draw it),
  *  so the alternative to refusing is a form the user believes is filled and
- *  everyone else receives empty. Same reasoning as the handnote and stamp
+ *  everyone else receives empty. Same reasoning as the stamp
  *  refusals above. */
 export const appendSetFormField = (_req: SetFormFieldRequest): Promise<AnnotateResult> =>
   Promise.resolve(ENGINE_ERRORS.appendNoFormFill)

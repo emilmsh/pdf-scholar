@@ -251,9 +251,15 @@ const SHOTS = [
   {
     // Marking up a draft the way a supervisor or an examiner does: red pen
     // gestures ON the text (a bracket down the margin, a wavy underline) and
-    // handwritten comments BESIDE it. Both are real marks — the pen strokes
-    // carry pressure, and the handwriting is a note in the embedded
-    // handwriting font (src/shared/hand-note.ts), not a caption pasted on top.
+    // written comments BESIDE it. Both are real marks — the pen strokes carry
+    // pressure, and the comments are real text boxes, not captions pasted on.
+    //
+    // The comments were HANDWRITING until v0.37: a text box set in an embedded
+    // handwriting font, which existed almost entirely to make this frame look
+    // like a marked-up paper. Emil's call to drop it (2026-08-09) — a typed
+    // note wearing handwriting is a costume, and someone who wants handwriting
+    // uses the pen. The frame now shows what the app actually does: real ink
+    // where a hand would make marks, readable red text where words belong.
     //
     // Placement is measured from the document's own text geometry rather than
     // hard-coded, so nothing lands on a word: the bracket takes the strip just
@@ -262,7 +268,7 @@ const SHOTS = [
     // line-end gaps, right margin, mixed); the left margin reads most like a
     // marked-up paper.
     name: 'feedback',
-    caption: 'A marked-up draft: red pen on the text, handwritten notes in the margin',
+    caption: 'A marked-up draft: red pen on the text, comments in the margin',
     setup: `
       await ui.closePanels()
       await ui.showAnnots(true)
@@ -274,8 +280,8 @@ const SHOTS = [
       const marks = ui.markRectsA()
       const top = marks.length ? Math.min(...marks.map((m) => m.top)) : 0
       const bottom = marks.length ? Math.max(...marks.map((m) => m.bottom)) : 0
-      // colorIndex 1 is the red pen in the text tool's palette — the same red
-      // the strokes are in, so the marks read as one hand's work
+      // colorIndex 1 is the red in the text tool's palette — the same red the
+      // strokes are in, so the marks read as one hand's work
       await ui.writeNote('Can you connect this to any contemporary phenomenon?',
         w.leftMargin.x, top - 6, { width: w.leftMargin.w, colorIndex: 1 })
       // Beside the underlined line rather than below it: below the last mark
@@ -589,7 +595,7 @@ const ui = {
    *  The shots share ONE app session and ONE draft, so marks accumulate: the
    *  margin frame — ninth in the running order — was photographed carrying the
    *  annotations scene's sticky note and red box AND the feedback scene's
-   *  handwriting, three scenes stacked in one picture. Every shot that wants
+   *  comments, three scenes stacked in one picture. Every shot that wants
    *  marks already makes its own (and the two that used to lean on inheritance
    *  have a fallback), so the fix is to hand each one an empty document.
    *
@@ -1465,7 +1471,8 @@ const ui = {
    *  paper: a ring around a phrase, a wavy underline under another, and an
    *  exclamation mark in the margin. Hand-authored paths with a little wobble
    *  and a pressure curve — honest about being *marks*, not fake handwriting
-   *  (words are where synthetic strokes start to look uncanny). */
+   *  (words are where synthetic strokes start to look uncanny; that judgement
+   *  is also why the app no longer ships a handwriting font at all). */
   async penScrawl(colorIndex = 0) {
     const pen = btn(L.pen);
     if (!pen) throw new Error('no pen button in the toolbar');
@@ -1598,7 +1605,7 @@ const ui = {
     const rects = spans.map((s) => s.getBoundingClientRect());
     const textLeft = Math.min(...rects.map((r) => r.left));
     const textRight = Math.max(...rects.map((r) => r.right));
-    // The pen's bracket sits just left of the column; the handwriting must
+    // The pen's bracket sits just left of the column; the written comment must
     // stop short of it or the two overprint each other.
     const bracketX = textLeft - 14;
     return {
@@ -1606,9 +1613,10 @@ const ui = {
       leftMargin: { x: pr.left + 10, w: Math.max(60, bracketX - (pr.left + 10) - 12) }
     };
   },
-  /** Set the text tool's typeface and colour, then write a note at (x, y).
-   *  font: 'hand' gives the red-pen-in-the-margin look. */
-  async writeNote(text, x, y, { font = 'hand', colorIndex = 0, width = 0 } = {}) {
+  /** Set the text tool's colour (and optionally its typeface family), then
+   *  write a note at (x, y). The family name is matched against the font
+   *  chips; Times reads more like a written comment than Helvetica does. */
+  async writeNote(text, x, y, { family = 'Times', colorIndex = 0, width = 0 } = {}) {
     const tool = btn(L.text);
     if (!tool) throw new Error('no text button in the toolbar');
     if (!tool.classList.contains('is-active')) { click(tool); await settle(350); }
@@ -1617,9 +1625,8 @@ const ui = {
       click(chev); await settle(300);
       const dots = [...document.querySelectorAll('.tool-menu .color-dot')];
       if (dots[colorIndex]) { click(dots[colorIndex]); await settle(200); }
-      const pick = [...document.querySelectorAll('.tool-menu .scope-option')].find((b) =>
-        /Håndskrift|Handwriting/.test(b.querySelector('strong')?.textContent || '') === (font === 'hand') &&
-        /Håndskrift|Handwriting|Trykt|Printed/.test(b.querySelector('strong')?.textContent || ''));
+      const pick = [...document.querySelectorAll('.tool-menu .font-chip')]
+        .find((b) => (b.textContent || '').trim() === family);
       if (pick) { click(pick); await settle(250); }
       click(chev); await settle(250);
     }

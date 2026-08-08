@@ -23,7 +23,6 @@ import type {
   DocSignature,
   FileError,
   ModifyAnnotationRequest,
-  PageRect,
   SetFormFieldRequest
 } from './types'
 import type {
@@ -37,14 +36,6 @@ import { buildAnnotation, hexToRgb, linePad, quadsBBox, rgbToHex, strokesBBox, t
 import { ENGINE_ERRORS } from './engine-errors'
 import { snapshotApLessLinks, stripGeneratedLinkAPs } from './link-ap-guard'
 import { decodePressures, encodePressures, inkPressureApContent } from './ink-outline'
-import {
-  HAND_LINE_HEIGHT,
-  HAND_NOTE_KEY,
-  handFont,
-  handFontBytes,
-  handFontFromAnnotation
-} from './hand-note'
-import type { HandFont } from './hand-note'
 
 /** wasm32 heap exhaustion: every open/serialize round-trips the whole file
  *  through the WASM heap, so very large documents can exceed what it can grow to
@@ -94,18 +85,6 @@ export interface RawPdfium {
   FPDFAnnot_HasKey(annotPtr: number, key: string): boolean
   EPDFAnnot_GetObjectNumber(annotPtr: number): number
   EPDFPage_RemoveAnnotByObjectNumber(pagePtr: number, objNum: number): boolean
-  // ---- handwritten notes (Stamp + embedded font); see ./hand-note.ts ----
-  FPDFAnnot_AppendObject(annotPtr: number, objPtr: number): boolean
-  FPDFAnnot_GetObjectCount(annotPtr: number): number
-  FPDFAnnot_RemoveObject(annotPtr: number, index: number): boolean
-  FPDFText_LoadFont(docPtr: number, dataPtr: number, size: number, fontType: number, cid: boolean): number
-  FPDFFont_Close(fontPtr: number): void
-  FPDFPageObj_CreateTextObj(docPtr: number, fontPtr: number, fontSize: number): number
-  FPDFText_SetText(objPtr: number, textPtr: number): boolean
-  FPDFPageObj_SetFillColor(objPtr: number, r: number, g: number, b: number, a: number): boolean
-  FPDFPageObj_Transform(objPtr: number, a: number, b: number, c: number, d: number, e: number, f: number): void
-  FPDFPageObj_Destroy(objPtr: number): void
-  FPDFPage_GenerateContent(pagePtr: number): boolean
   // ---- AcroForm field filling; every one of these needs the FORM HANDLE that
   // PageContext.withFormHandle opens, not the document or the page ----
   FORM_SetFocusedAnnot(formHandle: number, annotPtr: number): boolean
@@ -132,7 +111,7 @@ export interface RawPdfium {
    *  value change, so the new text/tick is VISIBLE in other readers too. */
   EPDFAnnot_GenerateFormFieldAP(annotPtr: number): boolean
   /** The underlying emscripten module — heap access for wide-string params,
-   *  FS_RECTF structs and the font bytes we hand to FPDFText_LoadFont */
+   *  and FS_RECTF structs */
   pdfium: {
     wasmExports: { malloc(size: number): number; free(ptr: number): void }
     HEAPU8: Uint8Array
@@ -186,20 +165,6 @@ export function withPageHandle<T>(
   const anyEngine = engine as unknown as EngineInternals
   const raw = anyEngine.pdfiumModule
   return anyEngine.cache.getContext(docId).borrowPage(pageIndex, (ctx) => fn(ctx.pagePtr, raw))
-}
-
-/** The same, plus the FPDF_DOCUMENT handle — fonts and page objects are
- *  created against the document, not the page. */
-function withDocAndPage<T>(
-  engine: PdfiumNative,
-  docId: string,
-  pageIndex: number,
-  fn: (docPtr: number, pagePtr: number, raw: RawPdfium) => T
-): T {
-  const anyEngine = engine as unknown as EngineInternals
-  const raw = anyEngine.pdfiumModule
-  const ctx = anyEngine.cache.getContext(docId)
-  return ctx.borrowPage(pageIndex, (p) => fn(ctx.docPtr, p.pagePtr, raw))
 }
 
 /** The same, plus a form-fill handle — everything about AcroForm fields is
@@ -399,274 +364,6 @@ export function readInkPressures(
   )
 }
 
-// ---------- handwritten notes (Stamp + embedded font) ----------
-
-const FPDF_FONT_TRUETYPE = 2
-
-/** Draw `lines` into an open Stamp annotation in the embedded handwriting
- *  font. The caller has already wrapped the text (the renderer measures with
- *  the very same font, so screen and file break lines identically).
- *
- *  Coordinates are the annotation's FORM space, not the page's: PDFium gives
- *  the appearance a BBox of [0 0 w h] and clips to it, so an object placed at
- *  absolute page coordinates is silently clipped away entirely (which is
- *  exactly what happened the first time). Origin is the box's bottom-left,
- *  y up — hence `box.h - <distance down from the top>`. A happy consequence:
- *  the glyphs are relative to the box, so moving the note is just a new
- *  /Rect and the appearance still lands correctly. */
-function drawHandLines(
-  raw: RawPdfium,
-  docPtr: number,
-  annotPtr: number,
-  lines: string[],
-  box: PageRect,
-  fontSize: number,
-  color: [number, number, number],
-  /** Which pen — its ascent places the first baseline */
-  font: HandFont,
-  /** Awaited by the caller before entering the raw bridge — the font is loaded
-   *  on demand and nothing may await under a borrowed page handle. */
-  bytes: Uint8Array
-): boolean {
-  const fontData = raw.pdfium.wasmExports.malloc(bytes.length)
-  raw.pdfium.HEAPU8.set(bytes, fontData)
-  const fontPtr = raw.FPDFText_LoadFont(docPtr, fontData, bytes.length, FPDF_FONT_TRUETYPE, true)
-  raw.pdfium.wasmExports.free(fontData)
-  if (!fontPtr) return false
-  const [r, g, b] = color.map((v) => Math.round(v * 255))
-  try {
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i] === '') continue
-      const obj = raw.FPDFPageObj_CreateTextObj(docPtr, fontPtr, fontSize)
-      if (!obj) return false
-      const ok = withWideString(raw, lines[i], (ptr) => raw.FPDFText_SetText(obj, ptr))
-      if (!ok) {
-        raw.FPDFPageObj_Destroy(obj)
-        return false
-      }
-      raw.FPDFPageObj_SetFillColor(obj, r, g, b, 255)
-      // Distance of this baseline BELOW the box's top, flipped into the
-      // form's y-up space
-      const down = fontSize * (font.ascent + i * HAND_LINE_HEIGHT)
-      raw.FPDFPageObj_Transform(obj, 1, 0, 0, 1, 0, box.h - down)
-      if (!raw.FPDFAnnot_AppendObject(annotPtr, obj)) {
-        raw.FPDFPageObj_Destroy(obj)
-        return false
-      }
-    }
-  } finally {
-    raw.FPDFFont_Close(fontPtr)
-  }
-  return true
-}
-
-/** Everything needed to draw a handwritten note again, kept in the annotation
- *  itself. Without this a move went through the generic model update, which
- *  rebuilds the appearance from a model that knows nothing about our text
- *  objects — measured: the /AP fell from 499 bytes to 42 and the note went
- *  blank. Storing the state means ANY note can be re-baked, including one
- *  reopened from a file the renderer no longer has state for. */
-const HAND_LINES_KEY = 'PDFX_HandLines'
-const HAND_SIZE_KEY = 'PDFX_HandSize'
-const HAND_COLOR_KEY = 'PDFX_HandColor'
-/** Which pen the words are in. A note without this key predates it, and every
- *  note written back then was Patrick Hand — so its absence is not "unknown",
- *  it is an answer (see handFontFromAnnotation). Re-baking reads it: a
- *  recolour must not silently re-set the note in whatever font the app writes
- *  with today, in a file that already carries the old one. */
-const HAND_FONT_KEY = 'PDFX_HandFont'
-
-/** Stamp the note as ours AND record what it takes to draw it again. */
-function writeHandState(
-  raw: RawPdfium,
-  annotPtr: number,
-  lines: string[],
-  fontSize: number,
-  color: [number, number, number],
-  font: HandFont
-): void {
-  withWideString(raw, '1', (p) => raw.FPDFAnnot_SetStringValue(annotPtr, HAND_NOTE_KEY, p))
-  withWideString(raw, lines.join('\n'), (p) =>
-    raw.FPDFAnnot_SetStringValue(annotPtr, HAND_LINES_KEY, p)
-  )
-  withWideString(raw, String(fontSize), (p) =>
-    raw.FPDFAnnot_SetStringValue(annotPtr, HAND_SIZE_KEY, p)
-  )
-  withWideString(raw, rgbToHex(color), (p) =>
-    raw.FPDFAnnot_SetStringValue(annotPtr, HAND_COLOR_KEY, p)
-  )
-  withWideString(raw, font.name, (p) => raw.FPDFAnnot_SetStringValue(annotPtr, HAND_FONT_KEY, p))
-}
-
-function readAnnotString(raw: RawPdfium, annotPtr: number, key: string): string | null {
-  const bytes = raw.FPDFAnnot_GetStringValue(annotPtr, key, 0, 0)
-  if (bytes <= 2) return null
-  const buf = raw.pdfium.wasmExports.malloc(bytes)
-  try {
-    raw.FPDFAnnot_GetStringValue(annotPtr, key, buf, bytes)
-    return raw.pdfium.UTF16ToString(buf)
-  } finally {
-    raw.pdfium.wasmExports.free(buf)
-  }
-}
-
-interface HandState {
-  lines: string[]
-  fontSize: number
-  color: [number, number, number]
-  box: PageRect
-  font: HandFont
-}
-
-/** The stored state of a handwritten note, or null if this annotation is not
- *  one of ours (a foreign image stamp, or any other subtype). */
-function readHandNote(open: OpenDoc, pageIndex: number, id: number): HandState | null {
-  const { engine, doc, docId } = open
-  const pageH = doc.pages[pageIndex]?.size.height
-  if (!pageH) return null
-  return withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
-    withAnnotByObjNum(pagePtr, raw, id, (annotPtr): HandState | null => {
-      if (!raw.FPDFAnnot_HasKey(annotPtr, HAND_NOTE_KEY)) return null
-      const linesRaw = readAnnotString(raw, annotPtr, HAND_LINES_KEY)
-      if (linesRaw === null) return null
-      const rectPtr = raw.pdfium.wasmExports.malloc(16)
-      let box: PageRect
-      try {
-        if (!raw.FPDFAnnot_GetRect(annotPtr, rectPtr)) return null
-        const left = raw.pdfium.getValue(rectPtr, 'float')
-        const top = raw.pdfium.getValue(rectPtr + 4, 'float')
-        const right = raw.pdfium.getValue(rectPtr + 8, 'float')
-        const bottom = raw.pdfium.getValue(rectPtr + 12, 'float')
-        box = { x: left, y: pageH - top, w: right - left, h: top - bottom }
-      } finally {
-        raw.pdfium.wasmExports.free(rectPtr)
-      }
-      const size = Number(readAnnotString(raw, annotPtr, HAND_SIZE_KEY))
-      const hex = readAnnotString(raw, annotPtr, HAND_COLOR_KEY)
-      return {
-        lines: linesRaw.split('\n'),
-        fontSize: Number.isFinite(size) && size > 0 ? size : 14,
-        color: hex ? hexToRgb(hex) : [0, 0, 0],
-        box,
-        font: handFontFromAnnotation(readAnnotString(raw, annotPtr, HAND_FONT_KEY))
-      }
-    })
-  )
-}
-
-/** Write the FS_RECTF for a page-space box (PDF space, y-up) */
-function setAnnotRect(raw: RawPdfium, annotPtr: number, box: PageRect, pageH: number): void {
-  const ptr = raw.pdfium.wasmExports.malloc(16)
-  raw.pdfium.setValue(ptr, box.x, 'float')
-  raw.pdfium.setValue(ptr + 4, pageH - box.y, 'float')
-  raw.pdfium.setValue(ptr + 8, box.x + box.w, 'float')
-  raw.pdfium.setValue(ptr + 12, pageH - (box.y + box.h), 'float')
-  raw.FPDFAnnot_SetRect(annotPtr, ptr)
-  raw.pdfium.wasmExports.free(ptr)
-}
-
-/** Create a handwritten note. Returns its PDF object number, like every other
- *  create — the renderer's id contract does not change for this subtype.
- *
- *  The empty Stamp is made through the MODEL api rather than the raw
- *  FPDFPage_CreateAnnot: the raw one leaves the annotation dict inline in
- *  /Annots, where it has no object number at all (measured: 0), and the whole
- *  id contract rests on having one. The model path gives it a real indirect
- *  object; the glyphs are then appended to that. */
-async function createHandNote(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateResult> {
-  const { engine, doc, docId } = open
-  const pageH = doc.pages[req.pageIndex]?.size.height
-  const box = req.quads[0]
-  if (!pageH || !box) return ENGINE_ERRORS.noPosition
-  const lines = req.lines ?? []
-  if (lines.length === 0) return ENGINE_ERRORS.handNoteEmpty
-
-  await engine
-    .createPageAnnotation(doc, doc.pages[req.pageIndex], {
-      id: crypto.randomUUID(),
-      pageIndex: req.pageIndex,
-      author: req.author ?? '',
-      contents: req.contents ?? lines.join('\n'),
-      created: new Date(),
-      type: PdfAnnotationSubtype.STAMP,
-      rect: toRect(box),
-      opacity: req.opacity
-    } as PdfAnnotationObject)
-    .toPromise()
-  const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
-  const id = objNums[objNums.length - 1]
-  if (!id) return ENGINE_ERRORS.noObjectNumber
-
-  // Load the font BEFORE the raw bridge: borrowPage is synchronous and nothing
-  // may await while a page handle is held. The renderer names the font it
-  // measured the wrapping with, so screen and file cannot disagree about it.
-  const font = handFont(req.handFont)
-  const fontBytes = await handFontBytes(font.id)
-  const drawn = withDocAndPage(engine, docId, req.pageIndex, (docPtr, pagePtr, raw) => {
-    const ok = withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
-      setAnnotRect(raw, annotPtr, box, pageH)
-      const size = req.fontSize ?? 14
-      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, size, req.color, font, fontBytes)) {
-        return false
-      }
-      writeHandState(raw, annotPtr, lines, size, req.color, font)
-      return true
-    })
-    if (ok === true) raw.FPDFPage_GenerateContent(pagePtr)
-    return ok === true
-  })
-  if (!drawn) {
-    // Never leave a blank stamp behind: an invisible annotation the user
-    // cannot see but can still hit is worse than a named failure.
-    withPageHandle(engine, docId, req.pageIndex, (pagePtr, raw) =>
-      raw.EPDFPage_RemoveAnnotByObjectNumber(pagePtr, id)
-    )
-    return ENGINE_ERRORS.handNoteFailed
-  }
-  return { ok: true, id }
-}
-
-/** Re-draw an existing handwritten note: strip its objects and lay the lines
- *  down again at the new box. Used for a move, a resize and an edit alike —
- *  all three change where the glyphs go, and re-baking is the only way to
- *  move text that is baked into an appearance. */
-async function rebakeHandNote(
-  open: OpenDoc,
-  pageIndex: number,
-  id: number,
-  lines: string[],
-  box: PageRect,
-  fontSize: number,
-  color: [number, number, number],
-  /** The note's own pen, unless the caller re-measured the wrapping in
-   *  another one (a text edit does; a move, a resize and a recolour do not) */
-  font: HandFont,
-  contents: string | undefined
-): Promise<boolean> {
-  const { engine, doc, docId } = open
-  const pageH = doc.pages[pageIndex]?.size.height
-  if (!pageH) return false
-  const fontBytes = await handFontBytes(font.id)
-  return withDocAndPage(engine, docId, pageIndex, (docPtr, pagePtr, raw) => {
-    const ok = withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
-      for (let i = raw.FPDFAnnot_GetObjectCount(annotPtr) - 1; i >= 0; i--) {
-        raw.FPDFAnnot_RemoveObject(annotPtr, i)
-      }
-      setAnnotRect(raw, annotPtr, box, pageH)
-      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, fontSize, color, font, fontBytes)) {
-        return false
-      }
-      if (contents !== undefined) {
-        withWideString(raw, contents, (p) => raw.FPDFAnnot_SetStringValue(annotPtr, 'Contents', p))
-      }
-      writeHandState(raw, annotPtr, lines, fontSize, color, font)
-      return true
-    })
-    if (ok === true) raw.FPDFPage_GenerateContent(pagePtr)
-    return ok === true
-  })
-}
-
 /** Find the high-level model for a PDF object number. Uses /Annots-order index
  *  alignment between the raw annot list and getPageAnnotations, guarded by a
  *  count check so silent misalignment is impossible. */
@@ -699,9 +396,6 @@ export function hasNoPosition(req: AnnotateRequest): boolean {
 export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateResult> {
   const { engine, doc, docId } = open
   return withLinkApGuard(engine, docId, req.pageIndex, async () => {
-    // A handwritten note is a Stamp built object-by-object, not a model the
-    // high-level create path knows how to make (see ./hand-note.ts).
-    if (req.type === 'handnote') return createHandNote(open, req)
     const spec = buildAnnotation(req)
     if ('error' in spec) return spec
     // A stamp's pixels ride in the CONTEXT argument, not the annotation model:
@@ -773,43 +467,6 @@ export async function readSignaturesOn(open: OpenDoc): Promise<DocSignature[]> {
 export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<AnnotateResult> {
   const { engine, doc, docId } = open
   return withLinkApGuard(engine, docId, req.pageIndex, async () => {
-    // A handwritten note's glyphs are baked into its appearance, so EVERY
-    // change to one — move, resize, recolour, edit — is the same operation:
-    // lay the lines down again. It must never reach the generic model update
-    // below, which rebuilds the appearance from a model that knows nothing
-    // about our text objects and leaves the note blank (measured: the /AP fell
-    // from 499 bytes to 42). The state to redraw from is stored on the
-    // annotation, so this works even for a note reopened from a file.
-    const hand = readHandNote(open, req.pageIndex, req.id)
-    if (hand || req.hand) {
-      const base = hand ?? {
-        lines: req.hand!.lines,
-        fontSize: req.hand!.fontSize,
-        color: req.hand!.color,
-        box: req.hand!.box,
-        font: handFont(req.hand!.font)
-      }
-      let box = req.hand?.box ?? req.rect ?? req.quads?.[0] ?? base.box
-      if (!req.hand && !req.rect && !req.quads && req.translate) {
-        box = { ...box, x: box.x + req.translate.dx, y: box.y + req.translate.dy }
-      }
-      const done = await rebakeHandNote(
-        open,
-        req.pageIndex,
-        req.id,
-        req.hand?.lines ?? base.lines,
-        box,
-        req.hand?.fontSize ?? base.fontSize,
-        req.hand?.color ?? req.color ?? base.color,
-        // The note keeps the pen it was written with. Only an edit that
-        // re-wrapped the words on screen may change it, and then only because
-        // the lines it sends were MEASURED in that font — anything else would
-        // bake widths from one font as glyphs from another.
-        req.hand?.font ? handFont(req.hand.font) : base.font,
-        req.contents
-      )
-      return done ? { ok: true, id: req.id } : ENGINE_ERRORS.handNoteFailed
-    }
     const model = await findByObjectNumber(open, req.pageIndex, req.id)
     if ('error' in model) return model
     const m = model as PdfAnnotationObject & {

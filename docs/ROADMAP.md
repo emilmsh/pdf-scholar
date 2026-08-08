@@ -229,23 +229,48 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
   origo i DOM-en** med et wrapper-element framfor å lappe koordinatformlene ~12
   steder. Da er zoom-ankringen urørt — beskjæringsendringer rutes gjennom
   `reanchorFor`, slik rotasjon og oppslag allerede gjør.
-- [x] **Håndskriftfonten byttes til Caveat** (Emils valg 2026-08-08, levert i
-  v0.36.0). Emils sluttdom etter å ha prøvd den: fonten holder, men han vil ha
-  **ekte flerfont-støtte** i stedet for en håndskrift/trykt-bryter — se
-  tankeboksen. Dagens
-  Patrick Hand er loddrett, usammenbundet og nesten monolinje — den leser som
-  pen blokkskrift, ikke som en penn. Caveat er skrå, delvis sammenbundet og har
-  ekte strekmodulasjon, har full Latin Extended-A og ingen Reserved Font Name,
-  og linjehøyden ligger allerede på det `hand-note.ts` antar. To feller:
-  Caveats naturlighet hviler på `calt`, som PDFium ikke shaper og nettleseren
-  slår på — så layout-featurene må strippes i subsettingen, ellers viser
-  overlayet andre glyfer og bredder enn fila. Og Google leverer bare den
-  variable `Caveat[wght].ttf`; en variabel font skal ikke bygges inn i en PDF.
-  Subsettet lander under dagens 215 kB, som krymper hver lagrede brukerfil.
-  **Fontnavnet lagres på merknaden** (ved siden av `PDFX_HandLines`/`HandSize`/
-  `HandColor`) så overlayet tegner en gammel note i den hånden den faktisk ble
-  skrevet med — uten det ville en urørt gammel note sett ulik ut i PDFX og i
-  alle andre lesere, som er nøyaktig det modulen finnes for å hindre.
+- [x] ~~**Håndskriftfonten**~~ **Hele håndskriftfunksjonen er fjernet**
+  (v0.37, Emils beslutning 2026-08-09). Den ble byttet til Caveat 2026-08-08 og
+  levde ett døgn. Emils begrunnelse, som er verdt å ta vare på fordi den snur
+  premisset: *poenget var aldri å annotere med en font som ser håndskrevet ut —
+  poenget var at man faktisk kunne skrive med pennen. Vi måtte bare simulere det
+  i shoot.* Uten en Surface Pro fantes ingen annen måte å få `feedback`-bildet
+  på, og funksjonen ble bygget for bildet. Det er bloat, uansett hvor pent det
+  er laget.
+  - Shoot-skriptet hadde allerede sagt det selv, før funksjonen fantes:
+    pennerammen tegner *merker*, ikke ord, fordi «words are where synthetic
+    strokes start to look uncanny». Vi resonnerte oss så fram til en funksjon
+    som er nøyaktig det — en maskinskrevet notis i kostyme.
+  - **Erstattet av et ekte skriftvalg** blant PDF-ens Standard 14 (se punktet
+    under). Da slutter håndskrift å være en rar av/på-bryter og blir borte i
+    stedet for å bli én rar oppføring i en fontmeny.
+  - Ryddet ut: `hand-note.ts`, `hand-font.ts`, begge fontmodulene (255 kB
+    base64), `assets/fonts/`-subsettene, `make-hand-font.mjs`, Stamp-med-
+    tekstobjekter-veien i motoren, ombakingen ved flytt/skaler/rediger, og
+    appenderens navngitte avslag. `handnote` er ute av `AnnotationType`.
+  - **Filer som allerede har slike notater åpner fint** — de er Stamps med
+    appearance stream, og pdf.js maler dem. De leses tilbake som stempler og kan
+    ikke lenger redigeres som håndskrift. Det gjelder bare Emils testfiler.
+  - `feedback`-rammen skytes på nytt: pennemerkene står (de er ekte blekk), de
+    to margnotisene er nå røde tekstbokser i Times.
+- [x] **Ekte flerfont-støtte i tekstverktøyet** (Emils bestilling 2026-08-08,
+  levert 2026-08-09): Helvetica, Times og Courier, med fet og kursiv — de tolv
+  tekstansiktene blant PDF-ens Standard 14. Symbol og ZapfDingbats er utelatt:
+  en tekstboks satt i dem viser ingenting du skrev.
+  - **Hvorfor akkurat fjorten:** PDFium bygger en FreeTexts appearance stream
+    fra sin egen kopi av disse, så ingenting bygges inn, ordene forblir ekte
+    søkbar tekst, og de ser like ut i enhver leser. Alt annet må bygges inn, og
+    `FPDFAnnot_AppendObject` nekter for FREETEXT — det var fella håndskriften
+    gikk i.
+  - EmbedPDF har `PdfStandardFont` og `standardFontCssProperties` fra før, så
+    overlegget, editoren og fila deler én kilde og kan ikke gli fra hverandre.
+  - Appenderen (filer over 150 MB) skriver riktig ansikt og /BaseFont. Den
+    estimerer linjebrekk med Helvetica-bredder også for Times: Times er smalere
+    nesten overalt, så estimatet brekker tidlig — teksten blir litt kort i
+    boksen, aldri for lang.
+  - Dekket av `test:engine` (/DA navngir ansiktet, ordene ligger i /Contents,
+    ingen /FontFile) og `test:annot-edit` (menyen, editoren og merket viser
+    samme skrift).
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som
@@ -301,26 +326,6 @@ Emil peker på Windows-nettbrett med penn (Surface-klassen) som neste satsing et
 Berøringsparitetsregelen gjelder hele bolken: hver mus/hover-interaksjon trenger en intuitiv berøringsekvivalent.
 
 ## Tankeboks (ikke planlagt, ikke glemt)
-- **Ekte flerfont-støtte for tekstverktøyet** (Emils ønske 2026-08-08: «Jeg vil
-  ikke ha bloat-funksjonalitet i appen bare for å få tatt noen bilder. Det jeg
-  ønsker er genuin fler-font-støtte»). Dagens SKRIFT-rad er en bryter mellom to
-  ting, ikke et fontvalg. Det som gjør dette til mer enn en nedtrekksliste er at
-  PDF-formatet deler skriftene i to leirer, og de to leirene lander på hver sin
-  annotasjonstype:
-  - **De 14 standardfontene** (Helvetica, Times, Courier + varianter) kan en
-    FreeText bære direkte. PDFium bygger appearance-strømmen selv, ingenting
-    bygges inn i fila, og hver leser i verden har dem. Dette er *nesten gratis* —
-    et `/DA`-felt og en meny — og dekker «rett skrift på et skjema».
-  - **Alt annet** (Caveat, en serif som ikke er Times, en skrivemaskinfont) må
-    bygges inn, og `FPDFAnnot_AppendObject` nekter for FREETEXT. Derfor er
-    håndskriftnotatet et Stamp med tegnede glyfer — og *hver* font utenfor de 14
-    må gå samme vei, med samme pris: ~110 kB per font i bunten, ombaking ved
-    hver flytt/endring, og ingen tekstsøk i fila på det som er tegnet.
-  Retningen som følger av det: **én meny, to klasser, sagt høyt i UI-et** — de
-  innebygde fontene merkes som «tegnet» slik at valget ikke skjuler at det
-  koster noe. Rekkefølgen bør være standardfontene først (billigst, mest
-  interoperabelt), håndskrift etter. Ikke planlagt ennå; hører hjemme i bolk 1
-  eller rett etter v1.0.
 - ~~**Levende bilde av lesing**~~ — **droppet (Emils beslutning 2026-08-08)**,
   samme dag idéen kom, etter at kartleggingen viste hva den faktisk koster.
   Bevaringsverdig fordi konklusjonen er kontraintuitiv og noen vil foreslå den

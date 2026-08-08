@@ -378,11 +378,7 @@ const TYPE_FILTERS: {
     labelKey: 'tb.markup'
   },
   { key: 'note', types: new Set(['note']), Icon: IconNote, labelKey: 'tb.note' },
-  // Both typefaces of the text tool belong to the same chip: a handwritten
-  // note is that tool's other output, not a separate kind of mark. Leaving it
-  // out would drop it from EVERY type filter — invisible the moment you
-  // filtered by anything.
-  { key: 'text', types: new Set(['freetext', 'handnote']), Icon: IconText, labelKey: 'tb.textTool' },
+  { key: 'text', types: new Set(['freetext']), Icon: IconText, labelKey: 'tb.textTool' },
   { key: 'draw', types: new Set(['ink']), Icon: IconPen, labelKey: 'tb.pen' },
   {
     key: 'shape',

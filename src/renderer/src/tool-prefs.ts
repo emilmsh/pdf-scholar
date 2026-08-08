@@ -13,9 +13,12 @@
 // changes how NEW annotations look, and saved ones keep whatever they were
 // written with, so a change reintroduces an old-vs-new mismatch on the page.
 // The user-facing sliders exist precisely so nobody has to touch these.
+import type { PdfStandardFont } from '@embedpdf/models'
 import {
   FREETEXT_COLOR,
   FREETEXT_SIZE,
+  isTextFont,
+  TEXT_FONT_DEFAULT,
   HIGHLIGHT_COLORS,
   HIGHLIGHT_FILL_ALPHA,
   MARKER_DEFAULT,
@@ -47,11 +50,11 @@ export interface MarkupPref {
 export interface TextPref {
   color: [number, number, number]
   fontSize: number
-  /** 'sans' writes a normal text box (FreeText, Helvetica). 'hand' writes a
-   *  handwritten note — the same words in an embedded handwriting font, the
-   *  red-pen-in-the-margin shape of feedback. See src/shared/hand-note.ts for
-   *  why the two are different PDF subtypes. */
-  font: 'sans' | 'hand'
+  /** Which of the Standard-14 faces the box is set in. A real font choice
+   *  since v0.37 — it used to be a two-way switch between a printed box and a
+   *  handwriting-font one, which was never a font choice at all. See
+   *  TEXT_FONT_FAMILIES in annotations.ts for why the list stops at fourteen. */
+  font: PdfStandardFont
 }
 
 /** What the eraser is allowed to remove. 'draw' (default) keeps it to marks
@@ -119,7 +122,7 @@ export const DEFAULT_TOOL_PREFS: ToolPrefs = {
     strikeout: { color: UNDERLINE_COLOR, opacity: 1 },
     squiggly: { color: UNDERLINE_COLOR, opacity: 1 }
   },
-  text: { color: FREETEXT_COLOR, fontSize: FREETEXT_SIZE, font: 'sans' },
+  text: { color: FREETEXT_COLOR, fontSize: FREETEXT_SIZE, font: TEXT_FONT_DEFAULT },
   eraserScope: 'draw',
   input: { fingerDraws: true, penSeen: false, penPressure: true }
 }
@@ -159,7 +162,9 @@ function mergeText(raw: unknown): TextPref {
       typeof r.fontSize === 'number' && Number.isFinite(r.fontSize)
         ? clamp(Math.round(r.fontSize), FONT_SIZE_MIN, FONT_SIZE_MAX)
         : base.fontSize,
-    font: r.font === 'hand' ? 'hand' : 'sans'
+    // A stored 'sans'/'hand' from v0.36 fails isTextFont and lands on the
+    // default, which is exactly right for both of them.
+    font: isTextFont(r.font) ? r.font : base.font
   }
 }
 

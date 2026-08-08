@@ -127,34 +127,39 @@ const ui = {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await settle(400);
   },
-  /** Every handwritten note on the page, with the shape the OVERLAY gave it */
-  handNotes() {
+  /** Every text box on the page, with the shape the OVERLAY gave it */
+  textBoxes() {
     const page = this.page();
     const p = page.getBoundingClientRect();
-    return [...page.querySelectorAll('.annot-handnote')].map((el) => {
+    return [...page.querySelectorAll('.annot-freetext')].map((el) => {
       const r = el.getBoundingClientRect();
       return {
         x: Math.round(r.left - p.left), y: Math.round(r.top - p.top),
         w: Math.round(r.width), h: Math.round(r.height),
-        lines: el.children.length,
-        font: getComputedStyle(el).fontFamily
+        font: getComputedStyle(el).fontFamily,
+        weight: getComputedStyle(el).fontWeight,
+        style: getComputedStyle(el).fontStyle
       };
     });
   },
-  /** Write a handwritten note: choose the handwriting typeface, click the page,
-   *  type, commit. Returns the font-family the EDITOR was showing while the
-   *  text was typed — the thing that has to match the mark. */
-  async writeHand(text) {
+  /** Write a text box in a CHOSEN face: pick the family (and bold), click the
+   *  page, type, commit. Returns what the EDITOR was showing while the text was
+   *  typed — the thing that has to match the mark it commits. */
+  async writeText(text) {
     const chev = [...document.querySelectorAll('.tb-chevron')]
       .find((b) => /Tekstfarge|Text colour/.test(b.title || ''));
     if (!chev) throw new Error('no text-options chevron');
     click(chev);
     await settle(400);
-    const pick = [...document.querySelectorAll('.tool-menu .scope-option')]
-      .find((b) => /Håndskrift|Handwriting/.test(b.textContent || ''));
-    if (!pick) throw new Error('no handwriting typeface in the text menu');
+    const pick = [...document.querySelectorAll('.tool-menu .font-chip')]
+      .find((b) => /Times/.test(b.textContent || ''));
+    if (!pick) throw new Error('no Times chip in the text menu');
     click(pick);
-    await settle(600);
+    await settle(350);
+    const bold = document.querySelector('.tool-menu .font-style-bold');
+    if (!bold) throw new Error('no bold toggle in the text menu');
+    click(bold);
+    await settle(350);
     click(chev); // close the menu; the chevron leaves the tool armed
     await settle(300);
     const page = this.page();
@@ -169,7 +174,8 @@ const ui = {
     await settle(600);
     const editor = document.querySelector('.freetext-editor');
     if (!editor) throw new Error('the text editor did not open');
-    const face = getComputedStyle(editor).fontFamily;
+    const cs = getComputedStyle(editor);
+    const face = { font: cs.fontFamily, weight: cs.fontWeight };
     editor.value = text;
     editor.dispatchEvent(new Event('input', { bubbles: true }));
     await settle(150);
@@ -409,50 +415,51 @@ try {
     Math.abs(shapeUndone.w - shapeBox.w) <= 3 && Math.abs(shapeUndone.h - shapeBox.h) <= 3,
     `${resized.w}x${resized.h} -> ${shapeUndone.w}x${shapeUndone.h} px`)
 
-  // ---- 3. a handwritten note is a TEXT BOX ----
+  // ---- 3. the text box's TYPEFACE ----
   //
-  // v0.36.0 shipped one that could not be moved and could not be resized, and
-  // whose editor typed in the default sans and only became handwriting on
-  // commit. Each of those was a different oversight in a different file, so
-  // each is checked separately here rather than as "the note works".
-  const editorFace = await evalIn(A, `return await ui.writeHand('Dette er en kommentar i margen')`)
-  const wrote = await evalIn(A, `return ui.handNotes()`)
-  check('a handwritten note was written', wrote.length === 1, `${wrote.length} note(s)`)
-  // The EDITOR has to be in the pen already: the committed lines are wrapped
-  // with that font's widths, so an editor measuring in another one breaks its
-  // lines somewhere else than the mark does.
-  check('the editor typed in the handwriting font', /PDFX Hand/.test(editorFace), editorFace)
-  check('…and the mark kept it', /PDFX Hand/.test(wrote[0]?.font ?? ''), wrote[0]?.font ?? 'no note')
+  // v0.36.0 offered "printed vs handwriting", which was never a font choice —
+  // and its editor typed in the default sans until the mark was committed. The
+  // typeface is now one of the PDF Standard 14, and the three things that have
+  // to agree are checked separately: the menu, the EDITOR, and the mark.
+  const editorFace = await evalIn(A, `return await ui.writeText('Tekst i valgt skrift')`)
+  const wrote = await evalIn(A, `return ui.textBoxes()`)
+  check('a text box was written', wrote.length === 1, `${wrote.length} box(es)`)
+  // Typing in one face and committing in another is not a preview — and it is
+  // not only cosmetic: the commit's minimum box is measured in the committed
+  // face, so an editor set in another one wraps somewhere else than the mark.
+  check('the editor typed in the chosen face',
+    /Times/i.test(editorFace.font) && editorFace.weight === '700',
+    `${editorFace.font} @ ${editorFace.weight}`)
+  check('…and the mark kept it',
+    /Times/i.test(wrote[0]?.font ?? '') && wrote[0]?.weight === '700',
+    `${wrote[0]?.font} @ ${wrote[0]?.weight}`)
 
-  await evalIn(A, `await ui.dragMark('.annot-handnote', -110, 70)`)
-  const moved = await evalIn(A, `return ui.handNotes()`)
-  check('the note can be dragged',
+  await evalIn(A, `await ui.dragMark('.annot-freetext', -110, 70)`)
+  const moved = await evalIn(A, `return ui.textBoxes()`)
+  check('the box can be dragged',
     moved.length === 1 && Math.abs(moved[0].x - (wrote[0].x - 110)) <= 6 &&
       Math.abs(moved[0].y - (wrote[0].y + 70)) <= 6,
     `(${wrote[0]?.x}, ${wrote[0]?.y}) -> (${moved[0]?.x}, ${moved[0]?.y})`)
 
-  const handFramed = await evalIn(A, `
-    const el = ui.page().querySelector('.annot-handnote');
+  const textFramed = await evalIn(A, `
+    const el = ui.page().querySelector('.annot-freetext');
     await ui.selectAt(el, 0.5, 0.5);
     return ui.marks();
   `)
-  check('selecting it shows four grips', handFramed.grips === 4, `${handFramed.grips} grip(s)`)
+  check('selecting it shows four grips', textFramed.grips === 4, `${textFramed.grips} grip(s)`)
 
-  // Narrower means MORE LINES: the note's glyphs are baked at fixed positions,
-  // so a resize that only moved the box would leave the words hanging outside
-  // it. That is why it had no handles at all until the re-wrap travelled along.
-  await evalIn(A, `await ui.dragHandle('.annot-selection .br', -70, 0)`)
-  const rewrapped = await evalIn(A, `return ui.handNotes()`)
-  check('dragging it narrower re-wraps the words',
-    rewrapped[0] && rewrapped[0].w < moved[0].w - 20 && rewrapped[0].lines > moved[0].lines,
-    `${moved[0]?.w}px/${moved[0]?.lines} line(s) -> ${rewrapped[0]?.w}px/${rewrapped[0]?.lines} line(s)`)
+  await evalIn(A, `await ui.dragHandle('.annot-selection .br', 90, 40)`)
+  const grown = await evalIn(A, `return ui.textBoxes()`)
+  check('dragging the corner resizes it',
+    grown[0] && grown[0].w > moved[0].w + 20,
+    `${moved[0]?.w}px -> ${grown[0]?.w}px`)
+  check('…and the face survives the resize', /Times/i.test(grown[0]?.font ?? ''), grown[0]?.font)
 
   await evalIn(A, `await ui.undo()`)
-  const handUndone = await evalIn(A, `return ui.handNotes()`)
-  check('Ctrl+Z puts the wrap back',
-    handUndone[0] && Math.abs(handUndone[0].w - moved[0].w) <= 4 &&
-      handUndone[0].lines === moved[0].lines,
-    `${rewrapped[0]?.w}px/${rewrapped[0]?.lines} -> ${handUndone[0]?.w}px/${handUndone[0]?.lines}`)
+  const textUndone = await evalIn(A, `return ui.textBoxes()`)
+  check('Ctrl+Z puts the box back',
+    textUndone[0] && Math.abs(textUndone[0].w - moved[0].w) <= 4,
+    `${grown[0]?.w}px -> ${textUndone[0]?.w}px`)
 } catch (err) {
   check('the run completed', false, err instanceof Error ? err.message : String(err))
   const log = app.log()

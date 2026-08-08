@@ -342,178 +342,66 @@ for (const req of reqs) {
   fs.rmSync(PFILE, { force: true })
 }
 
-// 10. handwritten notes: a Stamp whose appearance holds text in an EMBEDDED
-// handwriting font — the only subtype PDFium lets us append objects to
-// (FPDFAnnot_IsObjectSupportedSubtype says no to FreeText). What matters is
-// that the font travels inside the file (so the glyphs are identical
-// everywhere), that the words stay in /Contents (so the notes panel, search
-// and exports keep working), and that a move re-bakes rather than smearing.
+// 10. the text box's TYPEFACE: one of the PDF Standard 14, chosen in the tool
+// menu and written into the annotation's /DA. Nothing is embedded — that is the
+// whole point of the fourteen — so what this proves is that the face SURVIVES
+// into the file and is the one that was asked for. (v0.35–v0.36 had a
+// handwriting note here instead: a Stamp full of drawn glyphs in an embedded
+// font. It was removed in v0.37 — see the note in shared/types.ts.)
 {
-  const HFILE = path.join(os.tmpdir(), 'pdfx-handnote-test.pdf')
-  fs.copyFileSync(SAMPLE, HFILE)
-  const lines = ['Can you connect this', 'to any contemporary', 'phenomenon?']
-  const hbase = { path: HFILE, pageIndex: 1, opacity: 1, color: [0.82, 0.2, 0.18], author: 'test' }
+  const FFILE = path.join(os.tmpdir(), 'pdfx-textfont-test.pdf')
+  fs.copyFileSync(SAMPLE, FFILE)
+  const fbase = { path: FFILE, pageIndex: 0, color: [0.1, 0.1, 0.12], opacity: 1 }
+  // 10 = Times-BoldItalic in PdfStandardFont — a face nothing defaults to, so
+  // finding it in the file cannot be a coincidence.
+  const TIMES_BOLD_ITALIC = 10
+  const f1 = await applyAnnotation({
+    ...fbase, type: 'freetext', quads: q(40, 120, 220, 40),
+    contents: 'Times, fet og kursiv', fontSize: 14, font: TIMES_BOLD_ITALIC
+  })
+  check('textfont: create with a chosen face', 'ok' in f1, 'error' in f1 ? f1.error : `obj#${f1.id}`)
+  // A face nobody chose falls back to Helvetica rather than to nothing
+  const f2 = await applyAnnotation({
+    ...fbase, type: 'freetext', quads: q(40, 200, 220, 40),
+    contents: 'Uten valgt skrift', fontSize: 14
+  })
+  check('textfont: create without one', 'ok' in f2, 'error' in f2 ? f2.error : `obj#${f2.id}`)
+  await flushAnnotations(FFILE)
 
-  const h1 = await applyAnnotation({
-    ...hbase, type: 'handnote', quads: q(40, 120, 150, 70), fontSize: 15,
-    lines, contents: lines.join(' ')
-  })
-  check('handnote: create', 'ok' in h1, 'error' in h1 ? h1.error : `obj#${h1.id}`)
-  const hMove = await updateAnnotation({
-    path: HFILE, pageIndex: 1, id: h1.id, contents: lines.join(' '),
-    hand: { lines, box: { x: 40, y: 300, w: 150, h: 70 }, fontSize: 15, color: [0.82, 0.2, 0.18] }
-  })
-  check('handnote: move re-bakes', 'ok' in hMove, 'error' in hMove ? hMove.error : '')
-  // An empty one must be refused, not written as an invisible stamp
-  const hEmpty = await applyAnnotation({
-    ...hbase, type: 'handnote', quads: q(40, 500, 150, 40), fontSize: 15, lines: []
-  })
-  check('handnote: empty is refused', 'error' in hEmpty, 'error' in hEmpty ? hEmpty.code : 'accepted!')
-  await flushAnnotations(HFILE)
-
-  const raw = fs.readFileSync(HFILE)
-  check('handnote: the font is EMBEDDED (/FontFile2)', raw.includes(Buffer.from('FontFile2')))
-  check('handnote: it is the handwriting font', raw.includes(Buffer.from('Caveat')))
-
-  const pdf = mupdf.Document.openDocument(raw, 'application/pdf').asPDF()
-  const page = pdf.loadPage(1)
-  const a = page.getAnnotations().find((x) => x.getObject().asIndirect() === h1.id)
-  check('handnote: present after flush', !!a)
-  if (a) {
-    const obj = a.getObject()
-    check('handnote: subtype is Stamp', String(obj.get('Subtype')) === '/Stamp', String(obj.get('Subtype')))
-    const c = obj.get('Contents')
-    check('handnote: words live in /Contents (panel, search, export)',
-      !!c && !c.isNull() && /contemporary/.test(c.asString()),
-      c && !c.isNull() ? JSON.stringify(c.asString()) : 'missing')
-    const mark = obj.get('PDFX_Hand')
-    check('handnote: marked as ours, not a foreign image stamp', !!mark && !mark.isNull())
-    const pen = obj.get('PDFX_HandFont')
-    check('handnote: the pen it was written with is recorded',
-      !!pen && !pen.isNull() && pen.asString() === 'Caveat',
-      pen && !pen.isNull() ? pen.asString() : 'missing')
-    const ap = obj.get('AP')?.get('N')
-    const content = ap && !ap.isNull()
-      ? new TextDecoder('latin1').decode(ap.readStream().asUint8Array()) : ''
-    check('handnote: the AP draws text', /BT/.test(content) && /Tj|TJ/.test(content), `${content.length} bytes`)
-  }
-  // Pixels: the glyphs are at the MOVED box and gone from the old one. This is
-  // also what proves the appearance is drawn in FORM space — absolute page
-  // coordinates get clipped by the /BBox and render nothing at all.
-  const SC = 3
-  const pix = page.toPixmap(mupdf.Matrix.scale(SC, SC), mupdf.ColorSpace.DeviceRGB, false, true)
-  const W2 = pix.getWidth(), px2 = pix.getPixels()
-  const redIn = (y0, y1) => {
-    let n = 0
-    for (let y = Math.round(y0 * SC); y < Math.round(y1 * SC); y++)
-      for (let x = Math.round(35 * SC); x < Math.round(200 * SC); x++) {
-        const i = (y * W2 + x) * 3
-        if (px2[i] > 110 && px2[i] - px2[i + 1] > 45 && px2[i] - px2[i + 2] > 45) n++
-      }
-    return n
-  }
-  check('handnote: glyphs painted at the new box', redIn(295, 390) > 250, `${redIn(295, 390)} px`)
-  check('handnote: nothing left at the old box', redIn(115, 195) < 40, `${redIn(115, 195)} px`)
-  pdf.destroy()
-
-  // DRAGGING one in the UI sends `translate`, not `hand` — and that used to go
-  // through the generic model update, which rebuilds the appearance from a
-  // model that knows nothing about our text objects: the /AP collapsed from
-  // ~500 bytes to 42 and the note went blank. Every change to a handnote must
-  // re-bake instead, from the state stored on the annotation.
-  const h2 = await applyAnnotation({
-    ...hbase, type: 'handnote', quads: q(300, 120, 150, 70), fontSize: 15,
-    lines, contents: lines.join(' ')
-  })
-  const dragged = await updateAnnotation({
-    path: HFILE, pageIndex: 1, id: h2.id, translate: { dx: 0, dy: 180 }
-  })
-  check('handnote: a plain translate (what a drag sends) works', 'ok' in dragged,
-    'error' in dragged ? dragged.error : '')
-  const recolored = await updateAnnotation({
-    path: HFILE, pageIndex: 1, id: h2.id, color: [0.2, 0.3, 0.8]
-  })
-  check('handnote: a plain recolor works', 'ok' in recolored, 'error' in recolored ? recolored.error : '')
-  await flushAnnotations(HFILE)
-  {
-    const p2 = mupdf.Document.openDocument(fs.readFileSync(HFILE), 'application/pdf').asPDF()
-    const a2 = p2.loadPage(1).getAnnotations().find((x) => x.getObject().asIndirect() === h2.id)
-    const ap2 = a2?.getObject().get('AP')?.get('N')
-    const len = ap2 && !ap2.isNull() ? ap2.readStream().asUint8Array().length : 0
-    // The blank-note bug showed up here and nowhere else: the annotation still
-    // existed, still had an /AP, and the /AP was empty.
-    check('handnote: the appearance survives a drag (not blanked)', len > 200, `${len} bytes`)
-    const stored = a2?.getObject().get('PDFX_HandLines')
-    check('handnote: the redraw state travels with it', !!stored && !stored.isNull(),
-      stored && !stored.isNull() ? `${stored.asString().split('\n').length} lines` : 'missing')
-    p2.destroy()
-  }
-
-  // A note keeps the PEN it was written with. Every change to a handnote
-  // re-bakes its glyphs, so a recolour of a note written in the old font would
-  // otherwise re-set it in whatever font the app writes with today — a file
-  // whose words change typeface because the user picked another colour. The
-  // font is recorded on the annotation, and the re-bake reads it back.
-  const h3 = await applyAnnotation({
-    ...hbase, type: 'handnote', quads: q(300, 400, 150, 70), fontSize: 15,
-    lines, contents: lines.join(' '), handFont: 'patrickhand'
-  })
-  check('handnote: an old-pen note can be written', 'ok' in h3, 'error' in h3 ? h3.error : '')
-  const rec3 = await updateAnnotation({
-    path: HFILE, pageIndex: 1, id: h3.id, color: [0.1, 0.4, 0.2]
-  })
-  check('handnote: recolouring one works', 'ok' in rec3, 'error' in rec3 ? rec3.error : '')
-  await flushAnnotations(HFILE)
-  {
-    const raw3 = fs.readFileSync(HFILE)
-    check('handnote: the old pen is still embedded after a recolour',
-      raw3.includes(Buffer.from('PatrickHand')))
-    const p3 = mupdf.Document.openDocument(raw3, 'application/pdf').asPDF()
-    const a3 = p3.loadPage(1).getAnnotations().find((x) => x.getObject().asIndirect() === h3.id)
-    const pen3 = a3?.getObject().get('PDFX_HandFont')
-    check('handnote: and the annotation still names it',
-      !!pen3 && !pen3.isNull() && pen3.asString() === 'Patrick Hand',
-      pen3 && !pen3.isNull() ? pen3.asString() : 'missing')
-    p3.destroy()
-  }
-  fs.rmSync(HFILE, { force: true })
-}
-
-// ---- the handwriting ascents are derived, and this is where that is proved --
-//
-// HAND_FONTS carries one `ascent` per font: where the browser puts a block's
-// FIRST baseline, which is what the baked appearance stream has to match or the
-// words land somewhere other than the editor drew them. It looks like two magic
-// numbers. It is not — with the font's own ascent a and descent d, the browser's
-// half-leading puts that baseline at (LINE_HEIGHT - (a + d)) / 2 + a.
-//
-// This reads the metrics straight out of the shipped TTFs and checks the
-// constants against them, because the file used to carry ONE eyeballed number
-// with a comment claiming it came from the font's hhea. It did not, and Patrick
-// Hand's notes were baked 0.23 em high for it. A future font swap that forgets
-// to retune fails here instead of shipping crooked notes.
-{
-  const HAND_LINE_HEIGHT = 1.24
-  const EXPECTED = {
-    'Caveat-Regular-subset.ttf': 0.95,
-    'PatrickHand-Regular-subset.ttf': 0.985
-  }
-  for (const [file, declared] of Object.entries(EXPECTED)) {
-    const b = fs.readFileSync(path.join(__dirname, '..', 'assets', 'fonts', file))
-    const tables = {}
-    for (let i = 0; i < b.readUInt16BE(4); i++) {
-      tables[b.toString('ascii', 12 + i * 16, 16 + i * 16).trim()] = b.readUInt32BE(20 + i * 16)
+  const doc = mupdf.Document.openDocument(fs.readFileSync(FFILE), 'application/pdf')
+  const page = doc.loadPage(0)
+  const byId = (id) => {
+    for (const a of page.getAnnotations()) {
+      if (a.getObject().asIndirect() === id) return a.getObject()
     }
-    const upem = b.readUInt16BE(tables['head'] + 18)
-    const asc = b.readInt16BE(tables['hhea'] + 4) / upem
-    const desc = -b.readInt16BE(tables['hhea'] + 6) / upem
-    const baseline = (HAND_LINE_HEIGHT - (asc + desc)) / 2 + asc
-    check(
-      `handfont: ${file.split('-')[0]} ascent matches the font's own metrics`,
-      Math.abs(baseline - declared) < 0.005,
-      `declared ${declared}, derived ${baseline.toFixed(3)}`
-    )
+    return null
   }
+  const o1 = 'ok' in f1 ? byId(f1.id) : null
+  const o2 = 'ok' in f2 ? byId(f2.id) : null
+  check('textfont: the box is a FreeText, not a Stamp',
+    o1 && String(o1.get('Subtype')) === '/FreeText', o1 ? String(o1.get('Subtype')) : 'missing')
+  const da1 = o1?.get('DA')
+  const daText = da1 && !da1.isNull() ? da1.asString() : ''
+  check('textfont: /DA names the chosen face', /Times/i.test(daText), daText || 'no /DA')
+  const da2 = o2?.get('DA')
+  const daText2 = da2 && !da2.isNull() ? da2.asString() : ''
+  check('textfont: an unset face writes Helvetica', /Helv/i.test(daText2), daText2 || 'no /DA')
+  // The words stay TEXT — the reason for stopping at the Standard 14 in the
+  // first place. Two places have to carry them: /Contents (what the notes
+  // panel, search and the exports read) and the appearance stream, as a real
+  // show-text operator rather than as drawn outlines.
+  const c1 = o1?.get('Contents')
+  check('textfont: the words live in /Contents',
+    !!c1 && !c1.isNull() && c1.asString() === 'Times, fet og kursiv',
+    c1 && !c1.isNull() ? c1.asString() : 'missing')
+  const ap1 = o1?.get('AP')?.get('N')
+  const apText = ap1 && !ap1.isNull() ? ap1.readStream().asString() : ''
+  check('textfont: the appearance SHOWS text, it does not draw glyphs',
+    /BT/.test(apText) && /Tj|TJ/.test(apText), `${apText.length} bytes`)
+  const raw = fs.readFileSync(FFILE)
+  check('textfont: nothing was embedded (no /FontFile)', !raw.includes(Buffer.from('FontFile')))
+  doc.destroy()
+  fs.rmSync(FFILE, { force: true })
 }
 
 // 11. AcroForm field filling (engine slice — no UI yet). sample.pdf has no form

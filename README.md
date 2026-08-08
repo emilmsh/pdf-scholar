@@ -229,9 +229,9 @@ clutter the page while you read.
   zooms; pen pressure varies the line *(beta)*, and the saved file keeps the
   varying width — other readers render it the same. A toggle in the tool menus
   hands drawing back to the finger
-- **The text tool writes in two typefaces**: printed, or handwriting — the
-  red-pen-in-the-margin kind of comment. The font is embedded in the file, so
-  the note reads as handwriting for whoever opens it, not only here
+- **The text tool writes in the PDF's own typefaces** — Helvetica, Times or
+  Courier, bold and italic. Nothing is embedded, which is the point: the words
+  stay real, searchable text and look the same in every reader
 - **Sign without leaving the app**: draw your signature once — with a mouse, a
   pen or a finger — and stamp it wherever it is needed, on any document. It is
   kept on your machine, never uploaded, and lands in the file as a standard
@@ -397,11 +397,8 @@ rendering by [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0), plus
 [Electron](https://www.electronjs.org/) (MIT), [React](https://react.dev/) (MIT), the
 [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (MIT) and the
 [Libertinus](https://github.com/alerque/libertinus) wordmark font (SIL OFL 1.1).
-Handwritten notes are written in [Caveat](https://github.com/googlefonts/caveat)
-(SIL OFL 1.1), and notes made before v0.36 keep
-[Patrick Hand](https://github.com/google/fonts/tree/main/ofl/patrickhand)
-(SIL OFL 1.1), the font they were written with — both travel inside the PDFs you
-save, which is what makes a note look the same in every reader.
+Text boxes are set in the PDF standard fonts, which every reader already has —
+nothing is embedded in the documents you save.
 ([mupdf](https://mupdf.com/), AGPL, is used only as a development-time test
 verifier and ships with no release build.)
 

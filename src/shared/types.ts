@@ -1,5 +1,5 @@
 // Types shared between the Electron main process, preload bridge and renderer.
-import type { HandFontId } from './hand-note'
+import type { PdfStandardFont } from '@embedpdf/models'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one */
 export type ThemeName = 'day' | 'sepia' | 'night' | 'nightHc'
@@ -80,9 +80,6 @@ export type EngineErrorCode =
   | 'annot-list-asymmetric'
   | 'annot-empty-stroke'
   | 'annot-pressure-bake'
-  | 'annot-hand-empty'
-  | 'annot-hand-failed'
-  | 'annot-hand-too-large'
   | 'annot-line-endpoints'
   | 'annot-unknown-type'
   | 'annot-stamp-no-image'
@@ -164,18 +161,17 @@ export type AnnotationType =
   | 'line'
   | 'arrow'
   | 'freetext'
-  /** A handwritten note: text in an embedded handwriting font, written into a
-   *  Stamp annotation because no other subtype can carry an embedded font
-   *  (see src/shared/hand-note.ts). Its words also live in /Contents, so every
-   *  reader of a comment — notes panel, search, export — treats it normally. */
-  | 'handnote'
   /** An image placed on the page — the signature the user drew once and stamps
    *  wherever it is needed. A standard /Stamp annotation with the image in its
    *  appearance stream, so every other reader shows it. */
   | 'stamp'
-  // NOTE: 'handnote' and 'stamp' are BOTH /Stamp in the file. Reading one back
-  // tells them apart by /Contents: a handwritten note always carries its words,
-  // a signature never does. See SUBTYPE_MAP in renderer/src/annotations.ts.
+  // HISTORY: v0.35–v0.36 had a 'handnote' here too — a text box drawn in an
+  // embedded handwriting font, also a /Stamp. It was removed in v0.37: its
+  // whole purpose was to SIMULATE pen writing for the screenshots, and a typed
+  // note wearing handwriting is a costume, not a feature (Emil, 2026-08-09).
+  // Anyone who wants handwriting has a pen and uses the pen tool. A file that
+  // still contains one opens fine — it is a /Stamp with an appearance stream,
+  // and reads back as an (uneditable) stamp.
 
 /** Rect in PDF points, origin at the page's top-left, y growing downward —
  *  the same direction as pdf.js viewport space and as what the write engine
@@ -212,16 +208,16 @@ export interface AnnotateRequest {
   pressures?: number[][] | undefined
   /** ink/shapes: stroke width in PDF points */
   width?: number | undefined
-  /** freetext / handnote */
+  /** freetext only */
   fontSize?: number | undefined
-  /** handnote only: the text ALREADY wrapped into lines. The renderer measures
-   *  with the very same embedded font, so wrapping there and baking here is
-   *  what makes the screen and the saved page break lines identically. */
-  lines?: string[] | undefined
-  /** handnote only: the pen the lines above were MEASURED with, embedded and
-   *  recorded on the annotation so a later re-bake uses the same one. Omitted
-   *  means today's pen (see src/shared/hand-note.ts). */
-  handFont?: HandFontId | undefined
+  /** freetext only: which of the 14 standard PDF fonts the box is set in.
+   *  Standard-14 ONLY, deliberately: PDFium builds the appearance stream for
+   *  those itself, nothing is embedded, the words stay searchable, and every
+   *  reader in the world already has them. Omitted means Helvetica. Any other
+   *  typeface would have to be embedded, and FPDFAnnot_AppendObject refuses
+   *  every subtype but STAMP and INK — which is the trap the handwriting note
+   *  fell into. */
+  font?: PdfStandardFont | undefined
   /** freetext only: opaque fill behind the text (rgb 0–1). Used by the
    *  margin export's numbered anchor chips, which sit over page content and
    *  must stay readable there. */
@@ -292,22 +288,6 @@ export interface ModifyAnnotationRequest {
   quads?: PageRect[] | undefined
   /** line/arrow: one pair of endpoints. ink: the whole new stroke list. */
   strokes?: [number, number][][] | undefined
-  /** handnote: what it should look like now. A move, a resize and a text edit
-   *  all re-bake the same way — the glyphs live in the appearance, so there is
-   *  nothing to shift, only to draw again. */
-  hand?:
-    | {
-        lines: string[]
-        box: PageRect
-        fontSize: number
-        color: [number, number, number]
-        /** The pen `lines` were measured with. Set ONLY by an edit that
-         *  re-wrapped the words on screen; leaving it out keeps the note in
-         *  the font it was written with, which is what a move, a resize and a
-         *  recolour must do. */
-        font?: HandFontId | undefined
-      }
-    | undefined
   /** ink (pen): pressures parallel to `strokes`, when the caller holds them.
    *  The engines re-bake a moved/re-shaped pressure stroke's appearance either
    *  way (stored pressures are read back from the annotation itself); sending

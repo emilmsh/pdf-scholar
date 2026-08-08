@@ -41,7 +41,8 @@ import {
   quadsUnion,
   rgbCss,
   selectionRectsForPage,
-  strokesBox
+  strokesBox,
+  textFontCss
 } from '../annotations'
 import {
   clearToolPrefs,
@@ -50,10 +51,8 @@ import {
   saveToolPrefs
 } from '../tool-prefs'
 import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
+import type { PdfStandardFont } from '@embedpdf/models'
 import { notePenEvent, palmResting, PEN_NEAR_MS } from '../pen-input'
-import { HAND_FONT_DEFAULT, HAND_LINE_HEIGHT, wrapHandText } from '../../../shared/hand-note'
-import type { HandFontId } from '../../../shared/hand-note'
-import { handFontCss, handTextMeasurer, installHandFont } from '../hand-font'
 import type { BoxSize } from '../useResizable'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
@@ -337,25 +336,6 @@ export interface AnnotPatch {
   /** Drag-move: relative shift in page space — the engine reads its own
    *  current geometry and writes it back shifted (see ModifyAnnotationRequest) */
   translate?: { dx: number; dy: number }
-  /** handnote: the re-wrapped lines, kept on the record so the overlay breaks
-   *  where the baked appearance does */
-  lines?: string[] | undefined
-  /** handnote: what to draw again. The engine can recover this from the
-   *  annotation itself, but an EDIT changes the words, so the new state has to
-   *  travel with the request — including the pen the new lines were measured
-   *  with, since only a re-wrap may change it. */
-  hand?:
-    | {
-        lines: string[]
-        box: PageRect
-        fontSize: number
-        color: [number, number, number]
-        font?: HandFontId | undefined
-      }
-    | undefined
-  /** handnote: the pen, kept on the record so the overlay paints the note in
-   *  the font it was written with */
-  handFont?: HandFontId | undefined
 }
 
 /** Mutable identity for an annotation across undo/redo and document reloads */
@@ -536,17 +516,6 @@ export default function PdfViewer({
   /** All annotations per page: 'file' records (painted by pdf.js) + 'session'
    *  records created now (painted by our overlay) */
   const [annots, setAnnots] = useState<ReadonlyMap<number, PageAnnotation[]>>(new Map())
-  // A document that already CONTAINS handwritten notes needs the font to show
-  // them, even in a session that never writes one. Fetched once, on sight.
-  useEffect(() => {
-    const wanted = new Set<HandFontId>()
-    for (const list of annots.values()) {
-      for (const a of list) {
-        if (a.type === 'handnote') wanted.add(a.handFont ?? HAND_FONT_DEFAULT)
-      }
-    }
-    for (const id of wanted) void installHandFont(id)
-  }, [annots])
   const [annotPopover, setAnnotPopover] = useState<{
     x: number
     y: number
@@ -889,9 +858,6 @@ export default function PdfViewer({
   }, [prefs.input.fingerDraws])
   const textPref = prefs.text
   const patchTextPref = useCallback((patch: Partial<TextPref>) => {
-    // Fetch the handwriting font the moment it is CHOSEN, not when the first
-    // note is committed — it is a ~110 kB chunk and the user is about to type.
-    if (patch.font === 'hand') void installHandFont(HAND_FONT_DEFAULT)
     setPrefs((p) => ({ ...p, text: { ...p.text, ...patch } }))
   }, [])
   const resetTextPref = useCallback(() => {
@@ -917,14 +883,9 @@ export default function PdfViewer({
      *  unset and follow the live tool preference instead. */
     color?: [number, number, number]
     fontSize?: number
-    /** Editing an existing HANDWRITTEN note: the commit must re-bake it as one
-     *  rather than turn it into a printed text box (they are different PDF
-     *  subtypes — see shared/hand-note.ts). Unset for a new draft, which
-     *  follows the tool's current typeface instead. */
-    hand?: boolean
-    /** Editing a handwritten note: ITS pen, so the editor shows the letters the
-     *  re-bake will draw. Unset on a new draft, which gets today's pen. */
-    handFont?: HandFontId | undefined
+    /** Editing an existing box: ITS face, so the editor shows the letters the
+     *  commit will write. Unset on a new draft, which follows the tool. */
+    font?: PdfStandardFont | undefined
     /** The editor is positioned inside this pane's page layout, at its zoom */
     pane: PaneId
   } | null>(null)
@@ -2473,8 +2434,7 @@ export default function PdfViewer({
           pressures: snapshot.pressures,
           width: snapshot.width,
           fontSize: snapshot.fontSize,
-          lines: snapshot.lines,
-          handFont: snapshot.handFont,
+          font: snapshot.font,
           blend: snapshot.blend,
           // A stamp's picture goes to the engine as raw PNG bytes; the record
           // keeps the data URL, which is what the overlay can paint.
@@ -2565,7 +2525,6 @@ export default function PdfViewer({
           rect: markup ? undefined : reshapeQuads?.[0],
           quads: markup ? reshapeQuads : undefined,
           strokes: reshapeStrokes,
-          hand: patch.hand,
           translate: patch.translate
         })
         .catch(asWriteError)
@@ -2662,10 +2621,8 @@ export default function PdfViewer({
         pressures?: number[][] | undefined
         width?: number | undefined
         fontSize?: number | undefined
-        /** handnote: the pre-wrapped lines (see hand-note.ts) */
-        lines?: string[] | undefined
-        /** handnote: the pen the lines were measured with */
-        handFont?: HandFontId | undefined
+        /** freetext: the Standard-14 face it is set in */
+        font?: PdfStandardFont | undefined
         blend?: 'multiply' | undefined
         imageUrl?: string | undefined
       }
@@ -2689,8 +2646,7 @@ export default function PdfViewer({
         pressures: extras?.pressures,
         width: extras?.width,
         fontSize: extras?.fontSize,
-        lines: extras?.lines,
-        handFont: extras?.handFont,
+        font: extras?.font,
         blend: extras?.blend,
         imageUrl: extras?.imageUrl
       }
@@ -2713,22 +2669,6 @@ export default function PdfViewer({
       if (patch.quads) before.quads = record.quads
       if (patch.strokes) before.strokes = record.strokes
       if (patch.translate) before.translate = { dx: -patch.translate.dx, dy: -patch.translate.dy }
-      if (patch.lines) before.lines = record.lines
-      if (patch.handFont) before.handFont = record.handFont
-      // A handwritten note's words are DRAWN into its appearance stream, so
-      // undoing an edit or a resize has to re-bake the old state — restoring
-      // the record alone would leave the new glyphs in the file with the old
-      // text beside them in the notes panel. The reverse patch therefore
-      // carries the note exactly as the forward one does.
-      if (patch.hand && record.quads[0]) {
-        before.hand = {
-          lines: record.lines ?? (record.contents ?? '').split('\n'),
-          box: record.quads[0],
-          fontSize: record.fontSize ?? FREETEXT_SIZE,
-          color: record.color,
-          font: record.handFont
-        }
-      }
       pushUndo({ kind: 'change', handle, before, after: patch })
       void engineChange(handle, patch)
     },
@@ -2861,10 +2801,6 @@ export default function PdfViewer({
     if (!q) return
     setSelected(null)
     setAnnotPopover(null)
-    // The editor writes in the note's own pen, so the face has to be present
-    // before the first keystroke. Adding a FontFace re-lays out the text using
-    // it on its own, so nothing here has to wait for the fetch.
-    if (record.type === 'handnote') void installHandFont(record.handFont ?? HAND_FONT_DEFAULT)
     setFreeTextDraft({
       pageNumber,
       x: q.x,
@@ -2879,8 +2815,7 @@ export default function PdfViewer({
       text: record.contents ?? '',
       color: record.color,
       fontSize: record.fontSize ?? FREETEXT_SIZE,
-      hand: record.type === 'handnote',
-      handFont: record.handFont,
+      font: record.font,
       pane: activePaneRef.current
     })
   }, [])
@@ -2932,82 +2867,30 @@ export default function PdfViewer({
       const fontSize = freeTextDraft.editingId
         ? freeTextDraft.fontSize ?? FREETEXT_SIZE
         : prefsRef.current.text.fontSize
-      const min = freetextMinSize(text, fontSize, wDrag)
+      // Measured in the box's OWN face: Courier is far wider than Helvetica at
+      // the same size, so measuring every box in one font would let a
+      // monospaced one commit narrower than its own words.
+      const font = freeTextDraft.editingId ? freeTextDraft.font : prefsRef.current.text.font
+      const min = freetextMinSize(text, fontSize, wDrag, font)
       const w = Math.max(wDrag, min.w)
       const h = Math.max(hDrag, min.h)
       const rect = { x: freeTextDraft.x, y: freeTextDraft.y, w, h }
       if (freeTextDraft.editingId) {
+        // A re-opened box keeps its OWN face and size; the tool's current ones
+        // belong to the next box, not to this one.
         const record = (annotsRef.current.get(freeTextDraft.pageNumber) ?? []).find(
           (r) => r.id === freeTextDraft.editingId
         )
-        if (record && freeTextDraft.hand) {
-          // Re-wrap and re-bake: a handwritten note's glyphs live in its
-          // appearance, so edited text is drawn again rather than patched.
-          // The re-wrap is measured HERE, so the font it is measured in is the
-          // font the engine must bake — a record that names one keeps it, and
-          // one read back from a file (which names none) is re-set in today's
-          // pen rather than measured in one font and drawn in another.
-          const font = record.handFont ?? HAND_FONT_DEFAULT
-          await installHandFont(font)
-          const lines = wrapHandText(text, wDrag, handTextMeasurer(fontSize, font))
-          const box = {
-            x: freeTextDraft.x,
-            y: freeTextDraft.y,
-            w: wDrag,
-            h: Math.max(hDrag, lines.length * fontSize * HAND_LINE_HEIGHT + 2)
-          }
-          changeAnnotation(freeTextDraft.pageNumber, record, {
-            quads: [box],
-            contents: text,
-            lines,
-            handFont: font,
-            hand: { lines, box, fontSize, color: record.color, font }
-          })
-        } else if (record) {
+        if (record) {
           changeAnnotation(freeTextDraft.pageNumber, record, { quads: [rect], contents: text })
         }
         setFreeTextDraft(null)
         return
       }
       const pref = prefsRef.current.text
-      if (pref.font === 'hand') {
-        // A handwritten note wraps HERE, measured with the very font the
-        // engine will embed, and the lines travel with the request — that is
-        // what makes the mark on screen and the mark in the file break in the
-        // same places.
-        //
-        // It wraps to the box the user DREW (wDrag), not to freetextMinSize's
-        // floor: that floor exists to stop a typed box being dragged narrower
-        // than its own words, but a handwritten note in a margin is meant to
-        // be narrow and wrap — widening it to fit the longest line is exactly
-        // what pushes it out of the margin and across the text.
-        // The font must be REGISTERED before it can be measured — measuring
-        // against a fallback would wrap at the wrong widths and the note would
-        // reflow the moment it was saved.
-        await installHandFont(HAND_FONT_DEFAULT)
-        const lines = wrapHandText(text, wDrag, handTextMeasurer(pref.fontSize, HAND_FONT_DEFAULT))
-        const handRect = {
-          x: freeTextDraft.x,
-          y: freeTextDraft.y,
-          w: wDrag,
-          h: Math.max(hDrag, lines.length * pref.fontSize * HAND_LINE_HEIGHT + 2)
-        }
-        const handle = persistAnnotation(
-          freeTextDraft.pageNumber,
-          'handnote',
-          [handRect],
-          pref.color,
-          1,
-          text,
-          { fontSize: pref.fontSize, lines, handFont: HAND_FONT_DEFAULT }
-        )
-        setFreeTextDraft(null)
-        setActiveTool((tool) => (tool === 'text' ? null : tool))
-        setSelected({ pageNumber: freeTextDraft.pageNumber, localId: handle.localId })
-        return
-      }
       const handle = persistAnnotation(freeTextDraft.pageNumber, 'freetext', [rect], pref.color, 1, text, {
-        fontSize: pref.fontSize
+        fontSize: pref.fontSize,
+        font: pref.font
       })
       setFreeTextDraft(null)
       // Text boxes are one-shot: unlike pen strokes, nobody places several in
@@ -3794,10 +3677,7 @@ export default function PdfViewer({
       const pageNumber = Number(pageEl.dataset.page)
       const [px, py] = pagePointFromClient(e.clientX, e.clientY, pageEl)
       const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
-      // Both typefaces of the text tool reopen the same way — a handwritten
-      // note is text, and having to delete and rewrite it to fix a typo is
-      // exactly the kind of dead end a mark should not have.
-      if (hit && (hit.type === 'freetext' || hit.type === 'handnote')) {
+      if (hit && hit.type === 'freetext') {
         e.preventDefault()
         openFreeTextEditor(pageNumber, hit)
       }
@@ -3970,9 +3850,7 @@ export default function PdfViewer({
         if (e.pointerType === 'touch') {
           const sel = selectedRef.current
           if (
-            // Both typefaces of the text tool: a handwritten note is a text
-            // box, and a finger must reach its editor the same way.
-            (drag.record.type === 'freetext' || drag.record.type === 'handnote') &&
+            drag.record.type === 'freetext' &&
             sel?.pageNumber === drag.pageNumber &&
             sel.localId === drag.record.id
           ) {
@@ -4098,23 +3976,11 @@ export default function PdfViewer({
         const min = freetextMinSize(
           rs.record.contents ?? '',
           rs.record.fontSize ?? FREETEXT_SIZE,
-          w
+          w,
+          rs.record.font
         )
         w = Math.max(w, min.w)
         h = Math.max(h, min.h)
-      } else if (rs.record.type === 'handnote') {
-        // A handwritten note has NO width floor — narrow and wrapping is what
-        // a margin note is for, and widening it to the longest word is exactly
-        // what would push it across the text. Only the height follows, from
-        // the wrap at the candidate width, measured in the note's own pen so
-        // the ghost is the size the release actually commits.
-        const fontSize = rs.record.fontSize ?? FREETEXT_SIZE
-        const lines = wrapHandText(
-          rs.record.contents ?? '',
-          w,
-          handTextMeasurer(fontSize, rs.record.handFont ?? HAND_FONT_DEFAULT)
-        )
-        h = Math.max(h, lines.length * fontSize * HAND_LINE_HEIGHT + 2)
       }
       // The box grows away from the anchored corner when a minimum kicks in,
       // so that corner stays exactly put; the upper clamp keeps a box that
@@ -4144,35 +4010,6 @@ export default function PdfViewer({
       return { rect: inkQuad(strokes, rs.record.width ?? 2), strokes }
     },
     [sizes]
-  )
-
-  /** Commit a handwritten note's resize. Its glyphs are DRAWN into the file at
-   *  fixed positions, so a new box is not a new box until the words have been
-   *  re-wrapped to it and re-baked — the same recipe an edit uses (saveFreeText
-   *  above), measured in the note's own pen so what wraps on screen is what
-   *  lands in the PDF. */
-  const resizeHandNote = useCallback(
-    async (pageNumber: number, record: PageAnnotation, rect: PageRect) => {
-      const font = record.handFont ?? HAND_FONT_DEFAULT
-      const fontSize = record.fontSize ?? FREETEXT_SIZE
-      await installHandFont(font)
-      const lines = wrapHandText(
-        record.contents ?? '',
-        rect.w,
-        handTextMeasurer(fontSize, font)
-      )
-      const box = {
-        ...rect,
-        h: Math.max(rect.h, lines.length * fontSize * HAND_LINE_HEIGHT + 2)
-      }
-      changeAnnotation(pageNumber, record, {
-        quads: [box],
-        lines,
-        handFont: font,
-        hand: { lines, box, fontSize, color: record.color, font }
-      })
-    },
-    [changeAnnotation]
   )
 
   const onResizeStart = useCallback(
@@ -4227,10 +4064,6 @@ export default function PdfViewer({
         Math.abs(next.rect.h - before.h) < 0.01
       if (same) return
       setSelected({ pageNumber: rs.pageNumber, localId: rs.record.id })
-      if (rs.record.type === 'handnote') {
-        void resizeHandNote(rs.pageNumber, rs.record, next.rect)
-        return
-      }
       const patch: AnnotPatch = { quads: [next.rect] }
       if (next.strokes) patch.strokes = next.strokes
       changeAnnotation(rs.pageNumber, rs.record, patch)
@@ -4248,7 +4081,7 @@ export default function PdfViewer({
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
     }
-  }, [active, resizeTarget, changeAnnotation, resizeHandNote])
+  }, [active, resizeTarget, changeAnnotation])
 
   /** ONE page's text, for the interactive path. The whole-document pass is far
    *  too slow to sit inside a gesture — a 15-page paper takes over a second, and
@@ -5453,11 +5286,10 @@ export default function PdfViewer({
   const tocVisible = tocPinned || tocPeek
   const aiVisible = aiPinned || aiPeek
 
-  /** Is the open text editor writing HANDWRITING? A re-opened box knows from
-   *  the record it came from (`hand` is a boolean there, false for a printed
-   *  one); a fresh draft follows the tool's current typeface, which is also
-   *  what its commit will use. */
-  const handEditor = freeTextDraft ? freeTextDraft.hand ?? textPref.font === 'hand' : false
+  /** The face the open editor should type in: a re-opened box's own, or — for
+   *  a fresh draft — the tool's current one, which is what the commit will
+   *  use. Typing in one face and committing in another is not a preview. */
+  const editorFont = freeTextDraft?.editingId ? freeTextDraft.font : textPref.font
 
   /** Pane-local chrome: the floating text-box editor and the drag ghost. Both
    *  are positioned in PAGE-LAYOUT coordinates, which differ per column (each
@@ -5485,18 +5317,12 @@ export default function PdfViewer({
             // the tool preference live, so what you type is what commits
             color: rgbCss(freeTextDraft.color ?? textPref.color, 1),
             fontSize: (freeTextDraft.fontSize ?? textPref.fontSize) * paneScale,
-            // …and that includes the TYPEFACE. Writing a handwritten note in
-            // the editor's default sans and watching it turn into handwriting
-            // on commit is not a preview at all — and it is not only cosmetic:
-            // the committed lines are wrapped with the hand font's widths, so
-            // an editor measuring in another font breaks its lines somewhere
-            // else than the mark ends up breaking them (Emil, 2026-08-08).
-            ...(handEditor
-              ? {
-                  fontFamily: handFontCss(freeTextDraft.handFont),
-                  lineHeight: `${(freeTextDraft.fontSize ?? textPref.fontSize) * HAND_LINE_HEIGHT * paneScale}px`
-                }
-              : {}),
+            // …and that includes the TYPEFACE. Typing in one face and watching
+            // it change on commit is not a preview, and it is not only
+            // cosmetic: the commit's minimum box is measured in the committed
+            // face, so an editor set in another one wraps somewhere else than
+            // the mark ends up wrapping (Emil, 2026-08-08).
+            ...textFontCss(editorFont),
             ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
           }}
           onKeyDown={(e) => {

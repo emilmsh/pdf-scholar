@@ -6,7 +6,15 @@
 // engine and reads the geometry back with an independent library.
 import type { CSSProperties } from 'react'
 import type { AnnotationType, PageRect, ViewRotation } from '../../shared/types'
-import type { HandFontId } from '../../shared/hand-note'
+import {
+  makeStandardFont,
+  PdfStandardFont,
+  PdfStandardFontFamily,
+  standardFontCssProperties,
+  standardFontFamily,
+  standardFontIsBold,
+  standardFontIsItalic
+} from '@embedpdf/models'
 import { pagePointToView, pageRectToView } from './rotation'
 import { t } from './i18n'
 
@@ -39,19 +47,14 @@ export interface PageAnnotation {
    *  mark renders as a variable-width filled outline (shared/ink-outline)
    *  instead of a constant-width stroked path */
   pressures?: number[][] | undefined
-  /** handnote: the text already wrapped, so the overlay breaks lines exactly
-   *  where the baked appearance stream does */
-  lines?: string[] | undefined
-  /** handnote: the pen the words were written (and measured) with, so the
-   *  overlay paints the note in the font the file actually carries. Absent on
-   *  a record read back from a file — those are painted by pdf.js from the
-   *  appearance stream, and the engine reads the pen off the annotation
-   *  itself. See src/shared/hand-note.ts. */
-  handFont?: HandFontId | undefined
   /** ink/shapes: stroke width in points */
   width?: number | undefined
   /** freetext only */
   fontSize?: number | undefined
+  /** freetext only: which Standard-14 face it is set in (see TEXT_FONTS).
+   *  Absent on a record read back from a file — pdf.js paints those from the
+   *  appearance stream, so the overlay never has to choose. */
+  font?: PdfStandardFont | undefined
   /** ink (marker): drawn AND baked with multiply so text stays legible */
   blend?: 'multiply' | undefined
   /** stamp: the PNG as a data URL, for painting the mark while it is still a
@@ -152,6 +155,87 @@ export const UNDERLINE_COLORS: HighlightColor[] = [
 export const UNDERLINE_COLOR: [number, number, number] = [0.886, 0.286, 0.29]
 export const STRIKEOUT_COLOR: [number, number, number] = [0.886, 0.286, 0.29]
 export const NOTE_COLOR: [number, number, number] = [0.933, 0.796, 0.4]
+
+// ---------- Text-box typefaces ----------
+//
+// The Standard 14 and nothing else. PDFium builds a FreeText's appearance from
+// exactly these, which is what keeps the words REAL TEXT in the file —
+// searchable, selectable, and identical in every reader without a byte of font
+// data travelling with the document. Any other typeface has to be embedded, and
+// FPDFAnnot_AppendObject refuses every subtype but STAMP and INK; that is the
+// trap v0.36's handwriting note fell into, and why it was a Stamp full of drawn
+// glyphs rather than a text box at all. It is gone (Emil, 2026-08-09) and this
+// replaced it.
+//
+// Symbol and ZapfDingbats are the two of the fourteen left out: they are
+// pictogram fonts, and a text box set in one shows nothing you typed.
+export const TEXT_FONT_FAMILIES = [
+  PdfStandardFontFamily.Helvetica,
+  PdfStandardFontFamily.Times,
+  PdfStandardFontFamily.Courier
+] as const
+
+export type TextFontFamily = (typeof TEXT_FONT_FAMILIES)[number]
+
+/** The face a new text box is set in. Helvetica because it is what a PDF means
+ *  by "no font specified" — a box written here and a box written by any other
+ *  reader then look the same. */
+export const TEXT_FONT_DEFAULT: PdfStandardFont = PdfStandardFont.Helvetica
+
+/** Split a face into the three things the menu actually offers. */
+export function textFontParts(font: PdfStandardFont): {
+  family: TextFontFamily
+  bold: boolean
+  italic: boolean
+} {
+  const family = standardFontFamily(font)
+  return {
+    family: (TEXT_FONT_FAMILIES as readonly PdfStandardFontFamily[]).includes(family)
+      ? (family as TextFontFamily)
+      : PdfStandardFontFamily.Helvetica,
+    bold: standardFontIsBold(font),
+    italic: standardFontIsItalic(font)
+  }
+}
+
+/** Put one back together. Every combination of the three offered families with
+ *  bold/italic exists in the Standard 14, so this cannot fail — but it is
+ *  guarded anyway, because `makeStandardFont` answers undefined for the ones
+ *  that do not (Symbol has no bold) and a silent NaN font would write garbage
+ *  into /DA. */
+export function textFontOf(
+  family: TextFontFamily,
+  bold: boolean,
+  italic: boolean
+): PdfStandardFont {
+  return makeStandardFont(family, { bold, italic }) ?? TEXT_FONT_DEFAULT
+}
+
+/** Only a face this app offers. Guards a stored preference and anything that
+ *  came over IPC — a bogus number would reach PDFium as a font index. */
+export function isTextFont(v: unknown): v is PdfStandardFont {
+  if (typeof v !== 'number' || !Number.isInteger(v)) return false
+  const p = textFontParts(v as PdfStandardFont)
+  return textFontOf(p.family, p.bold, p.italic) === v
+}
+
+/** How a face renders on screen — EmbedPDF's own mapping, so the overlay, the
+ *  editor and the appearance stream in the file cannot drift apart. Bold and
+ *  italic come back as weight/style rather than baked into the family name,
+ *  because "Helvetica-Bold" is not a font any OS here actually has. */
+export function textFontCss(font: PdfStandardFont | undefined): {
+  fontFamily: string
+  fontWeight: 'normal' | 'bold'
+  fontStyle: 'normal' | 'italic'
+} {
+  return standardFontCssProperties(font ?? TEXT_FONT_DEFAULT)
+}
+
+/** The same as one canvas `font` shorthand, for measuring. */
+export function textFontCanvas(font: PdfStandardFont | undefined, sizePx: number): string {
+  const css = textFontCss(font)
+  return `${css.fontStyle} ${css.fontWeight} ${sizePx}px ${css.fontFamily}`
+}
 
 /** Localized display name for an annotation type */
 export function annotTypeLabel(type: AnnotationType): string {
@@ -419,10 +503,6 @@ export function annotationCss(
     }
     case 'freetext':
       return { ...toCss(q), color: rgbCss(a.color, 1) }
-    case 'handnote':
-      // Same box as a text block; AnnotationMarks paints the words in the
-      // embedded handwriting font (see hand-note.ts)
-      return { ...toCss(q), color: rgbCss(a.color, 1) }
     case 'stamp':
       // The image fills the box; opacity is the record's. Painted as an <img>
       // in AnnotationMarks while the mark is still a session one — once it is
@@ -565,14 +645,20 @@ const SUBTYPE_MAP: Record<string, AnnotationType> = {
   // keyed on the subtype alone cannot.
 }
 
-/** A /Stamp is a handwritten note if it carries words, and a signature stamp
- *  if it does not. That is not a guess: a handnote always writes its text to
+/** LEGACY: a /Stamp used to be classified by its /Contents — words meant a
+ *  handwritten note, no words meant a signature. The handnote type is gone
+ *  (v0.37), so every /Stamp now reads back as a stamp, including the ones
+ *  v0.36 wrote. Those still PAINT correctly (pdf.js draws their appearance
+ *  stream); they simply cannot be re-typed as handwriting, which is the point.
+ *  Kept as a named function so the reasoning survives with it.
+ *
+ *  The old note: a handnote always writes its text to
  *  /Contents (that is what keeps it searchable and listable), and a signature
  *  is an image with nothing to say. A foreign image stamp from another app
  *  lands on 'stamp' too, which is right — it is an image on the page, and
  *  reading it back lets it be selected and removed like any other mark. */
-function stampTypeOf(a: PdfJsAnnotationData): AnnotationType {
-  return (a.contentsObj?.str ?? '').trim() ? 'handnote' : 'stamp'
+function stampTypeOf(_a: PdfJsAnnotationData): AnnotationType {
+  return 'stamp'
 }
 
 /** Raw pdf.js annotation data (the fields we consume) */
@@ -658,12 +744,6 @@ export function annotationAtPoint(
 export const MOVABLE_TYPES = new Set<AnnotationType>([
   'note',
   'freetext',
-  // A handwritten note moves like any other text box. It was missing from this
-  // set in v0.36.0 while the ENGINE already knew how to move one (a translate
-  // with no new geometry shifts the box and re-bakes the glyphs there — see
-  // pdfium-annot-ops.ts), so the only thing standing between the mark and the
-  // drag was this list. Emil found it the day it shipped.
-  'handnote',
   'square',
   'circle',
   'line',
@@ -690,12 +770,6 @@ export function resizeKindOf(a: PageAnnotation): ResizeKind | null {
     a.type === 'square' ||
     a.type === 'circle' ||
     a.type === 'freetext' ||
-    // A handwritten note resizes like any other text box. Its lines are
-    // wrapped and baked, so the words would hang outside a narrower box unless
-    // the RE-WRAP travels with the resize — which is why it had no handles at
-    // all in v0.36.0. It does now (PdfViewer's resizeHandNote), so the handles
-    // are honest.
-    a.type === 'handnote' ||
     a.type === 'ink' ||
     // A signature is almost never the right size on the first try
     a.type === 'stamp'
@@ -716,18 +790,23 @@ let freetextMeasureCtx: CanvasRenderingContext2D | null = null
 /** The smallest box that shows EVERY letter of a FreeText at (or near) the
  *  candidate width: the width floor is the widest unbreakable word, the
  *  height is the greedy-wrapped line count at the effective width. Mirrors
- *  .annot-freetext exactly — Helvetica stack, line-height 1.35, pre-wrap, no
- *  padding — so what the clamp allows is what the overlay shows. A resize (or
- *  an editor commit) below this clips letters, which reads as data loss. */
+ *  .annot-freetext exactly — line-height 1.35, pre-wrap, no padding — so what
+ *  the clamp allows is what the overlay shows. A resize (or an editor commit)
+ *  below this clips letters, which reads as data loss.
+ *
+ *  `font` is not optional in spirit: Courier is far wider than Helvetica at the
+ *  same size, so measuring every box in one face would let a monospaced box be
+ *  dragged narrower than its own words. */
 export function freetextMinSize(
   text: string,
   fontSize: number,
-  candidateW: number
+  candidateW: number,
+  font?: PdfStandardFont | undefined
 ): { w: number; h: number } {
   const content = text.length > 0 ? text : ' '
   const ctx = (freetextMeasureCtx ??= document.createElement('canvas').getContext('2d'))
   if (!ctx) return { w: MIN_SHAPE_SIZE, h: MIN_SHAPE_SIZE }
-  ctx.font = `${fontSize}px Helvetica, Arial, sans-serif`
+  ctx.font = textFontCanvas(font, fontSize)
   const measure = (s: string): number => ctx.measureText(s).width
   // pre-wrap keeps words whole: the widest word is the honest width floor
   let maxWord = 0

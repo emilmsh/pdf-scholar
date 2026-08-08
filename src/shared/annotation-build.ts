@@ -176,7 +176,10 @@ export function buildAnnotation(req: AnnotateRequest): PdfAnnotationObject | Fil
         type: PdfAnnotationSubtype.FREETEXT,
         contents: req.contents ?? '',
         rect: toRect(q),
-        fontFamily: PdfStandardFont.Helvetica,
+        // One of the Standard 14, chosen in the text tool's menu. PDFium
+        // builds the appearance from its own copy of these, so nothing is
+        // embedded and the words stay real text in the file.
+        fontFamily: req.font ?? PdfStandardFont.Helvetica,
         fontSize: req.fontSize ?? 12,
         fontColor: color,
         textAlign: PdfTextAlignment.Left,

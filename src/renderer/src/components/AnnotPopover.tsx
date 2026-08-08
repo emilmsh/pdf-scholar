@@ -118,7 +118,7 @@ export default function AnnotPopover({
           so the swatch that is ringed here is the swatch you picked there. */}
       <MarkupColorRow
         palette={
-          annotation.type === 'freetext' || annotation.type === 'handnote'
+          annotation.type === 'freetext'
             ? FREETEXT_COLORS
             : annotation.type === 'highlight' || annotation.type === 'note'
               ? HIGHLIGHT_COLORS
@@ -129,8 +129,7 @@ export default function AnnotPopover({
         swatch={
           annotation.type === 'highlight' ||
           annotation.type === 'note' ||
-          annotation.type === 'freetext' ||
-          annotation.type === 'handnote'
+          annotation.type === 'freetext'
             ? 'dot'
             : 'bar'
         }

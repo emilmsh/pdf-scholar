@@ -15,6 +15,10 @@ import {
   MARKUP_TOOL_TYPES,
   PEN_COLORS,
   SHAPE_TOOL_TYPES,
+  TEXT_FONT_FAMILIES,
+  textFontCss,
+  textFontOf,
+  textFontParts,
   UNDERLINE_COLORS
 } from '../annotations'
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
@@ -1227,23 +1231,54 @@ export default function Toolbar({
                 onChange={(e) => onTextPrefChange({ fontSize: Number(e.target.value) })}
                 aria-label={t('tb.fontSize')}
               />
-              {/* Typeface, not decoration: handwriting writes a different kind
-                  of mark (see hand-note.ts) — the red pen in the margin rather
-                  than a typed label on the page. */}
+              {/* A real typeface choice, and only the PDF's own Standard 14 —
+                  those need no embedding, so the words stay searchable text in
+                  the file and look the same in every reader. Each chip is set
+                  IN its own face: the sample is the label. */}
               <div className="theme-menu-label">{t('tb.textFont')}</div>
-              <div className="scope-options">
-                {(['sans', 'hand'] as const).map((font) => (
-                  <button
-                    key={font}
-                    className={`scope-option${textPref.font === font ? ' selected' : ''}`}
-                    onClick={() => onTextPrefChange({ font })}
-                  >
-                    <strong className={font === 'hand' ? 'font-sample-hand' : undefined}>
-                      {t(font === 'sans' ? 'tb.textFontSans' : 'tb.textFontHand')}
-                    </strong>
-                    <span>{t(font === 'sans' ? 'tb.textFontSansHint' : 'tb.textFontHandHint')}</span>
-                  </button>
-                ))}
+              <div className="font-row">
+                {TEXT_FONT_FAMILIES.map((family) => {
+                  const parts = textFontParts(textPref.font)
+                  const face = textFontOf(family, parts.bold, parts.italic)
+                  return (
+                    <button
+                      key={family}
+                      className={`font-chip${parts.family === family ? ' selected' : ''}`}
+                      style={textFontCss(face)}
+                      onClick={() => onTextPrefChange({ font: face })}
+                    >
+                      {family}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="font-style-row">
+                {([
+                  ['bold', 'tb.textBold'],
+                  ['italic', 'tb.textItalic']
+                ] as const).map(([which, tip]) => {
+                  const parts = textFontParts(textPref.font)
+                  const on = which === 'bold' ? parts.bold : parts.italic
+                  return (
+                    <button
+                      key={which}
+                      className={`font-style font-style-${which}${on ? ' selected' : ''}`}
+                      title={t(tip)}
+                      aria-pressed={on}
+                      onClick={() =>
+                        onTextPrefChange({
+                          font: textFontOf(
+                            parts.family,
+                            which === 'bold' ? !parts.bold : parts.bold,
+                            which === 'italic' ? !parts.italic : parts.italic
+                          )
+                        })
+                      }
+                    >
+                      A
+                    </button>
+                  )
+                })}
               </div>
               <div className="menu-hint">{t('tb.textMoveHint')}</div>
               <ResetLink hidden={textPrefIsDefault(textPref)} onClick={onTextPrefReset} />

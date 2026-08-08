@@ -3,14 +3,12 @@ import { AnnotationMode, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
-import { annotationCss, arrowHeadPoints, arrowShaftEnd, isTextMarkup, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData } from '../annotations'
+import { annotationCss, arrowHeadPoints, arrowShaftEnd, isTextMarkup, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData, textFontCss } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
 import { penNear } from '../pen-input'
-import { HAND_LINE_HEIGHT } from '../../../shared/hand-note'
-import { handFontCss } from '../hand-font'
 import {
   outlineSvgPath,
   PRESSURE_EMA_ALPHA,
@@ -1259,36 +1257,15 @@ function AnnotationMarks({
     return (
       <div
         className="annot annot-freetext"
-        style={{ ...css, fontSize: (annotation.fontSize ?? 12) * scale }}
-      >
-        {annotation.contents}
-      </div>
-    )
-  }
-  if (annotation.type === 'handnote') {
-    const css = annotationCss(annotation, annotation.quads[0], scale, { w: pageW, h: pageH }, rotation)
-    const size = annotation.fontSize ?? 14
-    // Pre-wrapped at write time and stored with the mark, so the overlay
-    // breaks lines exactly where the baked appearance does — same font, same
-    // widths, same wrap. Falls back to the raw contents for a note that came
-    // from the file (where only /Contents survives).
-    const lines = annotation.lines ?? (annotation.contents ?? '').split('\n')
-    return (
-      <div
-        className="annot annot-handnote"
         style={{
           ...css,
-          // The pen this note was WRITTEN with, not the one the app writes
-          // with today: a note keeps its font in the file, so the overlay has
-          // to keep it on screen or the two would show different letters.
-          fontFamily: handFontCss(annotation.handFont),
-          fontSize: size * scale,
-          lineHeight: `${size * HAND_LINE_HEIGHT * scale}px`
+          // The face the appearance stream will be built in, so the overlay
+          // and the saved page show the same letters at the same widths.
+          ...textFontCss(annotation.font),
+          fontSize: (annotation.fontSize ?? 12) * scale
         }}
       >
-        {lines.map((line, i) => (
-          <div key={i}>{line || ' '}</div>
-        ))}
+        {annotation.contents}
       </div>
     )
   }

@@ -175,11 +175,14 @@ siden av siden, og eksporten printer dem slik.
   zooms; pen pressure varies the line **(beta)**, and the saved file keeps the
   varying width — other readers render it the same. A toggle in the tool menus
   hands drawing back to the finger
-- The text tool writes in two typefaces: printed, or **handwriting** — the
-  red-pen-in-the-margin kind of comment. The handwriting font is embedded in
-  the file, so the note reads as handwriting for whoever opens it, not only
-  here. (Say "handwriting", never "handwritten": nobody's actual hand is
-  involved, and claiming otherwise is a promise the file cannot keep.)
+- The text tool writes in **the PDF's own typefaces** — Helvetica, Times or
+  Courier, bold and italic — chosen from the tool menu. Nothing is embedded in
+  the file, which is the point: the words stay real, searchable text and look
+  the same in every reader on earth. (Claim the fonts, never "any font": a
+  typeface outside those fourteen would have to travel inside the document, and
+  we deliberately do not do that. v0.36 shipped a handwriting font that did,
+  and it came back out — a typed note wearing handwriting is a costume, and
+  someone who wants handwriting uses the pen.)
 - Sign without leaving the app: draw your signature once — with a mouse, a pen
   or a finger — and stamp it wherever it is needed, on any document. It is kept
   on your machine, never uploaded, and lands in the file as a standard stamp

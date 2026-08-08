@@ -63,7 +63,7 @@ ANNOTATION
 • Highlight, underline, strikeout and a true-wave squiggly, in your own colours
 • Pen and marker with hold-to-straighten, shapes, sticky notes and free text in the colour and size you pick
 • With a stylus on a touch screen, the pen draws while a finger scrolls and zooms; pen pressure varies the line (beta), and the saved file keeps the varying width
-• The text tool writes printed or in handwriting — the red-pen-in-the-margin kind of comment, with the font embedded so it reads that way for whoever opens the file
+• The text tool writes in the PDF's own typefaces — Helvetica, Times or Courier, bold and italic — so the words stay real, searchable text in every reader
 • Sign without leaving the app: draw your signature once and stamp it wherever it is needed. It stays on your machine and lands in the file as a standard stamp annotation (placing a signature is not the same as digitally signing a document)
 • Password-protected documents open: type the password and read, mark up and save as normal — the file stays protected
 • Colour, thickness and opacity per tool, remembered between sessions
@@ -116,7 +116,7 @@ ANNOTERING
 • Utheving, understreking, gjennomstreking og en ekte bølget strek, i dine egne farger
 • Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst i farge og størrelse du velger
 • Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden
-• Tekstverktøyet skriver trykt eller i håndskrift — kommentaren i margen med rød penn, med fonten innebygd så den leses slik hos alle som åpner filen
+• Tekstverktøyet skriver i PDF-ens egne skrifter — Helvetica, Times eller Courier, fet og kursiv — så ordene forblir ekte, søkbar tekst i enhver leser
 • Signer uten å forlate appen: tegn signaturen din én gang og stemple den inn der den trengs. Den blir på maskinen din og lagres i filen som en standard stempel-merknad (å plassere en signatur er ikke det samme som å signere digitalt)
 • Passordbeskyttede dokumenter åpnes: skriv passordet og les, marker og lagre som vanlig — filen forblir beskyttet
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
@@ -142,20 +142,22 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.36.0
+## What's new in this version (≤ 1 500 chars) — v0.37.0
 
 **EN:**
 ```
-• Handwritten notes are written in a new hand — slanted and joined-up, the way a pen actually moves, instead of the upright printing they used before
-• The handwriting font is smaller too, so a document carrying handwritten notes is smaller than it used to be
-• Pinch-zoom lands where you meant it to on a rotated page or in a two-page spread: releasing near fit-width now snaps to the same fit the toolbar button gives
+• The text tool now offers a real typeface choice: Helvetica, Times or Courier, bold and italic. They are the PDF's own fonts, so nothing is embedded and the words stay real, searchable text in every reader
+• Drawing with a mouse is smooth again — the line no longer wanders ahead of the cursor before settling
+• A signature can be uploaded or pasted as a picture instead of drawn, and a photographed one has its paper removed so only the ink lands on the page
+• The pen carries its own colours — black, red, green, yellow and blue — with black as the one it starts in
 ```
 
 **NO:**
 ```
-• Håndskrevne notater skrives med en ny hånd — skrå og sammenbundet, slik en penn faktisk beveger seg, i stedet for den loddrette blokkskriften de hadde før
-• Håndskriftfonten er også mindre, så et dokument med håndskrevne notater blir mindre enn det pleide
-• Knip-zoom lander der du mente på en rotert side eller i tosiders oppslag: slipper du nær tilpass-bredde, snapper den nå til samme tilpasning som knappen i verktøylinja gir
+• Tekstverktøyet har fått et ekte skriftvalg: Helvetica, Times eller Courier, fet og kursiv. Det er PDF-ens egne skrifter, så ingenting bygges inn og ordene forblir ekte, søkbar tekst i enhver leser
+• Å tegne med mus er jevnt igjen — streken vandrer ikke lenger foran musepekeren før den faller på plass
+• Signaturen kan lastes opp eller limes inn som bilde i stedet for å tegnes, og et fotografert eksemplar får papiret fjernet så bare blekket havner på siden
+• Pennen har fått sine egne farger — svart, rød, grønn, gul og blå — med svart som den den starter i
 ```
 
 ---

@@ -1020,6 +1020,10 @@ button {
   color: var(--accent);
 }
 
+/* The FACE is set inline per mark, from the Standard-14 choice stored on it
+   (textFontCss) — the same mapping the editor and the appearance stream use.
+   Helvetica here is only the fallback for a box read back from a file, which
+   pdf.js paints from its own appearance anyway. */
 .annot-freetext {
   position: absolute;
   font-family: Helvetica, Arial, sans-serif;
@@ -1029,19 +1033,6 @@ button {
   pointer-events: none;
 }
 
-/* A handwritten note. The @font-face is registered from the SAME font bytes
-   that get embedded in the PDF (src/renderer/src/hand-font.ts installs them as
-   a data: URL on demand), so what the overlay shows and what the file carries
-   are the same glyphs — no substitute font, no reflow on save. The family here
-   is only the fallback: the mark sets its OWN font inline, because a note is
-   painted in the pen it was written with (see hand-note.ts, HAND_FONTS). */
-.annot-handnote {
-  position: absolute;
-  font-family: 'PDFX Hand Caveat', 'Segoe Script', cursive;
-  white-space: pre;
-  overflow: visible;
-  pointer-events: none;
-}
 
 /* ---------- Margin view: comment cards beside the page ---------- */
 
@@ -6019,10 +6010,71 @@ html.touch-ui .confirm-actions .btn-secondary {
   filter: brightness(1.07);
 }
 
-/* The handwriting option previews itself: the label is set in the very font
-   the note will be written in, so the choice is visible before it is made.
-   Follows HAND_FONT_DEFAULT in src/shared/hand-note.ts — change both together. */
-.scope-option strong.font-sample-hand {
-  font-family: 'PDFX Hand Caveat', 'Segoe Script', cursive;
-  font-size: 15px;
+/* Typeface picker in the text tool's menu. Each chip is SET IN the face it
+   offers — the sample is the label, so the choice is visible before it is
+   made. The faces are the PDF Standard 14 (see TEXT_FONT_FAMILIES), which is
+   why naming them outright is safe: every machine has something to show for
+   Helvetica, Times and Courier. */
+.font-row {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 8px;
+}
+
+.font-chip {
+  flex: 1;
+  padding: 7px 6px;
+  font-size: 13px;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.font-chip:hover {
+  background: var(--hover);
+}
+
+.font-chip.selected {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.font-style-row {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+/* A bold A and an italic A: the two toggles need no words, in any language.
+   Square, so they read as switches rather than as two more font choices. */
+.font-style {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
+  font-family: 'Times New Roman', Times, serif;
+  color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.font-style-bold {
+  font-weight: bold;
+}
+
+.font-style-italic {
+  font-style: italic;
+}
+
+.font-style:hover {
+  background: var(--hover);
+}
+
+.font-style.selected {
+  color: var(--accent);
+  border-color: var(--accent);
 }
