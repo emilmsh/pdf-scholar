@@ -225,6 +225,15 @@ clutter the page while you read.
 - **The text tool writes in two typefaces**: printed, or handwriting — the
   red-pen-in-the-margin kind of comment. The font is embedded in the file, so
   the note reads as handwriting for whoever opens it, not only here
+- **Sign without leaving the app**: draw your signature once — with a mouse, a
+  pen or a finger — and stamp it wherever it is needed, on any document. It is
+  kept on your machine, never uploaded, and lands in the file as a standard
+  stamp annotation. *Placing a signature is not the same as digitally signing a
+  document.* Where a document already carries digital signatures the app says
+  so, and says plainly that it does not check whether they are valid
+- **Password-protected documents open**: type the password and read, mark up
+  and save as normal — the file stays protected. Printing one is the exception,
+  and the app says so
 - **Colour, thickness and opacity per tool**, remembered between sessions. A «Standard»
   link appears next to any tool you have changed from its default
 - Shapes (rectangle, ellipse, line, arrow), draggable sticky notes, and free text typed

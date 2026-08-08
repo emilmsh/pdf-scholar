@@ -56,6 +56,8 @@ Marking up a paper never interrupts reading it: the tools come to the text you s
 • Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes and free text
 • With a stylus on a touch screen, the pen draws while a finger scrolls; pen pressure varies the line (beta), and the saved file keeps the varying width
 • The text tool writes printed or in handwriting, with the font embedded in the file
+• Draw your signature once and stamp it wherever it is needed — it stays on your machine (placing a signature is not the same as digitally signing a document)
+• Password-protected documents open: type the password and read, mark up and save as normal
 • Colour, thickness and opacity per tool, remembered between sessions
 • Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape
 • Marks are saved back into the PDF itself as standard annotations, so the file reads the same in Acrobat and every other viewer

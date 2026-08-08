@@ -230,6 +230,33 @@ const SHOTS = [
     `
   },
   {
+    // Sign without leaving the app: the signature drawn once and stamped where
+    // it is needed. Shot on the last page, because that is where a document
+    // gets signed — and the claim is "stamp it anywhere", not "fill a form".
+    //
+    // The signature this draws is SYNTHETIC and looks it. Three shapes were
+    // tried (one big wave, pointed minims, rounded loops) and all three read as
+    // a drawn curve rather than a name — the same uncanny problem as
+    // hand-authored handwriting, and no amount of extra harmonics fixes it.
+    // So this frame earns its keep as a smoke test of the whole chain — pad,
+    // pen strokes, save, arm, place, stamp on the page — and NOT as the
+    // picture that ships. The shipped one wants Emil's own signature on the
+    // pad with a real pen; it is his app and his name.
+    name: 'signature',
+    caption: 'A signature drawn once and stamped onto the page (synthetic — reshoot by hand)',
+    setup: `
+      await ui.closePanels()
+      await ui.showAnnots(true)
+      await ui.fitWidth()
+      // The LAST page: a signature belongs where a document ends, and the
+      // whitespace under the final paragraph is where a hand would put it —
+      // not across a body paragraph in the middle.
+      await ui.goToLastPage()
+      await ui.signHere(0.24, 0.62)
+      await ui.settle(3400)   // outlast the nav pills' idle fade
+    `
+  },
+  {
     // The release's headline, shot as its own frame: the comments stand in the
     // margin as visible text — the way a corrected draft reads on paper. Notes
     // carry their text into cards on the tinted strip; the highlight from the
@@ -381,6 +408,7 @@ const L = {
   pen: ['Penn', 'Pen'],
   note: ['Notat', 'Note'],
   text: ['Tekst på siden', 'Text on the page'],
+  signature: ['Signatur', 'Signature'],
   margin: ['Vis kommentarer i margen', 'Show comments in the margin']
 };
 const titleOf = (el) => el.title || '';
@@ -597,6 +625,18 @@ const ui = {
   },
   goToPage(n) {
     return this.paneGoToPage(0, n);
+  },
+  /** The document's last page — counted from the mounted layout, so it works
+   *  on the six-page sample and the fifteen-page house paper alike.
+   *  (No regex: PRELUDE is itself a template literal, and its escapes would be
+   *  eaten before the page ever sees them.) */
+  goToLastPage() {
+    const pages = [...document.querySelectorAll('.pages[data-pane="a"] .pdf-page')]
+      .map((p) => Number(p.dataset.page))
+      .filter((n) => Number.isFinite(n));
+    const total = pages.length ? Math.max(...pages) : 0;
+    if (!total) throw new Error('cannot tell how many pages this document has');
+    return this.paneGoToPage(0, total);
   },
   async fitWidth() {
     // The fit control offers the mode you are NOT in, so click only if needed
@@ -1386,6 +1426,89 @@ const ui = {
     await settle(800);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await settle(300);
+  },
+  /** Draw a signature on the pad and stamp it onto the page.
+   *
+   *  Hand-authored as a single continuous ribbon rather than letterforms: a
+   *  signature is a gesture, and synthetic letters are where this stops
+   *  looking like a hand (the same reason the pen frame draws marks, not
+   *  words). Pen pointer events with a pressure ramp, because that is what the
+   *  pad is built for. */
+  async signHere(fx = 0.2, fy = 0.78) {
+    const sig = btn(L.signature);
+    if (!sig) throw new Error('no signature button in the toolbar');
+    // A leftover signature would skip the pad and arm the old one
+    try { localStorage.removeItem('pdfx-signatures') } catch { /* fine */ }
+    click(sig);
+    await settle(700);
+    const pad = document.querySelector('.signature-canvas');
+    if (!pad) throw new Error('the signature pad did not open');
+    const r = pad.getBoundingClientRect();
+    const P = (type, x, y, pressure, extra = {}) => pad.dispatchEvent(new PointerEvent(type, {
+      bubbles: true, cancelable: true, pointerId: 51, isPrimary: true, pointerType: 'pen',
+      button: 0, buttons: 1, clientX: x, clientY: y, pressure, ...extra
+    }));
+    const baseY = r.top + r.height * 0.60;
+    const x0 = r.left + r.width * 0.14;
+    const span = r.width * 0.60;
+    const H = r.height;
+    // A capital's opening loop, then connected minims of decreasing height,
+    // then a long trailing flourish back under the whole thing. Slanted
+    // forward the way a hand writes, and never a pure sine — the giveaway of
+    // the first attempt was one huge regular wave.
+    const slant = (f) => -f * H * 0.06;
+    P('pointerdown', x0, baseY, 0.25);
+    // 1. the opening capital loop
+    for (let i = 1; i <= 26; i++) {
+      const t = (i / 26) * Math.PI * 2;
+      P('pointermove',
+        x0 + span * 0.10 * (1 - Math.cos(t)) + span * 0.02 * (i / 26),
+        baseY - H * 0.30 * Math.sin(t) - H * 0.06 * (1 - Math.cos(t)) + slant(i / 26),
+        0.35 + 0.3 * Math.sin(t));
+      if (i % 10 === 0) await settle(16);
+    }
+    // 2. the body: rounded loops (a plain sine, not |sin| — the cusps of an
+    // absolute value are what read as a drawn zigzag rather than a hand), each
+    // a little smaller and a little faster than the last
+    for (let i = 1; i <= 80; i++) {
+      const f = i / 80;
+      const x = x0 + span * (0.22 + 0.60 * f) + Math.sin(f * 5.3) * span * 0.012;
+      const amp = H * 0.17 * (1 - 0.45 * f);
+      const y = baseY
+        - Math.sin(f * Math.PI * 3.1 + 0.5) * amp
+        - Math.sin(f * Math.PI * 6.4) * amp * 0.28
+        + slant(0.22 + 0.60 * f);
+      P('pointermove', x, y, 0.35 + 0.35 * Math.sin(f * Math.PI));
+      if (i % 14 === 0) await settle(16);
+    }
+    // 3. the trailing flourish: a shallow sweep back under the name that stops
+    // short of the start, so the signature never closes into a shape
+    for (let i = 1; i <= 34; i++) {
+      const f = i / 34;
+      P('pointermove',
+        x0 + span * (0.82 - 0.62 * f),
+        baseY + H * 0.12 + Math.sin(f * Math.PI) * H * 0.09 + slant(1),
+        0.45 * (1 - f * 0.8));
+    }
+    P('pointerup', x0 + span * 0.20, baseY + H * 0.12 + slant(1), 0, { buttons: 0 });
+    await settle(500);
+    const save = [...document.querySelectorAll('.signature-actions button')]
+      .find((b) => !b.disabled && /Lagre|Save|Bruk|Use/.test(b.textContent || ''));
+    if (!save) throw new Error('the signature pad has nothing to save');
+    click(save);
+    await settle(900);
+    const overlay = document.querySelector('.note-place-overlay');
+    if (!overlay) throw new Error('saving the signature did not arm it');
+    const host = document.querySelector('.pages[data-pane="a"]').getBoundingClientRect();
+    overlay.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 53, isPrimary: true, button: 0, buttons: 1,
+      clientX: Math.round(host.left + host.width * fx),
+      clientY: Math.round(host.top + host.height * fy)
+    }));
+    await settle(1100);
+    const stamp = document.querySelector('.annot-stamp');
+    if (!stamp) throw new Error('the signature produced no stamp on the page');
+    this.expectInFrame(stamp, 'the signature stamp');
   },
   /** Place a sticky note in the margin and write in it. */
   async placeNote(text, fx = 0.92, fy = 0.3) {

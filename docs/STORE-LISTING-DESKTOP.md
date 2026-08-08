@@ -64,6 +64,8 @@ ANNOTATION
 • Pen and marker with hold-to-straighten, shapes, sticky notes and free text in the colour and size you pick
 • With a stylus on a touch screen, the pen draws while a finger scrolls and zooms; pen pressure varies the line (beta), and the saved file keeps the varying width
 • The text tool writes printed or in handwriting — the red-pen-in-the-margin kind of comment, with the font embedded so it reads that way for whoever opens the file
+• Sign without leaving the app: draw your signature once and stamp it wherever it is needed. It stays on your machine and lands in the file as a standard stamp annotation (placing a signature is not the same as digitally signing a document)
+• Password-protected documents open: type the password and read, mark up and save as normal — the file stays protected
 • Colour, thickness and opacity per tool, remembered between sessions
 • Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape, text box or drawing
 • Comments anchored to the text they mark
@@ -115,6 +117,8 @@ ANNOTERING
 • Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst i farge og størrelse du velger
 • Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden
 • Tekstverktøyet skriver trykt eller i håndskrift — kommentaren i margen med rød penn, med fonten innebygd så den leses slik hos alle som åpner filen
+• Signer uten å forlate appen: tegn signaturen din én gang og stemple den inn der den trengs. Den blir på maskinen din og lagres i filen som en standard stempel-merknad (å plassere en signatur er ikke det samme som å signere digitalt)
+• Passordbeskyttede dokumenter åpnes: skriv passordet og les, marker og lagre som vanlig — filen forblir beskyttet
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
 • Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form, tekstboks eller tegning
 • Kommentarer forankret til teksten de merker

@@ -27,6 +27,7 @@
     "annotations": { "ships": ["readme", "landing", "store"] },
     "annotations_edit": { "ships": [] },
     "feedback": { "ships": [] },
+    "signature": { "ships": [] },
     "margin": { "ships": ["readme"] },
     "dual-pane": { "ships": ["readme", "landing", "store"] },
     "assistant": { "ships": ["readme", "landing", "store"] },
