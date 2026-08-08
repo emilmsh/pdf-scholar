@@ -47,6 +47,11 @@ export interface MarkupPref {
 export interface TextPref {
   color: [number, number, number]
   fontSize: number
+  /** 'sans' writes a normal text box (FreeText, Helvetica). 'hand' writes a
+   *  handwritten note — the same words in an embedded handwriting font, the
+   *  red-pen-in-the-margin shape of feedback. See src/shared/hand-note.ts for
+   *  why the two are different PDF subtypes. */
+  font: 'sans' | 'hand'
 }
 
 /** What the eraser is allowed to remove. 'draw' (default) keeps it to marks
@@ -114,7 +119,7 @@ export const DEFAULT_TOOL_PREFS: ToolPrefs = {
     strikeout: { color: UNDERLINE_COLOR, opacity: 1 },
     squiggly: { color: UNDERLINE_COLOR, opacity: 1 }
   },
-  text: { color: FREETEXT_COLOR, fontSize: FREETEXT_SIZE },
+  text: { color: FREETEXT_COLOR, fontSize: FREETEXT_SIZE, font: 'sans' },
   eraserScope: 'draw',
   input: { fingerDraws: true, penSeen: false, penPressure: true }
 }
@@ -153,7 +158,8 @@ function mergeText(raw: unknown): TextPref {
     fontSize:
       typeof r.fontSize === 'number' && Number.isFinite(r.fontSize)
         ? clamp(Math.round(r.fontSize), FONT_SIZE_MIN, FONT_SIZE_MAX)
-        : base.fontSize
+        : base.fontSize,
+    font: r.font === 'hand' ? 'hand' : 'sans'
   }
 }
 
@@ -236,6 +242,6 @@ export function markupPrefIsDefault(type: MarkupToolType, pref: MarkupPref): boo
 
 export function textPrefIsDefault(pref: TextPref): boolean {
   const d = DEFAULT_TOOL_PREFS.text
-  return sameRgb(pref.color, d.color) && pref.fontSize === d.fontSize
+  return sameRgb(pref.color, d.color) && pref.fontSize === d.fontSize && pref.font === d.font
 }
 

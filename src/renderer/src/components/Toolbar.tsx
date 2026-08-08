@@ -1133,6 +1133,24 @@ export default function Toolbar({
                 onChange={(e) => onTextPrefChange({ fontSize: Number(e.target.value) })}
                 aria-label={t('tb.fontSize')}
               />
+              {/* Typeface, not decoration: handwriting writes a different kind
+                  of mark (see hand-note.ts) — the red pen in the margin rather
+                  than a typed label on the page. */}
+              <div className="theme-menu-label">{t('tb.textFont')}</div>
+              <div className="scope-options">
+                {(['sans', 'hand'] as const).map((font) => (
+                  <button
+                    key={font}
+                    className={`scope-option${textPref.font === font ? ' selected' : ''}`}
+                    onClick={() => onTextPrefChange({ font })}
+                  >
+                    <strong className={font === 'hand' ? 'font-sample-hand' : undefined}>
+                      {t(font === 'sans' ? 'tb.textFontSans' : 'tb.textFontHand')}
+                    </strong>
+                    <span>{t(font === 'sans' ? 'tb.textFontSansHint' : 'tb.textFontHandHint')}</span>
+                  </button>
+                ))}
+              </div>
               <div className="menu-hint">{t('tb.textMoveHint')}</div>
               <ResetLink hidden={textPrefIsDefault(textPref)} onClick={onTextPrefReset} />
             </div>

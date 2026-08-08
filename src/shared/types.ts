@@ -79,6 +79,9 @@ export type EngineErrorCode =
   | 'annot-list-asymmetric'
   | 'annot-empty-stroke'
   | 'annot-pressure-bake'
+  | 'annot-hand-empty'
+  | 'annot-hand-failed'
+  | 'annot-hand-too-large'
   | 'annot-line-endpoints'
   | 'annot-unknown-type'
   | 'pdf-password-protected'
@@ -151,6 +154,11 @@ export type AnnotationType =
   | 'line'
   | 'arrow'
   | 'freetext'
+  /** A handwritten note: text in an embedded handwriting font, written into a
+   *  Stamp annotation because no other subtype can carry an embedded font
+   *  (see src/shared/hand-note.ts). Its words also live in /Contents, so every
+   *  reader of a comment — notes panel, search, export — treats it normally. */
+  | 'handnote'
 
 /** Rect in PDF points, origin at the page's top-left, y growing downward —
  *  the same direction as pdf.js viewport space and as what the write engine
@@ -187,8 +195,12 @@ export interface AnnotateRequest {
   pressures?: number[][] | undefined
   /** ink/shapes: stroke width in PDF points */
   width?: number | undefined
-  /** freetext only */
+  /** freetext / handnote */
   fontSize?: number | undefined
+  /** handnote only: the text ALREADY wrapped into lines. The renderer measures
+   *  with the very same embedded font, so wrapping there and baking here is
+   *  what makes the screen and the saved page break lines identically. */
+  lines?: string[] | undefined
   /** freetext only: opaque fill behind the text (rgb 0–1). Used by the
    *  margin export's numbered anchor chips, which sit over page content and
    *  must stay readable there. */
@@ -234,6 +246,17 @@ export interface ModifyAnnotationRequest {
   quads?: PageRect[] | undefined
   /** line/arrow: one pair of endpoints. ink: the whole new stroke list. */
   strokes?: [number, number][][] | undefined
+  /** handnote: what it should look like now. A move, a resize and a text edit
+   *  all re-bake the same way — the glyphs live in the appearance, so there is
+   *  nothing to shift, only to draw again. */
+  hand?:
+    | {
+        lines: string[]
+        box: PageRect
+        fontSize: number
+        color: [number, number, number]
+      }
+    | undefined
   /** ink (pen): pressures parallel to `strokes`, when the caller holds them.
    *  The engines re-bake a moved/re-shaped pressure stroke's appearance either
    *  way (stored pressures are read back from the annotation itself); sending

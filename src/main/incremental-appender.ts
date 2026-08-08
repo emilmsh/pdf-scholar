@@ -1364,7 +1364,10 @@ const SUBTYPE_NAME: Record<AnnotateRequest['type'], string> = {
   circle: 'Circle',
   line: 'Line',
   arrow: 'Line',
-  freetext: 'FreeText'
+  freetext: 'FreeText',
+  // Never written by this path — opCreate refuses it (see handNoteUnsupported).
+  // Present so the map stays exhaustive over AnnotationType.
+  handnote: 'Stamp'
 }
 const TYPE_OF_SUBTYPE: Record<string, AnnotateRequest['type']> = {
   Highlight: 'highlight',
@@ -1585,6 +1588,11 @@ async function annotsHolderRewrite(
 }
 
 async function opCreate(pdf: PdfFile, req: AnnotateRequest): Promise<AnnotateResult> {
+  // A handwritten note needs an embedded TrueType font — a font file, a font
+  // descriptor and a widths array written by hand — which this path does not
+  // build. Refusing is the honest outcome: the alternative is a note that
+  // silently comes out in Helvetica, which is not the thing the user made.
+  if (req.type === 'handnote') return ENGINE_ERRORS.handNoteTooLarge
   if (req.quads.length === 0 && req.type !== 'ink' && req.type !== 'line' && req.type !== 'arrow') {
     return ENGINE_ERRORS.noPosition
   }

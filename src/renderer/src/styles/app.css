@@ -1029,6 +1029,18 @@ button {
   pointer-events: none;
 }
 
+/* A handwritten note. The @font-face is registered from the SAME font bytes
+   that get embedded in the PDF (src/shared/hand-note.ts installs it as a data:
+   URL at startup), so what the overlay shows and what the file carries are the
+   same glyphs — no substitute font, no reflow on save. */
+.annot-handnote {
+  position: absolute;
+  font-family: 'PDFX Hand', 'Segoe Script', cursive;
+  white-space: pre;
+  overflow: visible;
+  pointer-events: none;
+}
+
 /* ---------- Margin view: comment cards beside the page ---------- */
 
 /* Host column beside the page (side set by .side-left/.side-right).
@@ -5750,4 +5762,11 @@ html.touch-ui .menu-ai-chip {
 
 .crash-reload:hover {
   filter: brightness(1.07);
+}
+
+/* The handwriting option previews itself: the label is set in the very font
+   the note will be written in, so the choice is visible before it is made. */
+.scope-option strong.font-sample-hand {
+  font-family: 'PDFX Hand', 'Segoe Script', cursive;
+  font-size: 15px;
 }

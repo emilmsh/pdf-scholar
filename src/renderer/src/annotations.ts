@@ -38,6 +38,9 @@ export interface PageAnnotation {
    *  mark renders as a variable-width filled outline (shared/ink-outline)
    *  instead of a constant-width stroked path */
   pressures?: number[][] | undefined
+  /** handnote: the text already wrapped, so the overlay breaks lines exactly
+   *  where the baked appearance stream does */
+  lines?: string[] | undefined
   /** ink/shapes: stroke width in points */
   width?: number | undefined
   /** freetext only */
@@ -370,6 +373,10 @@ export function annotationCss(
     }
     case 'freetext':
       return { ...toCss(q), color: rgbCss(a.color, 1) }
+    case 'handnote':
+      // Same box as a text block; AnnotationMarks paints the words in the
+      // embedded handwriting font (see hand-note.ts)
+      return { ...toCss(q), color: rgbCss(a.color, 1) }
     case 'ink':
     case 'square':
     case 'circle':
@@ -500,7 +507,10 @@ const SUBTYPE_MAP: Record<string, AnnotationType> = {
   Square: 'square',
   Circle: 'circle',
   Line: 'line',
-  FreeText: 'freetext'
+  FreeText: 'freetext',
+  // Ours are handwritten notes; a foreign image stamp has no text to show, so
+  // fromPdfJsAnnotation only accepts a Stamp that carries /Contents.
+  Stamp: 'handnote'
 }
 
 /** Raw pdf.js annotation data (the fields we consume) */
@@ -525,6 +535,11 @@ export function fromPdfJsAnnotation(
 ): PageAnnotation | null {
   const type = SUBTYPE_MAP[a.subtype]
   if (!type) return null
+  // A Stamp is only ours if it carries words. Every other app's Stamp is an
+  // image or a rubber stamp we would render as an empty box and let the user
+  // "edit" into nonsense — leave those to pdf.js, which paints them from
+  // their own appearance.
+  if (type === 'handnote' && !(a.contentsObj?.str ?? '').trim()) return null
   const fileId = parseInt(a.id, 10)
   if (Number.isNaN(fileId)) return null
 

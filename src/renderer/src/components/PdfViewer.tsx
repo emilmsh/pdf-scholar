@@ -50,6 +50,8 @@ import {
 } from '../tool-prefs'
 import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
 import { notePenEvent, PEN_NEAR_MS } from '../pen-input'
+import { HAND_LINE_HEIGHT, wrapHandText } from '../../../shared/hand-note'
+import { handTextMeasurer } from '../hand-font'
 import type { BoxSize } from '../useResizable'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
@@ -2340,6 +2342,7 @@ export default function PdfViewer({
           pressures: snapshot.pressures,
           width: snapshot.width,
           fontSize: snapshot.fontSize,
+          lines: snapshot.lines,
           blend: snapshot.blend
         })
         .catch(asWriteError)
@@ -2523,6 +2526,8 @@ export default function PdfViewer({
         pressures?: number[][] | undefined
         width?: number | undefined
         fontSize?: number | undefined
+        /** handnote: the pre-wrapped lines (see hand-note.ts) */
+        lines?: string[] | undefined
         blend?: 'multiply' | undefined
       }
     ): AnnotHandle => {
@@ -2545,6 +2550,7 @@ export default function PdfViewer({
         pressures: extras?.pressures,
         width: extras?.width,
         fontSize: extras?.fontSize,
+        lines: extras?.lines,
         blend: extras?.blend
       }
       pushUndo({ kind: 'create', handle, snapshot })
@@ -2774,6 +2780,38 @@ export default function PdfViewer({
         return
       }
       const pref = prefsRef.current.text
+      if (pref.font === 'hand') {
+        // A handwritten note wraps HERE, measured with the very font the
+        // engine will embed, and the lines travel with the request — that is
+        // what makes the mark on screen and the mark in the file break in the
+        // same places.
+        //
+        // It wraps to the box the user DREW (wDrag), not to freetextMinSize's
+        // floor: that floor exists to stop a typed box being dragged narrower
+        // than its own words, but a handwritten note in a margin is meant to
+        // be narrow and wrap — widening it to fit the longest line is exactly
+        // what pushes it out of the margin and across the text.
+        const lines = wrapHandText(text, wDrag, handTextMeasurer(pref.fontSize))
+        const handRect = {
+          x: freeTextDraft.x,
+          y: freeTextDraft.y,
+          w: wDrag,
+          h: Math.max(hDrag, lines.length * pref.fontSize * HAND_LINE_HEIGHT + 2)
+        }
+        const handle = persistAnnotation(
+          freeTextDraft.pageNumber,
+          'handnote',
+          [handRect],
+          pref.color,
+          1,
+          text,
+          { fontSize: pref.fontSize, lines }
+        )
+        setFreeTextDraft(null)
+        setActiveTool((tool) => (tool === 'text' ? null : tool))
+        setSelected({ pageNumber: freeTextDraft.pageNumber, localId: handle.localId })
+        return
+      }
       const handle = persistAnnotation(freeTextDraft.pageNumber, 'freetext', [rect], pref.color, 1, text, {
         fontSize: pref.fontSize
       })

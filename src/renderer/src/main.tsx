@@ -2,10 +2,14 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import { ErrorBoundary } from './ErrorBoundary'
 import { initTouchUi } from './touch-ui'
+import { installHandFont } from './hand-font'
 import './styles/app.css'
 
 // Finger-sized targets follow the input in use (html.touch-ui) — see touch-ui.ts
 initTouchUi()
+// The handwriting font the engine embeds, registered for the overlay too, so
+// on-screen and saved glyphs match (and the wrap can be measured)
+void installHandFont()
 
 // The renderer fires and forgets a lot of async work (saves, engine writes, AI
 // calls). Each site that can meaningfully recover handles its own failure, but

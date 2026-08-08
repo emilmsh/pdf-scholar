@@ -32,6 +32,21 @@ export const ENGINE_ERRORS = {
     error: 'Fikk ikke lagret strekens trykkvariasjon i filen — streken ble ikke lagt til'
   },
   lineNoEndpoints: { code: 'annot-line-endpoints', error: 'Linjen mangler endepunkter' },
+  handNoteEmpty: { code: 'annot-hand-empty', error: 'Den håndskrevne merknaden er tom' },
+  /** The embedded font or the stamp itself could not be built. Like the
+   *  pressure bake, the note is NOT kept in some lesser form: a handwritten
+   *  comment silently turned into nothing is worse than a named failure. */
+  handNoteFailed: {
+    code: 'annot-hand-failed',
+    error: 'Fikk ikke skrevet den håndskrevne merknaden inn i filen'
+  },
+  /** The incremental appender (files past the WASM limit) does not build
+   *  embedded fonts, and a note that silently came out in Helvetica would not
+   *  be the thing the user wrote. */
+  handNoteTooLarge: {
+    code: 'annot-hand-too-large',
+    error: 'Håndskrevne merknader støttes ikke i så store dokumenter ennå'
+  },
   /** The type name is the diagnostic and cannot be reconstructed from a code,
    *  so it rides along in `error` the way the asymmetric counts do. */
   unknownType: (type: string): FileError => ({

@@ -326,5 +326,77 @@ for (const req of reqs) {
   fs.rmSync(PFILE, { force: true })
 }
 
+// 10. handwritten notes: a Stamp whose appearance holds text in an EMBEDDED
+// handwriting font — the only subtype PDFium lets us append objects to
+// (FPDFAnnot_IsObjectSupportedSubtype says no to FreeText). What matters is
+// that the font travels inside the file (so the glyphs are identical
+// everywhere), that the words stay in /Contents (so the notes panel, search
+// and exports keep working), and that a move re-bakes rather than smearing.
+{
+  const HFILE = path.join(os.tmpdir(), 'pdfx-handnote-test.pdf')
+  fs.copyFileSync(SAMPLE, HFILE)
+  const lines = ['Can you connect this', 'to any contemporary', 'phenomenon?']
+  const hbase = { path: HFILE, pageIndex: 1, opacity: 1, color: [0.82, 0.2, 0.18], author: 'test' }
+
+  const h1 = await applyAnnotation({
+    ...hbase, type: 'handnote', quads: q(40, 120, 150, 70), fontSize: 15,
+    lines, contents: lines.join(' ')
+  })
+  check('handnote: create', 'ok' in h1, 'error' in h1 ? h1.error : `obj#${h1.id}`)
+  const hMove = await updateAnnotation({
+    path: HFILE, pageIndex: 1, id: h1.id, contents: lines.join(' '),
+    hand: { lines, box: { x: 40, y: 300, w: 150, h: 70 }, fontSize: 15, color: [0.82, 0.2, 0.18] }
+  })
+  check('handnote: move re-bakes', 'ok' in hMove, 'error' in hMove ? hMove.error : '')
+  // An empty one must be refused, not written as an invisible stamp
+  const hEmpty = await applyAnnotation({
+    ...hbase, type: 'handnote', quads: q(40, 500, 150, 40), fontSize: 15, lines: []
+  })
+  check('handnote: empty is refused', 'error' in hEmpty, 'error' in hEmpty ? hEmpty.code : 'accepted!')
+  await flushAnnotations(HFILE)
+
+  const raw = fs.readFileSync(HFILE)
+  check('handnote: the font is EMBEDDED (/FontFile2)', raw.includes(Buffer.from('FontFile2')))
+  check('handnote: it is the handwriting font', raw.includes(Buffer.from('PatrickHand')))
+
+  const pdf = mupdf.Document.openDocument(raw, 'application/pdf').asPDF()
+  const page = pdf.loadPage(1)
+  const a = page.getAnnotations().find((x) => x.getObject().asIndirect() === h1.id)
+  check('handnote: present after flush', !!a)
+  if (a) {
+    const obj = a.getObject()
+    check('handnote: subtype is Stamp', String(obj.get('Subtype')) === '/Stamp', String(obj.get('Subtype')))
+    const c = obj.get('Contents')
+    check('handnote: words live in /Contents (panel, search, export)',
+      !!c && !c.isNull() && /contemporary/.test(c.asString()),
+      c && !c.isNull() ? JSON.stringify(c.asString()) : 'missing')
+    const mark = obj.get('PDFX_Hand')
+    check('handnote: marked as ours, not a foreign image stamp', !!mark && !mark.isNull())
+    const ap = obj.get('AP')?.get('N')
+    const content = ap && !ap.isNull()
+      ? new TextDecoder('latin1').decode(ap.readStream().asUint8Array()) : ''
+    check('handnote: the AP draws text', /BT/.test(content) && /Tj|TJ/.test(content), `${content.length} bytes`)
+  }
+  // Pixels: the glyphs are at the MOVED box and gone from the old one. This is
+  // also what proves the appearance is drawn in FORM space — absolute page
+  // coordinates get clipped by the /BBox and render nothing at all.
+  const SC = 3
+  const pix = page.toPixmap(mupdf.Matrix.scale(SC, SC), mupdf.ColorSpace.DeviceRGB, false, true)
+  const W2 = pix.getWidth(), px2 = pix.getPixels()
+  const redIn = (y0, y1) => {
+    let n = 0
+    for (let y = Math.round(y0 * SC); y < Math.round(y1 * SC); y++)
+      for (let x = Math.round(35 * SC); x < Math.round(200 * SC); x++) {
+        const i = (y * W2 + x) * 3
+        if (px2[i] > 110 && px2[i] - px2[i + 1] > 45 && px2[i] - px2[i + 2] > 45) n++
+      }
+    return n
+  }
+  check('handnote: glyphs painted at the new box', redIn(295, 390) > 250, `${redIn(295, 390)} px`)
+  check('handnote: nothing left at the old box', redIn(115, 195) < 40, `${redIn(115, 195)} px`)
+  pdf.destroy()
+  fs.rmSync(HFILE, { force: true })
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)

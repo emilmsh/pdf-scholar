@@ -193,19 +193,39 @@ const SHOTS = [
     `
   },
   {
-    // Freehand pen with pressure (beta), on its own page so the marks read as
-    // one hand's work: a ring, a wavy underline, an exclamation mark in the
-    // margin. Ships nowhere yet — a proposal frame for Emil to judge
-    // (scripts/lib/shots.json flips it on if it earns a surface).
-    name: 'pen',
-    caption: 'Freehand pen: pressure-varied strokes around and under the text (beta)',
+    // Marking up a draft the way a supervisor or an examiner does: red pen
+    // gestures ON the text (a bracket down the margin, a wavy underline) and
+    // handwritten comments BESIDE it. Both are real marks — the pen strokes
+    // carry pressure, and the handwriting is a note in the embedded
+    // handwriting font (src/shared/hand-note.ts), not a caption pasted on top.
+    //
+    // Placement is measured from the document's own text geometry rather than
+    // hard-coded, so nothing lands on a word: the bracket takes the strip just
+    // left of the column and the writing gets what is left of the margin. Four
+    // placements were photographed before this one was picked (left margin,
+    // line-end gaps, right margin, mixed); the left margin reads most like a
+    // marked-up paper.
+    name: 'feedback',
+    caption: 'A marked-up draft: red pen on the text, handwritten notes in the margin',
     setup: `
       await ui.closePanels()
       await ui.showAnnots(true)
       await ui.fitWidth()
-      await ui.goToPage(4)
-      ui.expectPage(0, 4)
+      await ui.goToPage(3)
+      ui.expectPage(0, 3)
       await ui.penScrawl()
+      const w = ui.whitespace()
+      const marks = ui.markRectsA()
+      const top = marks.length ? Math.min(...marks.map((m) => m.top)) : 0
+      const bottom = marks.length ? Math.max(...marks.map((m) => m.bottom)) : 0
+      // colorIndex 1 is the red pen in the text tool's palette — the same red
+      // the strokes are in, so the marks read as one hand's work
+      await ui.writeNote('Can you connect this to any contemporary phenomenon?',
+        w.leftMargin.x, top - 6, { width: w.leftMargin.w, colorIndex: 1 })
+      // Beside the underlined line rather than below it: below the last mark
+      // falls out of the window on a short page.
+      await ui.writeNote('Just a summary — what is YOUR reading?',
+        w.leftMargin.x, bottom - 40, { width: w.leftMargin.w, colorIndex: 1 })
       await ui.settle(3400)   // outlast the nav pills' idle fade
     `
   },
@@ -360,6 +380,7 @@ const L = {
   rectangle: ['Rektangel', 'Rectangle'],
   pen: ['Penn', 'Pen'],
   note: ['Notat', 'Note'],
+  text: ['Tekst på siden', 'Text on the page'],
   margin: ['Vis kommentarer i margen', 'Show comments in the margin']
 };
 const titleOf = (el) => el.title || '';
@@ -1222,10 +1243,18 @@ const ui = {
    *  exclamation mark in the margin. Hand-authored paths with a little wobble
    *  and a pressure curve — honest about being *marks*, not fake handwriting
    *  (words are where synthetic strokes start to look uncanny). */
-  async penScrawl() {
+  async penScrawl(colorIndex = 0) {
     const pen = btn(L.pen);
     if (!pen) throw new Error('no pen button in the toolbar');
     if (!pen.classList.contains('is-active')) { click(pen); await settle(400); }
+    // Swatch 0 of the pen's (saturated) palette is red — the marking-up colour
+    const chev = pen.parentElement.querySelector('.tb-chevron');
+    if (chev) {
+      click(chev); await settle(300);
+      const dots = [...document.querySelectorAll('.tool-menu .color-dot')];
+      if (dots[colorIndex]) { click(dots[colorIndex]); await settle(200); }
+      click(chev); await settle(250);
+    }
     const pageEl = this.pageElA();
     const layer = pageEl.querySelector('.draw-layer');
     if (!layer) throw new Error('the pen tool did not arm (no draw layer)');
@@ -1299,6 +1328,64 @@ const ui = {
     }
     const marks = pageEl.querySelectorAll('.annot-marks path');
     if (marks.length < 2) throw new Error('the pen produced ' + marks.length + ' mark(s) on this page');
+  },
+  /** The document's own white space, measured from the text layer — so a mark
+   *  can be put in the margin without landing on a word, whatever the paper. */
+  whitespace() {
+    const page = this.pageElA();
+    const pr = page.getBoundingClientRect();
+    const spans = [...page.querySelectorAll('.text-host .textLayer > span')]
+      .filter((s) => (s.textContent || '').trim().length > 1);
+    if (spans.length === 0) throw new Error('no text layer to measure margins from');
+    const rects = spans.map((s) => s.getBoundingClientRect());
+    const textLeft = Math.min(...rects.map((r) => r.left));
+    const textRight = Math.max(...rects.map((r) => r.right));
+    // The pen's bracket sits just left of the column; the handwriting must
+    // stop short of it or the two overprint each other.
+    const bracketX = textLeft - 14;
+    return {
+      textLeft, textRight, bracketX,
+      leftMargin: { x: pr.left + 10, w: Math.max(60, bracketX - (pr.left + 10) - 12) }
+    };
+  },
+  /** Set the text tool's typeface and colour, then write a note at (x, y).
+   *  font: 'hand' gives the red-pen-in-the-margin look. */
+  async writeNote(text, x, y, { font = 'hand', colorIndex = 0, width = 0 } = {}) {
+    const tool = btn(L.text);
+    if (!tool) throw new Error('no text button in the toolbar');
+    if (!tool.classList.contains('is-active')) { click(tool); await settle(350); }
+    const chev = tool.parentElement.querySelector('.tb-chevron');
+    if (chev) {
+      click(chev); await settle(300);
+      const dots = [...document.querySelectorAll('.tool-menu .color-dot')];
+      if (dots[colorIndex]) { click(dots[colorIndex]); await settle(200); }
+      const pick = [...document.querySelectorAll('.tool-menu .scope-option')].find((b) =>
+        /Håndskrift|Handwriting/.test(b.querySelector('strong')?.textContent || '') === (font === 'hand') &&
+        /Håndskrift|Handwriting|Trykt|Printed/.test(b.querySelector('strong')?.textContent || ''));
+      if (pick) { click(pick); await settle(250); }
+      click(chev); await settle(250);
+    }
+    const layer = this.pageElA().querySelector('.draw-layer');
+    if (!layer) throw new Error('the text tool did not arm');
+    layer.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, cancelable: true, pointerId: 47, isPrimary: true, button: 0, buttons: 1,
+      clientX: Math.round(x), clientY: Math.round(y)
+    }));
+    await settle(450);
+    const ta = document.querySelector('.freetext-editor');
+    if (!ta) throw new Error('the text editor did not open');
+    // The committed box is the EDITOR's box (saveFreeText reads offsetWidth),
+    // so narrowing it here is how the note is told to wrap inside the margin
+    // rather than run across the page.
+    if (width > 0) ta.style.width = Math.round(width) + 'px';
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(ta, text);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(200);
+    ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+    await settle(800);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle(300);
   },
   /** Place a sticky note in the margin and write in it. */
   async placeNote(text, fx = 0.92, fy = 0.3) {
