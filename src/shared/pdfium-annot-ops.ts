@@ -363,6 +363,90 @@ function drawHandLines(
   return true
 }
 
+/** Everything needed to draw a handwritten note again, kept in the annotation
+ *  itself. Without this a move went through the generic model update, which
+ *  rebuilds the appearance from a model that knows nothing about our text
+ *  objects — measured: the /AP fell from 499 bytes to 42 and the note went
+ *  blank. Storing the state means ANY note can be re-baked, including one
+ *  reopened from a file the renderer no longer has state for. */
+const HAND_LINES_KEY = 'PDFX_HandLines'
+const HAND_SIZE_KEY = 'PDFX_HandSize'
+const HAND_COLOR_KEY = 'PDFX_HandColor'
+
+/** Stamp the note as ours AND record what it takes to draw it again. */
+function writeHandState(
+  raw: RawPdfium,
+  annotPtr: number,
+  lines: string[],
+  fontSize: number,
+  color: [number, number, number]
+): void {
+  withWideString(raw, '1', (p) => raw.FPDFAnnot_SetStringValue(annotPtr, HAND_NOTE_KEY, p))
+  withWideString(raw, lines.join('\n'), (p) =>
+    raw.FPDFAnnot_SetStringValue(annotPtr, HAND_LINES_KEY, p)
+  )
+  withWideString(raw, String(fontSize), (p) =>
+    raw.FPDFAnnot_SetStringValue(annotPtr, HAND_SIZE_KEY, p)
+  )
+  withWideString(raw, rgbToHex(color), (p) =>
+    raw.FPDFAnnot_SetStringValue(annotPtr, HAND_COLOR_KEY, p)
+  )
+}
+
+function readAnnotString(raw: RawPdfium, annotPtr: number, key: string): string | null {
+  const bytes = raw.FPDFAnnot_GetStringValue(annotPtr, key, 0, 0)
+  if (bytes <= 2) return null
+  const buf = raw.pdfium.wasmExports.malloc(bytes)
+  try {
+    raw.FPDFAnnot_GetStringValue(annotPtr, key, buf, bytes)
+    return raw.pdfium.UTF16ToString(buf)
+  } finally {
+    raw.pdfium.wasmExports.free(buf)
+  }
+}
+
+interface HandState {
+  lines: string[]
+  fontSize: number
+  color: [number, number, number]
+  box: PageRect
+}
+
+/** The stored state of a handwritten note, or null if this annotation is not
+ *  one of ours (a foreign image stamp, or any other subtype). */
+function readHandNote(open: OpenDoc, pageIndex: number, id: number): HandState | null {
+  const { engine, doc, docId } = open
+  const pageH = doc.pages[pageIndex]?.size.height
+  if (!pageH) return null
+  return withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
+    withAnnotByObjNum(pagePtr, raw, id, (annotPtr): HandState | null => {
+      if (!raw.FPDFAnnot_HasKey(annotPtr, HAND_NOTE_KEY)) return null
+      const linesRaw = readAnnotString(raw, annotPtr, HAND_LINES_KEY)
+      if (linesRaw === null) return null
+      const rectPtr = raw.pdfium.wasmExports.malloc(16)
+      let box: PageRect
+      try {
+        if (!raw.FPDFAnnot_GetRect(annotPtr, rectPtr)) return null
+        const left = raw.pdfium.getValue(rectPtr, 'float')
+        const top = raw.pdfium.getValue(rectPtr + 4, 'float')
+        const right = raw.pdfium.getValue(rectPtr + 8, 'float')
+        const bottom = raw.pdfium.getValue(rectPtr + 12, 'float')
+        box = { x: left, y: pageH - top, w: right - left, h: top - bottom }
+      } finally {
+        raw.pdfium.wasmExports.free(rectPtr)
+      }
+      const size = Number(readAnnotString(raw, annotPtr, HAND_SIZE_KEY))
+      const hex = readAnnotString(raw, annotPtr, HAND_COLOR_KEY)
+      return {
+        lines: linesRaw.split('\n'),
+        fontSize: Number.isFinite(size) && size > 0 ? size : 14,
+        color: hex ? hexToRgb(hex) : [0, 0, 0],
+        box
+      }
+    })
+  )
+}
+
 /** Write the FS_RECTF for a page-space box (PDF space, y-up) */
 function setAnnotRect(raw: RawPdfium, annotPtr: number, box: PageRect, pageH: number): void {
   const ptr = raw.pdfium.wasmExports.malloc(16)
@@ -412,8 +496,7 @@ async function createHandNote(open: OpenDoc, req: AnnotateRequest): Promise<Anno
       if (!drawHandLines(raw, docPtr, annotPtr, lines, box, req.fontSize ?? 14, req.color)) {
         return false
       }
-      // Ours, as opposed to a foreign image stamp (see HAND_NOTE_KEY)
-      withWideString(raw, '1', (p) => raw.FPDFAnnot_SetStringValue(annotPtr, HAND_NOTE_KEY, p))
+      writeHandState(raw, annotPtr, lines, req.fontSize ?? 14, req.color)
       return true
     })
     if (ok === true) raw.FPDFPage_GenerateContent(pagePtr)
@@ -457,6 +540,7 @@ function rebakeHandNote(
       if (contents !== undefined) {
         withWideString(raw, contents, (p) => raw.FPDFAnnot_SetStringValue(annotPtr, 'Contents', p))
       }
+      writeHandState(raw, annotPtr, lines, fontSize, color)
       return true
     })
     if (ok === true) raw.FPDFPage_GenerateContent(pagePtr)
@@ -536,18 +620,33 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
 export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<AnnotateResult> {
   const { engine, doc, docId } = open
   return withLinkApGuard(engine, docId, req.pageIndex, async () => {
-    // A handwritten note's glyphs are baked into its appearance, so a move, a
-    // resize and a text edit are all the same operation: lay the lines down
-    // again at the new box. The caller sends what it wants it to look like now.
-    if (req.hand) {
+    // A handwritten note's glyphs are baked into its appearance, so EVERY
+    // change to one — move, resize, recolour, edit — is the same operation:
+    // lay the lines down again. It must never reach the generic model update
+    // below, which rebuilds the appearance from a model that knows nothing
+    // about our text objects and leaves the note blank (measured: the /AP fell
+    // from 499 bytes to 42). The state to redraw from is stored on the
+    // annotation, so this works even for a note reopened from a file.
+    const hand = readHandNote(open, req.pageIndex, req.id)
+    if (hand || req.hand) {
+      const base = hand ?? {
+        lines: req.hand!.lines,
+        fontSize: req.hand!.fontSize,
+        color: req.hand!.color,
+        box: req.hand!.box
+      }
+      let box = req.hand?.box ?? req.rect ?? req.quads?.[0] ?? base.box
+      if (!req.hand && !req.rect && !req.quads && req.translate) {
+        box = { ...box, x: box.x + req.translate.dx, y: box.y + req.translate.dy }
+      }
       const done = rebakeHandNote(
         open,
         req.pageIndex,
         req.id,
-        req.hand.lines,
-        req.hand.box,
-        req.hand.fontSize,
-        req.hand.color,
+        req.hand?.lines ?? base.lines,
+        box,
+        req.hand?.fontSize ?? base.fontSize,
+        req.hand?.color ?? req.color ?? base.color,
         req.contents
       )
       return done ? { ok: true, id: req.id } : ENGINE_ERRORS.handNoteFailed

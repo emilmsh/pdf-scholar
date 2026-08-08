@@ -625,6 +625,10 @@ export function resizeKindOf(a: PageAnnotation): ResizeKind | null {
   if (a.type === 'square' || a.type === 'circle' || a.type === 'freetext' || a.type === 'ink') {
     return a.quads.length > 0 ? 'box' : null
   }
+  // A handwritten note deliberately has NO resize handles yet: its lines are
+  // wrapped and baked at write time, so a narrower box would not re-wrap — the
+  // words would simply hang outside it. Moving it works; resizing needs the
+  // wrap to travel with the resize, which it does not yet.
   return null
 }
 

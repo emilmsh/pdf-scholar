@@ -395,6 +395,39 @@ for (const req of reqs) {
   check('handnote: glyphs painted at the new box', redIn(295, 390) > 250, `${redIn(295, 390)} px`)
   check('handnote: nothing left at the old box', redIn(115, 195) < 40, `${redIn(115, 195)} px`)
   pdf.destroy()
+
+  // DRAGGING one in the UI sends `translate`, not `hand` — and that used to go
+  // through the generic model update, which rebuilds the appearance from a
+  // model that knows nothing about our text objects: the /AP collapsed from
+  // ~500 bytes to 42 and the note went blank. Every change to a handnote must
+  // re-bake instead, from the state stored on the annotation.
+  const h2 = await applyAnnotation({
+    ...hbase, type: 'handnote', quads: q(300, 120, 150, 70), fontSize: 15,
+    lines, contents: lines.join(' ')
+  })
+  const dragged = await updateAnnotation({
+    path: HFILE, pageIndex: 1, id: h2.id, translate: { dx: 0, dy: 180 }
+  })
+  check('handnote: a plain translate (what a drag sends) works', 'ok' in dragged,
+    'error' in dragged ? dragged.error : '')
+  const recolored = await updateAnnotation({
+    path: HFILE, pageIndex: 1, id: h2.id, color: [0.2, 0.3, 0.8]
+  })
+  check('handnote: a plain recolor works', 'ok' in recolored, 'error' in recolored ? recolored.error : '')
+  await flushAnnotations(HFILE)
+  {
+    const p2 = mupdf.Document.openDocument(fs.readFileSync(HFILE), 'application/pdf').asPDF()
+    const a2 = p2.loadPage(1).getAnnotations().find((x) => x.getObject().asIndirect() === h2.id)
+    const ap2 = a2?.getObject().get('AP')?.get('N')
+    const len = ap2 && !ap2.isNull() ? ap2.readStream().asUint8Array().length : 0
+    // The blank-note bug showed up here and nowhere else: the annotation still
+    // existed, still had an /AP, and the /AP was empty.
+    check('handnote: the appearance survives a drag (not blanked)', len > 200, `${len} bytes`)
+    const stored = a2?.getObject().get('PDFX_HandLines')
+    check('handnote: the redraw state travels with it', !!stored && !stored.isNull(),
+      stored && !stored.isNull() ? `${stored.asString().split('\n').length} lines` : 'missing')
+    p2.destroy()
+  }
   fs.rmSync(HFILE, { force: true })
 }
 
