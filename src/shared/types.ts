@@ -84,12 +84,17 @@ export type EngineErrorCode =
   | 'annot-hand-too-large'
   | 'annot-line-endpoints'
   | 'annot-unknown-type'
+  | 'annot-stamp-no-image'
   | 'pdf-password-protected'
+  | 'pdf-password-wrong'
+  | 'pdf-print-encrypted'
   | 'doc-too-large'
   | 'doc-too-large-browser'
   | 'doc-not-open'
   | 'append-unsupported'
   | 'append-objstm-edit'
+  | 'append-encrypted'
+  | 'append-no-image'
 
 /** The same idea for the AI request path, which fails for its own set of named
  *  reasons. Kept a separate union because these are whole sentences shown in a
@@ -159,6 +164,13 @@ export type AnnotationType =
    *  (see src/shared/hand-note.ts). Its words also live in /Contents, so every
    *  reader of a comment — notes panel, search, export — treats it normally. */
   | 'handnote'
+  /** An image placed on the page — the signature the user drew once and stamps
+   *  wherever it is needed. A standard /Stamp annotation with the image in its
+   *  appearance stream, so every other reader shows it. */
+  | 'stamp'
+  // NOTE: 'handnote' and 'stamp' are BOTH /Stamp in the file. Reading one back
+  // tells them apart by /Contents: a handwritten note always carries its words,
+  // a signature never does. See SUBTYPE_MAP in renderer/src/annotations.ts.
 
 /** Rect in PDF points, origin at the page's top-left, y growing downward —
  *  the same direction as pdf.js viewport space and as what the write engine
@@ -210,6 +222,31 @@ export interface AnnotateRequest {
   /** ink (marker): bake the appearance with /BM Multiply so text under the
    *  stroke stays legible — the freehand twin of a text highlight */
   blend?: 'multiply' | undefined
+  /** stamp only: the PNG bytes to embed. PDFium decodes these itself and stores
+   *  the image in the appearance stream, so nothing here re-encodes pixels.
+   *  Travels over IPC as a Uint8Array (structured clone handles it). */
+  image?: Uint8Array | undefined
+}
+
+/** A digital signature found in the document.
+ *
+ *  Deliberately says nothing about VALIDITY. Verifying a signature means
+ *  parsing the PKCS#7 blob and walking a certificate chain to a trust store —
+ *  a crypto dependency this app does not carry, and the kind of claim that is
+ *  worse than useless if it is wrong. What we can honestly report is that the
+ *  document carries signatures, when they were made and why; the UI says the
+ *  rest in words. */
+export interface DocSignature {
+  /** /M — when it was signed, as the PDF recorded it. May be empty. */
+  time: string
+  /** /Reason — free text the signer typed, when they typed one */
+  reason: string
+  /** The signature handler, e.g. `adbe.pkcs7.detached` or `ETSI.CAdES.detached`
+   *  (the latter is what makes a signature PAdES). Empty when unreadable. */
+  subFilter: string
+  /** True when the signature declares a DocMDP transform — "no changes allowed
+   *  after this point", the certification signature rather than an approval. */
+  certifying: boolean
 }
 
 /** On success carries the PDF object number of the (new) annotation */
@@ -525,6 +562,18 @@ export interface PdfxApi {
   /** Tell main a document is open in this window (unsaved-changes guard) */
   docOpened(path: string): void
   docClosed(path: string): void
+  /** Hand over the password an encrypted document was just unlocked with, so the
+   *  write engine can open it too. The renderer is where the unlock happens —
+   *  pdf.js refuses the bytes and the user types the password — but on desktop
+   *  the annotation engine lives in main and opens the draft itself, which is
+   *  encrypted the same way. Held in memory for the session only, never written
+   *  to disk. A no-op on the platforms whose write engine is already in the
+   *  renderer (browser, extension). */
+  docUnlock(path: string, password: string): Promise<void>
+  /** The digital signatures the document carries, if any. Read once per open —
+   *  a signature cannot appear while the file sits there. Never reports whether
+   *  a signature is VALID; see DocSignature. */
+  docSignatures(path: string): Promise<DocSignature[] | FileError>
   /** True when the document has unsaved annotation changes (a draft exists) */
   docIsDirty(path: string): Promise<boolean>
   /** True when the original file changed outside the app since this session

@@ -185,6 +185,39 @@ regressions are treated as bugs, not as acceptable platform lag.
     a CORS toggle for browser use). Such a rejection surfaces as the named
     `ai-endpoint-unreachable` error, never something cryptic.
 
+15. **Password-protected documents open, and annotate, on every platform — with
+    two named exceptions.** The unlock prompt lives in the renderer (pdf.js is
+    what refuses the bytes), so all three targets share it. Where they differ is
+    only in where the password is then kept: desktop hands it to main over
+    `doc:unlock` because the write engine opens the draft there
+    (`src/main/doc-passwords.ts`, memory only, dropped when the draft is
+    discarded); the browser and extension keep it beside the bytes in
+    `annotation-engine-browser.ts`, since their engine is already in the
+    renderer. Nothing is ever persisted, on any platform — re-opening a locked
+    document asks again. The two exceptions, both platform-independent:
+    **printing** a locked document (`pdf-print-encrypted`) — Electron prints
+    through Chromium's own PDF plugin in a hidden window and there is no way to
+    hand it a password, so it says so instead of hanging; and **annotating a
+    locked document over 150 MB** (`append-encrypted`) — that size routes to the
+    incremental appender, which writes object bytes with plain Node and has no
+    cipher. Reading a locked file of any size works everywhere. Covered by
+    `npm run test:password` on all three OSes.
+
+16. **Signature stamps work everywhere; over 150 MB they do not.** The saved
+    signature lives in the renderer (`src/renderer/src/signatures.ts`,
+    localStorage, same as the tool preferences), so all three targets behave
+    identically — including the pad, which accepts mouse, pen and finger. The
+    one divergence is by document SIZE, not platform: above 150 MB writes route
+    to the incremental appender, which builds annotation dictionaries by hand
+    and has no image encoder, so a stamp is refused there with
+    `append-no-image` while every other mark still works. Reading a document's
+    EXISTING digital signatures is likewise uniform — and uniformly limited: we
+    report that signatures are present and what they say about themselves
+    (`getSignatures`), and never whether they are valid, which would need a
+    PKCS#7 parser and a trust store. The UI says so in words rather than
+    implying a check we did not do. Covered by `npm run test:signatures` (CI,
+    all three OSes) and `npm run test:signature-stamp` (desktop session).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

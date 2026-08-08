@@ -48,13 +48,21 @@ const nb = {
   'engine.annot-hand-too-large': 'håndskrevne merknader støttes ikke i så store dokumenter ennå',
   'engine.annot-line-endpoints': 'linjen mangler endepunkter',
   'engine.annot-unknown-type': 'denne merknadstypen støttes ikke',
+  'engine.annot-stamp-no-image': 'signaturen mangler bilde',
   'engine.pdf-password-protected': 'PDF-en er passordbeskyttet',
+  'engine.pdf-password-wrong': 'feil passord',
+  'engine.pdf-print-encrypted':
+    'utskrift av passordbeskyttede dokumenter støttes ikke ennå — lagre en kopi uten passord først',
   'engine.doc-too-large': 'dokumentet er for stort til å annoteres (minnegrense i skrivemotoren)',
   'engine.doc-too-large-browser': 'dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren)',
   'engine.doc-not-open': 'dokumentet er ikke åpent for redigering',
   'engine.append-unsupported':
     'PDF-en har en struktur denne skrivemåten ikke støtter ennå — filen er urørt',
   'engine.append-objstm-edit': 'denne merknaden kan ikke endres i så store dokumenter ennå',
+  'engine.append-encrypted':
+    'passordbeskyttede dokumenter av denne størrelsen kan leses, men ikke annoteres',
+  'engine.append-no-image':
+    'signaturer kan ikke settes inn i dokumenter over 150 MB ennå',
   // One per AiErrorCode. Unlike engine.* these stand alone in a chat bubble, so
   // they are whole sentences that say what to do next.
   'aierr.ai-key-missing': 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.',
@@ -179,6 +187,28 @@ const nb = {
   'tb.aiTip': 'Assistent (A) — spør om dokumentet',
   'tb.snipTip': 'Forklar område — dra en firkant rundt en figur eller tabell',
   'tb.noteTip': 'Notat — klikk der notatet skal stå',
+  'tb.signatureTip': 'Signatur — klikk der den skal stå',
+  'tb.signatureOptionsTip': 'Velg eller tegn signatur',
+  // The signature pad and its menu
+  'sig.padTitle': 'Tegn signaturen din',
+  'sig.padDetail':
+    'Tegn med mus, penn eller finger. Signaturen lagres på denne maskinen og kan settes inn så mange ganger du vil.',
+  'sig.clear': 'Tøm',
+  'sig.save': 'Lagre signatur',
+  'sig.none': 'Ingen signaturer lagret ennå.',
+  'sig.drawNew': 'Tegn ny signatur …',
+  'sig.place': 'Sett inn denne',
+  'sig.saved': 'Lagret signatur',
+  'sig.delete': 'Slett signaturen',
+  'sig.armed': 'Klikk der signaturen skal stå. Esc avbryter.',
+  // Digital signatures already in the document (read-only, never verified)
+  'sigInfo.badge': 'Signert',
+  'sigInfo.tip': 'Dokumentet har digitale signaturer',
+  'sigInfo.title': 'Dokumentet har {count} digital(e) signatur(er)',
+  'sigInfo.noDate': 'Uten datostempel',
+  'sigInfo.certifying': 'Låser dokumentet',
+  'sigInfo.notVerified':
+    'PDF Scholar leser at signaturene finnes, men kontrollerer ikke om de er gyldige. Åpne dokumentet i Adobe Acrobat hvis gyldigheten er viktig.',
   'note.hint': 'Klikk der notatet skal stå · Esc avbryter',
   'tb.viewTip': 'Zoom og sidevisning',
   'tb.readingModeTip': 'Lesemodus — dag, sepia, natt, merknader',
@@ -249,6 +279,7 @@ const nb = {
   'tb.search': 'Søk',
   'tb.textTool': 'Tekst',
   'tb.note': 'Notat',
+  'tb.signature': 'Signatur',
   'tb.eraser': 'Viskelær',
   'tb.tocRailTip': 'Innhold — klikk for å feste, hover for et raskt blikk',
   'tb.aiRailTip': 'Assistent — klikk for å feste, hover for et raskt blikk',
@@ -299,6 +330,7 @@ const nb = {
   'annot.arrow': 'Pil',
   'annot.freetext': 'Tekst',
   'annot.handnote': 'Håndskrift',
+  'annot.stamp': 'Signatur',
 
   // Selection menu
   'menu.marker': 'Marker',
@@ -415,6 +447,14 @@ const nb = {
   'viewer.errorBytes': '({bytes} byte lest, begynner «{head}», slutter «{tail}»)',
   'viewer.errorRetry': 'Prøv igjen',
   'viewer.opening': 'Åpner {name} …',
+  // Unlock prompt for encrypted documents
+  'password.title': 'Dokumentet er passordbeskyttet',
+  'password.detail': 'Skriv passordet for å åpne {name}.',
+  'password.retry': 'Passordet stemte ikke. Prøv igjen for {name}.',
+  'password.unlock': 'Lås opp',
+  /** Shown on the error screen when the user closes the prompt without
+   *  unlocking — «Prøv igjen» there brings the prompt back. */
+  'password.cancelled': 'Dokumentet er passordbeskyttet og ble ikke låst opp.',
   'viewer.backToPage': '‹ Tilbake til s. {page}',
   'viewer.forwardToPage': 'Frem til s. {page} ›',
   'viewer.ofPages': 'av {count}',
@@ -651,13 +691,21 @@ const en: Dict = {
   'engine.annot-hand-too-large': 'handwritten notes are not supported in documents this large yet',
   'engine.annot-line-endpoints': 'the line has no endpoints',
   'engine.annot-unknown-type': 'this annotation type is not supported',
+  'engine.annot-stamp-no-image': 'the signature has no image',
   'engine.pdf-password-protected': 'the PDF is password protected',
+  'engine.pdf-password-wrong': 'wrong password',
+  'engine.pdf-print-encrypted':
+    'printing password-protected documents is not supported yet — save a copy without a password first',
   'engine.doc-too-large': 'the document is too large to annotate (write-engine memory limit)',
   'engine.doc-too-large-browser': 'the document is too large to annotate in the browser (write-engine memory limit)',
   'engine.doc-not-open': 'the document is not open for editing',
   'engine.append-unsupported':
     'this PDF has a structure that write path does not support yet — the file is untouched',
   'engine.append-objstm-edit': 'this annotation cannot be changed in documents this large yet',
+  'engine.append-encrypted':
+    'password-protected documents this large can be read, but not annotated',
+  'engine.append-no-image':
+    'signatures cannot be placed in documents over 150 MB yet',
   'aierr.ai-key-missing': 'No API key is stored for the selected provider. Open the AI settings.',
   'aierr.ai-key-undecryptable':
     'The stored API key could not be decrypted. That happens when the user account or browser profile has changed. Enter the key again in the AI settings.',
@@ -774,6 +822,26 @@ const en: Dict = {
   'tb.aiTip': 'Assistant (A) — ask about the document',
   'tb.snipTip': 'Explain area — drag a box around a figure or table',
   'tb.noteTip': 'Note — click where the note should go',
+  'tb.signatureTip': 'Signature — click where it should go',
+  'tb.signatureOptionsTip': 'Choose or draw a signature',
+  'sig.padTitle': 'Draw your signature',
+  'sig.padDetail':
+    'Draw with a mouse, pen or finger. It is saved on this machine and can be placed as many times as you like.',
+  'sig.clear': 'Clear',
+  'sig.save': 'Save signature',
+  'sig.none': 'No signatures saved yet.',
+  'sig.drawNew': 'Draw a new signature …',
+  'sig.place': 'Place this one',
+  'sig.saved': 'Saved signature',
+  'sig.delete': 'Delete signature',
+  'sig.armed': 'Click where the signature should go. Esc cancels.',
+  'sigInfo.badge': 'Signed',
+  'sigInfo.tip': 'This document carries digital signatures',
+  'sigInfo.title': 'This document carries {count} digital signature(s)',
+  'sigInfo.noDate': 'No timestamp',
+  'sigInfo.certifying': 'Locks the document',
+  'sigInfo.notVerified':
+    'PDF Scholar reads that the signatures are there, but does not check whether they are valid. Open the document in Adobe Acrobat if validity matters.',
   'note.hint': 'Click where the note should go · Esc cancels',
   'tb.viewTip': 'Zoom and page layout',
   'tb.readingModeTip': 'Reading mode — day, sepia, night, annotations',
@@ -843,6 +911,7 @@ const en: Dict = {
   'tb.search': 'Search',
   'tb.textTool': 'Text',
   'tb.note': 'Note',
+  'tb.signature': 'Signature',
   'tb.eraser': 'Eraser',
   'tb.tocRailTip': 'Contents — click to pin, hover for a quick look',
   'tb.aiRailTip': 'Assistant — click to pin, hover for a quick look',
@@ -890,6 +959,7 @@ const en: Dict = {
   'annot.arrow': 'Arrow',
   'annot.freetext': 'Text',
   'annot.handnote': 'Handwriting',
+  'annot.stamp': 'Signature',
 
   'menu.marker': 'Highlight',
   'menu.markerTip': 'Highlight ({color})',
@@ -998,6 +1068,11 @@ const en: Dict = {
   'viewer.errorBytes': '({bytes} bytes read, starts “{head}”, ends “{tail}”)',
   'viewer.errorRetry': 'Try again',
   'viewer.opening': 'Opening {name} …',
+  'password.title': 'This document is password protected',
+  'password.detail': 'Enter the password to open {name}.',
+  'password.retry': 'That password did not work. Try again for {name}.',
+  'password.unlock': 'Unlock',
+  'password.cancelled': 'The document is password protected and was not unlocked.',
   'viewer.backToPage': '‹ Back to p. {page}',
   'viewer.forwardToPage': 'Forward to p. {page} ›',
   'viewer.ofPages': 'of {count}',

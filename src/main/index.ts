@@ -31,8 +31,13 @@ import {
   dropAnnotations,
   flushAllAnnotations,
   flushAnnotations,
+  forgetPassword,
+  passwordFor,
+  readSignatures,
+  rememberPassword,
   updateAnnotation
 } from './annotation-engine-embedpdf'
+import { ENGINE_ERRORS } from '../shared/engine-errors'
 import {
   discardDraft,
   draftPathFor,
@@ -745,6 +750,28 @@ function registerIpc(): void {
     openDocs.get(e.sender.id)?.delete(path)
   })
 
+  // The renderer unlocked an encrypted document; the write engine opens the
+  // DRAFT of that path, which is a byte copy and therefore carries the same
+  // encryption — so the password is remembered under the draft path the engine
+  // will ask for. draftPathFor is pure string arithmetic: no draft is created
+  // here, and none needs to exist yet.
+  ipcMain.handle('doc:unlock', (_e, path: string, password: string) => {
+    // Under BOTH names the engine may be asked to open this document by: the
+    // draft (every annotation write) and the original (a signature read before
+    // anything has been annotated). Same file, same encryption, and remembering
+    // one but not the other fails whichever call happens to come first.
+    rememberPassword(draftPathFor(path), password)
+    rememberPassword(path, password)
+  })
+
+  // Read from the DRAFT when there is one: the draft is what the viewer shows,
+  // and a signature the user is about to invalidate by annotating is still a
+  // signature that is in the document in front of them.
+  // readPathFor, not draftPathFor: a document with no unsaved changes has no
+  // draft file at all, and reading signatures must not depend on the user
+  // having annotated first.
+  ipcMain.handle('doc:signatures', (_e, path: string) => readSignatures(readPathFor(path)))
+
   ipcMain.handle('doc:is-dirty', (_e, path: string) => hasDraft(path))
 
   // Checked by the renderer before Save/Ctrl+S: true when something outside
@@ -854,6 +881,10 @@ function registerIpc(): void {
     // the draft file we are about to delete
     await dropAnnotations(draftPathFor(path)).catch(() => {})
     discardDraft(path)
+    // The draft this password belonged to is gone. Re-opening the document
+    // asks for it again, which is the right amount of memory for a secret.
+    forgetPassword(draftPathFor(path))
+    forgetPassword(path)
   })
 
   ipcMain.on('shell:open-external', (_e, url: string) => {
@@ -950,6 +981,12 @@ function registerIpc(): void {
   // renders the file (with saved annotations) and drives the print dialog.
   ipcMain.handle('file:print', async (_e, path: string) => {
     try {
+      // Chromium's PDF plugin would meet the encryption itself and put up an
+      // unlock prompt in a window that is deliberately never shown — a hang
+      // with no way out. Holding a password for this path is exactly the test
+      // for "the user had to unlock this": an owner-password-only file has none
+      // and prints fine. Say so instead.
+      if (passwordFor(draftPathFor(path)) !== undefined) return ENGINE_ERRORS.printEncrypted
       // Print what the user just annotated — flush the engine cache first
       await flushDraft(path)
       const printWin = new BrowserWindow({

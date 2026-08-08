@@ -312,6 +312,64 @@ try {
       `${box2.marks} -> ${afterFingerDraw} mark(s)`)
   }
 
+  // ---- 7. the palm guard covers click-to-place overlays too ----
+  // A full-window overlay where ONE pointerdown commits something is the worst
+  // place to miss the guard: arming a note (or a signature — same overlay) and
+  // reaching in to place it dropped the mark wherever the palm landed first.
+  // Reproduced before the fix; this keeps it fixed.
+  {
+    const armed = await evalIn(A, `
+      // The toolbar folds on a narrow window, so the note tool may be in the
+      // overflow menu rather than inline — look in both.
+      let note = [...document.querySelectorAll('button')]
+        .find((b) => /^(Notat|Note)\\b/.test(b.title || ''));
+      if (!note) {
+        const more = [...document.querySelectorAll('button')]
+          .find((b) => /^(Flere verkt|More tools)/.test(b.title || ''));
+        if (more) {
+          click(more); await settle(350);
+          note = [...document.querySelectorAll('[class*=overflow] button')]
+            .find((b) => /^(Notat|Note)$/.test((b.textContent || '').trim()));
+        }
+      }
+      if (!note) return { fail: 'no note button, inline or in the overflow' };
+      click(note); await settle(500);
+      return { overlay: !!document.querySelector('.note-place-overlay') };
+    `)
+    check('the note tool arms its placement overlay', armed.overlay === true, armed.fail ?? '')
+    if (armed.overlay) {
+      const palm = await evalIn(A, `
+        const before = document.querySelectorAll('.annot-note-mark').length;
+        // pen in HOVER range — no contact, just proximity
+        window.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, pointerType: 'pen', pointerId: 95, isPrimary: true, buttons: 0,
+          clientX: 500, clientY: 400 }));
+        await settle(80);
+        const guard = document.documentElement.className.includes('pen-near');
+        const ov = document.querySelector('.note-place-overlay');
+        ov.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 96,
+          isPrimary: true, button: 0, buttons: 1, clientX: 520, clientY: 460 }));
+        await settle(700);
+        const afterPalm = document.querySelectorAll('.annot-note-mark').length - before;
+        // and once the pen is gone, a finger may place normally again
+        await settle(900);
+        ov.dispatchEvent(new PointerEvent('pointerdown', {
+          bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 97,
+          isPrimary: true, button: 0, buttons: 1, clientX: 560, clientY: 500 }));
+        await settle(700);
+        const draftOpen = !!document.querySelector('.note-popover');
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        await settle(300);
+        return { guard, afterPalm, draftOpen };
+      `)
+      check('a hovering pen arms the palm guard', palm.guard === true)
+      check('a palm places NOTHING while the pen hovers', palm.afterPalm === 0,
+        `${palm.afterPalm} placed`)
+      check('a finger still places once the pen is away', palm.draftOpen === true)
+    }
+  }
+
   console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 } catch (err) {
   console.error('FATAL:', err.message)

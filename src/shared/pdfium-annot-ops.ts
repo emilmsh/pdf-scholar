@@ -20,11 +20,16 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  DocSignature,
   FileError,
   ModifyAnnotationRequest,
   PageRect
 } from './types'
-import type { PdfAnnotationObject, PdfDocumentObject } from '@embedpdf/models'
+import type {
+  PdfAnnotationObject,
+  PdfDocumentObject,
+  PdfSignatureObject
+} from '@embedpdf/models'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import { buildAnnotation, hexToRgb, linePad, quadsBBox, rgbToHex, strokesBBox, toRect } from './annotation-build'
@@ -38,6 +43,24 @@ import { HAND_ASCENT, HAND_LINE_HEIGHT, HAND_NOTE_KEY, handFontBytes } from './h
  *  (~2 GB). An emscripten abort also KILLS the wasm instance, which is why both
  *  callers reset their engine singleton when this matches. */
 export const OOM_RE = /realloc|malloc|out of memory|cannot enlarge memory|oom|aborted/i
+
+/** FPDF_ERR_PASSWORD — "password required or incorrect" in PDFium's error enum. */
+const FPDF_ERR_PASSWORD = 4
+
+/** Did this throw mean "the document is encrypted and the password was missing
+ *  or wrong"?
+ *
+ *  Must be asked of the REASON, not the message: PDFium reports a locked file as
+ *  the generic `FPDF_LoadMemDocument failed` and carries the real verdict in
+ *  `reason.code`. All three callers used to match /password/i on the message
+ *  instead, which never fired — so a locked file surfaced as raw engine prose
+ *  rather than the named failure it already had a code for. The text match is
+ *  kept as a second net in case a future engine version words it differently. */
+export function isPasswordError(err: unknown): boolean {
+  const reason = (err as { reason?: { code?: number } } | null | undefined)?.reason
+  if (reason?.code === FPDF_ERR_PASSWORD) return true
+  return /password/i.test(err instanceof Error ? err.message : String(err))
+}
 
 /** Files above this size must be REFUSED at write time, not accepted: the
  *  in-memory create would succeed and report ok, but every later serialize would
@@ -85,6 +108,13 @@ export interface RawPdfium {
     getValue(ptr: number, type: 'float' | 'i32'): number
     setValue(ptr: number, value: number, type: 'float' | 'i32'): void
   }
+}
+
+/** A view's bytes as a standalone ArrayBuffer. A Uint8Array that came over IPC
+ *  (or out of a larger pool) can be a WINDOW onto a bigger buffer, and handing
+ *  `.buffer` straight to the engine would embed everything around it. */
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
 }
 
 /** An open document, as both callers hold it */
@@ -591,7 +621,16 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
     if (req.type === 'handnote') return createHandNote(open, req)
     const spec = buildAnnotation(req)
     if ('error' in spec) return spec
-    await engine.createPageAnnotation(doc, doc.pages[req.pageIndex], spec).toPromise()
+    // A stamp's pixels ride in the CONTEXT argument, not the annotation model:
+    // PDFium decodes the PNG itself and writes it into the appearance stream as
+    // an image XObject. buildAnnotation has already refused an imageless stamp.
+    const context =
+      req.type === 'stamp' && req.image
+        ? { data: toArrayBuffer(req.image), mimeType: 'image/png' as const }
+        : undefined
+    await engine
+      .createPageAnnotation(doc, doc.pages[req.pageIndex], spec, context as never)
+      .toPromise()
     // The new annotation is last in /Annots order (covered by test:engine's
     // create-then-recolor-by-id case).
     const objNums = rawObjectNumbers(engine, docId, req.pageIndex)
@@ -620,6 +659,31 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
     }
     return { ok: true, id }
   })
+}
+
+/** ASCII out of one of PDFium's raw signature buffers, trimmed of the NULs and
+ *  padding PDF strings routinely carry. Returns '' for anything unreadable —
+ *  a garbled field must not become a garbled sentence in the UI. */
+function bufferText(buf: ArrayBuffer | undefined): string {
+  if (!buf || buf.byteLength === 0) return ''
+  let out = ''
+  for (const byte of new Uint8Array(buf)) {
+    if (byte >= 0x20 && byte < 0x7f) out += String.fromCharCode(byte)
+  }
+  return out.trim()
+}
+
+/** The document's digital signatures, as much as can be read without doing any
+ *  cryptography. See DocSignature: this reports PRESENCE, never validity. */
+export async function readSignaturesOn(open: OpenDoc): Promise<DocSignature[]> {
+  const found = await open.engine.getSignatures(open.doc).toPromise()
+  return (found as PdfSignatureObject[]).map((s) => ({
+    time: typeof s.time === 'string' ? s.time.trim() : bufferText(s.time as never),
+    reason: typeof s.reason === 'string' ? s.reason.trim() : bufferText(s.reason as never),
+    subFilter: bufferText(s.subFilter),
+    // Any non-zero DocMDP means the signature also locks the document.
+    certifying: typeof s.docMDP === 'number' && s.docMDP > 0
+  }))
 }
 
 /** Recolour / retext / move an existing annotation, addressed by object number */

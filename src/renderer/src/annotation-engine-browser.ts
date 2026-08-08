@@ -14,6 +14,7 @@ import type {
   AnnotateRequest,
   AnnotateResult,
   DeleteAnnotationRequest,
+  DocSignature,
   FileError,
   ModifyAnnotationRequest
 } from '../../shared/types'
@@ -23,7 +24,9 @@ import {
   applyOn,
   deleteOn,
   hasNoPosition,
+  isPasswordError,
   OOM_RE,
+  readSignaturesOn,
   updateOn,
   WASM_SAFE_LIMIT
 } from '../../shared/pdfium-annot-ops'
@@ -72,14 +75,25 @@ async function getEngine(): Promise<PdfiumNative> {
 interface BrowserDoc {
   bytes: Uint8Array
   open: Promise<OpenDoc> | null
+  /** Set for encrypted documents, from the unlock prompt the viewer ran before
+   *  pdf.js would parse these bytes. Session-lived like everything in this Map —
+   *  the browser targets have no main process to keep it in, and nothing here is
+   *  ever persisted. */
+  password?: string | undefined
 }
 
 const docs = new Map<string, BrowserDoc>()
 
 /** Make `path`'s original bytes available for annotation editing (viewer mount).
  *  Cheap — the engine document opens lazily on the first write. */
-export function registerBrowserDoc(path: string, bytes: Uint8Array): void {
-  docs.set(path, { bytes, open: null })
+export function registerBrowserDoc(path: string, bytes: Uint8Array, password?: string): void {
+  docs.set(path, { bytes, open: null, password })
+}
+
+/** The password `path` was unlocked with, for the paths that need to re-open the
+ *  same bytes themselves (margin export). */
+export function browserDocPassword(path: string): string | undefined {
+  return docs.get(path)?.password
 }
 
 /** Release the live document and its bytes (viewer unmount / tab close). */
@@ -101,11 +115,16 @@ function openEntry(entry: BrowserDoc): NonNullable<BrowserDoc['open']> {
     const engine = await getEngine()
     const copy = entry.bytes.slice()
     const docId = crypto.randomUUID()
+    // Only pass a password when we have one — an owner-password-only document
+    // opens freely, and offering PDFium a password it does not want fails it.
     const doc = await engine
-      .openDocumentBuffer({
-        id: docId,
-        content: copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength) as ArrayBuffer
-      })
+      .openDocumentBuffer(
+        {
+          id: docId,
+          content: copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength) as ArrayBuffer
+        },
+        entry.password === undefined ? undefined : { password: entry.password }
+      )
       .toPromise()
     return { engine, doc, docId }
   })())
@@ -129,7 +148,13 @@ async function withDoc(
       entry.open = null
       return OVERSIZE
     }
-    if (/password/i.test(msg)) return ENGINE_ERRORS.passwordProtected
+    // Holding a password that still fails means it is the WRONG one — the file
+    // was unlocked once, so "this file is locked" would misdescribe it.
+    if (isPasswordError(err)) {
+      return entry.password === undefined
+        ? ENGINE_ERRORS.passwordProtected
+        : ENGINE_ERRORS.passwordWrong
+    }
     return { error: msg }
   }
 }
@@ -148,6 +173,24 @@ export function browserUpdateAnnotation(req: ModifyAnnotationRequest): Promise<A
 
 export function browserDeleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult> {
   return withDoc(req.path, (open) => deleteOn(open, req))
+}
+
+/** The document's digital signatures (browser/extension twin of the desktop's
+ *  readSignatures). Opening the document for a pure read is the same lazy open
+ *  the first write would do — cheap after that. */
+export async function browserReadSignatures(path: string): Promise<DocSignature[] | FileError> {
+  const entry = docs.get(path)
+  if (!entry) return NOT_OPEN
+  try {
+    return await readSignaturesOn(await openEntry(entry))
+  } catch (err) {
+    if (isPasswordError(err)) {
+      return entry.password === undefined
+        ? ENGINE_ERRORS.passwordProtected
+        : ENGINE_ERRORS.passwordWrong
+    }
+    return { error: err instanceof Error ? err.message : String(err) }
+  }
 }
 
 /** Serialize the live document — original bytes plus every annotation edit.

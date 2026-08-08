@@ -616,11 +616,15 @@ class PdfFile {
       const prev = section.trailer.get('Prev')
       if (prev?.t === 'num') queue.push(prev.v)
     }
+    // Every object we append would have to be encrypted with the file's own key
+    // to be readable, and this writer is deliberately cipher-free plain Node.
+    // Distinct from the engine's "password protected": by the time a write gets
+    // here the document IS unlocked — it is the size that rules it out.
     if (this.trailer.get('Encrypt'))
       throw new AppendError(
-        ENGINE_ERRORS.passwordProtected.error,
+        ENGINE_ERRORS.appendEncrypted.error,
         'encrypted document',
-        ENGINE_ERRORS.passwordProtected.code
+        ENGINE_ERRORS.appendEncrypted.code
       )
     if (!this.trailer.get('Root')) throw new AppendError(UNSUPPORTED_MSG, 'trailer has no /Root')
     let maxNum = 0
@@ -1365,9 +1369,13 @@ const SUBTYPE_NAME: Record<AnnotateRequest['type'], string> = {
   line: 'Line',
   arrow: 'Line',
   freetext: 'FreeText',
-  // Never written by this path — opCreate refuses it (see handNoteUnsupported).
-  // Present so the map stays exhaustive over AnnotationType.
-  handnote: 'Stamp'
+  // Both are /Stamp in the file and NEITHER is written by this path: opCreate
+  // refuses a handwritten note (it would need an embedded font) and a signature
+  // stamp (it would need an image XObject and its /Resources — a second
+  // encoder this writer does not have). They sit here only so the map stays
+  // exhaustive over AnnotationType.
+  handnote: 'Stamp',
+  stamp: 'Stamp'
 }
 const TYPE_OF_SUBTYPE: Record<string, AnnotateRequest['type']> = {
   Highlight: 'highlight',
@@ -1897,7 +1905,13 @@ function withFile(path: string, op: (pdf: PdfFile) => Promise<AnnotateResult>): 
 
 /** Create an annotation via incremental append. Returns the PDF object number. */
 export const appendAnnotation = (req: AnnotateRequest): Promise<AnnotateResult> =>
-  withFile(req.path, (pdf) => opCreate(pdf, req))
+  // Refused before the file is even opened: a stamp's appearance is an image
+  // XObject with its own stream, filter and /Resources entry, and nothing in
+  // this hand-rolled writer produces one. Better to say so than to append an
+  // annotation whose appearance would be blank in every reader.
+  req.type === 'stamp'
+    ? Promise.resolve(ENGINE_ERRORS.appendNoImage)
+    : withFile(req.path, (pdf) => opCreate(pdf, req))
 
 /** Patch an existing annotation (color/opacity/contents/rect/translate). */
 export const appendUpdateAnnotation = (req: ModifyAnnotationRequest): Promise<AnnotateResult> =>

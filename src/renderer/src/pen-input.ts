@@ -27,3 +27,15 @@ export function notePenEvent(): void {
 export function penNear(): boolean {
   return performance.now() - lastPenAt < PEN_NEAR_MS
 }
+
+/** A touch that lands while the pen is in range is the hand the pen is held
+ *  with, not an intent — the same rule the draw layer applies, in the one
+ *  shape every click-to-place overlay can use.
+ *
+ *  This matters most where an overlay covers the WHOLE window and a single
+ *  pointerdown commits something: arming a signature and reaching in to place
+ *  it put the stamp wherever the palm touched down first (reproduced, then
+ *  fixed). The note tool's overlay had the same hole. */
+export function palmResting(e: { pointerType: string }): boolean {
+  return e.pointerType === 'touch' && penNear()
+}

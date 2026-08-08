@@ -47,6 +47,11 @@ export interface PageAnnotation {
   fontSize?: number | undefined
   /** ink (marker): drawn AND baked with multiply so text stays legible */
   blend?: 'multiply' | undefined
+  /** stamp: the PNG as a data URL, for painting the mark while it is still a
+   *  session one. Once the write lands and the document reloads, pdf.js paints
+   *  the stamp from the file's appearance stream and this is not needed —
+   *  which is why a 'file' stamp read back from the PDF has no image here. */
+  imageUrl?: string | undefined
 }
 
 export type ColorKey = 'yellow' | 'green' | 'blue' | 'pink' | 'purple' | 'red' | 'orange' | 'black' | 'custom'
@@ -377,6 +382,11 @@ export function annotationCss(
       // Same box as a text block; AnnotationMarks paints the words in the
       // embedded handwriting font (see hand-note.ts)
       return { ...toCss(q), color: rgbCss(a.color, 1) }
+    case 'stamp':
+      // The image fills the box; opacity is the record's. Painted as an <img>
+      // in AnnotationMarks while the mark is still a session one — once it is
+      // in the file, pdf.js paints it from the appearance stream like any other.
+      return { ...toCss(q), opacity: a.opacity }
     case 'ink':
     case 'square':
     case 'circle':
@@ -507,10 +517,21 @@ const SUBTYPE_MAP: Record<string, AnnotationType> = {
   Square: 'square',
   Circle: 'circle',
   Line: 'line',
-  FreeText: 'freetext',
-  // Ours are handwritten notes; a foreign image stamp has no text to show, so
-  // fromPdfJsAnnotation only accepts a Stamp that carries /Contents.
-  Stamp: 'handnote'
+  FreeText: 'freetext'
+  // /Stamp is deliberately ABSENT: two of our types share that subtype — a
+  // handwritten note (text in an embedded font) and a signature stamp (an
+  // image). fromPdfJsAnnotation decides between them below, because a map
+  // keyed on the subtype alone cannot.
+}
+
+/** A /Stamp is a handwritten note if it carries words, and a signature stamp
+ *  if it does not. That is not a guess: a handnote always writes its text to
+ *  /Contents (that is what keeps it searchable and listable), and a signature
+ *  is an image with nothing to say. A foreign image stamp from another app
+ *  lands on 'stamp' too, which is right — it is an image on the page, and
+ *  reading it back lets it be selected and removed like any other mark. */
+function stampTypeOf(a: PdfJsAnnotationData): AnnotationType {
+  return (a.contentsObj?.str ?? '').trim() ? 'handnote' : 'stamp'
 }
 
 /** Raw pdf.js annotation data (the fields we consume) */
@@ -533,13 +554,8 @@ export function fromPdfJsAnnotation(
   a: PdfJsAnnotationData,
   pageHeight: number
 ): PageAnnotation | null {
-  const type = SUBTYPE_MAP[a.subtype]
+  const type = a.subtype === 'Stamp' ? stampTypeOf(a) : SUBTYPE_MAP[a.subtype]
   if (!type) return null
-  // A Stamp is only ours if it carries words. Every other app's Stamp is an
-  // image or a rubber stamp we would render as an empty box and let the user
-  // "edit" into nonsense — leave those to pdf.js, which paints them from
-  // their own appearance.
-  if (type === 'handnote' && !(a.contentsObj?.str ?? '').trim()) return null
   const fileId = parseInt(a.id, 10)
   if (Number.isNaN(fileId)) return null
 
@@ -605,7 +621,8 @@ export const MOVABLE_TYPES = new Set<AnnotationType>([
   'circle',
   'line',
   'arrow',
-  'ink'
+  'ink',
+  'stamp'
 ])
 
 export function isMovableAnnotation(a: PageAnnotation): boolean {
@@ -622,7 +639,14 @@ export type ResizeKind = 'box' | 'endpoints'
 
 export function resizeKindOf(a: PageAnnotation): ResizeKind | null {
   if (a.type === 'line' || a.type === 'arrow') return a.strokes?.[0]?.length === 2 ? 'endpoints' : null
-  if (a.type === 'square' || a.type === 'circle' || a.type === 'freetext' || a.type === 'ink') {
+  if (
+    a.type === 'square' ||
+    a.type === 'circle' ||
+    a.type === 'freetext' ||
+    a.type === 'ink' ||
+    // A signature is almost never the right size on the first try
+    a.type === 'stamp'
+  ) {
     return a.quads.length > 0 ? 'box' : null
   }
   // A handwritten note deliberately has NO resize handles yet: its lines are
