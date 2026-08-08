@@ -93,6 +93,17 @@ other four can show the app doing something. Both 2880×1800 and 1280×800 are
 than stretched. Output lands in `_auto/store/`. Same rule as `shoot`: reaching
 the shipped folder takes an explicit `-- --out docs/store-screenshots`.
 
+**Tricolor is composed twice, at two sizes.** `shoot:store` makes the 1280×800
+one for the stores. The README and landing page take it at the shoot's own
+2880×1800, and nothing makes that one for you — it needs its own run:
+
+```bash
+npx electron scripts/compose-tricolor.cjs --full --from docs/screenshots/_auto --out docs/screenshots/_auto
+```
+
+That matters more since 2026-08-08, when tricolor became the opening frame on
+both surfaces: forget it and the hero is a store-sized image stretched to fill.
+
 The tricolor seam runs straight down through the toolbar (between two icons,
 `--at`) and then leans across the page (`--slant`). Both are measured against
 the current chrome — if the toolbar changes, re-measure rather than assume.
