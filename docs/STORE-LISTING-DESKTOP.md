@@ -142,28 +142,30 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.34.0
+## What's new in this version (≤ 1 500 chars) — v0.35.0
 
 **EN:**
 ```
+• Sign without leaving the app: draw your signature once and stamp it wherever it is needed. It stays on your machine (placing a signature is not the same as digitally signing a document)
+• Password-protected documents open: type the password and read, mark up and save as normal — the file stays protected
 • Pen input: with a stylus on a touch screen, the pen draws while a finger scrolls and zooms — and the pen's eraser end erases
 • Pen pressure varies the line (beta), and the saved file keeps the varying width — other readers render it the same
-• Comments in the margin: one switch shows every note and comment as visible text beside the page, with a leader line to the passage it belongs to
-• Export with comments in the margin: a copy with every page widened and the comments set in the new margin, numbered at their anchors — ready to print, the original untouched
-• The Notes panel grew up: comments edit right in the list, with type and with/without-comment filters beside the colour dots
-• The text tool picks up colour and size — red teacher's pen included
-• An optional name in settings signs new annotations — the standard PDF author field other readers show
+• The text tool writes printed or in handwriting — the red-pen-in-the-margin kind of comment, with the font embedded so it reads that way for whoever opens the file
+• A red pen at last: pen and shapes draw from the saturated palette instead of the highlighter pastels
+• The Notes panel's colour filter now offers the colours the document actually contains, custom picks included
+• macOS notices updates: it cannot install one itself, but it spots one and hands you the command or the link
 ```
 
 **NO:**
 ```
+• Signer uten å forlate appen: tegn signaturen din én gang og stemple den inn der den trengs. Den blir på maskinen din (å plassere en signatur er ikke det samme som å signere digitalt)
+• Passordbeskyttede dokumenter åpnes: skriv passordet og les, marker og lagre som vanlig — filen forblir beskyttet
 • Penn: med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer — og viskelær-enden på pennen visker
 • Pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden — andre lesere viser den likt
-• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden, med en strek til avsnittet den hører til
-• Eksport med kommentarer i margen: en kopi med bredere sider og kommentarene satt i den nye margen, nummerert ved ankrene — klar til utskrift, originalen urørt
-• Notater-panelet har vokst: kommentarene redigeres rett i lista, med type- og med/uten-kommentar-filter ved siden av fargeprikkene
-• Tekstverktøyet har fått farge og størrelse — rød rettepenn inkludert
-• Et valgfritt navn i innstillingene signerer nye merknader — det standard forfatterfeltet andre lesere viser
+• Tekstverktøyet skriver trykt eller i håndskrift — kommentaren i margen med rød penn, med fonten innebygd så den leses slik hos alle som åpner filen
+• Endelig en rød penn: penn og former tegner fra den mettede paletten i stedet for highlighter-pastellene
+• Fargefilteret i Notater viser nå fargene dokumentet faktisk inneholder, egendefinerte valg inkludert
+• macOS oppdager oppdateringer: den kan ikke installere dem selv, men den ser dem og gir deg kommandoen eller lenken
 ```
 
 ---

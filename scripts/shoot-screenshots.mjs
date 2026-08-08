@@ -1299,13 +1299,48 @@ const ui = {
     const layer = pageEl.querySelector('.draw-layer');
     if (!layer) throw new Error('the pen tool did not arm (no draw layer)');
     const host = document.querySelector('.pages[data-pane="a"]').getBoundingClientRect();
-    const spans = [...pageEl.querySelectorAll('.text-host .textLayer > span')]
-      .filter((s) => (s.textContent || '').trim().length > 25)
+    // Deliberately tolerant: a research paper's lines are shorter and narrower
+    // than the sample's, and the first version of this filter (25 chars, 160px,
+    // a 260px top inset) found nothing at all on the house document. Take the
+    // widest lines that are comfortably on screen, and only give up if the page
+    // genuinely has none.
+    // The text layer is built asynchronously after the page mounts, and this
+    // helper runs straight after a page jump — so wait for it rather than
+    // concluding the page has no text (which is what the first version did).
+    for (let i = 0; i < 40 && pageEl.querySelectorAll('.text-host .textLayer > span').length === 0; i++) {
+      await settle(150);
+    }
+    // Scroll until prose is actually on screen. A page jump lands at the page
+    // TOP, and on the house paper page 3 opens with Figure 1 — a picture, no
+    // text spans at all above the fold. Marking up a document must not depend
+    // on which page happens to start with a figure.
+    const candidates = () => [...pageEl.querySelectorAll('.text-host .textLayer > span')]
+      .filter((s) => (s.textContent || '').trim().length > 12)
       .filter((s) => {
         const r = s.getBoundingClientRect();
-        return r.top > host.top + 260 && r.bottom < host.bottom - 120 && r.width > 160;
+        return r.top > host.top + 140 && r.bottom < host.bottom - 100 && r.width > 90;
       });
-    if (spans.length < 2) throw new Error('no on-screen text to scrawl at');
+    const pane = document.querySelector('.pages[data-pane="a"]');
+    let inView = candidates();
+    for (let i = 0; i < 6 && inView.length < 2; i++) {
+      pane.scrollTop += host.height * 0.6;
+      pane.dispatchEvent(new Event('scroll'));
+      await settle(500);
+      inView = candidates();
+    }
+    const spans = inView.slice().sort((a, b) =>
+      b.getBoundingClientRect().width - a.getBoundingClientRect().width).slice(0, 12)
+      .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    if (spans.length < 2) {
+      const all = [...pageEl.querySelectorAll('.text-host .textLayer > span')];
+      const hr = host, sample = all.slice(0, 3).map((s) => {
+        const r = s.getBoundingClientRect();
+        return Math.round(r.top) + ',' + Math.round(r.width) + ',' + (s.textContent || '').trim().length;
+      });
+      throw new Error('no on-screen text to scrawl at — ' + all.length + ' span(s) on page, ' +
+        inView.length + ' in view; host ' + Math.round(hr.top) + '..' + Math.round(hr.bottom) +
+        '; first spans (top,width,len): ' + sample.join(' | '));
+    }
     const stroke = async (pts, pid) => {
       const at = (t, [x, y, p], buttons) => layer.dispatchEvent(new PointerEvent(t, {
         bubbles: true, cancelable: true, pointerId: pid, isPrimary: true, pointerType: 'pen',
