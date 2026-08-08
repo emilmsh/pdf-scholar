@@ -263,9 +263,11 @@ Emil peker på Windows-nettbrett med penn (Surface-klassen) som neste satsing et
 Berøringsparitetsregelen gjelder hele bolken: hver mus/hover-interaksjon trenger en intuitiv berøringsekvivalent.
 
 ## Tankeboks (ikke planlagt, ikke glemt)
-- **Levende bilde av lesing** (Emils idé 2026-08-08; kartlagt med målinger samme
-  dag). Et stillbilde av en kromfri leser ser ut som et bilde av en PDF — det er
-  bevegelse som må bære at leseren er levende. Tre funn snur premisset:
+- ~~**Levende bilde av lesing**~~ — **droppet (Emils beslutning 2026-08-08)**,
+  samme dag idéen kom, etter at kartleggingen viste hva den faktisk koster.
+  Bevaringsverdig fordi konklusjonen er kontraintuitiv og noen vil foreslå den
+  igjen. Idéen var: et stillbilde av en kromfri leser ser ut som et bilde av en
+  PDF, så bevegelse måtte bære at leseren er levende. Tre funn snur premisset:
   **GIF er utelukket** (180 bilder i 1440×900 blir 45–90 MB, fordi en rulling
   endrer hver piksel hvert bilde og GIF-ens mellombilde-triks ikke kjøper noe;
   VP9 er ~30× mindre), **GitHub-README-en kan ikke vise video** (markdown-
@@ -285,10 +287,15 @@ Berøringsparitetsregelen gjelder hele bolken: hver mus/hover-interaksjon trenge
   avgjøres før README-en loves noe. Butikkene kan uansett ikke ta animasjon
   (Edge/Chrome har bare YouTube-URL-felt); MS Store har derimot et ekte
   trailer-felt (MP4, nøyaktig 1920×1080, med PNG-miniatyr) — en senere skive.
-  To forbehold: **klippets vekt er permanent** i git-historikken, og Git LFS er
-  ikke et alternativ fordi Pages serverer pekerfila i stedet for videoen — så
-  klippet skal skytes sjelden og skal *ikke* inn i «skyt hele settet i én
-  kjøring»-regelen som styrer stillbildene.
+  Og det som til slutt avgjorde: **klippets vekt er permanent** i git-
+  historikken — ~4,4 MB per versjon av klippet, for alltid — og Git LFS er ingen
+  utvei fordi Pages serverer pekerfila i stedet for videoen. Et repo som bærer
+  et par megabyte lesevideo per release for én flates skyld er feil bytte.
+  Det animerte SVG-rullebåndet faller med samme beslutning: det var billig
+  (~0,4 MB), men det var README-oppgraderingen i en bevegelseshistorie som ikke
+  lenger finnes, og ett animert bilde alene er en rar enslig gjenstand.
+  Stillbildene bærer flatene. **Ikke foreslå video på nytt uten at Emil ber om
+  det.**
 - **Chat-eksport** (idé 2026-08-03; UI-beslutningen er Emils — han vil ikke cluttere eller komplisere UI, så ingen knapp legges til før han velger): tre kandidater i stigende ambisjon — (1) «Kopier som Markdown» (lim rett inn i en annen KI-app), (2) .md-fileksport med YAML-front-matter (dokument, dato, modell) og sitater som fotnoter med side + ordrett utdrag (char-siteringer konverteres til side+sitat slik utdragsmodusen allerede gjør), (3) «fortsett i annen app»-variant med to engelske innledningssetninger som gjør innlimingen selvforklarende. Datagrunnlaget i `src/renderer/src/chat-store.ts` (parts, siteringer, modell, usage) har alt som trengs; bilder noteres som *(vedlagt bilde)*, aldri base64.
 - **Zotero-integrasjon** (Emils notat 2026-07-12): vurdere kobling mot referanseverktøy — import av PDF-er fra Zotero-bibliotek, eksport av annoteringer/notater tilbake, evt. Better BibTeX-nøkler i referanseoppslaget.
 - **Legg monetiseringsstrategi**: hvordan PDFX eventuelt kan tjene penger (lisens/kjøp/abonnement/gratis+pro — omfang avklares med Emil når det tas opp). (Emils ønske 2026-07-09.)
