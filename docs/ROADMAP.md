@@ -173,13 +173,22 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     tie. Over 150 MB: navngitt avslag (`append-no-form-fill`), fordi appenderen
     kan skrive `/V` men ikke legge ut et appearance stream i dokumentets egen
     font, og en verdi uten utseende er blank i de fleste lesere.
-- [ ] **«Sett som standard PDF-leser» + førstegangsoppsett.** Installeren kaprer
-  bevisst ikke standardappen (fase 1), men appen sier heller ingenting — så folk
-  installerer, dobbeltklikker en PDF, og Edge åpner den. Knapp som deep-linker
-  til `ms-settings:defaultapps`, pluss en kort førstegangsflate som peker på
-  markeringsmenyen, at verktøylinja kan løsnes, og at KI-en trenger egen nøkkel.
-  Billigst per ny bruker av alt på lista. Paritet: utvidelsen har sin egen
-  variant av spørsmålet («gjør nettleseren til standard PDF-app»).
+- [ ] **Standard PDF-leser — men uten å mase** (omfanget krympet på Emils
+  beslutning 2026-08-08). Utgangspunktet var at installeren bevisst ikke kaprer
+  standardappen (fase 1), så folk installerer, dobbeltklikker en PDF, og Edge
+  åpner den. Emils svar: **det bestemmer brukeren selv, og vi skal i hvert fall
+  ikke mase.** Så ingen forespørsel, ingen banner, ingen førstegangsboble — bare
+  én rolig oppføring i innstillingene som dyplenker til `ms-settings:defaultapps`
+  og som aldri dukker opp av seg selv. Den hjelper den som allerede leter, og
+  koster ingenting for alle andre. *Ærlig om prisen:* dette løser ikke
+  installer-og-glem-tilfellet, som var hele adopsjonsargumentet — det er en
+  bevisst avveining mot å være påtrengende, ikke en gratis lunsj.
+  - **Førstegangsflata utgår.** `Welcome.tsx` bærer den allerede: tagline,
+    «Åpne PDF», dra-hint, **et KI-kort med sett-opp-nøkkel** og nylige filer.
+    KI-nøkkelen var det tyngste punktet, og det er dekket. Det som ikke er
+    dekket — markeringsmenyen og at verktøylinja kan løsnes — er oppførsel
+    inne i et dokument, og en boble der er per definisjon påtrengende. Hører
+    heller hjemme i en brukerveiledning (se tankeboksen) enn i et overlegg.
 - [ ] **Sidebehandling: slett, omorganiser, hent ut, slå sammen.** Emils
   beslutning 2026-08-08 — dette forlater «utenfor omfang»-lista i `SPEC.md` §10
   (som «page editing UI»), fordi det er den ene tingen PDF Expert-brukere
