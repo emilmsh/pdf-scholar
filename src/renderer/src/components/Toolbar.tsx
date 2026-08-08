@@ -817,8 +817,13 @@ export default function Toolbar({
             })}
           </div>
         )}
+        {/* Pen and shapes draw THIN opaque lines, where the highlighter pastels
+            wash out — the same reason UNDERLINE_COLORS exists for line markup
+            ("pastels vanish as thin lines"). It also puts a red pen in reach,
+            which is what marking up a draft actually asks for. The marker is a
+            highlighter and keeps the pastels. Defaults are untouched. */}
         <div className="color-row">
-          {HIGHLIGHT_COLORS.map((c) => (
+          {(tool === 'marker' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) => (
             <button
               key={c.hex}
               className={`color-dot${pref.color.join() === c.rgb.join() ? ' selected' : ''}`}

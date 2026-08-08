@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS } from '../annotations'
+import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import type { DocBookmark } from '../../../shared/types'
 import { t, useLang } from '../i18n'
@@ -352,6 +352,10 @@ function colorDistance(a: [number, number, number], b: [number, number, number])
   return (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2
 }
 
+/** rgb 0–1 -> #rrggbb, for the filter dots' own swatch and React key */
+const rgbHex = (c: [number, number, number]): string =>
+  '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('')
+
 /** Type filter for the Merknader list — grouped the way the toolbar groups
  *  the tools, so the chips read as "the thing I made with that button". */
 const TYPE_FILTERS: {
@@ -539,6 +543,35 @@ function AnnotationList({
     return rows
   }, [annotations])
 
+  // The colours to offer as filter dots: the ones this document actually
+  // CONTAINS, not a fixed palette. A fixed row was wrong in three ways at
+  // once — it showed the highlighter pastels only, so a red underline (the
+  // shipped default!), any pen or shape colour, and every custom hex from the
+  // colour wheel were unfilterable; and it offered colours the document did
+  // not contain, so clicking one emptied the list. Deriving it also means a
+  // palette change can never desync the filter again.
+  const docColors = useMemo(() => {
+    const out: { rgb: [number, number, number]; label: string }[] = []
+    for (const { record } of flat) {
+      if (out.some((c) => colorDistance(c.rgb, record.color) < 0.001)) continue
+      const known = [...UNDERLINE_COLORS, ...HIGHLIGHT_COLORS].find(
+        (p) => colorDistance(p.rgb, record.color) < 0.001
+      )
+      out.push({
+        rgb: record.color,
+        label: known ? colorLabel(known) : rgbHex(record.color).toUpperCase()
+      })
+    }
+    return out
+  }, [flat])
+
+  // A filter whose colour just left the document (last mark of that colour
+  // deleted) would sit active over an empty list with no dot to unclick.
+  useEffect(() => {
+    if (!colorFilter) return
+    if (!docColors.some((c) => colorDistance(c.rgb, colorFilter) < 0.001)) setColorFilter(null)
+  }, [docColors, colorFilter])
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     const typeGroup = TYPE_FILTERS.find((g) => g.key === typeFilter)
@@ -640,14 +673,14 @@ function AnnotationList({
           aria-label={t('side.searchAnnots')}
         />
         <div className="annot-filter-colors">
-          {HIGHLIGHT_COLORS.map((c) => (
+          {docColors.map((c) => (
             <button
-              key={c.hex}
+              key={rgbHex(c.rgb)}
               className={`annot-filter-dot${
                 colorFilter && colorDistance(c.rgb, colorFilter) < 0.001 ? ' active' : ''
               }`}
-              style={{ background: c.hex }}
-              title={t('side.showOnly', { color: colorLabel(c).toLowerCase() })}
+              style={{ background: rgbHex(c.rgb) }}
+              title={t('side.showOnly', { color: c.label.toLowerCase() })}
               onClick={() =>
                 setColorFilter((prev) =>
                   prev && colorDistance(c.rgb, prev) < 0.001 ? null : c.rgb
@@ -657,7 +690,7 @@ function AnnotationList({
           ))}
           {/* Type chips share the row's grammar: click to show only, click
               again to clear */}
-          <span className="annot-filter-sep" />
+          {docColors.length > 0 && <span className="annot-filter-sep" />}
           {TYPE_FILTERS.map(({ key, Icon, labelKey }) => (
             <button
               key={key}
