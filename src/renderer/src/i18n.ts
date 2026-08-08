@@ -437,6 +437,9 @@ const nb = {
   'tb.saveAsTip': 'Lagre en kopi og fortsett i den … (originalen forblir uendret)',
   'tb.saveCopyTip': 'Lagre en kopi til disk … (originalen forblir uendret)',
   'tb.saveToDiskTip': 'Lagre til disk … (velg mappe, Ctrl+S)',
+  'tb.saveOptionsTip': 'Flere lagringsvalg',
+  'tb.saveAs': 'Lagre en kopi …',
+  'tb.saveCopy': 'Lagre en kopi til disk …',
 
   // Read aloud
   'ra.playPause': 'Spill av / pause',
@@ -1007,6 +1010,9 @@ const en: Dict = {
   'tb.saveAsTip': 'Save a copy and continue in it … (the original stays untouched)',
   'tb.saveCopyTip': 'Save a copy to disk … (the original stays untouched)',
   'tb.saveToDiskTip': 'Save to disk … (choose a folder, Ctrl+S)',
+  'tb.saveOptionsTip': 'More save options',
+  'tb.saveAs': 'Save a copy …',
+  'tb.saveCopy': 'Save a copy to disk …',
 
   'ra.playPause': 'Play / pause',
   'ra.stop': 'Stop reading aloud',

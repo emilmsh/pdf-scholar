@@ -375,6 +375,10 @@ export default function Toolbar({
   // the other about how it is laid out in the window.
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
+  // Save is a split button: the frequent action (write changes back to the
+  // file) stays one click, the rare one (save a copy) moves behind the
+  // chevron — one glyph less in a row of three disk-like icons.
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false)
   // The gear menu: the app's technical surface (language, annotation
   // visibility, AI setup, update check, reset, version/about)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
@@ -393,6 +397,7 @@ export default function Toolbar({
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
   const themeMenuRef = useRef<HTMLDivElement>(null)
   const viewMenuRef = useRef<HTMLDivElement>(null)
+  const saveMenuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
   // Responsive overflow: secondary buttons fold into a "…" menu (left of the
@@ -407,6 +412,7 @@ export default function Toolbar({
   const closeToolMenu = useCallback(() => setToolMenu(null), [])
   const closeThemeMenu = useCallback(() => setThemeMenuOpen(false), [])
   const closeViewMenu = useCallback(() => setViewMenuOpen(false), [])
+  const closeSaveMenu = useCallback(() => setSaveMenuOpen(false), [])
   const closeSettingsMenu = useCallback(() => setSettingsMenuOpen(false), [])
   const closeOverflowMenu = useCallback(() => setOverflowMenuOpen(false), [])
 
@@ -451,6 +457,8 @@ export default function Toolbar({
 
   useDismissable(viewMenuRef, viewMenuOpen, closeViewMenu, NO_ESCAPE)
 
+  useDismissable(saveMenuRef, saveMenuOpen, closeSaveMenu, NO_ESCAPE)
+
   useDismissable(settingsMenuRef, settingsMenuOpen, closeSettingsMenu, NO_ESCAPE)
 
   // Esc closes any open toolbar menu (and the reset confirmation) before the
@@ -459,6 +467,7 @@ export default function Toolbar({
     if (
       !themeMenuOpen &&
       !viewMenuOpen &&
+      !saveMenuOpen &&
       !settingsMenuOpen &&
       !overflowMenuOpen &&
       !toolMenu &&
@@ -474,13 +483,14 @@ export default function Toolbar({
       }
       setThemeMenuOpen(false)
       setViewMenuOpen(false)
+      setSaveMenuOpen(false)
       setSettingsMenuOpen(false)
       setOverflowMenuOpen(false)
       setToolMenu(null)
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [themeMenuOpen, viewMenuOpen, settingsMenuOpen, overflowMenuOpen, toolMenu, resetAsk])
+  }, [themeMenuOpen, viewMenuOpen, saveMenuOpen, settingsMenuOpen, overflowMenuOpen, toolMenu, resetAsk])
 
   // Version + update capability are static — fetch once, the first time the
   // gear menu opens.
@@ -1261,10 +1271,12 @@ export default function Toolbar({
         )}
 
         {canSaveInPlace ? (
-          <>
-            {/* Desktop + extension: write changes back to the file in place, plus
-                save-a-copy. The extension's first in-place save may prompt once
-                for write access, then stays silent (see extension-api.ts). */}
+          /* Desktop + extension: write changes back to the file in place, plus
+             save-a-copy. The extension's first in-place save may prompt once
+             for write access, then stays silent (see extension-api.ts).
+             Saving a copy of an UNCHANGED file is legitimate, so the chevron
+             stays live even while the primary button is disabled. */
+          <span className="tb-split theme-menu-anchor" ref={saveMenuRef}>
             <button
               className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
               onClick={onSave}
@@ -1274,13 +1286,29 @@ export default function Toolbar({
               <IconSave />
             </button>
             <button
-              className="tb-btn"
-              onClick={onSaveAs}
-              title={isElectron ? t('tb.saveAsTip') : t('tb.saveCopyTip')}
+              className={`tb-chevron${saveMenuOpen ? ' is-active' : ''}`}
+              title={t('tb.saveOptionsTip')}
+              aria-label={t('tb.saveOptionsTip')}
+              onClick={() => setSaveMenuOpen((o) => !o)}
             >
-              <IconSaveAs />
+              <IconChevronDown size={11} />
             </button>
-          </>
+            {saveMenuOpen && (
+              <div className="theme-menu save-menu">
+                <button
+                  className="menu-action"
+                  onClick={() => {
+                    setSaveMenuOpen(false)
+                    onSaveAs()
+                  }}
+                  title={isElectron ? t('tb.saveAsTip') : t('tb.saveCopyTip')}
+                >
+                  <IconSaveAs size={15} />
+                  {isElectron ? t('tb.saveAs') : t('tb.saveCopy')}
+                </button>
+              </div>
+            )}
+          </span>
         ) : (
           // Browser/extension: one Save that bakes annotations in, then
           // overwrites the local file (opened from disk) or downloads (URL).

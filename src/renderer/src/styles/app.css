@@ -5108,6 +5108,18 @@ html.pen-near .draw-layer {
   opacity: 0.35;
 }
 
+/* The save split button's menu holds a single row, so it drops the grouped
+   menus' 264px floor and hugs its label instead. Left-aligned: the button sits
+   in the middle of the right-hand cluster, where a right-aligned panel would
+   hang off toward the page controls it has nothing to do with. */
+.theme-menu.save-menu {
+  min-width: 0;
+  left: 0;
+  right: auto;
+  padding: 6px;
+  white-space: nowrap;
+}
+
 .tb-save.has-changes {
   color: var(--accent);
 }
