@@ -10,6 +10,7 @@ import type {
   PdfxApi,
   DocBookmark,
   ReadingPosition,
+  SetFormFieldRequest,
   Settings
 } from '../shared/types'
 
@@ -29,6 +30,7 @@ const api: PdfxApi = {
   annotate: (req: AnnotateRequest) => ipcRenderer.invoke('annotate', req),
   updateAnnotation: (req: ModifyAnnotationRequest) => ipcRenderer.invoke('annotation:update', req),
   deleteAnnotation: (req: DeleteAnnotationRequest) => ipcRenderer.invoke('annotation:delete', req),
+  setFormField: (req: SetFormFieldRequest) => ipcRenderer.invoke('form:set-field', req),
   openExternal: (url: string) => ipcRenderer.send('shell:open-external', url),
   openDefaultAppsSettings: () => ipcRenderer.send('app:open-default-apps'),
   newWindow: (path?: string) => ipcRenderer.send('window:new', path),

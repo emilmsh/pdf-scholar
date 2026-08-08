@@ -22,6 +22,7 @@ import type {
   ModifyAnnotationRequest,
   DocBookmark,
   ReadingPosition,
+  SetFormFieldRequest,
   Settings
 } from '../shared/types'
 import { registerAiIpc } from './ai'
@@ -35,6 +36,7 @@ import {
   passwordFor,
   readSignatures,
   rememberPassword,
+  setFormField,
   updateAnnotation
 } from './annotation-engine-embedpdf'
 import { ENGINE_ERRORS } from '../shared/engine-errors'
@@ -734,6 +736,16 @@ function registerIpc(): void {
     const path = draftFor(req.path)
     if (typeof path !== 'string') return path
     const result = await deleteAnnotation({ ...req, path })
+    if ('ok' in result) notifyOtherWindows(e.sender.id, req.path)
+    return result
+  })
+
+  // Filling a form field edits the document exactly as an annotation write
+  // does — same draft, same dirty state, same cross-window notification.
+  ipcMain.handle('form:set-field', async (e, req: SetFormFieldRequest) => {
+    const path = draftFor(req.path)
+    if (typeof path !== 'string') return path
+    const result = await setFormField({ ...req, path })
     if ('ok' in result) notifyOtherWindows(e.sender.id, req.path)
     return result
   })

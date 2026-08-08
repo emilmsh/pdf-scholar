@@ -86,6 +86,9 @@ export type EngineErrorCode =
   | 'annot-line-endpoints'
   | 'annot-unknown-type'
   | 'annot-stamp-no-image'
+  | 'form-field-not-found'
+  | 'form-field-read-only'
+  | 'form-field-not-written'
   | 'pdf-password-protected'
   | 'pdf-password-wrong'
   | 'pdf-print-encrypted'
@@ -96,6 +99,7 @@ export type EngineErrorCode =
   | 'append-objstm-edit'
   | 'append-encrypted'
   | 'append-no-image'
+  | 'append-no-form-fill'
 
 /** The same idea for the AI request path, which fails for its own set of named
  *  reasons. Kept a separate union because these are whole sentences shown in a
@@ -315,6 +319,43 @@ export interface DeleteAnnotationRequest {
   path: string
   pageIndex: number
   id: number
+}
+
+/** What to put in one AcroForm field.
+ *
+ *  Three kinds because PDFium's form-fill environment has three doors and no
+ *  fourth: text goes in through the edit control (select-all + replace),
+ *  check boxes and radio buttons are TOGGLED (there is no "set to true"), and
+ *  a combo/list box picks by OPTION INDEX rather than by label — the label is
+ *  display text and two options may share one. A signature field is not here
+ *  at all: signing needs cryptography we deliberately do not carry (see
+ *  DocSignature). */
+export type FormFieldValue =
+  | { kind: 'text'; text: string }
+  | { kind: 'checked'; checked: boolean }
+  | {
+      kind: 'choice-index'
+      /** 0-based index into the field's /Opt array */
+      index: number
+      // `| undefined` alongside `?` for the same reason as AnnotateRequest: the
+      // renderer builds these as plain object literals, so an unused field is
+      // present-and-undefined rather than absent.
+      /** Omitted means "select it" — the only thing a combo box can do, and
+       *  what a click on a list box option means. `false` deselects, which
+       *  only a multi-select list box can honour. */
+      selected?: boolean | undefined
+    }
+
+export interface SetFormFieldRequest {
+  path: string
+  /** 0-based page index */
+  pageIndex: number
+  /** PDF object number of the WIDGET annotation — the same identity every
+   *  annotation write uses. Deliberately not the field's /T name (two widgets
+   *  of one radio group share it) and not EmbedPDF's /NM uuid (reading that
+   *  MINTS one into annotations that lack it, dirtying the document). */
+  id: number
+  value: FormFieldValue
 }
 
 // ---------- AI (BYO API key, multi-provider) ----------
@@ -559,6 +600,11 @@ export interface PdfxApi {
   /** Change color/opacity/contents of an existing annotation */
   updateAnnotation(req: ModifyAnnotationRequest): Promise<AnnotateResult>
   deleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult>
+  /** Fill one AcroForm field, addressed by its widget's PDF object number.
+   *  Returns that same id on success — the value is READ BACK out of the field
+   *  before we report ok, because PDFium returns success for writes it did not
+   *  perform (unchecking a radio button being the measured case). */
+  setFormField(req: SetFormFieldRequest): Promise<AnnotateResult>
   /** Open an http(s) URL in the system browser */
   openExternal(url: string): void
   /** Open Windows' "Default apps" settings page. Takes no URL on purpose —

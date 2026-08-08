@@ -50,6 +50,27 @@ export const ENGINE_ERRORS = {
   /** A stamp with no image is nothing at all — an empty annotation the user
    *  could never see, select or remove. */
   stampNoImage: { code: 'annot-stamp-no-image', error: 'Stempelet mangler bilde' },
+  /** No Widget annotation with that object number on that page. Distinct from
+   *  `notFound`: the id may well name a real annotation — just not a form
+   *  field — and "fant ikke annotasjonen" would send the user looking for a
+   *  mark that is right there. */
+  formFieldNotFound: { code: 'form-field-not-found', error: 'Fant ikke skjemafeltet i filen' },
+  /** The field's /Ff carries bit 1 (ReadOnly). PDFium does NOT enforce it —
+   *  measured: setting a value on such a field returns success and writes it —
+   *  so the refusal has to live at this boundary rather than only in a UI that
+   *  greys the field out. */
+  formFieldReadOnly: {
+    code: 'form-field-read-only',
+    error: 'Feltet er skrivebeskyttet og kan ikke fylles ut'
+  },
+  /** The engine reported success and the field does not hold the value. That
+   *  combination is real, not defensive: unchecking a radio button returns true
+   *  while leaving /V alone (correct PDF semantics, dishonest return value). We
+   *  read every field back and say so rather than pass the engine's ok along. */
+  formFieldNotWritten: {
+    code: 'form-field-not-written',
+    error: 'Verdien ble ikke skrevet inn i skjemafeltet'
+  },
   /** The type name is the diagnostic and cannot be reconstructed from a code,
    *  so it rides along in `error` the way the asymmetric counts do. */
   unknownType: (type: string): FileError => ({
@@ -88,6 +109,16 @@ export const ENGINE_ERRORS = {
     code: 'append-no-image',
     error:
       'Signaturer kan ikke settes inn i dokumenter over 150 MB ennå — alle andre merknader fungerer.'
+  },
+  /** Filling a form field in a file too large for the WASM engine. The appender
+   *  can patch /V easily enough, but a field's value is only VISIBLE through an
+   *  appearance stream laid out in the document's own font — which this writer
+   *  has no way to build. A value nobody can see is worse than a refusal, the
+   *  same reasoning as the handnote and stamp refusals above. */
+  appendNoFormFill: {
+    code: 'append-no-form-fill',
+    error:
+      'Skjemafelt kan ikke fylles ut i dokumenter over 150 MB ennå — alle andre merknader fungerer.'
   },
   /** The appender met a PDF construct it will not rewrite. The `detail` argument
    *  at the throw site says which one; it is logged, never shown. */

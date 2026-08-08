@@ -16,7 +16,8 @@ import type {
   DeleteAnnotationRequest,
   DocSignature,
   FileError,
-  ModifyAnnotationRequest
+  ModifyAnnotationRequest,
+  SetFormFieldRequest
 } from '../../shared/types'
 import { ENGINE_ERRORS } from '../../shared/engine-errors'
 import type { OpenDoc } from '../../shared/pdfium-annot-ops'
@@ -27,6 +28,7 @@ import {
   isPasswordError,
   OOM_RE,
   readSignaturesOn,
+  setFormFieldOn,
   updateOn,
   WASM_SAFE_LIMIT
 } from '../../shared/pdfium-annot-ops'
@@ -173,6 +175,13 @@ export function browserUpdateAnnotation(req: ModifyAnnotationRequest): Promise<A
 
 export function browserDeleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult> {
   return withDoc(req.path, (open) => deleteOn(open, req))
+}
+
+/** Fill one AcroForm field (browser/extension twin of the desktop's
+ *  setFormField). No size branch of its own: withDoc already refuses oversize
+ *  documents, and there is no appender on this platform to route to. */
+export function browserSetFormField(req: SetFormFieldRequest): Promise<AnnotateResult> {
+  return withDoc(req.path, (open) => setFormFieldOn(open, req))
 }
 
 /** The document's digital signatures (browser/extension twin of the desktop's

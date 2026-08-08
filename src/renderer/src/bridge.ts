@@ -19,6 +19,7 @@ import {
   browserApplyAnnotation,
   browserDeleteAnnotation,
   browserReadSignatures,
+  browserSetFormField,
   browserUpdateAnnotation
 } from './annotation-engine-browser'
 
@@ -111,6 +112,7 @@ export const webApi: PdfxApi = {
   annotate: (req) => browserApplyAnnotation(req),
   updateAnnotation: (req) => browserUpdateAnnotation(req),
   deleteAnnotation: (req) => browserDeleteAnnotation(req),
+  setFormField: (req) => browserSetFormField(req),
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')
   },

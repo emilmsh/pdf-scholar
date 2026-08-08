@@ -22,11 +22,17 @@ import type {
   DeleteAnnotationRequest,
   DocSignature,
   FileError,
-  ModifyAnnotationRequest
+  ModifyAnnotationRequest,
+  SetFormFieldRequest
 } from '../shared/types'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
 import { DocCache } from './doc-cache'
-import { appendAnnotation, appendDeleteAnnotation, appendUpdateAnnotation } from './incremental-appender'
+import {
+  appendAnnotation,
+  appendDeleteAnnotation,
+  appendSetFormField,
+  appendUpdateAnnotation
+} from './incremental-appender'
 import { ENGINE_ERRORS } from '../shared/engine-errors'
 import type { OpenDoc } from '../shared/pdfium-annot-ops'
 import {
@@ -36,6 +42,7 @@ import {
   isPasswordError,
   OOM_RE,
   readSignaturesOn,
+  setFormFieldOn,
   updateOn,
   WASM_SAFE_LIMIT
 } from '../shared/pdfium-annot-ops'
@@ -214,4 +221,12 @@ export async function updateAnnotation(req: ModifyAnnotationRequest): Promise<An
 export async function deleteAnnotation(req: DeleteAnnotationRequest): Promise<AnnotateResult> {
   if (await isAppenderFile(req.path)) return appendDeleteAnnotation(req)
   return withPdf(req.path, (open) => deleteOn(open, req))
+}
+
+/** Fill one AcroForm field. Goes through the very same draft + doc-cache path
+ *  as an annotation write: a filled field is an edit to the document, and it
+ *  must be undoable by discarding the draft like every other edit. */
+export async function setFormField(req: SetFormFieldRequest): Promise<AnnotateResult> {
+  if (await isAppenderFile(req.path)) return appendSetFormField(req)
+  return withPdf(req.path, (open) => setFormFieldOn(open, req))
 }

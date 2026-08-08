@@ -21,7 +21,8 @@ import type {
   DeleteAnnotationRequest,
   EngineErrorCode,
   ModifyAnnotationRequest,
-  PageRect
+  PageRect,
+  SetFormFieldRequest
 } from '../shared/types'
 import { ENGINE_ERRORS } from '../shared/engine-errors'
 import { decodePressures, encodePressures, pressureHalfWidths, strokeOutline } from '../shared/ink-outline'
@@ -1920,6 +1921,19 @@ export const appendUpdateAnnotation = (req: ModifyAnnotationRequest): Promise<An
 /** Remove an annotation from its page's /Annots (orphaning the object). */
 export const appendDeleteAnnotation = (req: DeleteAnnotationRequest): Promise<AnnotateResult> =>
   withFile(req.path, (pdf) => opDelete(pdf, req))
+
+/** Fill an AcroForm field — REFUSED at this size, and the file is never opened.
+ *
+ *  Patching /V would be easy; that is not what makes a filled field. The value
+ *  is only visible through an appearance stream laid out in the field's own /DA
+ *  font, at the field's own quadding, inside its own /BBox — a font this writer
+ *  does not embed and text metrics it does not have. A /V with no /AP shows
+ *  blank in most readers (only NeedAppearances-honouring ones would draw it),
+ *  so the alternative to refusing is a form the user believes is filled and
+ *  everyone else receives empty. Same reasoning as the handnote and stamp
+ *  refusals above. */
+export const appendSetFormField = (_req: SetFormFieldRequest): Promise<AnnotateResult> =>
+  Promise.resolve(ENGINE_ERRORS.appendNoFormFill)
 
 
 

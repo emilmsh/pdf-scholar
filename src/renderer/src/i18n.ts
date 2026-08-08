@@ -49,6 +49,9 @@ const nb = {
   'engine.annot-line-endpoints': 'linjen mangler endepunkter',
   'engine.annot-unknown-type': 'denne merknadstypen støttes ikke',
   'engine.annot-stamp-no-image': 'signaturen mangler bilde',
+  'engine.form-field-not-found': 'fant ikke skjemafeltet i filen',
+  'engine.form-field-read-only': 'feltet er skrivebeskyttet og kan ikke fylles ut',
+  'engine.form-field-not-written': 'verdien ble ikke skrevet inn i skjemafeltet',
   'engine.pdf-password-protected': 'PDF-en er passordbeskyttet',
   'engine.pdf-password-wrong': 'feil passord',
   'engine.pdf-print-encrypted':
@@ -63,6 +66,8 @@ const nb = {
     'passordbeskyttede dokumenter av denne størrelsen kan leses, men ikke annoteres',
   'engine.append-no-image':
     'signaturer kan ikke settes inn i dokumenter over 150 MB ennå',
+  'engine.append-no-form-fill':
+    'skjemafelt kan ikke fylles ut i dokumenter over 150 MB ennå',
   // One per AiErrorCode. Unlike engine.* these stand alone in a chat bubble, so
   // they are whole sentences that say what to do next.
   'aierr.ai-key-missing': 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.',
@@ -698,6 +703,9 @@ const en: Dict = {
   'engine.annot-line-endpoints': 'the line has no endpoints',
   'engine.annot-unknown-type': 'this annotation type is not supported',
   'engine.annot-stamp-no-image': 'the signature has no image',
+  'engine.form-field-not-found': 'the form field was not found in the file',
+  'engine.form-field-read-only': 'the field is read-only and cannot be filled in',
+  'engine.form-field-not-written': 'the value did not go into the form field',
   'engine.pdf-password-protected': 'the PDF is password protected',
   'engine.pdf-password-wrong': 'wrong password',
   'engine.pdf-print-encrypted':
@@ -712,6 +720,8 @@ const en: Dict = {
     'password-protected documents this large can be read, but not annotated',
   'engine.append-no-image':
     'signatures cannot be placed in documents over 150 MB yet',
+  'engine.append-no-form-fill':
+    'form fields cannot be filled in documents over 150 MB yet',
   'aierr.ai-key-missing': 'No API key is stored for the selected provider. Open the AI settings.',
   'aierr.ai-key-undecryptable':
     'The stored API key could not be decrypted. That happens when the user account or browser profile has changed. Enter the key again in the AI settings.',
