@@ -33,8 +33,9 @@ unlocks Firefox for Android too), PWA/iPad/Android.
 **Tier 1** — full feature parity, manually verified, release-blocking.
 **Tier 2** — same renderer and features *by construction* (shared code, `PdfxApi`
 abstraction), built and packaged in CI on every push, but not manually verified
-per release (no owner hardware). User-reported regressions are treated as bugs,
-not as acceptable platform lag.
+per release (no owner hardware — macOS has had hands-on testing on a tester's
+Apple machine as of v0.34.0; Linux has not run on real hardware). User-reported
+regressions are treated as bugs, not as acceptable platform lag.
 
 ## Allowed divergences (the complete list)
 

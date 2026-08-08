@@ -41,7 +41,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | Landing page | <https://emilmsh.github.io/pdf-scholar/> |
 | Privacy policy URL | `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md` |
 | Windows | Tier 1. One installer carries x64 and native arm64; per-user install, no admin rights. Also on the **Microsoft Store**, `9N75CPC0G9M2` (live) |
-| macOS / Linux | **Beta.** Built in CI, feature-identical by construction, not verified on owner hardware. macOS is unsigned (Gatekeeper workaround in the README) and cannot *install* an update itself; it does **notice** one and tell you how to get it, which is not the same claim — never write that macOS auto-updates. The recommended macOS install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel, and the in-app notice hands you that exact command. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
+| macOS / Linux | **Beta.** Built in CI, feature-identical by construction. macOS has been tested on Apple hardware (a tester's machine, not the owner's — say "tested", never "verified by the owner"); Linux has not run on real hardware. macOS is unsigned (Gatekeeper workaround in the README) and cannot *install* an update itself; it does **notice** one and tell you how to get it, which is not the same claim — never write that macOS auto-updates. The recommended macOS install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel, and the in-app notice hands you that exact command. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
 | Browser extension | **Beta**, Edge and Chrome. **Not in either store yet** — install is Load-unpacked from the release zip. Do not write otherwise until the listings are live |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
@@ -161,6 +161,10 @@ siden av siden, og eksporten printer dem slik.
 - Highlight, underline, strikeout and a true-wave squiggly; pen and marker with
   hold-to-straighten; shapes, sticky notes, free text typed on the page in the
   colour and size you pick, and text-anchored comments
+- On a touch screen with a stylus, the pen draws while a finger scrolls and
+  zooms; pen pressure varies the line **(beta)**, and the saved file keeps the
+  varying width — other readers render it the same. A toggle in the tool menus
+  hands drawing back to the finger
 - Colour, thickness and opacity per tool, remembered between sessions
 - A mark can be corrected rather than redrawn: drag either end of a highlight
   and it snaps to whole words, or a corner of a shape, text box or drawing
@@ -256,8 +260,11 @@ siden av siden, og eksporten printer dem slik.
 - **Self-praise adjectives** — "polished", "beautiful", "powerful". The house
   voice states what the thing does and lets the reader conclude. Concrete beats
   superlative.
-- **Claims about untested platforms.** macOS has not run on Apple hardware; the
-  README says so and nothing elsewhere may imply otherwise.
+- **Claims about untested platforms.** Linux has not run on real hardware and no
+  surface may imply otherwise. macOS HAS been tested on Apple hardware (since
+  v0.34.0) but remains beta — "tested" is the strongest word on offer; never
+  "verified", "stable" or anything that promises the owner stands behind the
+  build day to day.
 - **A third macOS install path, or Gatekeeper explained twice.** Every surface
   offers at most two ways in — Homebrew and by hand — sharing one explanation
   of what the unsigned build costs (one `xattr` per version, no self-update).

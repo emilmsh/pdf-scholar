@@ -80,8 +80,9 @@ If Gatekeeper's dialog says *unverified developer* rather than "damaged",
 **Open Anyway** under **System Settings → Privacy & Security** works as well;
 the "damaged" variant never offers that button, so use the Terminal command.
 
-> **The macOS build has not been tested on Apple hardware yet** — it is built in
-> CI. If you run it on a Mac, [open an
+> **The macOS build is beta.** It is built in CI and has been tested on Apple
+> hardware, but it sees far less daily use than the Windows build. If something
+> misbehaves on your Mac, [open an
 > issue](https://github.com/emilmsh/pdf-scholar/issues) with what works and what
 > breaks.
 
@@ -217,6 +218,10 @@ clutter the page while you read.
 - Labeled colour rows and custom hex colours
 - Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
   straight
+- On a touch screen with a stylus, the pen draws while a finger scrolls and
+  zooms; pen pressure varies the line *(beta)*, and the saved file keeps the
+  varying width — other readers render it the same. A toggle in the tool menus
+  hands drawing back to the finger
 - **Colour, thickness and opacity per tool**, remembered between sessions. A «Standard»
   link appears next to any tool you have changed from its default
 - Shapes (rectangle, ellipse, line, arrow), draggable sticky notes, and free text typed

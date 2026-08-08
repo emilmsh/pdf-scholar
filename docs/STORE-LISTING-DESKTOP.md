@@ -62,6 +62,7 @@ ANNOTATION
 • The same tools sit in the toolbar for marking several passages in a row, and the toolbar unpins when you want nothing but the page
 • Highlight, underline, strikeout and a true-wave squiggly, in your own colours
 • Pen and marker with hold-to-straighten, shapes, sticky notes and free text in the colour and size you pick
+• With a stylus on a touch screen, the pen draws while a finger scrolls and zooms; pen pressure varies the line (beta), and the saved file keeps the varying width
 • Colour, thickness and opacity per tool, remembered between sessions
 • Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape, text box or drawing
 • Comments anchored to the text they mark
@@ -111,6 +112,7 @@ ANNOTERING
 • De samme verktøyene ligger i verktøylinja når du skal merke flere avsnitt på rad, og linja kan løsnes når du bare vil ha siden
 • Utheving, understreking, gjennomstreking og en ekte bølget strek, i dine egne farger
 • Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst i farge og størrelse du velger
+• Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
 • Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form, tekstboks eller tegning
 • Kommentarer forankret til teksten de merker
@@ -134,26 +136,28 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.33.x
+## What's new in this version (≤ 1 500 chars) — v0.34.0
 
 **EN:**
 ```
-• Comments in the margin: one switch shows every note and comment as visible text beside the page — left or right — with a leader line to the passage it belongs to, and arrows to the nearest comment when none is in view
-• Export with comments in the margin: a copy of the document with every page widened and the comments set in the new margin, numbered at their anchors — ready to print, the original untouched
-• The Notes panel grew up: comments edit right in the list (even on marks that have none yet), with type and with/without-comment filters beside the colour dots
-• The text tool picks up colour and size — red teacher's pen included — and a text box can no longer be shrunk below its own words
+• Pen input: with a stylus on a touch screen, the pen draws while a finger scrolls and zooms — and the pen's eraser end erases
+• Pen pressure varies the line (beta), and the saved file keeps the varying width — other readers render it the same
+• Comments in the margin: one switch shows every note and comment as visible text beside the page, with a leader line to the passage it belongs to
+• Export with comments in the margin: a copy with every page widened and the comments set in the new margin, numbered at their anchors — ready to print, the original untouched
+• The Notes panel grew up: comments edit right in the list, with type and with/without-comment filters beside the colour dots
+• The text tool picks up colour and size — red teacher's pen included
 • An optional name in settings signs new annotations — the standard PDF author field other readers show
-• The assistant works with eight AI providers, one key field each — or local models via Ollama/LM Studio, no key at all
 ```
 
 **NO:**
 ```
-• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden — venstre eller høyre — med en strek til avsnittet den hører til, og piler til nærmeste kommentar når ingen er i synsfeltet
-• Eksport med kommentarer i margen: en kopi av dokumentet med bredere sider og kommentarene satt i den nye margen, nummerert ved ankrene — klar til utskrift, originalen urørt
-• Notater-panelet har vokst: kommentarene redigeres rett i lista (også på merker som ikke har noen ennå), med type- og med/uten-kommentar-filter ved siden av fargeprikkene
-• Tekstverktøyet har fått farge og størrelse — rød rettepenn inkludert — og en tekstboks kan ikke lenger krympes under sine egne ord
+• Penn: med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer — og viskelær-enden på pennen visker
+• Pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden — andre lesere viser den likt
+• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden, med en strek til avsnittet den hører til
+• Eksport med kommentarer i margen: en kopi med bredere sider og kommentarene satt i den nye margen, nummerert ved ankrene — klar til utskrift, originalen urørt
+• Notater-panelet har vokst: kommentarene redigeres rett i lista, med type- og med/uten-kommentar-filter ved siden av fargeprikkene
+• Tekstverktøyet har fått farge og størrelse — rød rettepenn inkludert
 • Et valgfritt navn i innstillingene signerer nye merknader — det standard forfatterfeltet andre lesere viser
-• Assistenten virker med åtte AI-leverandører, ett nøkkelfelt hver — eller lokale modeller via Ollama/LM Studio, helt uten nøkkel
 ```
 
 ---
@@ -182,7 +186,7 @@ Notes panel that keeps every mark one click away — comments edit right in the 
 Comments in the margin: notes as visible text beside the page, left or right
 Export a print-ready copy with the comments in a real widened margin, numbered at their anchors
 Highlight, underline, strikeout and true-wave squiggly, in your own colours
-Pen and marker, shapes, sticky notes, free text and text-anchored comments
+Pressure-sensitive pen (beta) and marker, shapes, sticky notes, free text and text-anchored comments
 Colour, thickness and opacity per tool, remembered between sessions
 Correct a mark instead of redrawing it: drag a highlight's end or a shape's corner
 Standard PDF annotations that open correctly in Acrobat
@@ -206,7 +210,7 @@ Notater-panel som holder hvert merke ett klikk unna — kommentarene redigeres r
 Kommentarer i margen: notater som synlig tekst ved siden av siden, venstre eller høyre
 Eksporter en utskriftsklar kopi med kommentarene i en ekte, bredere marg, nummerert ved ankrene
 Utheving, understreking, gjennomstreking og ekte bølget strek, i egne farger
-Penn og tusj, former, gule lapper, fritekst og tekstforankrede kommentarer
+Trykkfølsom penn (beta) og tusj, former, gule lapper, fritekst og tekstforankrede kommentarer
 Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
 Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving eller hjørnet av en form
 Standard PDF-annoteringer som åpnes riktig i Acrobat
