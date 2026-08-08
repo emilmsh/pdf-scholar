@@ -93,16 +93,19 @@ other four can show the app doing something. Both 2880×1800 and 1280×800 are
 than stretched. Output lands in `_auto/store/`. Same rule as `shoot`: reaching
 the shipped folder takes an explicit `-- --out docs/store-screenshots`.
 
-**Tricolor is composed twice, at two sizes.** `shoot:store` makes the 1280×800
-one for the stores. The README and landing page take it at the shoot's own
-2880×1800, and nothing makes that one for you — it needs its own run:
+**Tricolor is composed twice, at two sizes, and each channel's own command makes
+its own.** `shoot:store` composes the 1280×800 one for the stores; `shoot`
+composes the 2880×1800 one for the README and the landing page, at the end of
+any run that shot all three of its sources. Neither is a step you perform.
 
-```bash
-npx electron scripts/compose-tricolor.cjs --full --from docs/screenshots/_auto --out docs/screenshots/_auto
-```
+It used to be one — a `compose-tricolor.cjs --full` you had to remember — which
+was survivable while tricolor sat halfway down the page and is not now that it
+opens both surfaces. Emil's rule (2026-08-08): if a frame ships to a channel, the
+shoot for that channel produces it.
 
-That matters more since 2026-08-08, when tricolor became the opening frame on
-both surfaces: forget it and the hero is a store-sized image stretched to fill.
+The sources must come from the SAME run. `_auto/` persists, so composing from
+whatever is on disk would build a cover out of two different moments of the app —
+`shoot` therefore refuses rather than mixing, and says which source it is missing.
 
 The tricolor seam runs straight down through the toolbar (between two icons,
 `--at`) and then leans across the page (`--slant`). Both are measured against

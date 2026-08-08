@@ -75,7 +75,7 @@ export async function waitForPageTargets(port, count = 1, timeoutMs = 30_000) {
  *  an EMPTY node_modules and borrows the parent checkout's — so a path pinned to
  *  `root` spawns nothing and the failure reads as ENOENT on an exe that does
  *  exist one directory up. */
-function electronBinary(root) {
+export function electronBinary(root) {
   const exe = process.platform === 'win32' ? 'electron.exe' : 'electron'
   let dir = resolve(root)
   for (;;) {

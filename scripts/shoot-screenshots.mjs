@@ -61,7 +61,16 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { cdp, openSocket, waitForPageTargets, launchApp, evaluate, sleep } from './lib/cdp.mjs'
+import { spawnSync } from 'node:child_process'
+import {
+  cdp,
+  openSocket,
+  waitForPageTargets,
+  launchApp,
+  evaluate,
+  sleep,
+  electronBinary
+} from './lib/cdp.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
@@ -1892,6 +1901,8 @@ const app = launchApp({
 })
 
 let failed = 0
+/** Names that actually produced a PNG this run — what the composer may use */
+const shotOk = new Set()
 try {
   const [target] = await waitForPageTargets(PORT, 1)
   const ws = await openSocket(target.webSocketDebuggerUrl)
@@ -1927,6 +1938,7 @@ try {
       })
       const file = join(OUT_DIR, `${shot.name}.png`)
       writeFileSync(file, Buffer.from(data, 'base64'))
+      shotOk.add(shot.name)
       console.log(`ok (${Math.round(Buffer.from(data, 'base64').length / 1024)} kB)`)
     } catch (err) {
       failed++
@@ -1942,6 +1954,38 @@ try {
     ).catch(() => {})
   }
   ws.close()
+
+  // Composed frames belong to the set, so the run that shoots their sources
+  // produces them too. The store path always worked this way (scale-store-shots
+  // spawns the composer itself); the README-sized tricolor was a command you
+  // had to remember, which was survivable while it was a frame down the page
+  // and is not now that it opens both surfaces.
+  //
+  // Only from sources shot in THIS run. _auto persists between runs, so
+  // composing from whatever happens to be on disk would silently build a cover
+  // out of two different moments of the app — the exact failure the "shoot the
+  // whole set in one run" rule in RELEASE.md exists to prevent.
+  const MAP = JSON.parse(readFileSync(join(ROOT, 'scripts', 'lib', 'shots.json'), 'utf8'))
+  for (const [name, spec] of Object.entries(MAP.frames)) {
+    if (!spec.composed) continue
+    const sources = spec.sourceFor ?? []
+    const missing = sources.filter((s) => !shotOk.has(s))
+    if (missing.length) {
+      // Silent when this run was never about that frame; loud when it was close.
+      if (sources.some((s) => shotOk.has(s)))
+        console.log(`  ${name} … not composed (this run has no ${missing.join(', ')})`)
+      continue
+    }
+    const r = spawnSync(
+      electronBinary(ROOT),
+      [join(ROOT, 'scripts', 'compose-tricolor.cjs'), '--full', '--from', OUT_DIR, '--out', OUT_DIR],
+      { stdio: 'inherit' }
+    )
+    if (r.status !== 0) {
+      failed++
+      console.log(`  ${name} … FAILED to compose`)
+    }
+  }
 } catch (err) {
   console.error(`\nShoot aborted: ${err.message}`)
   const log = app.log().trim()
