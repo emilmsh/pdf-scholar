@@ -142,30 +142,22 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.35.0
+## What's new in this version (≤ 1 500 chars) — v0.36.0
 
 **EN:**
 ```
-• Sign without leaving the app: draw your signature once and stamp it wherever it is needed. It stays on your machine (placing a signature is not the same as digitally signing a document)
-• Password-protected documents open: type the password and read, mark up and save as normal — the file stays protected
-• Pen input: with a stylus on a touch screen, the pen draws while a finger scrolls and zooms — and the pen's eraser end erases
-• Pen pressure varies the line (beta), and the saved file keeps the varying width — other readers render it the same
-• The text tool writes printed or in handwriting — the red-pen-in-the-margin kind of comment, with the font embedded so it reads that way for whoever opens the file
-• A red pen at last: pen and shapes draw from the saturated palette instead of the highlighter pastels
-• The Notes panel's colour filter now offers the colours the document actually contains, custom picks included
-• macOS notices updates: it cannot install one itself, but it spots one and hands you the command or the link
+• Handwritten notes are written in a new hand — slanted and joined-up, the way a pen actually moves, instead of the upright printing they used before
+• The handwriting font is smaller too, so a document carrying handwritten notes is smaller than it used to be
+• Pinch-zoom lands where you meant it to on a rotated page or in a two-page spread: releasing near fit-width now snaps to the same fit the toolbar button gives
+• Settings can send you straight to Windows' own "Default apps" page, if and when you want to choose which app opens your PDFs
 ```
 
 **NO:**
 ```
-• Signer uten å forlate appen: tegn signaturen din én gang og stemple den inn der den trengs. Den blir på maskinen din (å plassere en signatur er ikke det samme som å signere digitalt)
-• Passordbeskyttede dokumenter åpnes: skriv passordet og les, marker og lagre som vanlig — filen forblir beskyttet
-• Penn: med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer — og viskelær-enden på pennen visker
-• Pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden — andre lesere viser den likt
-• Tekstverktøyet skriver trykt eller i håndskrift — kommentaren i margen med rød penn, med fonten innebygd så den leses slik hos alle som åpner filen
-• Endelig en rød penn: penn og former tegner fra den mettede paletten i stedet for highlighter-pastellene
-• Fargefilteret i Notater viser nå fargene dokumentet faktisk inneholder, egendefinerte valg inkludert
-• macOS oppdager oppdateringer: den kan ikke installere dem selv, men den ser dem og gir deg kommandoen eller lenken
+• Håndskrevne notater skrives med en ny hånd — skrå og sammenbundet, slik en penn faktisk beveger seg, i stedet for den loddrette blokkskriften de hadde før
+• Håndskriftfonten er også mindre, så et dokument med håndskrevne notater blir mindre enn det pleide
+• Knip-zoom lander der du mente på en rotert side eller i tosiders oppslag: slipper du nær tilpass-bredde, snapper den nå til samme tilpasning som knappen i verktøylinja gir
+• Innstillingene kan sende deg rett til Windows' egen «Standardapper»-side, hvis og når du vil velge hvilken app som åpner PDF-ene dine
 ```
 
 ---
