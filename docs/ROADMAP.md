@@ -164,8 +164,9 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
 - [ ] **Sidebehandling: slett, omorganiser, hent ut, slå sammen.** Emils
   beslutning 2026-08-08 — dette forlater «utenfor omfang»-lista i `SPEC.md` §10
   (som «page editing UI»), fordi det er den ene tingen PDF Expert-brukere
-  forventer og ikke finner. Klart størst byggejobb i bolken; skyves til etter
-  v1.0 hvis den truer porten.
+  forventer og ikke finner. Klart størst byggejobb i bolken, og den står fast:
+  rekkefølgen innenfor bolken er forhandlingsbar, omfanget er det ikke. Går noe
+  galt, tas det når det oppstår (Emil 2026-08-08).
 - [ ] **Beskjær marger** (åpent fase 2-punkt) — reell verdi for skannede og
   bredmargede artikler på en laptopskjerm.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
