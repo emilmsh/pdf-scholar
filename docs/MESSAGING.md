@@ -109,6 +109,10 @@ block of bullets, the README the full account.
   reading a paper and losing your place in one
 - Remembers reading positions and recent files; tabs and multiple windows, and a
   tab can be dragged out into its own window
+- Password-protected documents open: type the password and read, mark up and
+  save as normal — the file stays protected. *Supporting, not a headline: a
+  browser opens these too, so leading with it would be boasting about the
+  minimum. Printing one is the exception, and the app says so.*
 - Interface in Norwegian and English, which also sets the AI prompts, exports and
   date formats
 

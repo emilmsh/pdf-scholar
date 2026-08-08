@@ -117,6 +117,9 @@ export const webApi: PdfxApi = {
   // harmless no-op so the save UI can still be exercised
   docOpened: () => {},
   docClosed: () => {},
+  // Nothing to hand over: outside Electron the annotation engine is in this same
+  // renderer and already holds the password (registerBrowserDoc took it).
+  docUnlock: async () => {},
   docIsDirty: async () => false,
   docWasModifiedExternally: async () => false,
   docSave: async () => ({ ok: true }),

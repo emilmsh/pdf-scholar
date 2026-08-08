@@ -38,7 +38,31 @@ export const ENGINE_ERRORS = {
     code: 'annot-unknown-type',
     error: `Ukjent annotasjonstype: ${type}`
   }),
+  /** The file is encrypted and we have no password for it (yet). The renderer
+   *  turns this into the unlock prompt rather than an error screen. */
   passwordProtected: { code: 'pdf-password-protected', error: 'PDF-en er passordbeskyttet' },
+  /** A password was supplied and the document rejected it. Distinct from
+   *  `passwordProtected` because the prompt must say "try again", not "this
+   *  file is locked" — the user already knows it is locked. */
+  passwordWrong: { code: 'pdf-password-wrong', error: 'Feil passord' },
+  /** Printing routes through Chromium's own PDF plugin in a hidden window, and
+   *  there is no way to hand it the password — it would sit there showing an
+   *  unlock prompt nobody can see. Named so the user gets a sentence instead of
+   *  a silent hang. */
+  printEncrypted: {
+    code: 'pdf-print-encrypted',
+    error: 'Utskrift av passordbeskyttede dokumenter støttes ikke ennå — lagre en kopi uten passord først.'
+  },
+  /** An encrypted document too large for the WASM engine. The appender writes
+   *  object bytes straight into the file and has no cipher, so unlike every
+   *  other locked file this one cannot be annotated at all — saying "password
+   *  protected" here would send the user off to unlock a file they already
+   *  unlocked. Reading it works fine. */
+  appendEncrypted: {
+    code: 'append-encrypted',
+    error:
+      'Passordbeskyttede dokumenter av denne størrelsen kan leses, men ikke annoteres — endringen ble ikke lagret.'
+  },
   /** The appender met a PDF construct it will not rewrite. The `detail` argument
    *  at the throw site says which one; it is logged, never shown. */
   appendUnsupported: {

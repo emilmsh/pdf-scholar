@@ -616,11 +616,15 @@ class PdfFile {
       const prev = section.trailer.get('Prev')
       if (prev?.t === 'num') queue.push(prev.v)
     }
+    // Every object we append would have to be encrypted with the file's own key
+    // to be readable, and this writer is deliberately cipher-free plain Node.
+    // Distinct from the engine's "password protected": by the time a write gets
+    // here the document IS unlocked — it is the size that rules it out.
     if (this.trailer.get('Encrypt'))
       throw new AppendError(
-        ENGINE_ERRORS.passwordProtected.error,
+        ENGINE_ERRORS.appendEncrypted.error,
         'encrypted document',
-        ENGINE_ERRORS.passwordProtected.code
+        ENGINE_ERRORS.appendEncrypted.code
       )
     if (!this.trailer.get('Root')) throw new AppendError(UNSUPPORTED_MSG, 'trailer has no /Root')
     let maxNum = 0

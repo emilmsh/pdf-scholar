@@ -33,6 +33,11 @@ jobs:
       - run: npm run test:appender
       # The debounced document cache that sits under both write paths
       - run: npm run test:cache
+      # Encrypted documents through the real engine: that a locked file fails
+      # with the code we can name (PDFium hides it in reason.code, not the
+      # message), and that saving an unlocked one KEEPS the encryption — if that
+      # ever regressed we would publish protected documents in the clear
+      - run: npm run test:password
       # Pure-function rotation/spread transforms: a wrong one writes corrupted
       # coordinates into the file, so it is cheap insurance
       - run: npm run test:rotation

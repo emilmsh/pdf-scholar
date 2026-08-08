@@ -32,10 +32,18 @@ import {
   applyOn,
   deleteOn,
   hasNoPosition,
+  isPasswordError,
   OOM_RE,
   updateOn,
   WASM_SAFE_LIMIT
 } from '../shared/pdfium-annot-ops'
+import { passwordFor } from './doc-passwords'
+// Re-exported as part of the engine's own surface: a password is something the
+// engine needs in order to open a document, so main hands it over here rather
+// than reaching around into a second module — the same way flushAnnotations and
+// dropAnnotations are the engine's lifecycle API. It is also what lets
+// `npm run test:password` drive the real register through the bundled engine.
+export { forgetPassword, passwordFor, rememberPassword } from './doc-passwords'
 
 /** Files at/above this size never touch the WASM engine: annotations are
  *  written by the incremental appender (src/main/incremental-appender.ts),
@@ -93,11 +101,19 @@ const cache = new DocCache<OpenDoc>({
     const engine = await getEngine()
     const data = await readFile(path)
     const docId = randomUUID()
+    // An encrypted draft needs the password the renderer collected (doc:unlock).
+    // Passed only when we have one: handing a password to a file that has no
+    // user password — an owner-password-only document, which opens freely —
+    // makes PDFium reject it outright.
+    const password = passwordFor(path)
     const doc = await engine
-      .openDocumentBuffer({
-        id: docId,
-        content: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
-      })
+      .openDocumentBuffer(
+        {
+          id: docId,
+          content: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+        },
+        password === undefined ? undefined : { password }
+      )
       .toPromise()
     return { engine, doc, docId }
   },
@@ -133,7 +149,13 @@ async function withPdf(
     return await cache.mutate(path, op, (result) => !('error' in result))
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    if (/password/i.test(msg)) return ENGINE_ERRORS.passwordProtected
+    // A password we already hold and that still fails is a WRONG password —
+    // the file was unlocked once, so "this file is locked" would be a lie.
+    if (isPasswordError(err)) {
+      return passwordFor(path) === undefined
+        ? ENGINE_ERRORS.passwordProtected
+        : ENGINE_ERRORS.passwordWrong
+    }
     if (OOM_RE.test(msg)) return OVERSIZE
     return { error: msg }
   }

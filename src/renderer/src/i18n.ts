@@ -46,12 +46,17 @@ const nb = {
   'engine.annot-line-endpoints': 'linjen mangler endepunkter',
   'engine.annot-unknown-type': 'denne merknadstypen støttes ikke',
   'engine.pdf-password-protected': 'PDF-en er passordbeskyttet',
+  'engine.pdf-password-wrong': 'feil passord',
+  'engine.pdf-print-encrypted':
+    'utskrift av passordbeskyttede dokumenter støttes ikke ennå — lagre en kopi uten passord først',
   'engine.doc-too-large': 'dokumentet er for stort til å annoteres (minnegrense i skrivemotoren)',
   'engine.doc-too-large-browser': 'dokumentet er for stort til å annoteres i nettleseren (minnegrense i skrivemotoren)',
   'engine.doc-not-open': 'dokumentet er ikke åpent for redigering',
   'engine.append-unsupported':
     'PDF-en har en struktur denne skrivemåten ikke støtter ennå — filen er urørt',
   'engine.append-objstm-edit': 'denne merknaden kan ikke endres i så store dokumenter ennå',
+  'engine.append-encrypted':
+    'passordbeskyttede dokumenter av denne størrelsen kan leses, men ikke annoteres',
   // One per AiErrorCode. Unlike engine.* these stand alone in a chat bubble, so
   // they are whole sentences that say what to do next.
   'aierr.ai-key-missing': 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.',
@@ -406,6 +411,14 @@ const nb = {
   'viewer.errorBytes': '({bytes} byte lest, begynner «{head}», slutter «{tail}»)',
   'viewer.errorRetry': 'Prøv igjen',
   'viewer.opening': 'Åpner {name} …',
+  // Unlock prompt for encrypted documents
+  'password.title': 'Dokumentet er passordbeskyttet',
+  'password.detail': 'Skriv passordet for å åpne {name}.',
+  'password.retry': 'Passordet stemte ikke. Prøv igjen for {name}.',
+  'password.unlock': 'Lås opp',
+  /** Shown on the error screen when the user closes the prompt without
+   *  unlocking — «Prøv igjen» there brings the prompt back. */
+  'password.cancelled': 'Dokumentet er passordbeskyttet og ble ikke låst opp.',
   'viewer.backToPage': '‹ Tilbake til s. {page}',
   'viewer.forwardToPage': 'Frem til s. {page} ›',
   'viewer.ofPages': 'av {count}',
@@ -637,12 +650,17 @@ const en: Dict = {
   'engine.annot-line-endpoints': 'the line has no endpoints',
   'engine.annot-unknown-type': 'this annotation type is not supported',
   'engine.pdf-password-protected': 'the PDF is password protected',
+  'engine.pdf-password-wrong': 'wrong password',
+  'engine.pdf-print-encrypted':
+    'printing password-protected documents is not supported yet — save a copy without a password first',
   'engine.doc-too-large': 'the document is too large to annotate (write-engine memory limit)',
   'engine.doc-too-large-browser': 'the document is too large to annotate in the browser (write-engine memory limit)',
   'engine.doc-not-open': 'the document is not open for editing',
   'engine.append-unsupported':
     'this PDF has a structure that write path does not support yet — the file is untouched',
   'engine.append-objstm-edit': 'this annotation cannot be changed in documents this large yet',
+  'engine.append-encrypted':
+    'password-protected documents this large can be read, but not annotated',
   'aierr.ai-key-missing': 'No API key is stored for the selected provider. Open the AI settings.',
   'aierr.ai-key-undecryptable':
     'The stored API key could not be decrypted. That happens when the user account or browser profile has changed. Enter the key again in the AI settings.',
@@ -977,6 +995,11 @@ const en: Dict = {
   'viewer.errorBytes': '({bytes} bytes read, starts “{head}”, ends “{tail}”)',
   'viewer.errorRetry': 'Try again',
   'viewer.opening': 'Opening {name} …',
+  'password.title': 'This document is password protected',
+  'password.detail': 'Enter the password to open {name}.',
+  'password.retry': 'That password did not work. Try again for {name}.',
+  'password.unlock': 'Unlock',
+  'password.cancelled': 'The document is password protected and was not unlocked.',
   'viewer.backToPage': '‹ Back to p. {page}',
   'viewer.forwardToPage': 'Forward to p. {page} ›',
   'viewer.ofPages': 'of {count}',

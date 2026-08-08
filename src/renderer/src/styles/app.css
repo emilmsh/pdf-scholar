@@ -4963,6 +4963,32 @@ html.pen-near .draw-layer {
   gap: 8px;
 }
 
+/* The unlock field, in the same dialog shell (PasswordPrompt.tsx) */
+.password-input {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 16px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.password-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+/* A rejected password colours the field rather than adding a line of text —
+   the detail line above already says what went wrong. */
+.password-input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
 /* Pen and marker get tool-shaped cursors (hotspot at the tip) */
 
 .draw-layer.pen-mode {

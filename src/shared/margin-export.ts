@@ -24,7 +24,7 @@ import type { WrappedPdfiumModule } from '@embedpdf/pdfium'
 import type { FileError, PageRect } from './types'
 import { ENGINE_ERRORS } from './engine-errors'
 import type { OpenDoc } from './pdfium-annot-ops'
-import { applyOn } from './pdfium-annot-ops'
+import { applyOn, isPasswordError } from './pdfium-annot-ops'
 
 export interface MarginExportCard {
   /** 0-based page index */
@@ -143,12 +143,13 @@ function widenPageBoxes(
   wrapped: WrappedPdfiumModule,
   bytes: Uint8Array,
   gutterPt: number,
-  side: MarginSide
+  side: MarginSide,
+  password: string
 ): Uint8Array | FileError {
   const m = wrapped.pdfium
   const src = m.wasmExports.malloc(bytes.length)
   heapU8(m).set(bytes, src)
-  const doc = wrapped.FPDF_LoadMemDocument(src, bytes.length, '')
+  const doc = wrapped.FPDF_LoadMemDocument(src, bytes.length, password)
   if (!doc) {
     m.wasmExports.free(src)
     return { error: `PDFium could not open the document (error ${wrapped.FPDF_GetLastError()})` }
@@ -242,18 +243,25 @@ export async function buildMarginCopy(
   side: MarginSide = 'right',
   /** Author (/T) for the baked margin annotations — the user's own name from
    *  settings, or nothing */
-  author?: string
+  author?: string,
+  /** The password the document was unlocked with, when it is encrypted. Both
+   *  passes below re-open the bytes, and the widened intermediate keeps the
+   *  encryption PDFium was given — so both need it. */
+  password?: string
 ): Promise<Uint8Array | FileError> {
-  const widened = widenPageBoxes(wrapped, bytes, gutterPt, side)
+  const widened = widenPageBoxes(wrapped, bytes, gutterPt, side, password ?? '')
   if (!(widened instanceof Uint8Array)) return widened
 
   const docId = `margin-export-${Date.now().toString(36)}`
   const buf = widened
   const doc = await engine
-    .openDocumentBuffer({
-      id: docId,
-      content: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
-    })
+    .openDocumentBuffer(
+      {
+        id: docId,
+        content: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
+      },
+      password === undefined ? undefined : { password }
+    )
     .toPromise()
   const open: OpenDoc = { engine, doc, docId }
   try {
@@ -343,7 +351,8 @@ export async function buildMarginCopy(
     return new Uint8Array(saved)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return /password/i.test(msg) ? ENGINE_ERRORS.passwordProtected : { error: msg }
+    if (!isPasswordError(err)) return { error: msg }
+    return password === undefined ? ENGINE_ERRORS.passwordProtected : ENGINE_ERRORS.passwordWrong
   } finally {
     await engine
       .closeDocument(doc)

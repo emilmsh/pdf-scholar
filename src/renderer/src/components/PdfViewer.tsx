@@ -109,6 +109,7 @@ import {
 import type { AiDocument, ResolvedCitation } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import AnnotPopover from './AnnotPopover'
+import { PasswordPrompt } from './PasswordPrompt'
 import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
 import { OverlayScrollbars } from './OverlayScrollbars'
 import PdfPage from './PdfPage'
@@ -155,10 +156,14 @@ interface DocResources {
 // — pdf.js falls back to XHR for the non-http schemes.
 const pdfjsAssetUrl = (dir: string): string => new URL(`${dir}/`, document.baseURI).href
 
-function openDocument(data: Uint8Array): DocResources {
+function openDocument(data: Uint8Array, password?: string): DocResources {
   const port = new PdfWorkerCtor()
   const task = getDocument({
     data,
+    // Only sent when we actually hold one. A document with an owner password but
+    // no user password opens freely, and offering pdf.js a password it did not
+    // ask for makes it reject the file as "Incorrect Password".
+    ...(password === undefined ? {} : { password }),
     worker: PDFWorker.create({ port }),
     wasmUrl: pdfjsAssetUrl('wasm'),
     cMapUrl: pdfjsAssetUrl('cmaps'),
@@ -166,6 +171,14 @@ function openDocument(data: Uint8Array): DocResources {
     iccUrl: pdfjsAssetUrl('iccs')
   })
   return { task, port }
+}
+
+/** pdf.js signals both "locked" and "wrong password" as PasswordException,
+ *  separated by `code` (1 = NEED_PASSWORD, 2 = INCORRECT_PASSWORD). Neither is
+ *  a broken file, so neither may take the re-read-and-retry path meant for
+ *  half-written ones — the bytes are whole, they are just encrypted. */
+function isPasswordException(err: unknown): boolean {
+  return (err as { name?: string } | null | undefined)?.name === 'PasswordException'
 }
 
 /** What the parser said, plus what it was actually given. A file that is still
@@ -1111,6 +1124,20 @@ export default function PdfViewer({
    *  file, since the bytes already in hand are the ones that failed. */
   const [loadAttempt, setLoadAttempt] = useState(0)
 
+  /** The password this document was unlocked with, for every RE-open that
+   *  follows: the engine rewrites the file after each annotation and the copy is
+   *  encrypted the same way, so reloadDocument would otherwise be locked out of
+   *  the document the user is looking at. */
+  const docPasswordRef = useRef<string | undefined>(undefined)
+
+  /** Set while the unlock prompt is up; the promise resolves with what the user
+   *  typed, or null if they closed it. Same shape as the external-update prompt
+   *  in ExtensionApp. */
+  const [passwordAsk, setPasswordAsk] = useState<{
+    retry: boolean
+    resolve: (password: string | null) => void
+  } | null>(null)
+
   useEffect(() => {
     let destroyed = false
     /** Register the bytes with the engines that need them, then hand pdf.js its
@@ -1118,16 +1145,23 @@ export default function PdfViewer({
      *  the document (desktop edits a draft file instead), so the registration
      *  must follow whatever bytes pdf.js actually parsed — otherwise a retry
      *  would annotate a different version than the one on screen. */
-    const openWith = (bytes: Uint8Array): { bytes: Uint8Array; resources: DocResources } => {
-      if (!isElectron) registerBrowserDoc(payload.path, bytes)
+    const openWith = (
+      bytes: Uint8Array,
+      password?: string
+    ): { bytes: Uint8Array; resources: DocResources } => {
+      // The browser twin annotates these same bytes and needs the same secret
+      if (!isElectron) registerBrowserDoc(payload.path, bytes, password)
       // Spike: when the PDFium raster flag is on, the same bytes also feed the
       // render engine (no-op otherwise — the register call guards on the flag)
       registerPdfiumDoc(payload.path, bytes)
       // pdf.js transfers the underlying buffer to its worker, so hand it a copy
-      const resources = openDocument(bytes.slice())
+      const resources = openDocument(bytes.slice(), password)
       docResourcesRef.current = resources
       return { bytes, resources }
     }
+    /** Ask the user, once, for this document's password. */
+    const askPassword = (retry: boolean): Promise<string | null> =>
+      new Promise<string | null>((resolve) => setPasswordAsk({ retry, resolve }))
     ;(async () => {
       const initial = loadAttempt === 0 ? payload.data : ((await rereadSettled()) ?? payload.data)
       if (destroyed) return
@@ -1137,20 +1171,50 @@ export default function PdfViewer({
         doc = await attempt.resources.task.promise
       } catch (err) {
         if (destroyed) return
-        // We are a PDF handler: the program that asked us to open this file is
-        // often the one still writing it, and a half-written file parses as a
-        // broken one. Wait for it to settle, read again, and only then believe
-        // the failure.
-        const fresh = await rereadSettled()
-        if (destroyed) return
-        if (!fresh) throw loadFailure(err, attempt.bytes)
-        attempt.resources.task.destroy()
-        attempt.resources.port.terminate()
-        attempt = openWith(fresh)
-        try {
-          doc = await attempt.resources.task.promise
-        } catch (again) {
-          throw loadFailure(again, attempt.bytes)
+        if (isPasswordException(err)) {
+          // Encrypted, not broken: ask until it opens or the user gives up.
+          // Re-reading the file (below) would be pointless — the bytes are fine.
+          let retry = false
+          for (;;) {
+            const entered = await askPassword(retry)
+            setPasswordAsk(null)
+            if (destroyed) return
+            if (entered === null) throw new Error(t('password.cancelled'))
+            attempt.resources.task.destroy()
+            attempt.resources.port.terminate()
+            attempt = openWith(attempt.bytes, entered)
+            try {
+              doc = await attempt.resources.task.promise
+            } catch (locked) {
+              if (destroyed) return
+              if (isPasswordException(locked)) {
+                retry = true
+                continue
+              }
+              throw loadFailure(locked, attempt.bytes)
+            }
+            docPasswordRef.current = entered
+            // Desktop's write engine lives in main and opens the draft itself,
+            // which carries the same encryption. Browser targets no-op here.
+            await bridge.docUnlock(payload.path, entered)
+            break
+          }
+        } else {
+          // We are a PDF handler: the program that asked us to open this file is
+          // often the one still writing it, and a half-written file parses as a
+          // broken one. Wait for it to settle, read again, and only then believe
+          // the failure.
+          const fresh = await rereadSettled()
+          if (destroyed) return
+          if (!fresh) throw loadFailure(err, attempt.bytes)
+          attempt.resources.task.destroy()
+          attempt.resources.port.terminate()
+          attempt = openWith(fresh)
+          try {
+            doc = await attempt.resources.task.promise
+          } catch (again) {
+            throw loadFailure(again, attempt.bytes)
+          }
         }
       }
       if (destroyed) return
@@ -1170,6 +1234,12 @@ export default function PdfViewer({
     })
     return () => {
       destroyed = true
+      // Unmounting with the prompt up (tab closed mid-unlock) must settle the
+      // promise, or the load loop above never returns and the effect leaks.
+      setPasswordAsk((ask) => {
+        ask?.resolve(null)
+        return null
+      })
       if (!isElectron) void releaseBrowserDoc(payload.path)
       void releasePdfiumDoc(payload.path)
       // Destroy whatever is CURRENT (a reload may have swapped resources)
@@ -1197,7 +1267,9 @@ export default function PdfViewer({
     // Fresh bytes carry the engine's annotation edits — the PDFium raster
     // source must see them too (no-op when the spike flag is off)
     registerPdfiumDoc(payload.path, data)
-    const resources = openDocument(data.slice())
+    // The engine's rewrite preserved the encryption, so re-opening needs the
+    // same password the user gave when the document was first unlocked.
+    const resources = openDocument(data.slice(), docPasswordRef.current)
     try {
       const doc = await resources.task.promise
       const fileAnnots = await collectAnnotations(doc)
@@ -2230,7 +2302,10 @@ export default function PdfViewer({
       cards,
       undefined,
       marginViewRef.current.side,
-      settingsRef.current.annotAuthor.trim() || undefined
+      settingsRef.current.annotAuthor.trim() || undefined,
+      // The bytes above are the CURRENT document — still encrypted, because both
+      // the draft and the engine's own rewrite keep the encryption.
+      docPasswordRef.current
     )
     if (!(out instanceof Uint8Array)) {
       showToast(t('viewer.saveFailed', { error: errorText(out) }))
@@ -5000,6 +5075,20 @@ export default function PdfViewer({
   )
 
   // ---------- Render ----------
+
+  // Before the error screen: a locked document is not a failed one, and the
+  // prompt has to be reachable while the load is still suspended waiting on it.
+  if (passwordAsk) {
+    return (
+      <PasswordPrompt
+        name={payload.name}
+        retry={passwordAsk.retry}
+        active={active}
+        onSubmit={(password) => passwordAsk.resolve(password)}
+        onCancel={() => passwordAsk.resolve(null)}
+      />
+    )
+  }
 
   if (error) {
     return (

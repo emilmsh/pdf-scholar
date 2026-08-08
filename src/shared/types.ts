@@ -82,11 +82,14 @@ export type EngineErrorCode =
   | 'annot-line-endpoints'
   | 'annot-unknown-type'
   | 'pdf-password-protected'
+  | 'pdf-password-wrong'
+  | 'pdf-print-encrypted'
   | 'doc-too-large'
   | 'doc-too-large-browser'
   | 'doc-not-open'
   | 'append-unsupported'
   | 'append-objstm-edit'
+  | 'append-encrypted'
 
 /** The same idea for the AI request path, which fails for its own set of named
  *  reasons. Kept a separate union because these are whole sentences shown in a
@@ -502,6 +505,14 @@ export interface PdfxApi {
   /** Tell main a document is open in this window (unsaved-changes guard) */
   docOpened(path: string): void
   docClosed(path: string): void
+  /** Hand over the password an encrypted document was just unlocked with, so the
+   *  write engine can open it too. The renderer is where the unlock happens —
+   *  pdf.js refuses the bytes and the user types the password — but on desktop
+   *  the annotation engine lives in main and opens the draft itself, which is
+   *  encrypted the same way. Held in memory for the session only, never written
+   *  to disk. A no-op on the platforms whose write engine is already in the
+   *  renderer (browser, extension). */
+  docUnlock(path: string, password: string): Promise<void>
   /** True when the document has unsaved annotation changes (a draft exists) */
   docIsDirty(path: string): Promise<boolean>
   /** True when the original file changed outside the app since this session

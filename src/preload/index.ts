@@ -34,6 +34,7 @@ const api: PdfxApi = {
   tabDropAtCursor: (path: string) => ipcRenderer.invoke('tab:drop-at-cursor', path),
   docOpened: (path: string) => ipcRenderer.send('doc:opened', path),
   docClosed: (path: string) => ipcRenderer.send('doc:closed', path),
+  docUnlock: (path: string, password: string) => ipcRenderer.invoke('doc:unlock', path, password),
   docIsDirty: (path: string) => ipcRenderer.invoke('doc:is-dirty', path),
   docWasModifiedExternally: (path: string) =>
     ipcRenderer.invoke('doc:was-modified-externally', path),

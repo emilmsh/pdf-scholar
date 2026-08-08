@@ -37,6 +37,24 @@ import { decodePressures, encodePressures, inkPressureApContent } from './ink-ou
  *  callers reset their engine singleton when this matches. */
 export const OOM_RE = /realloc|malloc|out of memory|cannot enlarge memory|oom|aborted/i
 
+/** FPDF_ERR_PASSWORD — "password required or incorrect" in PDFium's error enum. */
+const FPDF_ERR_PASSWORD = 4
+
+/** Did this throw mean "the document is encrypted and the password was missing
+ *  or wrong"?
+ *
+ *  Must be asked of the REASON, not the message: PDFium reports a locked file as
+ *  the generic `FPDF_LoadMemDocument failed` and carries the real verdict in
+ *  `reason.code`. All three callers used to match /password/i on the message
+ *  instead, which never fired — so a locked file surfaced as raw engine prose
+ *  rather than the named failure it already had a code for. The text match is
+ *  kept as a second net in case a future engine version words it differently. */
+export function isPasswordError(err: unknown): boolean {
+  const reason = (err as { reason?: { code?: number } } | null | undefined)?.reason
+  if (reason?.code === FPDF_ERR_PASSWORD) return true
+  return /password/i.test(err instanceof Error ? err.message : String(err))
+}
+
 /** Files above this size must be REFUSED at write time, not accepted: the
  *  in-memory create would succeed and report ok, but every later serialize would
  *  abort (measured: a 413 MB file needs ~2.36 GB ≈ 5.7× its size, over the 2 GB
