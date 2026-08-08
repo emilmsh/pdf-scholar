@@ -51,7 +51,8 @@ import {
 } from '../tool-prefs'
 import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
 import { notePenEvent, palmResting, PEN_NEAR_MS } from '../pen-input'
-import { HAND_LINE_HEIGHT, wrapHandText } from '../../../shared/hand-note'
+import { HAND_FONT_DEFAULT, HAND_LINE_HEIGHT, wrapHandText } from '../../../shared/hand-note'
+import type { HandFontId } from '../../../shared/hand-note'
 import { handTextMeasurer, installHandFont } from '../hand-font'
 import type { BoxSize } from '../useResizable'
 import { makePaneHandle } from '../pane-handle'
@@ -341,10 +342,20 @@ export interface AnnotPatch {
   lines?: string[] | undefined
   /** handnote: what to draw again. The engine can recover this from the
    *  annotation itself, but an EDIT changes the words, so the new state has to
-   *  travel with the request. */
+   *  travel with the request — including the pen the new lines were measured
+   *  with, since only a re-wrap may change it. */
   hand?:
-    | { lines: string[]; box: PageRect; fontSize: number; color: [number, number, number] }
+    | {
+        lines: string[]
+        box: PageRect
+        fontSize: number
+        color: [number, number, number]
+        font?: HandFontId | undefined
+      }
     | undefined
+  /** handnote: the pen, kept on the record so the overlay paints the note in
+   *  the font it was written with */
+  handFont?: HandFontId | undefined
 }
 
 /** Mutable identity for an annotation across undo/redo and document reloads */
@@ -528,12 +539,13 @@ export default function PdfViewer({
   // A document that already CONTAINS handwritten notes needs the font to show
   // them, even in a session that never writes one. Fetched once, on sight.
   useEffect(() => {
+    const wanted = new Set<HandFontId>()
     for (const list of annots.values()) {
-      if (list.some((a) => a.type === 'handnote')) {
-        void installHandFont()
-        return
+      for (const a of list) {
+        if (a.type === 'handnote') wanted.add(a.handFont ?? HAND_FONT_DEFAULT)
       }
     }
+    for (const id of wanted) void installHandFont(id)
   }, [annots])
   const [annotPopover, setAnnotPopover] = useState<{
     x: number
@@ -878,8 +890,8 @@ export default function PdfViewer({
   const textPref = prefs.text
   const patchTextPref = useCallback((patch: Partial<TextPref>) => {
     // Fetch the handwriting font the moment it is CHOSEN, not when the first
-    // note is committed — it is a 280 kB chunk and the user is about to type.
-    if (patch.font === 'hand') void installHandFont()
+    // note is committed — it is a ~110 kB chunk and the user is about to type.
+    if (patch.font === 'hand') void installHandFont(HAND_FONT_DEFAULT)
     setPrefs((p) => ({ ...p, text: { ...p.text, ...patch } }))
   }, [])
   const resetTextPref = useCallback(() => {
@@ -2456,6 +2468,7 @@ export default function PdfViewer({
           width: snapshot.width,
           fontSize: snapshot.fontSize,
           lines: snapshot.lines,
+          handFont: snapshot.handFont,
           blend: snapshot.blend,
           // A stamp's picture goes to the engine as raw PNG bytes; the record
           // keeps the data URL, which is what the overlay can paint.
@@ -2645,6 +2658,8 @@ export default function PdfViewer({
         fontSize?: number | undefined
         /** handnote: the pre-wrapped lines (see hand-note.ts) */
         lines?: string[] | undefined
+        /** handnote: the pen the lines were measured with */
+        handFont?: HandFontId | undefined
         blend?: 'multiply' | undefined
         imageUrl?: string | undefined
       }
@@ -2669,6 +2684,7 @@ export default function PdfViewer({
         width: extras?.width,
         fontSize: extras?.fontSize,
         lines: extras?.lines,
+        handFont: extras?.handFont,
         blend: extras?.blend,
         imageUrl: extras?.imageUrl
       }
@@ -2900,8 +2916,13 @@ export default function PdfViewer({
         if (record && freeTextDraft.hand) {
           // Re-wrap and re-bake: a handwritten note's glyphs live in its
           // appearance, so edited text is drawn again rather than patched.
-          await installHandFont()
-          const lines = wrapHandText(text, wDrag, handTextMeasurer(fontSize))
+          // The re-wrap is measured HERE, so the font it is measured in is the
+          // font the engine must bake — a record that names one keeps it, and
+          // one read back from a file (which names none) is re-set in today's
+          // pen rather than measured in one font and drawn in another.
+          const font = record.handFont ?? HAND_FONT_DEFAULT
+          await installHandFont(font)
+          const lines = wrapHandText(text, wDrag, handTextMeasurer(fontSize, font))
           const box = {
             x: freeTextDraft.x,
             y: freeTextDraft.y,
@@ -2912,7 +2933,8 @@ export default function PdfViewer({
             quads: [box],
             contents: text,
             lines,
-            hand: { lines, box, fontSize, color: record.color }
+            handFont: font,
+            hand: { lines, box, fontSize, color: record.color, font }
           })
         } else if (record) {
           changeAnnotation(freeTextDraft.pageNumber, record, { quads: [rect], contents: text })
@@ -2935,8 +2957,8 @@ export default function PdfViewer({
         // The font must be REGISTERED before it can be measured — measuring
         // against a fallback would wrap at the wrong widths and the note would
         // reflow the moment it was saved.
-        await installHandFont()
-        const lines = wrapHandText(text, wDrag, handTextMeasurer(pref.fontSize))
+        await installHandFont(HAND_FONT_DEFAULT)
+        const lines = wrapHandText(text, wDrag, handTextMeasurer(pref.fontSize, HAND_FONT_DEFAULT))
         const handRect = {
           x: freeTextDraft.x,
           y: freeTextDraft.y,
@@ -2950,7 +2972,7 @@ export default function PdfViewer({
           pref.color,
           1,
           text,
-          { fontSize: pref.fontSize, lines }
+          { fontSize: pref.fontSize, lines, handFont: HAND_FONT_DEFAULT }
         )
         setFreeTextDraft(null)
         setActiveTool((tool) => (tool === 'text' ? null : tool))

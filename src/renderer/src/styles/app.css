@@ -1030,12 +1030,14 @@ button {
 }
 
 /* A handwritten note. The @font-face is registered from the SAME font bytes
-   that get embedded in the PDF (src/shared/hand-note.ts installs it as a data:
-   URL at startup), so what the overlay shows and what the file carries are the
-   same glyphs — no substitute font, no reflow on save. */
+   that get embedded in the PDF (src/renderer/src/hand-font.ts installs them as
+   a data: URL on demand), so what the overlay shows and what the file carries
+   are the same glyphs — no substitute font, no reflow on save. The family here
+   is only the fallback: the mark sets its OWN font inline, because a note is
+   painted in the pen it was written with (see hand-note.ts, HAND_FONTS). */
 .annot-handnote {
   position: absolute;
-  font-family: 'PDFX Hand', 'Segoe Script', cursive;
+  font-family: 'PDFX Hand Caveat', 'Segoe Script', cursive;
   white-space: pre;
   overflow: visible;
   pointer-events: none;
@@ -6009,8 +6011,9 @@ html.touch-ui .confirm-actions .btn-secondary {
 }
 
 /* The handwriting option previews itself: the label is set in the very font
-   the note will be written in, so the choice is visible before it is made. */
+   the note will be written in, so the choice is visible before it is made.
+   Follows HAND_FONT_DEFAULT in src/shared/hand-note.ts — change both together. */
 .scope-option strong.font-sample-hand {
-  font-family: 'PDFX Hand', 'Segoe Script', cursive;
+  font-family: 'PDFX Hand Caveat', 'Segoe Script', cursive;
   font-size: 15px;
 }
