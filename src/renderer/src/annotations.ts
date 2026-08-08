@@ -158,11 +158,42 @@ export function annotTypeLabel(type: AnnotationType): string {
   return t(`annot.${type}`)
 }
 
+// ---------- Drawing ink ----------
+//
+// The five a pen case holds: black, red, green, yellow, blue (Emil's list,
+// 2026-08-08). Named here because the palette below and the shipped defaults
+// must be the SAME numbers: the tool menu rings the selected swatch by exact
+// componentwise comparison, so a default that is merely close to a swatch
+// opens a menu with nothing selected at all — which is what both draw tools
+// did up to v0.36.0 (the pen shipped [0.16, 0.35, 0.75], a blue in no palette;
+// the shape tool's red was off the markup red by 0.004 in one channel).
+const INK_BLACK: [number, number, number] = [0.11, 0.11, 0.13]
+const INK_RED: [number, number, number] = [0.886, 0.286, 0.29]
+const INK_GREEN: [number, number, number] = [0.184, 0.62, 0.345]
+/** Deeper than the highlighter's #ffd54a on purpose: that pastel is meant for
+ *  a wide translucent band and is barely there as a 2 pt opaque line. */
+const INK_YELLOW: [number, number, number] = [0.918, 0.702, 0.031]
+const INK_BLUE: [number, number, number] = [0.196, 0.486, 0.965]
+
+/** Colours for the freehand pen and the shape tools.
+ *
+ *  Its own palette since v0.36.1. Both borrowed UNDERLINE_COLORS before that,
+ *  which left a drawing pen with no BLACK — the colour most handwriting is in —
+ *  while carrying a purple and an orange nobody reached for. The highlighter
+ *  keeps HIGHLIGHT_COLORS; pastels belong to a wide translucent band. */
+export const PEN_COLORS: HighlightColor[] = [
+  { key: 'black', hex: '#1c1c21', rgb: INK_BLACK },
+  { key: 'red', hex: '#e2494a', rgb: INK_RED },
+  { key: 'green', hex: '#2f9e58', rgb: INK_GREEN },
+  { key: 'yellow', hex: '#eab308', rgb: INK_YELLOW },
+  { key: 'blue', hex: '#327cf6', rgb: INK_BLUE }
+]
+
 export const SHAPE_DEFAULT: { color: [number, number, number]; width: number } = {
-  color: [0.886, 0.29, 0.29],
+  color: INK_RED,
   width: 2
 }
-export const FREETEXT_COLOR: [number, number, number] = [0.11, 0.11, 0.13]
+export const FREETEXT_COLOR: [number, number, number] = INK_BLACK
 export const FREETEXT_SIZE = 12
 
 /** Text colours for the FreeText tool: ink first (the default), then the
@@ -177,7 +208,7 @@ export const FREETEXT_COLORS: HighlightColor[] = [
 ]
 
 export const PEN_DEFAULT: { color: [number, number, number]; width: number } = {
-  color: [0.16, 0.35, 0.75],
+  color: INK_BLUE,
   width: 2.2
 }
 export const MARKER_DEFAULT: { color: [number, number, number]; width: number } = {
@@ -624,6 +655,12 @@ export function annotationAtPoint(
 export const MOVABLE_TYPES = new Set<AnnotationType>([
   'note',
   'freetext',
+  // A handwritten note moves like any other text box. It was missing from this
+  // set in v0.36.0 while the ENGINE already knew how to move one (a translate
+  // with no new geometry shifts the box and re-bakes the glyphs there — see
+  // pdfium-annot-ops.ts), so the only thing standing between the mark and the
+  // drag was this list. Emil found it the day it shipped.
+  'handnote',
   'square',
   'circle',
   'line',
@@ -650,16 +687,18 @@ export function resizeKindOf(a: PageAnnotation): ResizeKind | null {
     a.type === 'square' ||
     a.type === 'circle' ||
     a.type === 'freetext' ||
+    // A handwritten note resizes like any other text box. Its lines are
+    // wrapped and baked, so the words would hang outside a narrower box unless
+    // the RE-WRAP travels with the resize — which is why it had no handles at
+    // all in v0.36.0. It does now (PdfViewer's resizeHandNote), so the handles
+    // are honest.
+    a.type === 'handnote' ||
     a.type === 'ink' ||
     // A signature is almost never the right size on the first try
     a.type === 'stamp'
   ) {
     return a.quads.length > 0 ? 'box' : null
   }
-  // A handwritten note deliberately has NO resize handles yet: its lines are
-  // wrapped and baked at write time, so a narrower box would not re-wrap — the
-  // words would simply hang outside it. Moving it works; resizing needs the
-  // wrap to travel with the resize, which it does not yet.
   return null
 }
 

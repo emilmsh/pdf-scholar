@@ -147,6 +147,32 @@ posten folk til en butikk som ligger to versjoner bak.
 Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas etter v1.0.
 
 ### Bolk 1 — adopsjonshullene (v0.36)
+- [x] **Feltrapporten fra v0.36.0-installeren** (Emil, 2026-08-08 — seks funn på
+  én kveld med appen i hånden, som er grunnen til at bolk 2 har en QA-matrise på
+  lista). Fem er rettet, ett var ikke en feil:
+  1. **Pennen slanget seg foran musepekeren.** `getPredictedEvents()` ble kalt
+     for alle pekertyper. Kommentaren sa «pen only», koden testet det ikke, og
+     Chromium prediker også for mus — der er ekstrapolasjonen ren oversving,
+     tegnet og så overskrevet. Nå portet på `pointerType === 'pen'`.
+  2. **Håndskriftnotatet oppførte seg ikke som en tekstboks.** Tre uavhengige
+     forglemmelser: det manglet i `MOVABLE_TYPES` (mens *motoren* allerede kunne
+     flytte et), `resizeKindOf` ga det ingen håndtak, og editoren skrev i sans
+     til notatet ble committet. Alle tre rettet og dekket av `test:annot-edit`
+     — verifisert ved å slå av hver enkelt og se testen falle.
+  3. **Signaturen kan lastes opp eller limes inn**, ikke bare tegnes. Bildet
+     legges på selve paden, med papiret nøklet bort når bildet er ugjennomsiktig
+     (foto/skann), slik at det er én lagringsvei og du ser hva du får.
+  4. **Standardapp-oppføringen fjernet** — se punktet lenger ned; den utgår helt.
+  5. **Pennefargene er sitt eget sett**: svart, rød, grønn, gul, blå. De lånte
+     markeringspaletten, som ikke har svart. Standardfargen for penn flyttet fra
+     `#2959bf` (som ikke fantes i noen palett, så ingen prikk var valgt) til
+     palettens blå.
+  6. *Ikke en feil:* fargefilteret i Merknader viser fargene **dokumentet
+     faktisk inneholder**, ikke en fast rad. Se `Sidebar.tsx` — den faste raden
+     tilbød farger dokumentet ikke hadde (klikk = tom liste) og manglet penn-,
+     form- og fargehjul-farger. Én rød prikk betyr at dokumentet har ett rødt
+     merke. Etiketten slo opp i to av fire paletter, så en svart tekstboks het
+     «#1C1C21»; nå slår den opp i alle.
 - [ ] **Utfylling av skjemaer (AcroForm).** Edge fyller ut skjemaer, og Edge er
   interop-/paritetsbaren vår (fase 4-porten, `docs/PLATFORMS.md`). Merk at
   **skjema-OPPRETTELSE** forblir utenfor omfang (`docs/SPEC.md` §10) — bare
@@ -173,16 +199,16 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     tie. Over 150 MB: navngitt avslag (`append-no-form-fill`), fordi appenderen
     kan skrive `/V` men ikke legge ut et appearance stream i dokumentets egen
     font, og en verdi uten utseende er blank i de fleste lesere.
-- [ ] **Standard PDF-leser — men uten å mase** (omfanget krympet på Emils
-  beslutning 2026-08-08). Utgangspunktet var at installeren bevisst ikke kaprer
-  standardappen (fase 1), så folk installerer, dobbeltklikker en PDF, og Edge
-  åpner den. Emils svar: **det bestemmer brukeren selv, og vi skal i hvert fall
-  ikke mase.** Så ingen forespørsel, ingen banner, ingen førstegangsboble — bare
-  én rolig oppføring i innstillingene som dyplenker til `ms-settings:defaultapps`
-  og som aldri dukker opp av seg selv. Den hjelper den som allerede leter, og
-  koster ingenting for alle andre. *Ærlig om prisen:* dette løser ikke
-  installer-og-glem-tilfellet, som var hele adopsjonsargumentet — det er en
-  bevisst avveining mot å være påtrengende, ikke en gratis lunsj.
+- [x] ~~**Standard PDF-leser — men uten å mase**~~ **Utgår helt** (Emil,
+  2026-08-08, etter å ha sett den i v0.36.0: «Fjern … Den er ikke hjelpsom»).
+  Utgangspunktet var at installeren bevisst ikke kaprer standardappen (fase 1),
+  så folk installerer, dobbeltklikker en PDF, og Edge åpner den. Først krympet
+  omfanget til én rolig innstillings-oppføring med dyplenke til
+  `ms-settings:defaultapps`; så ble også den fjernet. Konklusjonen å ta med
+  videre: **hvilken app som åpner en PDF er brukerens sak**, og «Åpne med»-
+  oppføringen fra installeren er hele vårt bidrag. Prisen er sagt høyt —
+  installer-og-glem-tilfellet er ikke løst, og det var hele
+  adopsjonsargumentet — men å være påtrengende var en dyrere pris.
   - **Førstegangsflata utgår.** `Welcome.tsx` bærer den allerede: tagline,
     «Åpne PDF», dra-hint, **et KI-kort med sett-opp-nøkkel** og nylige filer.
     KI-nøkkelen var det tyngste punktet, og det er dekket. Det som ikke er
@@ -203,7 +229,10 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
   origo i DOM-en** med et wrapper-element framfor å lappe koordinatformlene ~12
   steder. Da er zoom-ankringen urørt — beskjæringsendringer rutes gjennom
   `reanchorFor`, slik rotasjon og oppslag allerede gjør.
-- [ ] **Håndskriftfonten byttes til Caveat** (Emils valg 2026-08-08). Dagens
+- [x] **Håndskriftfonten byttes til Caveat** (Emils valg 2026-08-08, levert i
+  v0.36.0). Emils sluttdom etter å ha prøvd den: fonten holder, men han vil ha
+  **ekte flerfont-støtte** i stedet for en håndskrift/trykt-bryter — se
+  tankeboksen. Dagens
   Patrick Hand er loddrett, usammenbundet og nesten monolinje — den leser som
   pen blokkskrift, ikke som en penn. Caveat er skrå, delvis sammenbundet og har
   ekte strekmodulasjon, har full Latin Extended-A og ingen Reserved Font Name,
@@ -272,6 +301,26 @@ Emil peker på Windows-nettbrett med penn (Surface-klassen) som neste satsing et
 Berøringsparitetsregelen gjelder hele bolken: hver mus/hover-interaksjon trenger en intuitiv berøringsekvivalent.
 
 ## Tankeboks (ikke planlagt, ikke glemt)
+- **Ekte flerfont-støtte for tekstverktøyet** (Emils ønske 2026-08-08: «Jeg vil
+  ikke ha bloat-funksjonalitet i appen bare for å få tatt noen bilder. Det jeg
+  ønsker er genuin fler-font-støtte»). Dagens SKRIFT-rad er en bryter mellom to
+  ting, ikke et fontvalg. Det som gjør dette til mer enn en nedtrekksliste er at
+  PDF-formatet deler skriftene i to leirer, og de to leirene lander på hver sin
+  annotasjonstype:
+  - **De 14 standardfontene** (Helvetica, Times, Courier + varianter) kan en
+    FreeText bære direkte. PDFium bygger appearance-strømmen selv, ingenting
+    bygges inn i fila, og hver leser i verden har dem. Dette er *nesten gratis* —
+    et `/DA`-felt og en meny — og dekker «rett skrift på et skjema».
+  - **Alt annet** (Caveat, en serif som ikke er Times, en skrivemaskinfont) må
+    bygges inn, og `FPDFAnnot_AppendObject` nekter for FREETEXT. Derfor er
+    håndskriftnotatet et Stamp med tegnede glyfer — og *hver* font utenfor de 14
+    må gå samme vei, med samme pris: ~110 kB per font i bunten, ombaking ved
+    hver flytt/endring, og ingen tekstsøk i fila på det som er tegnet.
+  Retningen som følger av det: **én meny, to klasser, sagt høyt i UI-et** — de
+  innebygde fontene merkes som «tegnet» slik at valget ikke skjuler at det
+  koster noe. Rekkefølgen bør være standardfontene først (billigst, mest
+  interoperabelt), håndskrift etter. Ikke planlagt ennå; hører hjemme i bolk 1
+  eller rett etter v1.0.
 - ~~**Levende bilde av lesing**~~ — **droppet (Emils beslutning 2026-08-08)**,
   samme dag idéen kom, etter at kartleggingen viste hva den faktisk koster.
   Bevaringsverdig fordi konklusjonen er kontraintuitiv og noen vil foreslå den

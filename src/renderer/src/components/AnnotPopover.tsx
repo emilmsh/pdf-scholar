@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { annotTypeLabel, FREETEXT_COLORS, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
+import {
+  annotTypeLabel,
+  FREETEXT_COLORS,
+  HIGHLIGHT_COLORS,
+  PEN_COLORS,
+  UNDERLINE_COLORS
+} from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import { t, useLang } from '../i18n'
 import { isFindHotkey } from '../platform'
@@ -7,6 +13,17 @@ import { useDraggable } from '../useDraggable'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { MarkupColorRow } from './SelectionMenu'
+
+/** Marks made by a DRAWING tool (the pen and the shapes), as opposed to marks
+ *  anchored to text. They share the pen case; text markup keeps its own
+ *  saturated palette, where a colour has to read as a thin line under words. */
+const DRAWN_TYPES: ReadonlySet<PageAnnotation['type']> = new Set([
+  'ink',
+  'square',
+  'circle',
+  'line',
+  'arrow'
+])
 
 interface Props {
   x: number
@@ -97,15 +114,26 @@ export default function AnnotPopover({
         {annotation.author && <span className="annot-popover-author">{annotation.author}</span>}
       </div>
 
+      {/* Recolouring a mark offers the palette the tool that MADE it offers,
+          so the swatch that is ringed here is the swatch you picked there. */}
       <MarkupColorRow
         palette={
-          annotation.type === 'freetext'
+          annotation.type === 'freetext' || annotation.type === 'handnote'
             ? FREETEXT_COLORS
             : annotation.type === 'highlight' || annotation.type === 'note'
               ? HIGHLIGHT_COLORS
-              : UNDERLINE_COLORS
+              : DRAWN_TYPES.has(annotation.type)
+                ? PEN_COLORS
+                : UNDERLINE_COLORS
         }
-        swatch={annotation.type === 'highlight' || annotation.type === 'note' || annotation.type === 'freetext' ? 'dot' : 'bar'}
+        swatch={
+          annotation.type === 'highlight' ||
+          annotation.type === 'note' ||
+          annotation.type === 'freetext' ||
+          annotation.type === 'handnote'
+            ? 'dot'
+            : 'bar'
+        }
         tipKey="popover.colorTip"
         onPick={(c) => onColor(c.rgb)}
       />

@@ -5011,9 +5011,18 @@ html.pen-near .draw-layer {
   gap: 8px;
 }
 
+.signature-actions-left,
 .signature-actions-right {
   display: flex;
   gap: 8px;
+}
+
+/* Only appears when an imported picture turned out to hold no signature —
+   sits above the pad so it is read before the eye goes back to the canvas. */
+.signature-import-error {
+  margin: 0 0 10px;
+  color: var(--danger);
+  font-size: 12.5px;
 }
 
 .signature-menu {

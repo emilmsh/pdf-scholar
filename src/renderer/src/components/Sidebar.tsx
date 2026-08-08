@@ -1,6 +1,13 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
-import { annotTypeLabel, colorLabel, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
+import {
+  annotTypeLabel,
+  colorLabel,
+  FREETEXT_COLORS,
+  HIGHLIGHT_COLORS,
+  PEN_COLORS,
+  UNDERLINE_COLORS
+} from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import type { DocBookmark } from '../../../shared/types'
 import { t, useLang } from '../i18n'
@@ -558,7 +565,11 @@ function AnnotationList({
     const out: { rgb: [number, number, number]; label: string }[] = []
     for (const { record } of flat) {
       if (out.some((c) => colorDistance(c.rgb, record.color) < 0.001)) continue
-      const known = [...UNDERLINE_COLORS, ...HIGHLIGHT_COLORS].find(
+      // EVERY shipped palette, so a dot gets its NAME rather than its hex.
+      // This list was the markup two, which meant the pen case and the text
+      // tool's ink — the colours most marks are actually made in — showed up
+      // as «#1C1C21» in the tooltip.
+      const known = [...PEN_COLORS, ...FREETEXT_COLORS, ...UNDERLINE_COLORS, ...HIGHLIGHT_COLORS].find(
         (p) => colorDistance(p.rgb, record.color) < 0.001
       )
       out.push({

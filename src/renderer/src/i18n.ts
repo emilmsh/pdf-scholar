@@ -197,7 +197,10 @@ const nb = {
   // The signature pad and its menu
   'sig.padTitle': 'Tegn signaturen din',
   'sig.padDetail':
-    'Tegn med mus, penn eller finger. Signaturen lagres på denne maskinen og kan settes inn så mange ganger du vil.',
+    'Tegn med mus, penn eller finger — eller lim inn et bilde av signaturen din. Den lagres på denne maskinen og kan settes inn så mange ganger du vil.',
+  'sig.upload': 'Last opp bilde …',
+  'sig.uploadTip': 'Bruk et bilde eller en skanning av signaturen din. Du kan også lime inn med Ctrl+V.',
+  'sig.uploadFailed': 'Fant ingen signatur i bildet.',
   'sig.clear': 'Tøm',
   'sig.save': 'Lagre signatur',
   'sig.none': 'Ingen signaturer lagret ennå.',
@@ -295,12 +298,6 @@ const nb = {
   'tb.settingsTip': 'Innstillinger — språk, merknader, AI, oppdateringer og om appen',
   'reset.action': 'Nullstill til standardinnstillinger',
   'reset.tip': 'Sett alle innstillinger tilbake slik de var da appen var ny',
-  // Neutral by design (Emils beslutning 2026-08-08): the entry states an
-  // action, never a verdict on the current state. An app that tells you
-  // unprompted that it is not your default is nagging, which is the thing
-  // this feature exists to avoid.
-  'settings.defaultApp': 'Velg standardapp for PDF-filer',
-  'settings.defaultAppTip': 'Åpner Windows-innstillingene, der du velger selv',
   'reset.confirmMessage': 'Nullstille alle innstillinger?',
   'reset.confirmDetail':
     'Lesemodus, språk, verktøyvalg (farge, bredde og dekkevne), viskelær, søkehistorikk, panelbredder og verktøylinjen settes tilbake til standard. API-nøkler, biblioteket og merknadene i dokumentene røres ikke.',
@@ -842,7 +839,10 @@ const en: Dict = {
   'tb.signatureOptionsTip': 'Choose or draw a signature',
   'sig.padTitle': 'Draw your signature',
   'sig.padDetail':
-    'Draw with a mouse, pen or finger. It is saved on this machine and can be placed as many times as you like.',
+    'Draw with a mouse, pen or finger — or paste a picture of your signature. It is saved on this machine and can be placed as many times as you like.',
+  'sig.upload': 'Upload an image …',
+  'sig.uploadTip': 'Use a photo or scan of your signature. You can also paste one with Ctrl+V.',
+  'sig.uploadFailed': 'No signature found in that image.',
   'sig.clear': 'Clear',
   'sig.save': 'Save signature',
   'sig.none': 'No signatures saved yet.',
@@ -938,8 +938,6 @@ const en: Dict = {
   'tb.settingsTip': 'Settings — language, annotations, AI, updates and about',
   'reset.action': 'Reset to default settings',
   'reset.tip': 'Put every setting back the way it was when the app was new',
-  'settings.defaultApp': 'Choose the default app for PDFs',
-  'settings.defaultAppTip': 'Opens Windows settings, where you decide',
   'reset.confirmMessage': 'Reset all settings?',
   'reset.confirmDetail':
     'Reading mode, language, tool settings (colour, width and opacity), the eraser, search history, panel widths and the toolbar go back to their defaults. API keys, the library and the annotations in your documents are left alone.',

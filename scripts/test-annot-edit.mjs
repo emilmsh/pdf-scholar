@@ -127,6 +127,82 @@ const ui = {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await settle(400);
   },
+  /** Every handwritten note on the page, with the shape the OVERLAY gave it */
+  handNotes() {
+    const page = this.page();
+    const p = page.getBoundingClientRect();
+    return [...page.querySelectorAll('.annot-handnote')].map((el) => {
+      const r = el.getBoundingClientRect();
+      return {
+        x: Math.round(r.left - p.left), y: Math.round(r.top - p.top),
+        w: Math.round(r.width), h: Math.round(r.height),
+        lines: el.children.length,
+        font: getComputedStyle(el).fontFamily
+      };
+    });
+  },
+  /** Write a handwritten note: choose the handwriting typeface, click the page,
+   *  type, commit. Returns the font-family the EDITOR was showing while the
+   *  text was typed — the thing that has to match the mark. */
+  async writeHand(text) {
+    const chev = [...document.querySelectorAll('.tb-chevron')]
+      .find((b) => /Tekstfarge|Text colour/.test(b.title || ''));
+    if (!chev) throw new Error('no text-options chevron');
+    click(chev);
+    await settle(400);
+    const pick = [...document.querySelectorAll('.tool-menu .scope-option')]
+      .find((b) => /Håndskrift|Handwriting/.test(b.textContent || ''));
+    if (!pick) throw new Error('no handwriting typeface in the text menu');
+    click(pick);
+    await settle(600);
+    click(chev); // close the menu; the chevron leaves the tool armed
+    await settle(300);
+    const page = this.page();
+    const layer = page.querySelector('.draw-layer');
+    if (!layer) throw new Error('the text tool did not arm');
+    const r = page.getBoundingClientRect();
+    layer.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, pointerId: 61, isPrimary: true, button: 0, buttons: 1,
+      clientX: Math.round(r.left + r.width * 0.60),
+      clientY: Math.round(r.top + r.height * 0.24)
+    }));
+    await settle(600);
+    const editor = document.querySelector('.freetext-editor');
+    if (!editor) throw new Error('the text editor did not open');
+    const face = getComputedStyle(editor).fontFamily;
+    editor.value = text;
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(150);
+    editor.dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter', ctrlKey: true, bubbles: true
+    }));
+    await settle(1600);
+    return face;
+  },
+  /** Press a MARK (not a handle) and drag it somewhere else. Mouse arms the
+   *  drag in onMouseDown; the move and the drop are pointer events on window. */
+  async dragMark(selector, dx, dy) {
+    const el = this.page().querySelector(selector);
+    if (!el) throw new Error('no mark matching ' + selector);
+    const r = el.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    const page = this.page();
+    page.dispatchEvent(new MouseEvent('mousedown', {
+      bubbles: true, cancelable: true, view: window, button: 0, clientX: x, clientY: y
+    }));
+    await settle(100);
+    const move = (cx, cy, buttons) => ({
+      bubbles: true, cancelable: true, pointerId: 62, isPrimary: true,
+      button: 0, buttons, clientX: cx, clientY: cy
+    });
+    window.dispatchEvent(new PointerEvent('pointermove', move(x + dx / 3, y + dy / 3, 1)));
+    await settle(120);
+    window.dispatchEvent(new PointerEvent('pointermove', move(x + dx, y + dy, 1)));
+    await settle(120);
+    window.dispatchEvent(new PointerEvent('pointerup', move(x + dx, y + dy, 0)));
+    await settle(1400);
+  },
   /** Click a mark to select it (mouse down/up/click, as a hand does) */
   async selectAt(el, fx, fy) {
     const r = el.getBoundingClientRect();
@@ -332,6 +408,51 @@ try {
   check('Ctrl+Z puts the rectangle back',
     Math.abs(shapeUndone.w - shapeBox.w) <= 3 && Math.abs(shapeUndone.h - shapeBox.h) <= 3,
     `${resized.w}x${resized.h} -> ${shapeUndone.w}x${shapeUndone.h} px`)
+
+  // ---- 3. a handwritten note is a TEXT BOX ----
+  //
+  // v0.36.0 shipped one that could not be moved and could not be resized, and
+  // whose editor typed in the default sans and only became handwriting on
+  // commit. Each of those was a different oversight in a different file, so
+  // each is checked separately here rather than as "the note works".
+  const editorFace = await evalIn(A, `return await ui.writeHand('Dette er en kommentar i margen')`)
+  const wrote = await evalIn(A, `return ui.handNotes()`)
+  check('a handwritten note was written', wrote.length === 1, `${wrote.length} note(s)`)
+  // The EDITOR has to be in the pen already: the committed lines are wrapped
+  // with that font's widths, so an editor measuring in another one breaks its
+  // lines somewhere else than the mark does.
+  check('the editor typed in the handwriting font', /PDFX Hand/.test(editorFace), editorFace)
+  check('…and the mark kept it', /PDFX Hand/.test(wrote[0]?.font ?? ''), wrote[0]?.font ?? 'no note')
+
+  await evalIn(A, `await ui.dragMark('.annot-handnote', -110, 70)`)
+  const moved = await evalIn(A, `return ui.handNotes()`)
+  check('the note can be dragged',
+    moved.length === 1 && Math.abs(moved[0].x - (wrote[0].x - 110)) <= 6 &&
+      Math.abs(moved[0].y - (wrote[0].y + 70)) <= 6,
+    `(${wrote[0]?.x}, ${wrote[0]?.y}) -> (${moved[0]?.x}, ${moved[0]?.y})`)
+
+  const handFramed = await evalIn(A, `
+    const el = ui.page().querySelector('.annot-handnote');
+    await ui.selectAt(el, 0.5, 0.5);
+    return ui.marks();
+  `)
+  check('selecting it shows four grips', handFramed.grips === 4, `${handFramed.grips} grip(s)`)
+
+  // Narrower means MORE LINES: the note's glyphs are baked at fixed positions,
+  // so a resize that only moved the box would leave the words hanging outside
+  // it. That is why it had no handles at all until the re-wrap travelled along.
+  await evalIn(A, `await ui.dragHandle('.annot-selection .br', -70, 0)`)
+  const rewrapped = await evalIn(A, `return ui.handNotes()`)
+  check('dragging it narrower re-wraps the words',
+    rewrapped[0] && rewrapped[0].w < moved[0].w - 20 && rewrapped[0].lines > moved[0].lines,
+    `${moved[0]?.w}px/${moved[0]?.lines} line(s) -> ${rewrapped[0]?.w}px/${rewrapped[0]?.lines} line(s)`)
+
+  await evalIn(A, `await ui.undo()`)
+  const handUndone = await evalIn(A, `return ui.handNotes()`)
+  check('Ctrl+Z puts the wrap back',
+    handUndone[0] && Math.abs(handUndone[0].w - moved[0].w) <= 4 &&
+      handUndone[0].lines === moved[0].lines,
+    `${rewrapped[0]?.w}px/${rewrapped[0]?.lines} -> ${handUndone[0]?.w}px/${handUndone[0]?.lines}`)
 } catch (err) {
   check('the run completed', false, err instanceof Error ? err.message : String(err))
   const log = app.log()

@@ -794,11 +794,20 @@ function PdfPage({
       return
     }
     if (moved) armStrokeHold(stroke)
-    // Predicted events (pen only, Chromium extrapolates) shave the perceived
-    // lag off the wet end of the stroke: drawn this frame, REPLACED by real
-    // points the next — they are never stored.
+    // The browser's extrapolated tail, drawn this frame and REPLACED by real
+    // points the next (never stored), shaves the perceived lag off the wet end
+    // of the stroke.
+    //
+    // A PEN ONLY, and that has to be TESTED here rather than assumed. Chromium
+    // runs its predictor for the mouse too, and a mouse has no lag worth
+    // hiding: what the extrapolation adds is pure overshoot, a tail that wags
+    // back and forth ahead of the cursor and only settles once the real point
+    // lands on top of it. v0.36.0 shipped exactly that — the guard was in the
+    // comment and not in the code — and drawing with a mouse looked broken
+    // (Emil, 2026-08-08). Predicting a pen's tail is worth it because a
+    // digitizer's samples genuinely arrive behind the tip.
     const predicted =
-      'getPredictedEvents' in native
+      e.pointerType === 'pen' && 'getPredictedEvents' in native
         ? native.getPredictedEvents().map((ev): [number, number] => pagePointOf(ev.clientX, ev.clientY, el))
         : []
     redrawStroke(stroke, predicted)

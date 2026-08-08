@@ -44,16 +44,29 @@ export function handFontCss(id: HandFontId | null | undefined): string {
   return `'${handFont(id).cssFamily}', 'Segoe Script', cursive`
 }
 
+/** One offscreen context for every measurement. Resizing a note re-wraps it on
+ *  each pointermove, and a fresh canvas per move is a DOM allocation per frame
+ *  for something that holds no state worth keeping. */
+let measureCtx: CanvasRenderingContext2D | null | undefined
+
 /** Measure a string in page points with a handwriting font, for
  *  `wrapHandText`. The font must be installed first — measuring against a
  *  fallback would wrap at the wrong widths and the note would reflow on save,
- *  so callers await installHandFont(). */
+ *  so callers await installHandFont().
+ *
+ *  The returned function sets `font` on every call rather than once up front:
+ *  the context is shared, so a measurer that trusted a font set at creation
+ *  time would silently start measuring in whatever a later measurer chose. */
 export function handTextMeasurer(
   fontSize: number,
   id: HandFontId = HAND_FONT_DEFAULT
 ): (s: string) => number {
-  const ctx = document.createElement('canvas').getContext('2d')
+  if (measureCtx === undefined) measureCtx = document.createElement('canvas').getContext('2d')
+  const ctx = measureCtx
   if (!ctx) return (s) => s.length * fontSize * 0.5
-  ctx.font = `${fontSize}px "${handFont(id).cssFamily}"`
-  return (s) => ctx.measureText(s).width
+  const font = `${fontSize}px "${handFont(id).cssFamily}"`
+  return (s) => {
+    ctx.font = font
+    return ctx.measureText(s).width
+  }
 }

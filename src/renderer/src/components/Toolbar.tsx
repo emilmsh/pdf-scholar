@@ -7,13 +7,13 @@ import type {
   UpdateUnsupportedReason
 } from '../../../shared/types'
 import { bridge, isElectron } from '../bridge'
-import { isWindows } from '../platform'
 import {
   annotTypeLabel,
   colorLabel,
   FREETEXT_COLORS,
   HIGHLIGHT_COLORS,
   MARKUP_TOOL_TYPES,
+  PEN_COLORS,
   SHAPE_TOOL_TYPES,
   UNDERLINE_COLORS
 } from '../annotations'
@@ -51,7 +51,6 @@ import {
   IconFullscreen,
   IconGear,
   IconComment,
-  IconExternal,
   IconHeart,
   IconMarginNotes,
   IconMarker,
@@ -857,12 +856,11 @@ export default function Toolbar({
           </div>
         )}
         {/* Pen and shapes draw THIN opaque lines, where the highlighter pastels
-            wash out — the same reason UNDERLINE_COLORS exists for line markup
-            ("pastels vanish as thin lines"). It also puts a red pen in reach,
-            which is what marking up a draft actually asks for. The marker is a
-            highlighter and keeps the pastels. Defaults are untouched. */}
+            wash out; the marker IS a highlighter and keeps them. PEN_COLORS is
+            the pen case — black, red, green, yellow, blue — and not the markup
+            palette these borrowed until v0.36.0, which had no black in it. */}
         <div className="color-row">
-          {(tool === 'marker' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) => (
+          {(tool === 'marker' ? HIGHLIGHT_COLORS : PEN_COLORS).map((c) => (
             <button
               key={c.hex}
               className={`color-dot${pref.color.join() === c.rgb.join() ? ' selected' : ''}`}
@@ -1641,25 +1639,12 @@ export default function Toolbar({
               )}
               {updOutcome && <div className="menu-hint">{updateOutcomeText(updOutcome)}</div>}
 
-              {/* Windows will not let an application make itself the default —
-                  it has not since Windows 8 — so this opens the Settings page
-                  and stops there. It says nothing about whether we ARE the
-                  default: an app that volunteers that is nagging, and not
-                  nagging is the whole point of the entry (Emil, 2026-08-08).
-                  It never appears on its own; you have to open this menu. */}
-              {isElectron && isWindows && (
-                <button
-                  className="menu-action"
-                  title={t('settings.defaultAppTip')}
-                  onClick={() => {
-                    setSettingsMenuOpen(false)
-                    bridge.openDefaultAppsSettings()
-                  }}
-                >
-                  <IconExternal size={15} />
-                  {t('settings.defaultApp')}
-                </button>
-              )}
+              {/* No «choose the default PDF app» entry here. It shipped in
+                  v0.36.0 as a deep link to ms-settings:defaultapps and came
+                  straight back out (Emil, 2026-08-08): which app opens a PDF
+                  is the user's business, and a reader that raises the question
+                  unprompted is already halfway to nagging. The installer's
+                  «Open with» association is as far as we go. */}
 
               <div className="theme-menu-sep" />
 

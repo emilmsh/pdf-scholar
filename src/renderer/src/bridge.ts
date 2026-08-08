@@ -116,10 +116,6 @@ export const webApi: PdfxApi = {
   openExternal: (url) => {
     window.open(url, '_blank', 'noopener')
   },
-  // No equivalent off the desktop: a web page cannot open an OS settings pane,
-  // and in the browser the question does not arise — the browser is already the
-  // thing opening PDFs. The menu entry is hidden there rather than inert.
-  openDefaultAppsSettings: () => {},
   // Save model: the browser preview has no real files — everything is a
   // harmless no-op so the save UI can still be exercised
   docOpened: () => {},
