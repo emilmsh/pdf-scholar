@@ -16,6 +16,19 @@ batch so the stores never silently fall a season behind.
 
 ## 0. Screenshots — by hand, Emil
 
+```bash
+npm run build
+```
+
+**Build first, every time.** `shoot` drives the app in `out/`, not the sources,
+so a stale build photographs a stale app — silently, because every frame still
+comes out looking like a screenshot. This is why the step order here is a trap:
+`build` lives in step 1, and step 0 needs it too. It has already cost one full
+set: on 2026-08-08 the shoot ran against a build from the previous morning, and
+the only reason it was caught is that `signature` failed outright — the feature
+had not existed when that build was made. Every other frame in that run was
+wrong in ways nothing would have flagged.
+
 **What ships is Emil's call.** Framing, what is on screen, which answer is worth
 showing and which page tells the story are judgement calls, so `npm run shoot`
 writes to the gitignored `docs/screenshots/_auto/` and cannot touch the shipped

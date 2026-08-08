@@ -454,7 +454,8 @@ const L = {
   // The pin control offers the action you are NOT in, so both titles are needed
   // and they are not interchangeable — see pinToolbar/unpinToolbar.
   unpin: ['Løsne verktøylinjen', 'Unpin the toolbar'],
-  pin: ['Fest verktøylinjen', 'Pin the toolbar']
+  pin: ['Fest verktøylinjen', 'Pin the toolbar'],
+  more: ['Flere verktøy', 'More tools']
 };
 const titleOf = (el) => el.title || '';
 const startsAny = (el, names) => names.some((n) => titleOf(el).startsWith(n));
@@ -688,6 +689,21 @@ const ui = {
     const fit = [...document.querySelectorAll('.toolbar-center .tb-btn')]
       .find((b) => L.fitToggle.some((w) => titleOf(b).includes(w)));
     if (fit && startsAny(fit, L.fitWidth)) { click(fit); await settle(600); }
+  },
+  /** Open the toolbar's "…" menu and return the row matching names, or null.
+   *  Overflow rows are .menu-action buttons carrying the label as TEXT, not as
+   *  a title — the inline buttons are the other way round, which is why this
+   *  cannot just reuse btn(). The caller clicks what it gets back; the menu
+   *  closes itself on that click. */
+  async fromOverflow(names) {
+    const more = btn(L.more);
+    if (!more) return null;
+    if (!document.querySelector('.overflow-menu')) {
+      click(more);
+      await settle(300);
+    }
+    const rows = [...document.querySelectorAll('.overflow-menu .menu-action')];
+    return rows.find((r) => names.some((n) => (r.textContent || '').trim().startsWith(n))) || null;
   },
   /** Scroll so a given phrase sits pad px below the top of the frame. Jumping
    *  to a page lands on the page's TOP EDGE, which on a typeset paper is an inch
@@ -1559,8 +1575,24 @@ const ui = {
    *  words). Pen pointer events with a pressure ramp, because that is what the
    *  pad is built for. */
   async signHere(fx = 0.2, fy = 0.78) {
-    const sig = btn(L.signature);
-    if (!sig) throw new Error('no signature button in the toolbar');
+    // The toolbar folds its secondary buttons into a "…" menu when it runs out
+    // of width, and at the shoot's 1440 px the signature is one of the folded
+    // ones — so looking only inline finds nothing and the frame dies. Reach it
+    // the way a user on a narrow window does.
+    const sig = btn(L.signature) || (await this.fromOverflow(L.signature));
+    if (!sig) {
+      // Say what WAS there. A bare "not found" sent two debugging rounds after
+      // the wrong theory (a renamed tooltip) when the button had merely folded
+      // into the overflow menu.
+      const inline = [...document.querySelectorAll('.tb-btn')].map((b) => titleOf(b).split(' —')[0]);
+      const rows = [...document.querySelectorAll('.overflow-menu .menu-action')]
+        .map((r) => (r.textContent || '').trim());
+      throw new Error(
+        'no signature button, inline or in the "…" menu.' +
+          ' inline: ' + JSON.stringify(inline) +
+          ' overflow: ' + JSON.stringify(rows)
+      );
+    }
     // A leftover signature would skip the pad and arm the old one
     try { localStorage.removeItem('pdfx-signatures') } catch { /* fine */ }
     click(sig);
