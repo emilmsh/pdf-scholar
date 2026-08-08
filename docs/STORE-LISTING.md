@@ -55,6 +55,7 @@ Marking up a paper never interrupts reading it: the tools come to the text you s
 • Comments in the margin: one switch shows every note and comment as visible text beside the page, and an export sets them in a real widened margin, numbered at their anchors, ready to print
 • Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes and free text
 • With a stylus on a touch screen, the pen draws while a finger scrolls; pen pressure varies the line (beta), and the saved file keeps the varying width
+• The text tool writes printed or in handwriting, with the font embedded in the file
 • Colour, thickness and opacity per tool, remembered between sessions
 • Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape
 • Marks are saved back into the PDF itself as standard annotations, so the file reads the same in Acrobat and every other viewer

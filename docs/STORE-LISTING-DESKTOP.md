@@ -63,6 +63,7 @@ ANNOTATION
 • Highlight, underline, strikeout and a true-wave squiggly, in your own colours
 • Pen and marker with hold-to-straighten, shapes, sticky notes and free text in the colour and size you pick
 • With a stylus on a touch screen, the pen draws while a finger scrolls and zooms; pen pressure varies the line (beta), and the saved file keeps the varying width
+• The text tool writes printed or in handwriting — the red-pen-in-the-margin kind of comment, with the font embedded so it reads that way for whoever opens the file
 • Colour, thickness and opacity per tool, remembered between sessions
 • Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape, text box or drawing
 • Comments anchored to the text they mark
@@ -113,6 +114,7 @@ ANNOTERING
 • Utheving, understreking, gjennomstreking og en ekte bølget strek, i dine egne farger
 • Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst i farge og størrelse du velger
 • Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden
+• Tekstverktøyet skriver trykt eller i håndskrift — kommentaren i margen med rød penn, med fonten innebygd så den leses slik hos alle som åpner filen
 • Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
 • Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form, tekstboks eller tegning
 • Kommentarer forankret til teksten de merker

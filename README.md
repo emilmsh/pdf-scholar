@@ -222,6 +222,9 @@ clutter the page while you read.
   zooms; pen pressure varies the line *(beta)*, and the saved file keeps the
   varying width — other readers render it the same. A toggle in the tool menus
   hands drawing back to the finger
+- **The text tool writes in two typefaces**: printed, or handwriting — the
+  red-pen-in-the-margin kind of comment. The font is embedded in the file, so
+  the note reads as handwriting for whoever opens it, not only here
 - **Colour, thickness and opacity per tool**, remembered between sessions. A «Standard»
   link appears next to any tool you have changed from its default
 - Shapes (rectangle, ellipse, line, arrow), draggable sticky notes, and free text typed

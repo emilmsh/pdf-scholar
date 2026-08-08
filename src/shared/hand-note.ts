@@ -12,10 +12,11 @@
 // inside the file the glyphs are identical in Acrobat, in a browser, and in
 // the app itself. The note's words also live in /Contents, so the notes panel,
 // search and the exports keep working on it like any other comment.
-import { HAND_FONT_BASE64, HAND_FONT_NAME } from './hand-font-data'
-
-export { HAND_FONT_NAME }
-
+// The font itself is 280 kB of base64 and is loaded ON DEMAND — the first time
+// someone writes or displays a handwritten note. Nothing about a plain reading
+// session should pay for a feature it never uses (and a static import put the
+// whole thing in every bundle and decoded it at startup).
+//
 /** Marks a Stamp as OURS. A Stamp is a generic subtype — other apps use it for
  *  image stamps — so reading one back only treats it as a handwritten note
  *  when this key is present. */
@@ -29,15 +30,25 @@ export const HAND_LINE_HEIGHT = 1.24
  *  to place the first baseline the same way in both renderings. */
 export const HAND_ASCENT = 0.75
 
-let cached: Uint8Array | null = null
+let cachedBytes: Uint8Array | null = null
+let loading: Promise<string> | null = null
 
-/** The font bytes. Decoded once — 210 kB of base64 is not worth re-parsing. */
-export function handFontBytes(): Uint8Array {
-  if (cached) return cached
-  const bin = atob(HAND_FONT_BASE64)
+/** The base64, fetched from its own chunk the first time it is wanted. */
+function handFontBase64(): Promise<string> {
+  loading ??= import('./hand-font-data').then((m) => m.HAND_FONT_BASE64)
+  return loading
+}
+
+/** The font bytes, for embedding. Awaited by the engines BEFORE they enter the
+ *  synchronous raw-pointer bridge, so the decode never happens under a
+ *  borrowed page handle. Decoded once. */
+export async function handFontBytes(): Promise<Uint8Array> {
+  if (cachedBytes) return cachedBytes
+  const b64 = await handFontBase64()
+  const bin = atob(b64)
   const out = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i)
-  cached = out
+  cachedBytes = out
   return out
 }
 
@@ -47,8 +58,8 @@ export function handFontBytes(): Uint8Array {
 export const HAND_FONT_CSS_FAMILY = 'PDFX Hand'
 
 /** A `data:` URL for the renderer's @font-face */
-export function handFontDataUrl(): string {
-  return `data:font/ttf;base64,${HAND_FONT_BASE64}`
+export async function handFontDataUrl(): Promise<string> {
+  return `data:font/ttf;base64,${await handFontBase64()}`
 }
 
 /** Greedy word wrap. Width is measured by the caller (it differs per

@@ -165,6 +165,11 @@ siden av siden, og eksporten printer dem slik.
   zooms; pen pressure varies the line **(beta)**, and the saved file keeps the
   varying width — other readers render it the same. A toggle in the tool menus
   hands drawing back to the finger
+- The text tool writes in two typefaces: printed, or **handwriting** — the
+  red-pen-in-the-margin kind of comment. The handwriting font is embedded in
+  the file, so the note reads as handwriting for whoever opens it, not only
+  here. (Say "handwriting", never "handwritten": nobody's actual hand is
+  involved, and claiming otherwise is a promise the file cannot keep.)
 - Colour, thickness and opacity per tool, remembered between sessions
 - A mark can be corrected rather than redrawn: drag either end of a highlight
   and it snaps to whole words, or a corner of a shape, text box or drawing

@@ -328,9 +328,11 @@ function drawHandLines(
   lines: string[],
   box: PageRect,
   fontSize: number,
-  color: [number, number, number]
+  color: [number, number, number],
+  /** Awaited by the caller before entering the raw bridge — the font is loaded
+   *  on demand and nothing may await under a borrowed page handle. */
+  bytes: Uint8Array
 ): boolean {
-  const bytes = handFontBytes()
   const fontData = raw.pdfium.wasmExports.malloc(bytes.length)
   raw.pdfium.HEAPU8.set(bytes, fontData)
   const font = raw.FPDFText_LoadFont(docPtr, fontData, bytes.length, FPDF_FONT_TRUETYPE, true)
@@ -490,10 +492,13 @@ async function createHandNote(open: OpenDoc, req: AnnotateRequest): Promise<Anno
   const id = objNums[objNums.length - 1]
   if (!id) return ENGINE_ERRORS.noObjectNumber
 
+  // Load the font BEFORE the raw bridge: borrowPage is synchronous and nothing
+  // may await while a page handle is held.
+  const fontBytes = await handFontBytes()
   const drawn = withDocAndPage(engine, docId, req.pageIndex, (docPtr, pagePtr, raw) => {
     const ok = withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
       setAnnotRect(raw, annotPtr, box, pageH)
-      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, req.fontSize ?? 14, req.color)) {
+      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, req.fontSize ?? 14, req.color, fontBytes)) {
         return false
       }
       writeHandState(raw, annotPtr, lines, req.fontSize ?? 14, req.color)
@@ -517,7 +522,7 @@ async function createHandNote(open: OpenDoc, req: AnnotateRequest): Promise<Anno
  *  down again at the new box. Used for a move, a resize and an edit alike —
  *  all three change where the glyphs go, and re-baking is the only way to
  *  move text that is baked into an appearance. */
-function rebakeHandNote(
+async function rebakeHandNote(
   open: OpenDoc,
   pageIndex: number,
   id: number,
@@ -526,17 +531,18 @@ function rebakeHandNote(
   fontSize: number,
   color: [number, number, number],
   contents: string | undefined
-): boolean {
+): Promise<boolean> {
   const { engine, doc, docId } = open
   const pageH = doc.pages[pageIndex]?.size.height
   if (!pageH) return false
+  const fontBytes = await handFontBytes()
   return withDocAndPage(engine, docId, pageIndex, (docPtr, pagePtr, raw) => {
     const ok = withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
       for (let i = raw.FPDFAnnot_GetObjectCount(annotPtr) - 1; i >= 0; i--) {
         raw.FPDFAnnot_RemoveObject(annotPtr, i)
       }
       setAnnotRect(raw, annotPtr, box, pageH)
-      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, fontSize, color)) return false
+      if (!drawHandLines(raw, docPtr, annotPtr, lines, box, fontSize, color, fontBytes)) return false
       if (contents !== undefined) {
         withWideString(raw, contents, (p) => raw.FPDFAnnot_SetStringValue(annotPtr, 'Contents', p))
       }
@@ -639,7 +645,7 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
       if (!req.hand && !req.rect && !req.quads && req.translate) {
         box = { ...box, x: box.x + req.translate.dx, y: box.y + req.translate.dy }
       }
-      const done = rebakeHandNote(
+      const done = await rebakeHandNote(
         open,
         req.pageIndex,
         req.id,
