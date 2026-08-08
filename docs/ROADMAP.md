@@ -147,13 +147,32 @@ posten folk til en butikk som ligger to versjoner bak.
 Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas etter v1.0.
 
 ### Bolk 1 — adopsjonshullene (v0.36)
-- [ ] **Utfylling av skjemaer (AcroForm).** Appen tegner ikke feltwidgets i det
-  hele tatt i dag, så en skjema-PDF ser tom og død ut — det leses som en feil,
-  ikke som en manglende funksjon. Edge fyller ut skjemaer, og Edge er
-  interop-/paritetsbaren vår (fase 4-porten, `docs/PLATFORMS.md`). PDFium kan
-  det allerede, så kostnaden er UI + lagringssti, ikke en ny motor. Merk at
+- [ ] **Utfylling av skjemaer (AcroForm).** Edge fyller ut skjemaer, og Edge er
+  interop-/paritetsbaren vår (fase 4-porten, `docs/PLATFORMS.md`). Merk at
   **skjema-OPPRETTELSE** forblir utenfor omfang (`docs/SPEC.md` §10) — bare
   utfylling kommer inn.
+  - *Korrigert 2026-08-08:* denne sto først som «appen tegner ikke feltwidgets i
+    det hele tatt». Det er feil, og det flytter arbeidet. `PdfPage.tsx` rendrer
+    med `AnnotationMode.ENABLE`, så pdf.js maler allerede widgetenes
+    appearance streams på lerretet — et Acrobat-laget skjema viser rammene og de
+    verdiene som står der. Defekten er at feltene er **døde**: ingen tone, ingen
+    markørendring, ingen fokus, ingenting skjer ved klikk. Det er en mindre
+    tegnejobb og en større interaksjonsjobb enn antatt.
+  - To funn som former løsningen: **å åpne skjemamiljøet i PDFium skitner
+    dokumentet** — det syntetiserer `/AP` for hver AP-løse annotasjon på siden,
+    inkludert de kantlinje-bare Link-ene `link-ap-guard.ts` finnes for, og
+    EmbedPDFs høynivå-API stempler i tillegg `/NM`-UUID-er ved lesing. Derfor
+    skal **all lesing gå gjennom pdf.js** (som eksponerer hele feltmodellen), og
+    hver skriveoperasjon pakkes i `withLinkApGuard`. Og **PDFium håndhever ikke
+    read-only**: en skrivebeskyttet felt tok imot verdien. Sperren må ligge på
+    IPC-grensen, ikke bare i UI-et.
+  - Grenser som må sies høyt i kopien: **XFA-skjemaer** (fortsatt utbredt i
+    norsk offentlig sektor) kan ikke fylles ut, og **felt-JavaScript kjører
+    ikke**, så et skjema med utregnede felt tar imot verdien uten å regne om.
+    Edge feiler på begge, så paritetsbaren holder — men appen må si det, ikke
+    tie. Over 150 MB: navngitt avslag (`append-no-form-fill`), fordi appenderen
+    kan skrive `/V` men ikke legge ut et appearance stream i dokumentets egen
+    font, og en verdi uten utseende er blank i de fleste lesere.
 - [ ] **«Sett som standard PDF-leser» + førstegangsoppsett.** Installeren kaprer
   bevisst ikke standardappen (fase 1), men appen sier heller ingenting — så folk
   installerer, dobbeltklikker en PDF, og Edge åpner den. Knapp som deep-linker
@@ -168,7 +187,27 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
   rekkefølgen innenfor bolken er forhandlingsbar, omfanget er det ikke. Går noe
   galt, tas det når det oppstår (Emil 2026-08-08).
 - [ ] **Beskjær marger** (åpent fase 2-punkt) — reell verdi for skannede og
-  bredmargede artikler på en laptopskjerm.
+  bredmargede artikler på en laptopskjerm. Retningen er valgt: **auto-deteksjon
+  via lavoppløst pikselskann** (det eneste som virker på en skannet side uten
+  tekstlag), **én dokumentbred beskjæring** i v1 fordi `buildRows` trenger alle
+  sideboksene før den kan bygge `tops`, og beskjæringen anvendes ved å **flytte
+  origo i DOM-en** med et wrapper-element framfor å lappe koordinatformlene ~12
+  steder. Da er zoom-ankringen urørt — beskjæringsendringer rutes gjennom
+  `reanchorFor`, slik rotasjon og oppslag allerede gjør.
+- [ ] **Håndskriftfonten byttes til Caveat** (Emils valg 2026-08-08). Dagens
+  Patrick Hand er loddrett, usammenbundet og nesten monolinje — den leser som
+  pen blokkskrift, ikke som en penn. Caveat er skrå, delvis sammenbundet og har
+  ekte strekmodulasjon, har full Latin Extended-A og ingen Reserved Font Name,
+  og linjehøyden ligger allerede på det `hand-note.ts` antar. To feller:
+  Caveats naturlighet hviler på `calt`, som PDFium ikke shaper og nettleseren
+  slår på — så layout-featurene må strippes i subsettingen, ellers viser
+  overlayet andre glyfer og bredder enn fila. Og Google leverer bare den
+  variable `Caveat[wght].ttf`; en variabel font skal ikke bygges inn i en PDF.
+  Subsettet lander under dagens 215 kB, som krymper hver lagrede brukerfil.
+  **Fontnavnet lagres på merknaden** (ved siden av `PDFX_HandLines`/`HandSize`/
+  `HandColor`) så overlayet tegner en gammel note i den hånden den faktisk ble
+  skrevet med — uten det ville en urørt gammel note sett ulik ut i PDFX og i
+  alle andre lesere, som er nøyaktig det modulen finnes for å hindre.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som
