@@ -23,9 +23,9 @@ store supports a localized listing.
 PDF Scholar
 
 ## Short description (≤132 chars — Chrome limit)
-**EN:** Read and annotate PDFs in the browser: annotation tools within reach, split view, and an optional AI assistant.
+**EN:** A PDF viewer for the browser that is nearly all page: tools within reach, split view, and an optional AI assistant.
 
-**NO:** Les og annoter PDF-er i nettleseren: annoteringsverktøy innen rekkevidde, delt visning og en valgfri AI-assistent.
+**NO:** En PDF-leser i nettleseren som er nesten bare side: verktøy innen rekkevidde, delt visning og en valgfri AI-assistent.
 
 ## Single purpose (Chrome requires this)
 PDF Scholar replaces the browser's built-in PDF viewer with a full-featured reader and annotator, so PDFs opened in the browser can be read and marked up in one place.
@@ -36,7 +36,7 @@ PDF Scholar replaces the browser's built-in PDF viewer with a full-featured read
 
 **EN:**
 ```
-PDF Scholar replaces the browser's built-in PDF viewer with a reader and annotator meant for the documents you have to work through: research articles, reports, books.
+PDF Scholar replaces the browser's built-in PDF viewer with a reader and annotator meant for the documents you have to work through: research articles, reports, books. The window is nearly all page — one slim toolbar carries the tools you use, and everything else stays out of the way until you call it, including the optional AI assistant.
 
 Open a PDF and it becomes an ordinary browser tab in the PDF Scholar viewer instead of the browser's basic reader. Make your browser your default PDF app and local PDFs open here too.
 
@@ -74,7 +74,7 @@ Free and open source (MIT). No account, no tracking, no ads. Everything works of
 
 **NO:**
 ```
-PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotator laget for dokumentene du må jobbe deg gjennom: forskningsartikler, rapporter, bøker.
+PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotator laget for dokumentene du må jobbe deg gjennom: forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank verktøylinje bærer verktøyene du bruker, og alt annet holder seg unna til du henter det fram, inkludert den valgfrie AI-assistenten.
 
 Åpne en PDF, og den blir en vanlig nettleserfane i PDF Scholar-leseren i stedet for nettleserens enkle visning. Gjør nettleseren til standard PDF-app, så åpnes lokale PDF-er også her.
 

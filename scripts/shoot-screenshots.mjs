@@ -95,6 +95,47 @@ const SHOTS = [
     `
   },
   {
+    // The claim the copy now LEADS with — the window is nearly all page — needs
+    // a picture, and tricolor cannot be it. Tricolor opens all three surfaces
+    // (Emil's rule, 2026-08-08: a frame that OPENS a surface has to read as an
+    // application, so it keeps its toolbar), and it is composed from `reading`,
+    // so unpinning there would strip the toolbar out of tricolor's own Day
+    // panel too. Hence a frame of its own.
+    //
+    // Deliberately NOT page 1: `reading`, `parchment` and `night` all frame the
+    // cover, and a fourth cover would read as a duplicate rather than as a
+    // different state of the app. A body page says "this is what reading looks
+    // like", which is the point.
+    //
+    // Fit-WIDTH, not fit-page: fitted whole, an A4 page leaves broad bands of
+    // app background down both sides, which is the opposite of the claim. At
+    // fit-width the page runs edge to edge and off the bottom, and the only
+    // chrome left is the tab strip (which stays put by design — see the
+    // .viewer.toolbar-unpinned rule in app.css). That strip is also what keeps
+    // the frame legible as an app rather than as a picture of a PDF.
+    //
+    // F11 is not what is photographed, and does not need to be: the shoot pins
+    // device metrics, so a real fullscreen capture differs from this one only
+    // by the tab strip. What carries the claim is the toolbar being gone.
+    name: 'page_only',
+    caption: 'The toolbar unpinned: the page, and almost nothing else',
+    setup: `
+      await ui.closePanels()
+      await ui.fitWidth()
+      await ui.goToPage(5)
+      ui.expectPage(0, 5)
+      // Past the page's top margin, so the frame opens on text rather than on
+      // an inch of blank paper — the whole point is a window full of page.
+      await ui.scrollTextToTop('Multi-head attention allows', 40)
+      await ui.unpinToolbar()
+      // Two 2.6 s timers have to run out, not one: the "toolbar unpinned" toast,
+      // and the reading HUD's own idle fade, which takes the page-number pill
+      // with it. Anything shorter photographs a toast.
+      await ui.settle(3400)
+      ui.expectNoToolbar()
+    `
+  },
+  {
     // Historical name, kept so the shot name stays stable; the shot is the
     // outline sidebar. It ships nowhere today (scripts/lib/shots.json) and is
     // kept as a smoke test of the sidebar.
@@ -409,7 +450,11 @@ const L = {
   note: ['Notat', 'Note'],
   text: ['Tekst på siden', 'Text on the page'],
   signature: ['Signatur', 'Signature'],
-  margin: ['Vis kommentarer i margen', 'Show comments in the margin']
+  margin: ['Vis kommentarer i margen', 'Show comments in the margin'],
+  // The pin control offers the action you are NOT in, so both titles are needed
+  // and they are not interchangeable — see pinToolbar/unpinToolbar.
+  unpin: ['Løsne verktøylinjen', 'Unpin the toolbar'],
+  pin: ['Fest verktøylinjen', 'Pin the toolbar']
 };
 const titleOf = (el) => el.title || '';
 const startsAny = (el, names) => names.some((n) => titleOf(el).startsWith(n));
@@ -643,6 +688,50 @@ const ui = {
     const fit = [...document.querySelectorAll('.toolbar-center .tb-btn')]
       .find((b) => L.fitToggle.some((w) => titleOf(b).includes(w)));
     if (fit && startsAny(fit, L.fitWidth)) { click(fit); await settle(600); }
+  },
+  /** Scroll so a given phrase sits pad px below the top of the frame. Jumping
+   *  to a page lands on the page's TOP EDGE, which on a typeset paper is an inch
+   *  of blank margin — fine when the frame is about the app, wrong when the
+   *  frame is about the page filling the window. Anchored on the text rather
+   *  than a pixel offset, so it survives a zoom or a margin change. */
+  async scrollTextToTop(phrase, pad = 40) {
+    const host = document.querySelector('.pages');
+    const span = [...host.querySelectorAll('.textLayer span')]
+      .find((s) => (s.textContent || '').includes(phrase));
+    if (!span) throw new Error('no text matching ' + JSON.stringify(phrase) + ' is rendered');
+    const box = host.getBoundingClientRect();
+    host.scrollTop += span.getBoundingClientRect().top - box.top - pad;
+    host.dispatchEvent(new Event('scroll'));
+    await settle(500);
+  },
+  /** Unpin the toolbar: it tucks itself away and takes the side panels with it.
+   *  Idempotent — the control offers the state you are NOT in, so calling it
+   *  twice would pin the toolbar straight back. */
+  async unpinToolbar() {
+    if (document.querySelector('.viewer.toolbar-unpinned')) return;
+    const b = btn(L.unpin);
+    if (!b) throw new Error('no unpin-toolbar button');
+    click(b);
+    await settle(500);
+  },
+  /** The counterpart, and the reason it exists: the pin state is written to
+   *  localStorage and the shots share ONE profile, so an unpinned toolbar would
+   *  otherwise leak into every frame taken after it. The between-shots reset
+   *  calls this. */
+  async pinToolbar() {
+    if (!document.querySelector('.viewer.toolbar-unpinned')) return;
+    const b = btn(L.pin);
+    if (!b) throw new Error('no pin-toolbar button');
+    click(b);
+    await settle(500);
+  },
+  /** Unpinned is not the same as GONE: the toolbar peeks back on a top-edge
+   *  hover, and a peeking toolbar is the one thing this frame exists to
+   *  disprove. Assert the tuck, not the setting. */
+  expectNoToolbar() {
+    const wrap = document.querySelector('.toolbar-wrap');
+    if (wrap && !wrap.classList.contains('tucked'))
+      throw new Error('the toolbar is still on screen — it peeked, or the unpin did not take');
   },
   async setTheme(id) {
     await this.toggle(L.theme);
@@ -1811,8 +1900,14 @@ try {
       failed++
       console.log(`FAILED: ${err.message}`)
     }
-    // Every shot starts from a clean slate, so one failure cannot cascade
-    await runSetup(send, `await ui.closePanels(); await ui.setTheme('day')`).catch(() => {})
+    // Every shot starts from a clean slate, so one failure cannot cascade.
+    // pinToolbar is not cosmetic: the pin state is persisted, and the shots
+    // share one profile, so without it `page_only` would silently unpin every
+    // frame taken after it.
+    await runSetup(
+      send,
+      `await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
+    ).catch(() => {})
   }
   ws.close()
 } catch (err) {

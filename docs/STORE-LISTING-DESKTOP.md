@@ -26,9 +26,9 @@ listing supports a localized variant. Privacy policy URL:
 PDF Scholar
 
 ## Short / summary description (≤ ~250 chars)
-**EN:** A PDF reader and annotator for Windows, for people who read long documents for work. Annotation tools within reach and never in the way, split view, and an optional AI assistant that cites the passage it used. Free and open source.
+**EN:** A PDF reader for Windows where the window is nearly all page — one slim toolbar, and everything else out of the way until you call it, including an optional AI assistant that cites the passage it used. Free and open source.
 
-**NO:** En PDF-leser og -annotator for Windows, for folk som leser lange dokumenter i jobben. Annoteringsverktøy innen rekkevidde og aldri i veien, delt visning, og en valgfri AI-assistent som viser hvor svaret kom fra. Gratis og åpen kildekode.
+**NO:** En PDF-leser for Windows der vinduet er nesten bare side — én slank verktøylinje, og alt annet unna til du henter det fram, inkludert en valgfri AI-assistent som viser hvor svaret kom fra. Gratis og åpen kildekode.
 
 ---
 
@@ -36,7 +36,7 @@ PDF Scholar
 
 **EN:**
 ```
-PDF Scholar is a PDF reader and annotator for Windows, for the documents you have to work through rather than skim: research articles, reports, books. Marking up a paper never interrupts reading it — the tools come to the text you selected and everything you have marked stays one panel away. The optional AI assistant answers from the document and shows which passage it used, and the toolbar can be hidden when you want the whole window showing the page.
+PDF Scholar is a PDF reader and annotator for Windows, for the documents you have to work through rather than skim: research articles, reports, books. The window is nearly all page — one slim toolbar carries the tools you use, everything else stays out of the way until you call it, and the toolbar itself unpins when you want nothing but the page. Marking up a paper never interrupts reading it: the tools come to the text you selected, and everything you have marked stays one panel away. The optional AI assistant answers from the document and shows which passage it used.
 
 Free and open source (MIT). No account, no sign-in, no tracking, no ads. Everything works offline except the optional AI, which uses your own key. Native x64 and arm64, so Windows-on-ARM machines like the Surface run the arm64 build rather than x64 under emulation. The Store keeps it updated automatically.
 
@@ -89,7 +89,7 @@ Source code: https://github.com/emilmsh/pdf-scholar
 
 **NO:**
 ```
-PDF Scholar er en PDF-leser og -annotator for Windows, for dokumentene du må jobbe deg gjennom og ikke bare skumme: forskningsartikler, rapporter, bøker. Å annotere en artikkel avbryter aldri lesingen — verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna. Den valgfrie AI-assistenten svarer ut fra dokumentet og viser hvilket avsnitt den brukte, og verktøylinja kan skjules når du vil at hele vinduet skal vise siden.
+PDF Scholar er en PDF-leser og -annotator for Windows, for dokumentene du må jobbe deg gjennom og ikke bare skumme: forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank verktøylinje bærer verktøyene du bruker, alt annet holder seg unna til du henter det fram, og verktøylinja selv kan løsnes når du bare vil ha siden. Å annotere en artikkel avbryter aldri lesingen: verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna. Den valgfrie AI-assistenten svarer ut fra dokumentet og viser hvilket avsnitt den brukte.
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel. Både x64 og arm64, så Windows-på-ARM-maskiner som Surface kjører arm64-varianten framfor x64 under emulering. Store holder appen automatisk oppdatert.
 

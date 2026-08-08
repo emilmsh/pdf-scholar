@@ -52,36 +52,42 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 
 ## The one-liner
 
-**EN:** A Windows PDF reader built for reading.
+**EN:** A Windows PDF reader that is nearly all page.
 
-**NO:** En PDF-leser for Windows, bygget for lesing.
+**NO:** En PDF-leser for Windows som er nesten bare side.
+
+The interface leads, deliberately (Emil's call, 2026-08-08): the first thing
+said about the app is what the window looks like, because that is what a reader
+notices first and what the app is actually built around. The assistant is named
+in the same breath — but last, and always as optional.
 
 Store-length variant, where the one-liner alone is too thin. Verbatim what the
 Microsoft Store listing carries — **250 characters is the cap**, and
 `npm run test:listing` enforces it:
 
-**EN:** A PDF reader and annotator for Windows, for people who read long
-documents for work. Annotation tools within reach and never in the way, split
-view, and an optional AI assistant that cites the passage it used. Free and open
-source.
+**EN:** A PDF reader for Windows where the window is nearly all page — one slim
+toolbar, and everything else out of the way until you call it, including an
+optional AI assistant that cites the passage it used. Free and open source.
 
-**NO:** En PDF-leser og -annotator for Windows, for folk som leser lange
-dokumenter i jobben. Annoteringsverktøy innen rekkevidde og aldri i veien, delt
-visning, og en valgfri AI-assistent som viser hvor svaret kom fra. Gratis og åpen
-kildekode.
+**NO:** En PDF-leser for Windows der vinduet er nesten bare side — én slank
+verktøylinje, og alt annet unna til du henter det fram, inkludert en valgfri
+AI-assistent som viser hvor svaret kom fra. Gratis og åpen kildekode.
 
 ## The lede
 
 **EN:** For the documents you work through rather than skim: research articles,
-reports, books. The window is nearly all page — one slim toolbar carries the
-tools you use frequently, and everything else stays out of the way until you
-call it. Free, MIT-licensed, and offline unless you ask a question.
+reports, books. One slim toolbar carries the tools you use frequently, and
+everything else — contents, notes, the assistant — stays out of the way until
+you call it. Free, MIT-licensed, and offline unless you ask a question.
 
 **NO:** For dokumentene du jobber deg gjennom og ikke bare skummer:
-forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank
-verktøylinje bærer verktøyene du bruker ofte, og alt annet holder seg unna
-til du henter det fram. Gratis, MIT-lisensiert, og offline med mindre du stiller
+forskningsartikler, rapporter, bøker. Én slank verktøylinje bærer verktøyene du
+bruker ofte, og alt annet — innhold, notater, assistenten — holder seg unna til
+du henter det fram. Gratis, MIT-lisensiert, og offline med mindre du stiller
 et spørsmål.
+
+*(The lede no longer opens with "the window is nearly all page": the one-liner
+above now says exactly that, and the two of them in a row read as a stutter.)*
 
 ---
 

@@ -4,12 +4,12 @@
 
 <h1 align="center">PDF Scholar</h1>
 
-<p align="center"><strong>A Windows PDF reader built for reading.</strong></p>
+<p align="center"><strong>A Windows PDF reader that is nearly all page.</strong></p>
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
-reports, books. The window is nearly all page: one slim toolbar carries the tools you use
-frequently, the contents and assistant panels stay out of the way until you call them, and 
-toggling fullscreen or the toolbar is always one click away, leaving the page and nothing else.
+reports, books. One slim toolbar carries the tools you use frequently, the contents and
+assistant panels stay out of the way until you call them, and toggling fullscreen or the
+toolbar is always one click away, leaving the page and nothing else.
 
 Everything a long document asks of you is here. A page you can stand to look at all day, in
 light, sepia or dark mode. Highlight, pen, shapes and notes, each with its own colour, thickness
@@ -24,7 +24,7 @@ ask a question.
 Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
 the same reader inside your browser.
 
-![Reading view](docs/screenshots/reading.png)
+![The same page in Day, Sepia and Night — one window, wiped across the three themes](docs/screenshots/tricolor.png)
 
 ## Download
 
@@ -145,13 +145,20 @@ the current desktop-vs-extension parity.
 
 **Language and themes**
 
-![The same page in Day, Sepia and Night — one window, wiped across the three themes](docs/screenshots/tricolor.png)
+The frame at the top of this page is one window wiped across Day, Sepia and Night. Sepia
+puts the page on warm ivory with a terracotta accent; Night and Night+ are the two dark
+modes, the second with higher contrast for bright text on very dark grey. The interface
+itself is available in Norwegian and English, and the setting also controls the AI
+prompts, exported documents and date formats.
 
-Above: the same page in Day, Sepia and Night, in one frame. Sepia puts the page on warm
-ivory with a terracotta accent; Night and Night+ are the two dark modes, the second with
-higher contrast for bright text on very dark grey. The interface itself is available in
-Norwegian and English, and the setting also controls the AI prompts, exported documents
-and date formats.
+**Nothing but the page**
+
+![A body page filling the window with the toolbar unpinned — only the tab strip above it](docs/screenshots/page_only.png)
+
+Unpin the toolbar with **V** and it goes, taking the side panels with it: what is left is
+the tab strip and the page. Hover the top edge to bring the toolbar back, the left edge for
+the contents, the right edge for the assistant — nothing is lost, it is just not in front of
+you. **Presentation mode** (P) drops even the tab strip.
 
 **Split view**
 

@@ -50,15 +50,24 @@ surface missing one it needs.
 
 | Frame | README | Landing page | Stores |
 |---|---|---|---|
-| `tricolor` (composed) | ✓ | ✓ | 1 |
-| `reading` | hero | hero + `og:image` | — |
+| `tricolor` (composed) | hero | hero + `og:image` | 1 |
+| `page_only` | ✓ | ✓ | — |
 | `annotations` | ✓ | ✓ | 2 |
 | `assistant` | ✓ | ✓ | 3 |
 | `assistant_figure` | ✓ | — | 4 |
 | `assistant_snip` | ✓ | — | — |
 | `dual-pane` | ✓ | ✓ | 5 |
-| `parchment`, `night` | — | — | — (tricolor's sources) |
+| `reading`, `parchment`, `night` | — | — | — (tricolor's sources) |
 | `night+`, `annotations_edit`, `reading_tabs` | — | — | — (shot as smoke tests) |
+
+**Why tricolor opens everything, and why it keeps its toolbar** (Emil, 2026-08-08).
+A frame that OPENS a surface has to read as an application, so the opening frame
+keeps the toolbar — and tricolor is the app's most recognisable single image, so
+it opens all three surfaces, `og:image` included (that is the thumbnail LinkedIn
+draws under a shared link). Consequence: `reading` keeps its toolbar too, because
+tricolor is composed from it, and `reading` therefore stopped shipping anywhere of
+its own. The toolbar-less frame the copy now leads with is `page_only` — a body
+page at fit-width with the toolbar unpinned — and it is second, never first.
 
 Shoot everything in one run when you re-shoot anything: the frames share a
 session, and a set mixed across runs shows the app at two different moments.
