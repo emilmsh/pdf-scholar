@@ -23,9 +23,9 @@ store supports a localized listing.
 PDF Scholar
 
 ## Short description (≤132 chars — Chrome limit)
-**EN:** A PDF viewer for the browser that is nearly all page: annotation at the selected text, split view, and an optional AI assistant.
+**EN:** A PDF viewer for the browser, built for research: annotation at the selected text, split view, and an optional AI assistant.
 
-**NO:** En PDF-leser i nettleseren som er nesten bare side: annotering ved merket tekst, delt visning og en valgfri AI-assistent.
+**NO:** En PDF-leser i nettleseren, laget for forskning: annotering ved merket tekst, delt visning og en valgfri AI-assistent.
 
 ## Single purpose (Chrome requires this)
 PDF Scholar replaces the browser's built-in PDF viewer with a full-featured reader and annotator, so PDFs opened in the browser can be read and marked up in one place.

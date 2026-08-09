@@ -4,7 +4,7 @@
 
 <h1 align="center">PDF Scholar</h1>
 
-<p align="center"><strong>A Windows PDF reader that is nearly all page.</strong></p>
+<p align="center"><strong>A Windows PDF reader for research.</strong></p>
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
 reports, books. One slim toolbar carries the annotation tools, the contents and assistant
@@ -146,10 +146,6 @@ two dark modes, the second with higher contrast.
   own window, or along the bar to reorder
 - The interface is in Norwegian or English; the choice also applies to the AI prompts,
   exports and date formats
-- Every key named above is a default: Settings → Keyboard shortcuts lists all of them in
-  one map, and any can be rebound or reset
-
-![The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another](docs/screenshots/shortcuts.png)
 
 **Split view**
 
@@ -257,6 +253,14 @@ reference. Following one goes to the sentence the claim came from.
 ![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
 
 ![Explain a figure — the region you marked sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
+
+**Keyboard shortcuts**
+
+Every command is listed in one map — Settings → Keyboard shortcuts — grouped by task,
+with its keys beside it. Any shortcut can be rebound or reset, one key or all at once;
+the keys named in this README are the defaults.
+
+![The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another](docs/screenshots/shortcuts.png)
 
 **Where your key is kept**
 

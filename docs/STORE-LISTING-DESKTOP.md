@@ -26,9 +26,9 @@ listing supports a localized variant. Privacy policy URL:
 PDF Scholar
 
 ## Short / summary description (≤ ~250 chars)
-**EN:** A PDF reader for Windows where the window is nearly all page — one slim toolbar, and everything else out of the way until you call it, including an optional AI assistant that cites the passage it used. Free and open source.
+**EN:** A PDF reader for Windows, built for research — one slim toolbar, everything else out of the way until you call it, and an optional AI assistant that cites the passage it used. Free and open source.
 
-**NO:** En PDF-leser for Windows der vinduet er nesten bare side — én slank verktøylinje, og alt annet unna til du henter det fram, inkludert en valgfri AI-assistent som viser hvor svaret kom fra. Gratis og åpen kildekode.
+**NO:** En PDF-leser for Windows, laget for forskning — én slank verktøylinje, alt annet unna til du henter det fram, og en valgfri AI-assistent som viser hvor svaret kom fra. Gratis og åpen kildekode.
 
 ---
 

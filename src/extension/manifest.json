@@ -3,7 +3,7 @@
   "name": "PDF Scholar",
   "short_name": "PDF Scholar",
   "version": "0.11.1",
-  "description": "Leser og annotator som er nesten bare side — tar over PDF-visning i nettleseren.",
+  "description": "Leser og annotator for forskning — tar over PDF-visning i nettleseren.",
   "minimum_chrome_version": "120",
   "background": {
     "service_worker": "background.js",

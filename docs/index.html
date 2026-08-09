@@ -30,8 +30,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PDF Scholar — a Windows PDF reader that is nearly all page</title>
-<meta name="description" content="A Windows PDF reader where the window is nearly all page: one slim toolbar, and everything else out of the way until you call it. Annotation that never interrupts reading, split view, four reading themes, and an optional AI assistant that cites the sentence it used. Free and MIT-licensed.">
+<title>PDF Scholar — a Windows PDF reader for research</title>
+<meta name="description" content="A Windows PDF reader and annotator for research: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
 <meta name="theme-color" content="#f7f7f9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="logo.png">
@@ -40,8 +40,8 @@
 <!-- Absolute URLs: LinkedIn, Slack and the like resolve og: tags off-site. -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://emilmsh.github.io/pdf-scholar/">
-<meta property="og:title" content="PDF Scholar — a Windows PDF reader that is nearly all page">
-<meta property="og:description" content="A PDF reader and annotator for Windows. One slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
+<meta property="og:title" content="PDF Scholar — a Windows PDF reader for research">
+<meta property="og:description" content="A Windows PDF reader and annotator for research: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
 <!-- tricolor, not a plain page: this is the thumbnail LinkedIn and Slack draw
      under a shared link, and it is the app's most recognisable single frame. -->
 <meta property="og:image" content="https://emilmsh.github.io/pdf-scholar/screenshots/tricolor.png">
@@ -262,11 +262,11 @@
 <main>
 
   <div class="hero">
-    <h1>A Windows PDF reader that is nearly all page.</h1>
+    <h1>A Windows PDF reader for research.</h1>
     <p class="lede">
-      For the documents you work through rather than skim: research articles, reports,
-      books. One slim toolbar carries the tools you use frequently, and everything
-      else — contents, notes, the assistant — stays out of the way until you call it.
+      The window is nearly all page: one slim toolbar carries the tools you use
+      frequently, and everything else — contents, notes, the assistant — stays out of
+      the way until you call it.
       <strong>Free, MIT-licensed, and offline unless you ask a question.</strong>
     </p>
 
@@ -290,13 +290,13 @@
 
   <!-- Reading comes first, directly under the opening frame: tricolor IS what
        opens this section (one window shown in three themes), so the section
-       needs no picture at its head. It CLOSES on one — the keyboard map, beside
-       the line about rebinding shortcuts. Never the other way round: a settings
-       dialog is a thing you go and find, not what the app looks like
-       (Emil, 2026-08-09). -->
+       carries no picture of its own. The keyboard map lives in its own small
+       section after the assistant (Emil, 2026-08-09) — never at the head of
+       the page: a settings dialog is a thing you go and find, not what the
+       app looks like. -->
   <section class="feature">
     <div class="body">
-      <h2>Reading</h2>
+      <h2>Undistracted reading</h2>
       <p>
         The frame above is one window shown in three of the four reading themes —
         Day, Sepia on warm ivory, and two dark modes, the second with higher contrast —
@@ -308,19 +308,17 @@
         <li>Zoom centres on the cursor or pinch point, and one button toggles fit-width and whole-page. Pages can be rotated, read as a two-page spread, or shown one at a time in full-screen presentation mode.</li>
         <li>Documents open in tabs and separate windows; a tab drags out into its own window. Going back to the library closes nothing — open documents stay in the tab strip, one click from where you left them.</li>
         <li>The toolbar can be unpinned; the page then fills the window, and the toolbar and panels return on hover at the window edges.</li>
-        <li>Keyboard shortcuts are listed in one map in settings, and any of them can be rebound. The interface is in Norwegian or English; the choice also applies to the AI prompts, exports and dates.</li>
+        <li>The interface is in Norwegian or English; the choice also applies to the AI prompts, exports and dates.</li>
       </ul>
     </div>
-    <img class="shot" src="screenshots/shortcuts.png" alt="The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another.">
   </section>
 
   <section class="feature">
     <div class="body">
-      <h2>Split view</h2>
+      <h2>Two pages at once</h2>
       <p>
-        Papers often require two pages at once — a table or figure on one, the text
-        that discusses it on another. The S key opens a second column of the same
-        document.
+        A table or figure often sits on one page and the text that discusses it on
+        another. The S key opens a second column of the same document.
       </p>
       <ul class="points">
         <li>Each column has its own page, zoom and rotation, so a landscape table can sit upright beside portrait text.</li>
@@ -333,7 +331,7 @@
 
   <section class="feature">
     <div class="body">
-      <h2>Annotation</h2>
+      <h2>Annotating while you read</h2>
       <p>
         Selecting text opens the annotation menu at the selection — highlight,
         underline, a comment, or a question for the assistant. The toolbar carries the
@@ -354,11 +352,10 @@
 
   <section class="feature">
     <div class="body">
-      <h2>The AI assistant</h2>
+      <h2>An assistant that cites its sources</h2>
       <p>
-        Optional, and it runs on your own API key. Answers cite their sources: each
-        claim carries a reference, and following it goes to the passage the claim came
-        from.
+        Optional, and it runs on your own API key. Each claim carries a reference, and
+        following it goes to the passage the claim came from.
       </p>
       <ul class="points">
         <li>Structured article summaries: research question, method, data, findings, limitations.</li>
@@ -371,8 +368,19 @@
     <img class="shot" src="screenshots/assistant.png" alt="The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip.">
   </section>
 
+  <section class="feature">
+    <div class="body">
+      <h2>Shortcuts you can rebind</h2>
+      <p>
+        Every command is listed in one map in settings, grouped by task, with its keys
+        beside it. Any shortcut can be rebound or reset — one key or all at once.
+      </p>
+    </div>
+    <img class="shot" src="screenshots/shortcuts.png" alt="The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another.">
+  </section>
+
   <div class="note">
-    <h2>Privacy</h2>
+    <h2>Local by default</h2>
     <p>
       Reading, annotating and saving are entirely local; the app runs without network
       access.

@@ -52,50 +52,51 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 
 ## The one-liner
 
-**EN:** A Windows PDF reader that is nearly all page.
+**EN:** A Windows PDF reader for research.
 
-**NO:** En PDF-leser for Windows som er nesten bare side.
+**NO:** En PDF-leser for Windows, laget for forskning.
 
-The interface leads, deliberately (Emil's call, 2026-08-08): the first thing
-said about the app is what the window looks like, because that is what a reader
-notices first and what the app is actually built around. The assistant is named
-in the same breath — but last, and always as optional.
+The audience leads (Emil's call, 2026-08-09, replacing the interface-led
+"nearly all page" line of 2026-08-08): the app is named for the work it
+serves, and the window description moved into the lede. Keep both claims,
+each said once — whichever heads a surface, the other follows in the body.
 
 Store-length variant, where the one-liner alone is too thin. Verbatim what the
 Microsoft Store listing carries — **250 characters is the cap**, and
 `npm run test:listing` enforces it:
 
-**EN:** A PDF reader for Windows where the window is nearly all page — one slim
-toolbar, and everything else out of the way until you call it, including an
-optional AI assistant that cites the passage it used. Free and open source.
+**EN:** A PDF reader for Windows, built for research — one slim toolbar,
+everything else out of the way until you call it, and an optional AI assistant
+that cites the passage it used. Free and open source.
 
-**NO:** En PDF-leser for Windows der vinduet er nesten bare side — én slank
-verktøylinje, og alt annet unna til du henter det fram, inkludert en valgfri
-AI-assistent som viser hvor svaret kom fra. Gratis og åpen kildekode.
+**NO:** En PDF-leser for Windows, laget for forskning — én slank verktøylinje,
+alt annet unna til du henter det fram, og en valgfri AI-assistent som viser
+hvor svaret kom fra. Gratis og åpen kildekode.
 
 ## The lede
 
-**EN:** For the documents you work through rather than skim: research articles,
-reports, books. One slim toolbar carries the tools you use frequently, and
-everything else — contents, notes, the assistant — stays out of the way until
-you call it. Free, MIT-licensed, and offline unless you ask a question.
+**EN:** The window is nearly all page: one slim toolbar carries the tools you
+use frequently, and everything else — contents, notes, the assistant — stays
+out of the way until you call it. Free, MIT-licensed, and offline unless you
+ask a question.
 
-**NO:** For dokumentene du jobber deg gjennom og ikke bare skummer:
-forskningsartikler, rapporter, bøker. Én slank verktøylinje bærer verktøyene du
+**NO:** Vinduet er nesten bare side: én slank verktøylinje bærer verktøyene du
 bruker ofte, og alt annet — innhold, notater, assistenten — holder seg unna til
 du henter det fram. Gratis, MIT-lisensiert, og offline med mindre du stiller
 et spørsmål.
 
-*(The lede no longer opens with "the window is nearly all page": the one-liner
-above now says exactly that, and the two of them in a row read as a stutter.)*
+*(The one-liner and the lede swapped roles on 2026-08-09: the one-liner names
+the audience, so the lede describes the window. Opening both with the same
+claim reads as a stutter, in either order.)*
 
 ---
 
 ## The pillars
 
-Five, in this order. Every surface tells the same story at its own length: the
-landing page gives each a heading and **four to six** points, the store listings
-a block of bullets, the README the full account.
+Six, in this order — the fifth deliberately small. Every surface tells the same
+story at its own length: the landing page gives each a heading and **four to
+six** points, the store listings a block of bullets, the README the full
+account.
 
 The landing page's count is a ceiling, not a target (Emil, 2026-08-09: "vi
 holder ting skarpt og direkte"). It said "three or four" and had drifted to
@@ -106,17 +107,17 @@ not a claim the landing page was missing.
 
 ### 1. Reading
 
-**EN heading:** Reading.
-**NO heading:** Lesing.
+**EN heading:** Undistracted reading.
+**NO heading:** Uforstyrret lesing.
 
-*(Until 2026-08-09 every pillar carried an aphoristic claim for a heading —
-"Everything a long document asks of you", "Marks that are always within reach and
-never in the way", "Nowhere, unless you ask a question". Emil retired the register:
-it reads as AI-generated marketing, not as something a professional would write.
-Headings are plain topic labels now, and the substance lives in the body; the
-one-liner is the only positioning line that survives. The opening frame — one
-window shown in three themes — still opens every surface, so the reading section
-sits directly under it and carries no picture of its own.)*
+*(Two heading decisions on 2026-08-09. First the aphoristic claims —
+"Everything a long document asks of you", "Nowhere, unless you ask a question"
+— were retired: that register reads as AI-generated marketing, not as something
+a professional would write. Then bare topic labels proved too flat. The rule
+that stuck: an active, factual phrase — it must state something true about the
+app, never perform. The opening frame — one window shown in three themes —
+still opens every surface, so the reading section sits directly under it and
+carries no picture of its own.)*
 
 - Smooth scrolling; zoom centres on the cursor or pinch point; fit width or
   whole page
@@ -134,15 +135,13 @@ sits directly under it and carries no picture of its own.)*
   strip, and returning to one restores page, zoom and panels
 - Password-protected documents open, can be annotated, and are saved with their
   protection intact. *Supporting, not a headline: a browser opens these too.*
-- Keyboard shortcuts are listed in one map in settings and can be rebound or
-  reset. Keep this to a line
 - Interface in Norwegian and English; the choice also applies to the AI
   prompts, exports and date formats
 
 ### 2. Split view
 
-**EN heading:** Split view.
-**NO heading:** Delt visning.
+**EN heading:** Two pages at once.
+**NO heading:** To sider samtidig.
 
 - Two columns of the same document, each with its own page, zoom and rotation —
   a table or figure can stay in view beside the text that discusses it
@@ -154,8 +153,8 @@ sits directly under it and carries no picture of its own.)*
 
 ### 3. Annotation
 
-**EN heading:** Annotation.
-**NO heading:** Annotering.
+**EN heading:** Annotating while you read.
+**NO heading:** Annotering mens du leser.
 
 **The pillar's substance:** annotating does not interrupt reading. The tools
 appear at the selection, the marks are listed in a panel, and neither clutters
@@ -217,8 +216,8 @@ kommentarene satt i en utvidet marg.
 
 ### 4. The assistant
 
-**EN heading:** The AI assistant.
-**NO heading:** AI-assistenten.
+**EN heading:** An assistant that cites its sources.
+**NO heading:** En assistent som oppgir kildene sine.
 
 - Optional, and it runs on your own API key
 - Answers cite their sources: each claim carries a reference, and following it
@@ -241,10 +240,25 @@ kommentarene satt i en utvidet marg.
   LM Studio (no key needed). Model lists are fetched live from each keyed
   provider, and every answer reports the provider's token count
 
-### 5. Privacy
+### 5. Keyboard
 
-**EN heading:** Privacy.
-**NO heading:** Personvern.
+**EN heading:** Shortcuts you can rebind.
+**NO heading:** Snarveier du kan binde om.
+
+*(Deliberately small — one short paragraph and the keyboard-map frame, placed
+after the assistant (Emil, 2026-08-09). A supporting point rather than a pillar
+of the app, but the map is the proof and earns its own picture. Never at the
+head of a surface: a settings dialog is a thing you go and find, not what the
+app looks like.)*
+
+- Every command is listed in one map in settings, grouped by task, with its
+  keys beside it
+- Any shortcut can be rebound or reset — one key or all at once
+
+### 6. Privacy
+
+**EN heading:** Local by default.
+**NO heading:** Lokalt som standard.
 
 - Reading, annotating and saving are entirely local; the app runs without
   network access
