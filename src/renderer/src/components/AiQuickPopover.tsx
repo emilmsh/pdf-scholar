@@ -37,7 +37,7 @@ import type { AiDocument, PreparedDocument } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import type { PageText } from '../search'
 import { errorText, t, useLang } from '../i18n'
-import { isFindHotkey } from '../platform'
+import { bubblesWhileTyping } from '../keymap'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { useDismissable } from '../useDismissable'
@@ -296,7 +296,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
               spellCheck={false}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
-                if (isFindHotkey(e)) return // bubbles to the window handler: focus search
+                if (bubblesWhileTyping(e)) return // an app shortcut (find, save, zoom …)
                 e.stopPropagation()
                 if (e.key === 'Enter' && question.trim()) setAsked(question.trim())
                 if (e.key === 'Escape') onClose()

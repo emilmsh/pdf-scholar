@@ -573,6 +573,13 @@ export const IconSplit = (p: IconProps): React.JSX.Element => (
 )
 
 /** Counter-clockwise arrow with a tick start — "back to how it shipped" */
+export const IconKeyboard = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="2" y="6" width="20" height="12" rx="2" />
+    <path d="M6 10h.01M9.5 10h.01M13 10h.01M16.5 10h.01M7.5 14h9" />
+  </Svg>
+)
+
 export const IconReset = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M3.5 12a8.5 8.5 0 1 0 2.49-6.01M3.5 4.5V10h5.5" />

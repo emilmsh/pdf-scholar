@@ -43,6 +43,15 @@ import type { SavedSignature } from '../signatures'
 import { READ_ALOUD } from '../flags'
 import { useDismissable } from '../useDismissable'
 import { updateOutcomeText } from './Welcome'
+import ShortcutsDialog from './ShortcutsDialog'
+import {
+  bubblesWhileTyping,
+  commandForEvent,
+  isKeyboardCaptured,
+  shortcutLabel,
+  withShortcut,
+  withShortcuts
+} from '../keymap'
 import {
   IconArrowLeft,
   IconArrowRight,
@@ -56,6 +65,7 @@ import {
   IconGear,
   IconComment,
   IconHeart,
+  IconKeyboard,
   IconMarginNotes,
   IconMarker,
   IconMarkupHighlight,
@@ -287,6 +297,15 @@ const LANGUAGES: { id: LanguagePreference; label: string }[] = [
 /** Percent readout for the opacity sliders (0.45 → «45 %») */
 const pct = (v: number): string => `${Math.round(v * 100)} %`
 
+/** The fit button's tooltip. The «W veksler …» clause is not appended with
+ *  withShortcut because it is a sentence about the key rather than a suffix —
+ *  and it has to vanish entirely if the reader unbound the toggle. */
+const fitTip = (whole: boolean): string => {
+  const base = t(whole ? 'tb.fitPageTip' : 'tb.fitWidthTip')
+  const keys = shortcutLabel('zoom.fitToggle')
+  return keys ? `${base} (${t('tb.fitToggleHint', { keys })})` : base
+}
+
 /** The one shared shape of an option popover's reset affordance: a quiet text
  *  link that only exists while there is something to undo, so an untouched tool
  *  shows no extra chrome at all. */
@@ -420,6 +439,8 @@ export default function Toolbar({
   // visibility, AI setup, update check, reset, version/about)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [resetAsk, setResetAsk] = useState(false)
+  /** The keyboard map, opened from the gear menu */
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const [appVersion, setAppVersion] = useState('')
   const [updChecking, setUpdChecking] = useState(false)
   const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
@@ -439,6 +460,9 @@ export default function Toolbar({
   const saveMenuRef = useRef<HTMLDivElement>(null)
   const toolMenuRef = useRef<HTMLDivElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
+  /** The page field, so the Gå-til-side command can focus it. Only ever one is
+   *  rendered — the single cluster drives whichever column is active. */
+  const pageInputRef = useRef<HTMLInputElement>(null)
   // Responsive overflow: secondary buttons fold into a "…" menu (left of the
   // protected Assistant button) when the toolbar is too narrow for them all.
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -531,6 +555,30 @@ export default function Toolbar({
     return () => window.removeEventListener('keydown', onKey, true)
   }, [themeMenuOpen, viewMenuOpen, saveMenuOpen, settingsMenuOpen, overflowMenuOpen, toolMenu, resetAsk])
 
+  // «Gå til side» is the toolbar's own shortcut: the command focuses the page
+  // field, which lives here, so the listener does too rather than routing a
+  // callback down from the viewer for one keypress. Capture phase + a swallowed
+  // event so the browser's own Ctrl+G (find-again in the web target) stays shut.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (isKeyboardCaptured()) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA'
+      if (commandForEvent(e, typing) !== 'nav.gotoPage') return
+      const el = pageInputRef.current
+      if (!el) return // the cluster is folded away — nothing to focus
+      e.preventDefault()
+      e.stopPropagation()
+      el.focus()
+      // …and select explicitly. The field's own onFocus does this for a CLICK,
+      // but a programmatic focus lets the caret land at the end instead, and
+      // then typing 5 on page 1 asks for page 15.
+      el.select()
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [])
+
   // Version + update capability are static — fetch once, the first time the
   // gear menu opens.
   useEffect(() => {
@@ -620,15 +668,20 @@ export default function Toolbar({
       <div className={`center-cluster${splitOpen ? ' is-split' : ''}`}>
         <div className="page-indicator">
           <input
+            ref={pageInputRef}
             value={value}
             onChange={(e) => setValue(e.target.value.replace(/[^0-9]/g, ''))}
             onFocus={(e) => e.currentTarget.select()}
             onBlur={commit}
             onKeyDown={(e) => {
+              // App shortcuts still reach the window handler from in here — a
+              // caret parked in the page field must not disable Ctrl+S
+              if (bubblesWhileTyping(e)) return
               e.stopPropagation()
               if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
             }}
             aria-label={t('tb.goToPage')}
+            title={withShortcut(t('tb.goToPage'), 'nav.gotoPage')}
           />
           <span>/ {pageCount || '–'}</span>
         </div>
@@ -638,7 +691,7 @@ export default function Toolbar({
         <button
           className="tb-btn"
           onClick={() => (isB ? onPaneZoomOut() : onZoomOut())}
-          title={t('tb.zoomOutTip')}
+          title={withShortcut(t('tb.zoomOutTip'), 'zoom.out')}
         >
           <IconMinus />
         </button>
@@ -651,6 +704,8 @@ export default function Toolbar({
             onFocus={(e) => e.currentTarget.select()}
             onBlur={() => setZoomEditing(null)}
             onKeyDown={(e) => {
+              // Ctrl+0 / Ctrl+± mean the same thing while typing a zoom value
+              if (bubblesWhileTyping(e)) return
               e.stopPropagation()
               if (e.key === 'Enter') {
                 const n = parseInt(zoomInput, 10)
@@ -676,7 +731,7 @@ export default function Toolbar({
         <button
           className="tb-btn"
           onClick={() => (isB ? onPaneZoomIn() : onZoomIn())}
-          title={t('tb.zoomInTip')}
+          title={withShortcut(t('tb.zoomInTip'), 'zoom.in')}
         >
           <IconPlus />
         </button>
@@ -688,7 +743,7 @@ export default function Toolbar({
             <button
               className={`tb-btn${mode !== 'custom' ? ' is-active' : ''}`}
               onClick={() => (isB ? (target === 'page' ? onPaneFitPage() : onPaneFitWidth()) : target === 'page' ? onFitPage() : onFitWidth())}
-              title={target === 'page' ? t('tb.fitPageTip') : t('tb.fitWidthTip')}
+              title={fitTip(target === 'page')}
             >
               {target === 'page' ? <IconFitPage /> : <IconFitWidth />}
             </button>
@@ -1004,7 +1059,7 @@ export default function Toolbar({
         <button
           className={`tb-btn${sidebarOpen ? ' is-active' : ''}`}
           onClick={onToggleSidebar}
-          title={t('tb.sidebarTip')}
+          title={withShortcut(t('tb.sidebarTip'), 'panel.toc')}
         >
           <IconSidebar />
         </button>
@@ -1106,7 +1161,7 @@ export default function Toolbar({
             <button
               className={`tb-btn${noteActive ? ' is-active' : ''}`}
               onClick={onToggleNote}
-              title={t('tb.noteTip')}
+              title={withShortcut(t('tb.noteTip'), 'tool.note')}
             >
               <IconNote />
             </button>
@@ -1156,12 +1211,12 @@ export default function Toolbar({
             </span>
           )}
           {inline('undo') && (
-            <button className="tb-btn" onClick={onUndo} disabled={!canUndo} title={t('tb.undoTip')}>
+            <button className="tb-btn" onClick={onUndo} disabled={!canUndo} title={withShortcut(t('tb.undoTip'), 'edit.undo')}>
               <IconUndo />
             </button>
           )}
           {inline('redo') && (
-            <button className="tb-btn" onClick={onRedo} disabled={!canRedo} title={t('tb.redoTip')}>
+            <button className="tb-btn" onClick={onRedo} disabled={!canRedo} title={withShortcut(t('tb.redoTip'), 'edit.redo')}>
               <IconRedo />
             </button>
           )}
@@ -1379,7 +1434,7 @@ export default function Toolbar({
                   <button
                     key={preset}
                     className={`zoom-preset${activeZoom.fitMode === 'custom' && activeZoom.percent === preset ? ' selected' : ''}`}
-                    title={preset === 100 ? t('tb.actualSizeTip') : undefined}
+                    title={preset === 100 ? withShortcut(t('tb.actualSizeTip'), 'zoom.actual') : undefined}
                     onClick={() => activeZoom.zoomTo(preset)}
                   >
                     {preset} %
@@ -1407,10 +1462,10 @@ export default function Toolbar({
               <div className="theme-auto-row">
                 <span className="view-row-label">{t('tb.rotate')}</span>
                 <span className="view-row-controls">
-                  <button className="tb-btn" onClick={() => onRotate(-1)} title={t('tb.rotateCcwTip')}>
+                  <button className="tb-btn" onClick={() => onRotate(-1)} title={withShortcut(t('tb.rotateCcwTip'), 'view.rotateLeft')}>
                     <IconRotateCcw />
                   </button>
-                  <button className="tb-btn" onClick={() => onRotate(1)} title={t('tb.rotateCwTip')}>
+                  <button className="tb-btn" onClick={() => onRotate(1)} title={withShortcuts(t('tb.rotateCwTip'), 'view.rotateRight')}>
                     <IconRotateCw />
                   </button>
                 </span>
@@ -1429,7 +1484,7 @@ export default function Toolbar({
 
       <div className="toolbar-group">
         {inline('search') && (
-          <button className="tb-btn" onClick={onToggleSearch} title={t('tb.searchTip')}>
+          <button className="tb-btn" onClick={onToggleSearch} title={withShortcut(t('tb.searchTip'), 'search.open')}>
             <IconSearch />
           </button>
         )}
@@ -1447,7 +1502,7 @@ export default function Toolbar({
         <div className="toolbar-sep" />
 
         {inline('print') && (
-          <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
+          <button className="tb-btn" onClick={onPrint} title={withShortcut(t('tb.printTip'), 'file.print')}>
             <IconPrint />
           </button>
         )}
@@ -1463,7 +1518,7 @@ export default function Toolbar({
               className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
               onClick={onSave}
               disabled={!dirty}
-              title={t('tb.saveTip')}
+              title={withShortcut(t('tb.saveTip'), 'file.save')}
             >
               <IconSave />
             </button>
@@ -1483,7 +1538,7 @@ export default function Toolbar({
                     setSaveMenuOpen(false)
                     onSaveAs()
                   }}
-                  title={isElectron ? t('tb.saveAsTip') : t('tb.saveCopyTip')}
+                  title={withShortcut(t(isElectron ? 'tb.saveAsTip' : 'tb.saveCopyTip'), 'file.saveAs')}
                 >
                   <IconSaveAs size={15} />
                   {isElectron ? t('tb.saveAs') : t('tb.saveCopy')}
@@ -1497,7 +1552,7 @@ export default function Toolbar({
           <button
             className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
             onClick={onSave}
-            title={t('tb.saveToDiskTip')}
+            title={withShortcut(t('tb.saveToDiskTip'), 'file.save')}
           >
             <IconSaveAs />
           </button>
@@ -1593,7 +1648,7 @@ export default function Toolbar({
           <button
             className={`tb-btn${marginNotes ? ' is-active' : ''}`}
             onClick={onToggleMarginNotes}
-            title={t('tb.marginNotesTip')}
+            title={withShortcut(t('tb.marginNotesTip'), 'view.marginNotes')}
           >
             <IconMarginNotes />
           </button>
@@ -1602,13 +1657,13 @@ export default function Toolbar({
           <button
             className={`tb-btn${splitOpen ? ' is-active' : ''}`}
             onClick={onToggleSplit}
-            title={t('tb.splitTip')}
+            title={withShortcut(t('tb.splitTip'), 'view.split')}
           >
             <IconSplit />
           </button>
         )}
         {inline('present') && (
-          <button className="tb-btn" onClick={onPresent} title={t('tb.presentTip')}>
+          <button className="tb-btn" onClick={onPresent} title={withShortcut(t('tb.presentTip'), 'view.present')}>
             <IconPresent />
           </button>
         )}
@@ -1616,13 +1671,13 @@ export default function Toolbar({
           <button
             className={`tb-btn${toolbarPinned ? '' : ' is-active'}`}
             onClick={onTogglePin}
-            title={toolbarPinned ? t('tb.unpinTip') : t('tb.pinTip')}
+            title={withShortcut(t(toolbarPinned ? 'tb.unpinTip' : 'tb.pinTip'), 'view.togglePin')}
           >
             {toolbarPinned ? <IconPin /> : <IconPinOff />}
           </button>
         )}
         {inline('fullscreen') && (
-          <button className="tb-btn" onClick={onToggleFullscreen} title={t('tb.fullscreenTip')}>
+          <button className="tb-btn" onClick={onToggleFullscreen} title={withShortcuts(t('tb.fullscreenTip'), 'view.fullscreen')}>
             <IconFullscreen />
           </button>
         )}
@@ -1670,6 +1725,8 @@ export default function Toolbar({
                 title={t('settings.annotAuthorHint')}
                 spellCheck={false}
                 onKeyDown={(e) => {
+                  // Even in a menu: Ctrl+S from here should still save
+                  if (bubblesWhileTyping(e)) return
                   e.stopPropagation()
                   if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
                 }}
@@ -1690,6 +1747,17 @@ export default function Toolbar({
               >
                 <IconSparkle size={15} />
                 {t('ai.keysTitle')}
+              </button>
+              <button
+                className="menu-action"
+                title={t('keys.openTip')}
+                onClick={() => {
+                  setSettingsMenuOpen(false)
+                  setShortcutsOpen(true)
+                }}
+              >
+                <IconKeyboard size={15} />
+                {t('keys.open')}
               </button>
               {isElectron && updSupport !== undefined && updSupport !== 'store' && (
                 <button className="menu-action" onClick={checkForUpdates} disabled={updChecking}>
@@ -1771,7 +1839,7 @@ export default function Toolbar({
           <button
             className={`tb-btn${snipActive ? ' is-active' : ''}`}
             onClick={onToggleSnip}
-            title={t('tb.snipTip')}
+            title={withShortcut(t('tb.snipTip'), 'tool.snip')}
           >
             <IconSnip />
           </button>
@@ -1814,7 +1882,7 @@ export default function Toolbar({
           <button
             className={`tb-btn tb-labeled${aiOpen ? ' is-active' : ''}`}
             onClick={onToggleAi}
-            title={t('tb.aiTip')}
+            title={withShortcut(t('tb.aiTip'), 'panel.ai')}
           >
             <IconSparkle />
             <span className="tb-label">{t('ai.assistant')}</span>
@@ -1825,6 +1893,15 @@ export default function Toolbar({
       {/* Reset-to-defaults is destructive enough to deserve the same modal
           treatment as an unsaved-changes prompt — and the detail line spells
           out exactly what survives it (API keys, library, annotations). */}
+      {/* The keyboard map. It owns the keyboard while recording a chord, so it
+          renders as a modal over everything — see ShortcutsDialog. */}
+      {shortcutsOpen && (
+        <ShortcutsDialog
+          onChange={(keymap) => onSettingsChange({ keymap })}
+          onClose={() => setShortcutsOpen(false)}
+        />
+      )}
+
       {resetAsk && (
         <div className="confirm-overlay" onMouseDown={(e) => e.stopPropagation()}>
           <div className="confirm-dialog" role="alertdialog" aria-modal="true">

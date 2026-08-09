@@ -64,7 +64,30 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 ## 9. Interop Requirement (non-negotiable)
 Every annotation is written into the PDF as a standard annotation object with a proper appearance stream. Two write paths, chosen by file size: **below 150 MB the file is rewritten in full** from a cached document behind a debounced flush (`src/main/doc-cache.ts`), and **at or above 150 MB an incremental appender** (`src/main/incremental-appender.ts`) appends the new objects and an xref section to the original bytes. Acceptance test per annotation type: create in PDFX → open in Acrobat Reader, SumatraPDF → renders identically and remains editable.
 
-## 10. Explicitly Out of Scope (post-parity stretch)
+## 10. Keyboard Map (shipped 2026-08-05)
+Every command the keyboard can reach is declared in one registry
+(`src/renderer/src/keymap.ts`) rather than as branches in two keydown handlers,
+and the gear menu opens it as a **map**: grouped by task (Fil, Faner,
+Navigasjon, Visning, Zoom, Paneler, Søk, Redigering, Verktøy), one row per
+command, its keys as chips.
+
+- **Rebindable.** Click a key to replace it, «+» to give a command a second one
+  (several commands ship with two — redo is Ctrl+Y *and* Ctrl+Shift+Z, rotate
+  right is Shift+R *and* `]`). A chord belongs to one command at a time: taking
+  a key says which command lost it and offers one-click undo.
+- **Reset per row and for everything**, the per-row one shown only where the
+  command is off its shipped default.
+- **The fourteen annotation tools are in the map but unbound as shipped** —
+  which tool deserves a letter is the reader's call, not ours.
+- **Fixed keys are listed too** (Esc, scrolling, the presentation arrows) so the
+  map is complete rather than merely editable.
+- Overrides live in `Settings.keymap` (command id → chords, absent = default),
+  so they follow the reader across desktop, extension and web, and the gear
+  menu's Reset clears them with everything else.
+- Tooltips read their key names out of the same registry, so none of them can
+  advertise a key that was rebound.
+
+## 11. Explicitly Out of Scope (post-parity stretch)
 Whole-document translation, measurement tools, OCR/Scan, reflow mode, form creation, sound notes, stickers.
 
 Items have left this list since it was written. **AI chat** became its own phase and shipped — see Phase 9 in `docs/ROADMAP.md`. **Text-to-speech reading** was built as well, but is hidden on every platform behind the `READ_ALOUD` flag (`src/renderer/src/flags.ts`) until a local neural voice replaces the robotic SAPI ones. **Page editing UI** left on Emil's decision 2026-08-08 (Phase 11, the stable-release push): delete, reorder, extract and merge pages are the one thing PDF Expert users look for and do not find. Note the split that survives — **filling in** a form is in scope from Phase 11; **creating** form fields is not, and stays on this list.

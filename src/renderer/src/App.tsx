@@ -11,7 +11,7 @@ import type {
 import { BREW_UPGRADE_COMMAND, RELEASES_PAGE_URL } from '../../shared/update-channel'
 import { bridge, isElectron } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
-import { primaryMod } from './platform'
+import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
 import TabBar from './components/TabBar'
@@ -158,6 +158,13 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     setLanguage(settings.language)
   }, [settings.language])
+
+  // Same for the keyboard map: the key handlers are not components, so the
+  // rebound shortcuts are mirrored into keymap.ts's own store where they can be
+  // read synchronously from a keydown listener.
+  useEffect(() => {
+    setKeymapOverrides(settings.keymap)
+  }, [settings.keymap])
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
     setSettingsState((prev) => ({ ...prev, ...patch }))
@@ -533,37 +540,60 @@ export default function App(): React.JSX.Element {
     if (tabs.length === 0) refreshRecents()
   }, [tabs.length, refreshRecents])
 
-  // Tab shortcuts: Ctrl+Tab / Ctrl+Shift+Tab cycle (Ctrl also on mac — Cmd+Tab
-  // is the OS app switcher), Cmd/Ctrl+W close, Cmd/Ctrl+O open
+  // Shell-level shortcuts (tabs, windows, opening a file). Which keys reach
+  // them is keymap.ts's business — this only says what each command does. The
+  // shipped bindings are the ones they always had: Ctrl+Tab cycles (Ctrl on mac
+  // too, Cmd+Tab being the OS app switcher), Cmd/Ctrl+W closes, Cmd/Ctrl+O opens.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.ctrlKey && e.key === 'Tab') {
-        e.preventDefault()
-        cycleTab(e.shiftKey ? -1 : 1)
-      } else if (primaryMod(e) && (e.key === 'w' || e.key === 'W')) {
-        e.preventDefault()
-        // Read the active id from a ref, not a setActiveId updater: closing runs
-        // its own setActiveId to pick the neighbour, and returning `current` from
-        // an outer updater would clobber that and leave no active tab.
-        if (activeIdRef.current) closeTab(activeIdRef.current)
-      } else if (primaryMod(e) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
-        e.preventDefault()
-        bridge.newWindow()
-      } else if (primaryMod(e) && (e.key === 'o' || e.key === 'O')) {
-        e.preventDefault()
-        void openDialog()
-      } else if (
-        primaryMod(e) &&
-        e.shiftKey &&
-        (e.key === 'PageUp' || e.key === 'PageDown')
-      ) {
-        // Move the active tab, the browser shortcut for the same thing
+      // The shortcuts dialog is recording a chord — every key belongs to it
+      if (isKeyboardCaptured()) return
+      const tag = (e.target as HTMLElement | null)?.tagName
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA'
+      const command = commandForEvent(e, typing)
+      if (!command) return
+      const moveActiveTab = (delta: number): void => {
         const id = activeIdRef.current
         if (!id) return
         const at = tabsRef.current.findIndex((t) => t.id === id)
         if (at === -1) return
         e.preventDefault()
-        moveTab(id, at + (e.key === 'PageUp' ? -1 : 1))
+        moveTab(id, at + delta)
+      }
+      switch (command) {
+        case 'tab.next':
+          e.preventDefault()
+          cycleTab(1)
+          break
+        case 'tab.prev':
+          e.preventDefault()
+          cycleTab(-1)
+          break
+        case 'tab.close':
+          e.preventDefault()
+          // Read the active id from a ref, not a setActiveId updater: closing runs
+          // its own setActiveId to pick the neighbour, and returning `current` from
+          // an outer updater would clobber that and leave no active tab.
+          if (activeIdRef.current) closeTab(activeIdRef.current)
+          break
+        case 'window.new':
+          e.preventDefault()
+          bridge.newWindow()
+          break
+        case 'file.open':
+          e.preventDefault()
+          void openDialog()
+          break
+        // Moving the active tab — the browser shortcut for the same thing
+        case 'tab.moveLeft':
+          moveActiveTab(-1)
+          break
+        case 'tab.moveRight':
+          moveActiveTab(1)
+          break
+        default:
+          // Every other command belongs to the viewer, which has its own listener
+          break
       }
     }
     window.addEventListener('keydown', onKeyDown)
