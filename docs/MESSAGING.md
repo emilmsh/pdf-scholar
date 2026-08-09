@@ -129,9 +129,9 @@ sits directly under it on every surface and carries no picture of its own.)*
   reading a paper and losing your place in one
 - Remembers reading positions and recent files; tabs and multiple windows, and a
   tab can be dragged out into its own window
-- The library is a **place, not an exit**: going back to it closes nothing, the
-  open documents stay in the tab strip, and returning to one puts you exactly
-  where you were — same page, same zoom, same panels, unsaved marks included
+- Going back to the library closes nothing: the open documents stay in the tab
+  strip, and returning to one puts you exactly where you were — same page, same
+  zoom, same panels, unsaved marks included
 - Password-protected documents open: type the password and read, mark up and
   save as normal — the file stays protected. *Supporting, not a headline: a
   browser opens these too, so leading with it would be boasting about the
@@ -311,6 +311,12 @@ siden av siden, og eksporten printer dem slik.
 - **Self-praise adjectives** — "polished", "beautiful", "powerful". The house
   voice states what the thing does and lets the reader conclude. Concrete beats
   superlative.
+- **Design slogans as information.** "The library is a place, not an exit" is
+  how the behaviour was *decided*, and it leaked from commit messages into four
+  surfaces (Emil, 2026-08-09: "fjas og intern metadebt"). The reader needs what
+  happens — going back closes nothing, returning restores everything — never the
+  metaphor it was built under. The test: does the sentence still say something
+  if you have never read our commit log?
 - **Claims about untested platforms.** Linux has not run on real hardware and no
   surface may imply otherwise. macOS HAS been tested on Apple hardware (since
   v0.34.0) but remains beta — "tested" is the strongest word on offer; never

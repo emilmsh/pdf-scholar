@@ -46,7 +46,7 @@ READING
 • Rotate pages, two-page spread, and a full-screen presentation mode
 • Table of contents, thumbnails, bookmarks, and search that marks every hit on the page while you look (match case / whole word)
 • Remembers your reading position and recent files; the mouse side-buttons move back and forward through your navigation history
-• The library is a place, not an exit: going back to it closes nothing and returns you exactly where you were
+• Going back to the library closes nothing: your documents stay open, and one click returns you exactly where you were
 • Every keyboard shortcut is listed in one map and can be rebound or reset
 • Opens PDFs straight from File Explorer, with a "Recent" Jump List on the taskbar
 
@@ -101,7 +101,7 @@ LESING
 • Roter sider, tosiders oppslag og en fullskjerms presentasjonsmodus
 • Innholdsfortegnelse, miniatyrer, bokmerker og søk som markerer alle treff på siden mens du leter (skill store/små, helord)
 • Husker leseposisjon og nylige filer; museknappene på siden går fram og tilbake i navigasjonshistorikken
-• Biblioteket er et sted, ikke en utgang: å gå dit lukker ingenting, og du kommer tilbake nøyaktig der du var
+• Å gå til biblioteket lukker ingenting: dokumentene forblir åpne, og ett klikk tar deg tilbake nøyaktig dit du var
 • Alle hurtigtaster står i ett kart og kan bindes om eller tilbakestilles
 • Åpner PDF-er rett fra Utforsker, med en «Nylig»-hurtigliste på oppgavelinjen
 
@@ -151,7 +151,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 **EN:**
 ```
 • Every keyboard shortcut is now listed in one map in settings — grouped by task, the whole thing readable at a glance — and any of them can be rebound or reset
-• The library is a place, not an exit: going back to it closes nothing, your documents stay in the tab strip, and clicking one returns you exactly where you were
+• Going back to the library no longer closes your documents: they stay in the tab strip, and clicking one returns you exactly where you were
 • The text tool offers a real typeface choice — Helvetica, Times or Courier, bold and italic — picked before you type or changed afterwards on a box that already exists. They are the PDF's own fonts, so the words stay real, searchable text in every reader
 • Black is properly black now, for the pen and the text tool alike. It used to be a soft off-black that read as grey in the dark themes
 • A slimmer toolbar: print moved in beside Save, and the tools you reach for are less crowded
@@ -162,7 +162,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 **NO:**
 ```
 • Alle hurtigtaster står nå i ett kart i innstillingene — gruppert etter oppgave, hele oversikten lesbar på én gang — og hver enkelt kan bindes om eller tilbakestilles
-• Biblioteket er et sted, ikke en utgang: å gå dit lukker ingenting, dokumentene blir stående i fanestripa, og ett klikk tar deg tilbake nøyaktig dit du var
+• Å gå tilbake til biblioteket lukker ikke lenger dokumentene: de blir stående i fanestripa, og ett klikk tar deg tilbake nøyaktig dit du var
 • Tekstverktøyet har fått et ekte skriftvalg — Helvetica, Times eller Courier, fet og kursiv — valgt før du skriver eller endret etterpå på en boks som alt finnes. Det er PDF-ens egne skrifter, så ordene forblir ekte, søkbar tekst i enhver leser
 • Svart er ordentlig svart nå, for både penn og tekst. Før var det en myk nesten-svart som leste som grå i mørke temaer
 • En slankere verktøylinje: utskrift har flyttet inn ved siden av Lagre, og verktøyene du strekker deg etter har fått bedre plass
