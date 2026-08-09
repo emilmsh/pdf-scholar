@@ -181,6 +181,16 @@ export default function ExtensionApp(): React.JSX.Element {
     await openPayload(result)
   }, [openPayload])
 
+  /** Recents are fetched once at mount — which is BEFORE this tab's own
+   *  document is registered, so the library listed everything except the file
+   *  you were reading, and only picked it up on a later visit (Emil, 2026-08-09:
+   *  "it didn't trigger for manuscript.pdf until it had been closed once").
+   *  Refresh on arrival at the library, the same rule App.tsx follows: reading
+   *  a document is exactly what changes this list. */
+  useEffect(() => {
+    if (atLibrary) void bridge.getRecents().then(setRecents)
+  }, [atLibrary])
+
   // On mount: load settings/recents, then the document handed to this tab.
   useEffect(() => {
     bridge.getSettings().then(setSettingsState)
