@@ -154,6 +154,8 @@ is what an hour with the document asks for:
   window** to put two documents side by side, or across the bar to reorder
 - The interface itself is in Norwegian or English, and that setting also controls the AI
   prompts, exported documents and date formats
+- Every key named above is a default. **Settings → Keyboard shortcuts** lists them all in
+  one map and lets you rebind or reset any of them, one key or all at once
 
 **Split view**
 

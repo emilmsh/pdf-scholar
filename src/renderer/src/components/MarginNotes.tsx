@@ -20,7 +20,7 @@ import type { RowLayout } from '../rotation'
 import { quadsUnion, rgbCss } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import { IconChevronDown } from './icons'
-import { isFindHotkey } from '../platform'
+import { bubblesWhileTyping } from '../keymap'
 import { t, useLang } from '../i18n'
 
 /** Vertical gap between stacked cards, CSS px */
@@ -98,9 +98,11 @@ export function MarginCard({
         onFocus={() => onSelect(pageNumber, a.id)}
         onKeyDown={(e) => {
           // Keep viewer shortcuts (H, W, Delete …) out of typed text; Esc and
-          // Ctrl/Cmd+Enter both commit via the blur below. Find bubbles to
-          // the window handler, same as the comment popover.
-          if (isFindHotkey(e)) return
+          // Ctrl/Cmd+Enter both commit via the blur below. App shortcuts still
+          // bubble to the window handler, same as the comment popover — and
+          // asking the keymap means a REBOUND find gets through too, not just
+          // Ctrl+F.
+          if (bubblesWhileTyping(e)) return
           e.stopPropagation()
           if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
             ;(e.target as HTMLTextAreaElement).blur()

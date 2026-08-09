@@ -6005,6 +6005,26 @@ html.touch-ui .confirm-actions .btn-secondary {
   padding-right: 18px;
 }
 
+/* The keyboard map's remove-key × is hover-revealed on a mouse, which on a
+   touch screen would mean a key you cannot take away at all. Keep it out and
+   finger-sized, and give the chips themselves a real target. */
+html.touch-ui .keys-chip-remove {
+  width: 26px;
+  height: 26px;
+  margin-left: 2px;
+  opacity: 0.6;
+}
+
+html.touch-ui .keys-chip {
+  padding: 7px 10px;
+}
+
+html.touch-ui .keys-add,
+html.touch-ui .keys-reset-one {
+  width: 30px;
+  height: 30px;
+}
+
 /* ============================================================
    Render-error fallback (see ErrorBoundary.tsx)
    ============================================================ */
@@ -6133,4 +6153,321 @@ html.touch-ui .confirm-actions .btn-secondary {
 .font-style.selected {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* ============================================================
+   Keyboard map (Hurtigtaster) — the whole shortcut surface in one
+   scrollable modal. Wider and taller than the confirm dialogs it shares an
+   overlay with, because it is a document to read rather than a question to
+   answer.
+   ============================================================ */
+
+.shortcuts-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(660px, calc(100vw - 48px));
+  max-height: min(760px, calc(100vh - 64px));
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-menu);
+}
+
+.shortcuts-head {
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.shortcuts-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shortcuts-title {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.shortcuts-changed {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.shortcuts-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.shortcuts-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.shortcuts-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.shortcuts-filter {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-chrome);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.shortcuts-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.shortcuts-reset-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.shortcuts-reset-all:hover {
+  color: var(--text);
+}
+
+.shortcuts-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 20px 18px;
+}
+
+.shortcuts-empty {
+  padding: 24px 2px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.keys-group {
+  padding-top: 14px;
+}
+
+.keys-group-title {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+/* One command. The binding column is right-aligned so every key chip lines up
+   down the dialog — a map you can scan, not a list you have to read. */
+.keys-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.keys-row:last-child {
+  border-bottom: none;
+}
+
+.keys-label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.keys-binding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+/* The chip and its × are one unit: hovering either reveals the ×, so a key can
+   be removed without a second control taking up permanent room. */
+.keys-chip-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.keys-chip {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-chrome);
+  color: var(--text);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.keys-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.keys-chip.is-fixed {
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.keys-chip-remove {
+  width: 0;
+  overflow: hidden;
+  margin-left: 0;
+  color: var(--text-secondary);
+  font-size: 10px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.keys-chip-wrap:hover .keys-chip-remove,
+.keys-chip-remove:focus-visible {
+  width: 16px;
+  margin-left: 2px;
+  opacity: 1;
+}
+
+.keys-chip-remove:hover {
+  color: var(--danger);
+}
+
+.keys-unbound {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.keys-add,
+.keys-reset-one {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+
+.keys-add:hover,
+.keys-reset-one:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* Recording. The dot pulses because the dialog is now swallowing every key —
+   the reader has to be able to tell at a glance that the keyboard is on loan. */
+.keys-recording {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.keys-recording-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: keys-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes keys-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.keys-recording-hint {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+/* Takeover / reserved-key notices sit under the row they belong to, spanning
+   both columns. */
+.keys-note {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 0 6px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.keys-note-warn {
+  color: var(--danger);
+}
+
+/* The overwrite question. Accent rather than danger: taking a key from another
+   command is a choice, not a mistake — and it is fully reversible. */
+.keys-note-ask {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.keys-note-action {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.keys-note-action:hover {
+  filter: brightness(1.07);
+}
+
+.keys-note-undo {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+}
+
+.keys-note-undo:hover {
+  background: var(--hover);
+}
+
+.keys-group-fixed {
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { t, useLang } from '../i18n'
+import { withShortcut } from '../keymap'
 import { IconChevronDown } from './icons'
 
 export interface TabInfo {
@@ -154,10 +155,10 @@ export default function TabBar({
           </button>
         </div>
       ))}
-      <button className="tab-new" onClick={onNewTab} title={t('tabs.new')}>
+      <button className="tab-new" onClick={onNewTab} title={withShortcut(t('tabs.new'), 'file.open')}>
         +
       </button>
-      <button className="tab-new-window" onClick={onNewWindow} title={t('tabs.newWindow')}>
+      <button className="tab-new-window" onClick={onNewWindow} title={withShortcut(t('tabs.newWindow'), 'window.new')}>
         ⧉
       </button>
       {/* Every open tab as a list. The strip compresses titles as it fills up,

@@ -126,6 +126,8 @@ sits directly under it on every surface and carries no picture of its own.)*
   save as normal — the file stays protected. *Supporting, not a headline: a
   browser opens these too, so leading with it would be boasting about the
   minimum. Printing one is the exception, and the app says so.*
+- Every keyboard shortcut is listed in one map in settings, and any of them can
+  be rebound or reset. Keep this to a line: it is a nice-to-have, not a pillar
 - Interface in Norwegian and English, which also sets the AI prompts, exports and
   date formats
 

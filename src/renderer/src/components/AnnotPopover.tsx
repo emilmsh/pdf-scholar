@@ -14,7 +14,7 @@ import {
 import type { PageAnnotation } from '../annotations'
 import type { PdfStandardFont } from '@embedpdf/models'
 import { t, useLang } from '../i18n'
-import { isFindHotkey } from '../platform'
+import { bubblesWhileTyping } from '../keymap'
 import { useDraggable } from '../useDraggable'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
@@ -221,7 +221,7 @@ export default function AnnotPopover({
             // popover, and the unmount flush above saves the pending text
             // exactly once. (The global Esc handler never sees keys from
             // here — propagation stops below.)
-            if (isFindHotkey(e)) return // bubbles to the window handler: focus search
+            if (bubblesWhileTyping(e)) return // an app shortcut (find, save, zoom …)
             if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || e.key === 'Escape') {
               e.preventDefault()
               onClose()
