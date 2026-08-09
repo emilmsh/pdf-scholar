@@ -439,9 +439,11 @@ export default function Toolbar({
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
-  const [toolMenu, setToolMenu] = useState<
-    DrawPrefKey | 'markup' | 'eraser' | 'text' | 'signature' | null
-  >(null)
+  /** Which tool has its option menu open. Named, because the overflow rows
+   *  refer to it too now — a folded tool opens the same menu its inline
+   *  chevron would. */
+  type ToolMenuKey = DrawPrefKey | 'markup' | 'eraser' | 'text' | 'signature'
+  const [toolMenu, setToolMenu] = useState<ToolMenuKey | null>(null)
   // Last markup type the user activated, so the split button's main click
   // re-arms that type rather than always defaulting to highlight
   const [markupType, setMarkupType] = useState<MarkupToolType>('highlight')
@@ -784,6 +786,8 @@ export default function Toolbar({
     onClick(): void
     active?: boolean
     disabled?: boolean
+    /** Tool-menu key this row's chevron opens, for a tool that has options */
+    opts?: ToolMenuKey
   }[] = [
     ...(READ_ALOUD
       ? [
@@ -811,16 +815,24 @@ export default function Toolbar({
       onClick: toggleFit,
       active: activeZoom.fitMode !== 'custom'
     },
-    // Annotation tools fold as single activation rows (their colour/width
-    // popovers aren't in the menu — reachable again by widening the window).
-    { key: 'signature', icon: <IconSignature size={15} />, label: t('tb.signature'), onClick: onSignaturePrimary, active: signatureActive },
+    // Annotation tools keep their options when they fold. `opts` names the
+    // tool-menu key the row should open — the same menu the inline chevron
+    // opens — and the row grows a chevron of its own to match. A row without
+    // `opts` is a plain toggle, exactly as its inline button is.
+    //
+    // «Figurer» is the one that was actively wrong rather than merely reduced:
+    // its inline button IS its menu (there is no separate shape tool), so the
+    // folded row calling onToolSelect('square') drew a rectangle while the
+    // label still said Shapes, and circle, line and arrow became unreachable.
+    // It opens the picker now, like the button does.
+    { key: 'signature', icon: <IconSignature size={15} />, label: t('tb.signature'), onClick: onSignaturePrimary, active: signatureActive, opts: 'signature' },
     { key: 'note', icon: <IconNote size={15} />, label: t('tb.note'), onClick: onToggleNote, active: noteActive },
-    { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => onToolSelect('square'), active: shapeActive },
-    { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text' },
-    { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser' },
-    { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup },
-    { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker' },
-    { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen' },
+    { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => setToolMenu((m) => (m === 'shape' ? null : 'shape')), active: shapeActive, opts: 'shape' },
+    { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text', opts: 'text' },
+    { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser', opts: 'eraser' },
+    { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup, opts: 'markup' },
+    { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker', opts: 'marker' },
+    { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen', opts: 'pen' },
     { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
     { key: 'fullscreen', icon: <IconFullscreen size={15} />, label: t('tb.fullscreen'), onClick: onToggleFullscreen },
     { key: 'redo', icon: <IconRedo size={15} />, label: t('tb.redo'), onClick: onRedo, disabled: !canRedo },
@@ -1034,6 +1046,183 @@ export default function Toolbar({
     </div>
   )
 
+  /** The option popover for whichever tool has its menu open — colour, width,
+   *  the shape picker, the eraser's scope, the text face, the signature list.
+   *
+   *  Lifted out of the tool row so it can be rendered in EITHER anchor. A tool
+   *  that has folded into the "…" menu has no inline button for this to hang
+   *  under, and until now that meant its options were simply gone until you
+   *  widened the window — with «Figurer» the worst of it, since that button IS
+   *  its menu and the folded row silently drew a rectangle instead. */
+  const toolPopover =toolMenu === 'signature' ? (
+            signatureMenu
+          ) : toolMenu === 'markup' ? (
+            <div className="tool-menu">
+              <div className="theme-menu-label">{t('tb.markup')}</div>
+              <div className="markup-grid">
+                {MARKUP_TOOL_TYPES.map((m) => {
+                  const Icon = MARKUP_ICONS[m]
+                  return (
+                    <button
+                      key={m}
+                      className={`markup-option${activeMarkup === m ? ' selected' : ''}`}
+                      onClick={() => {
+                        setMarkupType(m)
+                        onMarkupSelect(m)
+                      }}
+                    >
+                      <Icon size={16} />
+                      <span>{annotTypeLabel(m)}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="color-row">
+                {(markupType === 'highlight' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) =>
+                  markupType === 'highlight' ? (
+                    <button
+                      key={c.hex}
+                      className={`color-dot${markupPrefs[markupType].color.join() === c.rgb.join() ? ' selected' : ''}`}
+                      style={{ background: c.hex }}
+                      title={colorLabel(c)}
+                      onClick={() => onMarkupPrefChange(markupType, { color: c.rgb })}
+                    />
+                  ) : (
+                    <button
+                      key={c.hex}
+                      className={`color-bar${markupPrefs[markupType].color.join() === c.rgb.join() ? ' selected' : ''}`}
+                      title={colorLabel(c)}
+                      onClick={() => onMarkupPrefChange(markupType, { color: c.rgb })}
+                    >
+                      <span style={{ background: c.hex }} />
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="theme-menu-label slider-label">
+                {t('tb.opacity')}
+                <output>{pct(markupPrefs[markupType].opacity)}</output>
+              </div>
+              <input
+                type="range"
+                min={OPACITY_MIN}
+                max={OPACITY_MAX}
+                step={OPACITY_STEP}
+                value={markupPrefs[markupType].opacity}
+                onChange={(e) => onMarkupPrefChange(markupType, { opacity: Number(e.target.value) })}
+                aria-label={t('tb.opacity')}
+              />
+              <ResetLink
+                hidden={markupPrefIsDefault(markupType, markupPrefs[markupType])}
+                onClick={() => onMarkupPrefReset(markupType)}
+              />
+            </div>
+          ) : toolMenu === 'text' ? (
+            <div className="tool-menu">
+              <div className="theme-menu-label">{t('tb.textTool')}</div>
+              <div className="color-row">
+                {FREETEXT_COLORS.map((c) => (
+                  <button
+                    key={c.hex}
+                    className={`color-dot${textPref.color.join() === c.rgb.join() ? ' selected' : ''}`}
+                    style={{ background: c.hex }}
+                    title={colorLabel(c)}
+                    onClick={() => onTextPrefChange({ color: c.rgb })}
+                  />
+                ))}
+              </div>
+              <div className="theme-menu-label slider-label">
+                {t('tb.fontSize')}
+                <output>{textPref.fontSize} pt</output>
+              </div>
+              <input
+                type="range"
+                min={FONT_SIZE_MIN}
+                max={FONT_SIZE_MAX}
+                step={FONT_SIZE_STEP}
+                value={textPref.fontSize}
+                onChange={(e) => onTextPrefChange({ fontSize: Number(e.target.value) })}
+                aria-label={t('tb.fontSize')}
+              />
+              {/* A real typeface choice, and only the PDF's own Standard 14 —
+                  those need no embedding, so the words stay searchable text in
+                  the file and look the same in every reader. Each chip is set
+                  IN its own face: the sample is the label. */}
+              <div className="theme-menu-label">{t('tb.textFont')}</div>
+              <div className="font-row">
+                {TEXT_FONT_FAMILIES.map((family) => {
+                  const parts = textFontParts(textPref.font)
+                  const face = textFontOf(family, parts.bold, parts.italic)
+                  return (
+                    <button
+                      key={family}
+                      className={`font-chip${parts.family === family ? ' selected' : ''}`}
+                      style={textFontCss(face)}
+                      onClick={() => onTextPrefChange({ font: face })}
+                    >
+                      {family}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="font-style-row">
+                {([
+                  ['bold', 'tb.textBold'],
+                  ['italic', 'tb.textItalic']
+                ] as const).map(([which, tip]) => {
+                  const parts = textFontParts(textPref.font)
+                  const on = which === 'bold' ? parts.bold : parts.italic
+                  return (
+                    <button
+                      key={which}
+                      className={`font-style font-style-${which}${on ? ' selected' : ''}`}
+                      title={t(tip)}
+                      aria-pressed={on}
+                      onClick={() =>
+                        onTextPrefChange({
+                          font: textFontOf(
+                            parts.family,
+                            which === 'bold' ? !parts.bold : parts.bold,
+                            which === 'italic' ? !parts.italic : parts.italic
+                          )
+                        })
+                      }
+                    >
+                      A
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="menu-hint">{t('tb.textMoveHint')}</div>
+              <ResetLink hidden={textPrefIsDefault(textPref)} onClick={onTextPrefReset} />
+            </div>
+          ) : toolMenu === 'eraser' ? (
+            <div className="tool-menu">
+              <div className="theme-menu-label">{t('tb.eraser')}</div>
+              <div className="scope-options">
+                {(['draw', 'all'] as const).map((scope) => (
+                  <button
+                    key={scope}
+                    className={`scope-option${eraserScope === scope ? ' selected' : ''}`}
+                    onClick={() => onEraserScopeChange(scope)}
+                  >
+                    <strong>{t(scope === 'draw' ? 'tb.eraserScopeDraw' : 'tb.eraserScopeAll')}</strong>
+                    <span>
+                      {t(scope === 'draw' ? 'tb.eraserScopeDrawHint' : 'tb.eraserScopeAllHint')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {fingerRow}
+              <ResetLink
+                hidden={eraserScope === 'draw'}
+                onClick={() => onEraserScopeChange('draw')}
+              />
+            </div>
+          ) : toolMenu ? (
+            drawToolMenu(toolMenu)
+          ) : null
+
   return (
     <div className="toolbar" ref={toolbarRef}>
       <div className="toolbar-group">
@@ -1219,174 +1408,7 @@ export default function Toolbar({
             </button>
           )}
 
-          {toolMenu === 'signature' ? (
-            signatureMenu
-          ) : toolMenu === 'markup' ? (
-            <div className="tool-menu">
-              <div className="theme-menu-label">{t('tb.markup')}</div>
-              <div className="markup-grid">
-                {MARKUP_TOOL_TYPES.map((m) => {
-                  const Icon = MARKUP_ICONS[m]
-                  return (
-                    <button
-                      key={m}
-                      className={`markup-option${activeMarkup === m ? ' selected' : ''}`}
-                      onClick={() => {
-                        setMarkupType(m)
-                        onMarkupSelect(m)
-                      }}
-                    >
-                      <Icon size={16} />
-                      <span>{annotTypeLabel(m)}</span>
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="color-row">
-                {(markupType === 'highlight' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) =>
-                  markupType === 'highlight' ? (
-                    <button
-                      key={c.hex}
-                      className={`color-dot${markupPrefs[markupType].color.join() === c.rgb.join() ? ' selected' : ''}`}
-                      style={{ background: c.hex }}
-                      title={colorLabel(c)}
-                      onClick={() => onMarkupPrefChange(markupType, { color: c.rgb })}
-                    />
-                  ) : (
-                    <button
-                      key={c.hex}
-                      className={`color-bar${markupPrefs[markupType].color.join() === c.rgb.join() ? ' selected' : ''}`}
-                      title={colorLabel(c)}
-                      onClick={() => onMarkupPrefChange(markupType, { color: c.rgb })}
-                    >
-                      <span style={{ background: c.hex }} />
-                    </button>
-                  )
-                )}
-              </div>
-              <div className="theme-menu-label slider-label">
-                {t('tb.opacity')}
-                <output>{pct(markupPrefs[markupType].opacity)}</output>
-              </div>
-              <input
-                type="range"
-                min={OPACITY_MIN}
-                max={OPACITY_MAX}
-                step={OPACITY_STEP}
-                value={markupPrefs[markupType].opacity}
-                onChange={(e) => onMarkupPrefChange(markupType, { opacity: Number(e.target.value) })}
-                aria-label={t('tb.opacity')}
-              />
-              <ResetLink
-                hidden={markupPrefIsDefault(markupType, markupPrefs[markupType])}
-                onClick={() => onMarkupPrefReset(markupType)}
-              />
-            </div>
-          ) : toolMenu === 'text' ? (
-            <div className="tool-menu">
-              <div className="theme-menu-label">{t('tb.textTool')}</div>
-              <div className="color-row">
-                {FREETEXT_COLORS.map((c) => (
-                  <button
-                    key={c.hex}
-                    className={`color-dot${textPref.color.join() === c.rgb.join() ? ' selected' : ''}`}
-                    style={{ background: c.hex }}
-                    title={colorLabel(c)}
-                    onClick={() => onTextPrefChange({ color: c.rgb })}
-                  />
-                ))}
-              </div>
-              <div className="theme-menu-label slider-label">
-                {t('tb.fontSize')}
-                <output>{textPref.fontSize} pt</output>
-              </div>
-              <input
-                type="range"
-                min={FONT_SIZE_MIN}
-                max={FONT_SIZE_MAX}
-                step={FONT_SIZE_STEP}
-                value={textPref.fontSize}
-                onChange={(e) => onTextPrefChange({ fontSize: Number(e.target.value) })}
-                aria-label={t('tb.fontSize')}
-              />
-              {/* A real typeface choice, and only the PDF's own Standard 14 —
-                  those need no embedding, so the words stay searchable text in
-                  the file and look the same in every reader. Each chip is set
-                  IN its own face: the sample is the label. */}
-              <div className="theme-menu-label">{t('tb.textFont')}</div>
-              <div className="font-row">
-                {TEXT_FONT_FAMILIES.map((family) => {
-                  const parts = textFontParts(textPref.font)
-                  const face = textFontOf(family, parts.bold, parts.italic)
-                  return (
-                    <button
-                      key={family}
-                      className={`font-chip${parts.family === family ? ' selected' : ''}`}
-                      style={textFontCss(face)}
-                      onClick={() => onTextPrefChange({ font: face })}
-                    >
-                      {family}
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="font-style-row">
-                {([
-                  ['bold', 'tb.textBold'],
-                  ['italic', 'tb.textItalic']
-                ] as const).map(([which, tip]) => {
-                  const parts = textFontParts(textPref.font)
-                  const on = which === 'bold' ? parts.bold : parts.italic
-                  return (
-                    <button
-                      key={which}
-                      className={`font-style font-style-${which}${on ? ' selected' : ''}`}
-                      title={t(tip)}
-                      aria-pressed={on}
-                      onClick={() =>
-                        onTextPrefChange({
-                          font: textFontOf(
-                            parts.family,
-                            which === 'bold' ? !parts.bold : parts.bold,
-                            which === 'italic' ? !parts.italic : parts.italic
-                          )
-                        })
-                      }
-                    >
-                      A
-                    </button>
-                  )
-                })}
-              </div>
-              <div className="menu-hint">{t('tb.textMoveHint')}</div>
-              <ResetLink hidden={textPrefIsDefault(textPref)} onClick={onTextPrefReset} />
-            </div>
-          ) : toolMenu === 'eraser' ? (
-            <div className="tool-menu">
-              <div className="theme-menu-label">{t('tb.eraser')}</div>
-              <div className="scope-options">
-                {(['draw', 'all'] as const).map((scope) => (
-                  <button
-                    key={scope}
-                    className={`scope-option${eraserScope === scope ? ' selected' : ''}`}
-                    onClick={() => onEraserScopeChange(scope)}
-                  >
-                    <strong>{t(scope === 'draw' ? 'tb.eraserScopeDraw' : 'tb.eraserScopeAll')}</strong>
-                    <span>
-                      {t(scope === 'draw' ? 'tb.eraserScopeDrawHint' : 'tb.eraserScopeAllHint')}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {fingerRow}
-              <ResetLink
-                hidden={eraserScope === 'draw'}
-                onClick={() => onEraserScopeChange('draw')}
-              />
-            </div>
-          ) : toolMenu ? (
-            drawToolMenu(toolMenu)
-          ) : null}
+          {toolMenu && inline(toolMenu === 'shape' ? 'shapes' : toolMenu) ? toolPopover : null}
         </div>
       </div>
 
@@ -1878,19 +1900,37 @@ export default function Toolbar({
             {overflowMenuOpen && (
               <div className="theme-menu overflow-menu">
                 {hiddenActions.map((a) => (
-                  <button
-                    key={a.key}
-                    className={`menu-action${a.active ? ' is-active' : ''}`}
-                    disabled={a.disabled}
-                    onClick={() => {
-                      setOverflowMenuOpen(false)
-                      a.onClick()
-                    }}
-                  >
-                    {a.icon}
-                    {a.label}
-                  </button>
+                  /* A row does what its inline button does. With options, that
+                     means the same split: the body activates, the chevron opens
+                     the menu — and the menu renders below, inside this anchor,
+                     because the button it would normally hang under is exactly
+                     what folded away. Picking an option keeps the "…" menu open
+                     for the same reason the inline popover keeps the toolbar. */
+                  <span className={`menu-action-split${a.opts ? '' : ' is-plain'}`} key={a.key}>
+                    <button
+                      className={`menu-action${a.active ? ' is-active' : ''}`}
+                      disabled={a.disabled}
+                      onClick={() => {
+                        if (!a.opts) setOverflowMenuOpen(false)
+                        a.onClick()
+                      }}
+                    >
+                      {a.icon}
+                      {a.label}
+                    </button>
+                    {a.opts && (
+                      <button
+                        className={`tb-chevron${toolMenu === a.opts ? ' is-active' : ''}`}
+                        title={t('tb.toolOptionsTip')}
+                        aria-label={t('tb.toolOptionsTip')}
+                        onClick={() => setToolMenu((m) => (m === a.opts ? null : a.opts!))}
+                      >
+                        <IconChevronDown size={11} />
+                      </button>
+                    )}
+                  </span>
                 ))}
+                {toolMenu && !inline(toolMenu === 'shape' ? 'shapes' : toolMenu) ? toolPopover : null}
               </div>
             )}
           </div>

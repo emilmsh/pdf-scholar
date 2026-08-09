@@ -1082,30 +1082,18 @@ button {
 
 /* Drawing tools */
 
-/* The marking tools sit in a faint tray (Emil, 2026-08-09: the bar was
-   "visually crowded" — 28 identical outline glyphs at identical weight, with
-   nothing telling the eye where one job ends and the next begins). The tray
-   groups roughly half of them into one shape, so the bar reads as four regions
-   instead of a wall.
-   The tint is derived from --text, the same way --hover and --active are, so
-   all four themes get it for free — and it is deliberately BELOW --hover (3.5 %
-   against 5.5–8 %), or a hovered button inside the tray would sink into it
-   instead of lifting off it. Separators inside the tray lose their line: the
-   tray edge already says "group", and a divider inside a divided thing is the
-   noise we are removing. */
+/* No tray behind the marking tools. One was tried (2026-08-09) against the bar
+   reading as "visually crowded" — 28 identical outline glyphs at identical
+   weight — and it came straight back out: three icons left the bar in the same
+   pass for the same reason, and carrying both fixes pays for the second one
+   twice, once in ink and once in the asymmetry of a single group sitting on a
+   surface while every other group floats. Emil's read, and the right one: the
+   rest of the bar looked unfinished beside it. Separators do the grouping. */
 .tool-group {
   position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0 4px;
-  border-radius: 9px;
-  background: color-mix(in srgb, var(--text) 3.5%, transparent);
-}
-
-.tool-group .toolbar-sep {
-  background: transparent;
-  margin: 0 3px;
 }
 
 .tool-menu {
@@ -2846,6 +2834,24 @@ html.pen-near .draw-layer {
 .color-bar.selected {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+/* An overflow row that carries options is a split button, the same shape its
+   inline twin has: body activates, chevron opens the menu. is-plain rows have
+   no chevron and keep the full width. */
+.menu-action-split {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.menu-action-split > .menu-action {
+  flex: 1;
+  min-width: 0;
+}
+
+.menu-action-split .tb-chevron {
+  flex: none;
 }
 
 .menu-item {
