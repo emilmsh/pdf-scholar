@@ -64,6 +64,31 @@ export default function App(): React.JSX.Element {
   const [activeId, setActiveId] = useState<string | null>(null)
   const activeIdRef = useRef(activeId)
   activeIdRef.current = activeId
+  /** The library is a PLACE, not the absence of documents (Emil, 2026-08-09).
+   *
+   *  It used to be neither: the button called «back to the library» was wired
+   *  to closeTab, so with several documents open it closed one and landed you
+   *  in the next, and with one open it closed that and the library appeared
+   *  only because nothing was left. Going home cost you a document every time,
+   *  and the open ones were invisible from there.
+   *
+   *  So this is a view flag, and NOT `activeId = null`: the active tab has to
+   *  be remembered while you are away, or coming back would have to guess
+   *  which document you meant. Every PdfViewer stays MOUNTED behind the library
+   *  — `.tab-view` is absolute + visibility, never unmounted — so scroll
+   *  position, zoom, split, panels and unsaved drafts are all still there when
+   *  you return. Nothing is restored because nothing was torn down. */
+  const [atLibrary, setAtLibrary] = useState(false)
+  /** Same reason activeIdRef exists: the window-level key handler is bound once
+   *  and would otherwise close over the flag's first value forever. */
+  const atLibraryRef = useRef(atLibrary)
+  atLibraryRef.current = atLibrary
+  /** Go to a document. The ONE way a tab becomes active, so no caller can
+   *  activate one while the library is still covering it. */
+  const goToTab = useCallback((id: string) => {
+    setActiveId(id)
+    setAtLibrary(false)
+  }, [])
   const [recents, setRecents] = useState<RecentFile[]>([])
   const [settings, setSettingsState] = useState<Settings>(FALLBACK_SETTINGS)
   const [systemDark, setSystemDark] = useState(
@@ -279,13 +304,13 @@ export default function App(): React.JSX.Element {
             existing.payload.name
           )
           if (verdict === 'cancel') {
-            setActiveId(existing.id)
+            goToTab(existing.id)
             return
           }
           await bridge.docDiscard(existing.payload.path)
           setTabDirty(existing.id, false)
         }
-        setActiveId(existing.id)
+        goToTab(existing.id)
         const initialPosition = await bridge.getPosition(payload.path)
         setTabs((prev) =>
           prev.map((t) =>
@@ -298,10 +323,10 @@ export default function App(): React.JSX.Element {
       const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition, epoch: 0 }
       bridge.docOpened(payload.path)
       setTabs((prev) => [...prev, tab])
-      setActiveId(tab.id)
+      goToTab(tab.id)
       setError(null)
     },
-    [confirmExternalUpdateVerdict, setTabDirty]
+    [confirmExternalUpdateVerdict, setTabDirty, goToTab]
   )
 
   /** Called by the viewer when Save/Ctrl+S finds the file changed outside the
@@ -328,7 +353,7 @@ export default function App(): React.JSX.Element {
       }
       return verdict
     },
-    [confirmExternalUpdateVerdict, setTabDirty]
+    [confirmExternalUpdateVerdict, setTabDirty, goToTab]
   )
 
   /** Close with the unsaved-changes prompt when the tab is dirty. Resolves to
@@ -427,9 +452,9 @@ export default function App(): React.JSX.Element {
       setTabs((prev) =>
         prev.map((t) => (t.id === id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t))
       )
-      setActiveId(id)
+      goToTab(id)
     },
-    [setTabDirty, confirmCloseVerdict, reportCloseFailure]
+    [setTabDirty, confirmCloseVerdict, reportCloseFailure, goToTab]
   )
 
   /** «Save a copy» semantics: continue working in the copy. The edits were
@@ -470,6 +495,10 @@ export default function App(): React.JSX.Element {
   )
 
   const cycleTab = useCallback((delta: number) => {
+    // Ctrl+Tab from the library goes BACK INTO the documents rather than
+    // cycling invisibly behind it — with one open it is the only one, so the
+    // early return below would otherwise make the key do nothing at all.
+    if (tabsRef.current.length > 0) setAtLibrary(false)
     setActiveId((current) => {
       const list = tabsRef.current
       if (list.length < 2) return current
@@ -485,7 +514,7 @@ export default function App(): React.JSX.Element {
         const verdict = await confirmExternalUpdateVerdict(path, existing.payload.name)
         if (verdict === 'cancel') {
           // Unsaved annotations trump the external update — just focus the tab
-          setActiveId(existing.id)
+          goToTab(existing.id)
           return
         }
         // 'save' (copy flushed elsewhere) or 'discard': the old draft is no
@@ -498,7 +527,7 @@ export default function App(): React.JSX.Element {
       const result = await bridge.readFile(path)
       if ('error' in result) {
         if (existing) {
-          setActiveId(existing.id) // file gone/busy — keep showing what we have
+          goToTab(existing.id) // file gone/busy — keep showing what we have
           return
         }
         setError(t('app.openFailed', { error: errorText(result) }))
@@ -506,7 +535,7 @@ export default function App(): React.JSX.Element {
       }
       await openPayload(result)
     },
-    [openPayload, confirmExternalUpdateVerdict, setTabDirty]
+    [openPayload, confirmExternalUpdateVerdict, setTabDirty, goToTab]
   )
 
   const openDialog = useCallback(async () => {
@@ -528,10 +557,13 @@ export default function App(): React.JSX.Element {
     return bridge.onOpenPath((path) => openPath(path))
   }, [refreshRecents, openPath])
 
-  // Refresh recents whenever the last tab closes (back at the welcome screen)
+  // Refresh recents whenever the library comes into view — the last tab
+  // closing, or simply walking back to it. Reading a document is exactly what
+  // changes this list, so arriving with the version from an hour ago would
+  // show a stale «recent» every time.
   useEffect(() => {
-    if (tabs.length === 0) refreshRecents()
-  }, [tabs.length, refreshRecents])
+    if (atLibrary || tabs.length === 0) refreshRecents()
+  }, [atLibrary, tabs.length, refreshRecents])
 
   // Tab shortcuts: Ctrl+Tab / Ctrl+Shift+Tab cycle (Ctrl also on mac — Cmd+Tab
   // is the OS app switcher), Cmd/Ctrl+W close, Cmd/Ctrl+O open
@@ -545,7 +577,10 @@ export default function App(): React.JSX.Element {
         // Read the active id from a ref, not a setActiveId updater: closing runs
         // its own setActiveId to pick the neighbour, and returning `current` from
         // an outer updater would clobber that and leave no active tab.
-        if (activeIdRef.current) closeTab(activeIdRef.current)
+        // Nothing to close from the library: activeId still names the document
+        // you will return to, and Ctrl+W there would close a document you are
+        // not even looking at.
+        if (activeIdRef.current && !atLibraryRef.current) closeTab(activeIdRef.current)
       } else if (primaryMod(e) && e.shiftKey && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault()
         bridge.newWindow()
@@ -607,13 +642,20 @@ export default function App(): React.JSX.Element {
           path: t.payload.path,
           dirty: dirtyTabs.has(t.id)
         }))}
-        activeId={activeId}
+        // No tab is the current one while the library is showing — the strip
+        // stays, so the open documents are visible and one click away from
+        // there, but none of them is what you are looking at.
+        activeId={atLibrary ? null : activeId}
         // Fullscreen tucks the strip — but reaching for the top brings it
         // back with the toolbar. Only worth it with MORE THAN ONE tab: with a
         // single document open the strip is a title bar, and revealing it adds
         // nothing to a reader who went fullscreen to be rid of exactly that.
-        hidden={presenting || (fullscreen && (tabs.length < 2 || !chromeVisible))}
-        onSelect={setActiveId}
+        // At the library the strip is the only way back to a document, so it
+        // is never tucked there.
+        hidden={
+          !atLibrary && (presenting || (fullscreen && (tabs.length < 2 || !chromeVisible)))
+        }
+        onSelect={goToTab}
         onClose={closeTab}
         onNewTab={() => void openDialog()}
         onNewWindow={() => bridge.newWindow()}
@@ -626,14 +668,22 @@ export default function App(): React.JSX.Element {
         onReload={(id, path) => void reloadTab(id, path)}
       />
 
-      {tabs.length > 0 ? (
-        <div className="tab-views">
-          {tabs.map((tab) => (
-            <div key={`${tab.id}:${tab.epoch}`} className={`tab-view${tab.id === activeId ? ' active' : ''}`}>
+      {/* One stack, always. The documents are NEVER unmounted to show the
+          library — they are layers under it, hidden the same way an inactive
+          tab is (`.tab-view` = absolute + visibility). That is the whole
+          mechanism behind "go home and come back without losing your place":
+          there is no place to restore, because the viewer never stopped
+          existing. Unmounting here instead would throw away scroll position,
+          zoom, the split, open panels and any unsaved draft. */}
+      <div className="tab-views">
+        {tabs.map((tab) => {
+          const showing = tab.id === activeId && !atLibrary
+          return (
+            <div key={`${tab.id}:${tab.epoch}`} className={`tab-view${showing ? ' active' : ''}`}>
               <PdfViewer
                 payload={tab.payload}
                 initialPosition={tab.initialPosition}
-                active={tab.id === activeId}
+                active={showing}
                 settings={settings}
                 resolvedTheme={resolvedTheme}
                 onSettingsChange={updateSettings}
@@ -643,14 +693,18 @@ export default function App(): React.JSX.Element {
                 onSavedAs={(path) => void adoptSavedCopy(tab.id, path)}
                 onExternalSaveConflict={handleSaveExternalConflict}
                 onClose={() => closeTab(tab.id)}
-                tabCount={tabs.length}
+                onLeaveDocument={() => setAtLibrary(true)}
               />
             </div>
-          ))}
-        </div>
-      ) : (
-        <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
-      )}
+          )
+        })}
+        {/* With nothing open the library is not a choice, it is all there is */}
+        {(atLibrary || tabs.length === 0) && (
+          <div className="tab-view active">
+            <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+          </div>
+        )}
+      </div>
       {isElectron && update && (
         <div className="update-toast" role="status">
           <div className="update-toast-text">

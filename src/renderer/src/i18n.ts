@@ -121,7 +121,6 @@ const nb = {
   // Toolbar
   'tb.library': 'Bibliotek',
   'tb.libraryTip': 'Tilbake til biblioteket',
-  'tb.leaveDocTip': 'Lukk dokumentet',
   // Document button (browser/extension only — replaces the desktop tab bar's
   // file identity: shows the open file's path and opens another file)
   'doc.copyPath': 'Kopier sti',
@@ -764,7 +763,6 @@ const en: Dict = {
 
   'tb.library': 'Library',
   'tb.libraryTip': 'Back to the library',
-  'tb.leaveDocTip': 'Close this document',
   'doc.copyPath': 'Copy path',
   'doc.copied': 'Copied',
   'doc.openFile': 'Open another file …',

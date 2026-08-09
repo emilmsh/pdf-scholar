@@ -251,7 +251,26 @@ export function annotTypeLabel(type: AnnotationType): string {
 // opens a menu with nothing selected at all — which is what both draw tools
 // did up to v0.36.0 (the pen shipped [0.16, 0.35, 0.75], a blue in no palette;
 // the shape tool's red was off the markup red by 0.004 in one channel).
-const INK_BLACK: [number, number, number] = [0.11, 0.11, 0.13]
+/** Pure black, on Emil's call (2026-08-09). It was #1c1c21 — a soft off-black
+ *  chosen to sit gently on white paper — and in the dark themes that softness
+ *  read as grey: the page filter is `invert(0.89) … brightness(1.08)`, applied
+ *  to the marks overlay as well as the canvas, and it takes the document's own
+ *  pure-black text to ~247 while taking #1c1c21 to only ~221. Your own ink
+ *  landed 26 levels below the text it was written beside. Matching the paper's
+ *  own black is worth a slightly harder line in Day.
+ *
+ *  Marks already saved in #1c1c21 keep it — the colour lives in the file, and
+ *  we do not rewrite a user's documents to follow a palette. They simply no
+ *  longer ring a swatch in the tool menu, and the notes tab's colour filter
+ *  labels them by hex rather than «Svart». */
+export const INK_BLACK: [number, number, number] = [0, 0, 0]
+/** What INK_BLACK was up to v0.36. Exported for ONE reason: a tool preference
+ *  is persisted, so it outlives the palette, and every existing user has this
+ *  triple sitting in localStorage for the pen and the text tool. Left alone
+ *  they would keep drawing the old grey — and the tool menu would ring no
+ *  swatch at all, since the ring is an exact componentwise match. tool-prefs
+ *  maps it forward on read. */
+export const LEGACY_INK_BLACK: [number, number, number] = [0.11, 0.11, 0.13]
 const INK_RED: [number, number, number] = [0.886, 0.286, 0.29]
 const INK_GREEN: [number, number, number] = [0.184, 0.62, 0.345]
 /** Deeper than the highlighter's #ffd54a on purpose: that pastel is meant for
@@ -266,7 +285,7 @@ const INK_BLUE: [number, number, number] = [0.196, 0.486, 0.965]
  *  while carrying a purple and an orange nobody reached for. The highlighter
  *  keeps HIGHLIGHT_COLORS; pastels belong to a wide translucent band. */
 export const PEN_COLORS: HighlightColor[] = [
-  { key: 'black', hex: '#1c1c21', rgb: INK_BLACK },
+  { key: 'black', hex: '#000000', rgb: INK_BLACK },
   { key: 'red', hex: '#e2494a', rgb: INK_RED },
   { key: 'green', hex: '#2f9e58', rgb: INK_GREEN },
   { key: 'yellow', hex: '#eab308', rgb: INK_YELLOW },
@@ -284,7 +303,7 @@ export const FREETEXT_SIZE = 12
  *  saturated markup palette — red up front because a teacher's correction pen
  *  is the tool's signature use (Fredrik's Notability reference). */
 export const FREETEXT_COLORS: HighlightColor[] = [
-  { key: 'black', hex: '#1c1c21', rgb: FREETEXT_COLOR },
+  { key: 'black', hex: '#000000', rgb: FREETEXT_COLOR },
   { key: 'red', hex: '#e2494a', rgb: [0.886, 0.286, 0.29] },
   { key: 'blue', hex: '#327cf6', rgb: [0.196, 0.486, 0.965] },
   { key: 'green', hex: '#2f9e58', rgb: [0.184, 0.62, 0.345] },

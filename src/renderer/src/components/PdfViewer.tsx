@@ -42,6 +42,7 @@ import {
   rgbCss,
   selectionRectsForPage,
   strokesBox,
+  TEXT_FONT_DEFAULT,
   textFontCss
 } from '../annotations'
 import {
@@ -323,6 +324,10 @@ interface PageSize {
 export interface AnnotPatch {
   color?: [number, number, number]
   contents?: string
+  /** freetext: re-set an existing box in another of the Standard 14. Always
+   *  sent with re-measured `quads` — a wider face needs a wider box, and the
+   *  measurement (freetextMinSize) is a canvas that only exists here. */
+  font?: PdfStandardFont
   /** Note drag: replacement quads (engine gets quads[0] as the new rect) */
   quads?: PageRect[]
   /** Drag-move of an ink/line/arrow: replacement strokes.
@@ -401,10 +406,13 @@ interface Props {
    *  save to perform (it never does; 'cancel' means "stay dirty, do nothing"
    *  and the other two verdicts leave nothing left to save in place). */
   onExternalSaveConflict(path: string, name: string): Promise<'save' | 'discard' | 'cancel'>
+  /** CLOSE this document — the tab goes away. Reached from the error screen,
+   *  where the tab holds a file that would not open and is worth nothing. */
   onClose(): void
-  /** Documents open in this window — the leave button's tooltip depends on
-   *  whether closing this one lands you in the library or in the next tab. */
-  tabCount: number
+  /** GO TO THE LIBRARY, closing nothing. These two were the same function
+   *  until 2026-08-09, which is what made «back to the library» close a
+   *  document instead of going anywhere. */
+  onLeaveDocument(): void
   /** Browser/extension only: open another file (the shell handles the picker).
    *  When supplied, the toolbar shows a left-most file button that surfaces the
    *  current file's path and this action. Desktop leaves it undefined — the tab
@@ -425,7 +433,7 @@ export default function PdfViewer({
   onSavedAs,
   onExternalSaveConflict,
   onClose,
-  tabCount,
+  onLeaveDocument,
   onOpenFile
 }: Props): React.JSX.Element {
   useLang()
@@ -2534,6 +2542,7 @@ export default function PdfViewer({
           id: handle.fileId,
           color: patch.color,
           contents: patch.contents,
+          font: patch.font,
           rect: markup ? undefined : reshapeQuads?.[0],
           quads: markup ? reshapeQuads : undefined,
           strokes: reshapeStrokes,
@@ -2678,6 +2687,11 @@ export default function PdfViewer({
       const before: AnnotPatch = {}
       if (patch.color) before.color = record.color
       if (patch.contents !== undefined) before.contents = record.contents ?? ''
+      // A box read back from a FILE carries no font (pdf.js paints those from
+      // the appearance stream), so the undo value falls back to the same default
+      // buildAnnotation uses — otherwise undoing a font change on such a box
+      // would omit the key and leave the new face in place.
+      if (patch.font !== undefined) before.font = record.font ?? TEXT_FONT_DEFAULT
       if (patch.quads) before.quads = record.quads
       if (patch.strokes) before.strokes = record.strokes
       if (patch.translate) before.translate = { dx: -patch.translate.dx, dy: -patch.translate.dy }
@@ -5464,8 +5478,7 @@ export default function PdfViewer({
           onTextPrefChange={patchTextPref}
           onTextPrefReset={resetTextPref}
           onToggleSidebar={() => setTocPinned((o) => !o)}
-          onLeaveDocument={onClose}
-          tabCount={tabCount}
+          onLeaveDocument={onLeaveDocument}
           onGoToPage={jumpToPage}
           onZoomIn={() => manualZoom(scaleRef.current * 1.15)}
           onZoomOut={() => manualZoom(scaleRef.current / 1.15)}
@@ -5482,8 +5495,6 @@ export default function PdfViewer({
           canSaveInPlace={isElectron || isExtension}
           annotsHidden={annotsHidden}
           onToggleAnnots={() => setAnnotsHidden((h) => !h)}
-          marginNotes={marginNotes}
-          onToggleMarginNotes={toggleMarginNotes}
           canUndo={undoDepths.undo > 0}
           canRedo={undoDepths.redo > 0}
           onUndo={() => void performUndoRedo('undo')}
@@ -5513,8 +5524,6 @@ export default function PdfViewer({
           }}
           aiOpen={aiPinned}
           onToggleAi={() => setAiPinned((o) => !o)}
-          snipActive={!!snip}
-          onToggleSnip={() => setSnip((s) => (s ? null : { target: 'quick' }))}
           noteActive={notePlacing}
           onToggleNote={() => setNotePlacing((v) => !v)}
           signatureActive={armedSignature !== null}
@@ -6031,6 +6040,24 @@ export default function PdfViewer({
               focusText={annotPopover.focusText}
               annotation={record}
               onColor={(color) => changeAnnotation(annotPopover.pageNumber, record, { color })}
+              onFont={(font) => {
+                // Re-measure in the NEW face before sending: Courier is far
+                // wider than Helvetica at the same size, so keeping the old box
+                // would wrap the words somewhere else than they were written —
+                // or clip them, which reads as data loss. The box only ever
+                // GROWS here: shrinking a box the user had widened on purpose
+                // would undo a deliberate choice, so the floor is the minimum
+                // and the current width wins when it is already wider.
+                const q = record.quads[0]
+                if (!q) return
+                const min = freetextMinSize(record.contents ?? '', record.fontSize ?? 12, q.w, font)
+                const w = Math.max(q.w, min.w)
+                const h = Math.max(q.h, min.h)
+                changeAnnotation(annotPopover.pageNumber, record, {
+                  font,
+                  ...(w !== q.w || h !== q.h ? { quads: [{ ...q, w, h }] } : {})
+                })
+              }}
               onContents={(contents) =>
                 changeAnnotation(annotPopover.pageNumber, record, { contents })
               }

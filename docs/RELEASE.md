@@ -64,14 +64,14 @@ surface missing one it needs.
 | Frame | README | Landing page | Stores |
 |---|---|---|---|
 | `tricolor` (composed) | hero | hero + `og:image` | 1 |
-| `page_only` | ✓ | ✓ | — |
 | `annotations` | ✓ | ✓ | 2 |
 | `assistant` | ✓ | ✓ | 3 |
 | `assistant_figure` | ✓ | — | 4 |
 | `assistant_snip` | ✓ | — | — |
 | `dual-pane` | ✓ | ✓ | 5 |
+| `margin` | ✓ | — | — |
 | `reading`, `parchment`, `night` | — | — | — (tricolor's sources) |
-| `night+`, `annotations_edit`, `reading_tabs` | — | — | — (shot as smoke tests) |
+| `night+`, `annotations_edit`, `reading_tabs`, `page_only`, `feedback`, `signature` | — | — | — (shot as smoke tests) |
 
 **Why tricolor opens everything, and why it keeps its toolbar** (Emil, 2026-08-08).
 A frame that OPENS a surface has to read as an application, so the opening frame
@@ -79,8 +79,17 @@ keeps the toolbar — and tricolor is the app's most recognisable single image, 
 it opens all three surfaces, `og:image` included (that is the thumbnail LinkedIn
 draws under a shared link). Consequence: `reading` keeps its toolbar too, because
 tricolor is composed from it, and `reading` therefore stopped shipping anywhere of
-its own. The toolbar-less frame the copy now leads with is `page_only` — a body
-page at fit-width with the toolbar unpinned — and it is second, never first.
+its own.
+
+**And why nothing toolbar-less ships at all** (Emil, 2026-08-09). `page_only` — a
+body page at fit-width with the toolbar unpinned — used to be the second frame on
+both the README and the landing page. It came out because a picture with no
+application in it cannot carry a section: the other frames all show the app doing
+something, and this one showed its absence, which next to a browser's built-in
+viewer proves nothing. The reading section now sits directly under `tricolor` and
+uses that as its illustration, so it needs no frame of its own. Do not reach for an
+unshipped frame to fill a section either — the ones sitting at `ships: []` are
+there because they were judged and rejected, not because nobody got around to them.
 
 Shoot everything in one run when you re-shoot anything: the frames share a
 session, and a set mixed across runs shows the app at two different moments.

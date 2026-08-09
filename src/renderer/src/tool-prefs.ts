@@ -21,6 +21,8 @@ import {
   TEXT_FONT_DEFAULT,
   HIGHLIGHT_COLORS,
   HIGHLIGHT_FILL_ALPHA,
+  INK_BLACK,
+  LEGACY_INK_BLACK,
   MARKER_DEFAULT,
   MARKER_OPACITY,
   PEN_DEFAULT,
@@ -135,12 +137,21 @@ const isRgb = (v: unknown): v is [number, number, number] =>
 /** Merge one stored tool entry over its default, dropping anything malformed —
  *  a hand-edited or version-skewed localStorage entry must never be able to
  *  produce an invisible or zero-width tool. */
+/** Carry a stored v0.36 off-black forward to the pure black that replaced it.
+ *  Only that one triple moves; every other stored colour is the user's own
+ *  choice and is left exactly as it is. Applied on READ, so the correction
+ *  happens on the first launch and needs no migration step of its own. */
+function migrateInk(color: [number, number, number]): [number, number, number] {
+  const isLegacy = color.every((v, i) => Math.abs(v - LEGACY_INK_BLACK[i]) < 0.001)
+  return isLegacy ? [...INK_BLACK] : color
+}
+
 function mergeTool(key: DrawPrefKey, raw: unknown): ToolPref {
   const base = DEFAULT_TOOL_PREFS.tools[key]
   if (!raw || typeof raw !== 'object') return { ...base }
   const r = raw as Partial<ToolPref>
   return {
-    color: isRgb(r.color) ? r.color : base.color,
+    color: isRgb(r.color) ? migrateInk(r.color) : base.color,
     width:
       typeof r.width === 'number' && Number.isFinite(r.width)
         ? clamp(r.width, TOOL_WIDTH_MIN, TOOL_WIDTH_MAX[key])
@@ -157,7 +168,7 @@ function mergeText(raw: unknown): TextPref {
   if (!raw || typeof raw !== 'object') return { ...base }
   const r = raw as Partial<TextPref>
   return {
-    color: isRgb(r.color) ? r.color : base.color,
+    color: isRgb(r.color) ? migrateInk(r.color) : base.color,
     fontSize:
       typeof r.fontSize === 'number' && Number.isFinite(r.fontSize)
         ? clamp(Math.round(r.fontSize), FONT_SIZE_MIN, FONT_SIZE_MAX)

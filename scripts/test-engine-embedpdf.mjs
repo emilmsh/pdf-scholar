@@ -366,6 +366,28 @@ for (const req of reqs) {
     contents: 'Uten valgt skrift', fontSize: 14
   })
   check('textfont: create without one', 'ok' in f2, 'error' in f2 ? f2.error : `obj#${f2.id}`)
+  // A box that ALREADY EXISTS can be re-set in another face (Emil, 2026-08-09).
+  // Until then the toolbar's font choice only ever reached boxes that did not
+  // exist yet, so a paragraph typed in the wrong face had to be retyped.
+  //
+  // 0 = Courier in PdfStandardFont — and note that it is ZERO, which is why
+  // every hop in this path guards on `!== undefined` rather than truthiness.
+  // A `req.font &&` anywhere between the popover and EPDFAnnot_SetDefaultAppearance
+  // would silently drop Courier alone, and the box would keep its old face while
+  // every layer reported success.
+  const COURIER = 0
+  const f3 = await applyAnnotation({
+    ...fbase, type: 'freetext', quads: q(40, 280, 220, 40),
+    contents: 'Skrevet i Helvetica', fontSize: 14
+  })
+  check('textfont: create the box to re-set', 'ok' in f3, 'error' in f3 ? f3.error : `obj#${f3.id}`)
+  if ('ok' in f3) {
+    const changed = await updateAnnotation({
+      path: FFILE, pageIndex: 0, id: f3.id, font: COURIER
+    })
+    check('textfont: re-set an existing box', 'ok' in changed,
+      'error' in changed ? changed.error : '')
+  }
   await flushAnnotations(FFILE)
 
   const doc = mupdf.Document.openDocument(fs.readFileSync(FFILE), 'application/pdf')
@@ -378,6 +400,7 @@ for (const req of reqs) {
   }
   const o1 = 'ok' in f1 ? byId(f1.id) : null
   const o2 = 'ok' in f2 ? byId(f2.id) : null
+  const o3 = 'ok' in f3 ? byId(f3.id) : null
   check('textfont: the box is a FreeText, not a Stamp',
     o1 && String(o1.get('Subtype')) === '/FreeText', o1 ? String(o1.get('Subtype')) : 'missing')
   const da1 = o1?.get('DA')
@@ -398,6 +421,22 @@ for (const req of reqs) {
   const apText = ap1 && !ap1.isNull() ? ap1.readStream().asString() : ''
   check('textfont: the appearance SHOWS text, it does not draw glyphs',
     /BT/.test(apText) && /Tj|TJ/.test(apText), `${apText.length} bytes`)
+  // The re-set box: the face in the file is the NEW one, the words survived the
+  // rewrite, and the appearance is still a show-text operator — a font change
+  // that silently turned the paragraph into drawn outlines would pass a "looks
+  // like Courier" eyeball test and lose searchable text.
+  const da3 = o3?.get('DA')
+  const daText3 = da3 && !da3.isNull() ? da3.asString() : ''
+  check('textfont: the re-set box names the NEW face', /Cour/i.test(daText3), daText3 || 'no /DA')
+  check('textfont: and no longer the old one', !/Helv/i.test(daText3), daText3 || 'no /DA')
+  const c3 = o3?.get('Contents')
+  check('textfont: re-setting kept the words',
+    !!c3 && !c3.isNull() && c3.asString() === 'Skrevet i Helvetica',
+    c3 && !c3.isNull() ? c3.asString() : 'missing')
+  const ap3 = o3?.get('AP')?.get('N')
+  const apText3 = ap3 && !ap3.isNull() ? ap3.readStream().asString() : ''
+  check('textfont: the re-set appearance still SHOWS text',
+    /BT/.test(apText3) && /Tj|TJ/.test(apText3), `${apText3.length} bytes`)
   const raw = fs.readFileSync(FFILE)
   check('textfont: nothing was embedded (no /FontFile)', !raw.includes(Buffer.from('FontFile')))
   doc.destroy()

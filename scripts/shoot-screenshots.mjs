@@ -337,7 +337,7 @@ const SHOTS = [
       if (ui.markRectsA().length === 0) await ui.highlightSomeText()
       await ui.placeNote('Tie this back to the RNN baseline in §2', 0.08, 0.24)
       await ui.placeNote('Strong claim — soften it, or cite the ablation', 0.06, 0.52)
-      await ui.toggle(L.margin)
+      await ui.setMargin(true)
       await ui.fitWidth()
       await ui.settle(3400)
     `
@@ -575,9 +575,16 @@ const ui = {
     const split = btn(L.split);
     if (split && split.classList.contains('is-active')) { click(split); await settle(500); }
     // The margin view persists in localStorage — a scene that turned it on
-    // must not leak its strip into every frame that follows.
-    const margin = btn(L.margin);
-    if (margin && margin.classList.contains('is-active')) { click(margin); await settle(500); }
+    // must not leak its strip into every frame that follows. Read that same key
+    // rather than the DOM: it is the state the app itself restores from, and it
+    // answers without opening the sidebar to look (PdfViewer, MARGIN_VIEW_LS_KEY;
+    // 'pdfx-margin-notes' is the legacy boolean it still falls back to).
+    let marginOn = localStorage.getItem('pdfx-margin-notes') === '1';
+    try {
+      const raw = localStorage.getItem('pdfx-margin-view');
+      if (raw) marginOn = JSON.parse(raw).on === true;
+    } catch { /* unreadable = treat as off, same as the app does */ }
+    if (marginOn) await this.setMargin(false);
     // Disarm any tool a previous shot armed — the shots share one app session,
     // so the annotations shot's highlighter was still lit (and its button
     // outlined) in every theme shot that followed it.
@@ -619,6 +626,33 @@ const ui = {
       click(go);
       await settle(1200);   // the batch delete reloads the document
     }
+    if (!wasOpen) { click(side); await settle(400); }
+  },
+  /** Turn the margin view on or off from its ONE home, the Merknader tab.
+   *
+   *  It had a toolbar button until 2026-08-09; that button was a second copy of
+   *  a switch that already lived in the tab, and it came out with the rest of
+   *  the toolbar's weight. Same shape as clearAnnots(): open the sidebar if it
+   *  is shut, tick the box, put the sidebar back the way it was — the frames
+   *  that use the margin show it beside a page with no panels open.
+   *
+   *  Native .click() on the input, not the script's synthetic click(): a
+   *  dispatched MouseEvent performs no default action, so the checkbox would
+   *  never actually flip. */
+  async setMargin(on) {
+    const side = btn(L.sidebar);
+    if (!side) throw new Error('no sidebar button, so the margin switch cannot be reached');
+    const wasOpen = side.classList.contains('is-active');
+    if (!wasOpen) { click(side); await settle(450); }
+    const tab = [...document.querySelectorAll('.sidebar-tabs button')]
+      .find((b) => L.annotsTab.some((n) => (b.textContent || '').trim().startsWith(n)));
+    if (!tab) throw new Error('no Merknader tab, so the margin switch cannot be reached');
+    click(tab);
+    await settle(350);
+    const box = document.querySelector('.annot-margin input[type="checkbox"]');
+    if (!box) throw new Error('the Merknader tab has no margin switch');
+    if (box.checked !== on) { box.click(); await settle(500); }
+    if (box.checked !== on) throw new Error('the margin switch did not move to ' + on);
     if (!wasOpen) { click(side); await settle(400); }
   },
   /** H toggles annotation visibility. Nothing in the DOM reports the state — the
@@ -1237,13 +1271,35 @@ const ui = {
    *  above it (negative top), so a box measured off the page rect lands partly
    *  off-screen and the snip comes back empty. */
   async snipRegion() {
-    const b = btn(L.snip);
-    if (!b) throw new Error('no snip button');
-    click(b);
+    // Right-click on the page, with nothing selected. This was the toolbar's
+    // snip button until 2026-08-09; the button came out (the composer keeps
+    // one, and three entry points for one gesture was two too many), and this
+    // is the entry that still arms target 'quick'. Same handler either way —
+    // PdfViewer's SelectionMenu case 'snip' calls setSnip({target:'quick'}).
+    const page = this.pageElA();
+    const r = page.getBoundingClientRect();
+    const at = { x: Math.round(r.left + r.width * 0.5), y: Math.round(r.top + Math.min(r.height * 0.5, 400)) };
+    window.getSelection()?.removeAllRanges();
+    document.elementFromPoint(at.x, at.y)?.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true, clientX: at.x, clientY: at.y, button: 2
+    }));
+    await settle(400);
+    const menu = document.querySelector('.selection-menu');
+    if (!menu) throw new Error('right-click opened no menu, so the snip cannot be armed');
+    // Text, not titleOf(): a menu row carries its label as text and has no
+    // title attribute, and the label ends in an ellipsis ("Forklar område …")
+    // that L.snip does not, so this is startsWith rather than equality.
+    const row = [...menu.querySelectorAll('.menu-item')]
+      .find((x) => L.snip.some((n) => (x.textContent || '').trim().startsWith(n)));
+    if (!row) {
+      throw new Error('no "explain a region" row in the page menu. rows: ' +
+        JSON.stringify([...menu.querySelectorAll('.menu-item')].map((x) => (x.textContent || '').trim())));
+    }
+    click(row);
     await settle(500);
     await this.dragSnipBox();
-    // The TOOLBAR snip arms target 'quick' (PdfViewer: setSnip({target:'quick'})),
-    // so the result is the floating bubble, not the side panel's composer -
+    // This entry arms target 'quick' (PdfViewer: setSnip({target:'quick'})), so
+    // the result is the floating bubble, not the side panel's composer -
     // asserting on .ai-attach here was asserting the panel's flow instead.
     // Rasterising is async, so poll rather than guess a delay.
     for (let i = 0; i < 20; i++) {

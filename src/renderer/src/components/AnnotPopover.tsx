@@ -4,9 +4,15 @@ import {
   FREETEXT_COLORS,
   HIGHLIGHT_COLORS,
   PEN_COLORS,
+  TEXT_FONT_DEFAULT,
+  TEXT_FONT_FAMILIES,
+  textFontCss,
+  textFontOf,
+  textFontParts,
   UNDERLINE_COLORS
 } from '../annotations'
 import type { PageAnnotation } from '../annotations'
+import type { PdfStandardFont } from '@embedpdf/models'
 import { t, useLang } from '../i18n'
 import { isFindHotkey } from '../platform'
 import { useDraggable } from '../useDraggable'
@@ -37,6 +43,10 @@ interface Props {
   /** Focus the comment field on open (immediate-comment flow) */
   focusText?: boolean | undefined
   onColor(color: [number, number, number]): void
+  /** freetext only: re-set the box in another Standard-14 face. The viewer
+   *  re-measures the box in the new face before sending it on — a box typed in
+   *  Helvetica and switched to Courier needs more width for the same words. */
+  onFont(font: PdfStandardFont): void
   onContents(text: string): void
   onDelete(): void
   onClose(): void
@@ -54,6 +64,7 @@ export default function AnnotPopover({
   annotation,
   focusText,
   onColor,
+  onFont,
   onContents,
   onDelete,
   onClose,
@@ -136,6 +147,65 @@ export default function AnnotPopover({
         tipKey="popover.colorTip"
         onPick={(c) => onColor(c.rgb)}
       />
+
+      {/* A text box can be RE-SET, not only recoloured (Emil, 2026-08-09): the
+          toolbar's font choice only ever reached boxes that did not exist yet,
+          so a paragraph typed in the wrong face had to be deleted and retyped.
+          Deliberately the same three chips and the same two A's as the text
+          tool's own menu — one control, in two places, so neither has to be
+          learned twice. A box read back from a FILE has no font of its own
+          (pdf.js paints those from the appearance stream); it reads as
+          Helvetica here, which is what the engine will write if it is changed. */}
+      {annotation.type === 'freetext' &&
+        (() => {
+          const parts = textFontParts(annotation.font ?? TEXT_FONT_DEFAULT)
+          return (
+            <>
+              <div className="font-row">
+                {TEXT_FONT_FAMILIES.map((family) => {
+                  const face = textFontOf(family, parts.bold, parts.italic)
+                  return (
+                    <button
+                      key={family}
+                      className={`font-chip${parts.family === family ? ' selected' : ''}`}
+                      style={textFontCss(face)}
+                      onClick={() => onFont(face)}
+                    >
+                      {family}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="font-style-row">
+                {([
+                  ['bold', 'tb.textBold'],
+                  ['italic', 'tb.textItalic']
+                ] as const).map(([which, tip]) => {
+                  const on = which === 'bold' ? parts.bold : parts.italic
+                  return (
+                    <button
+                      key={which}
+                      className={`font-style font-style-${which}${on ? ' selected' : ''}`}
+                      title={t(tip)}
+                      aria-pressed={on}
+                      onClick={() =>
+                        onFont(
+                          textFontOf(
+                            parts.family,
+                            which === 'bold' ? !parts.bold : parts.bold,
+                            which === 'italic' ? !parts.italic : parts.italic
+                          )
+                        )
+                      }
+                    >
+                      A
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )
+        })()}
 
       {/* Text boxes edit their text inline (click the box) — a comment field
           here would just duplicate the box contents */}

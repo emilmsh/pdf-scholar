@@ -959,11 +959,30 @@ button {
 
 /* Drawing tools */
 
+/* The marking tools sit in a faint tray (Emil, 2026-08-09: the bar was
+   "visually crowded" — 28 identical outline glyphs at identical weight, with
+   nothing telling the eye where one job ends and the next begins). The tray
+   groups roughly half of them into one shape, so the bar reads as four regions
+   instead of a wall.
+   The tint is derived from --text, the same way --hover and --active are, so
+   all four themes get it for free — and it is deliberately BELOW --hover (3.5 %
+   against 5.5–8 %), or a hovered button inside the tray would sink into it
+   instead of lifting off it. Separators inside the tray lose their line: the
+   tray edge already says "group", and a divider inside a divided thing is the
+   noise we are removing. */
 .tool-group {
   position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text) 3.5%, transparent);
+}
+
+.tool-group .toolbar-sep {
+  background: transparent;
+  margin: 0 3px;
 }
 
 .tool-menu {
@@ -2676,11 +2695,17 @@ html.pen-near .draw-layer {
   padding: 5px 8px 9px;
 }
 
+/* The edge is derived from --text, not a fixed black (Emil, 2026-08-09): the
+   swatches sit on --bg-elevated, which is #26262a in Night+ and #30302e in
+   Night, and the black swatch is now #000. A black outline around a black disc
+   on near-black chrome is no outline at all — picking «black» meant clicking a
+   void. Deriving from --text gives a dark edge in Day and Sepia and a light one
+   in the two dark themes, so every swatch reads as a disc in all four. */
 .color-dot {
   width: 23px;
   height: 23px;
   border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.18);
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
   transition: transform 0.08s;
 }
 
@@ -4804,7 +4829,9 @@ html.pen-near .draw-layer {
   padding: 2px 4px;
   font-family: Helvetica, Arial, sans-serif;
   line-height: 1.35;
-  color: #1c1c21;
+  /* Fallback only — PdfViewer sets the real colour inline, from the draft's
+     own colour or the tool preference. Kept in step with INK_BLACK. */
+  color: #000000;
   background: rgba(255, 255, 255, 0.55);
   border: 1.5px dashed var(--accent);
   border-radius: 3px;

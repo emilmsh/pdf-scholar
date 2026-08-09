@@ -99,8 +99,15 @@ block of bullets, the README the full account.
 
 ### 1. Reading — the window is nearly all page
 
-**EN claim:** A page you can stand to look at all day.
-**NO claim:** En side du orker å se på hele dagen.
+**EN claim:** Everything a long document asks of you.
+**NO claim:** Alt et langt dokument krever av deg.
+
+*(The claim used to be "A page you can stand to look at all day" — Emil, 2026-08-09:
+too thin to head the pillar, because it promises only comfort while the pillar's
+substance is navigation and keeping your place. Comfort survives as the first
+sentence of the body; the heading now covers both. The opening frame — one window
+wiped across three themes — is what proves the comfort half, so the reading section
+sits directly under it on every surface and carries no picture of its own.)*
 
 - Smooth scrolling and pinch zoom that stays where you release it; fit width or
   whole page; the opening zoom follows the file's own setting, as Acrobat does

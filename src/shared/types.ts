@@ -269,6 +269,16 @@ export interface ModifyAnnotationRequest {
   color?: [number, number, number] | undefined
   opacity?: number | undefined
   contents?: string | undefined
+  /** freetext only: re-set the box in another of the Standard 14. The engine
+   *  writes it to the model's fontFamily and lets PDFium rebuild the appearance
+   *  stream, exactly as at create time — so a box re-set in Courier is
+   *  indistinguishable from one typed in Courier, and the words stay real text.
+   *
+   *  The RECT is not derived from this. A wider face needs a wider box, and the
+   *  measurement lives in the renderer (freetextMinSize, which is a canvas), not
+   *  here — so the caller sends the re-measured `quads` in the SAME patch. A
+   *  font sent alone is honoured and may leave the text wrapping differently. */
+  font?: PdfStandardFont | undefined
   /** Move/resize (note drag) — page space, top-left origin */
   rect?: PageRect | undefined
   /** Move: translate all geometry by (dx, dy) in page space (top-left origin,

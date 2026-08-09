@@ -56,7 +56,6 @@ import {
   IconGear,
   IconComment,
   IconHeart,
-  IconMarginNotes,
   IconMarker,
   IconMarkupHighlight,
   IconMarkupSquiggly,
@@ -90,7 +89,6 @@ import {
   IconChevronLeft,
   IconSidebar,
   IconSignature,
-  IconSnip,
   IconSparkle,
   IconSplit,
   IconNote,
@@ -175,11 +173,10 @@ interface Props {
   onNavBack(): void
   onNavForward(): void
   onToggleSidebar(): void
-  /** Leave this document. With other tabs open the next one takes over; with
-   *  none, the library is what is left — which is why the tooltip says which. */
+  /** Go to the library. Closes nothing — the documents stay open behind it,
+   *  in the tab strip, and this one is exactly where you left it when you come
+   *  back to it. */
   onLeaveDocument(): void
-  /** How many documents this window holds, for that tooltip */
-  tabCount: number
   onGoToPage(page: number): void
   onZoomIn(): void
   onZoomOut(): void
@@ -204,24 +201,22 @@ interface Props {
   /** All annotations temporarily hidden (clean reading view) */
   annotsHidden: boolean
   onToggleAnnots(): void
-  /** Margin view: notes + comments as visible cards beside the page. The
-   *  toolbar only toggles it — side + PDF export live in the Merknader tab,
-   *  the one home for everything comment-related. */
-  marginNotes: boolean
-  onToggleMarginNotes(): void
+  /* No marginNotes here: the margin view is toggled from the Merknader tab,
+     the one home for everything comment-related, and the toolbar's duplicate
+     toggle came out on 2026-08-09. */
   /** Annotation undo/redo (mirrors Ctrl+Z/Y — needed for pen/touch use) */
   canUndo: boolean
   canRedo: boolean
   onUndo(): void
   onRedo(): void
+  /** Print — reached from the Save button's chevron menu, not an icon of its own */
   onPrint(): void
   readAloudOpen: boolean
   onToggleReadAloud(): void
   aiOpen: boolean
   onToggleAi(): void
-  /** Snip-to-explain: armed = the crosshair overlay is up */
-  snipActive: boolean
-  onToggleSnip(): void
+  /* No snipActive/onToggleSnip: snip-to-explain is armed from the assistant
+     composer and from right-click on the page, not from the toolbar. */
   /** Note placement: armed = click-to-place overlay is up */
   noteActive: boolean
   onToggleNote(): void
@@ -340,7 +335,6 @@ export default function Toolbar({
   onNavForward,
   onToggleSidebar,
   onLeaveDocument,
-  tabCount,
   onGoToPage,
   onZoomIn,
   onZoomOut,
@@ -357,8 +351,6 @@ export default function Toolbar({
   canSaveInPlace,
   annotsHidden,
   onToggleAnnots,
-  marginNotes,
-  onToggleMarginNotes,
   canUndo,
   canRedo,
   onUndo,
@@ -368,8 +360,6 @@ export default function Toolbar({
   onToggleReadAloud,
   aiOpen,
   onToggleAi,
-  snipActive,
-  onToggleSnip,
   noteActive,
   onToggleNote,
   signatureActive,
@@ -720,6 +710,18 @@ export default function Toolbar({
   // sidebar toggle) stay inline as the irreducible core. Anything that has a
   // permanent home in the zoom/layout or gear menu is NOT listed here — folding
   // a duplicate into "…" would only pad the menu.
+  //
+  // The order was inverted until 2026-08-09: presentation and fullscreen sat at
+  // indices 0 and 2, so they were the FIRST things to disappear — and at the
+  // shoot's 1440 px they always had. Emil's call: those two change how the
+  // content is displayed, dynamically, mid-work, and nobody wants to open a menu
+  // to do that. They now fold near-last, after the marking tools. Marking tools
+  // folding first is not a demotion either — the selection menu is the primary
+  // way to mark a passage (MESSAGING pillar 3), and the toolbar copies exist for
+  // marking several in a row, which a narrow window is the worst case for. The
+  // first three out are the ones that are pointless or duplicated when narrow:
+  // split (two columns in a narrow window), pin, and fit (also in the Vis menu,
+  // and on W).
   const overflowActions: {
     key: string
     icon: React.JSX.Element
@@ -728,7 +730,6 @@ export default function Toolbar({
     active?: boolean
     disabled?: boolean
   }[] = [
-    { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
     ...(READ_ALOUD
       ? [
           {
@@ -740,8 +741,7 @@ export default function Toolbar({
           }
         ]
       : []),
-    { key: 'print', icon: <IconPrint size={15} />, label: t('tb.print'), onClick: onPrint },
-    { key: 'fullscreen', icon: <IconFullscreen size={15} />, label: t('tb.fullscreen'), onClick: onToggleFullscreen },
+    { key: 'split', icon: <IconSplit size={15} />, label: t('tb.split'), onClick: onToggleSplit, active: splitOpen },
     {
       key: 'pin',
       icon: toolbarPinned ? <IconPin size={15} /> : <IconPinOff size={15} />,
@@ -749,19 +749,6 @@ export default function Toolbar({
       onClick: onTogglePin,
       active: !toolbarPinned
     },
-    { key: 'split', icon: <IconSplit size={15} />, label: t('tb.split'), onClick: onToggleSplit, active: splitOpen },
-    { key: 'margin', icon: <IconMarginNotes size={15} />, label: t('tb.marginNotes'), onClick: onToggleMarginNotes, active: marginNotes },
-    { key: 'snip', icon: <IconSnip size={15} />, label: t('tb.snip'), onClick: onToggleSnip, active: snipActive },
-    // Annotation tools fold as single activation rows (their colour/width
-    // popovers aren't in the menu — reachable again by widening the window).
-    { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser' },
-    { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => onToolSelect('square'), active: shapeActive },
-    { key: 'note', icon: <IconNote size={15} />, label: t('tb.note'), onClick: onToggleNote, active: noteActive },
-    { key: 'signature', icon: <IconSignature size={15} />, label: t('tb.signature'), onClick: onSignaturePrimary, active: signatureActive },
-    { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text' },
-    { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup },
-    { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker' },
-    { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen' },
     {
       key: 'fit',
       icon: activeZoom.fitTarget === 'page' ? <IconFitPage size={15} /> : <IconFitWidth size={15} />,
@@ -769,6 +756,18 @@ export default function Toolbar({
       onClick: toggleFit,
       active: activeZoom.fitMode !== 'custom'
     },
+    // Annotation tools fold as single activation rows (their colour/width
+    // popovers aren't in the menu — reachable again by widening the window).
+    { key: 'signature', icon: <IconSignature size={15} />, label: t('tb.signature'), onClick: onSignaturePrimary, active: signatureActive },
+    { key: 'note', icon: <IconNote size={15} />, label: t('tb.note'), onClick: onToggleNote, active: noteActive },
+    { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => onToolSelect('square'), active: shapeActive },
+    { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text' },
+    { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser' },
+    { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup },
+    { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker' },
+    { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen' },
+    { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
+    { key: 'fullscreen', icon: <IconFullscreen size={15} />, label: t('tb.fullscreen'), onClick: onToggleFullscreen },
     { key: 'redo', icon: <IconRedo size={15} />, label: t('tb.redo'), onClick: onRedo, disabled: !canRedo },
     { key: 'undo', icon: <IconUndo size={15} />, label: t('tb.undo'), onClick: onUndo, disabled: !canUndo },
     { key: 'forward', icon: <IconArrowRight size={15} />, label: t('tb.forward'), onClick: onNavForward, disabled: !canNavForward },
@@ -986,15 +985,14 @@ export default function Toolbar({
         {/* Back to the library. It moved here from the tab strip (Emil,
             2026-08-09) so the strip holds nothing but tabs — and so it is
             reachable in fullscreen, where the strip is tucked but the toolbar
-            comes back on hover. Icon-only with a tooltip that says what it
-            actually does: with other tabs open this closes ONE document and
-            lands you in the next, and calling that "back to the library" was
-            the label's old lie. */}
-        <button
-          className="tb-btn"
-          onClick={onLeaveDocument}
-          title={t(tabCount > 1 ? 'tb.leaveDocTip' : 'tb.libraryTip')}
-        >
+            comes back on hover.
+            The tooltip is unconditional again, because the button finally does
+            one thing. It used to be wired to «close this tab», so with several
+            documents open it closed one and dropped you in the next — never in
+            the library — and the label switched to «Close this document» to
+            stop lying about it. The library is a PLACE now (App.tsx), so going
+            there closes nothing and the one label is true in every case. */}
+        <button className="tb-btn" onClick={onLeaveDocument} title={t('tb.libraryTip')}>
           <IconChevronLeft size={17} />
         </button>
         {/* «Innhold» lost its label: the panel holds thumbnails, contents,
@@ -1446,27 +1444,29 @@ export default function Toolbar({
 
         <div className="toolbar-sep" />
 
-        {inline('print') && (
-          <button className="tb-btn" onClick={onPrint} title={t('tb.printTip')}>
-            <IconPrint />
-          </button>
-        )}
-
-        {canSaveInPlace ? (
-          /* Desktop + extension: write changes back to the file in place, plus
-             save-a-copy. The extension's first in-place save may prompt once
-             for write access, then stays silent (see extension-api.ts).
-             Saving a copy of an UNCHANGED file is legitimate, so the chevron
-             stays live even while the primary button is disabled. */
-          <span className="tb-split theme-menu-anchor" ref={saveMenuRef}>
+        {/* Everything that sends the document OUT of the app lives under this
+            one button: save, save a copy, print. Print used to be its own icon
+            and was one of the first three to fold into "…" at any normal window
+            width — a top-five action, in a menu, by accident (Emil, 2026-08-09).
+            It costs a click here, which a thing nobody does twice a minute can
+            afford, and Ctrl+P is untouched. The browser branch gets the same
+            split button rather than a lone Save, or print would exist on one
+            platform and not the other. */}
+        {(() => {
+          const printRow = (
             <button
-              className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
-              onClick={onSave}
-              disabled={!dirty}
-              title={t('tb.saveTip')}
+              className="menu-action"
+              onClick={() => {
+                setSaveMenuOpen(false)
+                onPrint()
+              }}
+              title={t('tb.printTip')}
             >
-              <IconSave />
+              <IconPrint size={15} />
+              {t('tb.print')}
             </button>
+          )
+          const chevron = (
             <button
               className={`tb-chevron${saveMenuOpen ? ' is-active' : ''}`}
               title={t('tb.saveOptionsTip')}
@@ -1475,33 +1475,58 @@ export default function Toolbar({
             >
               <IconChevronDown size={11} />
             </button>
-            {saveMenuOpen && (
-              <div className="theme-menu save-menu">
-                <button
-                  className="menu-action"
-                  onClick={() => {
-                    setSaveMenuOpen(false)
-                    onSaveAs()
-                  }}
-                  title={isElectron ? t('tb.saveAsTip') : t('tb.saveCopyTip')}
-                >
-                  <IconSaveAs size={15} />
-                  {isElectron ? t('tb.saveAs') : t('tb.saveCopy')}
-                </button>
-              </div>
-            )}
-          </span>
-        ) : (
-          // Browser/extension: one Save that bakes annotations in, then
-          // overwrites the local file (opened from disk) or downloads (URL).
-          <button
-            className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
-            onClick={onSave}
-            title={t('tb.saveToDiskTip')}
-          >
-            <IconSaveAs />
-          </button>
-        )}
+          )
+          return canSaveInPlace ? (
+            /* Desktop + extension: write changes back to the file in place, plus
+               save-a-copy. The extension's first in-place save may prompt once
+               for write access, then stays silent (see extension-api.ts).
+               Saving a copy of an UNCHANGED file is legitimate, so the chevron
+               stays live even while the primary button is disabled. */
+            <span className="tb-split theme-menu-anchor" ref={saveMenuRef}>
+              <button
+                className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
+                onClick={onSave}
+                disabled={!dirty}
+                title={t('tb.saveTip')}
+              >
+                <IconSave />
+              </button>
+              {chevron}
+              {saveMenuOpen && (
+                <div className="theme-menu save-menu">
+                  <button
+                    className="menu-action"
+                    onClick={() => {
+                      setSaveMenuOpen(false)
+                      onSaveAs()
+                    }}
+                    title={isElectron ? t('tb.saveAsTip') : t('tb.saveCopyTip')}
+                  >
+                    <IconSaveAs size={15} />
+                    {isElectron ? t('tb.saveAs') : t('tb.saveCopy')}
+                  </button>
+                  {printRow}
+                </div>
+              )}
+            </span>
+          ) : (
+            // Browser/extension: one Save that bakes annotations in, then
+            // overwrites the local file (opened from disk) or downloads (URL).
+            // There is no save-a-copy to offer here, so the menu holds print
+            // alone — which is still a menu worth having, see above.
+            <span className="tb-split theme-menu-anchor" ref={saveMenuRef}>
+              <button
+                className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
+                onClick={onSave}
+                title={t('tb.saveToDiskTip')}
+              >
+                <IconSaveAs />
+              </button>
+              {chevron}
+              {saveMenuOpen && <div className="theme-menu save-menu">{printRow}</div>}
+            </span>
+          )
+        })()}
 
         <div className="toolbar-sep" />
 
@@ -1589,15 +1614,10 @@ export default function Toolbar({
           )}
         </div>
 
-        {inline('margin') && (
-          <button
-            className={`tb-btn${marginNotes ? ' is-active' : ''}`}
-            onClick={onToggleMarginNotes}
-            title={t('tb.marginNotesTip')}
-          >
-            <IconMarginNotes />
-          </button>
-        )}
+        {/* No margin-comments toggle here (Emil, 2026-08-09). The switch — and
+            the left/right choice that belongs with it — already live in the
+            notes tab, which is the one home for everything comment-related; this
+            was a second copy of a control that was never in the wrong place. */}
         {inline('split') && (
           <button
             className={`tb-btn${splitOpen ? ' is-active' : ''}`}
@@ -1767,15 +1787,13 @@ export default function Toolbar({
 
         <div className="toolbar-sep" />
 
-        {inline('snip') && (
-          <button
-            className={`tb-btn${snipActive ? ' is-active' : ''}`}
-            onClick={onToggleSnip}
-            title={t('tb.snipTip')}
-          >
-            <IconSnip />
-          </button>
-        )}
+        {/* No snip button here (Emil, 2026-08-09). "Explain a region" had THREE
+            entry points: this icon, the composer button in the assistant panel,
+            and right-click on the page. The composer button is the one that
+            belongs — it sits where the result lands, and it is the one that can
+            say why it is unavailable when the chosen model cannot read images.
+            The discoverability rule is satisfied by that button, so the icon
+            went rather than the bar staying a pixel wider. */}
 
         {/* Overflow: secondary buttons that didn't fit, folded to the LEFT of
             the (protected) Assistant button. */}

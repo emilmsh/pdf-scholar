@@ -126,39 +126,34 @@ the current desktop-vs-extension parity.
 ## Features
 
 **Reading**
+
+The frame at the top of this page is one window wiped across Day, Sepia and Night — the
+same page, the same moment, three of the four themes. Sepia puts the page on warm ivory
+with a terracotta accent; Night and Night+ are the two dark modes, the second with higher
+contrast for bright text on very dark grey. That is the half a picture can show. The rest
+is what an hour with the document asks for:
+
 - Smooth scrolling, pinch zoom that stays where you release it, one fit button that
   toggles width ⇄ whole page (W), and zoom presets from 50 % to 400 %. Fit uses the whole
   window: the page goes edge to edge, with a hair of margin
 - Four themes — Day, Sepia (ivory paper), Night and Night+ (higher contrast) — plus
-  **Auto**, which follows Windows' light/dark setting
-- Contrast and brightness are adjustable per theme
+  **Auto**, which follows Windows' light/dark setting. Contrast and brightness are
+  adjustable per theme
 - **Rotate pages** (Shift+R or `]` / `[`) and a **two-page spread** for wide layouts
-- **Presentation mode** (P): one page at a time, full screen
-- Unpin the toolbar (V) and it hides. Hover the top edge to bring it back, the left edge
-  for the table of contents, the right edge for the assistant
+- **Presentation mode** (P): one page at a time, full screen, and it drops even the tab
+  strip
+- Unpin the toolbar (V) and it hides, taking the side panels with it — what is left is the
+  tab strip and the page. Hover the top edge to bring the toolbar back, the left edge for
+  the table of contents, the right edge for the assistant. Nothing is lost, it is just not
+  in front of you
 - Table of contents, thumbnails, bookmarks (B marks the page you are on), and back/forward
   navigation (Alt+← / Alt+→) after following internal links
 - Remembers your reading position and recent files; a **library** home screen lists what
   you have been reading
 - Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
   window** to put two documents side by side, or across the bar to reorder
-
-**Language and themes**
-
-The frame at the top of this page is one window wiped across Day, Sepia and Night. Sepia
-puts the page on warm ivory with a terracotta accent; Night and Night+ are the two dark
-modes, the second with higher contrast for bright text on very dark grey. The interface
-itself is available in Norwegian and English, and the setting also controls the AI
-prompts, exported documents and date formats.
-
-**Nothing but the page**
-
-![A body page filling the window with the toolbar unpinned — only the tab strip above it](docs/screenshots/page_only.png)
-
-Unpin the toolbar with **V** and it goes, taking the side panels with it: what is left is
-the tab strip and the page. Hover the top edge to bring the toolbar back, the left edge for
-the contents, the right edge for the assistant — nothing is lost, it is just not in front of
-you. **Presentation mode** (P) drops even the tab strip.
+- The interface itself is in Norwegian or English, and that setting also controls the AI
+  prompts, exported documents and date formats
 
 **Split view**
 

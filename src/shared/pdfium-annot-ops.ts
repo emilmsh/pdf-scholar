@@ -28,7 +28,8 @@ import type {
 import type {
   PdfAnnotationObject,
   PdfDocumentObject,
-  PdfSignatureObject
+  PdfSignatureObject,
+  PdfStandardFont
 } from '@embedpdf/models'
 import { PdfAnnotationSubtype } from '@embedpdf/models'
 import type { PdfiumNative } from '@embedpdf/engines/pdfium'
@@ -484,6 +485,14 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
     }
     if (req.opacity !== undefined) (m as { opacity?: number }).opacity = req.opacity
     if (req.contents !== undefined) m.contents = req.contents
+    // Re-set a text box in another of the Standard 14. Nothing to bake by hand:
+    // the same field buildAnnotation fills at create time, and the engine
+    // regenerates the appearance from the model below — so PDFium writes the
+    // new face the way it wrote the old one, with no font data embedded. Guarded
+    // on the subtype because fontFamily is meaningless on every other one.
+    if (req.font !== undefined && m.type === PdfAnnotationSubtype.FREETEXT) {
+      ;(m as { fontFamily?: PdfStandardFont }).fontFamily = req.font
+    }
     if (req.rect && m.type !== PdfAnnotationSubtype.LINE) m.rect = toRect(req.rect)
     if (req.translate) {
       // A move is per-subtype: a Line's endpoints and an Ink's stroke list do
