@@ -102,6 +102,7 @@ export type EngineErrorCode =
   | 'doc-too-large'
   | 'doc-too-large-browser'
   | 'doc-not-open'
+  | 'doc-unreachable'
   | 'append-unsupported'
   | 'append-objstm-edit'
   | 'append-encrypted'
