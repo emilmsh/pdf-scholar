@@ -6292,11 +6292,17 @@ html.touch-ui .keys-reset-one {
    answer.
    ============================================================ */
 
+/* One plate, not a list you scroll (Emil, 2026-08-09: "elegant when you can
+   see all the functions and shortcuts at once"). 53 commands in 9 groups fit
+   three columns on any window this app is usable in; the width is what buys
+   that, so it is deliberately far wider than the confirm dialogs it shares an
+   overlay with. Narrower windows fall back to two columns and then one — see
+   the queries under .shortcuts-body. */
 .shortcuts-dialog {
   display: flex;
   flex-direction: column;
-  width: min(660px, calc(100vw - 48px));
-  max-height: min(760px, calc(100vh - 64px));
+  width: min(1180px, calc(100vw - 48px));
+  max-height: min(880px, calc(100vh - 48px));
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -6382,10 +6388,33 @@ html.touch-ui .keys-reset-one {
 }
 
 .shortcuts-body {
-  flex: 1;
+  /* Shrink-to-fit rather than `flex: 1`, so the plate is as tall as its content
+     and does not stretch to the dialog's full height on a tall window. Still
+     capped by max-height, which is what restores scrolling on a short one.
+     This does NOT even out the columns, and it was tried for that: with nine
+     groups of very unequal size and break-inside: avoid, column one (File,
+     Tabs, Navigation, View — 22 rows) sets the height and the other two end
+     early. Reordering the categories would balance it and cost the reading
+     order, which is the wrong trade. The ragged foot is the price of keeping
+     every category whole. */
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 20px 18px;
+  padding: 4px 20px 10px;
+  /* column-count, not column-width: the COUNT is the promise (three columns,
+     everything visible), and letting the browser pick would reflow the plate
+     every time a label got longer in translation. */
+  column-count: 3;
+  column-gap: 30px;
+}
+
+
+@media (max-width: 1120px) {
+  .shortcuts-body { column-count: 2; }
+}
+
+@media (max-width: 720px) {
+  .shortcuts-body { column-count: 1; }
 }
 
 .shortcuts-empty {
@@ -6395,7 +6424,11 @@ html.touch-ui .keys-reset-one {
 }
 
 .keys-group {
-  padding-top: 14px;
+  padding-top: 10px;
+  /* A category must never be split down a column boundary — half of «Zoom» at
+     the foot of one column and the rest at the head of the next is worse than
+     the single column we started from. */
+  break-inside: avoid;
 }
 
 .keys-group-title {
@@ -6414,8 +6447,8 @@ html.touch-ui .keys-reset-one {
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 10px;
-  min-height: 34px;
-  padding: 3px 0;
+  min-height: 28px;
+  padding: 0;
   border-bottom: 1px solid var(--border);
 }
 
