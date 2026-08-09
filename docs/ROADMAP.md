@@ -74,6 +74,32 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] Fanelinje for flere åpne dokumenter: klikk/klikk-på-✕/midtklikk lukker, + åpner, Ctrl+Tab / Ctrl+Shift+Tab veksler, Ctrl+W lukker, Ctrl+O åpner; bakgrunnsfaner beholder full tilstand (scroll, zoom, angre-stakk) og leseposisjon lagres ved fanebytte (levert 2026-07-10)
 - [x] Dra faner for å endre rekkefølge; «lukk andre faner»-meny (levert 2026-07-29) — dra bytter plass live i linja (ingen protokollendring: main svarte allerede `'same'` når slippet skjer i eget vindu), meny med «Lukk andre faner»/«Lukk faner til høyre» som spør om én fane om gangen, og «Flytt til venstre/høyre» + Ctrl+Shift+PageUp/PageDown for berøring og tastatur
 
+- [x] **Fanelinja bærer bare faner** (2026-08-09): «Bibliotek» flyttet ned i
+  verktøylinja som ikon, «Innhold» mistet etiketten (panelet har fire faner,
+  ikke bare innhold), fanene kommer tilbake sammen med verktøylinja i
+  fullskjerm, og en chevron i enden lister alle faner fra tre og oppover.
+- ~~**Kopi av samme dokument i en ny FANE**~~ — **sløyfet (Emil 2026-08-09)**,
+  etter at kostnaden ble kartlagt. Bevaringsverdig fordi forslaget er naturlig
+  og kommer igjen. Ideen var å gjenskape delt visning med to faner i stedet for
+  to paneler, live-synket. Det virker for et nytt VINDU fordi vinduet er
+  hovedprosessens regnskapsenhet — `openDocs` er nøklet på webContents, og
+  varslingen hopper over avsenderen. To faner deler ett webContents og er
+  dermed «samme hvem» for hele det maskineriet. Prisen:
+  - `openDocs` er et `Set` per vindu, ikke en teller. Lukker du én av to faner
+    på samme sti, forlater stien settet mens den andre fortsatt viser
+    dokumentet — og da mister skanningen ved vindulukking («har dette vinduet
+    ulagrede endringer?») utkastet av syne. **Tapt arbeid, stille.**
+  - Varslingen må nå fane B fra fane A, noe som i dag er utelukket ved
+    konstruksjon. Hovedprosessen vet ikke hva en fane er.
+  - Unikhet per sti er antatt tre steder i `App.tsx` (fane-deduplisering,
+    `adoptSavedCopy`, ekstern-endring-konflikten), og to faner deler ett utkast
+    — så «skitten» og lukkedialogen gjelder begge eller ingen.
+  Og gevinsten er liten: man ser bare én fane om gangen, så to faner av samme
+  fil kan ikke sammenlignes. **Delt visning** gir to steder samtidig med egen
+  zoom og rotasjon; **høyreklikk på fane → «Åpne i nytt vindu»** gir en ekte
+  uavhengig kopi som allerede er live-synket via det delte utkastet
+  (`test:windows` dekker det). Behovet er dekket to ganger fra før.
+
 ## Fase 7 — Skall-paritet og polering
 - [x] **Språkvalg i appen: norsk bokmål og engelsk** (Emils ønske 2026-07-11, levert samme dag) — alle UI-strenger i `src/renderer/src/i18n.ts` med `t()`-oppslag, velger i aA-menyen (Norsk/English/Auto der auto følger OS-språket), gjelder også KI-systemprompter, eksportdokumenter og datoformat. Nye strenger SKAL inn i begge ordbøkene.
 - [x] Høytlesing (Emils valg fra Edge-vurderingen, levert 2026-07-12): setningsvis TTS via SpeechSynthesis med markering som følger og auto-scroll, spill/pause/stopp, hastighet og stemmevalg. **Skjult bak `READ_ALOUD`-flagget på alle plattformer siden 2026-07-20** (`src/renderer/src/flags.ts`): Chromium på Windows eksponerer bare de gamle SAPI5-stemmene for `speechSynthesis`, og de er for robotiske å sende ut — funksjonen venter på en lokal nevral TTS (Piper e.l.), og skjules på alle plattformer for paritet selv om Edges stemmer er brukbare i utvidelsen
