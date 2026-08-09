@@ -12,7 +12,14 @@ import type { AiConfigView, AiProviderId } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
-import { compatPresets, DEFAULT_MODELS, keyProviders, SPEND_CAP_LABELS, SPEND_CAP_URLS } from './ai-models'
+import {
+  compatPresets,
+  DEFAULT_MODELS,
+  KEY_CREATE_URLS,
+  keyProviders,
+  SPEND_CAP_LABELS,
+  SPEND_CAP_URLS
+} from './ai-models'
 
 interface SettingsProps {
   config: AiConfigView
@@ -160,6 +167,36 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
               spellCheck={false}
             />
           </label>
+          {/* Each provider's doors, right where they are needed: create the key,
+              then cap it. Azure has no create page — prose says where keys live. */}
+          <p className="ai-field-hint">
+            {id === 'azure' && <>{t('ai.azureKeyHint')} </>}
+            {KEY_CREATE_URLS[id] && (
+              <>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    bridge.openExternal(KEY_CREATE_URLS[id]!)
+                  }}
+                >
+                  {t('ai.keyCreate')}
+                </a>
+                {' · '}
+              </>
+            )}
+            {SPEND_CAP_URLS[id] && (
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault()
+                  bridge.openExternal(SPEND_CAP_URLS[id]!)
+                }}
+              >
+                {t('ai.keyCap')}
+              </a>
+            )}
+          </p>
           {id === 'azure' && (
             <>
               <label className="ai-field">

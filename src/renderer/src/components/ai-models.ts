@@ -233,6 +233,22 @@ export function modelSupportsImages(
   return remoteModel(catalog, cat, modelId)?.vision !== false
 }
 
+// Where each provider lets you create an API key — linked from the key field
+// so "get a key" is one click, not a search. Azure is deliberately absent: it
+// has no single create page (keys live on the resource's Keys-and-Endpoint
+// blade), so its field gets an explanatory hint instead. 'compat' is absent
+// for the same kind of reason — a local Ollama or LM Studio needs no key at
+// all, and a custom endpoint's key comes from whoever runs it.
+export const KEY_CREATE_URLS: Partial<Record<AiProviderId, string>> = {
+  anthropic: 'https://console.anthropic.com/settings/keys',
+  openai: 'https://platform.openai.com/api-keys',
+  openrouter: 'https://openrouter.ai/keys',
+  gemini: 'https://aistudio.google.com/apikey',
+  xai: 'https://console.x.ai/',
+  mistral: 'https://console.mistral.ai/api-keys/',
+  groq: 'https://console.groq.com/keys'
+}
+
 // Where each provider lets you set a spending cap — linked from the key field
 // so the reminder to cap a key is one click from acting on it.
 export const SPEND_CAP_URLS: Partial<Record<AiProviderId, string>> = {
