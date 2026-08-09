@@ -128,12 +128,20 @@ export type AiErrorCode =
   | 'ai-provider-unknown'
   | 'ai-aborted'
 
+/** And the same for the browser-extension target, where the sandbox refuses in
+ *  ways neither the engine nor a provider can. These are fragments like the
+ *  `engine.*` family (they ride inside «Kunne ikke åpne filen: …»), live under
+ *  the `exterr.*` prefix, and `errorText` routes on the `ext-` stem. A code here
+ *  also tells the shell to offer the FIX rather than only the message — see
+ *  FileAccessNotice. */
+export type ExtensionErrorCode = 'ext-file-access'
+
 export interface FileError {
   /** Always set: the fallback text, and what goes in the log */
   error: string
   /** Set when the failure is one of the recognised kinds above, so the renderer
    *  can show its own translation rather than this string. */
-  code?: EngineErrorCode | AiErrorCode | undefined
+  code?: EngineErrorCode | AiErrorCode | ExtensionErrorCode | undefined
 }
 
 /** A partial update where "not changing this field" may be written as an explicit

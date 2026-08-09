@@ -195,6 +195,19 @@ regressions are treated as bugs, not as acceptable platform lag.
     `OLLAMA_ORIGINS`, but its defaults allow extension origins; LM Studio has
     a CORS toggle for browser use). Such a rejection surfaces as the named
     `ai-endpoint-unreachable` error, never something cryptic.
+15. **The extension must ASK for local-file access; the desktop app just has
+    it.** Reading a `file://` PDF needs Chromium's «Allow access to file URLs»,
+    which is not a manifest permission: it lives on the extension's details
+    page, only the user may flip it, and a store install always arrives with it
+    off. Nothing in the install flow can request it, so the extension asks in
+    words — one tab at install (only when the browser confirms the access is
+    missing, never on an update), a dismissible card on the welcome screen, and
+    the fix instead of the error when a local PDF fails to open (the named code
+    `ext-file-access`). The desktop app has no equivalent state and shows none of
+    this: the probe returning "cannot tell" is treated as granted precisely so
+    the shared renderer stays silent everywhere else. Settings address is
+    per-browser (`edge://` vs `chrome://`); see `docs/BROWSER-EXTENSION.md` and
+    `npm run test:file-access`.
 
 15. **Password-protected documents open, and annotate, on every platform — with
     two named exceptions.** The unlock prompt lives in the renderer (pdf.js is

@@ -51,6 +51,12 @@ interface ChromeApi {
     onInstalled: ChromeEvent<(details: { reason: string }) => void>
     lastError?: { message?: string }
   }
+  // The last survivor of the MV2 chrome.extension namespace we need: whether the
+  // user has granted "Allow access to file URLs". Callable without any
+  // permission (it only reports our own state), promisified in MV3.
+  extension?: {
+    isAllowedFileSchemeAccess?(): Promise<boolean>
+  }
   // getSelf is callable WITHOUT the "management" permission (own extension only)
   management?: {
     getSelf(): Promise<{ installType: 'development' | 'normal' | 'sideload' | 'admin' | 'other' }>

@@ -145,6 +145,10 @@ separate, free enrollment).
      one. No page content on non-PDF sites is read or modified."
    - `file:///*`: "Lets users open local PDF files in the viewer (users must
      additionally enable 'Allow access to file URLs' themselves)."
+   - The install opens ONE tab (the extension's own viewer page, no network
+     call) to tell the user about that toggle, and only when the browser reports
+     it is off — a store install cannot be asked for it any other way. Never on
+     an update. See `docs/BROWSER-EXTENSION.md`.
 5. Review typically takes up to ~7 days.
 
 ## Track C — Chrome Web Store (extension)

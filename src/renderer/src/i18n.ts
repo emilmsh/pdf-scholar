@@ -4,7 +4,7 @@
 // enough). Non-React modules (exports, prompts) call t() at use time.
 import { useSyncExternalStore } from 'react'
 
-import type { AiErrorCode, FileError } from '../../shared/types'
+import type { AiErrorCode, ExtensionErrorCode, FileError } from '../../shared/types'
 
 export type Lang = 'nb' | 'en'
 /** User's choice — 'auto' follows the OS/browser language */
@@ -92,6 +92,27 @@ const nb = {
   'aierr.ai-stream-aborted': 'Strømmen ble avbrutt uten fullført svar.',
   'aierr.ai-provider-unknown': 'Ukjent feil fra leverandøren.',
   'aierr.ai-aborted': 'Avbrutt',
+  // One per ExtensionErrorCode. Fragments like engine.* — the full instructions
+  // live in the notice the shell raises alongside (fileaccess.* below).
+  'exterr.ext-file-access': 'nettleseren gir ikke utvidelsen tilgang til lokale filer ennå',
+
+  // «Gi tilgang til URL-adresser for fil» — the one permission a store install
+  // cannot arrive with, and no extension can grant itself. The label is quoted
+  // in both languages on purpose: the browser shows it in ITS language, which
+  // is not necessarily the one this app is set to.
+  'fileaccess.title': 'Gi tilgang til lokale PDF-er',
+  'fileaccess.blockedTitle': 'PDF-en ligger på din egen maskin',
+  'fileaccess.body':
+    'Nettleseren holder lokale filer (file://) tilbake til du selv slår på bryteren «Gi tilgang til URL-adresser for fil» på utvidelsens detaljside. Den bryteren er forbeholdt deg — en utvidelse kan ikke slå den på selv.',
+  'fileaccess.step1': 'Åpne detaljsiden for PDF Scholar.',
+  'fileaccess.step2':
+    'Slå på «Gi tilgang til URL-adresser for fil» (på engelsk: «Allow access to file URLs»).',
+  'fileaccess.step3': 'Kom tilbake hit — så åpner lokale PDF-er seg i denne leseren.',
+  'fileaccess.step3Blocked': 'Kom tilbake til denne fanen, så åpnes dokumentet av seg selv.',
+  'fileaccess.open': 'Åpne detaljsiden',
+  'fileaccess.manual': 'Åpnes den ikke? Lim inn denne adressen i adressefeltet:',
+  'fileaccess.dismiss': 'Ikke nå',
+  'fileaccess.retry': 'Prøv på nytt',
 
   // Welcome
   'welcome.tagline': 'Laget for forskning.',
@@ -868,6 +889,20 @@ const en: Dict = {
   'aierr.ai-stream-aborted': 'The stream ended without a complete answer.',
   'aierr.ai-provider-unknown': 'Unknown error from the provider.',
   'aierr.ai-aborted': 'Stopped',
+  'exterr.ext-file-access': 'the browser does not let the extension read local files yet',
+
+  'fileaccess.title': 'Allow local PDFs',
+  'fileaccess.blockedTitle': 'This PDF lives on your own machine',
+  'fileaccess.body':
+    'The browser withholds local files (file://) until you turn on «Allow access to file URLs» on the extension’s details page. That switch is reserved for you — an extension cannot grant it to itself.',
+  'fileaccess.step1': 'Open the details page for PDF Scholar.',
+  'fileaccess.step2': 'Turn on «Allow access to file URLs».',
+  'fileaccess.step3': 'Come back here — local PDFs then open in this reader.',
+  'fileaccess.step3Blocked': 'Come back to this tab and the document opens by itself.',
+  'fileaccess.open': 'Open the details page',
+  'fileaccess.manual': 'Nothing opened? Paste this address into the address bar:',
+  'fileaccess.dismiss': 'Not now',
+  'fileaccess.retry': 'Try again',
 
   'welcome.tagline': 'Made for research.',
   'welcome.openPdf': 'Open PDF …',
@@ -1578,11 +1613,17 @@ export function locale(): string {
  *  a translated sentence. */
 export function errorText(e: FileError): string {
   if (!e.code) return e.error
-  // Two prefixes because the two families read differently: `engine.*` entries
-  // are lowercase fragments spliced into a toast sentence, `aierr.*` entries are
-  // whole sentences shown on their own in a chat bubble.
-  return isAiErrorCode(e.code) ? t(`aierr.${e.code}`) : t(`engine.${e.code}`)
+  // Three prefixes because the families read differently: `engine.*` and
+  // `exterr.*` entries are lowercase fragments spliced into a toast sentence,
+  // `aierr.*` entries are whole sentences shown on their own in a chat bubble.
+  if (isAiErrorCode(e.code)) return t(`aierr.${e.code}`)
+  if (isExtensionErrorCode(e.code)) return t(`exterr.${e.code}`)
+  return t(`engine.${e.code}`)
 }
 
 const isAiErrorCode = (code: NonNullable<FileError['code']>): code is AiErrorCode =>
   code.startsWith('ai-')
+
+const isExtensionErrorCode = (
+  code: NonNullable<FileError['code']>
+): code is ExtensionErrorCode => code.startsWith('ext-')

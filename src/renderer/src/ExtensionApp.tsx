@@ -11,8 +11,10 @@ import {
   skipExtensionUpdate,
   EXTENSION_DOWNLOAD_URL
 } from './extension-update'
+import { extensionContextLost, fileAccessGranted } from './extension-file-access'
 import PdfViewer from './components/PdfViewer'
 import Welcome from './components/Welcome'
+import FileAccessNotice from './components/FileAccessNotice'
 import { DEFAULT_SETTINGS as FALLBACK_SETTINGS } from '../../shared/defaults'
 
 // Single-document shell for the browser-extension target. Each PDF lives in its
@@ -40,6 +42,10 @@ export default function ExtensionApp(): React.JSX.Element {
   /** The plaintext twin of a URL whose https side never answered — the second,
    *  deliberately manual escape hatch (see shared/insecure-retry.ts). */
   const [insecureRetry, setInsecureRetry] = useState<string | null>(null)
+  /** The local PDF we were asked for while the browser withholds file:// access
+   *  — a named failure with a fix, so it gets the fix (FileAccessNotice) rather
+   *  than a line of red text. */
+  const [fileAccessPath, setFileAccessPath] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   /** Bumped when the open document is replaced with fresh bytes in place
    *  (external-update conflict) — forces PdfViewer to remount, matching
@@ -93,6 +99,7 @@ export default function ExtensionApp(): React.JSX.Element {
     setError(null)
     setErrorFallback(null)
     setInsecureRetry(null)
+    setFileAccessPath(null)
     document.title = `${p.name} — PDF Scholar`
     // Reflect the document in the address bar: a reopenable URL goes into the
     // encoded ?file= param (so a reload restores the document, and the raw param
@@ -112,6 +119,15 @@ export default function ExtensionApp(): React.JSX.Element {
     async (path: string, opts?: { handOffOnFailure?: boolean }) => {
       const result = await bridge.readFile(path)
       if ('error' in result) {
+        // The one failure that is a missing permission rather than a missing
+        // file: show what to switch on, not what went wrong (the notice keeps
+        // the hand-off to the browser's reader as its escape hatch).
+        if (result.code === 'ext-file-access') {
+          setError(null)
+          setErrorFallback(null)
+          setFileAccessPath(path)
+          return
+        }
         // `doc-unreachable` means the site never answered and it is an https URL,
         // so the hand-off is a dead end BY CONSTRUCTION: the browser's own
         // https→http fallback only fires for an upgrade the browser itself made,
@@ -167,6 +183,38 @@ export default function ExtensionApp(): React.JSX.Element {
       })
       .finally(() => setLoading(false))
   }, [openPath])
+
+  // The switch is flipped on a page we cannot see, so this tab has to notice by
+  // itself: re-probe whenever it is looked at again, and open the document the
+  // user originally asked for the moment the browser says yes. (Chromium may
+  // also restart the extension on the flip; the page then comes back with the
+  // same ?rawfile= and opens it anyway — this is the belt to those braces, and
+  // it costs one probe.)
+  useEffect(() => {
+    if (!fileAccessPath) return
+    const recheck = (): void => {
+      if (document.hidden) return
+      // Chromium RELOADS the extension when the switch is flipped, which leaves
+      // this page orphaned: every chrome.* call from here on throws, so it can
+      // never notice the very thing it is waiting for. Reload — the URL still
+      // carries the document, so the PDF comes straight back.
+      if (extensionContextLost()) {
+        location.reload()
+        return
+      }
+      void fileAccessGranted().then((granted) => {
+        if (granted !== true) return
+        setFileAccessPath(null)
+        void openPath(fileAccessPath)
+      })
+    }
+    document.addEventListener('visibilitychange', recheck)
+    window.addEventListener('focus', recheck)
+    return () => {
+      document.removeEventListener('visibilitychange', recheck)
+      window.removeEventListener('focus', recheck)
+    }
+  }, [fileAccessPath, openPath])
 
   // A dropped PDF opens in a NEW browser tab (this tab keeps its document),
   // matching the "each PDF is a tab" model. With no document yet, open in place.
@@ -232,6 +280,19 @@ export default function ExtensionApp(): React.JSX.Element {
     void checkForExtensionUpdate().then(setExtUpdate)
   }, [])
 
+  // The missing-permission screen. With no document it takes the welcome
+  // screen's place (there is nothing else to look at); with one open — a failed
+  // click in the recents list — it floats over it, because the document already
+  // on screen must not disappear behind an error.
+  const accessNotice = fileAccessPath && (
+    <FileAccessNotice
+      variant="blocked"
+      onRetry={() => void openPath(fileAccessPath)}
+      onOpenInBrowser={() => void openInBrowserViewer(fileAccessPath)}
+      onDismiss={() => setFileAccessPath(null)}
+    />
+  )
+
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
       {error && (
@@ -294,9 +355,16 @@ export default function ExtensionApp(): React.JSX.Element {
               onOpenFile={openDialog}
             />
           </div>
+          {accessNotice && (
+            <div className="fileaccess-backdrop" onMouseDown={() => setFileAccessPath(null)}>
+              <div onMouseDown={(e) => e.stopPropagation()}>{accessNotice}</div>
+            </div>
+          )}
         </div>
       ) : loading ? (
         <div className="ext-loading" />
+      ) : accessNotice ? (
+        <div className="fileaccess-screen">{accessNotice}</div>
       ) : (
         <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
       )}

@@ -62,6 +62,10 @@ jobs:
       # The one place the app proposes dropping encryption: which failures earn
       # the offer at all, and that the rewrite touches the scheme and nothing else
       - run: npm run test:insecure-retry
+      # «Allow access to file URLs»: the browser-specific settings address and
+      # the "cannot tell" ≠ "no access" distinction — wrong either way, a store
+      # user is sent to a dead page or every desktop user gets a pointless card
+      - run: npm run test:file-access
       # Version arithmetic behind the macOS update notice — that build detects
       # updates it cannot install, and getting this wrong either nags every four
       # hours or never speaks at all, on hardware we don't own

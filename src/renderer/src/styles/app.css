@@ -587,6 +587,119 @@ button {
   line-height: 1.5;
 }
 
+/* ---------- «Gi tilgang til URL-adresser for fil» (extension only) ----------
+   Same card in two places: a row on the welcome screen (nothing is broken yet,
+   so it stays quiet and dismissible) and the whole screen when a local PDF was
+   the thing that could not be opened. The .blocked modifier is what separates
+   "here is a switch you may want" from "here is the switch you need". */
+.fileaccess-card {
+  width: 100%;
+  margin-top: 40px;
+  padding: 16px 18px;
+  text-align: left;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.fileaccess-card.blocked {
+  width: min(480px, calc(100vw - 48px));
+  margin-top: 0;
+  padding: 20px 22px;
+  box-shadow: var(--shadow-menu);
+}
+
+.fileaccess-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fileaccess-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.fileaccess-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fileaccess-body {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.fileaccess-steps {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.fileaccess-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.fileaccess-actions .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.fileaccess-manual {
+  margin: 12px 0 0;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.fileaccess-url {
+  /* Selectable in one click — pasting it is the fallback when the browser
+     refuses to let us open its own settings page. */
+  user-select: all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--hover);
+}
+
+.fileaccess-screen {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-chrome);
+}
+
+.fileaccess-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
 .recents {
   margin-top: clamp(20px, 3.5vh, 56px);
   width: 100%;
