@@ -343,6 +343,20 @@ const SHOTS = [
     `
   },
   {
+    // Deliberately NOT an opening frame anywhere: a settings dialog is a thing
+    // you go and find, not what an app looks like (Emil, 2026-08-09). It earns
+    // a place late in a page, beside the sentence about rebinding keys.
+    name: 'shortcuts',
+    caption: 'The keyboard map: every command, its keys, all of them rebindable',
+    setup: `
+      await ui.closePanels()
+      await ui.goToPage(2)
+      await ui.fitWidth()
+      await ui.openShortcuts()
+      await ui.settle(900)
+    `
+  },
+  {
     name: 'parchment',
     caption: 'Sepia reading mode',
     setup: `
@@ -477,6 +491,8 @@ const L = {
   unpin: ['Løsne verktøylinjen', 'Unpin the toolbar'],
   pin: ['Fest verktøylinjen', 'Pin the toolbar'],
   more: ['Flere verktøy', 'More tools'],
+  settings: ['Innstillinger', 'Settings'],
+  keysOpen: ['Hurtigtaster', 'Keyboard shortcuts'],
   // Sidebar tabs carry their label as TEXT and no title — addressed by content.
   annotsTab: ['Merknader', 'Annotations'],
   fullscreen: ['Fullskjerm', 'Full screen']
@@ -627,6 +643,24 @@ const ui = {
       await settle(1200);   // the batch delete reloads the document
     }
     if (!wasOpen) { click(side); await settle(400); }
+  },
+  /** Open the keyboard map the way a reader reaches it: the gear, then its
+   *  entry. Asserting on the dialog rather than the click means a renamed menu
+   *  row fails loudly here instead of photographing a settings menu. */
+  async openShortcuts() {
+    const gear = btn(L.settings);
+    if (!gear) throw new Error('no settings button on the toolbar');
+    click(gear);
+    await settle(450);
+    const entry = [...document.querySelectorAll('.menu-action')]
+      .find((b) => L.keysOpen.some((n) => (b.textContent || '').trim().startsWith(n)));
+    if (!entry) {
+      throw new Error('no keyboard-shortcuts row in the gear menu. rows: ' +
+        JSON.stringify([...document.querySelectorAll('.menu-action')].map((b) => (b.textContent || '').trim())));
+    }
+    click(entry);
+    await settle(800);
+    if (!document.querySelector('.shortcuts-dialog')) throw new Error('the keyboard map did not open');
   },
   /** Turn the margin view on or off from its ONE home, the Merknader tab.
    *

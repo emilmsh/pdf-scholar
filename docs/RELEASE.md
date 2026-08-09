@@ -71,6 +71,7 @@ surface missing one it needs.
 | `dual-pane` | ✓ | ✓ | 5 |
 | `margin` | ✓ | — | — |
 | `reading`, `parchment`, `night` | — | — | — (tricolor's sources) |
+| `shortcuts` | — | — | — (approved in principle, awaiting Emil's shoot) |
 | `night+`, `annotations_edit`, `reading_tabs`, `page_only`, `feedback`, `signature` | — | — | — (shot as smoke tests) |
 
 **Why tricolor opens everything, and why it keeps its toolbar** (Emil, 2026-08-08).

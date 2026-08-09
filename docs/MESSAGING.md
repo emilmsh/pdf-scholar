@@ -94,8 +94,15 @@ above now says exactly that, and the two of them in a row read as a stutter.)*
 ## The pillars
 
 Five, in this order. Every surface tells the same story at its own length: the
-landing page gives each a heading and three or four points, the store listings a
-block of bullets, the README the full account.
+landing page gives each a heading and **four to six** points, the store listings
+a block of bullets, the README the full account.
+
+The landing page's count is a ceiling, not a target (Emil, 2026-08-09: "vi
+holder ting skarpt og direkte"). It said "three or four" and had drifted to
+eight and nine — a section that lists everything sells nothing. When a pillar
+grows past six, the fix is to cut or merge, not to add a seventh: the README is
+where the full account belongs, and a claim that only earns its place there is
+not a claim the landing page was missing.
 
 ### 1. Reading — the window is nearly all page
 
