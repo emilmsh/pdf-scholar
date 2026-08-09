@@ -148,8 +148,15 @@ const REGISTRY: readonly Command[] = [
   // ---------- File ----------
   { id: 'file.open', category: 'file', labelKey: 'keys.fileOpen', defaults: ['mod+o'], whileTyping: true },
   { id: 'file.save', category: 'file', labelKey: 'keys.fileSave', defaults: ['mod+s'], whileTyping: true },
-  { id: 'file.saveAs', category: 'file', labelKey: 'keys.fileSaveAs', defaults: [] },
-  { id: 'file.print', category: 'file', labelKey: 'keys.filePrint', defaults: [] },
+  // Both were shipped unbound, which the keyboard map made visible the moment
+  // it was photographed (Emil, 2026-08-09). The fourteen TOOL commands below
+  // are unbound on purpose — which letter a tool deserves is the reader's call
+  // — but these two are file commands with a convention every app on the
+  // platform already follows, and print had just lost its toolbar icon to the
+  // Save menu. Leaving it reachable only by two clicks was not the trade the
+  // move was meant to make.
+  { id: 'file.saveAs', category: 'file', labelKey: 'keys.fileSaveAs', defaults: ['mod+shift+s'] },
+  { id: 'file.print', category: 'file', labelKey: 'keys.filePrint', defaults: ['mod+p'] },
   { id: 'window.new', category: 'file', labelKey: 'keys.windowNew', defaults: ['mod+shift+n'], whileTyping: true },
 
   // ---------- Tabs ----------
