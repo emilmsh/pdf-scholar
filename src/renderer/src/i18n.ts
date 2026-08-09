@@ -672,7 +672,7 @@ const nb = {
   'keys.title': 'Hurtigtaster',
   'keys.intro':
     'Alt tastaturet kan gjøre, og hva det er koblet til. Klikk en tast for å bytte den ut, eller «+» for å gi funksjonen en tast til.',
-  'keys.open': 'Hurtigtaster …',
+  'keys.open': 'Hurtigtaster',
   'keys.openTip': 'Se og endre alle hurtigtaster',
   'keys.filter': 'Søk i funksjoner …',
   'keys.noMatches': 'Ingen funksjoner passer «{query}».',
@@ -1420,7 +1420,7 @@ const en: Dict = {
   'keys.title': 'Keyboard shortcuts',
   'keys.intro':
     'Everything the keyboard can do, and what it is bound to. Click a key to replace it, or “+” to give a command a second one.',
-  'keys.open': 'Keyboard shortcuts …',
+  'keys.open': 'Keyboard shortcuts',
   'keys.openTip': 'See and change every keyboard shortcut',
   'keys.filter': 'Search commands …',
   'keys.noMatches': 'No commands match “{query}”.',

@@ -420,6 +420,55 @@ interface Props {
   onOpenFile?(): void
 }
 
+/** Load a PDF blob in an offscreen frame and ask it to print.
+ *
+ *  Returns false — having cleaned up after itself — whenever the frame cannot
+ *  be driven: a cross-origin viewer document (Chromium's built-in PDF viewer
+ *  is an extension origin), a frame that never fires load, or a print() that
+ *  throws. The caller then opens a tab, which is the behaviour this replaced
+ *  and is still the honest fallback rather than a silent no-op.
+ *
+ *  The frame is left in the DOM for a while on success: removing it while the
+ *  print dialog is still open cancels the job in Chromium. */
+async function printViaHiddenFrame(url: string): Promise<boolean> {
+  const frame = document.createElement('iframe')
+  frame.setAttribute('aria-hidden', 'true')
+  frame.style.cssText = 'position:fixed;width:0;height:0;border:0;left:-9999px;top:0'
+  frame.src = url
+  document.body.appendChild(frame)
+  const drop = (): void => frame.remove()
+  const loaded = await new Promise<boolean>((resolve) => {
+    const timer = window.setTimeout(() => resolve(false), 4000)
+    frame.onload = () => {
+      window.clearTimeout(timer)
+      resolve(true)
+    }
+    frame.onerror = () => {
+      window.clearTimeout(timer)
+      resolve(false)
+    }
+  })
+  if (!loaded) {
+    drop()
+    return false
+  }
+  try {
+    const win = frame.contentWindow
+    if (!win) {
+      drop()
+      return false
+    }
+    win.focus()
+    win.print()
+    window.setTimeout(drop, 60_000)
+    return true
+  } catch {
+    // SecurityError: the viewer document is not ours to drive.
+    drop()
+    return false
+  }
+}
+
 export default function PdfViewer({
   payload,
   initialPosition,
@@ -5058,7 +5107,20 @@ export default function PdfViewer({
           const url = URL.createObjectURL(
             new Blob([bytes as BlobPart], { type: 'application/pdf' })
           )
-          window.open(url, '_blank', 'noopener')
+          // We render the page onto a canvas, and that canvas is NOT the
+          // document — printing it would print our screen rendering, at our
+          // resolution and through our theme filter. So the real bytes (with
+          // the annotation edits baked in) go to something that can print a
+          // PDF properly. On the desktop that is a hidden Electron window;
+          // here it is the browser's own PDF viewer.
+          //
+          // Try to reach its print dialog directly through a hidden frame, so
+          // "Print" prints instead of merely offering a preview to print from
+          // (Emil, 2026-08-09). Chromium hands a PDF to its bundled viewer,
+          // which may sit on another origin — then contentWindow.print()
+          // throws and we fall back to the tab, which is what this always did.
+          const printed = await printViaHiddenFrame(url)
+          if (!printed) window.open(url, '_blank', 'noopener')
           window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
           return
         }

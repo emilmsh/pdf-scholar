@@ -46,6 +46,14 @@ export default function ExtensionApp(): React.JSX.Element {
    *  — a named failure with a fix, so it gets the fix (FileAccessNotice) rather
    *  than a line of red text. */
   const [fileAccessPath, setFileAccessPath] = useState<string | null>(null)
+  /** The library is a place here too (Emil, 2026-08-09). It was wired to
+   *  window.close(), so a button labelled «Back to the library» shut the
+   *  browser tab and dropped you wherever it had been opened from — the
+   *  extensions page, in the report that found this. The shell already HAS a
+   *  library screen (Welcome, below); it simply was not reachable. Same shape
+   *  as App.tsx, deliberately: the two shells are meant to stay in functional
+   *  parity, and «each PDF is a browser tab» never required the tab to die. */
+  const [atLibrary, setAtLibrary] = useState(false)
   const [loading, setLoading] = useState(true)
   /** Bumped when the open document is replaced with fresh bytes in place
    *  (external-update conflict) — forces PdfViewer to remount, matching
@@ -96,6 +104,7 @@ export default function ExtensionApp(): React.JSX.Element {
     setInitialPosition(pos)
     bridge.docOpened(p.path)
     setPayload(p)
+    setAtLibrary(false)
     setError(null)
     setErrorFallback(null)
     setInsecureRetry(null)
@@ -234,10 +243,10 @@ export default function ExtensionApp(): React.JSX.Element {
     [payload, openPayload]
   )
 
-  const closeDocument = useCallback(() => {
-    // Closing the last document = closing this browser tab.
-    window.close()
-  }, [])
+  /** Leave the document for the library. Not window.close(): the tab belongs
+   *  to the reader, and a document that would not open is a reason to show
+   *  them the library, not to take the tab away. */
+  const goToLibrary = useCallback(() => setAtLibrary(true), [])
 
   // ---------- External-update conflict (Save finds the file changed) ----------
   // No native dialog here (not Electron) — same in-app modal + verdicts as
@@ -328,14 +337,19 @@ export default function ExtensionApp(): React.JSX.Element {
         </div>
       )}
 
+      {/* One stack, as in App.tsx: the viewer is never unmounted to show the
+          library, it is a layer underneath (.tab-view is absolute + visibility).
+          That is what lets you walk to the library and back without losing the
+          page you were on — or, here, an unsaved annotation, since this shell
+          has no draft file to fall back on. */}
       {payload ? (
         <div className="tab-views">
-          <div className="tab-view active">
+          <div className={`tab-view${atLibrary ? '' : ' active'}`}>
             <PdfViewer
               key={`${payload.path}:${epoch}`}
               payload={payload}
               initialPosition={initialPosition}
-              active
+              active={!atLibrary}
               settings={settings}
               resolvedTheme={resolvedTheme}
               onSettingsChange={updateSettings}
@@ -343,18 +357,19 @@ export default function ExtensionApp(): React.JSX.Element {
               // The extension has no tab strip of its own to reveal — the
               // browser's is right there above it.
               onChromeVisible={() => {}}
-              // The extension viewer owns the whole page: there is no library
-              // of ours to walk back to, so leaving the document IS closing it.
-              // The two are one action here and only here — on the desktop they
-              // were conflated by accident and cost you a document every time.
-              onLeaveDocument={closeDocument}
+              onLeaveDocument={goToLibrary}
               onDirtyChange={() => {}}
               onSavedAs={() => {}} // extension: «save a copy» is a plain export (PLATFORMS.md §9)
               onExternalSaveConflict={handleSaveExternalConflict}
-              onClose={closeDocument}
+              onClose={goToLibrary}
               onOpenFile={openDialog}
             />
           </div>
+          {atLibrary && (
+            <div className="tab-view active">
+              <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+            </div>
+          )}
           {accessNotice && (
             <div className="fileaccess-backdrop" onMouseDown={() => setFileAccessPath(null)}>
               <div onMouseDown={(e) => e.stopPropagation()}>{accessNotice}</div>

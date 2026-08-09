@@ -1587,10 +1587,14 @@ export default function Toolbar({
               )}
             </span>
           ) : (
-            // Browser/extension: one Save that bakes annotations in, then
-            // overwrites the local file (opened from disk) or downloads (URL).
-            // There is no save-a-copy to offer here, so the menu holds print
-            // alone — which is still a menu worth having, see above.
+            // The PLAIN-WEB preview only (npm run dev:web). Not the extension:
+            // canSaveInPlace is `isElectron || isExtension`, so the extension
+            // takes the branch above and does offer «save a copy» — this
+            // comment claimed otherwise until Emil opened the menu in a real
+            // browser and saw both rows (2026-08-09).
+            // One Save that bakes annotations in, then overwrites the local
+            // file (opened from disk) or downloads (URL). Nothing to copy to,
+            // so the menu holds print alone.
             <span className="tb-split theme-menu-anchor" ref={saveMenuRef}>
               <button
                 className={`tb-btn tb-save${dirty ? ' has-changes' : ''}`}
