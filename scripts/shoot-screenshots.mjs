@@ -354,6 +354,9 @@ const SHOTS = [
       await ui.fitWidth()
       await ui.openShortcuts()
       await ui.settle(900)
+      // NB: this frame ends with a modal on screen. The per-frame reset closes
+      // it (ui.closeOverlays) - without that, every later frame in the run is
+      // photographed through this dialog.
     `
   },
   {
@@ -865,6 +868,27 @@ const ui = {
     await settle(900);
     if (!this.tabStripGone())
       throw new Error('the tab strip is still there — fullscreen did not take');
+  },
+  /** Dismiss anything modal before the next frame starts.
+   *
+   *  Added after the "shortcuts" frame — the first one that leaves an overlay
+   *  up — poisoned every frame after it in the same run: the keyboard map sat
+   *  over the page, so the cover shots reported "title not rendered" and the
+   *  figure shots could not find their caption. The reset put panels, tools,
+   *  theme and fullscreen back but had never had to close a dialog.
+   *
+   *  Escape is what a reader presses, and it is what the app listens for.
+   *  Asserting afterwards matters more than the keypress: a modal that
+   *  survives has to fail HERE, loudly, rather than silently reappear in the
+   *  corner of the next twelve screenshots. */
+  async closeOverlays() {
+    for (let i = 0; i < 3; i++) {
+      if (!document.querySelector('.shortcuts-dialog, .confirm-dialog, .ai-settings')) return;
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await settle(350);
+    }
+    const left = document.querySelector('.shortcuts-dialog, .confirm-dialog, .ai-settings');
+    if (left) throw new Error('an overlay survived Escape: .' + left.className.split(' ')[0]);
   },
   async exitFullscreen() {
     if (!this.tabStripGone()) return;
@@ -2116,7 +2140,7 @@ try {
     // frame taken after it.
     await runSetup(
       send,
-      `await ui.exitFullscreen(); await ui.clearAnnots(); await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
+      `await ui.closeOverlays(); await ui.exitFullscreen(); await ui.clearAnnots(); await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
     ).catch(() => {})
   }
   ws.close()
