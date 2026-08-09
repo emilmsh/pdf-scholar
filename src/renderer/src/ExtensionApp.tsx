@@ -367,7 +367,16 @@ export default function ExtensionApp(): React.JSX.Element {
           </div>
           {atLibrary && (
             <div className="tab-view active">
-              <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+              {/* The document is still mounted behind this — and with no tab
+                  strip here, this button is the ONLY way back to it. Without
+                  it the back arrow was a one-way door: unsaved marks stranded
+                  behind a screen that offered nothing but "open another". */}
+              <Welcome
+                recents={recents}
+                onOpenDialog={openDialog}
+                onOpenRecent={openPath}
+                resume={{ name: payload.name, onResume: () => setAtLibrary(false) }}
+              />
             </div>
           )}
           {accessNotice && (

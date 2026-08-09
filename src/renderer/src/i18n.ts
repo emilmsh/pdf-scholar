@@ -116,6 +116,7 @@ const nb = {
 
   // Welcome
   'welcome.tagline': 'Laget for forskning.',
+  'welcome.resume': 'Fortsett i «{name}»',
   'welcome.openPdf': 'Åpne PDF …',
   'welcome.dragHint': '… eller dra og slipp en PDF hvor som helst i vinduet',
   'welcome.aiTitle': 'Sett opp AI-assistenten',
@@ -903,6 +904,7 @@ const en: Dict = {
   'fileaccess.retry': 'Try again',
 
   'welcome.tagline': 'Made for research.',
+  'welcome.resume': 'Back to “{name}”',
   'welcome.openPdf': 'Open PDF …',
   'welcome.dragHint': '… or drag and drop a PDF anywhere in the window',
   'welcome.aiTitle': 'Set up the AI assistant',

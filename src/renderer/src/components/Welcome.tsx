@@ -8,7 +8,7 @@ import type {
 import { BREW_UPGRADE_COMMAND } from '../../../shared/update-channel'
 import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
-import { AppMark, IconDocument, IconFolderOpen, IconHeart, IconSparkle } from './icons'
+import { AppMark, IconArrowLeft, IconDocument, IconFolderOpen, IconHeart, IconSparkle } from './icons'
 import { AiSettings } from './AiPanel'
 import FileAccessNotice from './FileAccessNotice'
 import { dismissFileAccessNotice, fileAccessGranted, fileAccessNoticeDismissed } from '../extension-file-access'
@@ -17,6 +17,14 @@ interface Props {
   recents: RecentFile[]
   onOpenDialog(): void
   onOpenRecent(path: string): void
+  /** A document still open behind this screen, and the way back to it.
+   *
+   *  The extension only. There, this screen IS the library and there is no tab
+   *  strip to return through — so without this the back arrow was a one-way
+   *  door with an unsaved document stranded behind it (Emil, 2026-08-09). The
+   *  desktop leaves it undefined: its tab strip is the way back, and a second
+   *  control saying the same thing would be clutter. */
+  resume?: { name: string; onResume(): void } | undefined
 }
 
 function formatDate(ts: number): string {
@@ -48,7 +56,7 @@ export function updateOutcomeText(outcome: UpdateCheckOutcome): string {
   }
 }
 
-export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props): React.JSX.Element {
+export default function Welcome({ recents, onOpenDialog, onOpenRecent, resume }: Props): React.JSX.Element {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showAiSetup, setShowAiSetup] = useState(false)
@@ -120,7 +128,16 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent }: Props):
         <p className="welcome-tagline">{t('welcome.tagline')}</p>
 
         <div className="welcome-actions">
-          <button className="btn-primary" onClick={onOpenDialog}>
+          {/* The document you came from leads, because you are one click from
+              having meant to go back to it. Opening another is the secondary
+              act while one is already open. */}
+          {resume && (
+            <button className="btn-primary" onClick={resume.onResume}>
+              <IconArrowLeft />
+              {t('welcome.resume', { name: resume.name })}
+            </button>
+          )}
+          <button className={resume ? 'btn-secondary' : 'btn-primary'} onClick={onOpenDialog}>
             <IconFolderOpen />
             {t('welcome.openPdf')}
           </button>
