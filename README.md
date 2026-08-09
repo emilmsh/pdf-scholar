@@ -149,7 +149,9 @@ is what an hour with the document asks for:
 - Table of contents, thumbnails, bookmarks (B marks the page you are on), and back/forward
   navigation (Alt+← / Alt+→) after following internal links
 - Remembers your reading position and recent files; a **library** home screen lists what
-  you have been reading
+  you have been reading. It is a place, not an exit: going back to it closes nothing, the
+  open documents stay in the tab strip, and clicking one returns you exactly where you
+  were — same page, same zoom, same panels, unsaved marks included
 - Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
   window** to put two documents side by side, or across the bar to reorder
 - The interface itself is in Norwegian or English, and that setting also controls the AI
@@ -227,8 +229,10 @@ clutter the page while you read.
   varying width — other readers render it the same. A toggle in the tool menus
   hands drawing back to the finger
 - **The text tool writes in the PDF's own typefaces** — Helvetica, Times or
-  Courier, bold and italic. Nothing is embedded, which is the point: the words
-  stay real, searchable text and look the same in every reader
+  Courier, bold and italic, picked before you type or changed afterwards on a box
+  that already exists, so a paragraph set in the wrong face is re-set rather than
+  retyped. Nothing is embedded, which is the point: the words stay real, searchable
+  text and look the same in every reader
 - **Sign without leaving the app**: draw your signature once — with a mouse, a
   pen or a finger — and stamp it wherever it is needed, on any document. It is
   kept on your machine, never uploaded, and lands in the file as a standard

@@ -47,6 +47,7 @@ READING
 • Split view: two columns of the same document, each with its own page, zoom and rotation
 • Table of contents, thumbnails, bookmarks and search (match case / whole word)
 • Remembers your reading position and recent files
+• Every keyboard shortcut is listed in one map and can be rebound or reset
 
 ANNOTATION
 Marking up a paper never interrupts reading it: the tools come to the text you selected, and everything you have marked is one panel away.
@@ -85,6 +86,7 @@ LESING
 • Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
 • Innholdsfortegnelse, miniatyrer, bokmerker og søk (skill store/små, helord)
 • Husker leseposisjon og nylige filer
+• Alle hurtigtaster står i ett kart og kan bindes om eller tilbakestilles
 
 ANNOTERING
 Å annotere en artikkel avbryter aldri lesingen: verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna.

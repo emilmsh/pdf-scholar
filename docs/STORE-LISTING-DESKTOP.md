@@ -46,6 +46,8 @@ READING
 • Rotate pages, two-page spread, and a full-screen presentation mode
 • Table of contents, thumbnails, bookmarks, and search that marks every hit on the page while you look (match case / whole word)
 • Remembers your reading position and recent files; the mouse side-buttons move back and forward through your navigation history
+• The library is a place, not an exit: going back to it closes nothing and returns you exactly where you were
+• Every keyboard shortcut is listed in one map and can be rebound or reset
 • Opens PDFs straight from File Explorer, with a "Recent" Jump List on the taskbar
 
 SPLIT VIEW
@@ -99,6 +101,8 @@ LESING
 • Roter sider, tosiders oppslag og en fullskjerms presentasjonsmodus
 • Innholdsfortegnelse, miniatyrer, bokmerker og søk som markerer alle treff på siden mens du leter (skill store/små, helord)
 • Husker leseposisjon og nylige filer; museknappene på siden går fram og tilbake i navigasjonshistorikken
+• Biblioteket er et sted, ikke en utgang: å gå dit lukker ingenting, og du kommer tilbake nøyaktig der du var
+• Alle hurtigtaster står i ett kart og kan bindes om eller tilbakestilles
 • Åpner PDF-er rett fra Utforsker, med en «Nylig»-hurtigliste på oppgavelinjen
 
 DELT VISNING

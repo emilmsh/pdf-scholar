@@ -211,7 +211,6 @@ export type MenuAction =
   | { kind: 'reference' }
   | { kind: 'critique' }
   | { kind: 'ask' }
-  | { kind: 'similar' }
   | { kind: 'snip' }
 
 interface MenuProps {
@@ -353,14 +352,7 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
               {t('menu.aiReference')}
             </button>
             <button
-              className="menu-ai-chip"
-              title={t('menu.aiSimilarTip')}
-              onClick={() => onAction({ kind: 'similar' })}
-            >
-              {t('menu.aiSimilar')}
-            </button>
-            <button
-              className="menu-ai-chip"
+              className="menu-ai-chip menu-ai-chip-wide"
               title={t('menu.aiAskTip')}
               onClick={() => onAction({ kind: 'ask' })}
             >

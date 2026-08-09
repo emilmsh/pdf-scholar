@@ -4611,6 +4611,13 @@ html.pen-near .draw-layer {
   padding: 2px 4px 4px;
 }
 
+/* «Spør …» spans the grid. It is the escape hatch to your own question, not a
+   sixth ready-made one, and after «Finn lignende» came out (Emil, 2026-08-09)
+   it would otherwise have sat alone on the last row looking unfinished. */
+.menu-ai-chip-wide {
+  grid-column: 1 / -1;
+}
+
 .menu-ai-chip {
   padding: 3px 9px;
   border: 1px solid var(--border);

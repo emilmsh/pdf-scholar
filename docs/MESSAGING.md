@@ -122,6 +122,9 @@ sits directly under it on every surface and carries no picture of its own.)*
   reading a paper and losing your place in one
 - Remembers reading positions and recent files; tabs and multiple windows, and a
   tab can be dragged out into its own window
+- The library is a **place, not an exit**: going back to it closes nothing, the
+  open documents stay in the tab strip, and returning to one puts you exactly
+  where you were — same page, same zoom, same panels, unsaved marks included
 - Password-protected documents open: type the password and read, mark up and
   save as normal — the file stays protected. *Supporting, not a headline: a
   browser opens these too, so leading with it would be boasting about the
@@ -185,8 +188,10 @@ siden av siden, og eksporten printer dem slik.
   varying width — other readers render it the same. A toggle in the tool menus
   hands drawing back to the finger
 - The text tool writes in **the PDF's own typefaces** — Helvetica, Times or
-  Courier, bold and italic — chosen from the tool menu. Nothing is embedded in
-  the file, which is the point: the words stay real, searchable text and look
+  Courier, bold and italic — chosen from the tool menu before you type, or
+  changed afterwards on a box that already exists, so a paragraph set in the
+  wrong face is re-set rather than retyped. Nothing is embedded in the file,
+  which is the point: the words stay real, searchable text and look
   the same in every reader on earth. (Claim the fonts, never "any font": a
   typeface outside those fourteen would have to travel inside the document, and
   we deliberately do not do that. v0.36 shipped a handwriting font that did,

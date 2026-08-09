@@ -3171,20 +3171,6 @@ export default function PdfViewer({
           })()
           break
         }
-        case 'similar': {
-          setMenu(null)
-          if (!selText) break
-          // Seed the AI search with the selection and fire it right away —
-          // the SAME semantic search the search bar's ✦ mode runs.
-          const q = selText.slice(0, 200)
-          setSearchMode('ai')
-          setSearchQuery(q)
-          searchJumpedRef.current = false
-          setSearchOpen(true)
-          window.getSelection()?.removeAllRanges()
-          void runSemanticSearchRef.current?.(q)
-          break
-        }
         case 'snip': {
           setMenu(null)
           setSnip({ target: 'quick' })
