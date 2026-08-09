@@ -159,6 +159,8 @@ is what an hour with the document asks for:
 - Every key named above is a default. **Settings → Keyboard shortcuts** lists them all in
   one map and lets you rebind or reset any of them, one key or all at once
 
+![The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another](docs/screenshots/shortcuts.png)
+
 **Split view**
 
 ![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)

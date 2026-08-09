@@ -71,7 +71,7 @@ surface missing one it needs.
 | `dual-pane` | ✓ | ✓ | 5 |
 | `margin` | ✓ | — | — |
 | `reading`, `parchment`, `night` | — | — | — (tricolor's sources) |
-| `shortcuts` | — | — | — (approved in principle, awaiting Emil's shoot) |
+| `shortcuts` | ✓ | ✓ | — (last in Reading, never an opening frame) |
 | `night+`, `annotations_edit`, `reading_tabs`, `page_only`, `feedback`, `signature` | — | — | — (shot as smoke tests) |
 
 **Why tricolor opens everything, and why it keeps its toolbar** (Emil, 2026-08-08).
@@ -87,8 +87,10 @@ body page at fit-width with the toolbar unpinned — used to be the second frame
 both the README and the landing page. It came out because a picture with no
 application in it cannot carry a section: the other frames all show the app doing
 something, and this one showed its absence, which next to a browser's built-in
-viewer proves nothing. The reading section now sits directly under `tricolor` and
-uses that as its illustration, so it needs no frame of its own. Do not reach for an
+viewer proves nothing. The reading section now OPENS on `tricolor` and closes on
+`shortcuts` — the keyboard map, beside the line about every shortcut being yours
+to change. That order is the rule, not an accident: a settings dialog is a thing
+you go and find, so it can end a section and must never begin one. Do not reach for an
 unshipped frame to fill a section either — the ones sitting at `ships: []` are
 there because they were judged and rejected, not because nobody got around to them.
 
