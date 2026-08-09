@@ -23,9 +23,9 @@ store supports a localized listing.
 PDF Scholar
 
 ## Short description (≤132 chars — Chrome limit)
-**EN:** A PDF viewer for the browser that is nearly all page: tools within reach, split view, and an optional AI assistant.
+**EN:** A PDF viewer for the browser that is nearly all page: annotation at the selected text, split view, and an optional AI assistant.
 
-**NO:** En PDF-leser i nettleseren som er nesten bare side: verktøy innen rekkevidde, delt visning og en valgfri AI-assistent.
+**NO:** En PDF-leser i nettleseren som er nesten bare side: annotering ved merket tekst, delt visning og en valgfri AI-assistent.
 
 ## Single purpose (Chrome requires this)
 PDF Scholar replaces the browser's built-in PDF viewer with a full-featured reader and annotator, so PDFs opened in the browser can be read and marked up in one place.
@@ -36,74 +36,76 @@ PDF Scholar replaces the browser's built-in PDF viewer with a full-featured read
 
 **EN:**
 ```
-PDF Scholar replaces the browser's built-in PDF viewer with a reader and annotator meant for the documents you have to work through: research articles, reports, books. The window is nearly all page — one slim toolbar carries the tools you use, and everything else stays out of the way until you call it, including the optional AI assistant.
+PDF Scholar replaces the browser's built-in PDF viewer with a reader and annotator for the documents you work through rather than skim: research articles, reports, books. The window is nearly all page — one slim toolbar carries the tools, and everything else stays out of the way until called, including the optional AI assistant.
 
 Open a PDF and it becomes an ordinary browser tab in the PDF Scholar viewer instead of the browser's basic reader. Make your browser your default PDF app and local PDFs open here too.
 
 READING
-• Smooth scrolling and pinch zoom that stays where you release it; fit width or page
+• Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
 • Day, Sepia and two Night themes, with contrast adjustable per theme
-• Rotate pages, two-page spread, and a full-screen presentation mode
+• Page rotation, two-page spread, and a full-screen presentation mode
 • Split view: two columns of the same document, each with its own page, zoom and rotation
 • Table of contents, thumbnails, bookmarks and search (match case / whole word)
-• Remembers your reading position and recent files
-• Every keyboard shortcut is listed in one map and can be rebound or reset
+• Reading positions and recent files are remembered
+• Keyboard shortcuts are listed in one map and can be rebound or reset
 
 ANNOTATION
-Marking up a paper never interrupts reading it: the tools come to the text you selected, and everything you have marked is one panel away.
-• Select a passage and the menu comes to you — highlight, underline, a comment or a note, without a trip to the toolbar and back
-• A Notes panel keeps every mark one click away: grouped by page, searchable, filtered by colour and type, comments editable right in the list — with export to Word, Markdown or HTML
-• Comments in the margin: one switch shows every note and comment as visible text beside the page, and an export sets them in a real widened margin, numbered at their anchors, ready to print
+Selecting text opens the annotation menu at the selection; every mark is listed in a panel beside the document.
+• A notes panel lists every mark by page, with search and filters; comments are edited directly in the list — with export to Word, Markdown or HTML
+• Comments in the margin: notes shown as visible text beside the page, and an export that sets them in a widened margin, numbered at their anchors
 • Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes and free text
-• With a stylus on a touch screen, the pen draws while a finger scrolls; pen pressure varies the line (beta), and the saved file keeps the varying width
-• The text tool writes in the PDF's own typefaces — Helvetica, Times or Courier, bold and italic
-• Draw your signature once and stamp it wherever it is needed — it stays on your machine (placing a signature is not the same as digitally signing a document)
-• Password-protected documents open: type the password and read, mark up and save as normal
-• Colour, thickness and opacity per tool, remembered between sessions
-• Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape
-• Marks are saved back into the PDF itself as standard annotations, so the file reads the same in Acrobat and every other viewer
+• With a stylus, the pen draws while a finger scrolls; pen pressure varies the line width (beta) and is preserved in the saved file
+• The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold and italic
+• A signature can be drawn once and stamped where needed; it is stored locally (placing a signature is not the same as digitally signing a document)
+• Password-protected documents open, can be annotated, and keep their protection when saved
+• Colour, thickness and opacity are set per tool and remembered between sessions
+• Existing marks can be adjusted rather than redrawn: the ends of a highlight, the corner of a shape
+• Marks are saved into the PDF as standard annotations, which open correctly in Acrobat and other viewers
 
 AI ASSISTANT (optional, bring your own key)
-• Ask questions about the open document; every answer links to the passage it came from
+• Answers cite their sources: each claim links to the passage it came from
 • Structured article summaries; explain, simplify, critique or define selected text
-• Snip a figure or a region and ask the assistant to explain it
-• Search by meaning: describe a topic in your own words and get the passages that discuss it
-• Eight providers, one key each: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — or an OpenAI-compatible endpoint such as a local Ollama (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose; with a local model it never leaves at all
+• A figure or region can be cropped into the chat and asked about
+• Semantic search: describe a topic in your own words and get the passages that discuss it
+• Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — one key field each — or an OpenAI-compatible endpoint such as a local Ollama (no key needed). Requests go directly to the provider; with a local model the document never leaves the machine
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
 ```
 
 **NO:**
 ```
-PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotator laget for dokumentene du må jobbe deg gjennom: forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank verktøylinje bærer verktøyene du bruker, og alt annet holder seg unna til du henter det fram, inkludert den valgfrie AI-assistenten.
+PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotator for dokumentene du jobber deg gjennom og ikke bare skummer: forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank verktøylinje bærer verktøyene, og alt annet holder seg unna til det hentes fram, inkludert den valgfrie AI-assistenten.
 
 Åpne en PDF, og den blir en vanlig nettleserfane i PDF Scholar-leseren i stedet for nettleserens enkle visning. Gjør nettleseren til standard PDF-app, så åpnes lokale PDF-er også her.
 
 LESING
-• Jevn rulling og knip-zoom som blir stående der du slipper; tilpass bredde eller side
+• Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
 • Dag-, Sepia- og to Natt-temaer, med kontrast som kan justeres per tema
-• Roter sider, tosiders oppslag og en fullskjerms presentasjonsmodus
+• Siderotasjon, tosiders oppslag og en fullskjerms presentasjonsmodus
 • Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
 • Innholdsfortegnelse, miniatyrer, bokmerker og søk (skill store/små, helord)
-• Husker leseposisjon og nylige filer
-• Alle hurtigtaster står i ett kart og kan bindes om eller tilbakestilles
+• Leseposisjon og nylige filer huskes
+• Hurtigtastene står i ett kart og kan bindes om eller tilbakestilles
 
 ANNOTERING
-Å annotere en artikkel avbryter aldri lesingen: verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna.
-• Merk et avsnitt, og menyen kommer til deg — utheving, understreking, en kommentar eller et notat, uten en tur innom verktøylinja
-• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, filtrert på farge og type, kommentarene redigerbare rett i lista — med eksport til Word, Markdown eller HTML
-• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden, og en eksport setter dem i en ekte, bredere marg, nummerert ved ankrene — klar til utskrift
+Å merke tekst åpner annoteringsmenyen ved merkingen; hvert merke listes i et panel ved siden av dokumentet.
+• Notatpanelet lister hvert merke per side, med søk og filtre; kommentarer redigeres direkte i lista — med eksport til Word, Markdown eller HTML
+• Kommentarer i margen: notater vist som synlig tekst ved siden av siden, og en eksport som setter dem i en utvidet marg, nummerert ved ankrene
 • Utheving, understreking, gjennomstreking og bølget strek; penn og tusj med hold-for-å-rette; former, gule lapper og fritekst
-• Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
-• Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form
-• Merkene lagres inn i PDF-en selv som standard annoteringer, så filen ser lik ut i Acrobat og alle andre lesere
+• Med penn på berøringsskjerm tegner pennen mens fingeren blar; pennetrykk varierer strekbredden (beta) og bevares i den lagrede filen
+• Tekstverktøyet bruker PDF-ens standardskrifter — Helvetica, Times eller Courier, fet og kursiv
+• Signaturen tegnes én gang og stemples inn der den trengs; den lagres lokalt (å plassere en signatur er ikke det samme som å signere digitalt)
+• Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
+• Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes mellom økter
+• Eksisterende merker kan justeres i stedet for å tegnes på nytt: enden av en utheving, hjørnet av en form
+• Merkene lagres i PDF-en som standard annoteringer, som åpnes riktig i Acrobat og andre lesere
 
 AI-ASSISTENT (valgfri, egen nøkkel)
-• Still spørsmål om dokumentet du har åpent; hvert svar lenker til avsnittet det kom fra
+• Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
-• Klipp ut en figur eller et område og be assistenten forklare det
-• Søk etter mening: beskriv et tema med dine egne ord og få avsnittene som handler om det
-• Åtte leverandører, én nøkkel hver: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — eller et OpenAI-kompatibelt endepunkt som en lokal Ollama (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte; med en lokal modell forlater det aldri maskinen
+• En figur eller et område kan klippes inn i samtalen og spørres om
+• Semantisk søk: beskriv et tema med egne ord og få avsnittene som omtaler det
+• Leverandører: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — ett nøkkelfelt hver — eller et OpenAI-kompatibelt endepunkt som en lokal Ollama (uten nøkkel). Forespørslene går rett til leverandøren; med en lokal modell forlater dokumentet aldri maskinen
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
 ```
@@ -151,9 +153,9 @@ captions:
 | File (`docs/store-screenshots/`) | Caption (EN) | Caption (NO) |
 |------|-------------|-------------|
 | `tricolor.png` | Reading themes: Day, Sepia and Night | Lesetemaer: Dag, Sepia og Natt |
-| `annotations.png` | Annotation tools within reach, never in the way | Annoteringsverktøy innen rekkevidde, aldri i veien |
-| `assistant.png` | AI assistant grounded in the document | AI-assistent forankret i dokumentet |
-| `assistant_figure.png` | Snip a figure and ask what it shows | Klipp ut en figur og spør hva den viser |
+| `annotations.png` | Annotation at the selected text | Annotering ved merket tekst |
+| `assistant.png` | AI assistant with source references | AI-assistent med kildehenvisninger |
+| `assistant_figure.png` | Ask about a cropped figure | Spør om en utklippet figur |
 | `dual-pane.png` | Two pages side by side in one window | To sider side om side i ett vindu |
 
 Five slots is not many, so the themes share one frame: `tricolor.png` is the

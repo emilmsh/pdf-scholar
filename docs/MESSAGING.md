@@ -104,181 +104,154 @@ grows past six, the fix is to cut or merge, not to add a seventh: the README is
 where the full account belongs, and a claim that only earns its place there is
 not a claim the landing page was missing.
 
-### 1. Reading — the window is nearly all page
+### 1. Reading
 
-**EN claim:** Everything a long document asks of you.
-**NO claim:** Alt et langt dokument krever av deg.
+**EN heading:** Reading.
+**NO heading:** Lesing.
 
-*(The claim used to be "A page you can stand to look at all day" — Emil, 2026-08-09:
-too thin to head the pillar, because it promises only comfort while the pillar's
-substance is navigation and keeping your place. Comfort survives as the first
-sentence of the body; the heading now covers both. The opening frame — one window
-wiped across three themes — is what proves the comfort half, so the reading section
-sits directly under it on every surface and carries no picture of its own.)*
+*(Until 2026-08-09 every pillar carried an aphoristic claim for a heading —
+"Everything a long document asks of you", "Marks that are always within reach and
+never in the way", "Nowhere, unless you ask a question". Emil retired the register:
+it reads as AI-generated marketing, not as something a professional would write.
+Headings are plain topic labels now, and the substance lives in the body; the
+one-liner is the only positioning line that survives. The opening frame — one
+window shown in three themes — still opens every surface, so the reading section
+sits directly under it and carries no picture of its own.)*
 
-- Smooth scrolling and pinch zoom that stays where you release it; fit width or
-  whole page; the opening zoom follows the file's own setting, as Acrobat does
-- Four themes — Day, Sepia on warm ivory (the tone matches Apple Books), Night
-  and Night+ — plus Auto, which follows Windows. Contrast and brightness
-  adjustable within each
-- Rotate pages, two-page spread, full-screen presentation mode
-- Unpin the toolbar and it hides; hover an edge to bring back the toolbar, the
-  contents or the assistant
-- Contents, thumbnails, bookmarks, and back/forward after following a
-  cross-reference (the mouse side-buttons work too) — the difference between
-  reading a paper and losing your place in one
-- Remembers reading positions and recent files; tabs and multiple windows, and a
-  tab can be dragged out into its own window
-- Going back to the library closes nothing: the open documents stay in the tab
-  strip, and returning to one puts you exactly where you were — same page, same
-  zoom, same panels, unsaved marks included
-- Password-protected documents open: type the password and read, mark up and
-  save as normal — the file stays protected. *Supporting, not a headline: a
-  browser opens these too, so leading with it would be boasting about the
-  minimum. Printing one is the exception, and the app says so.*
-- Every keyboard shortcut is listed in one map in settings, and any of them can
-  be rebound or reset. Keep this to a line: it is a nice-to-have, not a pillar
-- Interface in Norwegian and English, which also sets the AI prompts, exports and
-  date formats
+- Smooth scrolling; zoom centres on the cursor or pinch point; fit width or
+  whole page
+- Four themes — Day, Sepia on warm ivory, Night and Night+ (higher contrast) —
+  plus Auto, which follows the system setting. Contrast and brightness are
+  adjustable per theme
+- Page rotation, two-page spread, full-screen presentation mode
+- Table of contents, thumbnails, bookmarks, and back/forward navigation after
+  following an internal link
+- The toolbar can be unpinned; the page then fills the window, and the toolbar
+  and panels return on hover at the window edges
+- Reading positions and recent files are remembered. Documents open in tabs or
+  separate windows, and a tab can be dragged out into its own window
+- Going back to the library closes nothing: open documents stay in the tab
+  strip, and returning to one restores page, zoom and panels
+- Password-protected documents open, can be annotated, and are saved with their
+  protection intact. *Supporting, not a headline: a browser opens these too.*
+- Keyboard shortcuts are listed in one map in settings and can be rebound or
+  reset. Keep this to a line
+- Interface in Norwegian and English; the choice also applies to the AI
+  prompts, exports and date formats
 
-### 2. Split view — two pages at once
+### 2. Split view
 
-**EN claim:** Two pages at once.
-**NO claim:** To sider samtidig.
+**EN heading:** Split view.
+**NO heading:** Delt visning.
 
-- Two columns of the same document, each with its own page, zoom and rotation,
-  so a landscape table can sit upright beside portrait text
-- Ctrl+click an internal link to open its target in the other column and keep
-  the page you are on
-- Annotate in either column; it is one document, so a mark appears in both as
-  you make it
-- Toggling the split away and back returns the column exactly as you left it —
-  page, spot on the page, zoom and width
+- Two columns of the same document, each with its own page, zoom and rotation —
+  a table or figure can stay in view beside the text that discusses it
+- Ctrl+click on an internal link opens its target in the other column
+- Annotations can be made in either column and appear in both; it is a single
+  document
+- A closed column's page, zoom and width are restored when the split is
+  reopened
 
-### 3. Annotation — within reach, never in the way
+### 3. Annotation
 
-**EN claim:** Marks that are always within reach and never in the way.
-**NO claim:** Merknader som alltid er innen rekkevidde og aldri i veien.
+**EN heading:** Annotation.
+**NO heading:** Annotering.
 
-**This is the pillar's point, and the one most easily lost.** What the app does
-well is not that the marks are durable — durability is what anyone expects of a
-PDF annotator, and saying it out loud sounds like an apology. What it does well
-is that marking up a paper never interrupts the reading: the tools come to the
-text you selected, the marks you have made are one panel away, and neither the
-tools nor the marks clutter the page while you read.
+**The pillar's substance:** annotating does not interrupt reading. The tools
+appear at the selection, the marks are listed in a panel, and neither clutters
+the page. Durability is what anyone expects of a PDF annotator — it stays a
+supporting bullet, phrased as a consequence, never a headline.
 
-**EN body:** Select a passage and the menu comes to you — highlight, underline,
-a comment, or a question for the assistant — so marking a paper never costs a
-trip to the toolbar and back. Everything you have marked stays one panel away:
-the notes tab lists every mark by page, with search and colour and type filters,
-comments edit right in the list, and clicking one takes you to it. And when the
-comments should be *seen* rather than found — feedback on a draft, a marked-up
-student paper — the margin view lays them out as visible text beside the page,
-and the export prints them that way.
+**EN body:** Selecting text opens the annotation menu at the selection —
+highlight, underline, a comment, or a question for the assistant. A notes panel
+lists every mark by page, with search and colour and type filters; comments are
+edited directly in the list, and a click goes to the mark. For comments that
+others will read — feedback on a draft, a marked-up student paper — a margin
+view presents them as visible text beside the page, and an export produces a
+copy with the comments set in a widened margin.
 
-**NO body:** Merk et avsnitt, og menyen kommer til deg — utheving,
-understreking, en kommentar, eller et spørsmål til assistenten — så det å
-annotere en artikkel aldri koster en tur innom verktøylinja. Alt du har merket
-ligger ett panel unna: Notater-fanen lister hvert merke per side, med søk og
-farge- og typefilter, kommentarene redigeres rett i lista, og ett klikk tar deg
-dit. Og når kommentarene skal *ses* og ikke letes fram — tilbakemelding på et
-utkast, en rettet elevbesvarelse — legger margvisningen dem som synlig tekst ved
-siden av siden, og eksporten printer dem slik.
+**NO body:** Å merke tekst åpner annoteringsmenyen ved merkingen — utheving,
+understreking, kommentar, eller et spørsmål til assistenten. Et notatpanel
+lister hvert merke per side, med søk og farge- og typefilter; kommentarer
+redigeres direkte i lista, og ett klikk går til merket. Kommentarer som andre
+skal lese — tilbakemelding på et utkast, en rettet besvarelse — kan vises i
+margen som synlig tekst ved siden av siden, og en eksport lager en kopi med
+kommentarene satt i en utvidet marg.
 
-- The toolbar carries the same tools for when you mark several passages in a
-  row, and unpins entirely when you want nothing but the page
-- Highlight, underline, strikeout and a true-wave squiggly; pen and marker with
-  hold-to-straighten; shapes, sticky notes, free text typed on the page in the
-  colour and size you pick, and text-anchored comments
-- On a touch screen with a stylus, the pen draws while a finger scrolls and
-  zooms; pen pressure varies the line **(beta)**, and the saved file keeps the
-  varying width — other readers render it the same. A toggle in the tool menus
-  hands drawing back to the finger
-- The text tool writes in **the PDF's own typefaces** — Helvetica, Times or
-  Courier, bold and italic — chosen from the tool menu before you type, or
-  changed afterwards on a box that already exists, so a paragraph set in the
-  wrong face is re-set rather than retyped. Nothing is embedded in the file,
-  which is the point: the words stay real, searchable text and look
-  the same in every reader on earth. (Claim the fonts, never "any font": a
-  typeface outside those fourteen would have to travel inside the document, and
+- The toolbar carries the same tools, and can be unpinned entirely
+- Highlight, underline, strikeout and squiggly; pen and marker with
+  hold-to-straighten; shapes, sticky notes, free text, and text-anchored
+  comments
+- With a stylus, the pen draws while a finger scrolls and zooms; pen pressure
+  varies the line width **(beta)** and is preserved in the saved file
+- The text tool uses the standard PDF typefaces — Helvetica, Times and Courier,
+  with bold and italic — chosen before typing or changed on an existing box.
+  Nothing is embedded in the file; the text remains searchable and renders
+  identically in other readers. (Claim the fonts, never "any font": a typeface
+  outside the standard fourteen would have to travel inside the document, and
   we deliberately do not do that. v0.36 shipped a handwriting font that did,
-  and it came back out — a typed note wearing handwriting is a costume, and
-  someone who wants handwriting uses the pen.)
-- Sign without leaving the app: draw your signature once — with a mouse, a pen
-  or a finger — and stamp it wherever it is needed, on any document. It is kept
-  on your machine, never uploaded, and lands in the file as a standard stamp
-  annotation. *(Placing a signature is not the same as digitally signing a
-  document, and no surface may blur the two. Where a document already carries
-  digital signatures the app says so and says plainly that it does not check
-  whether they are valid.)*
-- Colour, thickness and opacity per tool, remembered between sessions
-- A mark can be corrected rather than redrawn: drag either end of a highlight
-  and it snaps to whole words, or a corner of a shape, text box or drawing
-- Nothing that pops up has to be dismissed to see past it: the selection menu,
-  and the comment and note bubbles, all drag aside by their grip — and the
-  bubbles resize. They close on Esc or a click outside
-- Comments in the margin: every note and comment as an always-visible card
-  beside the page — left or right — colour-keyed to its mark, with a leader
-  line to the passage it belongs to; when none is in view, quiet arrows fetch
-  the nearest. Comments edit right in the cards
-- Export with comments in the margin: a copy of the document with every page
-  widened and the comments set in the new margin as real annotations, a
-  numbered chip at each anchor tying text to comment on paper. The original is
-  untouched
-- The notes tab exports a summary — the highlighted text included — to Word,
+  and it came back out.)
+- A signature is drawn once — or uploaded or pasted as an image — and stamped
+  where needed. It is stored locally and saved as a standard stamp annotation.
+  *(Placing a signature is not the same as digitally signing a document, and no
+  surface may blur the two. Where a document already carries digital signatures
+  the app reports them and states that it does not verify them.)*
+- Colour, thickness and opacity are set per tool and remembered between
+  sessions
+- Existing marks can be adjusted rather than redrawn: the ends of a highlight,
+  the corner of a shape, text box or drawing
+- Comments in the margin: every note and comment as a visible card beside the
+  page — left or right — colour-keyed to its mark, with a leader line to the
+  passage it belongs to
+- Margin export: a copy of the document with every page widened and the
+  comments set in the new margin as ordinary annotations, numbered at their
+  anchors. The original file is untouched
+- The notes panel exports a summary, highlighted text included, to Word,
   Markdown or HTML
-- An optional name in settings signs new annotations — the standard PDF author
-  field other readers show; left empty, they stay unsigned
-- The file is only written when you save it: edits go to a draft, closing
-  prompts, and unsaved work survives a crash
-- A save guard warns before overwriting a file another program has changed, and
-  "save a copy" continues in the copy
-- *Supporting, never the headline:* the marks are standard PDF annotations with
-  appearance streams, so the file reads the same in Acrobat or anywhere else it
-  goes
+- An optional name in settings fills the standard PDF author field on new
+  annotations; left empty, they stay unsigned
+- Edits are held in a draft until saved; closing prompts, and the draft
+  survives a crash
+- *Supporting, never the headline:* marks are standard PDF annotations with
+  appearance streams and open correctly in other readers
 
-### 4. The assistant — it shows its work
+### 4. The assistant
 
-**EN claim:** An assistant that shows its work.
-**NO claim:** En assistent som viser hvor svaret kommer fra.
+**EN heading:** The AI assistant.
+**NO heading:** AI-assistenten.
 
 - Optional, and it runs on your own API key
-- Every claim carries a source chip: click one and you land on the sentence the
-  claim came from, so you can check the answer rather than take it on trust
+- Answers cite their sources: each claim carries a reference, and following it
+  goes to the passage the claim came from
 - Structured article summaries — research question, method, data, findings,
   limitations
-- Explain a figure: drag a box around a chart or table and the region lands in
-  the chat for you to ask about. Nothing is sent until you ask
-- Search by meaning: describe a topic in your own words and get the passages
-  that discuss it, ranked and clickable
-- Ask about your own marks: "summarize what I've highlighted"
-- Scanned documents are named as such rather than answered about blindly; attach
-  a page range as images and the assistant reads those
-- Optional web search, off by default: closed, on request, or always on
-  (Anthropic and OpenAI only — the toggle simply doesn't appear elsewhere)
-- LaTeX/TeX renders properly in answers, so maths stays readable
-- Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI),
-  Mistral and Groq — one key field each, entered once — plus any
-  OpenAI-compatible endpoint and local models via Ollama or LM Studio (local
-  servers need no key). Setup is paste-the-key-and-save; each provider's model
-  list is fetched live, and the model menu keeps every keyed provider one
-  click apart. Big lists (OpenRouter) are sectioned by vendor with a filter
-  field. Each answer shows the tokens the provider counted, so the cost stays
-  visible
+- A figure or region can be cropped into the chat and asked about; nothing is
+  sent until a question is asked
+- Semantic search: describe a topic in your own words and get the passages that
+  discuss it, ranked
+- Questions about your own annotations ("summarize what I've highlighted")
+- Scanned documents are identified as such rather than answered about blindly;
+  a page range can be attached as images instead
+- Optional web search, off by default (Anthropic and OpenAI only — the toggle
+  does not appear elsewhere)
+- LaTeX in answers is rendered
+- Providers: Anthropic (Claude), OpenAI, Azure OpenAI, OpenRouter, Google
+  Gemini, Grok (xAI), Mistral and Groq — one key field each, entered once —
+  plus any OpenAI-compatible endpoint, including local models via Ollama or
+  LM Studio (no key needed). Model lists are fetched live from each keyed
+  provider, and every answer reports the provider's token count
 
-### 5. Where your document goes
+### 5. Privacy
 
-**EN claim:** Nowhere, unless you ask a question.
-**NO claim:** Ingen steder, med mindre du stiller et spørsmål.
+**EN heading:** Privacy.
+**NO heading:** Personvern.
 
-- Reading, annotating and saving are entirely local; the app works with no
-  network at all
-- When you do use the assistant, the request goes straight to the provider you
-  picked — there is no server of ours in between — under your key and their
-  terms
-- Point it at a local model (Ollama, LM Studio) and even your questions stay
-  on your own machine
-- The key is kept in the platform's own key store; the exact mode differs per
+- Reading, annotating and saving are entirely local; the app runs without
+  network access
+- Assistant requests go directly to the chosen provider, under your key and
+  that provider's terms — there is no intermediary server
+- With a local model (Ollama, LM Studio), questions also stay on the machine
+- The key is stored in the platform's own key store; the exact mode differs per
   platform and the settings panel names the one in force. See "Wording we do not
   use" below before writing anything shorter than that
 
@@ -315,8 +288,19 @@ siden av siden, og eksporten printer dem slik.
   how the behaviour was *decided*, and it leaked from commit messages into four
   surfaces (Emil, 2026-08-09: "fjas og intern metadebt"). The reader needs what
   happens — going back closes nothing, returning restores everything — never the
-  metaphor it was built under. The test: does the sentence still say something
-  if you have never read our commit log?
+  metaphor it was built under.
+- **The AI register** (Emil, 2026-08-09: "typisk KI"). Aphoristic mirrors
+  ("within reach, never in the way"), anthropomorphised features ("the menu
+  comes to you"), benefit tails that restate the sentence ("so the cost stays
+  visible"), reassurance ("nothing is lost"), cutesy detail ("a hair of
+  margin"), and validation by name-drop ("as Acrobat does"). The test for every
+  sentence: would a colleague write it in a paper? State the capability and its
+  consequence, then stop.
+- **Bug history in evergreen copy.** A bullet that describes the absence of a
+  former defect — "zoom that stays where you release it", "writes each mark
+  exactly once", "the box can never be shrunk below its own words" — advertises
+  the repair, not the capability, and dates the text. Evergreen surfaces state
+  what the app does; a fix is named as a fix only in a "What's new" block.
 - **Claims about untested platforms.** Linux has not run on real hardware and no
   surface may imply otherwise. macOS HAS been tested on Apple hardware (since
   v0.34.0) but remains beta — "tested" is the strongest word on offer; never

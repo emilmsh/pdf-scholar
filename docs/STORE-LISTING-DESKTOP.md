@@ -36,110 +36,92 @@ PDF Scholar
 
 **EN:**
 ```
-PDF Scholar is a PDF reader and annotator for Windows, for the documents you have to work through rather than skim: research articles, reports, books. The window is nearly all page — one slim toolbar carries the tools you use, everything else stays out of the way until you call it, and the toolbar itself unpins when you want nothing but the page. Marking up a paper never interrupts reading it: the tools come to the text you selected, and everything you have marked stays one panel away. The optional AI assistant answers from the document and shows which passage it used.
+PDF Scholar is a PDF reader and annotator for Windows, for the documents you work through rather than skim: research articles, reports, books. The window is nearly all page — one slim toolbar carries the tools, the panels stay out of the way until called, and the toolbar itself can be unpinned. Annotation happens at the text you select, every mark is listed in a panel beside the document, and the optional AI assistant answers from the document and cites the passage it used.
 
-Free and open source (MIT). No account, no sign-in, no tracking, no ads. Everything works offline except the optional AI, which uses your own key. Native x64 and arm64, so Windows-on-ARM machines like the Surface run the arm64 build rather than x64 under emulation. The Store keeps it updated automatically.
+Free and open source (MIT). No account, no sign-in, no tracking, no ads. Everything works offline except the optional AI, which uses your own key. Native x64 and arm64, so Windows-on-ARM machines run the app without emulation. The Store keeps it updated.
 
 READING
-• Smooth scrolling and pinch zoom that stays where you release it; fit width or page; opening zoom follows the file's own setting, as Acrobat does
-• Day, Sepia and two Night themes; the Sepia tone matches Apple Books
-• Rotate pages, two-page spread, and a full-screen presentation mode
-• Table of contents, thumbnails, bookmarks, and search that marks every hit on the page while you look (match case / whole word)
-• Remembers your reading position and recent files; the mouse side-buttons move back and forward through your navigation history
-• Going back to the library closes nothing: your documents stay open, and one click returns you exactly where you were
-• Every keyboard shortcut is listed in one map and can be rebound or reset
-• Opens PDFs straight from File Explorer, with a "Recent" Jump List on the taskbar
+• Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
+• Day, Sepia and two Night themes, with contrast and brightness adjustable per theme
+• Page rotation, two-page spread, and a full-screen presentation mode
+• Table of contents, thumbnails, bookmarks, and search with match-case and whole-word options
+• Reading positions and recent files are remembered; back/forward navigation after following internal links
+• Going back to the library closes nothing: documents stay open, and returning to one restores your place
+• Keyboard shortcuts are listed in one map and can be rebound or reset
+• Opens PDFs from File Explorer, with a Recent list on the taskbar
 
 SPLIT VIEW
-• Two columns of the same document, each with its own page, zoom and rotation — keep a figure or a landscape-printed table in view while you read the text about it
-• Annotate in either column; it is one document, so a mark shows up in both as you make it
-• Ctrl+click an internal link to open the target in the other column, keeping the page you are on
-• Two windows on the same file work as well: they share one draft and sync as you annotate
+• Two columns of the same document, each with its own page, zoom and rotation — a table or figure can stay in view beside the text that discusses it
+• Annotations made in either column appear in both; two windows on one file also stay in sync
+• Ctrl+click on an internal link opens the target in the other column
 
 ANNOTATION
-• Select a passage and the menu comes to you — highlight, underline, a comment or a note, without a trip to the toolbar and back
-• A Notes panel keeps every mark one click away: grouped by page, searchable, filtered by colour and type, and a click takes you to the mark. Comments edit right in the list
-• Comments in the margin: one switch shows every note and comment as visible text beside the page — left or right — with a leader line to the passage it belongs to
-• Export a copy with the comments set in a real widened margin, numbered at their anchors — ready to print, the original untouched
-• The same tools sit in the toolbar for marking several passages in a row, and the toolbar unpins when you want nothing but the page
-• Highlight, underline, strikeout and a true-wave squiggly, in your own colours
-• Pen and marker with hold-to-straighten, shapes, sticky notes and free text in the colour and size you pick
-• With a stylus on a touch screen, the pen draws while a finger scrolls and zooms; pen pressure varies the line (beta), and the saved file keeps the varying width
-• The text tool writes in the PDF's own typefaces — Helvetica, Times or Courier, bold and italic — so the words stay real, searchable text in every reader
-• Sign without leaving the app: draw your signature once and stamp it wherever it is needed. It stays on your machine and lands in the file as a standard stamp annotation (placing a signature is not the same as digitally signing a document)
-• Password-protected documents open: type the password and read, mark up and save as normal — the file stays protected
-• Colour, thickness and opacity per tool, remembered between sessions
-• Correct a mark instead of redrawing it: drag either end of a highlight, or a corner of a shape, text box or drawing
-• Comments anchored to the text they mark
-• Export a summary of every mark — the highlighted text included — to Word, Markdown or HTML
-• An optional name in settings signs new annotations — the standard PDF author field other readers show
-• Standard PDF annotations that open correctly in Acrobat and every other viewer — not flattened images
-• A save guard that warns before overwriting a file another program has changed, and "save a copy" that continues in the copy
+Selecting text opens the annotation menu at the selection; every mark is listed in a panel beside the document.
+• Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes, free text and text-anchored comments
+• The notes panel lists every mark by page, with search and filters; comments are edited directly in the list; a summary exports to Word, Markdown or HTML
+• Comments in the margin: notes shown as visible text beside the page, and an export that sets them in a widened margin, numbered at their anchors — the original untouched
+• With a stylus, the pen draws while a finger scrolls and zooms; pen pressure varies the line width (beta) and is preserved in the saved file
+• The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold and italic — so the text stays searchable in every reader
+• A signature can be drawn once — or added as an image — and stamped where needed. It is stored locally (placing a signature is not the same as digitally signing a document)
+• Password-protected documents open, can be annotated, and keep their protection when saved
+• Colour, thickness and opacity are set per tool and remembered; existing marks can be adjusted rather than redrawn
+• An optional name in settings fills the standard PDF author field on new annotations
+• Edits are held in a draft until saved; what is saved is standard PDF annotations, which open correctly in Acrobat and other viewers
 
 AI ASSISTANT (optional — bring your own key)
-• Ask questions about the open document; every answer links to the passage it came from
-• Structured article summaries; explain, simplify, critique, define or ask about selected text
-• Snip a figure or region and ask the assistant to explain it
-• Search by meaning: describe a topic in your own words and get the passages that discuss it, ranked and clickable
-• A scanned PDF — pictures of words, with no text to search — is named as such rather than answered about blindly; attach a page range and the assistant reads those pages as images
-• LaTeX/TeX renders properly in answers, so maths stays readable
-• Optional web search, off by default: closed, on request, or always on
-• Eight providers, one key field each: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio (no key needed). The document leaves your device only when you ask a question, and goes straight to the provider you chose, under your key and their terms; with a local model it never leaves at all. PDF Scholar runs no server of its own.
+• Answers cite their sources: each claim links to the passage it came from
+• Structured article summaries; explain, simplify, critique or define selected text
+• A figure or region can be cropped into the chat and asked about
+• Semantic search: describe a topic in your own words and get the passages that discuss it
+• Scanned documents are identified as such; a page range can be attached as images for the assistant to read
+• LaTeX in answers is rendered; optional web search, off by default
+• Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — one key field each — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio (no key needed). Requests go directly to the provider; with a local model the document never leaves the machine. PDF Scholar operates no server.
 
 Source code: https://github.com/emilmsh/pdf-scholar
 ```
 
 **NO:**
 ```
-PDF Scholar er en PDF-leser og -annotator for Windows, for dokumentene du må jobbe deg gjennom og ikke bare skumme: forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank verktøylinje bærer verktøyene du bruker, alt annet holder seg unna til du henter det fram, og verktøylinja selv kan løsnes når du bare vil ha siden. Å annotere en artikkel avbryter aldri lesingen: verktøyene kommer til teksten du merket, og alt du har merket ligger ett panel unna. Den valgfrie AI-assistenten svarer ut fra dokumentet og viser hvilket avsnitt den brukte.
+PDF Scholar er en PDF-leser og -annotator for Windows, for dokumentene du jobber deg gjennom og ikke bare skummer: forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank verktøylinje bærer verktøyene, panelene holder seg unna til de hentes fram, og verktøylinja kan løsnes helt. Annotering skjer ved teksten du merker, hvert merke listes i et panel ved siden av dokumentet, og den valgfrie AI-assistenten svarer ut fra dokumentet og viser hvilket avsnitt den brukte.
 
-Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel. Både x64 og arm64, så Windows-på-ARM-maskiner som Surface kjører arm64-varianten framfor x64 under emulering. Store holder appen automatisk oppdatert.
+Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel. Både x64 og arm64, så Windows-på-ARM-maskiner kjører appen uten emulering. Store holder appen oppdatert.
 
 LESING
-• Jevn rulling og knip-zoom som blir stående der du slipper; tilpass bredde eller side; åpningszoom følger filens egen innstilling, slik Acrobat gjør
-• Dag-, Sepia- og to Natt-temaer; Sepia-tonen matcher Apple Books
-• Roter sider, tosiders oppslag og en fullskjerms presentasjonsmodus
-• Innholdsfortegnelse, miniatyrer, bokmerker og søk som markerer alle treff på siden mens du leter (skill store/små, helord)
-• Husker leseposisjon og nylige filer; museknappene på siden går fram og tilbake i navigasjonshistorikken
-• Å gå til biblioteket lukker ingenting: dokumentene forblir åpne, og ett klikk tar deg tilbake nøyaktig dit du var
-• Alle hurtigtaster står i ett kart og kan bindes om eller tilbakestilles
-• Åpner PDF-er rett fra Utforsker, med en «Nylig»-hurtigliste på oppgavelinjen
+• Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
+• Dag-, Sepia- og to Natt-temaer, med kontrast og lysstyrke justerbar per tema
+• Siderotasjon, tosiders oppslag og fullskjerms presentasjonsmodus
+• Innholdsfortegnelse, miniatyrer, bokmerker og søk med skill store/små og helord
+• Leseposisjon og nylige filer huskes; fram/tilbake-navigasjon etter fulgte interne lenker
+• Å gå til biblioteket lukker ingenting: dokumentene forblir åpne, og du kommer tilbake dit du var
+• Hurtigtastene står i ett kart og kan bindes om eller tilbakestilles
+• Åpner PDF-er fra Utforsker, med en «Nylig»-liste på oppgavelinjen
 
 DELT VISNING
-• To kolonner av samme dokument, hver med egen side, zoom og rotasjon — hold en figur eller en liggende tabell framme mens du leser teksten om den
-• Annoter i begge kolonner; det er ett dokument, så et merke vises i begge idet du lager det
-• Ctrl+klikk en intern lenke for å åpne målet i den andre kolonnen, mens siden du står på blir stående
-• To vinduer på samme fil virker også: de deler ett utkast og synkroniseres mens du annoterer
+• To kolonner av samme dokument, hver med egen side, zoom og rotasjon — en tabell eller figur kan stå framme ved siden av teksten som omtaler den
+• Merknader satt i én kolonne vises i begge; to vinduer på samme fil holdes også synkronisert
+• Ctrl+klikk på en intern lenke åpner målet i den andre kolonnen
 
 ANNOTERING
-• Merk et avsnitt, og menyen kommer til deg — utheving, understreking, en kommentar eller et notat, uten en tur innom verktøylinja
-• Et Notater-panel holder hvert merke ett klikk unna: gruppert per side, søkbart, filtrert på farge og type, og ett klikk tar deg til merket. Kommentarene redigeres rett i lista
-• Kommentarer i margen: én bryter viser hvert notat og hver kommentar som synlig tekst ved siden av siden — venstre eller høyre — med en strek til avsnittet den hører til
-• Eksporter en kopi med kommentarene satt i en ekte, bredere marg, nummerert ved ankrene — klar til utskrift, originalen urørt
-• De samme verktøyene ligger i verktøylinja når du skal merke flere avsnitt på rad, og linja kan løsnes når du bare vil ha siden
-• Utheving, understreking, gjennomstreking og en ekte bølget strek, i dine egne farger
-• Penn og tusj med hold-for-å-rette, former, gule lapper og fritekst i farge og størrelse du velger
-• Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykket varierer streken (beta), og den lagrede filen beholder den varierende bredden
-• Tekstverktøyet skriver i PDF-ens egne skrifter — Helvetica, Times eller Courier, fet og kursiv — så ordene forblir ekte, søkbar tekst i enhver leser
-• Signer uten å forlate appen: tegn signaturen din én gang og stemple den inn der den trengs. Den blir på maskinen din og lagres i filen som en standard stempel-merknad (å plassere en signatur er ikke det samme som å signere digitalt)
-• Passordbeskyttede dokumenter åpnes: skriv passordet og les, marker og lagre som vanlig — filen forblir beskyttet
-• Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
-• Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving, eller i hjørnet av en form, tekstboks eller tegning
-• Kommentarer forankret til teksten de merker
-• Eksporter en oppsummering av alle merker — den uthevede teksten inkludert — til Word, Markdown eller HTML
-• Et valgfritt navn i innstillingene signerer nye merknader — det standard forfatterfeltet andre lesere viser
-• Standard PDF-annoteringer som åpnes riktig i Acrobat og alle andre lesere — ikke flate bilder
-• En lagringsvakt som varsler før den overskriver en fil et annet program har endret, og «lagre en kopi» som fortsetter i kopien
+Å merke tekst åpner annoteringsmenyen ved merkingen; hvert merke listes i et panel ved siden av dokumentet.
+• Utheving, understreking, gjennomstreking og bølget strek; penn og tusj med hold-for-å-rette; former, gule lapper, fritekst og tekstforankrede kommentarer
+• Notatpanelet lister hvert merke per side, med søk og filtre; kommentarer redigeres direkte i lista; en oppsummering eksporteres til Word, Markdown eller HTML
+• Kommentarer i margen: notater vist som synlig tekst ved siden av siden, og en eksport som setter dem i en utvidet marg, nummerert ved ankrene — originalen urørt
+• Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykk varierer strekbredden (beta) og bevares i den lagrede filen
+• Tekstverktøyet bruker PDF-ens standardskrifter — Helvetica, Times eller Courier, fet og kursiv — så teksten forblir søkbar i enhver leser
+• Signaturen tegnes én gang — eller legges til som bilde — og stemples inn der den trengs. Den lagres lokalt (å plassere en signatur er ikke det samme som å signere digitalt)
+• Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
+• Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes; eksisterende merker kan justeres i stedet for å tegnes på nytt
+• Et valgfritt navn i innstillingene fyller PDF-ens standard forfatterfelt på nye merknader
+• Endringer holdes i et utkast til du lagrer; det som lagres er standard PDF-annoteringer, som åpnes riktig i Acrobat og andre lesere
 
 AI-ASSISTENT (valgfri — egen nøkkel)
-• Still spørsmål om dokumentet du har åpent; hvert svar lenker til avsnittet det kom fra
-• Strukturerte artikkelsammendrag; forklar, forenkle, kritiser, definer eller spør om merket tekst
-• Klipp ut en figur eller et område og be assistenten forklare det
-• Søk etter mening: beskriv et tema med dine egne ord og få avsnittene som handler om det, rangert og klikkbare
-• En skannet PDF — bilder av ord, uten tekst å søke i — sies det fra om i stedet for å svares på i blinde; legg ved et sideutvalg, så leser assistenten de sidene som bilder
-• LaTeX/TeX vises riktig i svar, så matematikk holder seg lesbar
-• Valgfritt nettsøk, av som standard: lukket, på forespørsel, eller alltid på
-• Åtte leverandører, ett nøkkelfelt hver: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — pluss et hvilket som helst OpenAI-kompatibelt endepunkt og lokale modeller via Ollama eller LM Studio (uten nøkkel). Dokumentet forlater maskinen bare når du stiller et spørsmål, og går rett til leverandøren du valgte, under din nøkkel og deres vilkår; med en lokal modell forlater det aldri maskinen. PDF Scholar kjører ingen egen server.
+• Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
+• Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
+• En figur eller et område kan klippes inn i samtalen og spørres om
+• Semantisk søk: beskriv et tema med egne ord og få avsnittene som omtaler det
+• Skannede dokumenter identifiseres som det; et sideutvalg kan legges ved som bilder som assistenten leser
+• LaTeX i svar gjengis; valgfritt nettsøk, av som standard
+• Leverandører: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — ett nøkkelfelt hver — pluss et hvilket som helst OpenAI-kompatibelt endepunkt og lokale modeller via Ollama eller LM Studio (uten nøkkel). Forespørslene går rett til leverandøren; med en lokal modell forlater dokumentet aldri maskinen. PDF Scholar driver ingen egen server.
 
 Kildekode: https://github.com/emilmsh/pdf-scholar
 ```
@@ -185,49 +167,37 @@ else, so each gets its own description, features and release notes.
 
 **EN:**
 ```
-PDF reader and annotator for Windows, for reading long documents
-Smooth scrolling and pinch zoom that stays where you release it
-Day, Sepia and two Night themes for long reading sessions
-Two-page spread, page rotation and full-screen presentation mode
+PDF reader and annotator for Windows, for long documents: articles, reports, books
+Day, Sepia and two Night themes, adjustable per theme
 Split view: two columns of one document, each with its own page, zoom and rotation
-Annotate in both columns at once, or in two windows on the same file
-Select text and the annotation menu comes to you — no trip to the toolbar and back
-Notes panel that keeps every mark one click away — comments edit right in the list
-Comments in the margin: notes as visible text beside the page, left or right
-Export a print-ready copy with the comments in a real widened margin, numbered at their anchors
-Highlight, underline, strikeout and true-wave squiggly, in your own colours
-Pressure-sensitive pen (beta) and marker, shapes, sticky notes, free text and text-anchored comments
-Colour, thickness and opacity per tool, remembered between sessions
-Correct a mark instead of redrawing it: drag a highlight's end or a shape's corner
-Standard PDF annotations that open correctly in Acrobat
-Optional AI assistant that links every answer to the passage it came from
-Snip a figure and ask the assistant to explain it; LaTeX renders in answers
-Bring your own AI key — or run a local model via Ollama/LM Studio, no key at all
-Native x64 and arm64; the Store keeps it updated automatically
+Selecting text opens the annotation menu at the selection
+A notes panel lists every mark, with search, filters and export to Word, Markdown or HTML
+Comments in the margin, and a print-ready export with the comments set in a widened margin
+Highlight, underline, strikeout, squiggly, pen, marker, shapes, notes and free text
+Pressure-sensitive pen (beta); the pen draws while a finger scrolls
+Existing marks can be adjusted rather than redrawn
+Standard PDF annotations that open correctly in Acrobat and other viewers
+Optional AI assistant that cites the passage each answer came from
+Bring your own AI key, or run a local model via Ollama/LM Studio with no key
+Native x64 and arm64; the Store keeps the app updated
 Free and open source (MIT) — no account, no tracking, no ads
 ```
 
 **NO:**
 ```
-PDF-leser og -annotator for Windows, for lesing av lange dokumenter
-Jevn rulling og knip-zoom som blir stående der du slipper
-Dag-, Sepia- og to Natt-temaer for lange leseøkter
-Tosiders oppslag, siderotasjon og fullskjerms presentasjonsmodus
+PDF-leser og -annotator for Windows, for lange dokumenter: artikler, rapporter, bøker
+Dag-, Sepia- og to Natt-temaer, justerbare per tema
 Delt visning: to kolonner av ett dokument, hver med egen side, zoom og rotasjon
-Annoter i begge kolonner samtidig, eller i to vinduer på samme fil
-Merk tekst, og annoteringsmenyen kommer til deg — uten en tur innom verktøylinja
-Notater-panel som holder hvert merke ett klikk unna — kommentarene redigeres rett i lista
-Kommentarer i margen: notater som synlig tekst ved siden av siden, venstre eller høyre
-Eksporter en utskriftsklar kopi med kommentarene i en ekte, bredere marg, nummerert ved ankrene
-Utheving, understreking, gjennomstreking og ekte bølget strek, i egne farger
-Trykkfølsom penn (beta) og tusj, former, gule lapper, fritekst og tekstforankrede kommentarer
-Farge, tykkelse og gjennomsiktighet per verktøy, husket mellom økter
-Rett et merke i stedet for å tegne det på nytt: dra i enden av en utheving eller hjørnet av en form
-Standard PDF-annoteringer som åpnes riktig i Acrobat
-Valgfri AI-assistent som lenker hvert svar til avsnittet det kom fra
-Klipp ut en figur og be assistenten forklare den; LaTeX vises i svar
-Bruk din egen AI-nøkkel — eller kjør en lokal modell via Ollama/LM Studio, helt uten nøkkel
-Både x64 og arm64; Store holder appen automatisk oppdatert
+Å merke tekst åpner annoteringsmenyen ved merkingen
+Et notatpanel lister hvert merke, med søk, filtre og eksport til Word, Markdown eller HTML
+Kommentarer i margen, og en utskriftsklar eksport med kommentarene satt i en utvidet marg
+Utheving, understreking, gjennomstreking, bølget strek, penn, tusj, former, notater og fritekst
+Trykkfølsom penn (beta); pennen tegner mens fingeren blar
+Eksisterende merker kan justeres i stedet for å tegnes på nytt
+Standard PDF-annoteringer som åpnes riktig i Acrobat og andre lesere
+Valgfri AI-assistent som viser hvilket avsnitt hvert svar kom fra
+Bruk din egen AI-nøkkel, eller kjør en lokal modell via Ollama/LM Studio uten nøkkel
+Både x64 og arm64; Store holder appen oppdatert
 Gratis og åpen kildekode (MIT) — ingen konto, ingen sporing, ingen reklame
 ```
 

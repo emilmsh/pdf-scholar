@@ -7,19 +7,17 @@
 <p align="center"><strong>A Windows PDF reader that is nearly all page.</strong></p>
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
-reports, books. One slim toolbar carries the tools you use frequently, the contents and
-assistant panels stay out of the way until you call them, and toggling fullscreen or the
-toolbar is always one click away, leaving the page and nothing else.
+reports, books. One slim toolbar carries the annotation tools, the contents and assistant
+panels stay out of the way until called, and the toolbar itself can be unpinned, leaving
+only the page.
 
-Everything a long document asks of you is here. A page you can stand to look at all day, in
-light, sepia or dark mode. Highlight, pen, shapes and notes, each with its own colour, thickness
-and opacity, remembered between sessions — the menu comes to the text you selected, and every
-mark you make stays one panel away. A second reading pane, so a figure or table can sit beside the
-passage that discusses it. Cross-references you can go to and return from, which is the
-difference between reading a paper and losing your place in one. And an optional AI-assistant
-that answers from the document, cites the sentence it used, explains snapshots of figures and images, 
-and finds the passage you half-remember. Free, MIT-licensed, and offline unless you
-ask a question.
+The reader has four themes for long sessions and reopens every file where you stopped.
+Annotation happens from a menu that opens at the selected text; every mark is listed in a
+panel beside the document, and comments can be laid out in the margin. A split view places
+a figure or table beside the passage that discusses it, and cross-references can be
+followed and returned from. The optional AI assistant answers from the open document and
+cites the passage each claim came from. Free, MIT-licensed, and offline unless you ask a
+question.
 
 Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
 the same reader inside your browser.
@@ -127,36 +125,29 @@ the current desktop-vs-extension parity.
 
 **Reading**
 
-The frame at the top of this page is one window wiped across Day, Sepia and Night — the
-same page, the same moment, three of the four themes. Sepia puts the page on warm ivory
-with a terracotta accent; Night and Night+ are the two dark modes, the second with higher
-contrast for bright text on very dark grey. Beyond the themes:
+The frame at the top of this page is one window shown in three of the four themes — the
+same page, the same moment. Sepia sets the page on warm ivory; Night and Night+ are the
+two dark modes, the second with higher contrast.
 
-- Smooth scrolling, pinch zoom that stays where you release it, one fit button that
-  toggles width ⇄ whole page (W), and zoom presets from 50 % to 400 %. Fit uses the whole
-  window: the page goes edge to edge, with a hair of margin
-- Four themes — Day, Sepia (ivory paper), Night and Night+ (higher contrast) — plus
-  **Auto**, which follows Windows' light/dark setting. Contrast and brightness are
-  adjustable per theme
-- **Rotate pages** (Shift+R or `]` / `[`) and a **two-page spread** for wide layouts
-- **Presentation mode** (P): one page at a time, full screen, and it drops even the tab
-  strip
-- Unpin the toolbar (V) and it hides, taking the side panels with it — what is left is the
-  tab strip and the page. Hover the top edge to bring the toolbar back, the left edge for
-  the table of contents, the right edge for the assistant. Nothing is lost, it is just not
-  in front of you
-- Table of contents, thumbnails, bookmarks (B marks the page you are on), and back/forward
-  navigation (Alt+← / Alt+→) after following internal links
-- Remembers your reading position and recent files; a **library** home screen lists what
-  you have been reading. Going back to it closes nothing: the open documents stay in the
-  tab strip, and clicking one returns you exactly where you were — same page, same zoom,
-  same panels, unsaved marks included
-- Tabs for several open documents, plus multiple windows. **Drag a tab out into its own
-  window** to put two documents side by side, or across the bar to reorder
-- The interface itself is in Norwegian or English, and that setting also controls the AI
-  prompts, exported documents and date formats
-- Every key named above is a default. **Settings → Keyboard shortcuts** lists them all in
-  one map and lets you rebind or reset any of them, one key or all at once
+- Smooth scrolling; zoom centres on the cursor or pinch point; one button toggles
+  fit-width and whole-page (W)
+- Four themes — Day, Sepia, Night and Night+ — plus Auto, which follows Windows'
+  light/dark setting. Contrast and brightness are adjustable per theme
+- Page rotation (Shift+R) and a two-page spread for wide layouts
+- Presentation mode (P): one page at a time, full screen
+- The toolbar can be unpinned (V); the side panels go with it, and each returns on hover
+  at its window edge
+- Table of contents, thumbnails, bookmarks (B), and back/forward navigation
+  (Alt+← / Alt+→, or the mouse side-buttons) after following internal links
+- Reading positions and recent files are remembered; a library home screen lists them.
+  Going back to it closes nothing: open documents stay in the tab strip, and returning
+  to one restores the page, zoom and panels
+- Several documents open in tabs or separate windows; a tab can be dragged out into its
+  own window, or along the bar to reorder
+- The interface is in Norwegian or English; the choice also applies to the AI prompts,
+  exports and date formats
+- Every key named above is a default: Settings → Keyboard shortcuts lists all of them in
+  one map, and any can be rebound or reset
 
 ![The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another](docs/screenshots/shortcuts.png)
 
@@ -164,163 +155,104 @@ contrast for bright text on very dark grey. Beyond the themes:
 
 ![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)
 
-Research papers and reports often ask you to hold two pages in your head at the same
-time — for example, a table or figure on one, the relevant text somewhere else. Press
-**S** and you get both.
+Papers often require two pages at once — a table or figure on one, the text that
+discusses it on another. S opens a second column of the same document.
 
-- **Two columns of the same document**, each with its own page and its own zoom. Keep a
-  figure or a table in view while you read the passage that discusses it
-- Both columns are equals. The toolbar's centre gains a column switcher showing both
-  columns' page numbers — the active one solid — and its page + zoom controls drive that
-  column; click the other number (or the column itself) to move over. You can annotate,
-  erase and undo in either one; it is a single document, so a mark shows up in both
-  columns as you make it
-- **Rotation is per column**, so a landscape-printed table can sit upright beside
-  portrait text
-- **Ctrl+click an internal link to open the target in the other column**, keeping the
-  page you are on. It opens the split first if it is closed. A plain click follows the
-  link in place. External links always open in your browser, where the modifier does
-  nothing
-- Search, the outline, the notes list and the assistant's citation chips all move the
-  active column and leave the other alone. Back/forward history is per column as well
-- Drag the divider to rebalance (double-click it for an even split); both columns re-fit
-  as you drag. Opening the contents or assistant panel narrows both columns in proportion,
-  so the balance you set survives it. The ✕ beside the zoom closes the active column and
-  keeps the other's content
-- **S remembers the column you closed** — its page, the exact spot on it, its zoom, its
-  rotation and the width you gave it. Park a figure on the right, toggle it away to read
-  in peace, toggle it back: it returns framed exactly as you left it. Closing the *left*
-  column instead moves the right one's view over, and starts the next split fresh
-- **Two windows on the same file also work**: they share one draft and sync as you
-  annotate, and a Save from either window writes each mark exactly once
+- Each column has its own page, zoom and rotation, so a landscape-printed table can sit
+  upright beside portrait text
+- The toolbar's page and zoom controls drive the active column. Annotation, eraser and
+  undo work in either column, and a mark made in one appears in both
+- Ctrl+click on an internal link opens its target in the other column, keeping the
+  current page. Search, the outline, the notes list and the assistant's citations move
+  only the active column, and back/forward history is per column
+- The divider can be dragged to rebalance; a closed column's page, zoom and width are
+  restored when the split is reopened
+- Two windows on the same file are also possible: they share one draft and stay in sync
+  as you annotate
 
 **Annotation**
 
 ![A highlight, an underline, a box around a paragraph and a sticky note on the same page, with the selection menu open beside the text it acts on](docs/screenshots/annotations.png)
 
-Marking up a paper should not interrupt reading it. The tools come to the text you
-selected, what you have marked is one panel away, and neither the tools nor the marks
-clutter the page while you read.
+The tools appear at the text you select, and everything you have marked is listed in a
+panel beside the document.
 
-- **Select text and the menu comes to you**: highlight, underline, strikeout and squiggly
-  in one row each, a comment or a note, copy, dictionary, translate — and the assistant's
-  actions on exactly what you selected. The toolbar carries the same tools for when you
-  want to mark several passages in a row, and unpins entirely (V) when you want nothing
-  but the page
-- **Notes tab**: every annotation grouped by page, with search plus colour, type and
-  with/without-comment filters. Comments edit right in the list — even on a mark that has
-  none yet — and a click takes you to the mark. Export a summary — including the
-  highlighted text itself — to Word, Markdown or HTML. Clearing them all is one confirmed
-  step, and one Ctrl+Z brings the lot back
-- **Comments in the margin**: flip one switch and every note and comment becomes an
-  always-visible card beside the page — left or right margin, your choice — colour-keyed
-  to its mark, with a leader line to the passage it belongs to. When no comment is in
-  view, quiet arrows fetch the nearest one above or below
-- **Export with comments in the margin**: a copy of the document with every page widened
-  and the comments set in the new margin as real PDF annotations — a small numbered chip
-  at each anchor ties text to comment on paper, so the printout reads like a corrected
-  manuscript. The original file is untouched
+- Selecting text opens the annotation menu: highlight, underline, strikeout and squiggly,
+  a comment or a note, copy, dictionary, translate, and the assistant's actions on the
+  selection. The toolbar carries the same tools for marking several passages in a row
+- The notes panel lists every annotation by page, with search and colour, type and
+  comment filters. Comments are edited directly in the list, and a click goes to the
+  mark. A summary — highlighted text included — exports to Word, Markdown or HTML
+- Comments in the margin: one switch lays every note and comment out as a visible card
+  beside the page — left or right — colour-keyed to its mark, with a leader line to the
+  passage it belongs to
+- Margin export: a copy of the document with every page widened and the comments set in
+  the new margin as ordinary PDF annotations, numbered at their anchors. The original
+  file is untouched
 
 ![The margin view: two comments as visible cards on a tinted strip beside the page, colour-keyed to the marks they belong to](docs/screenshots/margin.png)
-- Labeled colour rows and custom hex colours
-- Pen and marker with hold-to-straighten: hold still mid-stroke and the line snaps
-  straight
-- On a touch screen with a stylus, the pen draws while a finger scrolls and
-  zooms; pen pressure varies the line *(beta)*, and the saved file keeps the
-  varying width — other readers render it the same. A toggle in the tool menus
-  hands drawing back to the finger
-- **The text tool writes in the PDF's own typefaces** — Helvetica, Times or
-  Courier, bold and italic, picked before you type or changed afterwards on a box
-  that already exists, so a paragraph set in the wrong face is re-set rather than
-  retyped. Nothing is embedded, so the words stay real, searchable text and look the
-  same in every reader
-- **Sign without leaving the app**: draw your signature once — with a mouse, a
-  pen or a finger — and stamp it wherever it is needed, on any document. It is
-  kept on your machine, never uploaded, and lands in the file as a standard
-  stamp annotation. *Placing a signature is not the same as digitally signing a
-  document.* Where a document already carries digital signatures the app says
-  so, and says plainly that it does not check whether they are valid
-- **Password-protected documents open**: type the password and read, mark up
-  and save as normal — the file stays protected. Printing one is the exception,
-  and the app says so
-- **Colour, thickness and opacity per tool**, remembered between sessions. A «Standard»
-  link appears next to any tool you have changed from its default
+- Pen and marker with hold-to-straighten: holding still mid-stroke straightens the line
 - Shapes (rectangle, ellipse, line, arrow), draggable sticky notes, and free text typed
-  directly on the page — in the colour and size you pick, red teacher's pen included, and
-  the box can never be shrunk below its own words
-- An optional name in the settings signs new annotations — the standard PDF author field
-  other readers show. Left empty, your marks stay unsigned
-- An eraser that removes whole strokes, and can be set to remove every kind of
-  annotation instead
-- Click any annotation to select it, drag to move it, and add a comment to it. Full
-  undo/redo (Ctrl+Z / Ctrl+Shift+Z)
-- Selected marks can be adjusted rather than redrawn: drag either end of a highlight to
-  cover more or less text (it snaps to whole words), or a corner of a shape, text box or
-  drawing to resize it
-- Comment and note bubbles can be dragged **and resized** — pull the corner for a long
-  note, double-click the grip to restore the default size
-- **The selection menu drags aside too**, by the grip along its top: it is the tallest
-  popup in the app, and seeing what is under it should not cost you the selection
-- **The file is only written when you save it.** Edits go to a draft until you press
-  Save (Ctrl+S); closing prompts you, and unsaved work survives a crash. What lands in
-  the file is standard PDF annotations with appearance streams, so it reads the same in
-  Acrobat, SumatraPDF and anywhere else it goes
-- Preferences reset to their defaults, per tool or all at once from the settings menu
-  (with a confirmation; API keys, library and annotations are left untouched)
+  directly on the page, in the colour and size you pick
+- On a touch screen with a stylus, the pen draws while a finger scrolls and zooms; pen
+  pressure varies the line width *(beta)* and is preserved in the saved file. A toggle
+  in the tool menus hands drawing back to the finger
+- The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold
+  and italic — chosen before typing or changed on an existing box. Nothing is embedded;
+  the text remains searchable and renders identically in other readers
+- A signature can be drawn once — with a mouse, pen or finger — or uploaded or pasted as
+  an image, and stamped where needed. It is stored locally and saved as a standard stamp
+  annotation. *Placing a signature is not the same as digitally signing a document.*
+  Where a file already carries digital signatures, the app lists them and does not claim
+  to verify them
+- Password-protected documents open, can be annotated, and are saved with their
+  protection intact
+- Colour, thickness and opacity are set per tool and remembered between sessions
+- An optional name in settings fills the standard PDF author field on new annotations;
+  left empty, they stay unsigned
+- An eraser removes whole strokes, or can be set to remove any kind of annotation
+- Any mark can be selected, moved, commented on, and adjusted rather than redrawn: the
+  ends of a highlight (snapping to whole words), or a corner of a shape, text box or
+  drawing. Undo and redo cover everything (Ctrl+Z / Ctrl+Shift+Z)
+- Edits are held in a draft until you save (Ctrl+S); closing prompts, and the draft
+  survives a crash. What is saved is standard PDF annotations with appearance streams,
+  which open correctly in other readers. A guard warns before overwriting a file another
+  program has changed
 
 **Search & the web**
-- In-document search (Ctrl+F): match case, whole word (Norwegian æøå-safe), a results
-  list with excerpts, jump-to-hit, F3 / Shift+F3. Every match on the page is marked
-  quietly while you search, with the one you are on kept loud, and the last ten searches
-  are offered when the field is empty
-- **AI search**: describe a topic in your own words and get the passages that discuss it,
-  ranked and clickable (uses your own API key, like the assistant)
-- Selection menu: copy, search the web, dictionary, translate, and the AI actions below
+- In-document search (Ctrl+F): match case, whole word, a results list with excerpts, and
+  F3 / Shift+F3 between hits. Every match on the page is marked while you search
+- Semantic search: describe a topic in your own words and get the passages that discuss
+  it, ranked (uses your own API key, like the assistant)
+- The selection menu also offers copy, web search, dictionary and translation
 
 **AI assistant (bring your own key)**
 
 ![The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip](docs/screenshots/assistant.png)
 
-The assistant answers from the document you have open, and every claim it makes carries a
-source chip. Click one and you land on the sentence the claim came from, so you can check
-the answer rather than take it on trust.
+The assistant answers from the document you have open, and each claim carries a source
+reference. Following one goes to the sentence the claim came from.
 
-- Ask about a dense passage ("explain this simply", "what does this term mean here?").
-  The chip reads as a page number ("s. 12"), the jump highlights the sentence itself, as
-  in the picture above, and getting back is one click on the pill in the corner
-- Structured article summaries (research question / method / data / findings /
-  limitations)
-- Ask about your own annotations: "summarize what I've highlighted"
-- Context-menu actions on any selection: explain, simplify, critique ("what would a
-  referee ask?"), look up a cited reference, find similar passages, or ask your own
-  question
-- **Explain a figure**: drag a box around a chart, diagram or table and the region lands
-  in the chat as an attachment you can add a question to — nothing is sent until you do.
-  The answer describes what is actually in the crop, and cites the pages it draws on. You
-  can paste or attach images the same way
-- **Scanned documents**: a PDF that is pictures of words has no text to search, and the
-  assistant says so instead of answering about nothing. Pick a page range and those pages
-  are attached as images for it to read — the chip names which ones, and it is told it can
-  see only those
-- **Optional web search**, off by default: closed, on request, or always on (Anthropic
-  and OpenAI keys). LaTeX in answers renders properly, so maths stays readable
-- Providers: Anthropic (Claude, with native citations), OpenAI, Azure OpenAI — or any
-  OpenAI-compatible endpoint, including local models via Ollama or LM Studio (no key
-  needed) — one model list across them all, with per-model reasoning-effort control.
-  Your key goes to the provider you picked and nowhere else — there is no server of ours
-  in between — and the document leaves your machine only when you ask a question. With
-  a local model, even your questions stay on your own machine
-- **Using an OpenRouter, Gemini, Grok, Mistral or Groq key**: open the assistant
-  settings, paste the key next to that service's name, and save — every provider
-  has its own key field, entered once. Each keyed provider's models are fetched
-  live and appear in the model menu, one click apart, so switching between (say)
-  a Gemini model and an OpenRouter model happens mid-chat. Big lists are
-  sectioned by vendor, with a filter field when needed. For a local model, start
-  Ollama or LM Studio and use *Custom / local* — no key at all, and a running
-  Ollama is detected and offered with one click
-- **Cost stays visible**: each answer shows the tokens the provider counted, and the key
-  settings link straight to your provider's console, where you set a spending cap and see
-  what you have spent
+- Questions about a passage ("explain this simply", "what does this term mean here?"),
+  or a structured article summary: research question, method, data, findings,
+  limitations
+- Questions about your own annotations: "summarize what I've highlighted"
+- Context-menu actions on any selection: explain, simplify, critique, look up a cited
+  reference, or a free-form question
+- Explain a figure: a region dragged around a chart or table lands in the chat as an
+  attachment, and nothing is sent until you add a question. Images can be pasted or
+  attached the same way
+- A scanned PDF has no text layer, and the assistant reports that instead of guessing;
+  a page range can be attached as images for it to read
+- Optional web search, off by default: closed, on request, or always on (Anthropic and
+  OpenAI keys). LaTeX in answers is rendered
+- Providers: Anthropic (Claude, with native citations), OpenAI, Azure OpenAI,
+  OpenRouter, Google Gemini, Grok (xAI), Mistral and Groq — one key field each, entered
+  once — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio,
+  which need no key. Model lists are fetched live and appear in one menu; requests go
+  directly to the provider, with no server in between
+- Each answer reports the token count the provider billed, and the key settings link to
+  the provider's console, where a spending cap can be set
 
 ![Dragging a box around a figure — the crop tool while you are using it](docs/screenshots/assistant_snip.png)
 
