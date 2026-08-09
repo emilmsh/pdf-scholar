@@ -6302,7 +6302,10 @@ html.touch-ui .keys-reset-one {
   display: flex;
   flex-direction: column;
   width: min(1180px, calc(100vw - 48px));
-  max-height: min(880px, calc(100vh - 48px));
+  /* 32px of inset, not 48: at 1280x800 — an ordinary laptop — the plate was
+     seven pixels from fitting, and a modal that is nearly the whole point of
+     "see it all at once" should not scroll over seven pixels. */
+  max-height: min(880px, calc(100vh - 32px));
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -6423,15 +6426,34 @@ html.touch-ui .keys-reset-one {
   color: var(--text-secondary);
 }
 
+/* A long category MAY run over into the next column (Emil, 2026-08-09) — with
+   nine groups of very unequal size, forbidding it left column one setting the
+   height and the other two ending early. The condition was that the heading
+   divisions stay clear, which is what the rest of this block buys:
+
+     * every category START carries a hairline above it. Default
+       box-decoration-break slices, so the rule is drawn on the FIRST fragment
+       only — which means no rule is itself the signal that these rows are the
+       continuation of the category overleaf, rather than a new one.
+     * a heading is never left alone at the foot of a column (break-after on
+       the title), because a title with its list overleaf is the one split
+       that genuinely misleads.
+     * a single row never splits down the middle. */
 .keys-group {
   padding-top: 10px;
-  /* A category must never be split down a column boundary — half of «Zoom» at
-     the foot of one column and the rest at the head of the next is worse than
-     the single column we started from. */
-  break-inside: avoid;
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
 }
 
+/* The first category needs no rule: nothing sits above it to divide from. */
+.keys-group:first-child {
+  margin-top: 0;
+  border-top: none;
+}
+
+
 .keys-group-title {
+  break-after: avoid;
   margin: 0 0 2px;
   font-size: 11px;
   font-weight: 600;
@@ -6443,6 +6465,8 @@ html.touch-ui .keys-reset-one {
 /* One command. The binding column is right-aligned so every key chip lines up
    down the dialog — a map you can scan, not a list you have to read. */
 .keys-row {
+  /* No row splits down the middle of a column break */
+  break-inside: avoid;
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
