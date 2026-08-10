@@ -7,17 +7,17 @@
 <p align="center"><strong>A Windows PDF reader for research.</strong></p>
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
-reports, books. One slim toolbar carries the annotation tools, the contents and assistant
-panels stay out of the way until called, and the toolbar itself can be unpinned, leaving
-only the page.
+reports, books. The window is nearly all page — one slim toolbar carries the tools, the
+contents and assistant panels stay out of the way until called, and the toolbar itself
+can be unpinned, leaving only the page.
 
-The reader has four themes for long sessions and reopens every file where you stopped.
-Annotation happens from a menu that opens at the selected text; every mark is listed in a
-panel beside the document, and comments can be laid out in the margin. A split view places
-a figure or table beside the passage that discusses it, and cross-references can be
-followed and returned from. The optional AI assistant answers from the open document and
-cites the passage each claim came from. Free, MIT-licensed, and offline unless you ask a
-question.
+There are four reading themes, and every file reopens where you stopped. Annotation
+happens from a menu that opens at the selected text; every mark is listed in a panel
+beside the document, and comments can be laid out in the margin — or exported into one.
+A split view places a figure or table beside the passage that discusses it, and
+cross-references can be followed and returned from. The optional AI assistant answers
+from the open document and cites the passage each claim came from. Free, MIT-licensed,
+and offline unless you ask a question.
 
 Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
 the same reader inside your browser.
@@ -123,7 +123,7 @@ the current desktop-vs-extension parity.
 
 ## Features
 
-**Reading**
+### Undistracted reading
 
 The frame at the top of this page is one window shown in three of the four themes — the
 same page, the same moment. Sepia sets the page on warm ivory; Night and Night+ are the
@@ -147,12 +147,12 @@ two dark modes, the second with higher contrast.
 - The interface is in Norwegian or English; the choice also applies to the AI prompts,
   exports and date formats
 
-**Split view**
+### Two pages at once
 
 ![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)
 
-Papers often require two pages at once — a table or figure on one, the text that
-discusses it on another. S opens a second column of the same document.
+A table or figure often sits on one page and the text that discusses it on another. S
+opens a second column of the same document.
 
 - Each column has its own page, zoom and rotation, so a landscape-printed table can sit
   upright beside portrait text
@@ -166,7 +166,7 @@ discusses it on another. S opens a second column of the same document.
 - Two windows on the same file are also possible: they share one draft and stay in sync
   as you annotate
 
-**Annotation**
+### Annotating while you read
 
 ![A highlight, an underline, a box around a paragraph and a sticky note on the same page, with the selection menu open beside the text it acts on](docs/screenshots/annotations.png)
 
@@ -215,19 +215,20 @@ panel beside the document.
   which open correctly in other readers. A guard warns before overwriting a file another
   program has changed
 
-**Search & the web**
+### Search by words or by meaning
 - In-document search (Ctrl+F): match case, whole word, a results list with excerpts, and
   F3 / Shift+F3 between hits. Every match on the page is marked while you search
 - Semantic search: describe a topic in your own words and get the passages that discuss
   it, ranked (uses your own API key, like the assistant)
 - The selection menu also offers copy, web search, dictionary and translation
 
-**AI assistant (bring your own key)**
+### An assistant that cites its sources
 
 ![The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip](docs/screenshots/assistant.png)
 
-The assistant answers from the document you have open, and each claim carries a source
-reference. Following one goes to the sentence the claim came from.
+Optional, and it runs on your own API key. The assistant answers from the document you
+have open, and each claim carries a source reference; following one goes to the sentence
+the claim came from.
 
 - Questions about a passage ("explain this simply", "what does this term mean here?"),
   or a structured article summary: research question, method, data, findings,
@@ -254,7 +255,7 @@ reference. Following one goes to the sentence the claim came from.
 
 ![Explain a figure — the region you marked sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
 
-**Keyboard shortcuts**
+### Shortcuts you can rebind
 
 Every command is listed in one map — Settings → Keyboard shortcuts — grouped by task,
 with its keys beside it. Any shortcut can be rebound or reset, one key or all at once;
@@ -262,7 +263,12 @@ the keys named in this README are the defaults.
 
 ![The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another](docs/screenshots/shortcuts.png)
 
-**Where your key is kept**
+### Local by default
+
+Reading, annotating and saving are entirely local; the app runs without network access.
+When you do use the assistant, the request goes directly to the provider you chose, under
+your key and that provider's terms — there is no intermediary server, and with a local
+model (Ollama, LM Studio) even your questions stay on the machine.
 
 You paste the key once, in the assistant's settings, and it goes into the platform's key
 store: DPAPI on Windows, Keychain on macOS, the system keyring on Linux. The browser
