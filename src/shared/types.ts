@@ -527,6 +527,11 @@ export interface AiChatRequest {
   /** Web-search mode (server-side provider tool). Only honored by providers
    *  that support it (Anthropic, OpenAI); others ignore it. Absent = 'off'. */
   webSearch?: AiWebSearchMode
+  /** What the request is for, when it is not the chat panel. No provider ever
+   *  sees this — it exists so the screenshot fixture layer (src/main/ai.ts)
+   *  can tell a semantic-search request from a chat question; the two are
+   *  otherwise the same shape (text-only, one user message). */
+  purpose?: 'search'
 }
 
 /** Normalized citation. 'char' = offsets into the document text we sent

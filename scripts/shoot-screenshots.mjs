@@ -361,6 +361,24 @@ const SHOTS = [
     `
   },
   {
+    // The «by meaning» half, and the reason the search section exists at all:
+    // the query is phrased in words the paper never uses, and the hits are the
+    // passages that answer it — the first one followed, so the page shows the
+    // flashed sentence beside the list that named it. Keyless runs replay
+    // docs/ai-fixtures/search.json, like the assistant frames; the flash
+    // animation runs 7 s, so the short settle photographs it mid-glow rather
+    // than waiting for the nav pill and losing the flash.
+    name: 'search_ai',
+    caption: 'AI search: a plain-words query, ranked passages, the first one flashed on the page',
+    needsAi: true,
+    setup: `
+      await ui.closePanels()
+      await ui.fitWidth()
+      await ui.openAiSearch('How does the model know the order of the words?')
+      await ui.settle(1200)
+    `
+  },
+  {
     // Deliberately NOT an opening frame anywhere: a settings dialog is a thing
     // you go and find, not what an app looks like (Emil, 2026-08-09). It earns
     // a place late in a page, beside the sentence about rebinding keys.
@@ -513,6 +531,8 @@ const L = {
   pin: ['Fest verktøylinjen', 'Pin the toolbar'],
   more: ['Flere verktøy', 'More tools'],
   search: ['Søk i dokumentet', 'Search the document'],
+  // The AI tab in the search bar carries its label as TEXT ("✦ AI" / "✦ KI").
+  searchAi: ['AI', 'KI'],
   settings: ['Innstillinger', 'Settings'],
   keysOpen: ['Hurtigtaster', 'Keyboard shortcuts'],
   // Sidebar tabs carry their label as TEXT and no title — addressed by content.
@@ -690,6 +710,41 @@ const ui = {
     await settle(900);
     if (!document.querySelector('.search-hit')) {
       throw new Error('no marked hits on the page after jumping to the first result');
+    }
+  },
+  /** The «by meaning» half: switch the search bar to its AI tab and run a
+   *  query phrased in plain words — the point of the mode is that the words
+   *  do NOT have to appear in the paper. Waits for ranked hits (a real call
+   *  takes seconds, a replayed one is quick — poll, don't guess), then
+   *  follows the first one so the passage it names is flashed on the page. */
+  async openAiSearch(query) {
+    const b = btn(L.search);
+    if (!b) throw new Error('no search button on the toolbar');
+    if (!document.querySelector('.search-bar')) { click(b); await settle(450); }
+    const tab = [...document.querySelectorAll('.search-mode-btn')]
+      .find((el) => L.searchAi.some((n) => (el.textContent || '').includes(n)));
+    if (!tab) throw new Error('no AI tab in the search bar');
+    click(tab);
+    await settle(300);
+    const input = document.querySelector('.search-bar input');
+    if (!input) throw new Error('the search bar lost its input after the tab switch');
+    input.focus();
+    await settle(80);
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, query);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(200);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    for (let i = 0; i < 120; i++) {
+      if (document.querySelector('.search-results .search-result')) break;
+      await settle(500);
+    }
+    const row = document.querySelector('.search-results .search-result');
+    if (!row) throw new Error('the AI search returned no hits — is docs/ai-fixtures/search.json recorded?');
+    click(row);
+    await settle(900);
+    if (!document.querySelector('.search-hit.cite-flash')) {
+      throw new Error('following the first hit did not flash a passage on the page');
     }
   },
   /** Open the keyboard map the way a reader reaches it: the gear, then its
@@ -1999,7 +2054,9 @@ const record = args.includes('--record')
  *  and --with-ai --record refreshes what is replayed. */
 const FIXTURE_DIR = join(ROOT, 'docs', 'ai-fixtures')
 const haveFixtures =
-  existsSync(join(FIXTURE_DIR, 'answer.json')) && existsSync(join(FIXTURE_DIR, 'figure.json'))
+  existsSync(join(FIXTURE_DIR, 'answer.json')) &&
+  existsSync(join(FIXTURE_DIR, 'figure.json')) &&
+  existsSync(join(FIXTURE_DIR, 'search.json'))
 // Default output is the gitignored _auto/ folder, so a run can never clobber the
 // hand-taken set the README and the stores ship. --out is the explicit override.
 const outFlag = args.indexOf('--out')

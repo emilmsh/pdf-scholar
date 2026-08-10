@@ -1,0 +1,82 @@
+{
+  "ok": true,
+  "parts": [
+    {
+      "text": "1. Word order is supplied explicitly because attention alone lacks recurrence and convolution.",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "we must inject some information about the relative or absolute position of the tokens in the sequence"
+        }
+      ]
+    },
+    {
+      "text": "\n2. Positional encodings are added directly to encoder and decoder input embeddings.",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "we add \"positional encodings\" to the input embeddings at the bottoms of the encoder and decoder stacks"
+        }
+      ]
+    },
+    {
+      "text": "\n3. Each position receives a pattern of sine and cosine signals at different frequencies.",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "In this work, we use sine and cosine functions of different frequencies"
+        }
+      ]
+    },
+    {
+      "text": "\n4. Sinusoidal encodings were chosen to help attention learn relative positions.",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "We chose this function because we hypothesized it would allow the model to easily learn to attend by relative positions"
+        }
+      ]
+    },
+    {
+      "text": "\n5. Learned positional embeddings worked nearly as well as fixed sinusoidal encodings.",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 6,
+          "quote": "We also experimented with using learned positional embeddings [9] instead, and found that the two versions produced nearly identical results"
+        }
+      ]
+    },
+    {
+      "text": "\n6. Decoder masking preserves output order by blocking attention to future positions.",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 3,
+          "quote": "We also modify the self-attention sub-layer in the decoder stack to prevent positions from attending to subsequent positions"
+        }
+      ]
+    },
+    {
+      "text": "\n7. Masking and shifted embeddings restrict each prediction to earlier known outputs.",
+      "citations": [
+        {
+          "kind": "quote",
+          "pageNumber": 3,
+          "quote": "predictions for position i can depend only on the known outputs at positions less than i"
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "inputTokens": 10655,
+    "outputTokens": 499,
+    "cacheReadTokens": 0,
+    "cacheWriteTokens": 0
+  },
+  "model": "gpt-5.6-sol"
+}

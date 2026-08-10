@@ -4860,7 +4860,8 @@ export default function PdfViewer({
       requestId,
       system: chatSystem() + (prep.excerpt ? excerptSystemNote() : ''),
       messages: [{ role: 'user', text: semanticSearchPrompt(query) }],
-      document: { title: payload.name, text: prep.doc.text }
+      document: { title: payload.name, text: prep.doc.text },
+      purpose: 'search'
     })
     if (semanticReqRef.current !== requestId) return // superseded/aborted
     semanticReqRef.current = null

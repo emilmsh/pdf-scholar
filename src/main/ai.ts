@@ -54,9 +54,20 @@ const devOnlyDir = (name: string): string | null => {
 }
 
 /** One fixture per kind of request the shoot makes. Keyed by shape, not by the
- *  prompt text, so re-wording a question does not orphan the recording. */
+ *  prompt text, so re-wording a question does not orphan the recording. The
+ *  semantic search is shaped exactly like a chat question, which is why the
+ *  request carries `purpose` at all — without it the replay would hand the
+ *  search the assistant's recorded ANSWER, and the shot would show a results
+ *  list built from the wrong recording. */
 const fixtureFile = (dir: string, req: AiChatRequest): string =>
-  join(dir, req.messages.some((m) => (m.images?.length ?? 0) > 0) ? 'figure.json' : 'answer.json')
+  join(
+    dir,
+    req.messages.some((m) => (m.images?.length ?? 0) > 0)
+      ? 'figure.json'
+      : req.purpose === 'search'
+        ? 'search.json'
+        : 'answer.json'
+  )
 
 function readFixture(req: AiChatRequest): AiChatResult | null {
   const dir = devOnlyDir('PDFX_AI_FIXTURE')
