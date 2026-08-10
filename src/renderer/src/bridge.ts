@@ -12,6 +12,8 @@ import type {
 } from '../../shared/types'
 import { t } from './i18n'
 import { createExtensionApi, isExtensionContext } from './extension-api'
+import { requestAssistantJump, subscribeAssistantJumps } from './assistant-channel'
+import { buildAssistantHash } from '../../shared/viewer-url'
 import { version as appVersion } from '../../../package.json'
 import { DEFAULT_SETTINGS } from '../../shared/defaults'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
@@ -297,7 +299,16 @@ export const webApi: PdfxApi = {
     return () => {
       webAiDeltaListeners.delete(cb)
     }
-  }
+  },
+  // Detached assistant in a plain browser: a second tab carrying #assistant=,
+  // with citation jumps relayed over a BroadcastChannel (assistant-channel.ts).
+  // The receiving tab cannot raise itself here — that is a browser rule, not
+  // ours; the extension layer adds tab activation where chrome.tabs exists.
+  openAssistant: (path) => {
+    window.open(`${location.origin}/#${buildAssistantHash(path)}`, '_blank')
+  },
+  assistantJumpToCitation: (path, target) => requestAssistantJump(path, target),
+  onAssistantJumpRequest: (cb) => subscribeAssistantJumps(cb)
 }
 
 /** Trigger a browser download of PDF bytes (the browser decides folder prompt). */

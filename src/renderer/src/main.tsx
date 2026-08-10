@@ -1,6 +1,8 @@
 import ReactDOM from 'react-dom/client'
 import App from './App'
+import AssistantApp from './AssistantApp'
 import { ErrorBoundary } from './ErrorBoundary'
+import { parseAssistantTarget } from '../../shared/viewer-url'
 import { initTouchUi } from './touch-ui'
 import './styles/app.css'
 
@@ -29,8 +31,11 @@ if (import.meta.env.DEV && !window.api) {
   }
 }
 
+// A window whose URL carries #assistant=<path> hosts the detached assistant
+// for that document instead of the full app (main opens it that way in
+// createAssistantWindow; dev:web via bridge.openAssistant).
+const assistantFor = parseAssistantTarget(location.href)
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
+  <ErrorBoundary>{assistantFor ? <AssistantApp docPath={assistantFor} /> : <App />}</ErrorBoundary>
 )

@@ -37,6 +37,7 @@ import type { AiDocument, PreparedDocument } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import type { PageText } from '../search'
 import { errorText, t, useLang } from '../i18n'
+import { loadAiTextScale } from '../ai-text-scale'
 import { bubblesWhileTyping } from '../keymap'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
@@ -233,11 +234,20 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   // be the only way out (it once sat offscreen and trapped the bubble open)
   useDismissable(popRef, true, onClose)
 
+  // The panel's text-size preference applies here too (the body styles are
+  // shared with .ai-assistant). Read once per popover — it opens and closes
+  // constantly, so it always picks up the latest stored value.
+  const [textScale] = useState(loadAiTextScale)
+
   return (
     <div
       className="ai-quick"
       ref={popRef}
-      style={{ ...(pos ?? { left: state.x, top: state.y, visibility: 'hidden' }), ...quickSizeStyle }}
+      style={{
+        ...(pos ?? { left: state.x, top: state.y, visibility: 'hidden' }),
+        ...quickSizeStyle,
+        ...({ '--ai-scale': textScale } as React.CSSProperties)
+      }}
       onMouseDown={(e) => e.stopPropagation()}
     >
       <div

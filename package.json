@@ -40,6 +40,7 @@
     "test:pen": "node scripts/test-pen.mjs",
     "test:ai-settings": "node scripts/test-ai-settings.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
+    "test:assistant": "node scripts/test-assistant-window.mjs",
     "test:torn-read": "node scripts/test-torn-read.mjs",
     "test:listing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-store-listing.ps1",
     "test:ext-publish": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ext-publish.ps1 -CheckOnly",

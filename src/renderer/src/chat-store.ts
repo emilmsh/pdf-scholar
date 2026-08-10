@@ -41,7 +41,10 @@ export interface StoredConversation {
   messages: ChatMessage[]
 }
 
-const LS_KEY = 'pdfx-ai-chats'
+/** Exported for the panel's cross-window refresh: a `storage` event on this
+ *  key means ANOTHER window/tab (e.g. a detached assistant) wrote the store. */
+export const CHATS_LS_KEY = 'pdfx-ai-chats'
+const LS_KEY = CHATS_LS_KEY
 const MAX_CHATS_PER_DOC = 10
 const MAX_DOCS = 30
 

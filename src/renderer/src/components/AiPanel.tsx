@@ -36,11 +36,12 @@ import {
 } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import { errorText, t, useLang, locale } from '../i18n'
+import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-scale'
 import { bubblesWhileTyping } from '../keymap'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
 import type { ChatMessage, StoredConversation } from '../chat-store'
-import { deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
+import { CHATS_LS_KEY, deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { AssistantBody, renderMarkdown } from './ai-markdown'
@@ -50,6 +51,7 @@ import { ModelQuickMenu } from './AiModelMenu'
 import type { AiSeed } from './AiQuickPopover'
 import {
   IconChevronDown,
+  IconDetach,
   IconGlobe,
   IconGlobeLive,
   IconGlobeOff,
@@ -141,8 +143,13 @@ interface PanelProps {
   /** A page region snipped for the chat — staged as a composer attachment */
   chatSnip: { id: number; image: AiImage } | null
   onChatSnipConsumed(): void
-  /** Arm the viewer's snip overlay with the chat as destination */
-  onRequestSnip(): void
+  /** Arm the viewer's snip overlay with the chat as destination. Optional:
+   *  only a host with a mounted viewer can offer it — the detached window
+   *  omits it and the button simply is not rendered. */
+  onRequestSnip?(): void
+  /** Detach the chat into its own window/tab. Only the DOCKED host passes it
+   *  (a detached window has nowhere further to go). */
+  onDetach?(): void
   /** Whole pages rendered as images, for a document with no text layer. Staged
    *  like a snip: they land in the composer with an editable question, and the
    *  chip says exactly which pages will go along — nothing is sent by itself. */
@@ -181,6 +188,7 @@ export default function AiPanel({
   chatSnip,
   onChatSnipConsumed,
   onRequestSnip,
+  onDetach,
   chatPages,
   onChatPagesConsumed,
   onRequestPageImages,
@@ -214,6 +222,50 @@ export default function AiPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+
+  /** Conversation text size, applied as --ai-scale on the panel root. Owned
+   *  here; the quick popover reads the same stored value on its own. */
+  const [textScale, setTextScale] = useState(loadAiTextScale)
+  const applyTextScale = useCallback((next: number): void => {
+    setTextScale(next)
+    saveAiTextScale(next)
+  }, [])
+  // Reopening re-reads the stored value: an app-wide reset (or another
+  // window) may have changed it while the panel was closed.
+  useEffect(() => {
+    if (open) setTextScale(loadAiTextScale())
+  }, [open])
+  // Ctrl+scroll over the panel steps the size. The document's wheel-zoom
+  // listener sits on the .pages container, so the gesture is unclaimed here —
+  // and non-passive, because preventDefault must also stop the browser's own
+  // page zoom on the web/extension targets. Literal ctrlKey on macOS too: this
+  // is the documented ctrl+wheel exception (docs/PLATFORMS.md §3) — a mac
+  // trackpad pinch reports ctrlKey, and Cmd+wheel is not a zoom idiom there.
+  const wheelAccRef = useRef(0)
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent): void => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      // Mouse notches (|deltaY| >= 90) step immediately; a trackpad pinch is a
+      // stream of small deltas that accumulate into steps — the same split the
+      // viewer's zoom wheel makes.
+      const notch = Math.abs(e.deltaY) >= 90
+      wheelAccRef.current = notch ? e.deltaY : wheelAccRef.current + e.deltaY
+      if (!notch && Math.abs(wheelAccRef.current) < 30) return
+      const direction = wheelAccRef.current < 0 ? 1 : -1
+      wheelAccRef.current = 0
+      setTextScale((s) => {
+        const next = stepAiTextScale(s, direction)
+        saveAiTextScale(next)
+        return next
+      })
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [])
   /** Images staged for the next composer send (pasted or attached) */
   const [pendingImages, setPendingImages] = useState<AiImage[]>([])
   /** When those images ARE pages of this document, which ones — so the chip can
@@ -500,6 +552,25 @@ export default function AiPanel({
     setShowHistory(false)
     setShowModelMenu(false)
   }, [open, openSettingsAskId])
+
+  // Another window wrote the shared chat store (a detached assistant and a
+  // docked panel edit the same per-document history). `storage` events fire
+  // only in OTHER windows/tabs, so this can never loop; skipped while busy —
+  // the write-through below persists the settled state right after anyway.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key !== CHATS_LS_KEY || busy) return
+      const fresh = loadConversations(docPath)
+      setConversations(fresh)
+      const activeId = activeChatIdRef.current
+      if (activeId) {
+        const chat = fresh.find((c) => c.id === activeId)
+        if (chat) setMessages(chat.messages)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [busy, docPath])
 
   // Write-through: persist only settled states (never mid-stream). An aborted
   // send still settles (error message appended, busy=false) and is persisted.
@@ -827,14 +898,16 @@ export default function AiPanel({
               )}
             </button>
           )}
-          <button
-            className="ai-attach-add"
-            disabled={!visionOk}
-            title={visionOk ? t('tb.snipTip') : noVisionTip}
-            onClick={onRequestSnip}
-          >
-            <IconSnip size={16} />
-          </button>
+          {onRequestSnip && (
+            <button
+              className="ai-attach-add"
+              disabled={!visionOk}
+              title={visionOk ? t('tb.snipTip') : noVisionTip}
+              onClick={onRequestSnip}
+            >
+              <IconSnip size={16} />
+            </button>
+          )}
           <button
             className="ai-attach-add"
             disabled={!visionOk}
@@ -886,7 +959,11 @@ export default function AiPanel({
   )
 
   return (
-    <aside className="ai-panel">
+    <aside
+      className="ai-panel"
+      ref={panelRef}
+      style={{ '--ai-scale': textScale } as React.CSSProperties}
+    >
       <header className="ai-header">
         <IconSparkle size={16} />
         <span className="ai-title">{t('ai.assistant')}</span>
@@ -912,6 +989,8 @@ export default function AiPanel({
           {showModelMenu && config && (
             <ModelQuickMenu
               config={config}
+              textScale={textScale}
+              onTextScale={applyTextScale}
               onSaved={setConfig}
               onClose={() => setShowModelMenu(false)}
               onOpenSettings={() => {
@@ -942,6 +1021,11 @@ export default function AiPanel({
             menu ("KI-innstillinger"), open straight from the chip for Azure, and
             auto-open on first run when no key is set — so the header stays
             uncluttered and the model name gets the freed width. */}
+        {onDetach && (
+          <button className="tb-btn" title={t('ai.detachTip')} onClick={onDetach}>
+            <IconDetach size={15} />
+          </button>
+        )}
         <button className="tb-btn" title={t('ai.closeTip')} onClick={onClose}>
           ✕
         </button>

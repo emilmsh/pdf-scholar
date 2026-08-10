@@ -242,6 +242,30 @@ regressions are treated as bugs, not as acceptable platform lag.
     implying a check we did not do. Covered by `npm run test:signatures` (CI,
     all three OSes) and `npm run test:signature-stamp` (desktop session).
 
+17. **The detached assistant is a real second window on the desktop and a
+    separate tab in the browser/extension.** The chat panel's «Åpne i eget
+    vindu» hosts the assistant for one document in its own surface
+    (`AssistantApp.tsx`, mounted when the page URL says so —
+    `parseAssistantTarget` in `shared/viewer-url.ts`). Desktop opens a frameless
+    `BrowserWindow` with its OWN remembered bounds (`state.assistantWindow`,
+    never the main window's key); the extension opens a `viewer.html` tab in
+    assistant mode and dev:web a second browser tab — web content cannot own
+    app windows, the same adaptation as «new window». Citation clicks are
+    relayed to whichever window SHOWS the document: through main on desktop
+    (`assistant:jump`, routed via the same openDocs map as the annotation
+    broadcast, and main also raises the target window), over a
+    `BroadcastChannel` between same-origin tabs otherwise — where the receiving
+    extension tab pulls itself forward via `chrome.tabs.getCurrent`/`update`
+    (no «tabs» permission needed, and that permission stays forbidden). A tab
+    cannot be raised by its SENDER outside Electron; the ack tells the
+    assistant somebody showed it, and a missed ack becomes the «Åpne
+    dokumentet» toast. Chat history is the same shared localStorage store on
+    every platform (panels refresh on the `storage` event; simultaneous writes
+    stay last-write-wins). A detached assistant re-asks an encrypted
+    document's password — nothing is persisted, per §15. Covered by
+    `npm run test:assistant` (desktop session) and the URL forms by
+    `npm run test:viewer-url` (CI).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

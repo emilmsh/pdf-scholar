@@ -564,6 +564,20 @@ export default function App(): React.JSX.Element {
     return bridge.onOpenPath((path) => openPath(path))
   }, [refreshRecents, openPath])
 
+  // A detached assistant asked for a citation in one of our documents: bring
+  // that document's tab forward (and leave the library). The mounted viewer's
+  // own subscription performs the jump and answers for it — this one always
+  // returns false so it can never ack a jump nobody displayed.
+  useEffect(
+    () =>
+      bridge.onAssistantJumpRequest((path) => {
+        const tab = tabsRef.current.find((t) => t.payload.path === path)
+        if (tab) goToTab(tab.id)
+        return false
+      }),
+    [goToTab]
+  )
+
   // Refresh recents whenever the library comes into view — the last tab
   // closing, or simply walking back to it. Reading a document is exactly what
   // changes this list, so arriving with the version from an hour ago would

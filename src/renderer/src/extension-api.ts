@@ -29,7 +29,8 @@ import type {
 } from '../../shared/types'
 import type { FetchFailure } from '../../shared/insecure-retry'
 import { offersInsecureRetry } from '../../shared/insecure-retry'
-import { buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
+import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
+import { subscribeAssistantJumps } from './assistant-channel'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
 import { fileAccessGranted } from './extension-file-access'
@@ -197,6 +198,30 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       if (chrome?.tabs) void chrome.tabs.create({ url, active: true })
       else window.open(url, '_blank')
     },
+
+    // The detached assistant is a second viewer.html tab in assistant mode
+    // (?view=assistant&file=…). Citation jumps ride the same BroadcastChannel
+    // as dev:web (assistant-channel.ts, inherited assistantJumpToCitation) —
+    // what the extension ADDS is the receiving tab pulling itself forward,
+    // which chrome.tabs.getCurrent/update can do without the forbidden "tabs"
+    // permission (Chrome Web Store rejected declaring it, 2026-07-24).
+    openAssistant: (path: string) => {
+      const url = buildAssistantUrl(chrome?.runtime?.getURL('viewer.html') ?? 'viewer.html', path)
+      if (chrome?.tabs) void chrome.tabs.create({ url, active: true })
+      else window.open(url, '_blank')
+    },
+    onAssistantJumpRequest: (cb) =>
+      subscribeAssistantJumps((path, target) => {
+        const handled = cb(path, target)
+        if (handled && chrome?.tabs) {
+          void chrome.tabs.getCurrent().then((tab) => {
+            if (tab?.id !== undefined) void chrome?.tabs?.update?.(tab.id, { active: true })
+            if (tab?.windowId !== undefined && chrome?.windows)
+              void chrome.windows.update(tab.windowId, { focused: true })
+          })
+        }
+        return handled
+      }),
 
     // ---------- Persistence ----------
 

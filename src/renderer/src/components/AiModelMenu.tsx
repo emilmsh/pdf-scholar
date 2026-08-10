@@ -12,6 +12,13 @@ import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/
 import { isCompatService, OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
+import {
+  AI_SCALE_DEFAULT,
+  AI_SCALE_MAX,
+  AI_SCALE_MIN,
+  aiTextScaleLabel,
+  stepAiTextScale
+} from '../ai-text-scale'
 import { useDismissable } from '../useDismissable'
 import { keyProviders, MODELS, modelOptions, THINKING_LEVELS } from './ai-models'
 
@@ -37,6 +44,9 @@ const vendorLabel = (v: string): string => VENDOR_NAMES[v] ?? v.charAt(0).toUppe
 
 interface ModelMenuProps {
   config: AiConfigView
+  /** Conversation text-size scale — owned by the panel, adjusted here */
+  textScale: number
+  onTextScale(next: number): void
   onSaved(next: AiConfigView): void
   onClose(): void
   onOpenSettings(): void
@@ -47,7 +57,14 @@ interface ModelMenuProps {
  *  model from another provider switches provider too — the chat history is
  *  resent in full on the next question, so mid-chat switches are safe.
  *  Keys/providers are managed in the key settings (button at the bottom). */
-export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: ModelMenuProps): React.JSX.Element {
+export function ModelQuickMenu({
+  config,
+  textScale,
+  onTextScale,
+  onSaved,
+  onClose,
+  onOpenSettings
+}: ModelMenuProps): React.JSX.Element {
   useLang()
   const ref = useRef<HTMLDivElement>(null)
   // Was the one surface in the app with no Escape path at all; the shared hook
@@ -219,6 +236,36 @@ export function ModelQuickMenu({ config, onSaved, onClose, onOpenSettings }: Mod
           </select>
         </label>
       )}
+      {/* Conversation text size: fixed steps, not a slider. The hover title is
+          the only place the Ctrl+scroll gesture is advertised — a permanent
+          hint line would cost real estate in a narrow menu. */}
+      <div className="ai-field" title={t('ai.textSizeWheelTip')}>
+        <span>{t('ai.textSize')}</span>
+        <div className="ai-scale-row">
+          <button
+            className="ai-scale-btn"
+            title={t('ai.textSmallerTip')}
+            disabled={textScale <= AI_SCALE_MIN}
+            onClick={() => onTextScale(stepAiTextScale(textScale, -1))}
+          >
+            −
+          </button>
+          <span className="ai-scale-value">{aiTextScaleLabel(textScale)}</span>
+          <button
+            className="ai-scale-btn"
+            title={t('ai.textLargerTip')}
+            disabled={textScale >= AI_SCALE_MAX}
+            onClick={() => onTextScale(stepAiTextScale(textScale, 1))}
+          >
+            +
+          </button>
+          {textScale !== AI_SCALE_DEFAULT && (
+            <button className="ai-scale-reset" onClick={() => onTextScale(AI_SCALE_DEFAULT)}>
+              {t('ai.textSizeReset')}
+            </button>
+          )}
+        </div>
+      </div>
       <button className="ai-model-more" onClick={onOpenSettings}>
         {anyKey ? t('ai.keysTitle') : t('ai.calloutCta')}
       </button>

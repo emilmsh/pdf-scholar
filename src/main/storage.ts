@@ -37,6 +37,9 @@ export interface AppState {
   /** Live model lists cached from the providers (see shared/ai-model-catalog.ts) */
   modelCatalog: AiModelCatalog
   window?: WindowState
+  /** The detached ASSISTANT window's remembered bounds — its own key, so a
+   *  small chat window closing can never clobber the main window's bounds */
+  assistantWindow?: WindowState
 }
 
 const DEFAULT_AI: StoredAiConfig = {

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AiChatRequest,
+  AiCitationTarget,
   AiConfig,
   AiProviderId,
   AnnotateRequest,
@@ -137,6 +138,20 @@ const api: PdfxApi = {
     ipcRenderer.on('ai:delta', listener)
     return () => {
       ipcRenderer.removeListener('ai:delta', listener)
+    }
+  },
+  openAssistant: (path: string) => ipcRenderer.send('window:assistant', path),
+  assistantJumpToCitation: (path: string, target: AiCitationTarget) =>
+    ipcRenderer.invoke('assistant:jump', path, target),
+  onAssistantJumpRequest: (cb: (path: string, target: AiCitationTarget) => boolean) => {
+    // Main already routed this to a window holding the document; the handled
+    // flag only matters for the BroadcastChannel fallback outside Electron.
+    const listener = (_e: unknown, path: string, target: AiCitationTarget): void => {
+      cb(path, target)
+    }
+    ipcRenderer.on('assistant:jump-to', listener)
+    return () => {
+      ipcRenderer.removeListener('assistant:jump-to', listener)
     }
   }
 }

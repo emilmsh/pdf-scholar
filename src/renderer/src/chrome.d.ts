@@ -13,6 +13,7 @@ interface ChromeStorageArea {
 interface ChromeTab {
   id?: number
   url?: string
+  windowId?: number
 }
 
 interface ChromeEvent<T extends (...args: never[]) => void> {
@@ -73,8 +74,13 @@ interface ChromeApi {
   tabs?: {
     create(props: { url: string; active?: boolean }): Promise<ChromeTab>
     getCurrent(): Promise<ChromeTab | undefined>
-    update?(tabId: number, props: { url: string }): Promise<ChromeTab | undefined>
+    update?(tabId: number, props: { url?: string; active?: boolean }): Promise<ChromeTab | undefined>
     remove(tabId: number): Promise<void>
+  }
+  // Raising the window a tab lives in needs no permission either (the window
+  // is only addressed by id, nothing about it is read)
+  windows?: {
+    update(windowId: number, props: { focused?: boolean }): Promise<unknown>
   }
   action?: {
     onClicked: ChromeEvent<(tab: ChromeTab) => void>

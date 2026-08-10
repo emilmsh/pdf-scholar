@@ -70,6 +70,44 @@ eq(V.buildViewerUrl(EXT, ''), EXT, 'empty path → bare viewer URL')
 eq(V.parseViewerTarget(`${EXT}?${V.RAW_FILE_PARAM}=`), null, 'empty raw param → null')
 eq(V.parseViewerTarget(`${EXT}#min%20fil.pdf`), null, 'picked-file hash is not a target')
 
+// --- The detached assistant's two URL forms -----------------------------------
+// Hash form (Electron window / dev:web tab) and query form (extension tab)
+// must both round-trip; a plain viewer URL must never read as assistant mode,
+// and vice versa.
+for (const path of [
+  'https://example.org/a.pdf?x=1&y=2',
+  'file:///C:/Users/emil/a b.pdf',
+  'fsa:min rapport.pdf',
+  'C:\\Users\\emil\\Documents\\paper.pdf'
+]) {
+  eq(
+    V.parseAssistantTarget(`http://localhost:5199/#${V.buildAssistantHash(path)}`),
+    path,
+    `assistant hash round-trip: ${path}`
+  )
+  eq(
+    V.parseAssistantTarget(V.buildAssistantUrl(EXT, path)),
+    path,
+    `assistant query round-trip: ${path}`
+  )
+}
+eq(V.parseAssistantTarget(V.buildViewerUrl(EXT, 'fsa:a.pdf')), null, 'viewer URL is not assistant mode')
+eq(V.parseViewerTarget(V.buildAssistantUrl(EXT, 'fsa:a.pdf')), null, 'assistant URL is not a viewer target')
+eq(V.parseAssistantTarget(EXT), null, 'bare viewer → no assistant target')
+eq(V.parseAssistantTarget('http://localhost:5199/#open=sample.pdf'), null, 'dev-web #open is not assistant mode')
+// The redirect rule folds the document URL in verbatim — a document URL that
+// happens to carry view=assistant in its own query must stay a viewer target.
+eq(
+  V.parseAssistantTarget(`${EXT}?${V.RAW_FILE_PARAM}=https://example.org/a.pdf?view=assistant&file=x`),
+  null,
+  'rawfile can never produce assistant mode'
+)
+eq(
+  V.parseViewerTarget(`${EXT}?${V.RAW_FILE_PARAM}=https://example.org/a.pdf?view=assistant&file=x`),
+  'https://example.org/a.pdf?view=assistant&file=x',
+  'that same URL stays a verbatim viewer target'
+)
+
 // --- Producer and consumer must agree on the param name ----------------------
 // background.ts keeps the name as a literal so the service worker stays a single
 // self-contained file (see the comment there); this is the guard against the two

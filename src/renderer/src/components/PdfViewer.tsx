@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { getDocument, PDFWorker } from 'pdfjs-dist'
-import type { PDFDocumentLoadingTask, PDFDocumentProxy } from 'pdfjs-dist'
-import PdfWorkerCtor from 'pdfjs-dist/build/pdf.worker.mjs?worker'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { isPasswordException, openDocument } from '../pdf-doc'
+import type { DocResources } from '../pdf-doc'
+import { renderPagesAsImages as renderAiPageImages } from '../ai-page-images'
 import type {
   AiCitation,
   AiImage,
@@ -144,6 +145,7 @@ import {
   resolveMatchRects
 } from '../search'
 import { addSearchHistory, clearSearchHistory } from '../search-history'
+import { clearAiTextScale } from '../ai-text-scale'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { offsetAtPoint, rangeOfQuads, snapToWords } from '../text-range'
 import type { CharRange } from '../text-range'
@@ -155,45 +157,8 @@ import { PANEL_DEFAULTS, PANEL_LS_KEY, usePanelWidths } from '../hooks/usePanelW
 import { useUndoStack } from '../hooks/useUndoStack'
 import { DEFAULT_SETTINGS } from '../../../shared/defaults'
 
-// One worker per open document (not a shared global port) so the document can
-// be re-opened after the annotation engine rewrites the file on disk.
-interface DocResources {
-  task: PDFDocumentLoadingTask
-  port: Worker
-}
-
-// pdf.js side-loads binary companions from URLs: wasm image decoders (scanned
-// pages are JBIG2/JPX — without wasmUrl they render BLANK), CJK CMaps, the 14
-// standard fonts and a CMYK ICC profile. config/vite.pdfjs-assets.ts ships the dirs
-// next to index.html in every target, so resolving against the page URL works
-// under http (dev), file:// (packaged app) and chrome-extension:// (extension)
-// — pdf.js falls back to XHR for the non-http schemes.
-const pdfjsAssetUrl = (dir: string): string => new URL(`${dir}/`, document.baseURI).href
-
-function openDocument(data: Uint8Array, password?: string): DocResources {
-  const port = new PdfWorkerCtor()
-  const task = getDocument({
-    data,
-    // Only sent when we actually hold one. A document with an owner password but
-    // no user password opens freely, and offering pdf.js a password it did not
-    // ask for makes it reject the file as "Incorrect Password".
-    ...(password === undefined ? {} : { password }),
-    worker: PDFWorker.create({ port }),
-    wasmUrl: pdfjsAssetUrl('wasm'),
-    cMapUrl: pdfjsAssetUrl('cmaps'),
-    standardFontDataUrl: pdfjsAssetUrl('standard_fonts'),
-    iccUrl: pdfjsAssetUrl('iccs')
-  })
-  return { task, port }
-}
-
-/** pdf.js signals both "locked" and "wrong password" as PasswordException,
- *  separated by `code` (1 = NEED_PASSWORD, 2 = INCORRECT_PASSWORD). Neither is
- *  a broken file, so neither may take the re-read-and-retry path meant for
- *  half-written ones — the bytes are whole, they are just encrypted. */
-function isPasswordException(err: unknown): boolean {
-  return (err as { name?: string } | null | undefined)?.name === 'PasswordException'
-}
+// openDocument/isPasswordException live in pdf-doc.ts, shared with the
+// detached assistant window (which opens the same bytes but mounts no page).
 
 /** What the parser said, plus what it was actually given. A file that is still
  *  being written and a genuinely broken document fail with the same message, and
@@ -231,12 +196,6 @@ async function collectAnnotations(
 
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
-
-/** Long side, in px, of a whole page rendered for the assistant to READ (scanned
- *  documents). 1400 matches the cap on pasted images: enough that body text in a
- *  300 dpi scan stays legible to a vision model, small enough that four of them
- *  fit in a request — and in the localStorage chat store — without trouble. */
-const AI_PAGE_IMAGE_SIDE = 1400
 
 /** What the eraser removes in its default 'draw' scope: marks the user drew by
  *  hand. Ink is hit-tested against the stroke path before this set is consulted
@@ -3355,47 +3314,11 @@ export default function PdfViewer({
     [pdf, snip]
   )
 
-  /** Whole pages as images, for the assistant to READ when the document has no
-   *  text layer (the other half of the scanned-PDF story: it could say "I cannot
-   *  read this" but not read it).
-   *
-   *  Rendered offscreen rather than captured from the on-screen canvas, which may
-   *  be low-res at fit-width and is recoloured by the reading theme. JPEG, not
-   *  PNG: a full page of scanned text as PNG runs several megabytes, and every
-   *  attachment is also persisted in the chat store. */
+  /** Whole pages as images for the assistant to READ (scanned documents) —
+   *  the shared renderer in ai-page-images.ts, bound to this viewer's pdf. */
   const renderPagesAsImages = useCallback(
-    async (from: number, count: number): Promise<{ pages: number[]; images: AiImage[] }> => {
-      if (!pdf) return { pages: [], images: [] }
-      const first = clamp(from, 1, pdf.numPages)
-      const last = Math.min(pdf.numPages, first + Math.max(1, count) - 1)
-      const pages: number[] = []
-      const images: AiImage[] = []
-      for (let n = first; n <= last; n++) {
-        try {
-          const page = await pdf.getPage(n)
-          const base = page.getViewport({ scale: 1, rotation: page.rotate })
-          const k = AI_PAGE_IMAGE_SIDE / Math.max(base.width, base.height)
-          const viewport = page.getViewport({ scale: k, rotation: page.rotate })
-          const canvas = document.createElement('canvas')
-          canvas.width = Math.max(1, Math.floor(viewport.width))
-          canvas.height = Math.max(1, Math.floor(viewport.height))
-          // Scanned pages are photographs of paper: white behind them, so a
-          // transparent canvas does not come out grey once flattened to JPEG.
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.fillStyle = '#ffffff'
-            ctx.fillRect(0, 0, canvas.width, canvas.height)
-          }
-          await page.render({ canvas, viewport }).promise
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-          images.push({ mediaType: 'image/jpeg', dataBase64: dataUrl.slice(dataUrl.indexOf(',') + 1) })
-          pages.push(n)
-        } catch {
-          /* one page that will not render is skipped; the rest still go */
-        }
-      }
-      return { pages, images }
-    },
+    (from: number, count: number): Promise<{ pages: number[]; images: AiImage[] }> =>
+      pdf ? renderAiPageImages(pdf, from, count) : Promise.resolve({ pages: [], images: [] }),
     [pdf]
   )
 
@@ -4400,6 +4323,8 @@ export default function PdfViewer({
     setPrefs(structuredClone(DEFAULT_TOOL_PREFS))
     clearCustomColors()
     clearSearchHistory()
+    // The assistant re-reads this when the panel next opens
+    clearAiTextScale()
     setPanelW({ ...PANEL_DEFAULTS })
     try {
       localStorage.removeItem(PANEL_LS_KEY)
@@ -5069,6 +4994,21 @@ export default function PdfViewer({
   )
 
   const consumeAiSeed = useCallback(() => setAiSeed(null), [])
+
+  // A DETACHED assistant clicked a citation in this document: show it here.
+  // ensureAiDocument first — a viewer that never opened its own panel has no
+  // page texts yet, and the jump needs them to resolve rects. Returning true
+  // is the ack that some window showed it (BroadcastChannel targets outside
+  // Electron; main already routed to this window on desktop).
+  useEffect(
+    () =>
+      bridge.onAssistantJumpRequest((path, target) => {
+        if (path !== payload.path) return false
+        void ensureAiDocument().then(() => jumpToAiCitation(target))
+        return true
+      }),
+    [payload.path, ensureAiDocument, jumpToAiCitation]
+  )
 
   /** The user's annotations as a compact text block for the AI (same data as
    *  the export: page, type, marked-up excerpt, comment) */
@@ -6023,6 +5963,14 @@ export default function PdfViewer({
                 chatSnip={chatSnip}
                 onChatSnipConsumed={() => setChatSnip(null)}
                 onRequestSnip={() => setSnip({ target: 'chat' })}
+                onDetach={() => {
+                  // The chat moves out; the docked panel closes behind it.
+                  // Reopening it (A) is allowed — both write the same stored
+                  // history, and the panel refreshes on the storage event.
+                  bridge.openAssistant(payload.path)
+                  setAiPeek(false)
+                  setAiPinned(false)
+                }}
                 chatPages={chatPages}
                 onChatPagesConsumed={() => setChatPages(null)}
                 onRequestPageImages={onRequestPageImages}

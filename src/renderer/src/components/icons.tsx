@@ -409,6 +409,14 @@ export const IconHistory = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+export const IconDetach = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M11 5H5.5A1.5 1.5 0 0 0 4 6.5v12A1.5 1.5 0 0 0 5.5 20h12a1.5 1.5 0 0 0 1.5-1.5V13" />
+    <path d="M14 4h6v6" />
+    <path d="M20 4l-8.5 8.5" />
+  </Svg>
+)
+
 export const IconSave = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M5 3.5h11l4.5 4.5v11a1.5 1.5 0 0 1 -1.5 1.5h-14a1.5 1.5 0 0 1 -1.5 -1.5v-14A1.5 1.5 0 0 1 5 3.5z" />

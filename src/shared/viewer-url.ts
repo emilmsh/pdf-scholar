@@ -42,12 +42,67 @@ export function parseViewerTarget(href: string): string | null {
   if (q < 0) return null
   // Our own links are properly encoded, so ordinary query parsing is correct —
   // and the value never contains a fragment.
-  return new URLSearchParams(href.slice(q + 1).split('#')[0]).get(FILE_PARAM) || null
+  const params = new URLSearchParams(href.slice(q + 1).split('#')[0])
+  // An assistant tab's URL also carries file=, but it is not a VIEWER target —
+  // the two parsers stay mutually exclusive (see parseAssistantTarget below).
+  if (params.get(ASSISTANT_VIEW_PARAM) === ASSISTANT_VIEW) return null
+  return params.get(FILE_PARAM) || null
 }
 
 /** A viewer URL for a document we already hold a path/URL for. */
 export function buildViewerUrl(base: string, path: string): string {
   return path ? `${base}?${FILE_PARAM}=${encodeURIComponent(path)}` : base
+}
+
+// ---------- The detached assistant window/tab ----------
+//
+// The assistant can leave the panel and live in its own surface: a second
+// BrowserWindow on the desktop, a second viewer.html tab in the extension, a
+// second browser tab in dev:web. Which document that surface belongs to rides
+// in its URL, in two forms mirroring the viewer's own pair:
+//
+//  • `#assistant=<enc>` — surfaces we open ourselves where a hash is the
+//    natural channel (Electron's loadFile({ hash }), dev:web's `#open=` twin).
+//  • `?view=assistant&file=<enc>` — the extension tab, where the hash is
+//    already spoken for by picked-file names and the viewer URL is query-built.
+//
+// A `?rawfile=` URL is always the redirect rule's product and NEVER assistant
+// mode — everything after that marker is the document URL verbatim, so it is
+// checked (and rejected) before any query parsing.
+
+export const ASSISTANT_HASH_KEY = 'assistant'
+export const ASSISTANT_VIEW_PARAM = 'view'
+export const ASSISTANT_VIEW = 'assistant'
+
+/** Hash payload (without the '#') for a desktop/dev-web assistant window. */
+export function buildAssistantHash(path: string): string {
+  return `${ASSISTANT_HASH_KEY}=${encodeURIComponent(path)}`
+}
+
+/** Extension-tab URL that hosts the ASSISTANT for a document. */
+export function buildAssistantUrl(base: string, path: string): string {
+  return `${base}?${ASSISTANT_VIEW_PARAM}=${ASSISTANT_VIEW}&${FILE_PARAM}=${encodeURIComponent(path)}`
+}
+
+/** The document whose assistant this page should host, or null when the URL
+ *  is a plain viewer target. Accepts both producer forms above. */
+export function parseAssistantTarget(href: string): string | null {
+  if (href.includes(`?${RAW_FILE_PARAM}=`)) return null
+  const marker = `#${ASSISTANT_HASH_KEY}=`
+  const hashAt = href.indexOf(marker)
+  if (hashAt >= 0) {
+    const raw = href.slice(hashAt + marker.length)
+    try {
+      return decodeURIComponent(raw) || null
+    } catch {
+      return raw || null // malformed escape: better an odd name than no window
+    }
+  }
+  const q = href.indexOf('?')
+  if (q < 0) return null
+  const params = new URLSearchParams(href.slice(q + 1).split('#')[0])
+  if (params.get(ASSISTANT_VIEW_PARAM) !== ASSISTANT_VIEW) return null
+  return params.get(FILE_PARAM) || null
 }
 
 /** Display name for a document URL: its last path segment, with the query and

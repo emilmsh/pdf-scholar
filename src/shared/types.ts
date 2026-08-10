@@ -554,6 +554,17 @@ export type AiChatResult =
   | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string }
   | FileError
 
+/** Where a clicked citation should land in the document: a page plus a char
+ *  range within that page's extracted text (start === end means "just the
+ *  page"). This is the payload the detached assistant sends to whichever
+ *  window is SHOWING the document — the renderer's ResolvedCitation is this
+ *  exact shape. */
+export interface AiCitationTarget {
+  pageNumber: number
+  start: number
+  end: number
+}
+
 /** Why a build can't self-update: developer run, unsigned macOS, or a
  *  Microsoft Store/MSIX package (the Store owns the update cycle). `null`
  *  means self-update is supported. Note that 'mac' bars INSTALLING an update,
@@ -745,6 +756,21 @@ export interface PdfxApi {
   aiChat(request: AiChatRequest): Promise<AiChatResult>
   aiAbort(requestId: number): void
   onAiDelta(cb: (requestId: number, text: string) => void): () => void
+  // ---------- Detached assistant (chat in its own window/tab) ----------
+  /** Open (or focus) the assistant surface for a document: a second
+   *  BrowserWindow on desktop, a separate viewer.html tab in the extension,
+   *  a second browser tab in dev:web (docs/PLATFORMS.md). */
+  openAssistant(path: string): void
+  /** A citation was clicked in a detached assistant: ask whichever window is
+   *  showing `path` to scroll there and raise itself. Resolves false when no
+   *  surface has the document open — the assistant then offers to open it. */
+  assistantJumpToCitation(path: string, target: AiCitationTarget): Promise<boolean>
+  /** Viewer side of the same channel: fires when a detached assistant asks
+   *  this window to show a citation in `path`. The callback returns true when
+   *  THIS window showed it — that answer drives the BroadcastChannel ack (and
+   *  tab self-activation) outside Electron; on desktop main already routed to
+   *  the right window and the return value is ignored. */
+  onAssistantJumpRequest(cb: (path: string, target: AiCitationTarget) => boolean): () => void
 }
 
 declare global {

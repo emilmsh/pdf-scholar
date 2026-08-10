@@ -14,6 +14,7 @@ import { open, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type {
+  AiCitationTarget,
   AnnotateRequest,
   CloseOutcome,
   DeleteAnnotationRequest,
@@ -25,6 +26,7 @@ import type {
   SetFormFieldRequest,
   Settings
 } from '../shared/types'
+import { buildAssistantHash } from '../shared/viewer-url'
 import { registerAiIpc } from './ai'
 import {
   applyAnnotation,
@@ -506,6 +508,84 @@ function createWindow(openPath?: string | null): BrowserWindow {
   return win
 }
 
+// ---------- The detached assistant window ----------
+
+/** docPath → its assistant window: detaching twice focuses the one that exists.
+ *  These windows are chat-only — they never register in openDocs (no document
+ *  is "open" in them for the unsaved-changes guard, and assistant:jump routing
+ *  below relies on exactly that to find VIEWERS of a path, never assistants. */
+const assistantWindows = new Map<string, BrowserWindow>()
+
+function createAssistantWindow(path: string): BrowserWindow {
+  const existing = assistantWindows.get(path)
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore()
+    existing.moveTop()
+    existing.focus()
+    return existing
+  }
+  const saved = getState().assistantWindow
+  const win = new BrowserWindow({
+    // Its own remembered bounds under state.assistantWindow — a chat column is
+    // not a document window, and neither one's size should leak into the other.
+    width: saved?.width ?? 460,
+    height: saved?.height ?? 760,
+    ...(saved?.x !== undefined && saved?.y !== undefined ? { x: saved.x, y: saved.y } : {}),
+    minWidth: 320,
+    minHeight: 420,
+    show: false,
+    autoHideMenuBar: true,
+    backgroundColor: '#1c1c1e',
+    // Same frameless chrome as the main window; the renderer's assistant shell
+    // draws its own slim titlebar strip inset via env(titlebar-area-*).
+    titleBarStyle: 'hidden',
+    titleBarOverlay:
+      process.platform === 'darwin'
+        ? { height: 36 }
+        : { ...initialTitleBarColors(), height: 36 },
+    ...(process.platform === 'darwin' ? { trafficLightPosition: { x: 12, y: 10 } } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js')
+    }
+  })
+  assistantWindows.set(path, win)
+
+  win.once('ready-to-show', () => {
+    if (win.isDestroyed()) return
+    win.show()
+    win.moveTop()
+    win.focus()
+  })
+  // Bounds are tracked live and persisted on 'closed', NOT in a 'close'
+  // handler: the panel's own ✕ closes this window via window.close() from the
+  // renderer, and that teardown path skips the 'close' event entirely (found
+  // by test:assistant — the native X fires it, the renderer route does not).
+  // After 'closed' the window object cannot be measured, hence the tracking.
+  let lastBounds = win.getNormalBounds()
+  const rememberBounds = (): void => {
+    if (!win.isDestroyed() && !win.isMinimized()) lastBounds = win.getNormalBounds()
+  }
+  win.on('resize', rememberBounds)
+  win.on('move', rememberBounds)
+  win.on('closed', () => {
+    getState().assistantWindow = lastBounds
+    saveState()
+    if (assistantWindows.get(path) === win) assistantWindows.delete(path)
+  })
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:')) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+
+  const hash = buildAssistantHash(path)
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${hash}`)
+  } else {
+    win.loadFile(join(__dirname, '../renderer/index.html'), { hash })
+  }
+  return win
+}
+
 /** The write-engines cache open docs keyed on the DRAFT path and flush to
  *  disk on a debounce (see doc-cache.ts) — force the flush before any code
  *  path reads the draft's bytes. Logs instead of throwing: reading a briefly-
@@ -607,6 +687,32 @@ function registerIpc(): void {
   // place documents side by side or view two spots in one file at once
   ipcMain.on('window:new', (_e, path?: string) => {
     createWindow(typeof path === 'string' && path ? path : null)
+  })
+
+  // Detach the assistant into its own window (or focus the one it has)
+  ipcMain.on('window:assistant', (_e, path: string) => {
+    if (typeof path === 'string' && path) createAssistantWindow(path)
+  })
+
+  // A citation clicked in a detached assistant: hand it to a window SHOWING
+  // the document and raise that window — the same restore/raise dance as
+  // tab:drop-at-cursor. Viewers register in openDocs (doc:opened); assistant
+  // windows never do, so this can only route to a real viewer. False when
+  // nobody has the document open; the assistant offers to open it instead.
+  ipcMain.handle('assistant:jump', (e, path: string, target: AiCitationTarget) => {
+    for (const [wcId, paths] of openDocs) {
+      if (wcId === e.sender.id || !paths.has(path)) continue
+      const win = BrowserWindow.getAllWindows().find(
+        (w) => !w.isDestroyed() && !w.webContents.isDestroyed() && w.webContents.id === wcId
+      )
+      if (!win) continue
+      win.webContents.send('assistant:jump-to', path, target)
+      if (win.isMinimized()) win.restore()
+      win.moveTop()
+      win.focus()
+      return true
+    }
+    return false
   })
 
   // A tab was dragged out and released. HTML5 drag events don't cross OS

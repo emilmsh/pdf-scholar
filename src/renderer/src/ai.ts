@@ -97,6 +97,10 @@ EXCERPT MODE
 - The pages between the attached ones are missing. If the excerpt does not answer the question, say that the relevant part of the document may not be attached — never conclude that the document lacks something from the excerpt alone.`
 }
 
+/** Where a citation lands in the document. The same shape travels between
+ *  windows when the assistant is detached — that shared name is
+ *  AiCitationTarget (shared/types.ts); this interface stays its structural
+ *  twin under the name the renderer has always used. */
 export interface ResolvedCitation {
   pageNumber: number
   /** Offsets within that page's PageText.text */

@@ -3590,6 +3590,11 @@ html.pen-near .draw-layer {
   padding: 16px 14px;
 }
 
+/* Every font-size in the conversation surface (landing, messages, composer —
+   not the header/history/settings chrome) is multiplied by --ai-scale, the
+   assistant's text-size preference (ai-text-scale.ts, set inline on .ai-panel
+   and .ai-quick). At the default 1 every calc() below collapses to exactly
+   the pixel value it multiplies. */
 .ai-landing-head {
   display: flex;
   flex-direction: column;
@@ -3597,7 +3602,7 @@ html.pen-near .draw-layer {
   text-align: center;
   gap: 8px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: calc(13px * var(--ai-scale, 1));
   line-height: 1.5;
 }
 
@@ -3620,7 +3625,7 @@ html.pen-near .draw-layer {
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   background: color-mix(in srgb, var(--accent) 7%, transparent);
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ai-scale, 1));
   line-height: 1.5;
   text-align: center;
   color: var(--text-primary);
@@ -3637,7 +3642,7 @@ html.pen-near .draw-layer {
   border: 1px solid var(--border);
   background: var(--hover);
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ai-scale, 1));
   line-height: 1.55;
   text-align: left;
   color: var(--text-secondary);
@@ -3661,7 +3666,7 @@ html.pen-near .draw-layer {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ai-scale, 1));
 }
 .ai-notice-pages input {
   width: 48px;
@@ -3671,25 +3676,25 @@ html.pen-near .draw-layer {
   background: var(--bg);
   color: var(--text);
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ai-scale, 1));
   text-align: center;
 }
 .ai-notice-pages .btn-primary {
   margin-left: auto;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ai-scale, 1));
 }
 .ai-notice-cap {
   flex-basis: 100%;
   margin: 0;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ai-scale, 1));
   opacity: 0.8;
 }
 /* The chip that names the pages going along with the question */
 .ai-attach-pages {
   gap: 4px;
   padding: 3px 4px 3px 8px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ai-scale, 1));
   white-space: nowrap;
 }
 
@@ -3710,7 +3715,7 @@ html.pen-near .draw-layer {
   border: 1px solid var(--border);
   border-radius: 9px;
   background: var(--bg-elevated);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ai-scale, 1));
   color: var(--text);
 }
 
@@ -3719,7 +3724,7 @@ html.pen-near .draw-layer {
 }
 
 .ai-msg {
-  font-size: 13px;
+  font-size: calc(13px * var(--ai-scale, 1));
   line-height: 1.55;
 }
 
@@ -3767,21 +3772,21 @@ html.pen-near .draw-layer {
 
 .ai-assistant h3,
 .ai-quick-body h3 {
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--ai-scale, 1));
   font-weight: 700;
   margin: 12px 0 6px;
 }
 
 .ai-assistant h4,
 .ai-quick-body h4 {
-  font-size: 13px;
+  font-size: calc(13px * var(--ai-scale, 1));
   font-weight: 650;
   margin: 10px 0 5px;
 }
 
 .ai-assistant h5,
 .ai-quick-body h5 {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ai-scale, 1));
   font-weight: 650;
   margin: 8px 0 4px;
 }
@@ -3795,7 +3800,7 @@ html.pen-near .draw-layer {
 .ai-assistant code,
 .ai-quick-body code {
   font-family: Consolas, monospace;
-  font-size: 12px;
+  font-size: calc(12px * var(--ai-scale, 1));
   background: var(--hover);
   border-radius: 4px;
   padding: 0 4px;
@@ -3815,7 +3820,7 @@ html.pen-near .draw-layer {
 .ai-quick-body pre code {
   background: none;
   padding: 0;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ai-scale, 1));
   line-height: 1.5;
 }
 
@@ -3841,7 +3846,7 @@ html.pen-near .draw-layer {
 
 .ai-table-wrap table {
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: calc(12px * var(--ai-scale, 1));
   min-width: 100%;
 }
 
@@ -3861,7 +3866,7 @@ html.pen-near .draw-layer {
 /* Citation chips flow inline with the sentence they support */
 .ai-chip {
   display: inline-block;
-  font-size: 10px;
+  font-size: calc(10px * var(--ai-scale, 1));
   font-weight: 600;
   line-height: 1;
   color: var(--accent);
@@ -3904,7 +3909,7 @@ html.pen-near .draw-layer {
 }
 
 .ai-meta {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ai-scale, 1));
   color: var(--text-secondary);
   margin-top: 5px;
 }
@@ -3925,14 +3930,14 @@ html.pen-near .draw-layer {
 /* One-time companion to the first excerpt answer: lexical page selection
    retrieves better when the question speaks the document's language */
 .ai-excerpt-hint {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ai-scale, 1));
   color: var(--text-secondary);
   margin-top: 4px;
   font-style: italic;
 }
 
 .ai-error {
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ai-scale, 1));
   color: var(--danger);
   background: rgb(var(--danger-rgb) / 0.08);
   border: 1px solid rgb(var(--danger-rgb) / 0.25);
@@ -3942,7 +3947,7 @@ html.pen-near .draw-layer {
 
 .ai-thinking {
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ai-scale, 1));
   animation: ai-pulse 1.4s ease-in-out infinite;
 }
 
@@ -3978,7 +3983,7 @@ html.pen-near .draw-layer {
   background: transparent;
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ai-scale, 1));
   line-height: 1.45;
   padding: 10px 12px 2px;
   max-height: 120px;
@@ -4058,7 +4063,7 @@ html.pen-near .draw-layer {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ai-scale, 1));
   font-weight: 600;
   color: var(--accent);
   padding: 4px 10px;
@@ -4120,7 +4125,7 @@ html.pen-near .draw-layer {
 }
 
 .ai-total {
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ai-scale, 1));
   color: var(--text-secondary);
   text-align: center;
   padding: 0 12px 8px;
@@ -4221,6 +4226,54 @@ html.pen-near .draw-layer {
   color: var(--text-secondary);
 }
 
+/* Text-size stepper in the model chip's menu. Chrome-sized on purpose: the
+   row is the control, not the content, so it never scales with --ai-scale. */
+.ai-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-scale-btn {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.ai-scale-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.ai-scale-btn:disabled {
+  opacity: 0.4;
+}
+
+.ai-scale-value {
+  min-width: 44px;
+  text-align: center;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ai-scale-reset {
+  margin-left: auto;
+  border: none;
+  background: none;
+  padding: 2px 4px;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--accent);
+}
+
 .ai-field {
   display: flex;
   flex-direction: column;
@@ -4277,6 +4330,95 @@ html.pen-near .draw-layer {
   gap: 8px;
 }
 
+/* ---------- Detached assistant window (AssistantApp) ----------
+   A window/tab that is nothing but the chat panel: a slim titlebar strip
+   (the drag region on the frameless desktop window, a plain header in a
+   browser tab) over a full-width .ai-panel. */
+
+.assistant-window {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--bg-chrome);
+}
+
+.assistant-titlebar {
+  position: relative;
+  flex: 0 0 36px;
+  background: var(--bg-titlebar);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.assistant-titlebar-inner {
+  position: absolute;
+  left: env(titlebar-area-x, 0px);
+  top: env(titlebar-area-y, 0px);
+  width: env(titlebar-area-width, 100%);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.assistant-titlebar-inner svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.assistant-titlebar-inner span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assistant-window .ai-panel {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-left: none;
+}
+
+.assistant-error {
+  padding: 24px 18px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.assistant-error p {
+  margin: 0;
+}
+
+/* "No window is showing the document" — the citation click's dead end, with
+   the way out (open it) in the toast itself */
+.assistant-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assistant-toast .btn-primary {
+  padding: 4px 12px;
+}
+
+.assistant-toast-close {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.assistant-toast-close:hover {
+  color: var(--text);
+}
+
 /* Quick popover (explain selection) */
 
 .ai-quick {
@@ -4325,7 +4467,7 @@ html.pen-near .draw-layer {
 
 .ai-quick-body {
   padding: 11px 13px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ai-scale, 1));
   line-height: 1.55;
   color: var(--text);
   max-height: 240px;
@@ -4375,7 +4517,7 @@ html.pen-near .draw-layer {
 
 /* The submitted question echoed above the streamed answer */
 .ai-quick-question {
-  font-size: 12px;
+  font-size: calc(12px * var(--ai-scale, 1));
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 7px;

@@ -212,7 +212,11 @@ function configView(): AiConfigView {
 
 // ---------- IPC ----------
 
-const activeRequests = new Map<number, AbortController>()
+/** In-flight chats keyed by `${webContents.id}:${requestId}` — the renderer's
+ *  request counter is per WINDOW, so two windows (a viewer and a detached
+ *  assistant, or simply two app windows) can mint the same id. Keying on the
+ *  id alone let one window's abort kill the other window's request. */
+const activeRequests = new Map<string, AbortController>()
 
 export function registerAiIpc(): void {
   // Before anything can read a key: get any legacy plaintext off disk.
@@ -287,7 +291,8 @@ export function registerAiIpc(): void {
   ipcMain.handle('ai:chat', async (e: IpcMainInvokeEvent, req: AiChatRequest): Promise<AiChatResult> => {
     const sender = e.sender
     const controller = new AbortController()
-    activeRequests.set(req.requestId, controller)
+    const requestKey = `${sender.id}:${req.requestId}`
+    activeRequests.set(requestKey, controller)
     const emit = (text: string): void => {
       if (!sender.isDestroyed()) sender.send('ai:delta', req.requestId, text)
     }
@@ -319,11 +324,11 @@ export function registerAiIpc(): void {
       writeFixture(req, result)
       return result
     } finally {
-      activeRequests.delete(req.requestId)
+      activeRequests.delete(requestKey)
     }
   })
 
-  ipcMain.on('ai:abort', (_e, requestId: number) => {
-    activeRequests.get(requestId)?.abort()
+  ipcMain.on('ai:abort', (e, requestId: number) => {
+    activeRequests.get(`${e.sender.id}:${requestId}`)?.abort()
   })
 }
