@@ -78,6 +78,7 @@ AI ASSISTANT (optional — bring your own key)
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
 • Scanned documents are identified as such; a page range can be attached as images for the assistant to read
+• The assistant can open in its own window; a citation click still goes to the passage in the document's window
 • LaTeX in answers is rendered; optional web search, off by default
 • Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — one key field each — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio (no key needed). Requests go directly to the provider; with a local model the document never leaves the machine. PDF Scholar operates no server.
 
@@ -128,6 +129,7 @@ AI-ASSISTENT (valgfri — egen nøkkel)
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
 • Skannede dokumenter identifiseres som det; et sideutvalg kan legges ved som bilder som assistenten leser
+• Assistenten kan åpnes i eget vindu; et sitatklikk går fortsatt til avsnittet i dokumentvinduet
 • LaTeX i svar gjengis; valgfritt nettsøk, av som standard
 • Leverandører: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — ett nøkkelfelt hver — pluss et hvilket som helst OpenAI-kompatibelt endepunkt og lokale modeller via Ollama eller LM Studio (uten nøkkel). Forespørslene går rett til leverandøren; med en lokal modell forlater dokumentet aldri maskinen. PDF Scholar driver ingen egen server.
 

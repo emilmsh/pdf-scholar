@@ -245,6 +245,12 @@ that.)*
 - Questions about your own annotations ("summarize what I've highlighted")
 - Scanned documents are identified as such rather than answered about blindly;
   a page range can be attached as images instead
+- The assistant can open in its own window, so the document keeps the whole
+  screen; a citation click still goes to the passage in the window showing the
+  document. *(The extension opens a separate tab instead — say "window" only
+  on desktop surfaces; PLATFORMS §17 is the authority.)*
+- The answer text has its own size control (80–160 %), separate from the
+  document's zoom. *(README only — at listing length this is trivia.)*
 - Optional web search, off by default (Anthropic and OpenAI only — the toggle
   does not appear elsewhere)
 - LaTeX in answers is rendered

@@ -244,6 +244,11 @@ the claim came from.
   attached the same way
 - A scanned PDF has no text layer, and the assistant reports that instead of guessing;
   a page range can be attached as images for it to read
+- The assistant can open in its own window — the document keeps the whole screen, or a
+  second monitor carries the chat. A citation click still goes to the passage in the
+  window showing the document, and raises it
+- The answer text has its own size control (80–160 %), from the model menu or
+  Ctrl+scroll over the panel — separate from the document's zoom
 - Optional web search, off by default: closed, on request, or always on (Anthropic and
   OpenAI keys). LaTeX in answers is rendered
 - Providers: Anthropic (Claude, with native citations), OpenAI, Azure OpenAI,
