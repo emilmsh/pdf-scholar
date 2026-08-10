@@ -216,10 +216,13 @@ panel beside the document.
   program has changed
 
 ### Search by words or by meaning
-- In-document search (Ctrl+F): match case, whole word, a results list with excerpts, and
-  F3 / Shift+F3 between hits. Every match on the page is marked while you search
-- Semantic search: describe a topic in your own words and get the passages that discuss
-  it, ranked (uses your own API key, like the assistant)
+
+Both modes live in one search bar, a tab apart.
+
+- By words (Ctrl+F): match case, whole word, a results list with excerpts, and F3 /
+  Shift+F3 between hits. Every match on the page is marked while you search
+- By meaning: describe a topic in your own words and get the passages that discuss it,
+  ranked (uses the assistant's key)
 - The selection menu also offers copy, web search, dictionary and translation
 
 ### An assistant that cites its sources

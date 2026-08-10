@@ -45,9 +45,14 @@ READING
 • Day, Sepia and two Night themes, with contrast adjustable per theme
 • Page rotation, two-page spread, and a full-screen presentation mode
 • Split view: two columns of the same document, each with its own page, zoom and rotation
-• Table of contents, thumbnails, bookmarks and search (match case / whole word)
+• Table of contents, thumbnails and bookmarks
 • Reading positions and recent files are remembered
 • Keyboard shortcuts are listed in one map and can be rebound or reset
+
+SEARCH
+Both modes live in one search bar, a tab apart.
+• By words: match case, whole word, a results list with excerpts, and every match marked on the page
+• By meaning: describe a topic in your own words and get the passages that discuss it, ranked (uses the assistant's key)
 
 ANNOTATION
 Selecting text opens the annotation menu at the selection; every mark is listed in a panel beside the document.
@@ -66,7 +71,6 @@ AI ASSISTANT (optional, bring your own key)
 • Answers cite their sources: each claim links to the passage it came from
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
-• Semantic search: describe a topic in your own words and get the passages that discuss it
 • Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — one key field each — or an OpenAI-compatible endpoint such as a local Ollama (no key needed). Requests go directly to the provider; with a local model the document never leaves the machine
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
@@ -83,9 +87,14 @@ LESING
 • Dag-, Sepia- og to Natt-temaer, med kontrast som kan justeres per tema
 • Siderotasjon, tosiders oppslag og en fullskjerms presentasjonsmodus
 • Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
-• Innholdsfortegnelse, miniatyrer, bokmerker og søk (skill store/små, helord)
+• Innholdsfortegnelse, miniatyrer og bokmerker
 • Leseposisjon og nylige filer huskes
 • Hurtigtastene står i ett kart og kan bindes om eller tilbakestilles
+
+SØK
+Begge modusene bor i én søkelinje, en fane fra hverandre.
+• Etter ord: skill store/små, helord, en treffliste med utdrag, og hvert treff markert på siden
+• Etter mening: beskriv et tema med egne ord og få avsnittene som omtaler det, rangert (bruker assistentens nøkkel)
 
 ANNOTERING
 Å merke tekst åpner annoteringsmenyen ved merkingen; hvert merke listes i et panel ved siden av dokumentet.
@@ -104,7 +113,6 @@ AI-ASSISTENT (valgfri, egen nøkkel)
 • Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
-• Semantisk søk: beskriv et tema med egne ord og få avsnittene som omtaler det
 • Leverandører: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — ett nøkkelfelt hver — eller et OpenAI-kompatibelt endepunkt som en lokal Ollama (uten nøkkel). Forespørslene går rett til leverandøren; med en lokal modell forlater dokumentet aldri maskinen
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.

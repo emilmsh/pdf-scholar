@@ -93,10 +93,10 @@ claim reads as a stutter, in either order.)*
 
 ## The pillars
 
-Six, in this order — the fifth deliberately small. Every surface tells the same
-story at its own length: the landing page gives each a heading and **four to
-six** points, the store listings a block of bullets, the README the full
-account.
+Seven, in this order — the fourth and sixth deliberately small. Every surface
+tells the same story at its own length: the landing page gives each a heading
+and **four to six** points, the store listings a block of bullets, the README
+the full account.
 
 The landing page's count is a ceiling, not a target (Emil, 2026-08-09: "vi
 holder ting skarpt og direkte"). It said "three or four" and had drifted to
@@ -214,7 +214,23 @@ kommentarene satt i en utvidet marg.
 - *Supporting, never the headline:* marks are standard PDF annotations with
   appearance streams and open correctly in other readers
 
-### 4. The assistant
+### 4. Search
+
+**EN heading:** Search by words or by meaning.
+**NO heading:** Søk etter ord eller mening.
+
+*(Small, like the keyboard section. Promoted to a section of its own on
+2026-08-10 — it had been a README-only block, and Emil wants the surfaces at
+parity: what one presents, the others present. Both modes live in ONE search
+bar, a tab apart, and the frame that ships with the section shows exactly
+that.)*
+
+- By words: match case, whole word, a results list with excerpts, and every
+  match marked on the page
+- By meaning: describe a topic in your own words and get the passages that
+  discuss it, ranked. This mode uses the assistant's key
+
+### 5. The assistant
 
 **EN heading:** An assistant that cites its sources.
 **NO heading:** En assistent som oppgir kildene sine.
@@ -226,8 +242,6 @@ kommentarene satt i en utvidet marg.
   limitations
 - A figure or region can be cropped into the chat and asked about; nothing is
   sent until a question is asked
-- Semantic search: describe a topic in your own words and get the passages that
-  discuss it, ranked
 - Questions about your own annotations ("summarize what I've highlighted")
 - Scanned documents are identified as such rather than answered about blindly;
   a page range can be attached as images instead
@@ -240,7 +254,7 @@ kommentarene satt i en utvidet marg.
   LM Studio (no key needed). Model lists are fetched live from each keyed
   provider, and every answer reports the provider's token count
 
-### 5. Keyboard
+### 6. Keyboard
 
 **EN heading:** Shortcuts you can rebind.
 **NO heading:** Snarveier du kan binde om.
@@ -255,7 +269,7 @@ app looks like.)*
   keys beside it
 - Any shortcut can be rebound or reset — one key or all at once
 
-### 6. Privacy
+### 7. Privacy
 
 **EN heading:** Local by default.
 **NO heading:** Lokalt som standard.

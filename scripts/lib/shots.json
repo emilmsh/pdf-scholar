@@ -50,6 +50,7 @@
     "feedback": { "ships": [] },
     "signature": { "ships": [] },
     "margin": { "ships": ["readme"] },
+    "search": { "ships": ["readme", "landing"] },
     "shortcuts": { "ships": ["readme", "landing"] },
     "dual-pane": { "ships": ["readme", "landing", "store"] },
     "assistant": { "ships": ["readme", "landing", "store"] },

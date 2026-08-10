@@ -343,6 +343,24 @@ const SHOTS = [
     `
   },
   {
+    // The frame behind the «Search by words or by meaning» section: a results
+    // list with excerpts, every match marked on the page — and the AI tab
+    // visible beside the text tab, which is the «by meaning» half of the
+    // heading. «positional encoding» is the house paper's staging query
+    // (project memory: it lands on the section the demo answers point at) and
+    // returns a list of readable length, not a wall.
+    name: 'search',
+    caption: 'Search: a results list with excerpts, every match marked on the page, the AI mode one tab away',
+    setup: `
+      await ui.closePanels()
+      await ui.fitWidth()
+      await ui.openSearch('positional encoding')
+      // The jump to the first hit leaves a "back to p. N" pill; outlast its
+      // 2.6 s idle fade like the other navigation-heavy frames do.
+      await ui.settle(3400)
+    `
+  },
+  {
     // Deliberately NOT an opening frame anywhere: a settings dialog is a thing
     // you go and find, not what an app looks like (Emil, 2026-08-09). It earns
     // a place late in a page, beside the sentence about rebinding keys.
@@ -494,6 +512,7 @@ const L = {
   unpin: ['Løsne verktøylinjen', 'Unpin the toolbar'],
   pin: ['Fest verktøylinjen', 'Pin the toolbar'],
   more: ['Flere verktøy', 'More tools'],
+  search: ['Søk i dokumentet', 'Search the document'],
   settings: ['Innstillinger', 'Settings'],
   keysOpen: ['Hurtigtaster', 'Keyboard shortcuts'],
   // Sidebar tabs carry their label as TEXT and no title — addressed by content.
@@ -646,6 +665,32 @@ const ui = {
       await settle(1200);   // the batch delete reloads the document
     }
     if (!wasOpen) { click(side); await settle(400); }
+  },
+  /** Open the search bar from its toolbar button and type a query the way a
+   *  reader does — search-as-you-type — then wait until the results list has
+   *  rows. Enter jumps to the first hit, so the page under the bar carries
+   *  marked text; both are asserted, because a frame of an empty search bar
+   *  says the opposite of what the search section claims. */
+  async openSearch(query) {
+    const b = btn(L.search);
+    if (!b) throw new Error('no search button on the toolbar');
+    if (!document.querySelector('.search-bar')) { click(b); await settle(450); }
+    const input = document.querySelector('.search-bar input');
+    if (!input) throw new Error('the search bar did not open');
+    input.focus();
+    await settle(80);
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    setter.call(input, query);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(1200);
+    if (!document.querySelector('.search-results .search-result-snippet')) {
+      throw new Error('search found nothing for "' + query + '" — is this the house demo paper?');
+    }
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle(900);
+    if (!document.querySelector('.search-hit')) {
+      throw new Error('no marked hits on the page after jumping to the first result');
+    }
   },
   /** Open the keyboard map the way a reader reaches it: the gear, then its
    *  entry. Asserting on the dialog rather than the click means a renamed menu
@@ -882,12 +927,19 @@ const ui = {
    *  survives has to fail HERE, loudly, rather than silently reappear in the
    *  corner of the next twelve screenshots. */
   async closeOverlays() {
+    // The search bar is an overlay too, but its home is a toolbar TOGGLE, and
+    // Escape belongs to its input rather than the window — so toggle it off
+    // instead of hoping a window-level Escape reaches it.
+    if (document.querySelector('.search-bar')) {
+      const sb = btn(L.search);
+      if (sb) { click(sb); await settle(350); }
+    }
     for (let i = 0; i < 3; i++) {
-      if (!document.querySelector('.shortcuts-dialog, .confirm-dialog, .ai-settings')) return;
+      if (!document.querySelector('.shortcuts-dialog, .confirm-dialog, .ai-settings, .search-bar')) return;
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       await settle(350);
     }
-    const left = document.querySelector('.shortcuts-dialog, .confirm-dialog, .ai-settings');
+    const left = document.querySelector('.shortcuts-dialog, .confirm-dialog, .ai-settings, .search-bar');
     if (left) throw new Error('an overlay survived Escape: .' + left.className.split(' ')[0]);
   },
   async exitFullscreen() {

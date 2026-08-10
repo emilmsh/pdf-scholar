@@ -44,7 +44,7 @@ READING
 • Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
 • Day, Sepia and two Night themes, with contrast and brightness adjustable per theme
 • Page rotation, two-page spread, and a full-screen presentation mode
-• Table of contents, thumbnails, bookmarks, and search with match-case and whole-word options
+• Table of contents, thumbnails and bookmarks
 • Reading positions and recent files are remembered; back/forward navigation after following internal links
 • Going back to the library closes nothing: documents stay open, and returning to one restores your place
 • Keyboard shortcuts are listed in one map and can be rebound or reset
@@ -68,11 +68,15 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • An optional name in settings fills the standard PDF author field on new annotations
 • Edits are held in a draft until saved; what is saved is standard PDF annotations, which open correctly in Acrobat and other viewers
 
+SEARCH
+Both modes live in one search bar, a tab apart.
+• By words: match case, whole word, a results list with excerpts, and every match marked on the page
+• By meaning: describe a topic in your own words and get the passages that discuss it, ranked (uses the assistant's key)
+
 AI ASSISTANT (optional — bring your own key)
 • Answers cite their sources: each claim links to the passage it came from
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
-• Semantic search: describe a topic in your own words and get the passages that discuss it
 • Scanned documents are identified as such; a page range can be attached as images for the assistant to read
 • LaTeX in answers is rendered; optional web search, off by default
 • Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — one key field each — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio (no key needed). Requests go directly to the provider; with a local model the document never leaves the machine. PDF Scholar operates no server.
@@ -90,7 +94,7 @@ LESING
 • Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
 • Dag-, Sepia- og to Natt-temaer, med kontrast og lysstyrke justerbar per tema
 • Siderotasjon, tosiders oppslag og fullskjerms presentasjonsmodus
-• Innholdsfortegnelse, miniatyrer, bokmerker og søk med skill store/små og helord
+• Innholdsfortegnelse, miniatyrer og bokmerker
 • Leseposisjon og nylige filer huskes; fram/tilbake-navigasjon etter fulgte interne lenker
 • Å gå til biblioteket lukker ingenting: dokumentene forblir åpne, og du kommer tilbake dit du var
 • Hurtigtastene står i ett kart og kan bindes om eller tilbakestilles
@@ -114,11 +118,15 @@ ANNOTERING
 • Et valgfritt navn i innstillingene fyller PDF-ens standard forfatterfelt på nye merknader
 • Endringer holdes i et utkast til du lagrer; det som lagres er standard PDF-annoteringer, som åpnes riktig i Acrobat og andre lesere
 
+SØK
+Begge modusene bor i én søkelinje, en fane fra hverandre.
+• Etter ord: skill store/små, helord, en treffliste med utdrag, og hvert treff markert på siden
+• Etter mening: beskriv et tema med egne ord og få avsnittene som omtaler det, rangert (bruker assistentens nøkkel)
+
 AI-ASSISTENT (valgfri — egen nøkkel)
 • Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
-• Semantisk søk: beskriv et tema med egne ord og få avsnittene som omtaler det
 • Skannede dokumenter identifiseres som det; et sideutvalg kan legges ved som bilder som assistenten leser
 • LaTeX i svar gjengis; valgfritt nettsøk, av som standard
 • Leverandører: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — ett nøkkelfelt hver — pluss et hvilket som helst OpenAI-kompatibelt endepunkt og lokale modeller via Ollama eller LM Studio (uten nøkkel). Forespørslene går rett til leverandøren; med en lokal modell forlater dokumentet aldri maskinen. PDF Scholar driver ingen egen server.
