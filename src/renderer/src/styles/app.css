@@ -3437,6 +3437,13 @@ html.pen-near .draw-layer {
   background: var(--bg-chrome);
   border-left: 1px solid var(--border);
   overflow: hidden;
+  /* Reading measure for the conversation surface: 48em of the 13px message
+     font (the width ChatGPT caps its thread column at), scaled with the
+     text-size preference so a bigger font keeps the same characters per
+     line. Messages, landing and composer turn width beyond it into gutters
+     (padding-inline at each site) — a detached window on a full monitor
+     would otherwise run 200-character lines. */
+  --ai-measure: calc(624px * var(--ai-scale, 1));
 }
 
 .ai-header {
@@ -3536,7 +3543,9 @@ html.pen-near .draw-layer {
 .ai-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 14px 14px 8px;
+  padding-block: 14px 8px;
+  /* Cap the column at --ai-measure; the scrollbar stays at the panel edge */
+  padding-inline: max(14px, calc((100% - var(--ai-measure)) / 2));
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3587,7 +3596,8 @@ html.pen-near .draw-layer {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px 14px;
+  padding-block: 16px;
+  padding-inline: max(14px, calc((100% - var(--ai-measure)) / 2));
 }
 
 /* Every font-size in the conversation surface (landing, messages, composer —
@@ -3961,7 +3971,8 @@ html.pen-near .draw-layer {
    mic + send controls anchored bottom-right inside it — nothing beside it, so
    a narrow panel never gets cramped. */
 .ai-composer {
-  padding: 10px 12px 4px;
+  padding-block: 10px 4px;
+  padding-inline: max(12px, calc((100% - var(--ai-measure)) / 2));
 }
 
 .ai-composer-field {
