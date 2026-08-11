@@ -48,7 +48,7 @@
     "dist": "npm run build && electron-builder --win --config config/electron-builder.yml",
     "dist:linux": "npm run build && electron-builder --linux --config config/electron-builder.yml",
     "dist:mac": "npm run build && electron-builder --mac --config config/electron-builder.yml",
-    "dist:store": "npm run build && electron-builder --win --config config/electron-builder.store.yml",
+    "dist:store": "npm run build && electron-builder --win --publish never --config config/electron-builder.store.yml",
     "test:password": "esbuild src/main/annotation-engine-embedpdf.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.engine-test-bundle.mjs && node scripts/test-password.mjs",
     "test:signatures": "esbuild src/main/annotation-engine-embedpdf.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.engine-test-bundle.mjs && node scripts/test-signatures.mjs",
     "test:signature-stamp": "node scripts/test-signature-stamp.mjs"
