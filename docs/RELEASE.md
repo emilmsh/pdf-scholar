@@ -65,14 +65,15 @@ surface missing one it needs.
 |---|---|---|---|
 | `tricolor` (composed) | hero | hero + `og:image` | 1 |
 | `annotations` | ✓ | ✓ | 2 |
+| `search_ai` | ✓ | ✓ | — (carries the search section) |
 | `assistant` | ✓ | ✓ | 3 |
 | `assistant_figure` | ✓ | — | 4 |
 | `assistant_snip` | ✓ | — | — |
 | `dual-pane` | ✓ | ✓ | 5 |
 | `margin` | ✓ | — | — |
 | `reading`, `parchment`, `night` | — | — | — (tricolor's sources) |
-| `shortcuts` | ✓ | ✓ | — (last in Reading, never an opening frame) |
-| `night+`, `annotations_edit`, `reading_tabs`, `page_only`, `feedback`, `signature` | — | — | — (shot as smoke tests) |
+| `shortcuts` | ✓ | ✓ | — (its own section after the assistant, never an opening frame) |
+| `night+`, `annotations_edit`, `reading_tabs`, `page_only`, `feedback`, `signature`, `search` | — | — | — (shot as smoke tests) |
 
 **Why tricolor opens everything, and why it keeps its toolbar** (Emil, 2026-08-08).
 A frame that OPENS a surface has to read as an application, so the opening frame
@@ -87,12 +88,13 @@ body page at fit-width with the toolbar unpinned — used to be the second frame
 both the README and the landing page. It came out because a picture with no
 application in it cannot carry a section: the other frames all show the app doing
 something, and this one showed its absence, which next to a browser's built-in
-viewer proves nothing. The reading section now OPENS on `tricolor` and closes on
-`shortcuts` — the keyboard map, beside the line about every shortcut being yours
-to change. That order is the rule, not an accident: a settings dialog is a thing
-you go and find, so it can end a section and must never begin one. Do not reach for an
-unshipped frame to fill a section either — the ones sitting at `ships: []` are
-there because they were judged and rejected, not because nobody got around to them.
+viewer proves nothing. The reading section sits directly under `tricolor` and
+carries no picture of its own; the keyboard map has its own small section after
+the assistant (2026-08-10). The rule behind its placement stands: a settings
+dialog is a thing you go and find, so it must never begin a surface. Do not reach
+for an unshipped frame to fill a section either — the ones sitting at `ships: []`
+are there because they were judged and rejected, not because nobody got around to
+them (`search`, the text mode, lost to `search_ai` on exactly those terms).
 
 Shoot everything in one run when you re-shoot anything: the frames share a
 session, and a set mixed across runs shows the app at two different moments.

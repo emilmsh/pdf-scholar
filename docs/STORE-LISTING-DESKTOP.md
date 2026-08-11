@@ -138,28 +138,18 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.37.0
+## What's new in this version (≤ 1 500 chars) — v0.38.0
 
 **EN:**
 ```
-• Every keyboard shortcut is now listed in one map in settings — grouped by task, the whole thing readable at a glance — and any of them can be rebound or reset
-• Going back to the library no longer closes your documents: they stay in the tab strip, and clicking one returns you exactly where you were
-• The text tool offers a real typeface choice — Helvetica, Times or Courier, bold and italic — picked before you type or changed afterwards on a box that already exists. They are the PDF's own fonts, so the words stay real, searchable text in every reader
-• Black is properly black now, for the pen and the text tool alike. It used to be a soft off-black that read as grey in the dark themes
-• A slimmer toolbar: print moved in beside Save, and the tools you reach for are less crowded
-• Drawing with a mouse is smooth again — the line no longer wanders ahead of the cursor before settling
-• A signature can be uploaded or pasted as a picture instead of drawn, and a photographed one has its paper removed so only the ink lands on the page
+• The assistant can open in its own window: the document keeps the whole screen — or a whole monitor — and a citation click still goes to the passage in the window showing the document, and raises it
+• The answer text has its own size control, 80–160 % in fixed steps, from the model menu or Ctrl+scroll over the panel. It scales the conversation only; the document's zoom is untouched
 ```
 
 **NO:**
 ```
-• Alle hurtigtaster står nå i ett kart i innstillingene — gruppert etter oppgave, hele oversikten lesbar på én gang — og hver enkelt kan bindes om eller tilbakestilles
-• Å gå tilbake til biblioteket lukker ikke lenger dokumentene: de blir stående i fanestripa, og ett klikk tar deg tilbake nøyaktig dit du var
-• Tekstverktøyet har fått et ekte skriftvalg — Helvetica, Times eller Courier, fet og kursiv — valgt før du skriver eller endret etterpå på en boks som alt finnes. Det er PDF-ens egne skrifter, så ordene forblir ekte, søkbar tekst i enhver leser
-• Svart er ordentlig svart nå, for både penn og tekst. Før var det en myk nesten-svart som leste som grå i mørke temaer
-• En slankere verktøylinje: utskrift har flyttet inn ved siden av Lagre, og verktøyene du strekker deg etter har fått bedre plass
-• Å tegne med mus er jevnt igjen — streken vandrer ikke lenger foran musepekeren før den faller på plass
-• Signaturen kan lastes opp eller limes inn som bilde i stedet for å tegnes, og et fotografert eksemplar får papiret fjernet så bare blekket havner på siden
+• Assistenten kan åpnes i eget vindu: dokumentet beholder hele skjermen — eller en hel monitor — og et sitatklikk går fortsatt til avsnittet i vinduet som viser dokumentet, og løfter det fram
+• Svarteksten har fått egen størrelseskontroll, 80–160 % i faste trinn, fra modellmenyen eller Ctrl+rullehjul over panelet. Den skalerer bare samtalen; dokumentets zoom er urørt
 ```
 
 ---
