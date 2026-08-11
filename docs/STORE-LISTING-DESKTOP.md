@@ -138,13 +138,14 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.38.1
+## What's new in this version (≤ 1 500 chars) — v0.38.2
 
 **EN:**
 ```
 • The assistant can open in its own window: the document keeps the whole screen — or a whole monitor — and a citation click still goes to the passage in the window showing the document, and raises it
 • The answer text has its own size control, 80–160 % in fixed steps, from the model menu or Ctrl+scroll over the panel. It scales the conversation only; the document's zoom is untouched
 • In a wide window the conversation keeps a fixed reading width instead of running full-width lines
+• Fixed: a window last closed on a monitor that is no longer connected could reopen out of sight; remembered positions are now placed back onto a connected display
 ```
 
 **NO:**
@@ -152,6 +153,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Assistenten kan åpnes i eget vindu: dokumentet beholder hele skjermen — eller en hel monitor — og et sitatklikk går fortsatt til avsnittet i vinduet som viser dokumentet, og løfter det fram
 • Svarteksten har fått egen størrelseskontroll, 80–160 % i faste trinn, fra modellmenyen eller Ctrl+rullehjul over panelet. Den skalerer bare samtalen; dokumentets zoom er urørt
 • I et bredt vindu holder samtalen en fast lesebredde i stedet for linjer over hele vinduet
+• Rettet: et vindu sist lukket på en skjerm som ikke lenger er tilkoblet kunne gjenåpnes utenfor synsfeltet; huskede posisjoner legges nå tilbake på en tilkoblet skjerm
 ```
 
 ---
