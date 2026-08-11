@@ -365,9 +365,10 @@ const SHOTS = [
     // the query is phrased in words the paper never uses, and the hits are the
     // passages that answer it — the first one followed, so the page shows the
     // flashed sentence beside the list that named it. Keyless runs replay
-    // docs/ai-fixtures/search.json, like the assistant frames; the flash
-    // animation runs 7 s, so the short settle photographs it mid-glow rather
-    // than waiting for the nav pill and losing the flash.
+    // docs/ai-fixtures/search.json, like the assistant frames. The settle
+    // threads a needle Emil called (2026-08-10): the jump's "back to p. N"
+    // pill fades after 2.6 s idle, the flash animation runs 7 s — so 3 s
+    // photographs the flash mid-glow with the pill gone.
     name: 'search_ai',
     caption: 'AI search: a plain-words query, ranked passages, the first one flashed on the page',
     needsAi: true,
@@ -375,7 +376,7 @@ const SHOTS = [
       await ui.closePanels()
       await ui.fitWidth()
       await ui.openAiSearch('How does the model know the order of the words?')
-      await ui.settle(1200)
+      await ui.settle(3000)
     `
   },
   {

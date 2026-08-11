@@ -217,6 +217,8 @@ panel beside the document.
 
 ### Search by words or by meaning
 
+![The AI search: a question in plain words, the ranked passages that answer it, and the first one highlighted on the page](docs/screenshots/search_ai.png)
+
 Both modes live in one search bar, a tab apart.
 
 - By words (Ctrl+F): match case, whole word, a results list with excerpts, and F3 /
