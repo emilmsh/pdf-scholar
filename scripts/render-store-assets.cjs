@@ -1,6 +1,8 @@
 // Render the extension-store listing assets into docs/store-assets/: the
-// 300x300 "Extension logo" both dashboards ask for, and the 440x280 small
-// promotional tile. These are neither app icons (build/icon.png) nor the
+// 300x300 "Extension logo" the Edge dashboard asks for, the 128x128 store
+// icon the Chrome dashboard asks for (content at 96x96 with transparent
+// padding, per the CWS image guidelines for full-bleed marks), and the
+// 440x280 small promotional tile both take. These are neither app icons (build/icon.png) nor the
 // in-package extension icons (src/extension/icons/, capped at 128px) — they
 // are uploaded by hand in the Edge/Chrome dashboards, which is exactly how
 // the Edge listing kept showing the pre-v0.25.4 scroll logo long after every
@@ -34,6 +36,24 @@ app.whenReady().then(async () => {
   console.log(`wrote extension-logo-300.png (${logo.length} bytes, 300x300)`)
 
   const svg = fs.readFileSync(path.join(__dirname, 'icon.svg'), 'utf-8')
+
+  // Chrome Web Store icon: 128x128 canvas, mark at 96x96, transparent
+  // padding. A window capture cannot carry alpha reliably, so composite the
+  // PNG by hand: downscale the master to 96, then centre its rows into a
+  // 128x128 BGRA buffer and let nativeImage re-encode it.
+  const small = base.resize({ width: 96, height: 96, quality: 'best' })
+  const smallBmp = small.toBitmap()
+  const CW = 128
+  const off = (CW - 96) / 2
+  const canvas = Buffer.alloc(CW * CW * 4)
+  for (let y = 0; y < 96; y++) {
+    smallBmp.copy(canvas, ((y + off) * CW + off) * 4, y * 96 * 4, (y + 1) * 96 * 4)
+  }
+  const cwsIcon = nativeImage
+    .createFromBitmap(canvas, { width: CW, height: CW })
+    .toPNG()
+  fs.writeFileSync(path.join(outDir, 'chrome-store-icon-128.png'), cwsIcon)
+  console.log(`wrote chrome-store-icon-128.png (${cwsIcon.length} bytes, 128x128, 96px mark)`)
   const logoPx = Math.round(TILE.h * TILE.scale)
   const win = new BrowserWindow({
     show: false,
