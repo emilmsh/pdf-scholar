@@ -242,7 +242,11 @@ if ($app.PSObject.Properties.Name -contains 'pendingApplicationSubmission' -and 
 
 # --- 4. create a new submission (clones the last published one) -----------
 Write-Host 'Creating a new submission...'
-$submission = Invoke-RestMethod -Method Post -Uri "$apiBase/applications/$AppId/submissions" -Headers $headers
+# The Ingestion API started rejecting body-less POSTs ("Only JSON content is
+# accepted", target: mediaType) — an empty JSON body forces the Content-Type
+# header onto the wire, which Invoke-RestMethod omits when there is no body.
+$submission = Invoke-RestMethod -Method Post -Uri "$apiBase/applications/$AppId/submissions" -Headers $headers `
+  -ContentType 'application/json' -Body '{}'
 $submissionId = $submission.id
 $uploadUrl    = $submission.fileUploadUrl
 Write-Host "Submission $submissionId created."
@@ -311,7 +315,8 @@ Invoke-RestMethod -Method Put -Uri "$apiBase/applications/$AppId/submissions/$su
 
 # --- 9. commit ------------------------------------------------------------
 Write-Host 'Committing submission...'
-Invoke-RestMethod -Method Post -Uri "$apiBase/applications/$AppId/submissions/$submissionId/commit" -Headers $headers | Out-Null
+Invoke-RestMethod -Method Post -Uri "$apiBase/applications/$AppId/submissions/$submissionId/commit" -Headers $headers `
+  -ContentType 'application/json' -Body '{}' | Out-Null
 
 # --- 10. poll status ------------------------------------------------------
 Write-Host 'Waiting for commit to finish...'
