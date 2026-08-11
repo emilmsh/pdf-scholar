@@ -327,6 +327,31 @@ function cascadeBounds(
   }
 }
 
+/** A remembered rect is only trusted back onto a display that still exists.
+ *  Bounds saved while a window sat on a since-unplugged monitor reopen it
+ *  fully off-screen — the assistant window shipped doing exactly that (closed
+ *  at y −1209 on a display above the primary, reopened after undocking with
+ *  nothing visible anywhere). Clamp into the work area of the closest live
+ *  display, the same guard cascadeBounds gives new document windows. */
+function onLiveDisplay(saved: { x: number; y: number; width: number; height: number }): {
+  x: number
+  y: number
+  width: number
+  height: number
+} {
+  const area = screen.getDisplayMatching(saved).workArea
+  const width = Math.min(saved.width, area.width)
+  const height = Math.min(saved.height, area.height)
+  const fit = (v: number, min: number, span: number, extent: number): number =>
+    Math.max(min, Math.min(v, min + span - extent))
+  return {
+    x: fit(saved.x, area.x, area.width, width),
+    y: fit(saved.y, area.y, area.height, height),
+    width,
+    height
+  }
+}
+
 function createWindow(openPath?: string | null): BrowserWindow {
   const state = getState()
   const cascade = cascadeBounds(
@@ -338,16 +363,24 @@ function createWindow(openPath?: string | null): BrowserWindow {
   // what makes Electron centre a first window on the primary display. Passing
   // `x: undefined` did the same thing in practice, but the type is right to
   // insist, so the absence is now explicit.
-  const position =
-    cascade
-      ? { x: cascade.x, y: cascade.y }
-      : state.window?.x !== undefined && state.window?.y !== undefined
-        ? { x: state.window.x, y: state.window.y }
-        : {}
+  const remembered =
+    state.window?.x !== undefined && state.window?.y !== undefined
+      ? onLiveDisplay({
+          x: state.window.x,
+          y: state.window.y,
+          width: state.window.width,
+          height: state.window.height
+        })
+      : null
+  const position = cascade
+    ? { x: cascade.x, y: cascade.y }
+    : remembered
+      ? { x: remembered.x, y: remembered.y }
+      : {}
 
   const win = new BrowserWindow({
-    width: cascade?.width ?? state.window?.width ?? 1280,
-    height: cascade?.height ?? state.window?.height ?? 860,
+    width: cascade?.width ?? remembered?.width ?? state.window?.width ?? 1280,
+    height: cascade?.height ?? remembered?.height ?? state.window?.height ?? 860,
     ...position,
     minWidth: 640,
     minHeight: 480,
@@ -525,12 +558,16 @@ function createAssistantWindow(path: string): BrowserWindow {
     return existing
   }
   const saved = getState().assistantWindow
+  const remembered =
+    saved && saved.x !== undefined && saved.y !== undefined
+      ? onLiveDisplay({ x: saved.x, y: saved.y, width: saved.width, height: saved.height })
+      : null
   const win = new BrowserWindow({
     // Its own remembered bounds under state.assistantWindow — a chat column is
     // not a document window, and neither one's size should leak into the other.
-    width: saved?.width ?? 460,
-    height: saved?.height ?? 760,
-    ...(saved?.x !== undefined && saved?.y !== undefined ? { x: saved.x, y: saved.y } : {}),
+    width: remembered?.width ?? saved?.width ?? 460,
+    height: remembered?.height ?? saved?.height ?? 760,
+    ...(remembered ? { x: remembered.x, y: remembered.y } : {}),
     minWidth: 320,
     minHeight: 420,
     show: false,

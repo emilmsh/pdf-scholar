@@ -15,7 +15,7 @@
 //   same conversation (shared store + storage-event refresh); and closing the
 //   assistant window records its bounds under state.assistantWindow WITHOUT
 //   touching the main window's saved bounds.
-import { existsSync, copyFileSync, readFileSync, unlinkSync } from 'node:fs'
+import { existsSync, copyFileSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -94,7 +94,21 @@ if (!existsSync(mainJs)) {
 }
 copyFileSync(join(ROOT, 'src', 'renderer', 'public', 'sample.pdf'), FILE)
 
-const app = launchApp({ root: ROOT, mainJs, args: [FILE], port: PORT })
+// The profile remembers the assistant window on a display that no longer
+// exists (y −20000 — no real monitor arrangement reaches it). v0.38.0 restored
+// those coordinates blindly and the window opened with nothing visible
+// anywhere; the detach below must land it on a live display instead.
+const app = launchApp({
+  root: ROOT,
+  mainJs,
+  args: [FILE],
+  port: PORT,
+  prepareProfile: (dir) =>
+    writeFileSync(
+      join(dir, 'pdfx-state.json'),
+      JSON.stringify({ assistantWindow: { x: 300, y: -20000, width: 574, height: 915 } })
+    )
+})
 const sockets = []
 
 try {
@@ -131,6 +145,20 @@ try {
   const B = await attach(targetB)
   sockets.push(B.ws)
   check('assistant window shows the chat shell', await evalIn(B.send, `return await ui.waitFor('.assistant-window .ai-panel')`))
+  // The seeded phantom position must not be restored verbatim: the window has
+  // to intersect the display it reports as its own (screen.avail* is the live
+  // monitor Windows assigned it to — at y −20000 the two rects cannot meet).
+  const onScreen = await evalIn(
+    B.send,
+    `const r = { x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight };
+     const a = { x: screen.availLeft, y: screen.availTop, w: screen.availWidth, h: screen.availHeight };
+     return { hit: r.x < a.x + a.w && r.x + r.w > a.x && r.y < a.y + a.h && r.y + r.h > a.y, r, a };`
+  )
+  check(
+    'bounds remembered on a dead display are clamped onto a live one',
+    onScreen.hit,
+    `window=${JSON.stringify(onScreen.r)} display=${JSON.stringify(onScreen.a)}`
+  )
   check(
     'the assistant window mounts no pages',
     (await evalIn(B.send, `return document.querySelectorAll('.pdf-page').length`)) === 0
@@ -169,7 +197,10 @@ try {
   check('the reopened docked panel lists the assistant-window conversation', histShown)
 
   // ---- closing the assistant window records ITS bounds, not the main window's
-  await evalIn(B.send, `window.close()`)
+  // The page destroys its own context here, so the CDP response may never
+  // arrive (awaiting it once hung a run for its full timeout) — fire without
+  // awaiting; the target poll below is the real confirmation.
+  evalIn(B.send, `window.close()`).catch(() => {})
   let remaining = []
   for (let i = 0; i < 25; i++) {
     remaining = await listPageTargets(PORT)
