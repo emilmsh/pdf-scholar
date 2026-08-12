@@ -68,6 +68,28 @@ async function openAiLive(key) {
     .filter((id) => !/-\d{4}(-\d{2}-\d{2})?$/.test(id))
 }
 
+/** The hosted compat services list via GET {baseUrl}/models like the app does.
+ *  Base URLs parsed from ai-provider-profile.ts so a moved endpoint cannot
+ *  make this script silently check the wrong host. Gemini prefixes ids with
+ *  "models/" — normalized here exactly like modelOptions does. */
+function compatServiceBaseUrl(service) {
+  const src = readFileSync(join(root, 'src/shared/ai-provider-profile.ts'), 'utf8')
+  const m = src.match(new RegExp(`${service}:\\s*\\{\\s*baseUrl:\\s*'([^']+)'`))
+  return m ? m[1] : null
+}
+
+async function compatServiceLive(service, key) {
+  const baseUrl = compatServiceBaseUrl(service)
+  if (!baseUrl) throw new Error(`could not parse ${service} baseUrl from ai-provider-profile.ts`)
+  const res = await fetch(`${baseUrl}/models`, { headers: { authorization: `Bearer ${key}` } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const body = await res.json()
+  return (body.data ?? [])
+    .map((m) => m.id)
+    .filter(Boolean)
+    .map((id) => id.replace(/^models\//, ''))
+}
+
 // ---------- Report ----------
 
 const EFFORT_LADDER = ['low', 'medium', 'high', 'xhigh', 'max']
@@ -92,8 +114,13 @@ function diff(provider, curated, live, fallbackDefault) {
 
 console.log('Model catalogue drift report (see docs/MODEL-UPDATE.md for the protocol)')
 
-// Static sanity: every default must be in the curated list it belongs to
-for (const provider of ['anthropic', 'openai']) {
+// Every provider whose menu is curated-only (ai-models.ts modelOptions) —
+// openrouter and compat are live-listed by design and have nothing to check
+const CURATED_PROVIDERS = ['anthropic', 'openai', 'gemini', 'xai', 'mistral', 'groq']
+
+// Static sanity: the curated lists parse, and every non-empty default is in
+// the curated list it belongs to
+for (const provider of CURATED_PROVIDERS) {
   const ids = curatedIds(provider)
   if (ids.length === 0) flag(`could not parse curated ${provider} ids from ai-models.ts`)
   const def = defaultModel(provider)
@@ -136,6 +163,27 @@ if (openAiKey) {
   }
 } else {
   console.log('\nopenai: skipped live check (set OPENAI_API_KEY to enable)')
+}
+
+// The hosted compat services with curated lists — same diff when a key is in
+// the environment; without one the web half of docs/MODEL-UPDATE.md applies
+const SERVICE_KEYS = {
+  gemini: 'GEMINI_API_KEY',
+  xai: 'XAI_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+  groq: 'GROQ_API_KEY'
+}
+for (const [service, envVar] of Object.entries(SERVICE_KEYS)) {
+  const key = process.env[envVar]
+  if (!key) {
+    console.log(`\n${service}: skipped live check (set ${envVar} to enable)`)
+    continue
+  }
+  try {
+    diff(service, curatedIds(service), await compatServiceLive(service, key), defaultModel(service))
+  } catch (err) {
+    flag(`${service} live check failed: ${err.message}`)
+  }
 }
 
 console.log(

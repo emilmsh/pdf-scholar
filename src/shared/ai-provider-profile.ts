@@ -41,8 +41,13 @@ export interface AiProviderProfile {
  *  by request shaping (ai-chat.ts) and the reasoning selector's visibility
  *  (AiModelMenu), so what the UI offers and what the request sends can never
  *  drift apart. Providers whose profile says thinking:'per-model' (Anthropic)
- *  have their own capability logic and never consult this. */
-export const OPENAI_REASONING_RE = /gpt-5|o[0-9]/i
+ *  have their own capability logic and never consult this.
+ *
+ *  grok-4.5 is included because xAI documents reasoning_effort (low/medium/
+ *  high) for it (docs/agent-notes/modeller-api.md, verified 2026-08-12); the
+ *  match is deliberately that narrow — other grok ids stay out until someone
+ *  verifies them, per the fewer-models-that-work rule. */
+export const OPENAI_REASONING_RE = /gpt-5|o[0-9]|grok-4\.5/i
 
 /** The first-class hosted OpenAI-compatible services (fase 10.3): a FINITE,
  *  curated set — one key field each, entered once, stored exactly like the

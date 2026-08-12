@@ -55,6 +55,13 @@ export const compatPresets = (): { label: string; url: string; modelHint: string
 // list stays clean without leaving new users guessing. `label` is the
 // dropdown text; `short` is for the compact header chip (never the raw
 // hyphenated id).
+//
+// These lists are the WHOLE menu for their provider (modelOptions below):
+// a model is offered because we verified it against our request parameters,
+// never because the provider happens to list it — offering fewer models that
+// work beats offering everything (Emil, 2026-08-12). Kept current by the
+// scheduled review in docs/MODEL-UPDATE.md; deliberately short — current
+// generation only, no retired or dated-snapshot ids.
 export const MODELS: Record<
   AiProviderId,
   { id: string; label: string; short: string; hint?: MsgKey }[]
@@ -71,13 +78,34 @@ export const MODELS: Record<
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
   ],
   azure: [],
-  // The compat family (hosted services + custom/local) has no curated lists:
-  // the endpoint decides what exists, and the live /models fetch fills the menu
+  // Hosted-service lineups verified against provider docs 2026-08-12
+  // (docs/agent-notes/modeller-api.md has the sources and open questions)
+  gemini: [
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', short: 'Gemini 3.1 Pro', hint: 'ai.modelHintCapable' },
+    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', short: 'Gemini 3.6 Flash', hint: 'ai.modelHintRecommended' },
+    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Gemini 3.5 Flash-Lite', hint: 'ai.modelHintFast' }
+  ],
+  xai: [
+    { id: 'grok-4.5', label: 'Grok 4.5', short: 'Grok 4.5', hint: 'ai.modelHintCapable' },
+    { id: 'grok-4.3', label: 'Grok 4.3', short: 'Grok 4.3', hint: 'ai.modelHintRecommended' }
+  ],
+  // Mistral publishes dated ids only — Medium outranks Large in their current
+  // lineup (Medium 3.5 is the frontier model, Large 3 the value workhorse)
+  mistral: [
+    { id: 'mistral-medium-3-5-26-04', label: 'Mistral Medium 3.5', short: 'Mistral Medium', hint: 'ai.modelHintCapable' },
+    { id: 'mistral-large-3-25-12', label: 'Mistral Large 3', short: 'Mistral Large', hint: 'ai.modelHintRecommended' },
+    { id: 'mistral-small-4-0-26-03', label: 'Mistral Small 4', short: 'Mistral Small', hint: 'ai.modelHintFast' }
+  ],
+  // Groq's PRODUCTION tier only (their own designation) — the Llama pair was
+  // deprecated 2026-06-17 with gpt-oss as the named replacement
+  groq: [
+    { id: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B', short: 'GPT-OSS 120B', hint: 'ai.modelHintRecommended' },
+    { id: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B', short: 'GPT-OSS 20B', hint: 'ai.modelHintFast' }
+  ],
+  // No curated list where the endpoint IS the catalogue: OpenRouter is an
+  // aggregator (hundreds of models is the product) and compat is whatever
+  // server the user pointed us at — the live /models fetch fills those menus
   openrouter: [],
-  gemini: [],
-  xai: [],
-  mistral: [],
-  groq: [],
   compat: [],
   mock: [{ id: 'mock-1', label: 'Testmodell (mock)', short: 'Testmodell' }]
 }
@@ -103,11 +131,15 @@ export interface ModelOption {
   missing: boolean
 }
 
-/** The dropdown list for a provider: curated entries first (flagged when the
- *  live catalog no longer lists them), then live-discovered models the curated
- *  list does not know yet, in the provider's own (newest-first) order. With no
- *  fetched catalog this degrades to exactly the curated list.
+/** The dropdown list for a provider. A provider with a curated list shows
+ *  EXACTLY that list — live-discovered models are not appended, because a new
+ *  id is a model whose parameters nobody has verified yet (the scheduled
+ *  review in docs/MODEL-UPDATE.md adds it once someone has). The live catalog
+ *  still speaks here in one way: a curated id the provider no longer lists is
+ *  flagged (probably retired — the UI marks it ⚠).
  *
+ *  Providers with no curated list (OpenRouter, compat) are the opposite by
+ *  design: the endpoint IS the catalogue, so the live fetch fills the menu.
  *  For compat, pass the configured base URL: the snapshot remembers which
  *  endpoint it came from, and a list fetched from another server must not
  *  show against this one. */
@@ -126,25 +158,27 @@ export function modelOptions(
       : provider === 'anthropic' || provider === 'openai' || isCompatService(provider)
         ? catalog?.[provider]
         : undefined
-  if (!remote) return curated.map((m) => ({ ...m, curated: true, missing: false }))
-  const remoteIds = new Set(remote.models.map((m) => m.id))
-  const options: ModelOption[] = curated.map((m) => ({
-    ...m,
-    curated: true,
-    missing: !remoteIds.has(m.id)
-  }))
+  if (curated.length > 0) {
+    if (!remote) return curated.map((m) => ({ ...m, curated: true, missing: false }))
+    // Gemini's compat listing prefixes ids with "models/" while chat accepts
+    // the bare id — normalize so the retirement flag never fires on a prefix
+    const remoteIds = new Set(remote.models.map((m) => m.id.replace(/^models\//, '')))
+    return curated.map((m) => ({ ...m, curated: true, missing: !remoteIds.has(m.id) }))
+  }
+  if (!remote) return []
   // «lokal»-merke: models served from a loopback endpoint say so in the list
   // (the short chip name stays clean)
   const localSuffix =
     provider === 'compat' && catalog?.compat && isLocalEndpoint(catalog.compat.baseUrl)
       ? ` · ${t('ai.localTag')}`
       : ''
-  for (const m of remote.models) {
-    if (curated.some((c) => c.id === m.id)) continue
-    const label = (m.displayName ?? prettyModelName(provider, m.id)) + localSuffix
-    options.push({ id: m.id, label, short: prettyModelName(provider, m.id), curated: false, missing: false })
-  }
-  return options
+  return remote.models.map((m) => ({
+    id: m.id,
+    label: (m.displayName ?? prettyModelName(provider, m.id)) + localSuffix,
+    short: prettyModelName(provider, m.id),
+    curated: false,
+    missing: false
+  }))
 }
 
 /** Clean display name for the header chip. Uses the curated `short` name when the
@@ -179,7 +213,17 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   'claude-haiku-4-5': 200_000,
   'gpt-5.6-sol': 250_000,
   'gpt-5.6-terra': 250_000,
-  'gpt-5.6-luna': 250_000
+  'gpt-5.6-luna': 250_000,
+  // Verified against provider docs 2026-08-12; entries missing here on
+  // purpose (Gemini Flash-Lite, the Mistral trio) fall back to the provider
+  // floor because no context number was documented — excerpting early is the
+  // cheap failure, erroring mid-question is not
+  'gemini-3.1-pro-preview': 1_000_000,
+  'gemini-3.6-flash': 1_000_000,
+  'grok-4.5': 500_000,
+  'grok-4.3': 1_000_000,
+  'openai/gpt-oss-120b': 131_072,
+  'openai/gpt-oss-20b': 131_072
 }
 
 const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {

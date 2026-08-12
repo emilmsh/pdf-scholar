@@ -185,6 +185,7 @@ const QUOTE_CONTRACT = `
 
 CITATION RULES (important):
 - When you draw on the document, cite the source inline in the form [KILDE s.N: "verbatim excerpt"].
+- Write the literal word KILDE — never the document's filename or title in its place.
 - The excerpt MUST be an exact, verbatim substring of the document text (10–200 characters), and N is the page number where it appears (pages are marked "[Side N]" or "[Page N]" in the document).
 - Never invent quotes. If you cannot support a claim with a verbatim excerpt, say so explicitly.`
 
@@ -199,12 +200,21 @@ CITATION RULES (important):
 const CONTEXT_OVERFLOW_RE =
   /prompt is too long|too many tokens|context window|context length|maximum.{0,30}(context|tokens)/i
 
-/** A provider failure as a FileError. The context-overflow case is one WE can
- *  name, so it carries a code the renderer translates — while `error` keeps the
- *  provider's own sentence, which names the token counts and is the only part
- *  worth reading in a log. Anything else travels as its own text for the same
- *  reason: no invented translation could carry that detail. */
+// Account rate-limit rejections, across provider phrasings (OpenAI "Request
+// too large for <model> … on tokens per min (TPM)" / "Rate limit reached",
+// Anthropic "would exceed your organization's rate limit"). Checked BEFORE
+// context overflow: these also talk about tokens, but the fix is different —
+// wait, narrow the question, or pick a model with a higher quota.
+const RATE_LIMIT_RE = /request too large|rate.?limit|tokens per min/i
+
+/** A provider failure as a FileError. The rate-limit and context-overflow
+ *  cases are ones WE can name, so they carry codes the renderer translates —
+ *  while `error` keeps the provider's own sentence, which names the token
+ *  counts and is the only part worth reading in a log. Anything else travels
+ *  as its own text for the same reason: no invented translation could carry
+ *  that detail. */
 function providerFailure(message: string): FileError {
+  if (RATE_LIMIT_RE.test(message)) return AI_ERRORS.rateLimited(message)
   return CONTEXT_OVERFLOW_RE.test(message)
     ? AI_ERRORS.contextOverflow(message)
     : { error: message }
@@ -421,7 +431,11 @@ function parseQuoteContract(text: string): AiContentPart[] {
   // on a quote immediately followed by "]", so a model that puts (often escaped)
   // quotes inside the excerpt no longer breaks the match. Escapes are stripped below
   // so the quote stays a verbatim document substring for locate + highlight.
-  const regex = /\s*\[KILDE\s+s\.?\s*(\d+)\s*:\s*[«"“]([\s\S]{5,300}?)["»”]\]/gi
+  // The source token is any short bracket-safe run, not the literal KILDE:
+  // models (Gemini, observed 2026-08-12) substitute the document's filename
+  // ("[grebe2015-edoc.pdf s.2: …]"), and a marker that names the right page
+  // and quote is a citation regardless of what the model called the source.
+  const regex = /\s*\[[^\n[\]:«"“]{1,80}?\s+s\.?\s*(\d+)\s*:\s*[«"“]([\s\S]{5,300}?)["»”]\]/gi
   const parts: AiContentPart[] = []
   let last = 0
   let match: RegExpExecArray | null

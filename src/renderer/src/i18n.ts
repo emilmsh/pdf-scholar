@@ -87,6 +87,8 @@ const nb = {
     'Endepunktet svarte, men ikke som et OpenAI-kompatibelt API. Sjekk at base-URL-en peker på API-roten (vanligvis …/v1).',
   'aierr.ai-context-overflow':
     'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Start en ny samtale, eller bytt til en modell med større kontekstvindu.',
+  'aierr.ai-rate-limited':
+    'Leverandøren avviste forespørselen fordi kontoens minuttkvote for tokens er for lav for dette dokumentet, eller brukt opp. Vent litt og prøv igjen, still et mer avgrenset spørsmål — eller bytt til en nyere modell, som gjerne har høyere kvote.',
   'aierr.ai-refusal':
     'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren). Prøv å omformulere, eller bytt modell.',
   'aierr.ai-stream-aborted': 'Strømmen ble avbrutt uten fullført svar.',
@@ -470,6 +472,7 @@ const nb = {
   'search.modeAi': 'KI',
   'search.modeAiTip': 'KI-søk: finn stedene der et tema omtales. Enter søker — bruker KI-leverandøren og koster penger.',
   'search.aiPlaceholder': 'Beskriv hva du leter etter …',
+  'search.aiModelTip': 'KI-modellen som svarer — byttes i assistentens modellmeny',
   'search.aiSearching': 'KI leter i dokumentet …',
   'search.aiHits': '{count} steder',
   'search.aiNoHits': 'Fant ingen steder for dette',
@@ -892,6 +895,8 @@ const en: Dict = {
     'The endpoint answered, but not like an OpenAI-compatible API. Check that the base URL points at the API root (usually …/v1).',
   'aierr.ai-context-overflow':
     'The document (or the conversation) is too large for the model’s context window, so the request was refused. Start a new conversation, or switch to a model with a larger context window.',
+  'aierr.ai-rate-limited':
+    'The provider refused the request because the account’s per-minute token quota is too low for this document, or used up. Wait a moment and try again, ask a narrower question — or switch to a newer model, which usually has a higher quota.',
   'aierr.ai-refusal':
     'The model declined to answer this request (the provider’s safety filter). Try rephrasing, or switch model.',
   'aierr.ai-stream-aborted': 'The stream ended without a complete answer.',
@@ -1243,6 +1248,7 @@ const en: Dict = {
   'search.modeAi': 'AI',
   'search.modeAiTip': 'AI search: find where a topic is discussed. Enter searches — uses your AI provider and costs money.',
   'search.aiPlaceholder': 'Describe what you are looking for …',
+  'search.aiModelTip': 'The AI model that answers — switch it in the assistant’s model menu',
   'search.aiSearching': 'AI is searching the document …',
   'search.aiHits': '{count} passages',
   'search.aiNoHits': 'No passages found for this',

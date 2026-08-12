@@ -156,11 +156,13 @@ function baseParams(overrides) {
       anthropic: 'claude-sonnet-5',
       openai: 'gpt-5.6-terra',
       azure: '',
+      // The curated ids (ai-models.ts) — the harness must exercise what the
+      // menu actually offers, not ids the providers retired
       openrouter: 'anthropic/claude-sonnet-5',
-      gemini: 'gemini-2.5-flash',
-      xai: 'grok-4',
-      mistral: 'mistral-large-latest',
-      groq: 'llama-3.3-70b-versatile',
+      gemini: 'gemini-3.6-flash',
+      xai: 'grok-4.3',
+      mistral: 'mistral-large-3-25-12',
+      groq: 'openai/gpt-oss-120b',
       compat: 'llama3.1',
       mock: 'mock-1'
     },
@@ -399,6 +401,31 @@ section('azure: config gate + shaping + quote contract + overflow')
   const overflow = await run({ provider: 'azure' })
   ok(overflow.result.code === 'ai-context-overflow', 'provider overflow rejection gets the named code')
   ok(/128000/.test(overflow.result.error ?? ''), 'provider sentence (with the counts) is kept')
+
+  // A per-minute token quota rejection is NOT a context overflow: the fix is
+  // to wait / narrow the question / pick a model with a higher quota, so it
+  // carries its own name (observed live against gpt-4.1, 2026-08-12).
+  responder = () =>
+    new Response(
+      'Request too large for gpt-4.1 in organization org-x on tokens per min (TPM): Limit 30000, Requested 45047.',
+      { status: 429 }
+    )
+  const tpm = await run({ provider: 'azure' })
+  ok(tpm.result.code === 'ai-rate-limited', `TPM rejection gets the named code (got ${tpm.result.code})`)
+  ok(/45047/.test(tpm.result.error ?? ''), 'provider sentence (with the counts) is kept')
+
+  // Models substitute the document filename for the literal KILDE token
+  // (Gemini, observed 2026-08-12) — the parser accepts any short source name
+  responder = () => chatCompletionsSse({
+    deltas: ['Se her. [grebe2015-edoc.pdf s.3: "forhandlingsmakt i sekvensielle mekanismer"] Slutt.']
+  })
+  const named = await run({ provider: 'azure' })
+  ok(
+    (named.result.parts ?? [])
+      .flatMap((p) => p.citations)
+      .some((c) => c.kind === 'quote' && c.pageNumber === 3 && c.quote === 'forhandlingsmakt i sekvensielle mekanismer'),
+    'filename in place of KILDE still parses to a quote citation'
+  )
 }
 
 // ---------- compat (OpenAI-compatible endpoint, keyless local server) ----------
@@ -553,6 +580,19 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
     models: { anthropic: '', openai: '', azure: '', openrouter: 'openai/gpt-5.2', gemini: '', xai: '', mistral: '', groq: '', compat: '', mock: '' }
   })
   ok(calls[0]?.body?.reasoning_effort === 'medium', 'vendor-prefixed reasoning id gets reasoning_effort')
+
+  // grok-4.5 documents reasoning_effort (low/medium/high) — the shared regex
+  // includes exactly that id; grok-4.3 stays out until someone verifies it
+  // (fewer models that work beats more that might, 2026-08-12)
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({
+    provider: 'xai',
+    models: { anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: 'grok-4.5', mistral: '', groq: '', compat: '', mock: '' }
+  })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.5 gets reasoning_effort')
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'xai' })
+  ok(calls[0]?.body?.reasoning_effort === undefined, 'grok-4.3 sends no reasoning_effort (unverified)')
 }
 
 // ---------- compat catalog fetcher (fase 10.2: Ollama enrichment) ----------

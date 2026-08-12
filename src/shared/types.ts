@@ -123,6 +123,7 @@ export type AiErrorCode =
   | 'ai-endpoint-unreachable'
   | 'ai-endpoint-incompatible'
   | 'ai-context-overflow'
+  | 'ai-rate-limited'
   | 'ai-refusal'
   | 'ai-stream-aborted'
   | 'ai-provider-unknown'

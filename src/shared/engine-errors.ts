@@ -183,6 +183,16 @@ export const AI_ERRORS = {
     code: 'ai-context-overflow',
     error: providerMessage
   }),
+  /** The provider refused over the ACCOUNT's rate limit (tokens per minute),
+   *  not the model's context window — the same question may succeed in a
+   *  minute, with a narrower question, or against a model with a higher
+   *  quota. Older models sit on the lowest quotas, so this fires exactly
+   *  where users wander off the curated list. Provider wording kept as
+   *  `error`: it names the limit and the counts. */
+  rateLimited: (providerMessage: string): FileError => ({
+    code: 'ai-rate-limited',
+    error: providerMessage
+  }),
   refusal: {
     code: 'ai-refusal',
     error: 'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren).'

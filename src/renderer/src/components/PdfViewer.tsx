@@ -18,6 +18,7 @@ import type {
   ViewRotation
 } from '../../../shared/types'
 import { bridge, isElectron, isExtension } from '../bridge'
+import { prettyModelName } from './ai-models'
 import { bubblesWhileTyping, commandForEvent, isKeyboardCaptured, shortcutLabel } from '../keymap'
 import { READ_ALOUD } from '../flags'
 import {
@@ -985,6 +986,17 @@ export default function PdfViewer({
     note: string | null
   }>({ status: 'idle', hits: [], index: -1, note: null })
   const semanticReqRef = useRef<number | null>(null)
+  // The AI search must SAY which model answers (transparency rule). Refreshed
+  // every time the bar opens or flips to AI mode — the model can have been
+  // switched in the assistant panel in between.
+  const [semanticModelName, setSemanticModelName] = useState('')
+  useEffect(() => {
+    if (!searchOpen || searchMode !== 'ai') return
+    void bridge.aiGetConfig().then((c) => {
+      const model = c.provider === 'azure' ? c.azure.deployment : (c.models[c.provider] ?? '')
+      setSemanticModelName(prettyModelName(c.provider, model))
+    })
+  }, [searchOpen, searchMode, searchFocusToken])
   const [aiPinned, setAiPinned] = useState(false)
   const aiPinnedRef = useRef(aiPinned)
   aiPinnedRef.current = aiPinned
@@ -6057,6 +6069,7 @@ export default function PdfViewer({
           aiHits={semantic.hits.map((h) => ({ label: h.label, pageNumber: h.pageNumber }))}
           aiIndex={semantic.index}
           aiNote={semantic.note}
+          aiModelName={semanticModelName}
           onAiSearch={() => void runSemanticSearch()}
           onAiPick={pickSemanticHit}
           onOpenAiSettings={() => {

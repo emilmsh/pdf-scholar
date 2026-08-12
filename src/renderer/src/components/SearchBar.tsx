@@ -26,6 +26,10 @@ interface Props {
   aiHits: SemanticHitView[]
   aiIndex: number
   aiNote: string | null
+  /** Display name of the model that will answer — the search must say which
+   *  model it is about to spend the user's key on (same transparency rule as
+   *  every other AI surface). Empty when no model is configured yet. */
+  aiModelName: string
   onAiSearch(): void
   onAiPick(index: number): void
   onOpenAiSettings(): void
@@ -50,6 +54,7 @@ export default function SearchBar({
   aiHits,
   aiIndex,
   aiNote,
+  aiModelName,
   onAiSearch,
   onAiPick,
   onOpenAiSettings,
@@ -212,6 +217,13 @@ export default function SearchBar({
             </>
           )}
         </div>
+        {/* Which model answers, always visible in AI mode — switching it
+            happens in the assistant's model menu, the tooltip says so */}
+        {isAi && aiModelName && (
+          <span className="search-ai-model" title={t('search.aiModelTip')}>
+            {aiModelName}
+          </span>
+        )}
         <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
         {!isAi && (
           <>

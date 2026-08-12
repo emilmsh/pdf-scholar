@@ -36,6 +36,36 @@ Thinking-regler:
 - `reasoning_effort: none|low|medium|high|xhigh|max` (default medium) — gyldig toppnivåfelt på `/v1/chat/completions`, dagens SSE-kode fungerer uendret.
 - Azure: dagens `api-version=2024-12-01-preview` er for gammel for 5.6 — oppgrader ved behov.
 
+## Hostede kompat-tjenester (agentverifisert 12.8.2026, mot leverandørdocs)
+
+Kuratert i `ai-models.ts` etter kuratert-kun-regelen (færre modeller som
+beviselig virker > alle modeller). Kilder: ai.google.dev/gemini-api/docs
+(models + pricing), docs.x.ai/developers (models + grok-4-5),
+docs.mistral.ai/getting-started/models, console.groq.com/docs/models.
+
+| Leverandør | Kuratert id | Kontekst | Notat |
+|---|---|---|---|
+| Gemini | `gemini-3.1-pro-preview` | 1M | Flaggskip (Preview — id-en KAN rotere ved GA, sjekk ved neste review) |
+| Gemini | `gemini-3.6-flash` | 1M | Stabil, «most intelligent built for speed», $1.50/$7.50 |
+| Gemini | `gemini-3.5-flash-lite` | ukjent → gulv | GA, billigst ($0.30/$2.50) |
+| xAI | `grok-4.5` | 500K | Flaggskip; `reasoning_effort` low/medium/high DOKUMENTERT (default high) → med i OPENAI_REASONING_RE |
+| xAI | `grok-4.3` | 1M | Standard-tier ($1.25/$2.50); effort-støtte UVERIFISERT → utenfor regexen |
+| Mistral | `mistral-medium-3-5-26-04` | ukjent → gulv | Frontier (Medium > Large i dagens lineup!) |
+| Mistral | `mistral-large-3-25-12` | ukjent → gulv | Open-weight arbeidshest ($0.50/$1.50) |
+| Mistral | `mistral-small-4-0-26-03` | ukjent → gulv | Rask/billig |
+| Groq | `openai/gpt-oss-120b` | 131K | Production-tier; Llama-parene deprecated 17.6.2026 |
+| Groq | `openai/gpt-oss-20b` | 131K | Production-tier, rask |
+
+Åpne spørsmål til neste review (svar med kilde + dato når de lukkes):
+- Godtar Gemini-modellene `reasoning_effort` på OpenAI-kompat-endepunktet?
+  (Selektoren er skjult for dem i dag — degrade-nettet eier en evt. feil.)
+- Groqs gpt-oss-kort nevner reasoning — verifiser `reasoning_effort` mot
+  Groq-docs før id-ene evt. tas inn i regexen.
+- Mistral: finnes `-latest`-aliaser for 3.5/3/4-generasjonen, og hva er
+  kontekstvinduene? (Docs-siden oppga ingen tall 12.8.2026.)
+- xAI: Grok 4.6 var annonsert for uke 32–33/2026 — sjekk om den har landet og
+  hva `reasoning_effort`-støtten er.
+
 ## Anbefalt mapping «Tenkeinnsats» (Av/Lav/Middels/Høy)
 
 | Valg | Opus 4.8 / Sonnet 5 | Fable 5 | Haiku 4.5 | OpenAI |

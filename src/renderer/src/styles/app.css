@@ -2647,6 +2647,18 @@ html.pen-near .draw-layer {
   font-variant-numeric: tabular-nums;
 }
 
+/* Which model the AI search will spend the user's key on — same muted tone
+   as the status, capped so a long deployment name cannot squeeze the field */
+.search-ai-model {
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+  padding: 0 4px;
+}
+
 .search-row .tb-btn:disabled {
   opacity: 0.4;
   cursor: default;

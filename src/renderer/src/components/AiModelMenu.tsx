@@ -9,7 +9,7 @@
 // and this menu can never disagree about the active model.
 import { useEffect, useRef, useState } from 'react'
 import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/types'
-import { isCompatService, OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
+import { OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import {
@@ -76,13 +76,17 @@ export function ModelQuickMenu({
   const anyKey = keyProviders().some((p) => config.hasKey[p.id])
   // The provider profile decides whether a reasoning control exists at all;
   // within that, model-level exceptions keep the selector honest: Haiku
-  // ignores effort, and across the compat family (hosted services + custom
-  // endpoints) only OpenAI-style reasoning ids get the parameter at all
-  // (same regex request shaping uses).
+  // ignores effort, and every effort-style provider only shows the selector
+  // for ids the request actually sends the parameter to (same regex request
+  // shaping uses — a visible selector wired to nothing is a lie). Azure is
+  // the one exemption: deployment names are opaque, so the selector shows
+  // and a misfire is caught by the degrade-on-400 net.
   const thinkingApplies =
     PROVIDER_PROFILES[provider].thinking !== 'none' &&
     !/haiku/i.test(model) &&
-    (!(provider === 'compat' || isCompatService(provider)) || OPENAI_REASONING_RE.test(model))
+    (PROVIDER_PROFILES[provider].thinking !== 'effort' ||
+      provider === 'azure' ||
+      OPENAI_REASONING_RE.test(model))
   const [filter, setFilter] = useState('')
 
   const patch = (p: Parameters<typeof bridge.aiSetConfig>[0]): void => {
@@ -124,13 +128,12 @@ export function ModelQuickMenu({
         label: config.azure.deployment,
         hint: undefined
       })
-    // The configured compat model id stays pickable even when the live list
-    // does not know it (server offline, or an id typed by hand)
-    if (id === 'compat' && config.models.compat && !merged.some((m) => m.id === config.models.compat))
-      options.push({ value: `compat:${config.models.compat}`, label: config.models.compat, hint: undefined })
-    // A custom model id typed in an older version still shows up
-    if (id === provider && id !== 'azure' && model && !options.some((o) => o.value === `${id}:${model}`))
-      options.push({ value: `${id}:${model}`, label: model, hint: undefined })
+    // A stored model outside today's list stays pickable for EVERY provider:
+    // the curated-only trim, a shrunk live list (compat server offline) or an
+    // id typed by hand must never eat a choice the user already made
+    const stored = id === 'azure' ? '' : (config.models[id] ?? '')
+    if (stored && !options.some((o) => o.value === `${id}:${stored}`))
+      options.push({ value: `${id}:${stored}`, label: stored, hint: undefined })
     // compat opens on the base URL alone: the model that completes the setup
     // is picked from exactly this list once the endpoint's models are fetched
     const enabled =
