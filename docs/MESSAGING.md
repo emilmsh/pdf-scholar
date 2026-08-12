@@ -265,9 +265,11 @@ that.)*
   LM Studio (no key needed). Model lists are fetched live from each keyed
   provider, and every answer reports the provider's token count.
   *(The named roll-call is for OUR surfaces — README, landing page, Microsoft
-  Store. The **extension** listing states the capability without the eight
-  names: the Chrome Web Store rejected that line as keyword spam, ref "Yellow
-  Argon", 2026-08-12. See [`STORE-LISTING.md`](STORE-LISTING.md).)*
+  Store. The **extension** listing carries no third-party brand name at all,
+  not even "OpenAI-compatible" or "Acrobat": the Chrome Web Store rejected the
+  eight-name line as keyword spam, ref "Yellow Argon", 2026-08-12, and that
+  listing is now written to give a brand scanner nothing. See
+  [`STORE-LISTING.md`](STORE-LISTING.md).)*
 
 ### 6. Keyboard
 

@@ -65,14 +65,14 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • Password-protected documents open, can be annotated, and keep their protection when saved
 • Colour, thickness and opacity are set per tool and remembered between sessions
 • Existing marks can be adjusted rather than redrawn: the ends of a highlight, the corner of a shape
-• Marks are saved into the PDF as standard annotations, which open correctly in Acrobat and other viewers
+• Marks are saved into the PDF as standard annotations, so they open correctly in other PDF readers
 
 AI ASSISTANT (optional, bring your own key)
 • Answers cite their sources: each claim links to the passage it came from
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
 • The assistant can open in its own tab; a citation click still goes to the passage in the tab showing the document
-• Eight major AI services are supported, one key field each, alongside any OpenAI-compatible endpoint — including a local model server, which needs no key. The full list is on the project page. Requests go directly to the provider you chose; with a local model the document never leaves the machine
+• Eight major AI services are supported, one key field each, alongside any endpoint that speaks the standard chat-completions API — including a local model server, which needs no key. The providers are listed on the project page. Requests go directly to the provider you chose; with a local model the document never leaves the machine
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
 ```
@@ -108,30 +108,40 @@ ANNOTERING
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
 • Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes mellom økter
 • Eksisterende merker kan justeres i stedet for å tegnes på nytt: enden av en utheving, hjørnet av en form
-• Merkene lagres i PDF-en som standard annoteringer, som åpnes riktig i Acrobat og andre lesere
+• Merkene lagres i PDF-en som standard annoteringer, så de åpnes riktig i andre PDF-lesere
 
 AI-ASSISTENT (valgfri, egen nøkkel)
 • Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
 • Assistenten kan åpnes i egen fane; et sitatklikk går fortsatt til avsnittet i fanen som viser dokumentet
-• Åtte store AI-tjenester støttes, med ett nøkkelfelt hver, i tillegg til et hvilket som helst OpenAI-kompatibelt endepunkt — også en lokal modellserver, som ikke trenger nøkkel. Hele lista står på prosjektsiden. Forespørslene går rett til leverandøren du valgte; med en lokal modell forlater dokumentet aldri maskinen
+• Åtte store AI-tjenester støttes, med ett nøkkelfelt hver, i tillegg til ethvert endepunkt som følger den vanlige chat-API-standarden — også en lokal modellserver, som ikke trenger nøkkel. Leverandørene er listet opp på prosjektsiden. Forespørslene går rett til leverandøren du valgte; med en lokal modell forlater dokumentet aldri maskinen
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
 ```
 
-> **Do not name the AI providers here.** The Chrome Web Store rejected v0.38.2
-> for keyword spam (violation ref "Yellow Argon", 2026-08-12), quoting exactly
-> the roll-call this bullet used to carry: "OpenAI, Claude (Anthropic), Google
-> Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq". Eight
-> third-party trademarks in one line reads as brand stuffing to a reviewer
-> however true each name is, and the policy covers the description as metadata.
-> The capability is the claim; the roll-call belongs on the surfaces that are
-> ours — [`MESSAGING.md`](MESSAGING.md), the README, the landing page — where
-> nobody polices it. `OpenAI-compatible` survives on purpose: it is the name of
-> an interface, not a claim about a brand. The Microsoft Store listing
-> ([`STORE-LISTING-DESKTOP.md`](STORE-LISTING-DESKTOP.md)) keeps its list — it
-> was reviewed with it and passed; do not "fix" that one to match.
+> **No third-party brand name belongs in the two description blocks above.**
+> The Chrome Web Store rejected v0.38.2 for keyword spam (violation ref "Yellow
+> Argon", 2026-08-12), quoting exactly the roll-call the AI bullet used to
+> carry: "OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter,
+> Grok (xAI), Mistral and Groq". Eight third-party trademarks in one line reads
+> as brand stuffing to a reviewer however true each name is, and the policy
+> covers the description as metadata.
+>
+> The rule here is deliberately stricter than the ruling. "OpenAI-compatible"
+> (an interface name) and "opens correctly in Acrobat" (an interoperability
+> claim) were both defensible, and both came out anyway: this item has been
+> rejected twice without ever being approved, Chrome escalates on repeat
+> violations, and it gates the launch — so the last thing a brand scanner could
+> latch onto is worth more than the two words cost. Say what the capability
+> does; the names live on the surfaces that are ours.
+>
+> Two carve-outs. The **permission and data-use answers below** are
+> reviewer-facing, not metadata — being specific about which provider receives
+> what is the point, and naming them there has never been an issue. And the
+> **Microsoft Store listing** ([`STORE-LISTING-DESKTOP.md`](STORE-LISTING-DESKTOP.md))
+> keeps its full list: it was reviewed with it and passed. Do not "fix" either
+> one to match this file.
 
 ---
 
