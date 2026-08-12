@@ -130,11 +130,12 @@ Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt 
 >
 > The rule here is deliberately stricter than the ruling. "OpenAI-compatible"
 > (an interface name) and "opens correctly in Acrobat" (an interoperability
-> claim) were both defensible, and both came out anyway: this item has been
-> rejected twice without ever being approved, Chrome escalates on repeat
-> violations, and it gates the launch — so the last thing a brand scanner could
-> latch onto is worth more than the two words cost. Say what the capability
-> does; the names live on the surfaces that are ours.
+> claim) were both defensible, and both came out anyway: this item has now
+> collected two violations ("Purple Potassium", "Yellow Argon"), Chrome
+> escalates on repeat violations, and a rejected update leaves the OLD version
+> live in the store meanwhile — so the last thing a brand scanner could latch
+> onto is worth more than the two words cost. Say what the capability does;
+> the names live on the surfaces that are ours.
 >
 > Two carve-outs. The **permission and data-use answers below** are
 > reviewer-facing, not metadata — being specific about which provider receives

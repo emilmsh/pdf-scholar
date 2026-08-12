@@ -43,7 +43,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | Windows | Tier 1. One installer carries x64 and native arm64; per-user install, no admin rights. Also on the **Microsoft Store**, `9N75CPC0G9M2` (live) |
 | macOS | **Presented alongside Windows, no beta label** (Emil, 2026-08-11 — it has run on real Apple hardware since v0.34.0). Built in CI, feature-identical by construction. Tested on a tester's machine, not the owner's — say "tested", never "verified by the owner". The build is unsigned (Gatekeeper workaround in the README) and cannot *install* an update itself; it does **notice** one and tell you how to get it, which is not the same claim — never write that macOS auto-updates. The recommended install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel, and the in-app notice hands you that exact command. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
 | Linux | **Beta.** Built in CI, feature-identical by construction, but it has not run on real hardware and no surface may imply otherwise |
-| Browser extension | **Beta**, Edge and Chrome. **Not in either store yet** — install is Load-unpacked from the release zip. Do not write otherwise until the listings are live |
+| Browser extension | **Beta — and live in BOTH stores** (confirmed 2026-08-12). Edge Add-ons: `https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc`. Chrome Web Store: `https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd`. One click, self-updating — this is the install to lead with, and the Load-unpacked route is now only for running a build newer than the stores carry. **Both listings lag the current release** while their updates sit in review, so never name a version on a store surface |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
 | Author | Emil Mathias Strøm Halseth, who reads PDFs for a living — full name wherever he is credited. Where the author is named in long form (README footer, landing footer), the approved signature is verbatim: "Built by Emil Mathias Strøm Halseth, who reads PDFs for a living, with assistance from Claude Code." (Emil's wording, 2026-08-04 — no stronger Claude credit than "assistance".) The store copyright line stays author-only |
@@ -320,8 +320,11 @@ app looks like.)*
   that flattens them into one promise is wrong on at least one platform. Say
   "the platform's own key store — DPAPI on Windows, Keychain on macOS, the
   system keyring on Linux", and for the extension say what it actually is.
-- **Store availability the extension does not have.** Until the Edge and Chrome
-  listings are live, every surface says Load-unpacked and why.
+- **A store version the listing does not actually carry.** Both extension
+  listings are live (2026-08-12), so every surface leads with the one-click
+  install — but review lags, and a listing routinely trails the newest release.
+  Never state or imply which version a store holds; Load-unpacked is now
+  described as the way to run something newer, not as the way in.
 - **Version numbers in evergreen surfaces.** The landing page reads the version
   from the Releases API; the README uses a badge. Only
   `docs/STORE-LISTING-DESKTOP.md` names a version, in its "What's new" heading,

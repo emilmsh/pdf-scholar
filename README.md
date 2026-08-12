@@ -99,23 +99,27 @@ Both auto-update in place when a new release is published.
 
 The same viewer, but each PDF opens as an ordinary browser tab instead of in the
 browser's built-in reader. Make your browser the default PDF app and double-clicking a
-PDF in Explorer opens it here too.
+PDF in Explorer opens it here too. It is in both stores:
 
-[![Extension download](https://img.shields.io/badge/Edge%20%2F%20Chrome-download%20extension-2f6f7b?logo=googlechrome&logoColor=white)](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)
+[![Edge Add-ons](https://img.shields.io/badge/Edge%20Add--ons-PDF%20Scholar-2f6f7b?logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-PDF%20Scholar-2f6f7b?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd)
 
-**[⬇ Download the extension](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)** —
-no build step needed:
+**[⬇ Get it for Edge](https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc)**
+or **[for Chrome](https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd)** —
+one click, and new versions arrive on their own. Store review takes its time, so a listing
+can trail the newest release by a version or two.
 
-1. Download `pdf-scholar-extension.zip` and unzip it anywhere — it unpacks to a
-   single `pdf-scholar-extension` folder.
+**By hand** — to run a build newer than the stores carry:
+
+1. Download
+   [`pdf-scholar-extension.zip`](https://github.com/emilmsh/pdf-scholar/releases/latest/download/pdf-scholar-extension.zip)
+   and unzip it anywhere — it unpacks to a single `pdf-scholar-extension` folder.
 2. Open `edge://extensions` or `chrome://extensions` and turn on **Developer mode**.
 3. **Load unpacked** → select the `pdf-scholar-extension` folder.
-4. For local files (the Explorer double-click case): open the extension's **Details**
-   and enable **Allow access to file URLs** — a one-time toggle only you can grant.
 
-The extension is **not on the Chrome Web Store / Edge Add-ons yet**, and browsers only
-allow one-click installs from those stores — so the four steps above are the way in until
-the listings are live.
+Either way, opening local files (the Explorer double-click case) needs one more toggle:
+**Allow access to file URLs**, on the extension's **Details** page. Only you can grant it,
+so the extension asks once and then leaves it alone.
 
 See [`docs/BROWSER-EXTENSION.md`](docs/BROWSER-EXTENSION.md) for the architecture and
 the current desktop-vs-extension parity.
