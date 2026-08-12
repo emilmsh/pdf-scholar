@@ -72,7 +72,7 @@ AI ASSISTANT (optional, bring your own key)
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
 • The assistant can open in its own tab; a citation click still goes to the passage in the tab showing the document
-• Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — one key field each — or an OpenAI-compatible endpoint such as a local Ollama (no key needed). Requests go directly to the provider; with a local model the document never leaves the machine
+• Eight major AI services are supported, one key field each, alongside any OpenAI-compatible endpoint — including a local model server, which needs no key. The full list is on the project page. Requests go directly to the provider you chose; with a local model the document never leaves the machine
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
 ```
@@ -115,10 +115,23 @@ AI-ASSISTENT (valgfri, egen nøkkel)
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
 • Assistenten kan åpnes i egen fane; et sitatklikk går fortsatt til avsnittet i fanen som viser dokumentet
-• Leverandører: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — ett nøkkelfelt hver — eller et OpenAI-kompatibelt endepunkt som en lokal Ollama (uten nøkkel). Forespørslene går rett til leverandøren; med en lokal modell forlater dokumentet aldri maskinen
+• Åtte store AI-tjenester støttes, med ett nøkkelfelt hver, i tillegg til et hvilket som helst OpenAI-kompatibelt endepunkt — også en lokal modellserver, som ikke trenger nøkkel. Hele lista står på prosjektsiden. Forespørslene går rett til leverandøren du valgte; med en lokal modell forlater dokumentet aldri maskinen
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
 ```
+
+> **Do not name the AI providers here.** The Chrome Web Store rejected v0.38.2
+> for keyword spam (violation ref "Yellow Argon", 2026-08-12), quoting exactly
+> the roll-call this bullet used to carry: "OpenAI, Claude (Anthropic), Google
+> Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq". Eight
+> third-party trademarks in one line reads as brand stuffing to a reviewer
+> however true each name is, and the policy covers the description as metadata.
+> The capability is the claim; the roll-call belongs on the surfaces that are
+> ours — [`MESSAGING.md`](MESSAGING.md), the README, the landing page — where
+> nobody polices it. `OpenAI-compatible` survives on purpose: it is the name of
+> an interface, not a claim about a brand. The Microsoft Store listing
+> ([`STORE-LISTING-DESKTOP.md`](STORE-LISTING-DESKTOP.md)) keeps its list — it
+> was reviewed with it and passed; do not "fix" that one to match.
 
 ---
 

@@ -263,7 +263,11 @@ that.)*
   Gemini, Grok (xAI), Mistral and Groq — one key field each, entered once —
   plus any OpenAI-compatible endpoint, including local models via Ollama or
   LM Studio (no key needed). Model lists are fetched live from each keyed
-  provider, and every answer reports the provider's token count
+  provider, and every answer reports the provider's token count.
+  *(The named roll-call is for OUR surfaces — README, landing page, Microsoft
+  Store. The **extension** listing states the capability without the eight
+  names: the Chrome Web Store rejected that line as keyword spam, ref "Yellow
+  Argon", 2026-08-12. See [`STORE-LISTING.md`](STORE-LISTING.md).)*
 
 ### 6. Keyboard
 
