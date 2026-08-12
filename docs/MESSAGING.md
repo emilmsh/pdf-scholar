@@ -34,14 +34,15 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | | |
 | --- | --- |
 | Product name | **PDF Scholar** — always, in every language. Not "PDFX" (the repo's internal name), not "PDF Expert clone" |
-| One-line what | A PDF reader and annotator for Windows, for documents you work through rather than skim |
+| One-line what | A PDF reader and annotator for Windows and macOS, for documents you work through rather than skim. A store listing names only its own platform |
 | Price | Free. No account, no sign-in, no trial, no ads, no tracking |
 | Licence | MIT. Every bundled runtime component is permissively licensed |
 | Repo | <https://github.com/emilmsh/pdf-scholar> |
 | Landing page | <https://emilmsh.github.io/pdf-scholar/> |
 | Privacy policy URL | `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md` |
 | Windows | Tier 1. One installer carries x64 and native arm64; per-user install, no admin rights. Also on the **Microsoft Store**, `9N75CPC0G9M2` (live) |
-| macOS / Linux | **Beta.** Built in CI, feature-identical by construction. macOS has been tested on Apple hardware (a tester's machine, not the owner's — say "tested", never "verified by the owner"); Linux has not run on real hardware. macOS is unsigned (Gatekeeper workaround in the README) and cannot *install* an update itself; it does **notice** one and tell you how to get it, which is not the same claim — never write that macOS auto-updates. The recommended macOS install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel, and the in-app notice hands you that exact command. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
+| macOS | **Presented alongside Windows, no beta label** (Emil, 2026-08-11 — it has run on real Apple hardware since v0.34.0). Built in CI, feature-identical by construction. Tested on a tester's machine, not the owner's — say "tested", never "verified by the owner". The build is unsigned (Gatekeeper workaround in the README) and cannot *install* an update itself; it does **notice** one and tell you how to get it, which is not the same claim — never write that macOS auto-updates. The recommended install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel, and the in-app notice hands you that exact command. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
+| Linux | **Beta.** Built in CI, feature-identical by construction, but it has not run on real hardware and no surface may imply otherwise |
 | Browser extension | **Beta**, Edge and Chrome. **Not in either store yet** — install is Load-unpacked from the release zip. Do not write otherwise until the listings are live |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
@@ -52,14 +53,18 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 
 ## The one-liner
 
-**EN:** A Windows PDF reader for research.
+**EN:** A PDF reader for research.
 
-**NO:** En PDF-leser for Windows, laget for forskning.
+**NO:** En PDF-leser for forskning.
 
 The audience leads (Emil's call, 2026-08-09, replacing the interface-led
 "nearly all page" line of 2026-08-08): the app is named for the work it
 serves, and the window description moved into the lede. Keep both claims,
 each said once — whichever heads a surface, the other follows in the body.
+
+The platform left the one-liner when macOS graduated (2026-08-11): the
+download buttons name the platforms, the headline names the work. The
+Microsoft Store variant below keeps "for Windows" — it is the Windows store.
 
 Store-length variant, where the one-liner alone is too thin. Verbatim what the
 Microsoft Store listing carries — **250 characters is the cap**, and
@@ -336,10 +341,11 @@ app looks like.)*
   the repair, not the capability, and dates the text. Evergreen surfaces state
   what the app does; a fix is named as a fix only in a "What's new" block.
 - **Claims about untested platforms.** Linux has not run on real hardware and no
-  surface may imply otherwise. macOS HAS been tested on Apple hardware (since
-  v0.34.0) but remains beta — "tested" is the strongest word on offer; never
-  "verified", "stable" or anything that promises the owner stands behind the
-  build day to day.
+  surface may imply otherwise. macOS is presented alongside Windows without a
+  beta label (Emil, 2026-08-11) — it has been tested on Apple hardware since
+  v0.34.0, and "tested" remains the strongest word on offer; never "verified",
+  "stable" or anything that promises the owner stands behind the build day to
+  day.
 - **A third macOS install path, or Gatekeeper explained twice.** Every surface
   offers at most two ways in — Homebrew and by hand — sharing one explanation
   of what the unsigned build costs (one `xattr` per version, no self-update).

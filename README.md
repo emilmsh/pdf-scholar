@@ -4,7 +4,7 @@
 
 <h1 align="center">PDF Scholar</h1>
 
-<p align="center"><strong>A Windows PDF reader for research.</strong></p>
+<p align="center"><strong>A PDF reader for research.</strong></p>
 
 PDF Scholar is for the documents you work through rather than skim: research articles,
 reports, books. The window is nearly all page — one slim toolbar carries the tools, the
@@ -19,8 +19,8 @@ cross-references can be followed and returned from. The optional AI assistant an
 from the open document and cites the passage each claim came from. Free, MIT-licensed,
 and offline unless you ask a question.
 
-Windows is the reference build; macOS and Linux are in beta, and a browser extension puts
-the same reader inside your browser.
+PDF Scholar runs on Windows and macOS; a Linux build is in beta, and a browser extension
+puts the same reader inside your browser.
 
 ![The same page in Day, Sepia and Night — one window, wiped across the three themes](docs/screenshots/tricolor.png)
 
@@ -48,7 +48,7 @@ entered in the assistant settings.
 **[⬇ Get PDF Scholar from the Microsoft Store](https://apps.microsoft.com/detail/9N75CPC0G9M2)** —
 the same app as an MSIX package, x64 and arm64, although the installer is updated more frequently. 
 
-### Desktop app (macOS) — beta
+### Desktop app (macOS)
 
 The build is **not signed with an Apple Developer certificate** (deliberate —
 the app has zero recurring costs), which shapes both paths below the same way:
@@ -78,11 +78,10 @@ If Gatekeeper's dialog says *unverified developer* rather than "damaged",
 **Open Anyway** under **System Settings → Privacy & Security** works as well;
 the "damaged" variant never offers that button, so use the Terminal command.
 
-> **The macOS build is beta.** It is built in CI and has been tested on Apple
-> hardware, but it sees far less daily use than the Windows build. If something
-> misbehaves on your Mac, [open an
-> issue](https://github.com/emilmsh/pdf-scholar/issues) with what works and what
-> breaks.
+The build is made in CI on every release and has been tested on Apple hardware.
+If something misbehaves on your Mac, [open an
+issue](https://github.com/emilmsh/pdf-scholar/issues) with what works and what
+breaks.
 
 ### Desktop app (Linux) — beta
 

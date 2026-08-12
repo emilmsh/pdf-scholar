@@ -15,11 +15,12 @@
       static href is /releases/latest, which GitHub redirects for us.
     * Screenshots are the shipped ones in docs/screenshots/, referenced
       relatively — reshooting them updates this page too.
-    * Windows (installer + Microsoft Store) is the hero offer. The closing
-      "Get it" section also carries the macOS and Linux downloads, labelled
-      beta, resolved from the same API call; the extension keeps its one
-      footer line. Promoting a platform out of beta is a deliberate edit,
-      not upkeep.
+    * Windows (installer + Microsoft Store) and macOS share the hero offer —
+      the hero macOS button anchors to "Get it", where the per-arch dmgs and
+      the Homebrew line live, resolved from the same API call. Linux stays
+      there too, labelled beta; the extension keeps its one footer line.
+      Promoting a platform out of beta is a deliberate edit, not upkeep
+      (macOS graduated 2026-08-11).
 
   Colours are the app's own tokens from src/renderer/src/styles/app.css —
   the Day palette, with the Night palette under prefers-color-scheme: dark.
@@ -30,8 +31,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PDF Scholar — a Windows PDF reader for research</title>
-<meta name="description" content="A Windows PDF reader and annotator for research: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
+<title>PDF Scholar — a PDF reader for research</title>
+<meta name="description" content="A PDF reader and annotator for research, on Windows and macOS: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
 <meta name="theme-color" content="#f7f7f9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="logo.png">
@@ -40,8 +41,8 @@
 <!-- Absolute URLs: LinkedIn, Slack and the like resolve og: tags off-site. -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://emilmsh.github.io/pdf-scholar/">
-<meta property="og:title" content="PDF Scholar — a Windows PDF reader for research">
-<meta property="og:description" content="A Windows PDF reader and annotator for research: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
+<meta property="og:title" content="PDF Scholar — a PDF reader for research">
+<meta property="og:description" content="A PDF reader and annotator for research, on Windows and macOS: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
 <!-- tricolor, not a plain page: this is the thumbnail LinkedIn and Slack draw
      under a shared link, and it is the app's most recognisable single frame. -->
 <meta property="og:image" content="https://emilmsh.github.io/pdf-scholar/screenshots/tricolor.png">
@@ -262,7 +263,7 @@
 <main>
 
   <div class="hero">
-    <h1>A Windows PDF reader for research.</h1>
+    <h1>A PDF reader for research.</h1>
     <p class="lede">
       The window is nearly all page: one slim toolbar carries the tools you use
       frequently, and everything else — contents, notes, the assistant — stays out of
@@ -281,9 +282,13 @@
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.5 2.1 1 3v4.5h6.5V2.1Zm1 -.14V7.5H15V1l-6.5.96ZM1 8.5V13l6.5.9V8.5H1Zm7.5 0v5.54L15 15V8.5H8.5Z"/></svg>
         Microsoft Store
       </a>
+      <!-- Anchors to Get-it rather than downloading: the dmgs are per-arch and
+           the Homebrew line lives there — no one should get the wrong file
+           from the hero. -->
+      <a class="btn btn-secondary" href="#get">Download for macOS</a>
     </div>
 
-    <p class="dl-meta" id="dl-meta">Windows 10 and 11 <span class="sep">·</span> x64 and arm64 in one installer <span class="sep">·</span> no admin rights needed <span class="sep">·</span> <a href="#get">macOS and Linux betas</a></p>
+    <p class="dl-meta" id="dl-meta">Windows 10 and 11 <span class="sep">·</span> x64 and arm64 in one installer <span class="sep">·</span> no admin rights needed <span class="sep">·</span> <a href="#get">Linux beta</a></p>
   </div>
 
   <img class="shot hero-shot" src="screenshots/tricolor.png" alt="The same page in three themes at once: white paper on the left, warm ivory in the middle, near-black on the right, under one slim toolbar.">
@@ -417,11 +422,11 @@
         Download for Windows
       </a>
       <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">Microsoft Store</a>
+      <a class="btn btn-secondary" id="dl-mac" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
+        macOS
+      </a>
     </div>
     <div class="actions actions-beta">
-      <a class="btn btn-secondary" id="dl-mac" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
-        macOS <span class="badge">beta</span>
-      </a>
       <a class="btn btn-secondary" id="dl-linux" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
         Linux <span class="badge">beta</span>
       </a>
@@ -432,7 +437,7 @@
       Homebrew installs and updates it too:<br>
       <code>brew install --cask emilmsh/tap/pdf-scholar</code><br>
       Either way the build is unsigned, so the first launch takes
-      <a href="https://github.com/emilmsh/pdf-scholar#desktop-app-macos--beta">one Terminal command</a>.<br>
+      <a href="https://github.com/emilmsh/pdf-scholar#desktop-app-macos">one Terminal command</a>.<br>
       Linux is the deb for Ubuntu and Debian; other distros take the
       <a id="dl-linux-appimage" href="https://github.com/emilmsh/pdf-scholar/releases/latest">AppImage</a>.
     </p>
@@ -446,8 +451,8 @@
       <b>A browser extension</b> that puts the same reader inside Edge or Chrome is
       in beta — it is on the
       <a href="https://github.com/emilmsh/pdf-scholar/releases/latest">releases page</a>.
-      The macOS and Linux betas above are built in CI on every release; what each
-      platform supports today is in
+      The macOS build and the Linux beta above are made in CI on every release; what
+      each platform supports today is in
       <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PLATFORMS.md">the
       platform notes</a>.
     </p>
@@ -506,7 +511,7 @@
         meta.innerHTML =
           `Version ${version}, released ${date} ${sep} ${mb} MB ${sep} ` +
           `Windows 10 and 11, x64 and arm64 in one installer ${sep} no admin rights needed ` +
-          `${sep} <a href="#get">macOS and Linux betas</a>`;
+          `${sep} <a href="#get">Linux beta</a>`;
       }
     } catch {
       /* offline, blocked or rate-limited — the static markup stands. */
