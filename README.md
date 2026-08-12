@@ -134,14 +134,16 @@ two dark modes, the second with higher contrast.
 
 - Smooth scrolling; zoom centres on the cursor or pinch point; one button toggles
   fit-width and whole-page (W)
-- Four themes — Day, Sepia, Night and Night+ — plus Auto, which follows Windows'
+- Four themes — Day, Sepia, Night and Night+ — plus Auto, which follows the system's
   light/dark setting. Contrast and brightness are adjustable per theme
 - Page rotation (Shift+R) and a two-page spread for wide layouts
 - Presentation mode (P): one page at a time, full screen
 - The toolbar can be unpinned (V); the side panels go with it, and each returns on hover
   at its window edge
-- Table of contents, thumbnails, bookmarks (B), and back/forward navigation
-  (Alt+← / Alt+→, or the mouse side-buttons) after following internal links
+- Table of contents, thumbnails and bookmarks (B) in one panel; the toolbar's page
+  field jumps straight to a page number
+- Internal links and cross-references can be followed and returned from: back/forward
+  navigation (Alt+← / Alt+→, or the mouse side-buttons) holds the history
 - Reading positions and recent files are remembered; a library home screen lists them.
   Going back to it closes nothing: open documents stay in the tab strip, and returning
   to one restores the page, zoom and panels

@@ -130,8 +130,12 @@ carries no picture of its own.)*
   plus Auto, which follows the system setting. Contrast and brightness are
   adjustable per theme
 - Page rotation, two-page spread, full-screen presentation mode
-- Table of contents, thumbnails, bookmarks, and back/forward navigation after
-  following an internal link
+- Table of contents, thumbnails and bookmarks in one panel; the toolbar's page
+  field jumps straight to a page number
+- Internal links and cross-references can be followed and returned from —
+  back/forward buttons hold the navigation history *(navigation elevated to two
+  bullets on Emil's ask, 2026-08-12: moving around a long document matters to
+  him as much as the split view, and it was buried in a subclause)*
 - The toolbar can be unpinned; the page then fills the window, and the toolbar
   and panels return on hover at the window edges
 - Reading positions and recent files are remembered. Documents open in tabs or
