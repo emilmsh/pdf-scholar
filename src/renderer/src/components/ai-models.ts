@@ -68,7 +68,7 @@ export const MODELS: Record<
 > = {
   anthropic: [
     { id: 'claude-fable-5', label: 'Claude Fable 5', short: 'Fable 5', hint: 'ai.modelHintHeaviest' },
-    { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', short: 'Opus 4.8', hint: 'ai.modelHintCapable' },
+    { id: 'claude-opus-5', label: 'Claude Opus 5', short: 'Opus 5', hint: 'ai.modelHintCapable' },
     { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'ai.modelHintRecommended' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'ai.modelHintFast' }
   ],
@@ -78,7 +78,7 @@ export const MODELS: Record<
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
   ],
   azure: [],
-  // Hosted-service lineups verified against provider docs 2026-08-12
+  // Hosted-service lineups verified against provider docs 2026-08-12/13
   // (docs/agent-notes/modeller-api.md has the sources and open questions)
   gemini: [
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', short: 'Gemini 3.1 Pro', hint: 'ai.modelHintCapable' },
@@ -86,7 +86,7 @@ export const MODELS: Record<
     { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Gemini 3.5 Flash-Lite', hint: 'ai.modelHintFast' }
   ],
   xai: [
-    { id: 'grok-4.5', label: 'Grok 4.5', short: 'Grok 4.5', hint: 'ai.modelHintCapable' },
+    { id: 'grok-4.6', label: 'Grok 4.6', short: 'Grok 4.6', hint: 'ai.modelHintCapable' },
     { id: 'grok-4.3', label: 'Grok 4.3', short: 'Grok 4.3', hint: 'ai.modelHintRecommended' }
   ],
   // Mistral publishes dated ids only — Medium outranks Large in their current
@@ -207,23 +207,35 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
 // ids get the provider floor (Azure lowest: deployments routinely cap below
 // the base model). Maintained with the curated MODELS list (docs/MODEL-UPDATE.md).
 const MODEL_CONTEXT_TOKENS: Record<string, number> = {
-  'claude-fable-5': 200_000,
-  'claude-opus-4-8': 200_000,
-  'claude-sonnet-5': 200_000,
+  // Anthropic's own model table (platform.claude.com, verified 2026-08-13)
+  // states 1M tokens for Fable 5, Opus 5 and Sonnet 5 — matches
+  // docs/agent-notes/modeller-api.md, which had recorded the same number
+  // since July; the two were out of sync here until this pass.
+  'claude-fable-5': 1_000_000,
+  'claude-opus-5': 1_000_000,
+  'claude-sonnet-5': 1_000_000,
   'claude-haiku-4-5': 200_000,
   'gpt-5.6-sol': 250_000,
   'gpt-5.6-terra': 250_000,
   'gpt-5.6-luna': 250_000,
-  // Verified against provider docs 2026-08-12; entries missing here on
-  // purpose (Gemini Flash-Lite, the Mistral trio) fall back to the provider
-  // floor because no context number was documented — excerpting early is the
-  // cheap failure, erroring mid-question is not
+  // Verified against provider docs 2026-08-12/13; entries missing here on
+  // purpose (Gemini Flash-Lite) fall back to the provider floor because no
+  // context number was documented — excerpting early is the cheap failure,
+  // erroring mid-question is not
   'gemini-3.1-pro-preview': 1_000_000,
   'gemini-3.6-flash': 1_000_000,
+  'grok-4.6': 500_000,
+  // grok-4.5 kept here though no longer curated (see MODELS.xai) — a stored
+  // selection from before this review must not regress to the 128k floor
   'grok-4.5': 500_000,
   'grok-4.3': 1_000_000,
   'openai/gpt-oss-120b': 131_072,
-  'openai/gpt-oss-20b': 131_072
+  'openai/gpt-oss-20b': 131_072,
+  // Mistral model cards (docs.mistral.ai, verified 2026-08-13): all three of
+  // the "26" generation share a 256k window
+  'mistral-medium-3-5-26-04': 256_000,
+  'mistral-large-3-25-12': 256_000,
+  'mistral-small-4-0-26-03': 256_000
 }
 
 const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {

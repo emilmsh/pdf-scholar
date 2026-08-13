@@ -43,11 +43,14 @@ export interface AiProviderProfile {
  *  drift apart. Providers whose profile says thinking:'per-model' (Anthropic)
  *  have their own capability logic and never consult this.
  *
- *  grok-4.5 is included because xAI documents reasoning_effort (low/medium/
- *  high) for it (docs/agent-notes/modeller-api.md, verified 2026-08-12); the
- *  match is deliberately that narrow — other grok ids stay out until someone
+ *  grok-4.5 and grok-4.6 are included because xAI documents reasoning_effort
+ *  (low/medium/high, plus xhigh on 4.6) for both (docs/agent-notes/
+ *  modeller-api.md, verified 2026-08-12 and 2026-08-13); grok-4.5 stays in
+ *  the regex even though the curated menu now offers 4.6 instead, so a
+ *  stored 4.5 selection from before that switch keeps working. The match is
+ *  deliberately narrow — other grok ids (4.3) stay out until someone
  *  verifies them, per the fewer-models-that-work rule. */
-export const OPENAI_REASONING_RE = /gpt-5|o[0-9]|grok-4\.5/i
+export const OPENAI_REASONING_RE = /gpt-5|o[0-9]|grok-4\.[56]/i
 
 /** The first-class hosted OpenAI-compatible services (fase 10.3): a FINITE,
  *  curated set — one key field each, entered once, stored exactly like the
