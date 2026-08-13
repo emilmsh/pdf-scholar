@@ -581,15 +581,22 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
   })
   ok(calls[0]?.body?.reasoning_effort === 'medium', 'vendor-prefixed reasoning id gets reasoning_effort')
 
-  // grok-4.5 documents reasoning_effort (low/medium/high) — the shared regex
-  // includes exactly that id; grok-4.3 stays out until someone verifies it
-  // (fewer models that work beats more that might, 2026-08-12)
+  // grok-4.6 (curated) and grok-4.5 (retired from the menu, kept in the
+  // regex for stored selections) both document reasoning_effort (low/medium/
+  // high, plus xhigh on 4.6) — grok-4.3 stays out until someone verifies it
+  // (fewer models that work beats more that might, 2026-08-12/13)
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({
+    provider: 'xai',
+    models: { anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: 'grok-4.6', mistral: '', groq: '', compat: '', mock: '' }
+  })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.6 gets reasoning_effort')
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
   await run({
     provider: 'xai',
     models: { anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: 'grok-4.5', mistral: '', groq: '', compat: '', mock: '' }
   })
-  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.5 gets reasoning_effort')
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.5 (retired, still stored) gets reasoning_effort')
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
   await run({ provider: 'xai' })
   ok(calls[0]?.body?.reasoning_effort === undefined, 'grok-4.3 sends no reasoning_effort (unverified)')
