@@ -134,6 +134,8 @@ Things this rig does *not* give, so nobody counts on them:
   scope covers labels and comments together, so "labels only" is enforced by
   the Bash tool restriction and the prompt, not by the token. What *is*
   structural is that it cannot touch code: it has no write access to contents.
+  (The restriction syntax itself is confirmed working — first real run on issue
+  #6, 2026-08-13: labels applied, no comment, 33 seconds on Haiku.)
 - **Cron is approximate.** Scheduled runs can be delayed under load, which is
   why the review fires at :17 rather than on the hour.
 - **No agent verifies a model against a live API.** They read documentation.

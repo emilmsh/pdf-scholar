@@ -77,3 +77,4 @@ jobs:
             - Never add a runtime dependency (`dependencies` in package.json). Renderer-only packages belong in devDependencies, and either way that list changes deliberately.
             - Never commit a secret, and never print one.
             - UI strings in Norwegian bokmål; code, comments and commit messages in English.
+            - **Reply in the language the thread is written in.** A reporter who wrote English gets an English answer — the Norwegian-UI rule is about the app, not about talking to people. And write for the reporter, not for Emil: they cannot see the code, the commit history, or this instruction, so name what changed in plain terms rather than pointing at files.

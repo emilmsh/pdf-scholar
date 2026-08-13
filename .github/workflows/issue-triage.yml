@@ -7,9 +7,8 @@
 #     instruction asks for, this job cannot change a file or open a PR.
 #   - The Bash tool is restricted to `gh issue view/list/edit`, so it can read
 #     the thread, look for duplicates and set labels — but not comment, close,
-#     or run anything else. (Verify the restriction holds on the first run: if
-#     the pattern syntax is rejected the run fails loudly rather than quietly
-#     widening.)
+#     or run anything else. Confirmed working on the first real run (issue #6,
+#     2026-08-13): labels applied, no comment, 33 seconds on Haiku.
 #   - The prompt interpolates the issue NUMBER only. Passing
 #     github.event.issue.body into YAML would be a shell- and prompt-injection
 #     hole in one; the agent fetches the body itself instead.
