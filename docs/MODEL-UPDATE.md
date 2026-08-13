@@ -47,6 +47,16 @@ Anthropic model's capability summary (adaptive/budget thinking, effort levels).
 Without keys it still runs the static consistency checks. It is a report, not a
 gate — every `!` line maps to a row in the table below.
 
+The static half includes a **context-window cross-check**: the Kontekst column
+in `docs/agent-notes/modeller-api.md` against `MODEL_CONTEXT_TOKENS` in
+`ai-models.ts`. That column is the contract, and it holds the **input**
+capacity — not a total that includes the output ceiling. A code value *over*
+the documented window is the dangerous direction (the document is attached
+whole and the provider rejects it mid-question); a value materially *under* it
+silently excerpts documents that would have fit. Both are flagged, because the
+second one hid for months: the Anthropic models were documented at 1M and
+floored at 200K in code.
+
 ## Step 2 — update what the report points at
 
 | Finding | File to touch | What to do |

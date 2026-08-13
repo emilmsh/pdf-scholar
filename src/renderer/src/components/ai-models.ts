@@ -215,9 +215,12 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   'claude-opus-5': 1_000_000,
   'claude-sonnet-5': 1_000_000,
   'claude-haiku-4-5': 200_000,
-  'gpt-5.6-sol': 250_000,
-  'gpt-5.6-terra': 250_000,
-  'gpt-5.6-luna': 250_000,
+  // 922K is the documented INPUT capacity (1.05M total minus the 128K output
+  // ceiling); 900K keeps the floor conservative without throwing the window
+  // away, as the old 250_000 did. Verified 2026-08-13, see modeller-api.md.
+  'gpt-5.6-sol': 900_000,
+  'gpt-5.6-terra': 900_000,
+  'gpt-5.6-luna': 900_000,
   // Verified against provider docs 2026-08-12/13; entries missing here on
   // purpose (Gemini Flash-Lite) fall back to the provider floor because no
   // context number was documented — excerpting early is the cheap failure,

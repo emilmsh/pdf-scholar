@@ -41,11 +41,17 @@ Thinking-regler:
 
 ## OpenAI gpt-5.6 (lansert 9.7.2026)
 
-| Modell | ID | Kontekst | Pris inn/ut | Cached inn |
+Kontekst-kolonnen er kontrakten mot `MODEL_CONTEXT_TOKENS` (`npm run
+check:models` sammenligner dem): den oppgir **input**-kapasiteten, ikke en
+total som inkluderer output. Verifisert mot developers.openai.com/api/docs/models
+13.8.2026 — 1,05M er totalen, og med 128K output blir input ~922K. Notatene
+oppgav tidligere 1.05M i denne kolonnen, altså totalen, som er feil kontrakt.
+
+| Modell | ID | Kontekst (input) | Pris inn/ut | Cached inn |
 |---|---|---|---|---|
-| Sol (flaggskip) | `gpt-5.6-sol` | 1.05M | $5/$30 | $0.50 |
-| Terra (anbefalt) | `gpt-5.6-terra` | 1.05M | $2.50/$15 | $0.25 |
-| Luna (rask) | `gpt-5.6-luna` | 1.05M | $1/$6 | $0.10 — SVAK på long-context (41 %), unngå som dokument-default |
+| Sol (flaggskip) | `gpt-5.6-sol` | 922K (1,05M totalt inkl. 128K output) | $5/$30 | $0.50 |
+| Terra (anbefalt) | `gpt-5.6-terra` | 922K (som Sol) | $2/$12 (ned fra $2.50/$15 i juli) | $0.25 |
+| Luna (rask) | `gpt-5.6-luna` | 922K (som Sol) | $0.20/$1.20 (ned fra $1/$6 i juli) | $0.10 — SVAK på long-context (41 %), unngå som dokument-default |
 
 - `reasoning_effort: none|low|medium|high|xhigh|max` (default medium) — gyldig toppnivåfelt på `/v1/chat/completions`, dagens SSE-kode fungerer uendret.
 - Azure: dagens `api-version=2024-12-01-preview` er for gammel for 5.6 — oppgrader ved behov.
@@ -78,6 +84,11 @@ at brukere som allerede har den valgt ikke mister kontekstestimat eller
 tenkeinnsats-styring.
 
 Åpne spørsmål til neste review (svar med kilde + dato når de lukkes):
+- **Finnes det et prishopp over 272K input-tokens hos OpenAI?** Flere
+  tredjeparts-aggregatorer og en GitHub-issue hevder 2× input / 1,5× output for
+  hele forespørselen over 272K, men OpenAIs egen prisside viste ingen slik
+  terskel 13.8.2026. Er den reell, bør kontekstgulvet ned mot 250K igjen — det
+  er brukerens egen nøkkel som betaler. Finn et førstepartssvar.
 - Gemini: ai.google.dev/gemini-api/docs/openai har en reasoning_effort→
   thinking_level/-budget-tabell (sjekket 13.8.2026), men radene heter
   «Gemini 3.1 Pro / 3.1 Flash-Lite / 3 Flash / 2.5» — ikke våre eksakte

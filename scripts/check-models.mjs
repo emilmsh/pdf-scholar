@@ -33,6 +33,98 @@ function defaultModel(provider) {
   return m ? m[1] : ''
 }
 
+// ---------- Context-window consistency (notes vs code) ----------
+// The verified context numbers live in docs/agent-notes/modeller-api.md; the
+// numbers the app actually decides on live in MODEL_CONTEXT_TOKENS. Nothing
+// tied the two together, and they drifted for months without a single symptom:
+// the Anthropic models were documented at 1M and floored at 200K in code, so
+// every document between those sizes was excerpted for no reason. This check
+// closes that gap keylessly, on every run.
+//
+// The Kontekst column is the contract: it holds the number the code should
+// use — the INPUT capacity, not a total that includes output tokens.
+
+/** '1M' / '1.05M' / '200K' / '256K (verifisert …)' → tokens; null when the
+ *  cell documents no number ('ukjent → gulv'), which is a deliberate
+ *  fall-back-to-the-provider-floor and not a finding. */
+function parseContextCell(cell) {
+  const m = /(\d+(?:[.,]\d+)?)\s*([MK])\b/i.exec(cell)
+  if (!m) return null
+  const n = parseFloat(m[1].replace(',', '.'))
+  return Math.round(n * (m[2].toUpperCase() === 'M' ? 1_000_000 : 1_000))
+}
+
+/** The MODEL_CONTEXT_TOKENS map, parsed from source (1_000_000 → 1000000) */
+function codeContextTokens() {
+  const src = readFileSync(join(root, 'src/renderer/src/components/ai-models.ts'), 'utf8')
+  const block = src.match(/MODEL_CONTEXT_TOKENS[^{]*\{([\s\S]*?)\n\}/)
+  if (!block) return null
+  const out = {}
+  for (const m of block[1].matchAll(/'([^']+)':\s*([\d_]+)/g)) {
+    out[m[1]] = Number(m[2].replace(/_/g, ''))
+  }
+  return out
+}
+
+/** Every documented (id → context) pair from the notes' tables. All three
+ *  tables put Kontekst immediately after the id column, so the id cell is
+ *  located rather than indexed — a reordered column elsewhere in the row can
+ *  then never silently shift the reading. A row may carry both a dated id and
+ *  its alias, so every backticked token in that cell is tried. Rows whose
+ *  first backticked token is not a model id (the tenkeinnsats mapping table
+ *  quotes parameter values) fall out because nothing matches the code map and
+ *  their neighbouring cell holds no token count. */
+function notesContextTokens() {
+  const src = readFileSync(join(root, 'docs/agent-notes/modeller-api.md'), 'utf8')
+  const out = []
+  for (const line of src.split('\n')) {
+    if (!line.startsWith('|')) continue
+    const cells = line.split('|').map((c) => c.trim())
+    const idCell = cells.findIndex((c) => /`[^`]+`/.test(c))
+    if (idCell < 0 || idCell + 1 >= cells.length) continue
+    const ids = [...cells[idCell].matchAll(/`([^`]+)`/g)]
+      .map((m) => m[1])
+      .filter((id) => /^[a-z0-9][\w.\-/]*$/i.test(id))
+    if (ids.length === 0) continue
+    const documented = parseContextCell(cells[idCell + 1])
+    if (documented) out.push({ ids, documented })
+  }
+  return out
+}
+
+function contextConsistency() {
+  const code = codeContextTokens()
+  if (!code) {
+    flag('could not parse MODEL_CONTEXT_TOKENS from ai-models.ts')
+    return
+  }
+  const rows = notesContextTokens()
+  if (rows.length === 0) {
+    flag('could not parse any documented context windows from modeller-api.md')
+    return
+  }
+  console.log(`\ncontext windows: ${rows.length} documented, ${Object.keys(code).length} in code`)
+  for (const { ids, documented } of rows) {
+    const id = ids.find((i) => i in code)
+    if (!id) {
+      // Not in the map = falls back to the provider floor. Only worth a line
+      // when the notes DO know the number — then the floor is a needless guess.
+      console.log(`  + documented but no MODEL_CONTEXT_TOKENS entry: ${ids[0]} (${documented})`)
+      continue
+    }
+    const ours = code[id]
+    // Over the documented window is the dangerous direction: the document is
+    // attached whole and the provider rejects it mid-question.
+    if (ours > documented * 1.01) {
+      flag(`${id}: code says ${ours} but docs say ${documented} — OVER the real window, requests can fail`)
+    } else if (ours < documented * 0.9) {
+      // Under is safe but costs capacity: documents that would fit get
+      // excerpted anyway. This is the drift that hid for months.
+      flag(`${id}: code says ${ours} but docs say ${documented} — capacity left unused (excerpts early)`)
+    }
+  }
+}
+
 // ---------- Live lists ----------
 
 async function anthropicLive(key) {
@@ -117,6 +209,10 @@ console.log('Model catalogue drift report (see docs/MODEL-UPDATE.md for the prot
 // Every provider whose menu is curated-only (ai-models.ts modelOptions) —
 // openrouter and compat are live-listed by design and have nothing to check
 const CURATED_PROVIDERS = ['anthropic', 'openai', 'gemini', 'xai', 'mistral', 'groq']
+
+// The notes' context numbers vs the numbers the app decides on — the one
+// static check that needs no keys and catches silent capacity loss
+contextConsistency()
 
 // Static sanity: the curated lists parse, and every non-empty default is in
 // the curated list it belongs to
