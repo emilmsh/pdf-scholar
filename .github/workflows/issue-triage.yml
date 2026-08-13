@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The default label set covers bug/enhancement/question/documentation/
       # duplicate; these three are ours. --force keeps the step idempotent.

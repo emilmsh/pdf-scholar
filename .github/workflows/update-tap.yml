@@ -67,8 +67,11 @@ jobs:
             echo "INTEL_SHA=$INTEL_SHA"
           } >> "$GITHUB_ENV"
 
+      # The push below rides on the credentials this step persists (checkout v6+
+      # keeps them in a separate file wired in via an includeIf on the gitdir,
+      # not in .git/config) — so the push must stay in this same checkout.
       - name: Check out the tap
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: emilmsh/homebrew-tap
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
