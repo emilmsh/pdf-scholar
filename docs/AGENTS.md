@@ -104,9 +104,14 @@ land in an inbox:
 The gap that leaves: a silent week is indistinguishable from a dead workflow.
 Two things cover it — GitHub emails before suspending cron after ~60 days
 without repo activity, and `docs/MAINTENANCE.md` row 7 checks that the
-scheduled workflows are still enabled every month. If that ever feels too
-thin, the alternative is a weekly comment on one long-lived log issue: a
-scannable history, at the price of a notification a week.
+scheduled workflows are still enabled every month.
+
+**Silence is the decision, not the default** (Emil, 2026-08-13). The louder
+alternative — one comment a week on a long-lived log issue, buying a scannable
+history for a notification a week — was considered and turned down: a review
+that finds nothing has nothing to say, and a weekly ping for "nothing to see"
+trains you to ignore the one that matters. Do not re-pitch it without a reason
+the two covers above failed.
 
 ## Honest limits
 
