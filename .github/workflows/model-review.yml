@@ -27,17 +27,22 @@ name: Model catalogue review
 
 on:
   schedule:
-    - cron: '0 7 * * 1' # 09:00 Oslo time, Mondays
+    # 09:17 Oslo time, Mondays. Off the hour on purpose: GitHub delays
+    # scheduled runs under load, and the top of the hour is the worst queue.
+    - cron: '17 7 * * 1'
   workflow_dispatch:
 
+# Least privilege, per docs/AGENTS.md: exactly what a branch + PR needs. No
+# `issues: write` — a scheduled run has no thread to speak in, so granting it
+# would only widen what an injected provider doc page could reach.
 permissions:
   contents: write # commit the curated-list edits on a branch
   pull-requests: write # open the PR that delivers them
-  issues: write # the action reports progress through issue comments
 
 jobs:
   review:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,7 +61,11 @@ jobs:
           # static consistency half, and the live half is Emil's monthly pass
           # (MAINTENANCE.md row 1). Handing a scheduled agent six API keys to
           # widen a report is not a trade this project makes.
+          # Sonnet 5: reads documentation carefully, writes little code, and
+          # the delivery is a PR Emil reads. Pinned rather than left to the
+          # action's default so a review's judgement never changes silently.
           claude_args: >-
+            --model claude-sonnet-5
             --allowedTools Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch
           prompt: |
             You are the weekly model-catalogue review agent for PDFX. The repo is checked out and `npm ci` has already run.
