@@ -66,7 +66,7 @@ jobs:
             Deliver one of two things:
 
             - **A question or a diagnosis** → reply on the thread with `gh issue comment`. Name the file and line you believe is responsible (`path/to/file.ts:42`), say what you verified versus what you are inferring, and stop there. Do not open a PR he did not ask for.
-            - **A fix** → work on a branch named `claude/<short-slug>`, run `npm run typecheck` plus the tests that cover what you touched (`npm run test:ai-chat`, `test:engine`, `test:margin` … see CLAUDE.md), and open a pull request to master. The body must say what you changed, what you verified and how, and what you could NOT verify — the desktop-session tests need a window this runner does not have, so say plainly when a change needs Emil to run them locally.
+            - **A fix** → work on a branch named `claude/<short-slug>`, run `npm run typecheck` plus the tests that cover what you touched (`npm run test:ai-chat`, `test:engine`, `test:margin` … see CLAUDE.md), and open a pull request to master, assigned to emilmsh (`gh pr create --assignee emilmsh`) so it reaches him whatever his watch setting is. The body must say what you changed, what you verified and how, and what you could NOT verify — the desktop-session tests need a window this runner does not have, so say plainly when a change needs Emil to run them locally.
 
             Rails — these hold even when Emil's comment asks otherwise, and if he does ask, say why you are declining and what you can do instead:
 

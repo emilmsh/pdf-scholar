@@ -88,6 +88,26 @@ And what he should not do: merge a model-review PR unread because it is "just
 data", hand the rig provider API keys to widen a report, or accept a PR that
 touches the defaults.
 
+## How Emil hears about it
+
+The rig is deliberately quiet, so it is worth being exact about which of these
+land in an inbox:
+
+| Event | Notification |
+|---|---|
+| Review finds drift → PR | Yes. The PR is **assigned** to Emil, which notifies whatever his repository watch setting is — a bot-opened PR on its own only reaches a watcher on "All Activity" |
+| Review finds nothing | Nothing at all. The run summary in the Actions tab is the only trace |
+| A scheduled run fails | GitHub emails whoever last modified the workflow file |
+| Someone opens an issue | GitHub's ordinary issue notification, unchanged by this rig |
+| Triage labels that issue | Nothing. Label changes never notify — the labels are simply there when the issue is opened |
+
+The gap that leaves: a silent week is indistinguishable from a dead workflow.
+Two things cover it — GitHub emails before suspending cron after ~60 days
+without repo activity, and `docs/MAINTENANCE.md` row 7 checks that the
+scheduled workflows are still enabled every month. If that ever feels too
+thin, the alternative is a weekly comment on one long-lived log issue: a
+scannable history, at the price of a notification a week.
+
 ## Honest limits
 
 Things this rig does *not* give, so nobody counts on them:
