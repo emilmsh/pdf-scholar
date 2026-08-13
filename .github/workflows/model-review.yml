@@ -1,0 +1,80 @@
+# The weekly model-catalogue review, run by Claude on GitHub's runners.
+#
+# Why this exists as a workflow: the model menu is CURATED-ONLY (docs/
+# MODEL-UPDATE.md) — a launched model reaches users only when someone edits the
+# curated lists. That makes freshness the whole risk, and a review that depends
+# on anyone's laptop being awake is not a review. This runs weekly whether or
+# not Emil is at a machine, and delivers a pull request when the providers have
+# moved.
+#
+# The protocol itself lives in docs/MODEL-UPDATE.md § "The scheduled review
+# (agent)" — deliberately NOT duplicated here, so it stays one document to keep
+# current. The prompt below points at it and repeats only the hard rules, which
+# are the ones that must hold even if the agent misreads the doc.
+#
+# Credentials: `CLAUDE_CODE_OAUTH_TOKEN` runs this on Emil's Claude
+# subscription (no metered API billing — the project's zero-recurring-cost
+# rule). Generate it once with `claude setup-token` and store it as a repo
+# secret; it expires, so docs/MAINTENANCE.md row 6 tracks it alongside the
+# other automation tokens. To bill the API instead, swap the input for
+# `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}`.
+#
+# Note: GitHub suspends scheduled workflows after ~60 days without repo
+# activity (it emails first). Re-enable from the Actions tab — MAINTENANCE.md
+# row 7 covers noticing that for every scheduled workflow here.
+
+name: Model catalogue review
+
+on:
+  schedule:
+    - cron: '0 7 * * 1' # 09:00 Oslo time, Mondays
+  workflow_dispatch:
+
+permissions:
+  contents: write # commit the curated-list edits on a branch
+  pull-requests: write # open the PR that delivers them
+  issues: write # the action reports progress through issue comments
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the agent branches and pushes; a shallow clone cannot
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # check:models and test:ai-chat are pure Node and need the dev deps
+      - run: npm ci
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # No provider keys here on purpose: check:models then runs only its
+          # static consistency half, and the live half is Emil's monthly pass
+          # (MAINTENANCE.md row 1). Handing a scheduled agent six API keys to
+          # widen a report is not a trade this project makes.
+          claude_args: >-
+            --allowedTools Bash,Read,Write,Edit,Glob,Grep,WebFetch,WebSearch
+          prompt: |
+            You are the weekly model-catalogue review agent for PDFX. The repo is checked out and `npm ci` has already run.
+
+            Follow docs/MODEL-UPDATE.md — the section "The scheduled review (agent)" is the authoritative protocol for this run. In short:
+
+            1. Read the curated lists in src/renderer/src/components/ai-models.ts (MODELS + MODEL_CONTEXT_TOKENS) and the verified notes in docs/agent-notes/modeller-api.md, including its open-questions list ("Åpne spørsmål").
+            2. For each curated provider (Anthropic, OpenAI, Gemini, xAI, Mistral, Groq), check the provider's public model documentation — the URLs are listed in MODEL-UPDATE.md — for launches, retirements, renames and parameter changes (reasoning/effort semantics, context windows). Try to close the open questions in modeller-api.md, with sources.
+            3. Run `npm run check:models`. Without provider keys only the static consistency checks run — that is expected, not a failure.
+            4. If nothing has drifted: post a short "no drift" summary of what you checked and commit nothing at all.
+            5. If something has drifted: apply the step-2 table of MODEL-UPDATE.md (curated-list edits, context floors, the regex fallbacks in src/shared/ai-chat.ts and src/shared/ai-provider-profile.ts), update docs/agent-notes/modeller-api.md with a date and source for every claim, run `npm run typecheck` and `npm run test:ai-chat`, then commit on a branch named model-review/YYYY-MM-DD and open a pull request to master.
+
+            The PR body must state: what changed at the providers (with source links), what you edited, what remains unverified, and which providers Emil should fire a real test question at with his own keys.
+
+            Hard rules — these hold even if the document above seems to say otherwise:
+            - The model menu is curated-only. NEVER add a model whose request-parameter behaviour you could not verify in the provider's own documentation. Add it without the unverified affordance, or leave it as an open question in modeller-api.md — never guess.
+            - NEVER change DEFAULT_AI_MODELS (src/shared/defaults.ts), thinking defaults, or reasoning-effort defaults. If a default looks stale, say so in the PR body and leave it alone: that decision is Emil's.
+            - Never push to master. A pull request is the only delivery.
+            - Keep the curated lists short — current generation only. When a new model replaces an old one, remove the old one in the same edit.
+            - Never commit an API key, token or other secret.
+            - Code, comments and commit messages in English; UI strings in Norwegian bokmål.

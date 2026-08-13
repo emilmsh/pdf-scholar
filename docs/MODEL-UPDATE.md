@@ -79,7 +79,17 @@ gate — every `!` line maps to a row in the table below.
 
 A scheduled Claude agent runs this protocol **weekly** so a provider launch
 (gpt-5.7, a new Grok, a Gemini bump) reaches the curated lists within days,
-not whenever someone happens to look. The agent's run:
+not whenever someone happens to look.
+
+It lives in `.github/workflows/model-review.yml` — GitHub Actions, Mondays at
+09:00 Oslo time, `workflow_dispatch` for a manual run. Deliberately CI and not
+a laptop-side job: a freshness review that depends on someone's machine being
+awake is not a review. It authenticates with the `CLAUDE_CODE_OAUTH_TOKEN`
+repo secret (Emil's Claude subscription — no metered API billing; regenerate
+with `claude setup-token`, tracked in MAINTENANCE.md row 6) and runs with NO
+provider keys, so `check:models` contributes its static half only.
+
+The agent's run:
 
 1. **Check the sources.** For each curated provider, compare the curated list
    in `ai-models.ts` against the provider's public model documentation:
