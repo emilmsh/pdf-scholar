@@ -35,6 +35,12 @@ shell- and prompt-injection hole in one.
 | **Issue triage** (`issue-triage.yml`) | Issue opened/reopened | Apply labels. Nothing else — no comments, no closing | `contents: read`, `issues: write`, and the Bash tool is restricted to `gh issue view/list/edit` | Haiku 4.5 |
 | **On request** (`claude-assist.yml`) | Emil writes `@claude` in a comment | Diagnose in a reply, or fix and open a PR | `contents: write`, `pull-requests: write`, `issues: write` | Sonnet 5; Opus 5 when the comment says `@claude opus` |
 
+Every job additionally carries `id-token: write`. That is not repo access — it
+lets the workflow request an identity assertion about itself, which
+`claude-code-action` needs for its own authentication. Without it the action
+fails before it starts, with "Could not fetch an OIDC token", no matter which
+credential is configured. It does not widen the scopes in the table.
+
 The on-request job is gated on `author_association == 'OWNER'`. Without that
 gate, anyone outside could burn Emil's subscription quota and steer an agent
 that holds write access to the repo.

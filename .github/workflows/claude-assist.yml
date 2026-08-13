@@ -24,6 +24,7 @@ permissions:
   contents: write # commit on a branch
   pull-requests: write # open the PR that delivers it
   issues: write # reply on the thread he asked in
+  id-token: write # the action's own OIDC auth; no repo access, see AGENTS.md
 
 # Two mentions in a row should queue, not race — a cancelled fix leaves a
 # half-pushed branch behind

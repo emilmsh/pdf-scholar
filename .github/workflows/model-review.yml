@@ -38,6 +38,11 @@ on:
 permissions:
   contents: write # commit the curated-list edits on a branch
   pull-requests: write # open the PR that delivers them
+  # claude-code-action authenticates itself through OIDC and fails without
+  # this ("Could not fetch an OIDC token") even when the credential is the
+  # subscription token. It grants an identity assertion about this workflow,
+  # not any access to the repo — so it does not widen the scopes above.
+  id-token: write
 
 jobs:
   review:

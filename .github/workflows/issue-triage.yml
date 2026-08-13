@@ -27,6 +27,7 @@ on:
 permissions:
   contents: read # checkout, so the agent can tell desktop from extension
   issues: write # labels — GitHub scopes comments the same way, see AGENTS.md
+  id-token: write # the action's own OIDC auth; no repo access, see AGENTS.md
 
 # A reopened-then-edited flurry should not stack runs
 concurrency:
