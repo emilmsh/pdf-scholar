@@ -251,8 +251,14 @@ export function ModelQuickMenu({
       const enabled = config.hasKey[id] || (id === 'compat' && config.compat.baseUrl.trim() !== '')
       return { id, name, enabled, entries }
       // Platforms that cannot store keys (plain-web preview) hide the keyless
-      // real providers instead of greying them — there is no way to enable them
-    }).filter((g) => g.entries.length > 0 && (config.keysSupported || g.enabled))
+      // real providers instead of greying them — there is no way to enable them.
+      //
+      // A provider with NO models is still listed (it used to be dropped here,
+      // which hid the two that need setting up rather than a key: the custom /
+      // local endpoint — Ollama, LM Studio — and Azure. Those have no curated
+      // list and nothing live until they are configured, so the one place you
+      // would look to find them was the one place that never mentioned them).
+    }).filter((g) => config.keysSupported || g.enabled)
     if (provider === 'mock' || !config.keysSupported)
       groups.push({
         id: 'mock' as AiProviderId,
@@ -333,17 +339,30 @@ export function ModelQuickMenu({
     </button>
   )
 
-  const drillRow = (
+  /** A provider row: what it is on one line, what state it is in underneath.
+   *  Stacked rather than side by side because both halves can be long —
+   *  «Egendefinert / lokal (OpenAI-kompatibel)» next to a count truncated the
+   *  name down to «Open…», which is the one word a row like this must keep. */
+  const providerRow = (
     key: string,
     label: string,
     detail: string,
-    go: () => void
+    go: () => void,
+    kind: 'drill' | 'locked'
   ): React.JSX.Element => (
-    <button key={key} className="ai-menu-item is-drill" role="menuitem" data-menuitem onClick={go}>
+    <button
+      key={key}
+      className={`ai-menu-item is-${kind}`}
+      role="menuitem"
+      data-menuitem
+      onClick={go}
+    >
       <span className="ai-menu-check" />
-      <span className="ai-menu-label">{label}</span>
-      <span className="ai-menu-detail">{detail}</span>
-      <span className="ai-menu-chevron">›</span>
+      <span className="ai-menu-stack">
+        <span className="ai-menu-label">{label}</span>
+        <span className="ai-menu-detail">{detail}</span>
+      </span>
+      {kind === 'drill' && <span className="ai-menu-chevron">›</span>}
     </button>
   )
 
@@ -368,8 +387,13 @@ export function ModelQuickMenu({
           {vendorsOf(g ?? { id: view.provider, name: view.name, enabled: true, entries: [] }).map(
             ({ vendor, entries }) =>
               vendor
-                ? drillRow(vendor, vendorLabel(vendor), String(entries.length), () =>
-                    setView({ level: 'models', provider: view.provider, name: view.name, vendor })
+                ? providerRow(
+                    vendor,
+                    vendorLabel(vendor),
+                    t('ai.modelCountShort', { models: entries.length }),
+                    () =>
+                      setView({ level: 'models', provider: view.provider, name: view.name, vendor }),
+                    'drill'
                   )
                 : // Ids with no vendor prefix have nowhere further to go
                   entries.map((e) => modelRow(e))
@@ -388,21 +412,27 @@ export function ModelQuickMenu({
     return (
       <div className="ai-menu-list" role="menu" ref={listRef}>
         {groups.map((g) => {
-          if (!g.enabled)
-            // Nothing to pick until there is a key. The row is not dead — it is
-            // the shortest path to the one thing that would fix it.
+          // Nothing to pick yet. The row is not dead — it is the shortest path
+          // to the one thing that would fix it, and it says WHICH thing:
+          // Anthropic and the hosted services want a key, while the custom /
+          // local endpoint and Azure want an address before a key means
+          // anything. A configured endpoint that lists nothing is a third
+          // state again (server down, or nothing pulled yet).
+          if (!g.enabled || g.entries.length === 0)
             return (
-              <button
-                key={g.id}
-                className="ai-menu-item is-locked"
-                role="menuitem"
-                data-menuitem
-                onClick={onOpenSettings}
-              >
-                <span className="ai-menu-check" />
-                <span className="ai-menu-label">{g.name}</span>
-                <span className="ai-menu-detail">{t('ai.keyMissing')}</span>
-              </button>
+              <div key={g.id} className="ai-menu-group">
+                {providerRow(
+                  g.id,
+                  g.name,
+                  !g.enabled
+                    ? g.id === 'compat' || g.id === 'azure'
+                      ? t('ai.notConfigured')
+                      : t('ai.keyMissing')
+                    : t('ai.noModelsListed'),
+                  onOpenSettings,
+                  'locked'
+                )}
+              </div>
             )
           const vendors = vendorsOf(g)
           // A long list becomes one row you click into; a short one is listed
@@ -410,11 +440,12 @@ export function ModelQuickMenu({
           if (g.entries.length > INLINE_MAX && vendors.length > 1)
             return (
               <div key={g.id} className="ai-menu-group">
-                {drillRow(
+                {providerRow(
                   g.id,
                   g.name,
                   t('ai.modelCount', { models: g.entries.length, vendors: vendors.length }),
-                  () => setView({ level: 'vendors', provider: g.id, name: g.name })
+                  () => setView({ level: 'vendors', provider: g.id, name: g.name }),
+                  'drill'
                 )}
               </div>
             )

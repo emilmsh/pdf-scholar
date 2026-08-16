@@ -3596,6 +3596,30 @@ html.pen-near .draw-layer {
   white-space: nowrap;
 }
 
+/* Provider rows carry a second line inside the same row: the name can be as
+   long as «Egendefinert / lokal (OpenAI-kompatibel)» and the state as long as
+   «74 modeller · 23 leverandører» — side by side, one of them loses. */
+.ai-menu-stack {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ai-menu-stack .ai-menu-detail {
+  line-height: 1.3;
+}
+
+/* A provider's NAME wraps rather than truncates — there are nine of them, they
+   are ours, and «Egendefinert / lokal (OpenAI-kompatibel)» loses its point as
+   «Egendefinert / lokal (OpenAI-komp…». Model rows keep the ellipsis: a live id
+   can be arbitrarily long and the tooltip has the rest. */
+.ai-menu-stack .ai-menu-label {
+  white-space: normal;
+  line-height: 1.3;
+}
+
 /* Which provider a search hit came from — the level structure is gone while
    filtering, so the row has to say it itself */
 .ai-menu-prefix {
@@ -3604,6 +3628,9 @@ html.pen-near .draw-layer {
 
 .ai-menu-detail {
   flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 11px;
   color: var(--text-secondary);
 }
