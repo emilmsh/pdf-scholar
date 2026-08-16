@@ -357,7 +357,9 @@ export function ModelQuickMenu({
       data-menuitem
       onClick={go}
     >
-      <span className="ai-menu-check" />
+      {/* No check gutter here: a provider row is a peer of the section
+          headings, not of the models under one. Carrying the gutter indented
+          it to model depth and flattened the two levels into each other. */}
       <span className="ai-menu-stack">
         <span className="ai-menu-label">{label}</span>
         <span className="ai-menu-detail">{detail}</span>
