@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "provider": "compat",
+    "model": "self/keepalive",
+    "source": "recorded",
+    "recordedAt": "2026-08-16",
+    "note": "fake endpoint (scripts/lib/fake-provider.mjs)"
+  },
+  "http": {
+    "status": 200
+  },
+  "chunks": [
+    ": ping\n\n",
+    "\n",
+    "data: {\"choices\":[{\"delta\":{\"content\":\"Svar etter stillhet.\"}}]}\n\n",
+    ": ping\n\n",
+    "data: [DONE]\n\n"
+  ],
+  "expect": {
+    "ok": true,
+    "text": "Svar etter stillhet.",
+    "citations": 0,
+    "thinking": false
+  }
+}

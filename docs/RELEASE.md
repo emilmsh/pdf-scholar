@@ -141,6 +141,20 @@ npm run test:annot-edit  # a mark can be corrected: handles reachable AND workin
 npm run test:listing     # the Store copy still parses out of the doc
 ```
 
+**And the one that needs your keys** — CI cannot run it, and it is the only
+check that asks the providers whether the models we ship still work:
+
+```bash
+npm run test:live        # a few øre; ANTHROPIC_API_KEY etc. in env
+```
+
+Per model it proves the answer arrives, a citation survives into it, a pasted
+image is read or refused by name, and the degrade-on-400 net stayed quiet (two
+requests for one question = a parameter we send is being refused). Add
+`-- --record` when a provider surprises you: the stream lands in the replay
+library and CI guards it keylessly from then on. See
+[docs/AI-TESTING.md](AI-TESTING.md).
+
 **Also open the browser extension.** `npm run build:ext`, load
 `dist-extension/` unpacked, open a PDF and a file from the recents list. Neither
 `shoot` nor `test:windows` touches the extension — both drive Electron — and

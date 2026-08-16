@@ -1,0 +1,24 @@
+{
+  "meta": {
+    "provider": "compat",
+    "model": "self/reasoning",
+    "source": "recorded",
+    "recordedAt": "2026-08-16",
+    "note": "fake endpoint (scripts/lib/fake-provider.mjs)"
+  },
+  "http": {
+    "status": 200
+  },
+  "chunks": [
+    "data: {\"choices\":[{\"delta\":{\"reasoning\":\"Først må jeg lese side 1. \"}}]}\n\n",
+    "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Så vurderer jeg spørsmålet.\"}}]}\n\n",
+    "data: {\"choices\":[{\"delta\":{\"content\":\"Kort svar. [KILDE s.2: \\\"Metoden er enkel\\\"]\"}}]}\n\n",
+    "data: [DONE]\n\n"
+  ],
+  "expect": {
+    "ok": true,
+    "text": "Kort svar.",
+    "citations": 1,
+    "thinking": true
+  }
+}

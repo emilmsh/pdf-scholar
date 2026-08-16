@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "provider": "compat",
+    "model": "self/upstream-error",
+    "source": "recorded",
+    "recordedAt": "2026-08-16",
+    "note": "fake endpoint (scripts/lib/fake-provider.mjs)"
+  },
+  "http": {
+    "status": 200
+  },
+  "chunks": [
+    "data: {\"error\":{\"message\":\"Upstream provider error\"}}\n\n",
+    "data: [DONE]\n\n"
+  ],
+  "expect": {
+    "code": null,
+    "error": "Upstream provider error",
+    "thinking": false
+  }
+}

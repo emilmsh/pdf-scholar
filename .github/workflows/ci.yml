@@ -60,6 +60,11 @@ jobs:
       # drops (image/music generators, :batch twins, last year's models) and the
       # gates that stop it emptying a small or silent endpoint
       - run: npm run test:model-curation
+      # Real provider streams, recorded once by `npm run test:live --record` and
+      # replayed here keylessly forever after — including the shapes nobody
+      # would have thought to mock (reasoning-only streams, errors inside an
+      # HTTP 200, a JSON frame split across two TCP writes)
+      - run: npm run test:streams
       # The extension's redirect-rule → viewer-page URL handoff: a regression is
       # invisible until one specific kind of link (signed, tracker-tagged) breaks
       - run: npm run test:viewer-url

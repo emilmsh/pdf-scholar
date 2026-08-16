@@ -33,6 +33,8 @@
     "test:retrieval": "node scripts/test-ai-retrieval.mjs",
     "test:ai-chat": "node scripts/test-ai-chat.mjs",
     "test:model-curation": "node scripts/test-model-curation.mjs",
+    "test:streams": "node scripts/test-stream-replay.mjs",
+    "test:live": "node scripts/test-live.mjs",
     "test:viewer-url": "node scripts/test-viewer-url.mjs",
     "test:insecure-retry": "node scripts/test-insecure-retry.mjs",
     "test:file-access": "node scripts/test-file-access.mjs",

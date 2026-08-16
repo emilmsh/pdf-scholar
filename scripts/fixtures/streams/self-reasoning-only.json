@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "provider": "compat",
+    "model": "self/reasoning-only",
+    "source": "recorded",
+    "recordedAt": "2026-08-16",
+    "note": "fake endpoint (scripts/lib/fake-provider.mjs)"
+  },
+  "http": {
+    "status": 200
+  },
+  "chunks": [
+    "data: {\"choices\":[{\"delta\":{\"reasoning\":\"Tenker … \"}}]}\n\n",
+    "data: {\"choices\":[{\"delta\":{\"reasoning\":\"tenker fortsatt …\"}}]}\n\n",
+    "data: [DONE]\n\n"
+  ],
+  "expect": {
+    "code": "ai-stream-aborted",
+    "error": "Strømmen ble avbrutt uten fullført svar.",
+    "thinking": true
+  }
+}
