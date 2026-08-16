@@ -26,7 +26,7 @@ import type {
   FileError,
   ThinkingLevel
 } from './types'
-import { remoteModel } from './ai-model-catalog'
+import { isCatalogProvider, remoteModel } from './ai-model-catalog'
 import { COMPAT_SERVICES, isCompatService, OPENAI_REASONING_RE } from './ai-provider-profile'
 import { DEFAULT_AZURE_API_VERSION } from './defaults'
 import { AI_ERRORS } from './engine-errors'
@@ -207,17 +207,39 @@ const CONTEXT_OVERFLOW_RE =
 // wait, narrow the question, or pick a model with a higher quota.
 const RATE_LIMIT_RE = /request too large|rate.?limit|tokens per min/i
 
-/** A provider failure as a FileError. The rate-limit and context-overflow
+// A question with a picture in it, sent to a model with no eyes. Every provider
+// says this differently and none of them says it plainly: OpenRouter answers
+// «No endpoints found that support image input» with an HTTP 404 (which reads
+// as a missing model), OpenAI «Invalid content type. image_url is only
+// supported by certain models», Mistral «does not support image input». The
+// match is only consulted when the request actually CARRIED an image, so a
+// message about a corrupt or oversized image cannot be mistaken for this.
+const IMAGE_UNSUPPORTED_RE =
+  /support (?:image|vision|multimodal)|image input|image_url|modalit|no vision/i
+
+/** A provider failure as a FileError. The image, rate-limit and context-overflow
  *  cases are ones WE can name, so they carry codes the renderer translates —
  *  while `error` keeps the provider's own sentence, which names the token
  *  counts and is the only part worth reading in a log. Anything else travels
  *  as its own text for the same reason: no invented translation could carry
  *  that detail. */
-function providerFailure(message: string): FileError {
+function providerFailure(
+  message: string,
+  ctx?: { model?: string | null; hadImages?: boolean }
+): FileError {
+  if (ctx?.hadImages && IMAGE_UNSUPPORTED_RE.test(message))
+    return AI_ERRORS.modelNoImages(ctx.model || '')
   if (RATE_LIMIT_RE.test(message)) return AI_ERRORS.rateLimited(message)
   return CONTEXT_OVERFLOW_RE.test(message)
     ? AI_ERRORS.contextOverflow(message)
     : { error: message }
+}
+
+/** Does this request carry an image at all? The gate on every image-specific
+ *  diagnosis below — without it, "invalid image" from a corrupt paste would be
+ *  reported as "this model cannot see". */
+function carriesImages(req: AiChatRequest): boolean {
+  return req.messages.some((m) => (m.images?.length ?? 0) > 0)
 }
 
 const EMPTY_USAGE: AiUsage = {
@@ -558,7 +580,10 @@ async function chatOpenAiResponses(
         continue
       }
     }
-    return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`)
+    return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`, {
+      model,
+      hadImages: carriesImages(req)
+    })
   }
 
   // Typed SSE events; each data payload carries its own `type`, so the
@@ -607,11 +632,15 @@ async function chatOpenAiResponses(
             break
           case 'response.failed':
             failure = providerFailure(
-              parsed.response?.error?.message ?? AI_ERRORS.providerUnknown.error
+              parsed.response?.error?.message ?? AI_ERRORS.providerUnknown.error,
+              { model, hadImages: carriesImages(req) }
             )
             break
           case 'error':
-            failure = providerFailure(parsed.message ?? AI_ERRORS.providerUnknown.error)
+            failure = providerFailure(parsed.message ?? AI_ERRORS.providerUnknown.error, {
+              model,
+              hadImages: carriesImages(req)
+            })
             break
         }
       } catch {
@@ -730,7 +759,10 @@ async function chatOpenAiCompatible(
       delete body.reasoning_effort
       continue
     }
-    return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`)
+    return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`, {
+      model,
+      hadImages: carriesImages(req)
+    })
   }
 
   const reader = response.body.getReader()
@@ -790,7 +822,8 @@ async function chatOpenAiCompatible(
         if (parsed.usage) readUsage(parsed.usage)
         return { ok: true, parts: parseQuoteContract(text), usage, model: parsed.model ?? model ?? 'azure' }
       }
-      if (typeof parsed?.error?.message === 'string') return providerFailure(parsed.error.message)
+      if (typeof parsed?.error?.message === 'string')
+        return providerFailure(parsed.error.message, { model, hadImages: carriesImages(req) })
     } catch {
       /* not JSON either */
     }
@@ -886,6 +919,16 @@ export interface ProviderChatParams {
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
   const { provider, key, models, azure, compat, thinking, catalog, req, emit, signal } = params
   try {
+    // A picture in the question, and a catalogue that already says this model
+    // is text-only (OpenRouter's modalities, Ollama's capabilities): say so
+    // here rather than sending the images off to be refused. Only a listing
+    // that made the claim counts — `undefined` is "we do not know", and an
+    // unknown model still gets to try and be told no by the provider.
+    if (carriesImages(req) && isCatalogProvider(provider)) {
+      const id = models[provider]?.trim() ?? ''
+      if (id && remoteModel(catalog, provider, id)?.vision === false)
+        return AI_ERRORS.modelNoImages(id)
+    }
     // The first-class hosted services (OpenRouter, Gemini, xAI, Mistral,
     // Groq): fixed base URL, Bearer key, shared Chat Completions path. Their
     // model lists are live-fetched, so an empty model means "not picked yet"
@@ -948,6 +991,9 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
     }
   } catch (err) {
     if (signal.aborted) return AI_ERRORS.aborted
-    return providerFailure(err instanceof Error ? err.message : String(err))
+    return providerFailure(err instanceof Error ? err.message : String(err), {
+      model: models[provider],
+      hadImages: carriesImages(req)
+    })
   }
 }

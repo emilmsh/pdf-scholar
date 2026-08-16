@@ -3471,12 +3471,6 @@ html.pen-near .draw-layer {
   position: relative;
 }
 
-.ai-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
 .ai-model-anchor {
   flex: 1;
   min-width: 0;
@@ -3530,6 +3524,119 @@ html.pen-near .draw-layer {
   flex-direction: column;
   gap: 8px;
   animation: menu-in 0.12s ease;
+}
+
+/* The model list inside the chip's menu: one level of rows, drilled into for a
+   provider whose list is too long to read (OpenRouter). Rows are real buttons —
+   arrow keys and screen readers both need something focusable, which is exactly
+   what the <select> this replaced gave for free. */
+.ai-menu-list {
+  display: flex;
+  flex-direction: column;
+  /* The tallest this can get before it scrolls: a level holds at most ~22 rows
+     (OpenRouter's vendors), and the menu must still fit under the header in a
+     short window. */
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+.ai-menu-group + .ai-menu-group {
+  margin-top: 6px;
+}
+
+.ai-menu-head {
+  padding: 4px 8px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.ai-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--text);
+  text-align: left;
+}
+
+.ai-menu-item:hover,
+.ai-menu-item:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+
+.ai-menu-item.is-picked {
+  font-weight: 600;
+}
+
+.ai-menu-item.is-locked {
+  color: var(--text-secondary);
+}
+
+/* Fixed gutter so labels line up whether or not a row is the picked one */
+.ai-menu-check {
+  width: 12px;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.ai-menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Which provider a search hit came from — the level structure is gone while
+   filtering, so the row has to say it itself */
+.ai-menu-prefix {
+  color: var(--text-secondary);
+}
+
+.ai-menu-detail {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.ai-menu-chevron {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.ai-menu-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.ai-menu-back:hover,
+.ai-menu-back:focus-visible {
+  background: var(--hover);
+  color: var(--text);
+  outline: none;
+}
+
+.ai-menu-empty {
+  padding: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
 }
 
 .ai-model-more {
@@ -6284,6 +6391,15 @@ html.touch-ui .ai-history-delete {
 /* The compact assistant chips need finger-sized targets on touch */
 html.touch-ui .menu-ai-chip {
   padding: 8px 10px;
+}
+
+/* The model menu is now a list of rows rather than a native <select>, and a
+   native select's picker was finger-sized by the OS. Ours has to say so. */
+html.touch-ui .ai-menu-item,
+html.touch-ui .ai-menu-back {
+  min-height: 40px;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 
 /* Dialogs are where a too-small target hurts most: they are modal, so a miss

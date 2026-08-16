@@ -31,7 +31,7 @@ shell- and prompt-injection hole in one.
 
 | Job | Trigger | May do | Token scope | Model |
 |---|---|---|---|---|
-| **Model review** (`model-review.yml`) | Weekly, Mondays 09:00 Oslo (+ manual) | Read provider docs, edit the curated lists and notes, run typecheck/tests, open a PR | `contents: write`, `pull-requests: write` | Sonnet 5 |
+| **Model review** (`model-review.yml`) | Weekly, Mondays 09:00 Oslo (+ manual) | Read provider docs, edit the curated lists and notes (within MODEL-UPDATE.md § Curation rules), repair the OpenRouter listing fields the menu's selection rule reads, run typecheck/tests, open a PR | `contents: write`, `pull-requests: write` | Sonnet 5 |
 | **Issue triage** (`issue-triage.yml`) | Issue opened/reopened | Apply labels. Nothing else — no comments, no closing | `contents: read`, `issues: write`, and the Bash tool is restricted to `gh issue view/list/edit` | Haiku 4.5 |
 | **On request** (`claude-assist.yml`) | Emil writes `@claude` in a comment | Diagnose in a reply, or fix and open a PR | `contents: write`, `pull-requests: write`, `issues: write` | Sonnet 5; Opus 5 when the comment says `@claude opus` |
 

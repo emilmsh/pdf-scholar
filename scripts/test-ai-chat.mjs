@@ -518,6 +518,71 @@ section('compat: transport failures get their names')
   ok(single.result.usage?.inputTokens === 5, 'usage mapped from the one-shot body')
 }
 
+// ---------- a picture sent to a model with no eyes ----------
+//
+// The one failure the raw provider sentence describes worst. OpenRouter answers
+// «No endpoints found that support image input» with an HTTP 404, which reads
+// as "that model is gone" — and since the menu now offers only image-capable
+// models, anyone who hits this got there by typing a name into the filter or by
+// keeping an older selection, i.e. exactly the person who needs to be told what
+// really happened.
+section('images: a text-only model is named as such')
+{
+  const noEndpoints = () =>
+    new Response(JSON.stringify({ error: { message: 'No endpoints found that support image input.' } }), {
+      status: 404
+    })
+
+  responder = noEndpoints
+  const rejected = await run({ provider: 'openrouter' })
+  ok(rejected.result.code === 'ai-model-no-images', `image rejection → ai-model-no-images (got ${rejected.result.code})`)
+  ok(
+    /anthropic\/claude-sonnet-5/.test(rejected.result.error ?? ''),
+    'the model id rides in the log sentence (the renderer cannot name it)'
+  )
+
+  // The same sentence, but this question carried no image: whatever that 404 is
+  // about, it is not this — and guessing would put a wrong diagnosis on screen.
+  responder = noEndpoints
+  const noImage = await run({
+    provider: 'openrouter',
+    req: { requestId: 2, system: 'S', messages: [{ role: 'user', text: 'Hei' }], document: DOC }
+  })
+  ok(noImage.result.code !== 'ai-model-no-images', 'a request without images is never diagnosed this way')
+
+  // When the catalogue already says the model is text-only, the images are not
+  // sent at all — the user gets the same named answer without a round trip.
+  calls.length = 0
+  responder = () => new Response('should not be called', { status: 500 })
+  const known = await run({
+    provider: 'openrouter',
+    catalog: {
+      openrouter: {
+        fetchedAt: Date.now(),
+        models: [{ id: 'anthropic/claude-sonnet-5', vision: false }]
+      }
+    }
+  })
+  ok(known.result.code === 'ai-model-no-images', `a known text-only model fails up front (got ${known.result.code})`)
+  ok(calls.length === 0, 'and the images never leave the machine')
+
+  // vision:true and vision-unknown both still go out — an unverified model gets
+  // to try, and the rejection net above catches it if the provider says no.
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  const seeing = await run({
+    provider: 'openrouter',
+    catalog: {
+      openrouter: { fetchedAt: Date.now(), models: [{ id: 'anthropic/claude-sonnet-5', vision: true }] }
+    }
+  })
+  ok(seeing.result.ok === true, 'a vision model is sent as before')
+  const unknown = await run({
+    provider: 'openrouter',
+    catalog: { openrouter: { fetchedAt: Date.now(), models: [{ id: 'other/model' }] } }
+  })
+  ok(unknown.result.ok === true, 'a model the catalogue says nothing about is still tried')
+}
+
 // ---------- mock ----------
 
 section('mock: keyless offline provider')

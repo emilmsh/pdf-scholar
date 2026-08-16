@@ -56,6 +56,10 @@ jobs:
       # provider, SSE parsing, the degrade-on-400 nets, and that each path
       # matches its capability-profile row (no keys, no network)
       - run: npm run test:ai-chat
+      # The selection that turns a 409-model live listing into a menu: what it
+      # drops (image/music generators, :batch twins, last year's models) and the
+      # gates that stop it emptying a small or silent endpoint
+      - run: npm run test:model-curation
       # The extension's redirect-rule → viewer-page URL handoff: a regression is
       # invisible until one specific kind of link (signed, tracker-tagged) breaks
       - run: npm run test:viewer-url

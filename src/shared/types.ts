@@ -120,6 +120,7 @@ export type AiErrorCode =
   | 'ai-azure-unconfigured'
   | 'ai-compat-unconfigured'
   | 'ai-model-unchosen'
+  | 'ai-model-no-images'
   | 'ai-endpoint-unreachable'
   | 'ai-endpoint-incompatible'
   | 'ai-context-overflow'
@@ -429,9 +430,32 @@ export interface AiRemoteModel {
    *  architecture's maximum). Absent = unknown, use the provider floor. */
   contextTokens?: number
   /** Whether the model accepts images, when the endpoint reports it (Ollama's
-   *  capabilities array). Absent = unknown — treated as "allow and let the
-   *  degrade nets handle it". */
+   *  capabilities array, OpenRouter's architecture.input_modalities). Absent =
+   *  unknown — treated as "allow and let the degrade nets handle it". */
   vision?: boolean
+  /** Whether the model answers with anything OTHER than text (OpenRouter's
+   *  architecture.output_modalities). Image and music generators sit in the
+   *  same listing as the chat models and cannot answer a question about a
+   *  document at all — Nano Banana returns pictures, Lyria returns audio — so
+   *  the selection in curateRemoteModels drops them. Stated this way round on
+   *  purpose: "not images" would still have let the music through.
+   *  Absent = unknown. */
+  emitsNonText?: boolean
+  /** When the provider first listed the model, in unix SECONDS, where the
+   *  listing carries it (OpenRouter does). Absent = unknown, and unknown never
+   *  drops a model — only a date we have and that is old does. */
+  createdAt?: number
+  /** What the provider charges for OUTPUT, in USD per million tokens, where the
+   *  listing says (OpenRouter's `pricing.completion`, quoted per token).
+   *
+   *  It is here as the only honest proxy for model STRENGTH available in a
+   *  listing: nobody publishes parameter counts, but every vendor prices its
+   *  flagship above its small model, and does so consistently within its own
+   *  lineup. That is what the menu sorts on, so Sol/Opus sit above Luna/Haiku
+   *  (Emil, 2026-08-13). Across vendors it means much less — which is fine,
+   *  because the sort only ever runs inside one vendor's list. Absent =
+   *  unknown, and the order falls back to newest-first. */
+  outputPrice?: number
 }
 
 /** Cached snapshot of the providers' live model lists, fetched with the user's

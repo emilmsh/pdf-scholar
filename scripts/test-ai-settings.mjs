@@ -123,19 +123,23 @@ try {
     for (let i = 0; i < 30 && !document.querySelector('.ai-model-menu'); i++) await sleep(100)
     await sleep(600) // the TTL-gated refresh resolves (fails silently: no server)
   `, PRELUDE)
+  // The list is rows, not a <select>: each carries data-value "<provider>:<id>"
+  // and the picked one is aria-checked. The only <select> left in this menu is
+  // the reasoning one, so counting them still answers whether it is showing.
   const menu = await evaluate(send, `
     const menu = document.querySelector('.ai-model-menu')
+    const rows = [...(menu?.querySelectorAll('[data-menuitem]') ?? [])]
     return {
       open: !!menu,
-      selected: menu?.querySelector('select')?.value ?? '',
-      hasCompatOption: [...(menu?.querySelectorAll('option') ?? [])].some((o) => o.value === 'compat:llama3.1'),
+      selected: rows.find((r) => r.getAttribute('aria-checked') === 'true')?.dataset.value ?? '',
+      hasCompatOption: rows.some((r) => r.dataset.value === 'compat:llama3.1'),
       selects: menu?.querySelectorAll('select').length ?? 0
     }
   `, PRELUDE)
   ok(menu.open, 'model menu opens')
-  ok(menu.selected === 'compat:llama3.1', `configured compat model is the selection (got ${menu.selected})`)
+  ok(menu.selected === 'compat:llama3.1', `configured compat model is the picked row (got ${menu.selected})`)
   ok(menu.hasCompatOption, 'configured id stays pickable with the server offline')
-  ok(menu.selects === 1, `reasoning selector hidden for a non-reasoning compat id (selects: ${menu.selects})`)
+  ok(menu.selects === 0, `reasoning selector hidden for a non-reasoning compat id (selects: ${menu.selects})`)
 
   console.log(failures === 0 ? '\ntest-ai-settings: all checks passed' : `\ntest-ai-settings: ${failures} check(s) FAILED`)
   process.exitCode = failures === 0 ? 0 : 1

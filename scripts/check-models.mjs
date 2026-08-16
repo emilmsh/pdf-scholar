@@ -206,8 +206,10 @@ function diff(provider, curated, live, fallbackDefault) {
 
 console.log('Model catalogue drift report (see docs/MODEL-UPDATE.md for the protocol)')
 
-// Every provider whose menu is curated-only (ai-models.ts modelOptions) —
-// openrouter and compat are live-listed by design and have nothing to check
+// Every provider whose menu is a hand-written list (ai-models.ts modelOptions).
+// OpenRouter and compat have no curated list to diff — their menu comes from
+// the endpoint, put through the selection rule (curateRemoteModels). What CAN
+// go stale there is the listing shape that rule reads, checked separately below.
 const CURATED_PROVIDERS = ['anthropic', 'openai', 'gemini', 'xai', 'mistral', 'groq']
 
 // The notes' context numbers vs the numbers the app decides on — the one
@@ -280,6 +282,43 @@ for (const [service, envVar] of Object.entries(SERVICE_KEYS)) {
   } catch (err) {
     flag(`${service} live check failed: ${err.message}`)
   }
+}
+
+// ---------- OpenRouter's listing SHAPE ----------
+//
+// OpenRouter's menu is their live list minus what curateRemoteModels rejects,
+// and that rule reads three fields out of someone else's API. If they rename
+// one, every model reads as "unknown" — which the rule treats as "keep" — and
+// the menu silently fills back up with image generators and batch twins. Nobody
+// would see that until they opened the menu. test:model-curation pins the names
+// against a fixture (it catches US renaming them); only asking the real endpoint
+// catches THEM renaming them. The listing is public, so this needs no key.
+try {
+  const res = await fetch('https://openrouter.ai/api/v1/models')
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const data = (await res.json()).data ?? []
+  console.log(`\nopenrouter: ${data.length} models listed (menu = live list minus the selection rule)`)
+  const withField = (read) => data.filter((m) => read(m) !== undefined).length
+  const inputs = withField((m) => m.architecture?.input_modalities)
+  const outputs = withField((m) => m.architecture?.output_modalities)
+  const created = withField((m) => m.created)
+  // Not a gate on what the menu SHOWS, but on the order it shows it in: without
+  // a price, models of one generation fall back to newest-first
+  const priced = withField((m) => m.pricing?.completion)
+  // A handful of entries missing a field is normal; a collapse to near-zero is
+  // the rename this check exists for.
+  const thin = (n) => n < data.length / 2
+  if (thin(inputs)) flag(`architecture.input_modalities present on only ${inputs}/${data.length} models — renamed?`)
+  if (thin(outputs)) flag(`architecture.output_modalities present on only ${outputs}/${data.length} models — renamed?`)
+  if (thin(created)) flag(`created present on only ${created}/${data.length} models — renamed?`)
+  if (thin(priced)) flag(`pricing.completion present on only ${priced}/${data.length} models — renamed?`)
+  if (!thin(inputs) && !thin(outputs) && !thin(created) && !thin(priced))
+    console.log(
+      `  fields intact (modalities ${inputs}/${outputs}, created ${created}, pricing ${priced})`
+    )
+} catch (err) {
+  // A report, not a gate — the whole script keeps that contract
+  console.log(`\nopenrouter: listing shape not checked (${err.message})`)
 }
 
 console.log(

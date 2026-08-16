@@ -55,6 +55,12 @@ export const CATALOG_PROVIDERS: CatalogProviderId[] = [
   'compat'
 ]
 
+/** Is this a provider the catalog can hold a live list for? Azure (no listing)
+ *  and mock are the two that are not. */
+export function isCatalogProvider(provider: string): provider is CatalogProviderId {
+  return (CATALOG_PROVIDERS as string[]).includes(provider)
+}
+
 export function catalogStale(catalog: AiModelCatalog, provider: CatalogProviderId): boolean {
   const entry = catalog[provider]
   if (!entry) return true
@@ -264,20 +270,222 @@ export async function fetchCompatModels(
     headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {}
   })
   if (!res.ok) throw new Error(`Compat models: HTTP ${res.status}`)
-  const body = (await res.json()) as {
-    data?: { id?: string; name?: string; context_length?: number }[]
+  type CompatListing = {
+    id?: string
+    name?: string
+    context_length?: number
+    created?: number
+    /** OpenRouter states each model's modalities here. Nothing else we talk to
+     *  does today, and every read below is optional — a server that omits the
+     *  block is described as "unknown", never as "cannot". */
+    architecture?: { input_modalities?: string[]; output_modalities?: string[] }
+    /** Quoted per token, as decimal strings ("0.000015") */
+    pricing?: { completion?: string }
   }
+  const body = (await res.json()) as { data?: CompatListing[] }
   return (body.data ?? [])
-    .filter((m): m is { id: string; name?: string; context_length?: number } => !!m.id)
-    .map((m) => ({
-      id: m.id,
-      // OpenRouter ships a human name and the model's real context window in
-      // its listing — both are strictly better than guessing
-      ...(m.name ? { displayName: m.name } : {}),
-      ...(typeof m.context_length === 'number' && m.context_length > 0
-        ? { contextTokens: m.context_length }
-        : {})
-    }))
+    .filter((m): m is CompatListing & { id: string } => !!m.id)
+    .map((m) => {
+      const inputs = m.architecture?.input_modalities
+      const outputs = m.architecture?.output_modalities
+      // Quoted per token; carried as USD per million, the unit anyone reading
+      // it would expect. A free model quotes "0" — a real price, not unknown.
+      const perToken = Number(m.pricing?.completion)
+      return {
+        id: m.id,
+        // OpenRouter ships a human name and the model's real context window in
+        // its listing — both are strictly better than guessing
+        ...(m.name ? { displayName: m.name } : {}),
+        ...(typeof m.context_length === 'number' && m.context_length > 0
+          ? { contextTokens: m.context_length }
+          : {}),
+        ...(Array.isArray(inputs) ? { vision: inputs.includes('image') } : {}),
+        ...(Array.isArray(outputs) ? { emitsNonText: outputs.some((o) => o !== 'text') } : {}),
+        ...(typeof m.created === 'number' && m.created > 0 ? { createdAt: m.created } : {}),
+        ...(Number.isFinite(perToken) ? { outputPrice: perToken * 1e6 } : {})
+      }
+    })
+}
+
+/** Vendors inside an aggregator, ordered by our best guess at how likely a
+ *  reader is to want one — in practice the size of the lab's API business
+ *  (Emil, 2026-08-13). It mirrors `keyProviders()` where the names overlap, so
+ *  the vendor level under OpenRouter reads in the same order as the root menu,
+ *  and continues by the same standard: the big three, the most-used open-weight
+ *  family, then the rest of the frontier labs.
+ *
+ *  It is a judgement call and says so — no listing carries usage figures. Move
+ *  an entry when the world moves; anything not named here sorts after these,
+ *  alphabetically, which is a fine place for a long tail of one-model vendors. */
+const VENDOR_RANK = [
+  'openai',
+  'anthropic',
+  'google',
+  'meta',
+  'meta-llama',
+  'x-ai',
+  'mistralai',
+  'deepseek',
+  'qwen',
+  'moonshotai',
+  'amazon',
+  'microsoft',
+  'nvidia',
+  'perplexity',
+  'z-ai',
+  'minimax',
+  'bytedance-seed'
+]
+
+/** Sort comparator for vendor ids: ranked ones first in rank order, the rest
+ *  alphabetically behind them. */
+export function compareVendors(a: string, b: string): number {
+  const ra = VENDOR_RANK.indexOf(a)
+  const rb = VENDOR_RANK.indexOf(b)
+  if (ra !== -1 && rb !== -1) return ra - rb
+  if (ra !== -1) return -1
+  if (rb !== -1) return 1
+  return a.localeCompare(b)
+}
+
+/** A version number above this is not a version. Model ids carry parameter
+ *  counts in the same position (`gpt-oss-120b`, `qwen3.6-35b-a3b`), and reading
+ *  one as a generation would put the small open model above the flagship. */
+const MAX_PLAUSIBLE_GENERATION = 30
+
+/** The lineup an id belongs to, and where in that lineup it sits:
+ *  `anthropic/claude-opus-4.8` → claude, 4.8. The family is the leading word,
+ *  so Opus, Sonnet and Fable are correctly ONE lineup while Gemma is not Gemini
+ *  — different families age separately, and comparing a Gemma 4 against a
+ *  Gemini 3.7 by number alone would rank the small open model first.
+ *
+ *  Heuristic, and it says so: an id with no version we trust (`gpt-chat-latest`)
+ *  comes back generation-less and sorts after the ones we could read, since
+ *  "probably current" is not something to promote a model on. */
+function lineageOf(id: string): { family: string; generation: number | null } {
+  const name = id.includes('/') ? id.slice(id.indexOf('/') + 1) : id
+  const family = (/^[a-z]+/i.exec(name)?.[0] ?? name).toLowerCase()
+  for (const m of name.slice(family.length).matchAll(/\d+(?:\.\d+)?/g)) {
+    const n = Number(m[0])
+    if (n > 0 && n <= MAX_PLAUSIBLE_GENERATION) return { family, generation: n }
+  }
+  return { family, generation: null }
+}
+
+/** One vendor's models, strongest first.
+ *
+ *  Generation outranks price (Emil, 2026-08-13). Price alone had
+ *  `claude-opus-4.7-fast` at $150/1M leading Anthropic, ahead of Fable 5 at
+ *  $50 — last year's flagship still carrying last year's flagship price, which
+ *  says more about how little it is used than about how good it is. So the
+ *  order is: newest lineage first, then generation within it, and only among
+ *  models of the SAME generation does price decide — which is where it is
+ *  genuinely informative, because a vendor prices its own simultaneous models
+ *  against each other (Sol above Terra above Luna).
+ *
+ *  Everything after that is tie-breaking: newest, then id, so the list never
+ *  reshuffles between two renders of the same data. */
+export function rankByStrength(models: AiRemoteModel[]): AiRemoteModel[] {
+  const lineage = new Map(models.map((m) => [m.id, lineageOf(m.id)]))
+  // A family is as current as its newest member: that is what puts Gemini
+  // ahead of Gemma without either one's version number entering into it.
+  const newestIn = new Map<string, number>()
+  for (const m of models) {
+    const { family } = lineage.get(m.id)!
+    newestIn.set(family, Math.max(newestIn.get(family) ?? 0, m.createdAt ?? 0))
+  }
+  return [...models].sort((a, b) => {
+    const la = lineage.get(a.id)!
+    const lb = lineage.get(b.id)!
+    if (la.family !== lb.family)
+      return (newestIn.get(lb.family) ?? 0) - (newestIn.get(la.family) ?? 0) ||
+        la.family.localeCompare(lb.family)
+    return (
+      (lb.generation ?? -1) - (la.generation ?? -1) ||
+      (b.outputPrice ?? -1) - (a.outputPrice ?? -1) ||
+      (b.createdAt ?? 0) - (a.createdAt ?? 0) ||
+      a.id.localeCompare(b.id)
+    )
+  })
+}
+
+/** The selection rule for a live list too long to be a menu
+ *  (docs/MODEL-UPDATE.md § Curation rules, Emil 2026-08-13).
+ *
+ *  OpenRouter listed 409 models on 2026-08-13, and "the endpoint decides" made
+ *  every one of them a menu row — including generators that answer in pictures
+ *  (Nano Banana) or music (Lyria), the `:batch` twin of an id already listed,
+ *  and generations nobody should start a new conversation on. This keeps what
+ *  can actually do our job: takes images in (the composer pastes screenshots
+ *  and figures), answers in text ONLY, is current, and is one of at most seven
+ *  from its vendor. On that day's list it left 73 models across 22 vendors.
+ *
+ *  Two gates keep it from ever emptying a small or self-describing-poorly
+ *  endpoint: short lists pass through untouched, and so does a list where most
+ *  entries say nothing about their modalities (an LM Studio, a plain vLLM). The
+ *  models it removes stay REACHABLE — the menu's filter field searches the
+ *  unfiltered list, and an id already selected always stays pickable — they
+ *  just stop being offered. */
+export const CURATE_MIN_LIST = 25
+export const CURATE_PER_VENDOR = 7
+const CURATE_MAX_AGE_S = 365 * 24 * 60 * 60
+
+export function curateRemoteModels(models: AiRemoteModel[], now = Date.now()): AiRemoteModel[] {
+  if (models.length <= CURATE_MIN_LIST) return models
+  const described = models.filter((m) => m.vision !== undefined || m.emitsNonText !== undefined)
+  if (described.length * 2 < models.length) return models
+
+  const vendorOf = (id: string): string => (id.includes('/') ? id.slice(0, id.indexOf('/')) : '')
+  // Ids listed WITHOUT a suffix — an id that only ever appears as `x:free` has
+  // no base to be a duplicate of, and dropping it would remove the vendor
+  const baseIds = new Set(models.filter((m) => !m.id.includes(':')).map((m) => m.id))
+  const nowS = now / 1000
+
+  const kept = models.filter((m) => {
+    // Reads a document's figures, answers in text. Unknown counts as "no" here
+    // and only here: this branch is reached on a list that describes itself, so
+    // a silent entry among talkative ones is the odd one out, not the norm.
+    if (m.vision !== true || m.emitsNonText === true) return false
+    // `openai/gpt-5.6-luna:batch` next to `openai/gpt-5.6-luna` is the same
+    // model twice. A `:suffix` whose base is NOT listed is a real choice (a
+    // `:free` tier can be the only way a vendor appears) and survives. Only
+    // vendor-namespaced ids are judged this way: in Ollama's naming the tag IS
+    // the model (`llama3.1:8b` is not a variant of `llama3.1`, it is what you
+    // pulled), and those ids carry no vendor prefix.
+    if (m.id.includes('/') && m.id.includes(':') && baseIds.has(m.id.split(':')[0])) return false
+    // OpenRouter's `~vendor/...` routing aliases mirror ids listed properly
+    if (vendorOf(m.id).startsWith('~')) return false
+    // Current generation only — same rule the curated lists follow. A model
+    // with no date keeps the benefit of the doubt.
+    if (m.createdAt !== undefined && nowS - m.createdAt > CURATE_MAX_AGE_S) return false
+    return true
+  })
+
+  // A selection that selects nothing is not a selection. Whatever this list
+  // turned out to be, the user is better served by all of it than by an empty
+  // menu they cannot even re-pick their own model from.
+  if (kept.length === 0) return models
+
+  const byVendor = new Map<string, AiRemoteModel[]>()
+  for (const m of kept) {
+    const list = byVendor.get(vendorOf(m.id)) ?? []
+    list.push(m)
+    byVendor.set(vendorOf(m.id), list)
+  }
+  // Two different questions, deliberately answered by two different orders:
+  // WHICH models survive is about generation (newest first, then the cap), and
+  // that must not be decided by price — a cheap new model would lose its slot
+  // to last year's flagship. HOW they are then listed is about strength, which
+  // is what a reader scanning a vendor's models is actually looking for.
+  return [...byVendor.entries()]
+    .sort(([a], [b]) => compareVendors(a, b))
+    .flatMap(([, list]) =>
+      rankByStrength(
+        list
+          .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || a.id.localeCompare(b.id))
+          .slice(0, CURATE_PER_VENDOR)
+      )
+    )
 }
 
 /** Loopback host = a local model server: no cost reminder applies, and the

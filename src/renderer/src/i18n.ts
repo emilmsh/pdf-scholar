@@ -89,6 +89,8 @@ const nb = {
     'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Start en ny samtale, eller bytt til en modell med større kontekstvindu.',
   'aierr.ai-rate-limited':
     'Leverandøren avviste forespørselen fordi kontoens minuttkvote for tokens er for lav for dette dokumentet, eller brukt opp. Vent litt og prøv igjen, still et mer avgrenset spørsmål — eller bytt til en nyere modell, som gjerne har høyere kvote.',
+  'aierr.ai-model-no-images':
+    'Spørsmålet inneholdt et bilde, og denne modellen leser bare tekst — den fikk aldri se bildet. Velg en modell som tar imot bilder i modellmenyen, eller fjern bildet og spør på nytt.',
   'aierr.ai-refusal':
     'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren). Prøv å omformulere, eller bytt modell.',
   'aierr.ai-stream-aborted': 'Strømmen ble avbrutt uten fullført svar.',
@@ -590,6 +592,12 @@ const nb = {
   'ai.compatHint':
     'For lokale modeller (Ollama og LM Studio kjører uten nøkkel — velg dem i listen) og alle andre OpenAI-kompatible endepunkter. Modellisten hentes fra endepunktet når du lagrer.',
   'ai.modelFilter': 'Filtrer modeller …',
+  // The filter searches past the selection the menu offers — say so, or the
+  // models curateRemoteModels leaves out look gone rather than unlisted
+  'ai.modelFilterAll': 'Søk i alle modeller …',
+  'ai.modelCount': '{models} modeller · {vendors} leverandører',
+  'ai.modelNoHits': 'Ingen modeller matcher søket.',
+  'ai.modelMoreHits': '+{n} treff til — skriv mer for å snevre inn.',
   'ai.ollamaDetected': 'Ollama kjører på denne maskinen — klikk for å fylle inn adressen',
   'ai.noVisionTip': 'Valgt modell ({model}) kan ikke lese bilder',
   'ai.keyCapHint': 'Sett et utgiftstak på nøkkelen — samme sted viser leverandøren hva du faktisk har brukt. Appen teller tokens, men bare leverandøren vet prisen.',
@@ -897,6 +905,8 @@ const en: Dict = {
     'The document (or the conversation) is too large for the model’s context window, so the request was refused. Start a new conversation, or switch to a model with a larger context window.',
   'aierr.ai-rate-limited':
     'The provider refused the request because the account’s per-minute token quota is too low for this document, or used up. Wait a moment and try again, ask a narrower question — or switch to a newer model, which usually has a higher quota.',
+  'aierr.ai-model-no-images':
+    'The question included an image, and this model reads text only — it never saw the picture. Pick a model that accepts images from the model menu, or remove the image and ask again.',
   'aierr.ai-refusal':
     'The model declined to answer this request (the provider’s safety filter). Try rephrasing, or switch model.',
   'aierr.ai-stream-aborted': 'The stream ended without a complete answer.',
@@ -1356,6 +1366,10 @@ const en: Dict = {
   'ai.compatHint':
     'For local models (Ollama and LM Studio run without a key — pick them in the list) and any other OpenAI-compatible endpoint. The model list is fetched from the endpoint when you save.',
   'ai.modelFilter': 'Filter models …',
+  'ai.modelFilterAll': 'Search all models …',
+  'ai.modelCount': '{models} models · {vendors} vendors',
+  'ai.modelNoHits': 'No models match the search.',
+  'ai.modelMoreHits': '+{n} more matches — type more to narrow it down.',
   'ai.ollamaDetected': 'Ollama is running on this machine — click to fill in the address',
   'ai.noVisionTip': 'The selected model ({model}) cannot read images',
   'ai.keyCapHint': 'Set a spending cap on the key — the same page shows what you have actually used. This app counts tokens; only the provider knows the price.',

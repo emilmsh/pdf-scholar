@@ -193,6 +193,17 @@ export const AI_ERRORS = {
     code: 'ai-rate-limited',
     error: providerMessage
   }),
+  /** The question carried an image and the model cannot read one. Named
+   *  because the raw provider sentence is unusually unhelpful here —
+   *  OpenRouter answers «No endpoints found that support image input» with an
+   *  HTTP 404, which reads as "the model is gone" rather than "this model has
+   *  no eyes". Raised two ways: up front when the catalogue already says the
+   *  model is text-only, and from the rejection when it does not. The model id
+   *  rides in `error` because the renderer's sentence cannot name it. */
+  modelNoImages: (model: string): FileError => ({
+    code: 'ai-model-no-images',
+    error: `Modellen ${model} tar ikke imot bilder`
+  }),
   refusal: {
     code: 'ai-refusal',
     error: 'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren).'

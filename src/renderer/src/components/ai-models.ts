@@ -11,7 +11,7 @@
 // ones get flagged. Refresh workflow for the curated data: docs/MODEL-UPDATE.md
 // (`npm run check:models` reports the drift).
 import type { AiModelCatalog, AiProviderId, ThinkingLevel } from '../../../shared/types'
-import { isLocalEndpoint, remoteModel } from '../../../shared/ai-model-catalog'
+import { curateRemoteModels, isLocalEndpoint, remoteModel } from '../../../shared/ai-model-catalog'
 import type { CatalogProviderId } from '../../../shared/ai-model-catalog'
 import { isCompatService } from '../../../shared/ai-provider-profile'
 import { t } from '../i18n'
@@ -62,6 +62,10 @@ export const compatPresets = (): { label: string; url: string; modelHint: string
 // work beats offering everything (Emil, 2026-08-12). Kept current by the
 // scheduled review in docs/MODEL-UPDATE.md; deliberately short — current
 // generation only, no retired or dated-snapshot ids.
+//
+// Before adding an entry, read "Curation rules" at the top of
+// docs/MODEL-UPDATE.md: ~7 models per provider, image-in/text-out models only,
+// and a `short` that fits ~85px of header chip.
 export const MODELS: Record<
   AiProviderId,
   { id: string; label: string; short: string; hint?: MsgKey }[]
@@ -83,7 +87,10 @@ export const MODELS: Record<
   gemini: [
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', short: 'Gemini 3.1 Pro', hint: 'ai.modelHintCapable' },
     { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash', short: 'Gemini 3.6 Flash', hint: 'ai.modelHintRecommended' },
-    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Gemini 3.5 Flash-Lite', hint: 'ai.modelHintFast' }
+    // `short` drops "Flash-" — the full name is the widest label in the whole
+    // catalogue and the only one the header chip still cannot fit at the
+    // default panel width. The menu keeps the provider's own name.
+    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Gemini 3.5 Lite', hint: 'ai.modelHintFast' }
   ],
   xai: [
     { id: 'grok-4.6', label: 'Grok 4.6', short: 'Grok 4.6', hint: 'ai.modelHintCapable' },
@@ -139,14 +146,20 @@ export interface ModelOption {
  *  flagged (probably retired — the UI marks it ⚠).
  *
  *  Providers with no curated list (OpenRouter, compat) are the opposite by
- *  design: the endpoint IS the catalogue, so the live fetch fills the menu.
+ *  design: the endpoint IS the catalogue, so the live fetch fills the menu —
+ *  but a catalogue of 409 is not a menu, so a long self-describing list is put
+ *  through `curateRemoteModels` first (docs/MODEL-UPDATE.md § Curation rules).
+ *  `all` skips that selection: the menu passes it while the user is typing in
+ *  the filter field, which is what keeps every model REACHABLE by name even
+ *  though only the selection is offered.
  *  For compat, pass the configured base URL: the snapshot remembers which
  *  endpoint it came from, and a list fetched from another server must not
  *  show against this one. */
 export function modelOptions(
   provider: AiProviderId,
   catalog?: AiModelCatalog,
-  compatBaseUrl?: string
+  compatBaseUrl?: string,
+  opts?: { all?: boolean }
 ): ModelOption[] {
   const curated = MODELS[provider] ?? []
   const remote =
@@ -166,13 +179,17 @@ export function modelOptions(
     return curated.map((m) => ({ ...m, curated: true, missing: !remoteIds.has(m.id) }))
   }
   if (!remote) return []
+  const local = Boolean(
+    provider === 'compat' && catalog?.compat && isLocalEndpoint(catalog.compat.baseUrl)
+  )
   // «lokal»-merke: models served from a loopback endpoint say so in the list
   // (the short chip name stays clean)
-  const localSuffix =
-    provider === 'compat' && catalog?.compat && isLocalEndpoint(catalog.compat.baseUrl)
-      ? ` · ${t('ai.localTag')}`
-      : ''
-  return remote.models.map((m) => ({
+  const localSuffix = local ? ` · ${t('ai.localTag')}` : ''
+  // A local server is the one endpoint that really does get to decide: the
+  // models on it are there because the user pulled them, one at a time. The
+  // selection rule is for a hosted catalogue nobody curated.
+  const listed = opts?.all || local ? remote.models : curateRemoteModels(remote.models)
+  return listed.map((m) => ({
     id: m.id,
     label: (m.displayName ?? prettyModelName(provider, m.id)) + localSuffix,
     short: prettyModelName(provider, m.id),

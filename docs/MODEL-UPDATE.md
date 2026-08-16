@@ -10,11 +10,89 @@ freshness burden on the curated lists, which is why the scheduled review at
 the bottom of this document exists. This document is the checklist for
 refreshing the curated data quickly.
 
+## Curation rules — what the menu is allowed to show
+
+These bound every edit to `MODELS` in `src/renderer/src/components/ai-models.ts`,
+and they bound the live-fetched lists too (Emil, 2026-08-13).
+
+1. **At most ~7 models per provider.** Current generation only; when a new model
+   replaces an old one, the old one goes in the same edit. This is a reading
+   limit, not a technical one — a menu that has to be scrolled is a menu nobody
+   scans. It is also what keeps a provider listed INLINE in the model menu: a
+   list longer than `INLINE_MAX` (8) collapses into a row you have to click into
+   (provider → vendor → model), which is right for OpenRouter's ~73 and wrong
+   for a curated four. Trimming never strands anyone: a stored selection outside
+   today's list stays pickable (`AiModelMenu` re-adds it), so removing an entry
+   costs the user nothing.
+2. **Only real multimodal chat models.** A listed model must take images as
+   input (pasted screenshots and figures are a first-class input in the
+   composer), return text and never images, and follow the quote contract well
+   enough that `[KILDE s.N: "…"]` survives into citation chips. Note that
+   `PROVIDER_PROFILES` declares `vision: true` for every provider — the profile
+   is per provider by design, so it is the model list that has to keep that
+   declaration honest.
+3. **A `short` label has ~85 px in the header chip** at the default panel width
+   (340 px, measured). That is about 15 characters — «Gemini 3.5 Flash-Lite» did
+   not fit and shows as «Gemini 3.5 Lite», while the menu keeps the provider's
+   full name in `label`. Check a new `short` against that before adding it.
+4. **OpenRouter is a selection, not a mirror.** The exception that lets the live
+   list BE the menu for OpenRouter/compat was written when "the endpoint decides"
+   sounded harmless. It is not: their listing carries *generators* that answer in
+   pictures (`google/gemini-3-pro-image` — Nano Banana) or in music
+   (`google/lyria-3-pro-preview`), plus batch/alias duplicates, none of which can
+   answer a question about a document. Measured 2026-08-13: **409 models listed,
+   73 offered**, over 22 vendors.
+
+   `curateRemoteModels` (`src/shared/ai-model-catalog.ts`) is the rule, in order:
+   keep only models that take image input and answer in text *and nothing else*;
+   drop `:suffix` variants whose base id is also listed, and the `~vendor`
+   routing aliases; drop anything older than 12 months; keep at most 7 newest per
+   vendor. Two gates keep it from ever emptying a menu — a short list and a list
+   whose entries mostly say nothing about their modalities both pass through
+   untouched, a local endpoint is never curated at all (the user pulled those
+   models one at a time), and a selection that would come out empty returns
+   everything instead. Nothing becomes unreachable: the menu's filter field
+   searches the *unfiltered* list across every provider at once (placeholder
+   «Søk i alle modeller …» when a selection is in force) and an id already
+   selected always stays pickable.
+   Covered by `npm run test:model-curation`, which also pins the listing field
+   names the rule reads (`architecture.input_modalities` /
+   `output_modalities` / `created`) — a rename on their side would otherwise
+   silently refill the menu.
+
+5. **Order is part of the answer** (Emil, 2026-08-13). Within a provider, models
+   are listed **strongest first** — Fable/Sol near the top, Luna/Sonnet/Haiku
+   near the bottom — because the reader scanning a list is looking for "the good
+   one". The curated lists carry that order by hand (`MODELS` is written
+   heaviest-first; keep it that way when you add an entry).
+
+   A live list has no strength field, so `rankByStrength` reads two things out
+   of the id and the listing, in this order:
+
+   - **Generation first**, parsed from the id (`claude-opus-4.8` → the claude
+     lineup, generation 4.8). Families age separately, so Gemma 4 never outranks
+     Gemini 3.7 on its bigger number, and a version we cannot read sorts last
+     rather than first.
+   - **Then price**, among models of the same generation — where it is genuinely
+     informative, because a vendor prices its own simultaneous models against
+     each other (Sol $30 > Terra $6 > Luna $0.60 per million out).
+
+   Price used to come first and got this wrong: `claude-opus-4.7-fast` led
+   Anthropic at $150/1M, ahead of Fable 5 at $50 — last year's flagship still
+   carrying last year's flagship price, which says more about how little it is
+   used than about how good it is.
+
+   Note what none of this decides: the per-vendor **cap** still selects by
+   generation date, or a new cheap model would lose its slot to last year's
+   expensive one. Vendors themselves are ordered by `VENDOR_RANK`, our best
+   guess at the size of each lab's API business, mirroring `keyProviders()`
+   where the names overlap; unranked vendors follow alphabetically.
+
 ## What the runtime already handles (and what it cannot)
 
 | Layer | What it does | What it does NOT cover |
 |---|---|---|
-| Live catalog (`src/shared/ai-model-catalog.ts`) | Fetches `GET /v1/models` from Anthropic (with capability data), OpenAI (ids only) and each keyed hosted service (ids, plus name + `context_length` where the listing carries them) — cached 24 h in `pdfx-state.json` / `chrome.storage.local`. For curated providers it ONLY flags retirements (⚠ on curated ids the provider no longer lists) and enriches context/vision; it never adds menu entries. For OpenRouter and the compat provider (custom/local endpoints, 5 min TTL when local, keyed to base URL, Ollama-enriched) the live list IS the menu — the endpoint decides. | Getting a NEW model in front of users — that is a curated-list edit, nothing happens on its own anymore; labels/hints; OpenAI capabilities; Azure (manual by design); pricing. |
+| Live catalog (`src/shared/ai-model-catalog.ts`) | Fetches `GET /v1/models` from Anthropic (with capability data), OpenAI (ids only) and each keyed hosted service (ids, plus name + `context_length` where the listing carries them) — cached 24 h in `pdfx-state.json` / `chrome.storage.local`. For curated providers it ONLY flags retirements (⚠ on curated ids the provider no longer lists) and enriches context/vision; it never adds menu entries. For OpenRouter and the compat provider (custom/local endpoints, 5 min TTL when local, keyed to base URL, Ollama-enriched) the live list fills the menu — put through the selection rule first (`curateRemoteModels`, § Curation rules above), except from a local endpoint, where the models are there because the user pulled them. | Getting a NEW model in front of users — that is a curated-list edit, nothing happens on its own anymore; labels/hints; OpenAI capabilities; Azure (manual by design); pricing. |
 | Capability-driven request shaping (`anthropicTraits` in `src/shared/ai-chat.ts`) | Uses the fetched capability tree to decide thinking/effort parameters, so a fetched model never depends on the name regexes. | First run/offline (regex fallback applies); behaviors the capability tree does not expose (always-on thinking, off-semantics) — those stay family knowledge in code. |
 | Degrade-on-400 retry (`ai-chat.ts`, all three providers) | A request rejected over a parameter we added (thinking, effort, reasoning, web-search variant, fallbacks) is retried once without it. | It degrades silently: users lose thinking tuning / modern search on that model until the code catches up. A safety net, not a solution. |
 
@@ -76,6 +154,8 @@ floored at 200K in code.
 2. `npm run test:ai-chat` — the mocked conformance suite catches request-shaping
    regressions (thinking/effort params, quote contract, tool variants) without
    spending a token; update its expectations alongside any rule you changed.
+   `npm run test:model-curation` alongside it whenever the selection rule or the
+   fields it reads moved.
 3. One real question per provider you touched (desktop or extension — same
    shared core), with thinking on and off, and one with web search, watching
    for the degrade net in devtools (a retried 400 means a heuristic is still
@@ -111,8 +191,9 @@ The agent's run:
    - Groq: https://console.groq.com/docs/models (production tier only) and
      /docs/deprecations
    Also run `npm run check:models` — keyless it validates the static
-   consistency; with provider keys in the environment it diffs the live lists
-   too.
+   consistency and probes OpenRouter's public listing for the three fields the
+   selection rule reads; with provider keys in the environment it diffs the live
+   lists too.
 2. **No drift → stop.** Leave a short note (issue comment or run log), touch
    nothing.
 3. **Drift → follow step 2 of this document** and open a **pull request**
@@ -121,8 +202,11 @@ The agent's run:
    claim. New models enter ONLY with their parameter behavior verified against
    provider docs — when the docs do not answer (does it take reasoning_effort?
    which context?), add the model without the unverified affordance and list
-   the open question in modeller-api.md rather than guessing. Run
-   `npm run typecheck` and `npm run test:ai-chat` before opening the PR.
+   the open question in modeller-api.md rather than guessing. Every edit stays
+   inside § Curation rules above (~7 per provider, image-in/text-out only, a
+   `short` that fits the header chip). Run `npm run typecheck`,
+   `npm run test:ai-chat` and `npm run test:model-curation` before opening the
+   PR.
 4. **Never touch** `DEFAULT_AI_MODELS`, thinking defaults, or reasoning-effort
    defaults — flag them in the PR text when a default looks stale and let Emil
    decide (standing rule).
