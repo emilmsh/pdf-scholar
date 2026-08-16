@@ -140,7 +140,7 @@ async function migrateUnsealedKeys(keys: Keys): Promise<Keys> {
 // aborts by requestId; both must share these module-level registries with
 // aiChat (which is why the extension overrides all of onAiDelta/aiChat/aiAbort
 // together rather than inheriting any from the web fallback).
-const deltaListeners = new Set<(requestId: number, text: string) => void>()
+const deltaListeners = new Set<(requestId: number, text: string, kind?: 'thinking') => void>()
 const activeControllers = new Map<number, AbortController>()
 
 export function createExtensionAi(): Pick<
@@ -233,8 +233,8 @@ export function createExtensionAi(): Pick<
       }
       const controller = new AbortController()
       activeControllers.set(request.requestId, controller)
-      const emit = (text: string): void => {
-        for (const cb of deltaListeners) cb(request.requestId, text)
+      const emit = (text: string, kind?: 'thinking'): void => {
+        for (const cb of deltaListeners) cb(request.requestId, text, kind)
       }
       try {
         return await runProviderChat({

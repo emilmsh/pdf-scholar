@@ -249,7 +249,13 @@ const EMPTY_USAGE: AiUsage = {
   cacheWriteTokens: 0
 }
 
-type Emit = (text: string) => void
+/** Streaming callback. `kind` absent = answer text; 'thinking' = the model's
+ *  reasoning stream. The distinction exists because a reasoning model can spend
+ *  minutes producing ONLY thinking deltas — a UI that cannot tell reasoning
+ *  from silence shows «Leser dokumentet …» the whole time and reads as a hang
+ *  (Kimi K2.5 via OpenRouter, observed 2026-08-16). Thinking text never lands
+ *  in the answer; the panel uses it as a liveness signal. */
+type Emit = (text: string, kind?: 'thinking') => void
 
 async function chatAnthropic(
   apiKey: string,
@@ -378,6 +384,13 @@ async function chatAnthropic(
       stream.on('text', (delta: string) => {
         emitted = true
         emit(delta)
+      })
+      // Extended thinking streams before any text — surface it as liveness so
+      // the panel can say «Tenker …» instead of sitting on the read-placeholder.
+      // Deliberately does NOT set `emitted`: thinking never reaches the answer,
+      // so a degraded retry after it cannot duplicate anything on screen.
+      stream.on('thinking', (delta: string) => {
+        emit(delta, 'thinking')
       })
       final = await stream.finalMessage()
     } catch (err) {
@@ -771,6 +784,7 @@ async function chatOpenAiCompatible(
   let fullText = ''
   let raw = ''
   let sawChunk = false
+  let midStreamFailure: FileError | null = null
   const usage: AiUsage = { ...EMPTY_USAGE }
   const readUsage = (u: {
     prompt_tokens?: number
@@ -804,6 +818,22 @@ async function chatOpenAiCompatible(
           fullText += delta
           emit(delta)
         }
+        // Reasoning models stream their thinking in a separate field —
+        // OpenRouter normalizes it to `reasoning`, Moonshot/DeepSeek natively
+        // say `reasoning_content`. Never answer text; forwarded as liveness
+        // so the panel can say the model is working (Kimi K2.5 spends minutes
+        // here before the first content delta).
+        const reasoning: unknown =
+          parsed.choices?.[0]?.delta?.reasoning ?? parsed.choices?.[0]?.delta?.reasoning_content
+        if (typeof reasoning === 'string' && reasoning) emit(reasoning, 'thinking')
+        // OpenRouter reports upstream-provider failures as an SSE event with
+        // an error object — HTTP was long since 200 by then. Ignoring it (as
+        // this parser once did) turns the failure into an empty "successful"
+        // answer. Remembered rather than returned: a provider that recovers
+        // and streams an answer anyway has not failed.
+        const errMsg: unknown = parsed.error?.message ?? parsed.choices?.[0]?.error?.message
+        if (typeof errMsg === 'string' && errMsg)
+          midStreamFailure = providerFailure(errMsg, { model, hadImages: carriesImages(req) })
         if (parsed.usage) readUsage(parsed.usage)
       } catch {
         /* ignore malformed keep-alives */
@@ -829,6 +859,11 @@ async function chatOpenAiCompatible(
     }
     return AI_ERRORS.endpointIncompatible
   }
+  // A stream that carried no answer is not an empty answer. In order of what
+  // we know: a mid-stream error event names the reason; otherwise the stream
+  // ended without content (reasoning that consumed the whole budget, a cut
+  // connection) — say that, never render a blank assistant turn as success.
+  if (!fullText) return midStreamFailure ?? AI_ERRORS.streamAborted
   return { ok: true, parts: parseQuoteContract(fullText), usage, model: model ?? 'azure' }
 }
 

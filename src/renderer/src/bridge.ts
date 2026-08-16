@@ -323,7 +323,7 @@ function downloadBlob(name: string, data: Uint8Array): { path: string } {
   return { path: name }
 }
 
-const webAiDeltaListeners = new Set<(requestId: number, text: string) => void>()
+const webAiDeltaListeners = new Set<(requestId: number, text: string, kind?: 'thinking') => void>()
 const webAiAborted = new Set<number>()
 
 function loadWebAiConfig(): AiConfig {

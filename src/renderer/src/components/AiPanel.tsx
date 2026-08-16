@@ -207,6 +207,8 @@ export default function AiPanel({
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [streamText, setStreamText] = useState('')
+  // The model is reasoning (thinking deltas seen, no answer text yet)
+  const [thinking, setThinking] = useState(false)
   const [pinned, setPinned] = useState(true)
   const [, setDocReady] = useState(false) // bump-only: re-renders chips once docRef resolves
   const docRef = useRef<EnsuredDocument | null>(null)
@@ -345,8 +347,14 @@ export default function AiPanel({
 
   useEffect(
     () =>
-      bridge.onAiDelta((id, text) => {
-        if (id === currentIdRef.current) setStreamText((s) => s + text)
+      bridge.onAiDelta((id, text, kind) => {
+        if (id !== currentIdRef.current) return
+        // Reasoning deltas are liveness, not answer: a reasoning model (Kimi,
+        // Claude with utvidet tenking) can spend minutes here before its first
+        // content delta, and without this signal the panel sits on «Leser
+        // dokumentet …» and reads as hung. The text itself is not rendered.
+        if (kind === 'thinking') setThinking(true)
+        else setStreamText((s) => s + text)
       }),
     []
   )
@@ -442,6 +450,7 @@ export default function AiPanel({
       setInput('')
       setBusy(true)
       setStreamText('')
+      setThinking(false)
       setMessages((m) => [...m, { role: 'user', text: trimmed, display, images }])
       // Earlier turns' images ride along in the history — the model needs
       // them to answer follow-ups about the picture.
@@ -494,6 +503,7 @@ export default function AiPanel({
       })
       currentIdRef.current = null
       setStreamText('')
+      setThinking(false)
       setBusy(false)
       if ('error' in result) {
         setMessages((m) => [
@@ -1160,7 +1170,11 @@ export default function AiPanel({
                   {streamText ? (
                     renderMarkdown(streamText)
                   ) : (
-                    <div className="ai-thinking">{t('ai.readingDoc')}</div>
+                    // «Tenker …» once reasoning deltas arrive — the difference
+                    // between a model that is working and one that is not
+                    <div className="ai-thinking">
+                      {t(thinking ? 'ai.thinking' : 'ai.readingDoc')}
+                    </div>
                   )}
                 </div>
               )}

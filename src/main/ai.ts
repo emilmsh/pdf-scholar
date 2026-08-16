@@ -304,8 +304,8 @@ export function registerAiIpc(): void {
     const controller = new AbortController()
     const requestKey = `${sender.id}:${req.requestId}`
     activeRequests.set(requestKey, controller)
-    const emit = (text: string): void => {
-      if (!sender.isDestroyed()) sender.send('ai:delta', req.requestId, text)
+    const emit = (text: string, kind?: 'thinking'): void => {
+      if (!sender.isDestroyed()) sender.send('ai:delta', req.requestId, text, kind)
     }
     try {
       const recorded = readFixture(req)

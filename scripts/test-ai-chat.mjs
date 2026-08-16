@@ -518,6 +518,69 @@ section('compat: transport failures get their names')
   ok(single.result.usage?.inputTokens === 5, 'usage mapped from the one-shot body')
 }
 
+// ---------- reasoning models over Chat Completions ----------
+//
+// Kimi K2.5 via OpenRouter (observed 2026-08-16): the model spends minutes
+// streaming reasoning before its first content delta. Three separate failures
+// conspired to make that look like a hang — reasoning deltas were ignored (no
+// liveness), a mid-stream error event was ignored, and a stream that ended
+// with no content came back as a SUCCESSFUL empty answer.
+section('compat: reasoning deltas, mid-stream errors, empty streams')
+{
+  const reasoningSse = (extra = '') =>
+    sse(
+      [
+        `data: ${JSON.stringify({ choices: [{ delta: { reasoning: 'La meg tenke' } }] })}\n\n`,
+        `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: ' litt til' } }] })}\n\n`,
+        extra,
+        'data: [DONE]\n\n'
+      ].join('')
+    )
+
+  // Reasoning is liveness, never answer text
+  let events = []
+  const collect = (t, kind) => events.push([kind ?? 'text', t])
+  responder = () =>
+    reasoningSse(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Svaret.' } }] })}\n\n`)
+  const reasoned = await run({ provider: 'openrouter', emit: collect })
+  ok(reasoned.result.ok === true, 'reasoning followed by content answers normally')
+  ok(
+    events.some(([k, t]) => k === 'thinking' && t === 'La meg tenke'),
+    'OpenRouter delta.reasoning is forwarded as thinking'
+  )
+  ok(
+    events.some(([k, t]) => k === 'thinking' && t === ' litt til'),
+    'Moonshot-style delta.reasoning_content too'
+  )
+  const answer = (reasoned.result.parts ?? []).map((p) => p.text).join('')
+  ok(answer === 'Svaret.', `reasoning never lands in the answer text (got "${answer}")`)
+
+  // A stream that reasons and then ends is not an empty success
+  responder = () => reasoningSse()
+  const dry = await run({ provider: 'openrouter' })
+  ok(dry.result.code === 'ai-stream-aborted', `reasoning with no answer → named error (got ${dry.result.code})`)
+
+  // OpenRouter reports upstream failures as SSE error events on an HTTP 200
+  responder = () =>
+    sse(
+      `data: ${JSON.stringify({ error: { message: 'Upstream provider error' } })}\n\ndata: [DONE]\n\n`
+    )
+  const upstream = await run({ provider: 'openrouter' })
+  ok(upstream.result.error === 'Upstream provider error', `mid-stream error is surfaced (got ${upstream.result.error})`)
+
+  // …but a provider that errors and then recovers with an answer has not failed
+  responder = () =>
+    sse(
+      [
+        `data: ${JSON.stringify({ error: { message: 'transient' } })}\n\n`,
+        `data: ${JSON.stringify({ choices: [{ delta: { content: 'Gikk bra likevel.' } }] })}\n\n`,
+        'data: [DONE]\n\n'
+      ].join('')
+    )
+  const recovered = await run({ provider: 'openrouter' })
+  ok(recovered.result.ok === true, 'an error followed by content still answers')
+}
+
 // ---------- a picture sent to a model with no eyes ----------
 //
 // The one failure the raw provider sentence describes worst. OpenRouter answers

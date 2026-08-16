@@ -785,7 +785,9 @@ export interface PdfxApi {
   /** Streams deltas via onAiDelta; resolves with the final result */
   aiChat(request: AiChatRequest): Promise<AiChatResult>
   aiAbort(requestId: number): void
-  onAiDelta(cb: (requestId: number, text: string) => void): () => void
+  /** `kind` absent = answer text to append; 'thinking' = the model's reasoning
+   *  stream, forwarded as a liveness signal only (never rendered as answer) */
+  onAiDelta(cb: (requestId: number, text: string, kind?: 'thinking') => void): () => void
   // ---------- Detached assistant (chat in its own window/tab) ----------
   /** Open (or focus) the assistant surface for a document: a second
    *  BrowserWindow on desktop, a separate viewer.html tab in the extension,

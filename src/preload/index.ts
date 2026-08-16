@@ -133,8 +133,9 @@ const api: PdfxApi = {
   aiRefreshModels: (force?: boolean) => ipcRenderer.invoke('ai:refresh-models', force ?? false),
   aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
   aiAbort: (requestId: number) => ipcRenderer.send('ai:abort', requestId),
-  onAiDelta: (cb: (requestId: number, text: string) => void) => {
-    const listener = (_e: unknown, requestId: number, text: string): void => cb(requestId, text)
+  onAiDelta: (cb: (requestId: number, text: string, kind?: 'thinking') => void) => {
+    const listener = (_e: unknown, requestId: number, text: string, kind?: 'thinking'): void =>
+      cb(requestId, text, kind)
     ipcRenderer.on('ai:delta', listener)
     return () => {
       ipcRenderer.removeListener('ai:delta', listener)
