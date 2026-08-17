@@ -49,8 +49,14 @@ export interface AiProviderProfile {
  *  the regex even though the curated menu now offers 4.6 instead, so a
  *  stored 4.5 selection from before that switch keeps working. The match is
  *  deliberately narrow — other grok ids (4.3) stay out until someone
- *  verifies them, per the fewer-models-that-work rule. */
-export const OPENAI_REASONING_RE = /gpt-5|o[0-9]|grok-4\.[56]/i
+ *  verifies them, per the fewer-models-that-work rule.
+ *
+ *  gpt-oss (Groq's openai/gpt-oss-120b and openai/gpt-oss-20b) is included
+ *  because Groq documents reasoning_effort low/medium/high for both
+ *  (console.groq.com/docs/reasoning, verified 2026-08-17); "none"/off is
+ *  unverified there (same open gap as grok-4.5/4.6's off value), covered by
+ *  the degrade-on-400 net. */
+export const OPENAI_REASONING_RE = /gpt-5|o[0-9]|grok-4\.[56]|gpt-oss/i
 
 /** The first-class hosted OpenAI-compatible services (fase 10.3): a FINITE,
  *  curated set — one key field each, entered once, stored exactly like the
