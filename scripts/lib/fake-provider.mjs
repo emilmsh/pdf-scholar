@@ -74,6 +74,17 @@ export const SCENARIOS = {
     chunks: [reasoning('Tenker … '), reasoning('tenker fortsatt …'), DONE],
     expect: { code: 'ai-stream-aborted', thinking: true }
   },
+  /** An account with nothing to spend. Comes back as a 402 here; the live run
+   *  of 2026-08-18 met the same state as xAI's 403 "your team doesn't have any
+   *  credits" and OpenAI's 429 insufficient_quota. Three statuses, one remedy,
+   *  and none of them a bug in the app — which is why the suite skips a model
+   *  in this state rather than failing it. */
+  'no-credit': {
+    status: 402,
+    body: JSON.stringify({ error: { message: 'Insufficient credits on this account.' } }),
+    contentType: 'application/json',
+    expect: { code: 'ai-no-credit' }
+  },
   /** A server that ignores `stream: true` and answers with one JSON body */
   'non-streaming': {
     body: JSON.stringify({

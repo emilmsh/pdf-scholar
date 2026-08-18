@@ -71,6 +71,7 @@ export async function runLiveSuite({ keys = {}, args = [] } = {}) {
 
   let failures = 0
   let checks = 0
+  let skipped = 0
   const ok = (cond, msg) => {
     checks++
     if (cond) console.log(`    ✓ ${msg}`)
@@ -96,8 +97,18 @@ export async function runLiveSuite({ keys = {}, args = [] } = {}) {
   const SYSTEM =
     'Du er en forskningsassistent som svarer kort (1–2 setninger) om et vedlagt dokument. ' +
     'Siter alltid passasjen du bygger svaret på.'
-  // A 2×2 red square: enough for "what colour is this?" without spending tokens
-  const RED_PNG = Buffer.from(encodePng(2, 2, () => [220, 30, 30, 255])).toString('base64')
+  // A solid red square. It was 2×2 until the live run of 2026-08-18, where three
+  // OpenAI models called it orange or turquoise and Haiku said it saw no image
+  // at all — every provider resizes what it is sent, and there is nothing left
+  // of a 2×2 after that. 64×64 is still a rounding error in tokens and
+  // impossible to misread.
+  const RED_PNG = Buffer.from(encodePng(64, 64, () => [220, 30, 30, 255])).toString('base64')
+
+  /** Provider or account states that say nothing about whether the APP works:
+   *  no credit, an exhausted quota, a model saturated right now. The app naming
+   *  them correctly IS the pass — counting them as failures would make a run's
+   *  score depend on someone's billing page. */
+  const NOT_OUR_FAULT = new Set(['ai-no-credit', 'ai-rate-limited', 'ai-model-overloaded'])
 
   function baseParams(provider, model, req, emit, signal, compatBaseUrl) {
     return {
@@ -204,6 +215,14 @@ export async function runLiveSuite({ keys = {}, args = [] } = {}) {
       }
     })
     const text = answerText(run.result)
+    if ('error' in run.result && NOT_OUR_FAULT.has(run.result.code)) {
+      // Named correctly, and the rest of the suite has nothing left to measure:
+      // the provider never got as far as answering. Say so and move on.
+      skipped++
+      const why = String(run.result.error).replace(/\s+/g, ' ').slice(0, 90)
+      console.log(`    ⊘ skipped — ${run.result.code}: ${why}`)
+      return
+    }
     if ('error' in run.result) {
       ok(false, `answered (got ${run.result.code ?? 'error'}: ${String(run.result.error).slice(0, 120)})`)
     } else {
@@ -314,12 +333,12 @@ export async function runLiveSuite({ keys = {}, args = [] } = {}) {
       const providers = Object.keys(KEY_ENV).filter(
         (p) => (!ONLY_PROVIDER || p === ONLY_PROVIDER) && keyFor(p)
       )
-      const skipped = Object.keys(KEY_ENV).filter((p) => !keyFor(p))
+      const noKeys = Object.keys(KEY_ENV).filter((p) => !keyFor(p))
       // Nothing to ask: the caller decides what to say about it, because the
       // remedy depends on where it was looking for keys.
       if (providers.length === 0) return { failures: 0, checks: 0, noKeys: true }
       console.log(`Live conformance run — ${providers.join(', ')}`)
-      if (skipped.length) console.log(`skipped (no key): ${skipped.join(', ')}`)
+      if (noKeys.length) console.log(`skipped (no key): ${noKeys.join(', ')}`)
       for (const provider of providers) {
         // OpenRouter has no curated list: its menu is live, so name the model to
         // test with --model. Everyone else is asked about every model we OFFER.
@@ -332,10 +351,11 @@ export async function runLiveSuite({ keys = {}, args = [] } = {}) {
       }
     }
 
+    const tail = skipped ? ` (${skipped} model(s) skipped: provider or account state)` : ''
     console.log(
       failures === 0
-        ? `\ntest-live: ${checks} checks passed`
-        : `\ntest-live: ${failures} of ${checks} checks FAILED`
+        ? `\ntest-live: ${checks} checks passed${tail}`
+        : `\ntest-live: ${failures} of ${checks} checks FAILED${tail}`
     )
-    return { failures, checks }
+    return { failures, checks, skipped }
 }

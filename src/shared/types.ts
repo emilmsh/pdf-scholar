@@ -125,6 +125,8 @@ export type AiErrorCode =
   | 'ai-endpoint-incompatible'
   | 'ai-context-overflow'
   | 'ai-rate-limited'
+  | 'ai-model-overloaded'
+  | 'ai-no-credit'
   | 'ai-refusal'
   | 'ai-stream-aborted'
   | 'ai-provider-unknown'

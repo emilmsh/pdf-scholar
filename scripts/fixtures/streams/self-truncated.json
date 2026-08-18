@@ -3,7 +3,7 @@
     "provider": "compat",
     "model": "self/truncated",
     "source": "recorded",
-    "recordedAt": "2026-08-16",
+    "recordedAt": "2026-08-18",
     "note": "fake endpoint (scripts/lib/fake-provider.mjs)"
   },
   "http": {

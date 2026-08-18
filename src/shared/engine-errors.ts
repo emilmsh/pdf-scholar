@@ -204,6 +204,24 @@ export const AI_ERRORS = {
     code: 'ai-model-no-images',
     error: `Modellen ${model} tar ikke imot bilder`
   }),
+  /** The provider is up but this model is saturated (Gemini 503 "currently
+   *  experiencing high demand", Anthropic 529 overloaded_error). Nothing about
+   *  the request is wrong, which is exactly why the raw status is the wrong
+   *  thing to show: the remedy is to wait or pick another model, and the user
+   *  cannot read that out of a JSON dump. Provider wording kept in `error`. */
+  modelOverloaded: (providerMessage: string): FileError => ({
+    code: 'ai-model-overloaded',
+    error: providerMessage
+  }),
+  /** The account has no money or no active plan behind it — OpenAI's
+   *  insufficient_quota, Anthropic "credit balance is too low", xAI "your team
+   *  doesn't have any credits", OpenRouter's 402. Distinct from a rate limit on
+   *  purpose: waiting does not fix this one, and telling someone to wait when
+   *  their card needs attention wastes their afternoon. */
+  noCredit: (providerMessage: string): FileError => ({
+    code: 'ai-no-credit',
+    error: providerMessage
+  }),
   refusal: {
     code: 'ai-refusal',
     error: 'Modellen avslo å svare på denne forespørselen (sikkerhetsfilter hos leverandøren).'

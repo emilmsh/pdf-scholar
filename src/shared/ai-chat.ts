@@ -200,12 +200,33 @@ CITATION RULES (important):
 const CONTEXT_OVERFLOW_RE =
   /prompt is too long|too many tokens|context window|context length|maximum.{0,30}(context|tokens)/i
 
+// The account has nothing to spend: OpenAI's insufficient_quota, Anthropic's
+// "credit balance is too low", xAI's "your team doesn't have any credits",
+// OpenRouter's 402. Checked BEFORE the rate limit, because two of these arrive
+// as a 429 and the advice is opposite — waiting fixes a rate limit and does
+// nothing at all for an empty account. Deliberately narrow: only phrasings that
+// mean "no money", never a plain "you exceeded your quota", which is a free
+// tier resetting tomorrow and belongs with the rate limits.
+const NO_CREDIT_RE =
+  /insufficient[_ ]quota|insufficient credits|credit balance (is )?too low|(does ?n[o']t|do not) have any credits|no credits (or|left)|requires more credits|HTTP 402/i
+
+// The model itself is saturated, provider-side: Gemini 503 "currently
+// experiencing high demand", Anthropic 529 overloaded_error, a plain 503. The
+// request was fine — waiting or switching model is the whole remedy.
+const OVERLOADED_RE =
+  /overloaded|over capacity|high demand|temporarily unavailable|service unavailable|HTTP 503|HTTP 529/i
+
 // Account rate-limit rejections, across provider phrasings (OpenAI "Request
 // too large for <model> … on tokens per min (TPM)" / "Rate limit reached",
 // Anthropic "would exceed your organization's rate limit"). Checked BEFORE
 // context overflow: these also talk about tokens, but the fix is different —
 // wait, narrow the question, or pick a model with a higher quota.
-const RATE_LIMIT_RE = /request too large|rate.?limit|tokens per min/i
+// Quota language belongs here, not with the no-credit rules: a quota is a
+// ceiling that resets, and "wait, or ask something smaller" is the right
+// advice. The billing phrasings are matched earlier and win, which is what
+// keeps OpenAI's insufficient_quota — a 429 that means "no money" — out.
+const RATE_LIMIT_RE =
+  /request too large|rate.?limit|tokens per min|quota exceeded|exceeded your current quota|resource[_ ]exhausted/i
 
 // A question with a picture in it, sent to a model with no eyes. Every provider
 // says this differently and none of them says it plainly: OpenRouter answers
@@ -229,6 +250,8 @@ function providerFailure(
 ): FileError {
   if (ctx?.hadImages && IMAGE_UNSUPPORTED_RE.test(message))
     return AI_ERRORS.modelNoImages(ctx.model || '')
+  if (NO_CREDIT_RE.test(message)) return AI_ERRORS.noCredit(message)
+  if (OVERLOADED_RE.test(message)) return AI_ERRORS.modelOverloaded(message)
   if (RATE_LIMIT_RE.test(message)) return AI_ERRORS.rateLimited(message)
   return CONTEXT_OVERFLOW_RE.test(message)
     ? AI_ERRORS.contextOverflow(message)

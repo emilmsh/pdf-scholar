@@ -89,6 +89,10 @@ const nb = {
     'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Start en ny samtale, eller bytt til en modell med større kontekstvindu.',
   'aierr.ai-rate-limited':
     'Leverandøren avviste forespørselen fordi kontoens minuttkvote for tokens er for lav for dette dokumentet, eller brukt opp. Vent litt og prøv igjen, still et mer avgrenset spørsmål — eller bytt til en nyere modell, som gjerne har høyere kvote.',
+  'aierr.ai-model-overloaded':
+    'Modellen er overbelastet hos leverandøren akkurat nå — det er ikke noe galt med spørsmålet. Prøv igjen om litt, eller velg en annen modell.',
+  'aierr.ai-no-credit':
+    'Leverandøren avviste forespørselen fordi kontoen mangler kreditt eller et aktivt abonnement. Å vente hjelper ikke her — sjekk fakturering hos leverandøren, eller bytt til en leverandør du har kreditt hos.',
   'aierr.ai-model-no-images':
     'Spørsmålet inneholdt et bilde, og denne modellen leser bare tekst — den fikk aldri se bildet. Velg en modell som tar imot bilder i modellmenyen, eller fjern bildet og spør på nytt.',
   'aierr.ai-refusal':
@@ -908,6 +912,10 @@ const en: Dict = {
     'The document (or the conversation) is too large for the model’s context window, so the request was refused. Start a new conversation, or switch to a model with a larger context window.',
   'aierr.ai-rate-limited':
     'The provider refused the request because the account’s per-minute token quota is too low for this document, or used up. Wait a moment and try again, ask a narrower question — or switch to a newer model, which usually has a higher quota.',
+  'aierr.ai-model-overloaded':
+    'The model is overloaded at the provider right now — nothing is wrong with the question. Try again shortly, or pick another model.',
+  'aierr.ai-no-credit':
+    'The provider refused the request because the account has no credit or no active plan. Waiting does not help here — check billing at the provider, or switch to one you have credit with.',
   'aierr.ai-model-no-images':
     'The question included an image, and this model reads text only — it never saw the picture. Pick a model that accepts images from the model menu, or remove the image and ask again.',
   'aierr.ai-refusal':

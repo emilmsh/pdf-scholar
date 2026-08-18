@@ -581,6 +581,45 @@ section('compat: reasoning deltas, mid-stream errors, empty streams')
   ok(recovered.result.ok === true, 'an error followed by content still answers')
 }
 
+// ---------- provider conditions the user can act on ----------
+//
+// All three arrived as raw HTTP dumps in the live run of 2026-08-18, and the
+// three remedies are different: wait, top up, or narrow the question. Telling
+// someone to wait when their card needs attention wastes their afternoon, so
+// the ORDER these are matched in is as much under test as the matching.
+section('provider state: overloaded, out of credit, rate limited')
+{
+  const fail = (status, body) => () => new Response(JSON.stringify(body), { status })
+
+  // Gemini, observed live: 503 while the model is saturated
+  responder = fail(503, { error: { code: 503, message: 'This model is currently experiencing high demand. Spikes in demand may cause errors.' } })
+  const busy = await run({ provider: 'gemini' })
+  ok(busy.result.code === 'ai-model-overloaded', `503 high demand → ai-model-overloaded (got ${busy.result.code})`)
+
+  // xAI, observed live: a 403 that is really a billing state
+  responder = fail(403, { code: 'permission-denied', error: "Your newly created team doesn't have any credits or licenses yet." })
+  const broke = await run({ provider: 'xai' })
+  ok(broke.result.code === 'ai-no-credit', `403 no credits → ai-no-credit (got ${broke.result.code})`)
+
+  // OpenAI bills an empty account as a 429 — the status says rate limit and the
+  // body says otherwise. The body wins, or the user is told to wait forever.
+  responder = fail(429, { error: { type: 'insufficient_quota', message: 'You exceeded your current quota, please check your plan and billing details.' } })
+  const dry = await run({ provider: 'openai' })
+  ok(dry.result.code === 'ai-no-credit', `429 insufficient_quota → ai-no-credit (got ${dry.result.code})`)
+
+  // …but a plain quota exhaustion with no billing language is a free tier
+  // resetting, and must stay a rate limit: waiting IS the remedy there.
+  responder = fail(429, { error: { code: 429, message: 'You exceeded your current quota. Please retry in 41 seconds.' } })
+  const later = await run({ provider: 'gemini' })
+  ok(later.result.code === 'ai-rate-limited', `plain quota 429 stays ai-rate-limited (got ${later.result.code})`)
+
+  // A 500 is not an overload: it stays unnamed, with the provider's own words,
+  // because we have nothing useful to add to it.
+  responder = fail(500, { error: { message: 'Internal error' } })
+  const boom = await run({ provider: 'gemini' })
+  ok(boom.result.code === undefined, `a plain 500 is not dressed up as overload (got ${boom.result.code})`)
+}
+
 // ---------- a picture sent to a model with no eyes ----------
 //
 // The one failure the raw provider sentence describes worst. OpenRouter answers
