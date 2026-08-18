@@ -78,6 +78,11 @@ const nextRequestId = nextAiRequestId
 const MAX_IMAGES = 4
 const MAX_IMAGE_SIDE = 1400
 
+/** How long the panel waits before it starts SHOWING that it is waiting.
+ *  Under ten seconds a spinner-ish placeholder is enough and a counter would
+ *  only add anxiety; past it, silence starts to read as a hang. */
+const WAIT_HINT_S = 10
+
 /** Decode + downscale a pasted/picked image into an AiImage. JPEG stays JPEG
  *  (photos would balloon as PNG); everything else becomes PNG. */
 async function fileToAiImage(file: Blob): Promise<AiImage | null> {
@@ -209,6 +214,10 @@ export default function AiPanel({
   const [streamText, setStreamText] = useState('')
   // The model is reasoning (thinking deltas seen, no answer text yet)
   const [thinking, setThinking] = useState(false)
+  /** Seconds spent waiting for the FIRST word of an answer. Only ticks while
+   *  there is nothing to show yet — once text streams, the text itself is the
+   *  proof that something is happening. */
+  const [waited, setWaited] = useState(0)
   const [pinned, setPinned] = useState(true)
   const [, setDocReady] = useState(false) // bump-only: re-renders chips once docRef resolves
   const docRef = useRef<EnsuredDocument | null>(null)
@@ -344,6 +353,22 @@ export default function AiPanel({
       stale = true
     }
   }, [open])
+
+  // A slow provider and a hung one look identical for the first few seconds —
+  // and the panel looked identical for the first few MINUTES: Gemini Flash-Lite
+  // took 37s to say anything at all under load (live run, 2026-08-18). After
+  // WAIT_HINT_S the wait becomes visible: a counter that ticks is the strongest
+  // evidence that the app is still alive, and the note underneath says the wait
+  // is a provider trait rather than a fault.
+  useEffect(() => {
+    if (!busy || streamText) {
+      setWaited(0)
+      return
+    }
+    const started = Date.now()
+    const id = setInterval(() => setWaited(Math.floor((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [busy, streamText])
 
   useEffect(
     () =>
@@ -1172,9 +1197,15 @@ export default function AiPanel({
                   ) : (
                     // «Tenker …» once reasoning deltas arrive — the difference
                     // between a model that is working and one that is not
-                    <div className="ai-thinking">
-                      {t(thinking ? 'ai.thinking' : 'ai.readingDoc')}
-                    </div>
+                    <>
+                      <div className="ai-thinking">
+                        {t(thinking ? 'ai.thinking' : 'ai.readingDoc')}
+                        {waited >= WAIT_HINT_S && ` · ${waited} s`}
+                      </div>
+                      {waited >= WAIT_HINT_S && (
+                        <div className="ai-wait-note">{t('ai.slowFirstWord')}</div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

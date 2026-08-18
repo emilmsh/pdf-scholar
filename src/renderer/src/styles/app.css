@@ -4107,6 +4107,16 @@ html.pen-near .draw-layer {
   animation: ai-pulse 1.4s ease-in-out infinite;
 }
 
+/* The «still working» note under the waiting placeholder. Deliberately not
+   pulsing like the line above it: one moving thing in a quiet panel is
+   reassurance, two is a fairground. */
+.ai-wait-note {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: calc(11.5px * var(--ai-scale, 1));
+  opacity: 0.85;
+}
+
 @keyframes ai-pulse {
   50% {
     opacity: 0.45;
