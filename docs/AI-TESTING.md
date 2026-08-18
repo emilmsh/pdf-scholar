@@ -24,17 +24,28 @@ does. Layer 2 exists because a recording cannot flatter our assumptions.
 ## Layer 3 — the live run
 
 ```bash
-npm run test:live                      # every provider with a key in env
-npm run test:live -- --self-check      # no keys: the harness against a local fake endpoint
+npm run test:live                      # the app's own keys, every curated model
+npm run test:live -- --dry-run         # unlock the keys and stop: proves the plumbing, spends nothing
+npm run test:live -- --self-check      # no keys at all: the harness against a local fake endpoint
 npm run test:live -- --record          # …and save each stream into the replay library
 npm run test:live -- --provider=openrouter --model=moonshotai/kimi-k2.5
+npm run test:live -- --env-keys        # force ANTHROPIC_API_KEY etc. instead
 ```
 
-Keys come from the environment (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+**Where the keys come from.** By default: the app's own store. They are
+encrypted at rest with safeStorage, which only Electron can undo, so
+`test-live.mjs` relaunches itself under Electron
+(`scripts/live-in-electron.mjs`), which works from a COPY of the real profile
+(carrying `os_crypt` along, or the blobs cannot be decrypted), decrypts there,
+and hands the values straight to the suite. The keys never touch the
+environment, the terminal, or the disk — and nothing has to be pasted or
+remembered. `--env-keys` switches to `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
 `OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `MISTRAL_API_KEY`,
-`GROQ_API_KEY`); providers without one are skipped and said so. Every curated
-model at every keyed provider is asked one short question about a three-page
-test document, and then shown one 2×2 red PNG. Per model it asserts:
+`GROQ_API_KEY` when you want to test a key the app does not hold.
+
+Providers without a key are skipped and said so. Every curated model at every
+keyed provider is asked one short question about a three-page test document, and
+then shown one 2×2 red PNG. Per model it asserts:
 
 - **it answers**, inside the deadline (`--deadline=<ms>`, default 120 s);
 - **a citation survived** into the answer — the panel's whole point is a claim
@@ -51,7 +62,16 @@ test document, and then shown one 2×2 red PNG. Per model it asserts:
   gets an answer, but a worse one, and this is the only place that shows up.
 
 It is not in CI on purpose: it needs keys, it spends tokens, and a provider
-outage is not a broken build. Cost is a few øre per full run.
+outage is not a broken build. Cost is a few øre per full run — `--dry-run` and
+`--self-check` cost nothing, and between them they cover everything except the
+providers' own answers.
+
+Two Electron traps are paid for and commented in `live-in-electron.mjs`, because
+both fail in ways that look like something else: `await app.whenReady()` at the
+top level of an ESM main entry DEADLOCKS (Electron defers `ready` until the
+entry module finishes evaluating, and it never does), and the GPU process's
+teardown exits 0xC0000005 on Windows — a passing run reported as a crash — so
+hardware acceleration is disabled for a run that never opens a window.
 
 ## Layer 2 — the replay library
 

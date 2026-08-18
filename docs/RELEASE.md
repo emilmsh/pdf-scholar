@@ -145,7 +145,7 @@ npm run test:listing     # the Store copy still parses out of the doc
 check that asks the providers whether the models we ship still work:
 
 ```bash
-npm run test:live        # a few øre; ANTHROPIC_API_KEY etc. in env
+npm run test:live        # a few øre; uses the keys already in the app
 ```
 
 Per model it proves the answer arrives, a citation survives into it, a pasted
