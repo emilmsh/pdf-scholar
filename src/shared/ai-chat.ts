@@ -200,6 +200,22 @@ CITATION RULES (important):
 const CONTEXT_OVERFLOW_RE =
   /prompt is too long|too many tokens|context window|context length|maximum.{0,30}(context|tokens)/i
 
+// WHAT WE NAME, AND WHAT WE DO NOT (Emil, 2026-08-18).
+//
+// A failure earns a named code only when it is COMMON and its remedy differs
+// from "the provider is having a problem, try later": no credit (top up), a
+// rate limit (wait or ask smaller), a model that cannot see (pick another), a
+// context overflow (start a new chat). Everything else travels as the
+// provider's own sentence, which is more accurate than any category we could
+// invent for it.
+//
+// This is a ceiling, not a starting point. Users expect providers to break;
+// what they cannot forgive is an app that mistranslates the breakage. Each new
+// rule here is a phrase-match against someone else's error text — it rots
+// silently when they reword it, and the cost is paid forever. Resist adding one
+// per provider phrasing; if a state is not worth a sentence of advice in the
+// UI, it is not worth a code.
+
 // The account has nothing to spend: OpenAI's insufficient_quota, Anthropic's
 // "credit balance is too low", xAI's "your team doesn't have any credits",
 // OpenRouter's 402. Checked BEFORE the rate limit, because two of these arrive

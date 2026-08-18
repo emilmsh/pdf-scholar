@@ -121,6 +121,33 @@ whenever you touch a new provider, a new model family, or reproduce a live bug
   If the change touches request shaping, layer 3 for the affected provider —
   the degrade-net assertion is the one that tells you a parameter is wrong.
 
+## What we take responsibility for
+
+A provider will be down, out of capacity, or out of your credit. That is not a
+bug in this app, and chasing every phrasing a provider can produce is a losing
+maintenance bet: each rule is a phrase-match against someone else's error text,
+it rots silently when they reword it, and it is paid for forever.
+
+So the bar for naming a failure (`providerFailure` in `src/shared/ai-chat.ts`)
+is deliberately high — it must be **common**, and its remedy must **differ from
+"try again later"**:
+
+| Named | Because the user must do something different |
+|---|---|
+| `ai-no-credit` | top up; waiting never fixes it |
+| `ai-rate-limited` | wait, or ask something smaller |
+| `ai-model-overloaded` | wait, or switch model — the request was fine |
+| `ai-model-no-images` | pick a model that can see, or drop the image |
+| `ai-context-overflow` | start a new conversation |
+| `ai-endpoint-unreachable` / `-incompatible` | fix the address (their own endpoint) |
+
+Everything else keeps the provider's own sentence, which is more accurate than
+any category we could invent. A plain 500 stays nameless on purpose.
+
+The same bar applies to the live suite: a model in one of the account/provider
+states above is reported as ⊘ skipped, not failed. A test score that depends on
+somebody's billing page is a score nobody trusts.
+
 ## What none of this covers
 
 Worth writing down so nobody mistakes a green run for a guarantee:
