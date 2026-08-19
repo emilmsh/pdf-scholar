@@ -32,7 +32,8 @@ import {
   nextAiRequestId,
   prepareDocumentForRequest,
   resolveCitation,
-  summaryPrompt
+  summaryPrompt,
+  WAIT_HINT_S
 } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import { errorText, t, useLang, locale } from '../i18n'
@@ -77,11 +78,6 @@ const nextRequestId = nextAiRequestId
  *  sizes and the localStorage chat store sane. */
 const MAX_IMAGES = 4
 const MAX_IMAGE_SIDE = 1400
-
-/** How long the panel waits before it starts SHOWING that it is waiting.
- *  Under ten seconds a spinner-ish placeholder is enough and a counter would
- *  only add anxiety; past it, silence starts to read as a hang. */
-const WAIT_HINT_S = 10
 
 /** Decode + downscale a pasted/picked image into an AiImage. JPEG stays JPEG
  *  (photos would balloon as PNG); everything else becomes PNG. */

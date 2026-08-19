@@ -31,7 +31,8 @@ import {
   nextAiRequestId,
   prepareDocumentForRequest,
   referenceSystem,
-  referenceUserMessage
+  referenceUserMessage,
+  WAIT_HINT_S
 } from '../ai'
 import type { AiDocument, PreparedDocument } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
@@ -93,6 +94,8 @@ interface QuickProps {
 export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: QuickProps): React.JSX.Element {
   useLang()
   const [text, setText] = useState('')
+  /** Seconds waited for the first word — see WAIT_HINT_S */
+  const [waited, setWaited] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [meta, setMeta] = useState<string | null>(null)
@@ -111,13 +114,33 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const [asked, setAsked] = useState<string | null>(null)
   const active = !isAsk || asked !== null
 
+  // Same rule as the panel: past WAIT_HINT_S the wait becomes visible, and only
+  // while there is nothing else to show. `thinking` is deliberately not part of
+  // the condition — a reasoning model that has streamed nothing readable yet is
+  // still a blank bubble to the person looking at it.
+  useEffect(() => {
+    if (!active || text || error || parts) {
+      setWaited(0)
+      return
+    }
+    const started = Date.now()
+    const id = setInterval(() => setWaited(Math.floor((Date.now() - started) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [active, text, error, parts])
+
   useEffect(() => {
     if (!active) return
     let stale = false
     const requestId = nextRequestId()
     requestIdRef.current = requestId
-    const unsubscribe = bridge.onAiDelta((id, delta) => {
-      if (id === requestId && !stale) setText((s) => s + delta)
+    const unsubscribe = bridge.onAiDelta((id, delta, kind) => {
+      if (id !== requestId || stale) return
+      // Reasoning is NOT answer: appending it here would print the model's
+      // private thinking into the bubble as if it were the explanation the user
+      // asked for. The bubble's placeholder already says «Tenker …», so there
+      // is nothing for the signal itself to change here — dropping it is the
+      // whole handling.
+      if (kind !== 'thinking') setText((s) => s + delta)
     })
     void (async () => {
       // Reference lookup, critique and free-form questions attach the whole
@@ -335,7 +358,15 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             ) : text ? (
               renderMarkdown(text)
             ) : (
-              <div className="ai-thinking">{t('ai.thinking')}</div>
+              <>
+                <div className="ai-thinking">
+                  {t('ai.thinking')}
+                  {waited >= WAIT_HINT_S && ` · ${waited} s`}
+                </div>
+                {waited >= WAIT_HINT_S && (
+                  <div className="ai-wait-note">{t('ai.slowFirstWord')}</div>
+                )}
+              </>
             )}
           </>
         )}

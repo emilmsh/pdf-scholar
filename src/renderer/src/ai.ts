@@ -24,6 +24,13 @@ export type { AiDocument } from './ai-retrieval'
 let aiRequestCounter = 1
 export const nextAiRequestId = (): number => aiRequestCounter++
 
+/** How long an AI surface waits before it starts SHOWING that it is waiting.
+ *  Under ten seconds a quiet placeholder is enough and a counter would only
+ *  add anxiety; past it, silence starts to read as a hang — Gemini Flash-Lite
+ *  took 37 seconds to say anything at all under load (live run, 2026-08-18).
+ *  Shared so the panel and the quick popover cannot drift apart on it. */
+export const WAIT_HINT_S = 10
+
 /** Page markers let prompt-contract providers (OpenAI/Azure) name page
  *  numbers; Anthropic citations use raw char offsets which we map ourselves.
  *  Offsets are derived from the marker as written, so the localized label is
