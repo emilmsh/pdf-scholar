@@ -42,6 +42,7 @@
     "test:annot-edit": "node scripts/test-annot-edit.mjs",
     "test:pen": "node scripts/test-pen.mjs",
     "test:ai-settings": "node scripts/test-ai-settings.mjs",
+    "test:quick-ai": "node scripts/test-quick-ai.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
     "test:assistant": "node scripts/test-assistant-window.mjs",
     "test:torn-read": "node scripts/test-torn-read.mjs",

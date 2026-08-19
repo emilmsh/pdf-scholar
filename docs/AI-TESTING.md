@@ -14,7 +14,7 @@ catch.
 | 1. Unit / shaping | `npm run test:ai-chat` | nothing | CI, every push | What we SEND (params per provider, quote contract, images, tools), how we parse streams we imagined, the degrade-on-400 nets, and that every path matches its `PROVIDER_PROFILES` row |
 | 2. Recorded streams | `npm run test:streams` | nothing | CI, every push | What providers ACTUALLY sent, replayed byte for byte with their own write boundaries |
 | 3. Live conformance | `npm run test:live` | API keys | by hand: release + monthly | Everything the other three cannot: that the models we offer today still answer, cite, see images, and do not trip the degrade net |
-| 4. Real UI | `npm run test:ai-settings`, `test:assistant` | built app, desktop session | by hand before a release | That the answer reaches the panel — settings flow, model menu, streaming, citation chips, the detached window |
+| 4. Real UI | `npm run test:ai-settings`, `test:assistant`, `test:quick-ai` | built app, desktop session | by hand before a release | That the answer reaches the USER — settings flow, model menu, streaming, citation chips, the detached window, and the selection bubble |
 
 Layers 1 and 2 differ in a way worth stating plainly: **a mock is written from
 the same assumptions as the code it tests.** If we did not know a provider
@@ -120,6 +120,18 @@ whenever you touch a new provider, a new model family, or reproduce a live bug
 - **After any change to `src/shared/ai-chat.ts`:** layers 1 and 2 at minimum.
   If the change touches request shaping, layer 3 for the affected provider —
   the degrade-net assertion is the one that tells you a parameter is wrong.
+
+### Layer 4 is not optional
+
+The bug that made layer 4 grow a third test (2026-08-19): the provider core
+learned to tell a model's reasoning stream from its answer, the panel was taught
+to ignore the reasoning, and the selection bubble was not — so every reasoning
+model printed its private thinking into the bubble as the explanation the user
+had asked for. Layers 1–3 were green throughout. They test the core and its
+answers; they cannot test who is listening.
+
+The lesson generalises: when a shared channel gains a new kind of message, every
+subscriber is a place it can go wrong, and only the real UI shows which.
 
 ## What we take responsibility for
 

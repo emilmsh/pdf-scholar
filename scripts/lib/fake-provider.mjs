@@ -85,6 +85,21 @@ export const SCENARIOS = {
     contentType: 'application/json',
     expect: { code: 'ai-no-credit' }
   },
+  /** A long think before a short answer — the shape that makes a UI look hung.
+   *  Eight reasoning frames means a caller that spaces its writes out (see
+   *  `delayMs`) can hold the answer past any wait-hint threshold it wants to
+   *  test, without this scenario being slow when nobody asks it to be.
+   *  The marker in the reasoning text is deliberately unmistakable: a test
+   *  asserts it never reaches the answer. */
+  'long-reasoning': {
+    chunks: [
+      ...Array.from({ length: 8 }, (_, i) => reasoning(`INTERNAL-THOUGHT-${i} `)),
+      content('Kort svar til slutt.'),
+      DONE
+    ],
+    expect: { ok: true, text: 'Kort svar til slutt.', thinking: true }
+  },
+
   /** A server that ignores `stream: true` and answers with one JSON body */
   'non-streaming': {
     body: JSON.stringify({
