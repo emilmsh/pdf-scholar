@@ -129,6 +129,13 @@ The house demo document is "Attention Is All You Need" (arXiv 1706.03762) at
 `docs/screenshots/attention.pdf` — gitignored, never committed. Keep it free of
 saved annotations, or they turn up as clutter in unrelated shots.
 
+Being gitignored, it exists only in the checkout you put it in. `shoot` looks in
+this tree, then in the MAIN checkout (so a run from a git worktree finds it),
+then at `PDFX_DEMO_PDF`; if none of those has it the run REFUSES rather than
+quietly shooting `sample.pdf`, which is how a set of wrong-document frames used
+to reach the README. `--sample` shoots it deliberately, for working on the
+script itself.
+
 ## 1. Checks
 
 ```bash

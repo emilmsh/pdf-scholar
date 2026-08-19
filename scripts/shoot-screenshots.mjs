@@ -75,8 +75,26 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
 const SHOT_DIR = join(ROOT, 'docs', 'screenshots')
-/** The house demo doc (arXiv 1706.03762). Gitignored — see .gitignore. */
-const DEMO_PDF = join(SHOT_DIR, 'attention.pdf')
+/** The MAIN checkout of this repo — where a gitignored file lives when the
+ *  script itself is running from a worktree. `--git-common-dir` points at the
+ *  one shared .git directory; its parent is the main working tree. */
+function mainCheckout() {
+  const r = spawnSync('git', ['rev-parse', '--git-common-dir'], { cwd: ROOT, encoding: 'utf8' })
+  if (r.status !== 0 || !r.stdout) return null
+  return dirname(resolve(ROOT, r.stdout.trim()))
+}
+
+/** The house demo doc (arXiv 1706.03762). Gitignored — see .gitignore — which
+ *  is exactly why finding it takes care: a worktree has its own docs/ that the
+ *  file was never copied into, so a run from one fell back to sample.pdf and
+ *  produced a whole set of screenshots of the wrong document.
+ *  Looked for in order: PDFX_DEMO_PDF, this tree, the main checkout. */
+const DEMO_CANDIDATES = [
+  process.env.PDFX_DEMO_PDF,
+  join(SHOT_DIR, 'attention.pdf'),
+  mainCheckout() ? join(mainCheckout(), 'docs', 'screenshots', 'attention.pdf') : null
+].filter(Boolean)
+const DEMO_PDF = DEMO_CANDIDATES.find((c) => existsSync(c)) ?? null
 const FALLBACK_PDF = join(ROOT, 'src', 'renderer', 'public', 'sample.pdf')
 const PORT = 9333
 const WIDTH = 1440
@@ -2169,13 +2187,24 @@ if (!existsSync(mainJs)) {
   console.error('out/main/index.js is missing — run `npm run build` first.')
   process.exit(1)
 }
-const pdf = existsSync(DEMO_PDF) ? DEMO_PDF : FALLBACK_PDF
-if (pdf === FALLBACK_PDF) {
-  console.warn(
-    `! ${DEMO_PDF} not found — shooting sample.pdf instead.\n` +
-      '  The README uses "Attention Is All You Need" (arXiv 1706.03762); drop it there.'
+// A run against the wrong document is worse than no run: every frame looks
+// right, and the mistake only surfaces once the images are in the README. So
+// the fallback is opt-in rather than automatic.
+const pdf = DEMO_PDF ?? (args.includes('--sample') ? FALLBACK_PDF : null)
+if (!pdf) {
+  console.error('! The house demo document was not found. Looked in:')
+  for (const c of DEMO_CANDIDATES) console.error(`    ${c}`)
+  console.error(
+    '\n  The README uses "Attention Is All You Need" (arXiv 1706.03762). Drop it at\n' +
+      `    ${join(SHOT_DIR, 'attention.pdf')}\n` +
+      '  (gitignored on purpose), or point PDFX_DEMO_PDF at it.\n' +
+      '  Pass --sample to shoot sample.pdf deliberately — for working on this\n' +
+      '  script, never for frames that ship.'
   )
+  process.exit(1)
 }
+if (pdf === FALLBACK_PDF) console.warn('! --sample: shooting sample.pdf. These frames must not ship.')
+else if (pdf !== join(SHOT_DIR, 'attention.pdf')) console.log(`  demo document: ${pdf}`)
 
 mkdirSync(OUT_DIR, { recursive: true })
 console.log(`Shooting ${shots.length} screenshot(s) at ${WIDTH}×${HEIGHT} @${DPR}x`)
