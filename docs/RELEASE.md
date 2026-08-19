@@ -156,10 +156,14 @@ requests for one question = a parameter we send is being refused). Add
 library and CI guards it keylessly from then on. See
 [docs/AI-TESTING.md](AI-TESTING.md).
 
-**Also open the browser extension.** `npm run build:ext`, load
-`dist-extension/` unpacked, open a PDF and a file from the recents list. Neither
-`shoot` nor `test:windows` touches the extension — both drive Electron — and
-v0.27.1 shipped a broken recents-open there for exactly that reason.
+**Also open the browser extension.** `npm run ext:local` — it builds and
+mirrors the result into the `dist-extension/` your browser already has loaded
+unpacked (see [BROWSER-EXTENSION.md](BROWSER-EXTENSION.md#keeping-the-loaded-folder-current)
+for why that path is fixed) — then hit ⟳ on the card in `edge://extensions`,
+open a PDF and a file from the recents list. Neither `shoot` nor `test:windows`
+touches the extension — both drive Electron — and v0.27.1 shipped a broken
+recents-open there for exactly that reason. Running it here also leaves the
+sideloaded install on the version you are about to ship.
 
 ## 1b. Copy — `docs/MESSAGING.md` first
 

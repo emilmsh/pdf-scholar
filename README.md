@@ -302,6 +302,7 @@ npm run dev:web    # renderer only, in a plain browser on :5199
 npm run typecheck  # tsc for renderer, main/preload and the extension
 npm run dist       # NSIS installer (Windows)
 npm run build:ext  # browser-extension bundle → dist-extension/
+npm run ext:local  # same build, mirrored into the folder your browser loaded unpacked
 npm run test:windows  # two windows on one file, end to end (needs npm run build first)
 npm run shoot         # drive the app into each documented state and photograph it
 npm run check:shots   # which shipped screenshots predate the visual changes

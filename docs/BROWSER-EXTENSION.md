@@ -227,6 +227,7 @@ card about a browser toggle would be nonsense.
 ```
 npm run build:ext      # → dist-extension/
 npm run dev:ext        # rebuild on change (vite build --watch)
+npm run ext:local      # build, then refresh the folder the browser has loaded
 ```
 
 Then in `edge://extensions` (or `chrome://extensions`):
@@ -237,6 +238,35 @@ Then in `edge://extensions` (or `chrome://extensions`):
    local PDFs).
 4. To make double-click work: Windows **Settings → Apps → Default apps →** set
    `.pdf` to the extension's browser.
+
+### Keeping the loaded folder current
+
+**The loaded path is fixed, on purpose.** "Load unpacked" binds the browser to
+one absolute path forever, and Chromium derives an unpacked extension's ID from
+that path — move the folder and the browser sees a *different* extension:
+`chrome.storage.local` (recents, reading positions, the AI API keys) starts
+empty and "Allow access to file URLs" has to be granted again. So the folder to
+point at is the **main working tree's** `dist-extension/`, and it stays that
+folder.
+
+That collides with git worktrees, which is where the staleness comes from: each
+worktree builds into its own `dist-extension/`, so a build made in one leaves the
+folder the browser watches untouched — the app can sit at 0.39.0 while the
+browser still runs a build from weeks ago. `scripts/sync-extension-local.mjs`
+mirrors a freshly built `dist-extension/` into the main tree's copy from wherever
+it was built (copy first, delete stale after, so a browser reading mid-sync sees
+a mixed build and never a missing one).
+
+It runs by itself as `postbuild:ext`, so **any** local `build:ext` — including
+the one inside `pack:ext` — refreshes the browser's folder. Two cases where it
+stands down: on CI (`$CI`, which has no browser to serve), and when the build
+comes from a branch other than `master`, since a half-finished feature build is
+not what the browser should be handed silently. `npm run ext:local` overrides
+that and pushes the current branch's build anyway; `--out <dir>` /
+`PDFX_EXT_LOCAL_DIR` aim it somewhere else entirely.
+
+Either way the browser reads the folder only on reload — the ⟳ on the card in
+`edge://extensions`, or the next browser start.
 
 ## Parity matrix (as of this foundation)
 
