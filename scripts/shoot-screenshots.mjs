@@ -57,7 +57,7 @@
 // Every shot is taken with the app in ENGLISH (seeded into the throwaway
 // profile), because the README is in English. Tooltips are therefore matched
 // against both languages; see the L map in the PRELUDE.
-import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs'
+import { existsSync, writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join, resolve, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -2272,6 +2272,12 @@ try {
     } catch (err) {
       failed++
       console.log(`FAILED: ${err.message}`)
+      // _auto persists between runs, so a frame this run failed to take would
+      // otherwise be left standing from an earlier one — same filename, same
+      // directory, nothing to say it is from a different moment of the app or,
+      // as happened on 2026-08-19, a different document entirely. A missing
+      // file is a fact you can see; a stale one is not.
+      rmSync(join(OUT_DIR, `${shot.name}.png`), { force: true })
     }
     // Every shot starts from a clean slate, so one failure cannot cascade.
     // pinToolbar is not cosmetic: the pin state is persisted, and the shots
