@@ -6,7 +6,7 @@
 // dependency at all: spawn `electron out/main/index.js <pdf>
 // --remote-debugging-port`, list the page targets over HTTP, talk CDP over the
 // socket, and drive the UI with Runtime.evaluate.
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -87,6 +87,17 @@ export function electronBinary(root) {
   }
 }
 
+/** Is something already listening on this localhost port? `netstat -an` is the
+ *  one listing available on all three platforms without a dependency; the port
+ *  shows up as `:port` (Windows, Linux) or `.port` (macOS), and Windows says
+ *  LISTENING where the others say LISTEN. */
+export function portInUse(port) {
+  const r = spawnSync('netstat', ['-an'], { encoding: 'utf8' })
+  if (r.status !== 0 || !r.stdout) return false
+  const re = new RegExp('[.:]' + port + '\\b.*LISTEN', 'i')
+  return r.stdout.split(/\r?\n/).some((l) => re.test(l))
+}
+
 /**
  * Spawn the built app in a THROWAWAY profile, so a run never touches the real
  * recents / reading positions / theme, always starts from factory defaults, and
@@ -96,8 +107,22 @@ export function electronBinary(root) {
  * `prepareProfile(dir)` runs after the profile directory exists and BEFORE the
  * app starts, for the rare case where factory defaults are not enough (see the
  * AI shots in shoot-screenshots.mjs). Anything it writes dies with the profile.
+ *
+ * Refuses to start when the debugging port is already taken, because the
+ * failure it prevents is unrecognisable: two runs on one port drive EACH
+ * OTHER's windows — commands land in the wrong app while screenshots come from
+ * the right one — so the report is a scatter of "expected page 5, got page 1"
+ * that looks like a broken app rather than two runs in one room. Cost us a
+ * confusing afternoon on 2026-08-20.
  */
 export function launchApp({ root, mainJs, args = [], port, prepareProfile, env }) {
+  if (portInUse(port)) {
+    throw new Error(
+      `debugging port ${port} is already in use — another run of this script (or a ` +
+        'leftover Electron from one) is still holding it.\n' +
+        '  Let it finish, or close it: Get-Process electron | Stop-Process -Force'
+    )
+  }
   const profile = mkdtempSync(join(tmpdir(), 'pdfx-cdp-'))
   if (prepareProfile) prepareProfile(profile)
   const bin = electronBinary(root)
