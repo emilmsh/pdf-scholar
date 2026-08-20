@@ -136,6 +136,12 @@ quietly shooting `sample.pdf`, which is how a set of wrong-document frames used
 to reach the README. `--sample` shoots it deliberately, for working on the
 script itself.
 
+You can work in other windows while it runs — the app is launched with
+Chromium's backgrounding switches off, because pdf.js renders inside
+requestAnimationFrame and a covered window otherwise stops rendering pages half
+way through the run. Two runs at once is the one thing to avoid, and `launchApp`
+refuses rather than let them drive each other's windows.
+
 ## 1. Checks
 
 ```bash

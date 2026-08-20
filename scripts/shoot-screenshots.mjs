@@ -633,7 +633,14 @@ const ui = {
   expectPage(paneIndex, page) {
     const got = this.visiblePage(paneIndex);
     if (got !== page) {
-      throw new Error('column ' + paneIndex + ' shows page ' + got + ', expected ' + page);
+      // The state, not just the mismatch: a scroll that never moved and pages
+      // that never mounted are different faults, and the number alone cannot
+      // tell them apart.
+      const host = document.querySelectorAll('.pages')[paneIndex];
+      const mounted = [...host.querySelectorAll('.pdf-page')].map((el) => el.dataset.page).join(',');
+      throw new Error('column ' + paneIndex + ' shows page ' + got + ', expected ' + page +
+        ' (scrollTop ' + Math.round(host.scrollTop) + ' of ' + Math.round(host.scrollHeight) +
+        ', mounted [' + (mounted || 'none') + '])');
     }
   },
   /** Click a toolbar button by the start of its tooltip; throws if it is gone */
@@ -850,7 +857,14 @@ const ui = {
         .find((s) => (s.textContent || '').includes('Attention Is All You Need'));
       if (!title) await settle(250);
     }
-    if (!title) throw new Error('the title never rendered — page 1 has no text layer after 10s');
+    if (!title) {
+      const spans = [...host.querySelectorAll('.textLayer span')]
+        .slice(0, 3).map((s) => JSON.stringify((s.textContent || '').slice(0, 28))).join(' ');
+      const mounted = [...host.querySelectorAll('.pdf-page')].map((el) => el.dataset.page).join(',');
+      throw new Error('the title never rendered after 10s (scrollTop ' +
+        Math.round(host.scrollTop) + ', mounted [' + (mounted || 'none') + '], first spans: ' +
+        (spans || 'none') + ')');
+    }
     const box = host.getBoundingClientRect();
     host.scrollTop += title.getBoundingClientRect().top - box.top - 90;
     host.dispatchEvent(new Event('scroll'));

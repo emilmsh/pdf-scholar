@@ -126,9 +126,23 @@ export function launchApp({ root, mainJs, args = [], port, prepareProfile, env }
   const profile = mkdtempSync(join(tmpdir(), 'pdfx-cdp-'))
   if (prepareProfile) prepareProfile(profile)
   const bin = electronBinary(root)
+  // pdf.js renders inside requestAnimationFrame, and Chromium throttles rAF for
+  // a window it believes nobody can see. A run that starts in front and then
+  // gets covered — because the person who started it went back to their
+  // terminal — therefore stops rendering pages half way through, and every
+  // assertion that needs a RENDERED page starts failing while search and the
+  // assistant keep passing, since those read text through the worker and need
+  // no frames at all. That asymmetry is exactly what made it look like an app
+  // bug (2026-08-20). These three switches turn the throttling off for a
+  // process whose whole job is to be photographed.
+  const noThrottle = [
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--disable-background-timer-throttling'
+  ]
   const child = spawn(
     bin,
-    [mainJs, ...args, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`],
+    [mainJs, ...args, ...noThrottle, `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`],
     { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(env ?? {}) } }
   )
   let out = ''
