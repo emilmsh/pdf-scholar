@@ -629,6 +629,16 @@ const ui = {
     }
     if (z[0] !== z[1]) throw new Error('zooms differ: ' + z.join(' vs '));
   },
+  /** The chrome states a shot can be left in by the one before it. page_only
+   *  ends in fullscreen with the toolbar unpinned, and the after-each cleanup
+   *  is supposed to undo both — if it did not, everything that reaches for a
+   *  toolbar control afterwards is aiming at something tucked away. */
+  chromeState() {
+    const wrap = document.querySelector('.toolbar-wrap');
+    return 'unpinned ' + !!document.querySelector('.viewer.toolbar-unpinned') +
+      ', fullscreen ' + !!document.fullscreenElement +
+      ', toolbar ' + (wrap ? (wrap.classList.contains('tucked') ? 'tucked' : 'shown') : 'absent');
+  },
   /** Fail the shot rather than save a screenshot of the wrong thing */
   expectPage(paneIndex, page) {
     const got = this.visiblePage(paneIndex);
@@ -640,7 +650,7 @@ const ui = {
       const mounted = [...host.querySelectorAll('.pdf-page')].map((el) => el.dataset.page).join(',');
       throw new Error('column ' + paneIndex + ' shows page ' + got + ', expected ' + page +
         ' (scrollTop ' + Math.round(host.scrollTop) + ' of ' + Math.round(host.scrollHeight) +
-        ', mounted [' + (mounted || 'none') + '])');
+        ', mounted [' + (mounted || 'none') + '], ' + this.chromeState() + ')');
     }
   },
   /** Click a toolbar button by the start of its tooltip; throws if it is gone */
@@ -862,8 +872,8 @@ const ui = {
         .slice(0, 3).map((s) => JSON.stringify((s.textContent || '').slice(0, 28))).join(' ');
       const mounted = [...host.querySelectorAll('.pdf-page')].map((el) => el.dataset.page).join(',');
       throw new Error('the title never rendered after 10s (scrollTop ' +
-        Math.round(host.scrollTop) + ', mounted [' + (mounted || 'none') + '], first spans: ' +
-        (spans || 'none') + ')');
+        Math.round(host.scrollTop) + ', mounted [' + (mounted || 'none') + '], ' +
+        this.chromeState() + ', first spans: ' + (spans || 'none') + ')');
     }
     const box = host.getBoundingClientRect();
     host.scrollTop += title.getBoundingClientRect().top - box.top - 90;
