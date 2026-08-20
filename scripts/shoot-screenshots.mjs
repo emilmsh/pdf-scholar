@@ -639,6 +639,20 @@ const ui = {
       ', fullscreen ' + !!document.fullscreenElement +
       ', toolbar ' + (wrap ? (wrap.classList.contains('tucked') ? 'tucked' : 'shown') : 'absent');
   },
+  /** The state every shot is entitled to start from. Asserted between shots —
+   *  a cleanup that silently fails poisons every frame after it, and the run
+   *  used to plow on and report the poison as eleven unrelated failures. */
+  async expectBaseline() {
+    const wrap = document.querySelector('.toolbar-wrap');
+    if (document.querySelector('.viewer.toolbar-unpinned') || (wrap && wrap.classList.contains('tucked')))
+      throw new Error('the toolbar is still unpinned/tucked');
+    // The tab strip is how fullscreen is OBSERVED here (enterFullscreen
+    // asserts on the same thing): hidden strip = still fullscreen.
+    if (this.tabStripGone()) throw new Error('the tab strip is still hidden — fullscreen did not exit');
+    // The one mechanism that broke invisibly: prove navigation works before
+    // the next shot depends on it.
+    await this.goToPage(1);
+  },
   /** Fail the shot rather than save a screenshot of the wrong thing */
   expectPage(paneIndex, page) {
     const got = this.visiblePage(paneIndex);
@@ -949,8 +963,24 @@ const ui = {
     setter.call(input, String(n));
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await settle(60);
+    // The page box is the ONE control in the app that commits on blur
+    // (Toolbar.tsx: onBlur={commit}; Enter merely triggers blur). blur() only
+    // fires if the element genuinely holds focus — which it does not once the
+    // OS has focused another window, i.e. the moment the person who started
+    // the run clicks back to their terminal to watch it. That made every
+    // goToPage after that click a silent no-op, and the run fail from a
+    // DIFFERENT shot each time. React's onBlur listens to focusout, so
+    // dispatch it directly: it commits with or without real focus. (blur()
+    // first, so when focus IS held the input also visibly loses it.)
     input.blur();
-    await settle(800);
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    // Committing is not arriving: wait for the viewer to actually land on n,
+    // and name the failure HERE rather than let it surface shots later.
+    for (let i = 0; i < 20 && this.visiblePage(paneIndex) !== n; i++) await settle(150);
+    const got = this.visiblePage(paneIndex);
+    if (got !== n)
+      throw new Error('the page box did not navigate: still on page ' + got + ' after asking for ' + n);
+    await settle(500);
   },
   goToPage(n) {
     return this.paneGoToPage(0, n);
@@ -2320,11 +2350,22 @@ try {
     // Every shot starts from a clean slate, so one failure cannot cascade.
     // pinToolbar is not cosmetic: the pin state is persisted, and the shots
     // share one profile, so without it `page_only` would silently unpin every
-    // frame taken after it.
-    await runSetup(
-      send,
-      `await ui.closeOverlays(); await ui.exitFullscreen(); await ui.clearAnnots(); await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
-    ).catch(() => {})
+    // frame taken after it. The reset is VERIFIED, and a failure aborts the
+    // run naming the shot that poisoned the state: it used to be swallowed by
+    // a catch, and one bad reset surfaced as eleven unrelated failures.
+    try {
+      await runSetup(
+        send,
+        `await ui.closeOverlays(); await ui.exitFullscreen(); await ui.clearAnnots(); await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
+      )
+      await runSetup(send, `await ui.expectBaseline()`)
+    } catch (err) {
+      console.error(`
+ABORTING: after "${shot.name}" the app could not be returned to its baseline —`)
+      console.error(`every later frame would fail for that reason, not its own. (${err.message})`)
+      failed += 1
+      break
+    }
   }
   ws.close()
 
