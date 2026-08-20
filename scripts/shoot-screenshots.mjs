@@ -129,7 +129,7 @@ const SHOTS = [
     // so unpinning there would strip the toolbar out of tricolor's own Day
     // panel too. Hence a frame of its own.
     //
-    // Deliberately NOT page 1: `reading`, `parchment` and `night` all frame the
+    // Deliberately NOT page 1: `reading`, `parchment` and 'night' all frame the
     // cover, and a fourth cover would read as a duplicate rather than as a
     // different state of the app. A body page says "this is what reading looks
     // like", which is the point.
@@ -721,9 +721,15 @@ const ui = {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
     setter.call(input, query);
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    await settle(1200);
+    // The text index is built page by page on demand, so a fixed wait is a
+    // coin toss on a fifteen-page paper — this failed on 2026-08-20 while the
+    // AI tab, which polls, passed on the same document. Poll here too.
+    for (let i = 0; i < 40; i++) {
+      if (document.querySelector('.search-results .search-result-snippet')) break;
+      await settle(250);
+    }
     if (!document.querySelector('.search-results .search-result-snippet')) {
-      throw new Error('search found nothing for "' + query + '" — is this the house demo paper?');
+      throw new Error('no search results for "' + query + '" after 10s');
     }
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settle(900);
@@ -834,9 +840,17 @@ const ui = {
    *  the corner of a marketing image. */
   async cover() {
     const host = document.querySelector('.pages');
-    const title = [...host.querySelectorAll('.textLayer span')]
-      .find((s) => (s.textContent || '').includes('Attention Is All You Need'));
-    if (!title) throw new Error('title not rendered — is this the house demo paper?');
+    // Poll rather than look once. Only pages near the viewport mount a text
+    // layer, so a cover shot that follows one taken on page 6 has to wait for
+    // page 1's spans to come back — 'night+' failed here on 2026-08-20 while
+    // 'night', three shots earlier and already on page 1, passed.
+    let title = null;
+    for (let i = 0; i < 40 && !title; i++) {
+      title = [...host.querySelectorAll('.textLayer span')]
+        .find((s) => (s.textContent || '').includes('Attention Is All You Need'));
+      if (!title) await settle(250);
+    }
+    if (!title) throw new Error('the title never rendered — page 1 has no text layer after 10s');
     const box = host.getBoundingClientRect();
     host.scrollTop += title.getBoundingClientRect().top - box.top - 90;
     host.dispatchEvent(new Event('scroll'));
