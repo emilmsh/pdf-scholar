@@ -138,22 +138,22 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.38.2
+## What's new in this version (≤ 1 500 chars) — v0.40.0
 
 **EN:**
 ```
-• The assistant can open in its own window: the document keeps the whole screen — or a whole monitor — and a citation click still goes to the passage in the window showing the document, and raises it
-• The answer text has its own size control, 80–160 % in fixed steps, from the model menu or Ctrl+scroll over the panel. It scales the conversation only; the document's zoom is untouched
-• In a wide window the conversation keeps a fixed reading width instead of running full-width lines
-• Fixed: a window last closed on a monitor that is no longer connected could reopen out of sight; remembered positions are now placed back onto a connected display
+• The model menu is rebuilt: every provider in one menu, each with its state under its name — key missing, not configured, or how many models it offers. Short lists stay on one screen; a long one (an OpenRouter key brings hundreds) opens as provider → maker → model, and a search reaches everything the provider lists
+• The menu offers models the app can vouch for, strongest first — and a model you already picked stays pickable even when a list changes under it
+• A reasoning model no longer looks like a hang: the assistant shows that the model is thinking, and past ten seconds the wait becomes a visible counter — gone the moment the answer arrives. The selection bubble waits the same way, and a model's internal reasoning never appears as the answer
+• When a provider refuses, the app says why in plain words — out of credit, rate limited, model overloaded, or a model that cannot see images — each with what to do about it
 ```
 
 **NO:**
 ```
-• Assistenten kan åpnes i eget vindu: dokumentet beholder hele skjermen — eller en hel monitor — og et sitatklikk går fortsatt til avsnittet i vinduet som viser dokumentet, og løfter det fram
-• Svarteksten har fått egen størrelseskontroll, 80–160 % i faste trinn, fra modellmenyen eller Ctrl+rullehjul over panelet. Den skalerer bare samtalen; dokumentets zoom er urørt
-• I et bredt vindu holder samtalen en fast lesebredde i stedet for linjer over hele vinduet
-• Rettet: et vindu sist lukket på en skjerm som ikke lenger er tilkoblet kunne gjenåpnes utenfor synsfeltet; huskede posisjoner legges nå tilbake på en tilkoblet skjerm
+• Modellmenyen er bygget om: hver leverandør i én meny, med tilstanden under navnet — nøkkel mangler, ikke satt opp, eller hvor mange modeller den tilbyr. Korte lister står på én skjerm; en lang (en OpenRouter-nøkkel gir hundrevis) åpnes som leverandør → produsent → modell, og et søk når alt leverandøren lister
+• Menyen tilbyr modeller appen kan gå god for, sterkest først — og en modell du alt har valgt forblir valgbar selv når listen endrer seg under den
+• En resonneringsmodell ser ikke lenger ut som heng: assistenten viser at modellen tenker, og etter ti sekunder blir ventetiden en synlig teller — borte i det svaret kommer. Merketekst-boblen venter på samme måte, og modellens interne resonnering vises aldri som svaret
+• Når en leverandør avviser, sier appen hvorfor i klartekst — tom for kreditt, hastighetsbegrenset, overbelastet modell, eller en modell som ikke kan se bilder — hver med hva du kan gjøre
 ```
 
 ---
