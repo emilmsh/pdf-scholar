@@ -16,21 +16,58 @@
 // browser is one reload away from the newest code no matter which tree produced
 // it.
 //
-// Two entry points:
+// Three entry points:
 //   npm run ext:local          build here, then sync (always)
+//   npm run ext:release [tag]  download a published GitHub release's extension
+//                              zip and sync THAT — the release is built in CI,
+//                              so no local build ever corresponds to it, and
+//                              the browser's folder used to silently stay on
+//                              whatever was last built locally (Emil,
+//                              2026-08-21). RELEASE.md step 3 runs this.
 //   postbuild:ext (--auto)     after any local build:ext — silent on CI, and it
 //                              declines to push a feature branch's build into
 //                              the browser's folder unless asked explicitly
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
 const auto = args.includes('--auto')
 const force = args.includes('--force')
 const outFlag = args.indexOf('--out')
+const releaseFlag = args.indexOf('--release')
 const root = resolve(import.meta.dirname, '..')
-const src = join(root, 'dist-extension')
+
+/** Where the build to mirror comes from: dist-extension/ here, or a published
+ *  release's zip (the load-unpacked shape: one top-level folder, see
+ *  pack-extension.mjs). Extraction uses Windows' OWN tar (bsdtar, reads zip) —
+ *  the MSYS tar a git shell puts first on PATH reads `C:\...` as a hostname
+ *  and dies with "Cannot connect to C". */
+let src = join(root, 'dist-extension')
+let releaseLabel = ''
+let tmp = null
+if (releaseFlag >= 0) {
+  const tag = args[releaseFlag + 1] && !args[releaseFlag + 1].startsWith('--') ? args[releaseFlag + 1] : ''
+  tmp = mkdtempSync(join(tmpdir(), 'pdfx-ext-release-'))
+  try {
+    execFileSync('gh', ['release', 'download', ...(tag ? [tag] : []), '--pattern', 'pdf-scholar-extension.zip', '--dir', tmp], { cwd: root, stdio: ['ignore', 'inherit', 'inherit'] })
+    const tar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar'
+    execFileSync(tar, ['-xf', join(tmp, 'pdf-scholar-extension.zip'), '-C', tmp])
+  } catch {
+    console.error(`could not fetch $${tag || 'the latest release'} — is gh signed in, and does the release exist?`)
+    rmSync(tmp, { recursive: true, force: true })
+    process.exit(1)
+  }
+  const dir = readdirSync(tmp).find((n) => existsSync(join(tmp, n, 'manifest.json')))
+  if (!dir) {
+    console.error('the downloaded zip holds no folder with a manifest.json — did pack-extension.mjs change its layout?')
+    rmSync(tmp, { recursive: true, force: true })
+    process.exit(1)
+  }
+  src = join(tmp, dir)
+  releaseLabel = tag || 'latest release'
+}
 
 /** The main working tree's root — a worktree's .git file points at its common dir. */
 function mainTreeRoot() {
@@ -77,7 +114,8 @@ if (src === dst) {
 }
 
 const here = branch()
-if (auto && !force && here !== 'master') {
+// A published release outranks whatever branch this shell happens to be on
+if (auto && !force && !releaseLabel && here !== 'master') {
   console.log(
     `(not synced to ${dst} — this is branch ${here || 'unknown'}; run \`npm run ext:local\` to load it in the browser anyway)`
   )
@@ -139,6 +177,7 @@ if (existsSync(dst)) {
 }
 
 console.log(
-  `Extension v${version} (${here || 'unknown branch'}) → ${dst}\n` +
+  `Extension v${version} (${releaseLabel || here || 'unknown branch'}) → ${dst}\n` +
     `  ${copied} file(s) written, ${deleted} stale removed. Reload it in edge://extensions to pick it up.`
 )
+if (tmp) rmSync(tmp, { recursive: true, force: true })

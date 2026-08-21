@@ -217,6 +217,18 @@ gh release edit vX.Y.Z --draft=false
 Only now does electron-updater see it. Prune `release/` locally so one current
 installer remains.
 
+Then bring the browser's own unpacked extension up to the release:
+
+```bash
+npm run ext:release
+```
+
+It downloads the release's `pdf-scholar-extension.zip` and mirrors it into the
+folder Edge has loaded unpacked (the main tree's `dist-extension/`) — the
+release is built in CI, so no local build corresponds to it, and without this
+step the browser silently stays on whatever was last built locally. One reload
+in `edge://extensions` after.
+
 Publishing also fires `update-tap.yml`, which bumps the Homebrew cask to the
 new dmgs (it needs the `TAP_GITHUB_TOKEN` secret and fails loudly without it).
 Check that run went green; the tap's own audit workflow then test-installs the

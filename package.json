@@ -13,6 +13,7 @@
     "build:ext": "vite build --config config/vite.extension.config.ts",
     "postbuild:ext": "node scripts/sync-extension-local.mjs --auto",
     "ext:local": "npm run build:ext && node scripts/sync-extension-local.mjs",
+    "ext:release": "node scripts/sync-extension-local.mjs --release",
     "pack:ext": "npm run build:ext && node scripts/pack-extension.mjs",
     "pack:ext:store": "npm run build:ext && node scripts/pack-extension.mjs --store",
     "icons:app": "electron scripts/render-icon.cjs",
