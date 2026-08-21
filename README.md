@@ -39,9 +39,9 @@ install, so it needs no admin rights. It registers as a PDF handler in Explorer 
 a "Recent" Jump List to the taskbar. The installer contains both **x64 and native arm64**
 builds and picks the right one, so Windows-on-ARM machines (Surface and similar) run the
 arm64 build rather than x64 under emulation. Everything works offline. The AI features
-need your own API key (Anthropic, OpenAI or Azure OpenAI) — or any OpenAI-compatible
-endpoint, including local models via Ollama or LM Studio, which need no key at all —
-entered in the assistant settings.
+need your own API key (Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini,
+Grok, Mistral or Groq) — or any OpenAI-compatible endpoint, including local models
+via Ollama or LM Studio, which need no key at all — entered in the assistant settings.
 
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-PDF%20Scholar-2f6f7b?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9N75CPC0G9M2)
 
@@ -261,8 +261,9 @@ the claim came from.
 - Providers: Anthropic (Claude, with native citations), OpenAI, Azure OpenAI,
   OpenRouter, Google Gemini, Grok (xAI), Mistral and Groq — one key field each, entered
   once — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio,
-  which need no key. Model lists are fetched live and appear in one menu; requests go
-  directly to the provider, with no server in between
+  which need no key. One menu holds every provider's models — a curated, verified
+  list each, strongest first, with the provider's full live listing reachable by
+  search; requests go directly to the provider, with no server in between
 - Each answer reports the token count the provider billed, and the key settings link to
   the provider's console, where a spending cap can be set
 

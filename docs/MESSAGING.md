@@ -266,8 +266,9 @@ that.)*
 - Providers: Anthropic (Claude), OpenAI, Azure OpenAI, OpenRouter, Google
   Gemini, Grok (xAI), Mistral and Groq — one key field each, entered once —
   plus any OpenAI-compatible endpoint, including local models via Ollama or
-  LM Studio (no key needed). Model lists are fetched live from each keyed
-  provider, and every answer reports the provider's token count.
+  LM Studio (no key needed). The model menu offers a curated, verified list
+  per provider, strongest first — the provider's full live listing stays
+  reachable by search — and every answer reports the provider's token count.
   *(The named roll-call is for OUR surfaces — README, landing page, Microsoft
   Store. The **extension** listing carries no third-party brand name at all,
   not even "OpenAI-compatible" or "Acrobat": the Chrome Web Store rejected the
