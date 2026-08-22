@@ -237,8 +237,10 @@ AI-assistenten er valgfri og bruker din egen tredjeparts API-nøkkel (Anthropic,
 `Emil Mathias Strøm Halseth`
 
 ## Screenshots
-1280×800 PNGs live in `docs/store-screenshots/`, and the captioned set in
-`docs/STORE-LISTING.md` applies to the desktop listing too: themes, annotation,
-assistant, snip-a-figure, split view. Which frame goes to which surface is
-listed once in `scripts/lib/shots.json` (rendered as a table in
-`docs/RELEASE.md`). Store icon: `build/icon.png` (512×512).
+The desktop listing uses the FULL README set at full resolution — all nine
+PNGs in `docs/screenshots/` (2880×1800), in the README's narrative order
+(Emil, 2026-08-22); the Microsoft Store accepts them directly. The five-frame
+1280×800 set in `docs/store-screenshots/` is for the extension stores only,
+which require that exact size. Which frame goes to which surface is listed
+once in `scripts/lib/shots.json` (rendered as a table in `docs/RELEASE.md`).
+Store icon: `build/icon.png` (512×512).
