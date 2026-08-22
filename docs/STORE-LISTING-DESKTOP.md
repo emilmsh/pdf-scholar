@@ -138,7 +138,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.40.0
+## What's new in this version (≤ 1 500 chars) — v0.40.1
 
 **EN:**
 ```
