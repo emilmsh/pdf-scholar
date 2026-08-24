@@ -1,4 +1,4 @@
-# API-katalog (agentverifisert juli 2026, sist oppdatert 2026-08-17) — grunnlag for modell/tenkeinnsats-implementasjon
+# API-katalog (agentverifisert juli 2026, sist oppdatert 2026-08-24) — grunnlag for modell/tenkeinnsats-implementasjon
 
 > Vedlikehold: kjør `npm run check:models` og følg `docs/MODEL-UPDATE.md` når
 > katalogen skal fornyes. Appen henter nå modell-lister og kapabiliteter live
@@ -20,7 +20,7 @@ ikke på Opus-generasjon, så ingen kodeendring der).
 |---|---|---|---|
 | Claude Fable 5 | `claude-fable-5` | 1M | $10/$50 |
 | Claude Opus 5 | `claude-opus-5` | 1M | $5/$25 |
-| Claude Sonnet 5 | `claude-sonnet-5` | 1M | $3/$15 |
+| Claude Sonnet 5 | `claude-sonnet-5` | 1M | $2/$10 |
 | Claude Haiku 4.5 | `claude-haiku-4-5-20251001` (alias `claude-haiku-4-5`) | 200K | $1/$5 |
 
 Kontekstvinduet på 1M for Fable 5/Opus 5/Sonnet 5 sto allerede i tabellen over,
@@ -34,6 +34,16 @@ dag som Fable 5, men er invitasjons-only innenfor Project Glasswing (defensive
 cybersecurity, kontakt Anthropic/AWS/GCP-team for tilgang) — ingen selvbetjent
 API-nøkkel gir tilgang, så den kan ikke verifiseres eller brukes av våre
 brukere. Utenfor kuratert-kun-regelen inntil den blir allment tilgjengelig.
+
+Ukentlig review 2026-08-24 (platform.claude.com/docs/en/about-claude/pricing,
+sjekket samme dag): ingen endring i den kuraterte listen eller Mythos
+5-status. **Prisrettelse:** Sonnet 5 sto med $3/$15 i tabellen over — det var
+den planlagte prisen etter en introduksjonsperiode. Prissiden bekrefter nå at
+introduksjonsprisen $2/$10 er blitt permanent («The previously scheduled
+increase to $3/$15 per million input/output tokens on September 1, 2026 will
+not occur»); rettet til $2/$10 over. Ingen kodeendring — pris brukes ikke i
+`ai-models.ts` for kuraterte Anthropic-modeller, kun i denne tabellen. Fable
+5/Opus 5/Haiku 4.5-priser bekreftet uendret samme kilde.
 
 Thinking-regler:
 - `budget_tokens` gir **400** på Fable/Opus 5/Sonnet 5. Bruk `thinking: {type:"adaptive"}` + `output_config: {effort: "low|medium|high|xhigh|max"}`.
@@ -69,12 +79,18 @@ betaler); flagget til Emil i PR-en, ikke gjort her.
 
 | Modell | ID | Kontekst (input) | Pris inn/ut | Cached inn |
 |---|---|---|---|---|
-| Sol (flaggskip) | `gpt-5.6-sol` | 922K (1,05M totalt inkl. 128K output) | $5/$30 | $0.50 |
+| Sol (flaggskip) | `gpt-5.6-sol` | 922K (1,05M totalt inkl. 128K output) | $4/$20 (ned fra $5/$30, se nedenfor) | $0.40 |
 | Terra (anbefalt) | `gpt-5.6-terra` | 922K (som Sol) | $2/$12 (ned fra $2.50/$15 i juli) | $0.25 |
 | Luna (rask) | `gpt-5.6-luna` | 922K (som Sol) | $0.20/$1.20 (ned fra $1/$6 i juli) | $0.10 — SVAK på long-context (41 %), unngå som dokument-default |
 
 - `reasoning_effort: none|low|medium|high|xhigh|max` (default medium) — gyldig toppnivåfelt på `/v1/chat/completions`, dagens SSE-kode fungerer uendret.
 - Azure: dagens `api-version=2024-12-01-preview` er for gammel for 5.6 — oppgrader ved behov.
+- **Prisrettelse 2026-08-24** (developers.openai.com/api/docs/models/gpt-5.6-sol):
+  Sol falt fra $5/$30 (cached $0.50) til $4/$20 (cached $0.40) per MTok inn/ut.
+  Terra og Luna uendret samme kilde. Ren prisendring, ingen kodeendring —
+  `MODEL_CONTEXT_TOKENS` styres av kontekst, ikke pris, og pris for kuraterte
+  ids brukes ikke i UI-rangeringen (den gjelder kun live/OpenRouter-lister).
+  272K-terskelteksten fortsatt ordrett som notert 17.8.2026, samme side.
 
 ## Hostede kompat-tjenester (agentverifisert 12.8.2026, oppdatert 17.8.2026 mot leverandørdocs)
 
@@ -95,7 +111,7 @@ console.groq.com/docs/models, /docs/reasoning og /docs/deprecations.
 | Mistral | `mistral-medium-3-5-26-04` | 256K (verifisert 13.8.2026, model-card) | Frontier (Medium > Large i dagens lineup!) |
 | Mistral | `mistral-large-3-25-12` | 256K (verifisert 13.8.2026, model-card) | Open-weight arbeidshest ($0.50/$1.50) |
 | Mistral | `mistral-small-4-0-26-03` | 256K (verifisert 13.8.2026, model-card) | Rask/billig |
-| Groq | `openai/gpt-oss-120b` | 131K | Production-tier; Llama-parene deprecated (deprecations-siden ga en litt annen dato enn notert her: 16.8.2026 vs. tidligere notert 17.6.2026 — begge Llama-idene er uansett utenfor vår kuraterte liste, så ingen kodeendring uansett hvilken dato er riktig). `reasoning_effort` low/medium/high **bekreftet 17.8.2026** (console.groq.com/docs/reasoning: «only supported by GPT-OSS 20B and GPT-OSS 120B») → lagt til i OPENAI_REASONING_RE; «none»/av UVERIFISERT (samme gap som grok-4.5/4.6s av-verdi), degrade-on-400-nettet dekker feilgjetningen |
+| Groq | `openai/gpt-oss-120b` | 131K | Production-tier; Llama-parene (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) deprecated **16.8.2026, bekreftet på nytt 24.8.2026** (console.groq.com/docs/deprecations — datoen fra 17.8-runden holder, forrige notat om 17.6.2026 var feil kilde/lesing; begge Llama-idene er uansett utenfor vår kuraterte liste, så ingen kodeendring). `reasoning_effort` low/medium/high **bekreftet 17.8.2026** (console.groq.com/docs/reasoning: «only supported by GPT-OSS 20B and GPT-OSS 120B») → lagt til i OPENAI_REASONING_RE; «none»/av UVERIFISERT (samme gap som grok-4.5/4.6s av-verdi), degrade-on-400-nettet dekker feilgjetningen |
 | Groq | `openai/gpt-oss-20b` | 131K | Production-tier, rask — samme reasoning_effort-bekreftelse som 120b |
 
 Grok 4.5 (`grok-4.5`) er ikke lenger i den kuraterte listen, men står fortsatt
@@ -112,9 +128,10 @@ tenkeinnsats-styring. Det samme gjelder nå `gemini-3.6-flash` i
   kostnadshensyn er en produktbeslutning, ikke en korrekthetsrettelse — flagg
   til Emil, gjør det ikke selv.
 - Gemini: ai.google.dev/gemini-api/docs/openai har en reasoning_effort→
-  thinking_level/-budget-tabell (sjekket 13.8.2026, gjensjekket 17.8.2026 —
-  samme fire rader), men radene heter «Gemini 3.1 Pro / 3.1 Flash-Lite / 3
-  Flash / 2.5» — ikke våre eksakte kuraterte id-er (`gemini-3.5-flash-lite`
+  thinking_level/-budget-tabell (sjekket 13.8.2026, gjensjekket 17.8.2026 og
+  24.8.2026 — samme fire rader), men radene heter «Gemini 3.1 Pro / 3.1
+  Flash-Lite / 3 Flash / 2.5» — ikke våre eksakte kuraterte id-er
+  (`gemini-3.5-flash-lite`
   matcher ingen rad, og med byttet til `gemini-3.7-flash` denne runden matcher
   INGEN av de tre kuraterte id-ene en rad eksakt lenger; `gemini-3.1-pro-preview`
   er trolig samme familie som «3.1 Pro», men tabellen har INGEN `none`-rad, og
@@ -129,10 +146,37 @@ tenkeinnsats-styring. Det samme gjelder nå `gemini-3.6-flash` i
   likevel (samme mønster som grok-4.5/4.6), degrade-on-400-nettet dekker en
   feilgjetning der.
 - Mistral: ingen `-latest`-alias funnet for medium-3-5/large-3/small-4 på
-  docs.mistral.ai (sjekket 13.8.2026, gjensjekket 17.8.2026 — uendret).
-  Kontekstvinduene er nå verifisert (se tabellen), så denne delen av
+  docs.mistral.ai (sjekket 13.8.2026, gjensjekket 17.8.2026 og 24.8.2026 —
+  uendret). Kontekstvinduene er nå verifisert (se tabellen), så denne delen av
   spørsmålet er lukket; alias-delen forblir åpen i den forstand at et
-  fremtidig alias ikke er utelukket, bare ikke observert.
+  fremtidig alias ikke er utelukket, bare ikke observert. Sett på samme side
+  24.8.2026, men IKKE relevant for vår liste: en Ministral 3-serie (14B/8B/3B)
+  og Zhipus «Z.ai GLM 5.2» (tredjeparts open-weight, hostet i Mistrals
+  katalog, oppgitt 1M kontekst) — ingen av dem er Mistrals eget
+  flaggskip-spor, og verken bilde-input eller chat-kvalitet er vurdert for
+  dem; utenfor kuratert-kun-regelen inntil noen faktisk trenger dem.
+- **Nytt 24.8.2026 — xAI Grok 4.20, IKKE lagt til.** En ny modellfamilie er
+  under utrulling, fortsatt beta/eksperimentell: kilder spriker mellom id-en
+  `grok-4-20` (2M kontekst, nevnt i tredjepartsomtale) og de tre id-ene som
+  faktisk står i docs.x.ai/developers/models —
+  `grok-4.20-0309-reasoning`/`-non-reasoning`/`-multi-agent-0309` (1M
+  kontekst hver, $1.25/$2.50 under 200K prompt-tokens, dobler over — samme
+  terskelmønster som grok-4.6). Modellsiden
+  docs.x.ai/developers/models/grok-4.20 bekrefter bilde-input («text, image →
+  text», output kun tekst — kuratert-regel #2 ville vært innfridd), men
+  lister selv alias som `grok-4.20-beta` og
+  `grok-4.20-experimental-beta-0304-reasoning` — altså ikke en stabil,
+  GA-merket id ennå. Reasoning-parameteren er uklar: siden sier bare
+  «Reasoning: Yes» uten detaljer, mens uavhengig omtale nevner en
+  `reasoning_enabled`-boolean (av/på) i stedet for gradert
+  `reasoning_effort` — motstridende med grok-4.6/4.3s effort-nivåer, og ikke
+  til å gjette på. Lar den stå som åpent spørsmål: sjekk igjen ved neste
+  review om id-en har stabilisert seg (rotet ut av beta) og om
+  reasoning-parameteren er dokumentert presist nok til å legge i
+  OPENAI_REASONING_RE. Samtidig sett: `grok-build-0.1` (kodingsspesifikt
+  agent-verktøy, 256K kontekst, samme pristerskel-mønster) — ikke et
+  generelt chat-produkt og bilde-input er udokumentert, så den er utenfor
+  scope uavhengig av beta-status.
 
 ## Anbefalt mapping «Tenkeinnsats» (Av/Lav/Middels/Høy)
 
