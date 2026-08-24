@@ -29,8 +29,6 @@ interface AckMsg {
 type JumpListener = (path: string, target: AiCitationTarget) => boolean
 
 const listeners = new Set<JumpListener>()
-/** Ran after a jump was handled locally — the extension hooks tab activation on */
-let handledHook: (() => void) | null = null
 let channel: BroadcastChannel | null = null
 
 /** Nonces must not collide across TABS (each tab counts on its own), so the
@@ -50,7 +48,6 @@ function ensureChannel(): BroadcastChannel | null {
       }
       if (handled) {
         channel?.postMessage({ type: 'jump-ack', nonce: msg.nonce } satisfies AckMsg)
-        handledHook?.()
       }
     })
   }
@@ -65,11 +62,6 @@ export function subscribeAssistantJumps(cb: JumpListener): () => void {
   return () => {
     listeners.delete(cb)
   }
-}
-
-/** Extension only: run after this page handled a jump, to activate its tab. */
-export function setAssistantJumpHandledHook(hook: (() => void) | null): void {
-  handledHook = hook
 }
 
 /** Sending side: true when some page acked within the timeout. */

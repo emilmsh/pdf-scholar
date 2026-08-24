@@ -460,10 +460,6 @@ export function setKeymapOverrides(next: KeymapOverrides | undefined): void {
   rebuild()
 }
 
-export function getKeymapOverrides(): KeymapOverrides {
-  return overrides
-}
-
 /** Drop anything a hand-edited or version-skewed state file could contain:
  *  unknown command ids, non-arrays, non-strings, unparseable chords and
  *  duplicates. A broken keymap must degrade to defaults, never to a dead

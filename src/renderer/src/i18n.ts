@@ -153,7 +153,6 @@ const nb = {
   'tabs.showInFolder': 'Vis i Filutforsker',
 
   // Toolbar
-  'tb.library': 'Bibliotek',
   'tb.libraryTip': 'Tilbake til biblioteket',
   // Document button (browser/extension only — replaces the desktop tab bar's
   // file identity: shows the open file's path and opens another file)
@@ -262,7 +261,6 @@ const nb = {
   // have changed (see keymap.ts)
   'tb.splitTip': 'Delt visning — samme dokument i to kolonner, hver med egen side og zoom',
   'tb.marginNotes': 'Vis kommentarer i margen',
-  'tb.marginNotesTip': 'Vis kommentarer i margen — notater og kommentarer som tekst ved siden av siden',
   'margin.sideLabel': 'Side',
   'margin.sideLeft': 'Venstre',
   'margin.sideRight': 'Høyre',
@@ -311,7 +309,6 @@ const nb = {
   'tb.fullscreen': 'Fullskjerm',
   'tb.pin': 'Fest verktøylinjen',
   'tb.unpin': 'Løsne verktøylinjen',
-  'tb.snip': 'Forklar område',
   'tb.readAloud': 'Les opp',
   'tb.back': 'Tilbake',
   'tb.forward': 'Frem',
@@ -967,7 +964,6 @@ const en: Dict = {
   'tabs.moveToNewWindow': 'Move to new window',
   'tabs.showInFolder': 'Show in File Explorer',
 
-  'tb.library': 'Library',
   'tb.libraryTip': 'Back to the library',
   'doc.copyPath': 'Copy path',
   'doc.copied': 'Copied',
@@ -1067,7 +1063,6 @@ const en: Dict = {
   'tb.split': 'Split view',
   'tb.splitTip': 'Split view — the same document in two columns, each with its own page and zoom',
   'tb.marginNotes': 'Show comments in the margin',
-  'tb.marginNotesTip': 'Show comments in the margin — notes and comments as text beside the page',
   'margin.sideLabel': 'Side',
   'margin.sideLeft': 'Left',
   'margin.sideRight': 'Right',
@@ -1115,7 +1110,6 @@ const en: Dict = {
   'tb.fullscreen': 'Full screen',
   'tb.pin': 'Pin toolbar',
   'tb.unpin': 'Unpin toolbar',
-  'tb.snip': 'Explain area',
   'tb.readAloud': 'Read aloud',
   'tb.back': 'Back',
   'tb.forward': 'Forward',

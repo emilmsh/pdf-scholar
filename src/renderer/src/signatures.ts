@@ -77,15 +77,6 @@ export function removeSignature(list: SavedSignature[], id: string): SavedSignat
   return next
 }
 
-/** Cleared along with the other renderer preferences on app reset. */
-export function clearSignatures(): void {
-  try {
-    localStorage.removeItem(LS_KEY)
-  } catch {
-    /* nothing to clear */
-  }
-}
-
 /** The width, in PDF points, a freshly stamped signature gets. Sized so a
  *  normal signature spans about a third of an A4 text column — big enough to
  *  read, small enough that it rarely has to be shrunk before it is right. */

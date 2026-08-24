@@ -24,21 +24,10 @@ export function pressureWidthFactor(p: number): number {
   return 0.6 + 0.8 * clamped
 }
 
-/** The EMA weight both the batch smoother below and the renderer's
- *  incremental capture use — one constant so they agree. */
+/** The EMA weight for the renderer's incremental pressure smoothing. Pen
+ *  hardware reports pressure noisily sample-to-sample; without smoothing the
+ *  outline edge ripples. */
 export const PRESSURE_EMA_ALPHA = 0.35
-
-/** Exponential smoothing over a raw pressure sequence. Pen hardware reports
- *  pressure noisily sample-to-sample; without this the outline edge ripples. */
-export function smoothPressures(raw: number[], alpha = PRESSURE_EMA_ALPHA): number[] {
-  const out = new Array<number>(raw.length)
-  let acc = raw[0] ?? PRESSURE_NEUTRAL
-  for (let i = 0; i < raw.length; i++) {
-    acc = acc + alpha * (raw[i] - acc)
-    out[i] = Math.round(acc * 100) / 100
-  }
-  return out
-}
 
 const K_CAP = 6 // interior samples per semicircular cap
 

@@ -92,12 +92,6 @@ export function registerBrowserDoc(path: string, bytes: Uint8Array, password?: s
   docs.set(path, { bytes, open: null, password })
 }
 
-/** The password `path` was unlocked with, for the paths that need to re-open the
- *  same bytes themselves (margin export). */
-export function browserDocPassword(path: string): string | undefined {
-  return docs.get(path)?.password
-}
-
 /** Release the live document and its bytes (viewer unmount / tab close). */
 export async function releaseBrowserDoc(path: string): Promise<void> {
   const entry = docs.get(path)
