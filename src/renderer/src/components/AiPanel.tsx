@@ -1015,13 +1015,12 @@ export default function AiPanel({
       style={{ '--ai-scale': textScale } as React.CSSProperties}
     >
       <header className="ai-header">
-        {/* Icon only, no "Assistent" caption: the word cost ~67px of a 340px
-            header and the model chip was paying for it — "GPT-5.6 …" hides
+        {/* No "Assistent" caption and (since v0.41) no sparkle either: both
+            cost width the model chip was paying for — "GPT-5.6 …" hides
             exactly the part that separates Sol from Terra from Luna. Nothing
             is lost: the panel is named by the toolbar button that opens it
             (and by the window title in the detached one), and the aside
             carries the name for screen readers. */}
-        <IconSparkle size={16} />
         <div className="ai-model-anchor">
           <button
             className="ai-model"
