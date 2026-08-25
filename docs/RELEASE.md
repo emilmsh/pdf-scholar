@@ -14,6 +14,15 @@ release" from Emil. A monthly reminder issue
 (`.github/workflows/release-reminder.yml`, the 1st of each month) nudges that
 batch so the stores never silently fall a season behind.
 
+**Small updates go everywhere, hands-free** (Emil, 2026-08-25). When a release
+carries **no new listing copy and no new screenshots**, the store channels ride
+along via the two workflows (`store-publish.yml`, `ext-publish.yml`) rather than
+waiting for a batched full release — the one thing the APIs cannot carry
+(images) is exactly what such a release does not have. The
+one-delivery-per-certification rule (2026-08-11) still governs releases that DO
+bring new images or copy: those are submitted by hand, everything in one
+submission. And never push a channel that still has a submission in review.
+
 ## 0. Screenshots — by hand, Emil
 
 ```bash
@@ -253,7 +262,17 @@ submission is created through the API, never edit it in the Partner Center UI.
 
 ## 5. Extension stores — full release only
 
-Upload `pdf-scholar-extension-store.zip` (manifest at the zip root) to Edge
-Add-ons and the Chrome Web Store. Copy from `docs/STORE-LISTING.md`; the
-permission justifications there are written to pre-empt the reviewer. See
-`docs/STORE.md`.
+Package-only pushes go through the workflow:
+
+```bash
+gh workflow run ext-publish.yml -f target=all -f check_only=true
+```
+
+then for real (no `check_only`). It uploads the release's store zip and submits
+for review; it cannot touch listing copy, screenshots or permission
+justifications — those stay manual in the dashboards. Edge secrets are in and
+proven; **Chrome needs the `CWS_*` secrets set up first** (one-time, see
+`docs/STORE.md` Track C) — until then Chrome is a manual upload of
+`pdf-scholar-extension-store.zip` (manifest at the zip root) in the dev console.
+Copy lives in `docs/STORE-LISTING.md`; the permission justifications there are
+written to pre-empt the reviewer. See `docs/STORE.md`.
