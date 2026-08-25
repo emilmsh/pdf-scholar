@@ -43,6 +43,7 @@ import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
 import type { ChatMessage, StoredConversation } from '../chat-store'
 import { CHATS_LS_KEY, deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
+import { conversationMarkdown } from '../chat-export'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { AssistantBody, renderMarkdown } from './ai-markdown'
@@ -52,6 +53,7 @@ import { ModelQuickMenu } from './AiModelMenu'
 import type { AiSeed } from './AiQuickPopover'
 import {
   IconChevronDown,
+  IconCopy,
   IconDetach,
   IconGlobe,
   IconGlobeLive,
@@ -215,6 +217,10 @@ export default function AiPanel({
    *  proof that something is happening. */
   const [waited, setWaited] = useState(0)
   const [pinned, setPinned] = useState(true)
+  // "Copied" flash on the header's copy-as-markdown button
+  const [copied, setCopied] = useState(false)
+  const copyResetRef = useRef<number | undefined>(undefined)
+  useEffect(() => () => window.clearTimeout(copyResetRef.current), [])
   const [, setDocReady] = useState(false) // bump-only: re-renders chips once docRef resolves
   const docRef = useRef<EnsuredDocument | null>(null)
   const currentIdRef = useRef<number | null>(null)
@@ -667,6 +673,18 @@ export default function AiPanel({
     setShowSettings(false)
   }, [busy, docPath])
 
+  const copyConversation = useCallback((): void => {
+    const md = conversationMarkdown(docTitle, messagesRef.current, docRef.current?.doc ?? null)
+    navigator.clipboard?.writeText(md).then(
+      () => {
+        setCopied(true)
+        window.clearTimeout(copyResetRef.current)
+        copyResetRef.current = window.setTimeout(() => setCopied(false), 1600)
+      },
+      () => {} // clipboard denied — nothing sensible to do, the button stays
+    )
+  }, [docTitle])
+
   const handleCitation = useCallback(
     async (citation: AiCitation): Promise<void> => {
       // Web sources live outside the document — straight to the browser
@@ -1053,6 +1071,14 @@ export default function AiPanel({
           onClick={toggleHistory}
         >
           <IconHistory size={15} />
+        </button>
+        <button
+          className="tb-btn"
+          title={copied ? t('ai.copyMdDone') : t('ai.copyMdTip')}
+          disabled={messages.length === 0 || busy}
+          onClick={copyConversation}
+        >
+          {copied ? '✓' : <IconCopy size={15} />}
         </button>
         {/* No settings gear: AI settings live one click inside the model chip's
             menu ("KI-innstillinger"), open straight from the chip for Azure, and

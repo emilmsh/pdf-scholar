@@ -694,6 +694,10 @@ const nb = {
   'ai.historyMessages': '{count} meldinger',
   'ai.jumpNewestTip': 'Hopp til nyeste melding',
   'ai.untitledChat': 'Uten tittel',
+  'ai.copyMdTip': 'Kopier samtalen som Markdown',
+  'ai.copyMdDone': 'Kopiert',
+  'ai.exportYou': 'Du',
+  'ai.exportAssistant': 'Assistent',
 
   // Keyboard map (the Hurtigtaster dialog). Command labels are the same words
   // the toolbar and merknadslisten use for the same thing — a map that renames
@@ -1472,6 +1476,10 @@ const en: Dict = {
   'ai.historyMessages': '{count} messages',
   'ai.jumpNewestTip': 'Jump to newest message',
   'ai.untitledChat': 'Untitled',
+  'ai.copyMdTip': 'Copy the conversation as Markdown',
+  'ai.copyMdDone': 'Copied',
+  'ai.exportYou': 'You',
+  'ai.exportAssistant': 'Assistant',
 
   'keys.title': 'Keyboard shortcuts',
   'keys.intro':
