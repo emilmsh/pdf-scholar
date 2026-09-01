@@ -138,22 +138,20 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.40.1
+## What's new in this version (≤ 1 500 chars) — v0.42.0
 
 **EN:**
 ```
-• The model menu is rebuilt: every provider in one menu, each with its state under its name — key missing, not configured, or how many models it offers. Short lists stay on one screen; a long one (an OpenRouter key brings hundreds) opens as provider → maker → model, and a search reaches everything the provider lists
-• The menu offers models the app can vouch for, strongest first — and a model you already picked stays pickable even when a list changes under it
-• A reasoning model no longer looks like a hang: the assistant shows that the model is thinking, and past ten seconds the wait becomes a visible counter — gone the moment the answer arrives. The selection bubble waits the same way, and a model's internal reasoning never appears as the answer
-• When a provider refuses, the app says why in plain words — out of credit, rate limited, model overloaded, or a model that cannot see images — each with what to do about it
+• Two-page view can show the cover page separately: page 1 stands alone and facing pages pair up 2-3, 4-5 — the way they sit in a bound book. The toggle lives under the two-page option in the view menu, works per column in split view, and is remembered with your reading position
+• The assistant's conversation can be saved as Markdown — questions, answers and citations leave the panel as a file you can keep
+• The assistant's header now shows which model is answering
 ```
 
 **NO:**
 ```
-• Modellmenyen er bygget om: hver leverandør i én meny, med tilstanden under navnet — nøkkel mangler, ikke satt opp, eller hvor mange modeller den tilbyr. Korte lister står på én skjerm; en lang (en OpenRouter-nøkkel gir hundrevis) åpnes som leverandør → produsent → modell, og et søk når alt leverandøren lister
-• Menyen tilbyr modeller appen kan gå god for, sterkest først — og en modell du alt har valgt forblir valgbar selv når listen endrer seg under den
-• En resonneringsmodell ser ikke lenger ut som heng: assistenten viser at modellen tenker, og etter ti sekunder blir ventetiden en synlig teller — borte i det svaret kommer. Merketekst-boblen venter på samme måte, og modellens interne resonnering vises aldri som svaret
-• Når en leverandør avviser, sier appen hvorfor i klartekst — tom for kreditt, hastighetsbegrenset, overbelastet modell, eller en modell som ikke kan se bilder — hver med hva du kan gjøre
+• Topagevisning kan vise forsiden alene: side 1 står for seg selv og motstående sider pares 2-3, 4-5 — slik de ligger i en innbundet bok. Bryteren ligger under topage-valget i visningsmenyen, virker per kolonne i delt visning, og huskes med leseposisjonen
+• Assistentens samtale kan lagres som Markdown — spørsmål, svar og kildehenvisninger blir en fil du kan beholde
+• Assistentens topplinje viser nå hvilken modell som svarer
 ```
 
 ---
