@@ -210,18 +210,38 @@ export interface LayoutOpts {
   spreadGap: number
 }
 
+/** Left-page index of the spread row containing page index i. Cover mode
+ *  (Edge's "show cover page separately") shows page 1 alone, so the pairs
+ *  start at index 1 — facing pages align the way they do in a bound book. */
+export function spreadRowStart(i: number, cover: boolean): number {
+  if (!cover) return i - (i % 2)
+  return i === 0 ? 0 : i - ((i + 1) % 2)
+}
+
+/** The page indices of the spread row containing page index i (1 or 2 entries,
+ *  never past n). The one grouping rule, shared by layout and the fit modes —
+ *  a fit computed against a different pairing than the layout draws would be
+ *  wrong by exactly one page width. */
+export function spreadRow(i: number, n: number, cover: boolean): number[] {
+  const s = spreadRowStart(i, cover)
+  return s + 1 < n && !(cover && s === 0) ? [s, s + 1] : [s]
+}
+
 /**
  * Vertical stack of rows. In single mode each row is one page; in spread mode
- * pages pair up strictly (1-2, 3-4, …). Each page's view size accounts for the
+ * pages pair up strictly (1-2, 3-4, …), or — with `cover` — page 1 stands
+ * alone and the pairs run 2-3, 4-5, …. Each page's view size accounts for the
  * rotation; a row is as tall as its tallest page and its pages are centred
- * within it, and every row is centred horizontally in the content column.
+ * within it, and every row is centred horizontally in the content column
+ * (a lone page — cover or trailing odd page — centres like any other row).
  */
 export function buildRows(
   sizes: Size[],
   scale: number,
   rotation: ViewRotation,
   spread: boolean,
-  opts: LayoutOpts
+  opts: LayoutOpts,
+  cover = false
 ): RowLayout {
   const { containerWidth, pageGap, padTop, padBottom, sidePad, spreadGap } = opts
   const n = sizes.length
@@ -236,7 +256,11 @@ export function buildRows(
   // Group page indices into rows
   const groups: number[][] = []
   if (spread) {
-    for (let i = 0; i < n; i += 2) groups.push(i + 1 < n ? [i, i + 1] : [i])
+    for (let i = 0; i < n; ) {
+      const g = spreadRow(i, n, cover)
+      groups.push(g)
+      i += g.length
+    }
   } else {
     for (let i = 0; i < n; i++) groups.push([i])
   }

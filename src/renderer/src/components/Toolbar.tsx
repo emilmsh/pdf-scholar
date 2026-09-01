@@ -89,6 +89,7 @@ import {
   IconUndo,
   IconSearch,
   IconSpeaker,
+  IconCoverPage,
   IconSpread,
   IconTextMarkup,
   IconShapeArrow,
@@ -172,8 +173,11 @@ interface Props {
   onPenPressureChange(penPressure: boolean): void
   /** View rotation + two-page spread (live in the Visning menu) */
   spread: boolean
+  /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … (only while spread is on) */
+  coverPage: boolean
   onRotate(dir: 1 | -1): void
   onToggleSpread(): void
+  onToggleCoverPage(): void
   onToolPrefChange(tool: DrawPrefKey, patch: Partial<ToolPref>): void
   onToolPrefReset(tool: DrawPrefKey): void
   /** FreeText tool look (text colour + font size) */
@@ -343,8 +347,10 @@ export default function Toolbar({
   penPressure,
   onPenPressureChange,
   spread,
+  coverPage,
   onRotate,
   onToggleSpread,
+  onToggleCoverPage,
   onToolPrefChange,
   onToolPrefReset,
   textPref,
@@ -1494,6 +1500,20 @@ export default function Toolbar({
                 <input type="checkbox" checked={spread} onChange={onToggleSpread} />
                 <IconSpread size={15} />
                 {t('tb.spread')}
+              </label>
+              {/* Sub-option, meaningless on its own — greyed out rather than
+                  hidden so the layout choice stays discoverable */}
+              <label
+                className={`theme-menu-toggle view-row-toggle view-row-sub${spread ? '' : ' is-disabled'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={coverPage}
+                  disabled={!spread}
+                  onChange={onToggleCoverPage}
+                />
+                <IconCoverPage size={15} />
+                {t('tb.coverPage')}
               </label>
             </div>
           )}

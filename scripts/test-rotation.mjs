@@ -150,6 +150,61 @@ console.log('5) buildRows: single vs spread grouping + totals')
   close(rot90.widths[0], 800, 'rot90 single row page width = ph')
 }
 
+console.log('6) buildRows cover mode: page 1 alone, pairs 2-3, 4-5 …')
+{
+  const opts = { containerWidth: 1000, pageGap: 16, padTop: 28, padBottom: 28, sidePad: 64, spreadGap: 24 }
+  const page = { w: 600, h: 800 }
+  const mk = (n) => Array.from({ length: n }, () => page)
+
+  // 5 pages → [1], [2,3], [4,5]
+  const five = R.buildRows(mk(5), 1, 0, true, opts, true)
+  ok(five.rows.length === 3, `cover 5p rows=3 (got ${five.rows.length})`)
+  ok(
+    five.rows.map((r) => r.pages.length).join(',') === '1,2,2',
+    'cover 5p: [1,2,2] pages per row'
+  )
+  ok(
+    five.rows[1].pages[0].index === 1 && five.rows[1].pages[1].index === 2,
+    'cover 5p: second row is pages 2-3'
+  )
+  // the lone cover centres in the content column like any single-page row
+  close(five.lefts[0], (five.contentWidth - five.widths[0]) / 2, 'cover page centred')
+
+  // 4 pages → [1], [2,3], [4]: a trailing odd page stays alone
+  const four = R.buildRows(mk(4), 1, 0, true, opts, true)
+  ok(
+    four.rows.map((r) => r.pages.length).join(',') === '1,2,1',
+    'cover 4p: [1,2,1] pages per row'
+  )
+
+  // degenerate sizes never break the grouping
+  ok(R.buildRows(mk(1), 1, 0, true, opts, true).rows.length === 1, 'cover 1p: one row')
+  ok(
+    R.buildRows(mk(2), 1, 0, true, opts, true).rows.map((r) => r.pages.length).join(',') === '1,1',
+    'cover 2p: two single rows'
+  )
+
+  // cover=false keeps the strict 1-2, 3-4 pairing untouched
+  const plain = R.buildRows(mk(4), 1, 0, true, opts, false)
+  ok(
+    plain.rows.map((r) => r.pages.length).join(',') === '2,2',
+    'no cover: strict pairs unchanged'
+  )
+
+  // spreadRow (the shared grouping rule) agrees with the layout for every page
+  for (const n of [1, 2, 3, 4, 5, 6]) {
+    for (const cover of [false, true]) {
+      const lay = R.buildRows(mk(n), 1, 0, true, opts, cover)
+      for (let i = 0; i < n; i++) {
+        const row = lay.rows.find((r) => r.pages.some((p) => p.index === i))
+        const expect = row.pages.map((p) => p.index).join(',')
+        const got = R.spreadRow(i, n, cover).join(',')
+        ok(got === expect, `spreadRow(${i}, n=${n}, cover=${cover}) = [${expect}] (got [${got}])`)
+      }
+    }
+  }
+}
+
 if (failures === 0) {
   console.log('\nALL ROTATION ROUND-TRIPS PASS ✓')
   process.exit(0)

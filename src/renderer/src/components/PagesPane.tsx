@@ -37,6 +37,7 @@ import {
   shiftLayoutX,
   SIDE_PAD,
   SPREAD_GAP,
+  spreadRow,
   viewSize
 } from '../rotation'
 import { MarginJumpArrows } from './MarginNotes'
@@ -63,6 +64,8 @@ interface Props {
   annotsHidden: boolean
   rotation: ViewRotation
   spread: boolean
+  /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … */
+  coverPage: boolean
   /** Controlled zoom: the toolbar's centre owns it, this component reports the
    *  scale it arrives at (fit modes, pinch) back up. */
   scale: number
@@ -143,6 +146,7 @@ export default function PagesPane({
   annotsHidden,
   rotation,
   spread,
+  coverPage,
   scale,
   fitMode,
   onZoom,
@@ -241,33 +245,39 @@ export default function PagesPane({
 
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
-    const lay = buildRows(sizes, scale, rotation, spread, {
-      containerWidth: Math.max(containerWidth - marginGutter, 120),
-      pageGap: PAGE_GAP,
-      padTop: PAD_TOP,
-      padBottom: PAD_BOTTOM,
-      sidePad: SIDE_PAD,
-      spreadGap: SPREAD_GAP
-    })
+    const lay = buildRows(
+      sizes,
+      scale,
+      rotation,
+      spread,
+      {
+        containerWidth: Math.max(containerWidth - marginGutter, 120),
+        pageGap: PAGE_GAP,
+        padTop: PAD_TOP,
+        padBottom: PAD_BOTTOM,
+        sidePad: SIDE_PAD,
+        spreadGap: SPREAD_GAP
+      },
+      coverPage
+    )
     return shiftLayoutX(lay, marginView?.side === 'left' ? marginGutter : 0)
-  }, [sizes, scale, containerWidth, rotation, spread, marginGutter, marginView?.side])
+  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView?.side])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
   const fitDenom = useCallback(
     (page: number): { w: number; h: number } => {
       if (sizes.length === 0) return { w: 1, h: 1 }
-      const idx = spread
-        ? Math.min(Math.max(page - 1 - ((page - 1) % 2), 0), sizes.length - 1)
-        : Math.min(Math.max(page - 1, 0), sizes.length - 1)
-      const v0 = viewSize(sizes[idx].w, sizes[idx].h, rotation)
-      if (spread && idx + 1 < sizes.length) {
-        const v1 = viewSize(sizes[idx + 1].w, sizes[idx + 1].h, rotation)
+      const cur = Math.min(Math.max(page - 1, 0), sizes.length - 1)
+      const row = spread ? spreadRow(cur, sizes.length, coverPage) : [cur]
+      const v0 = viewSize(sizes[row[0]].w, sizes[row[0]].h, rotation)
+      if (row.length > 1) {
+        const v1 = viewSize(sizes[row[1]].w, sizes[row[1]].h, rotation)
         return { w: v0.w + v1.w + SPREAD_GAP, h: Math.max(v0.h, v1.h) }
       }
       return v0
     },
-    [sizes, rotation, spread]
+    [sizes, rotation, spread, coverPage]
   )
 
   const currentPageRef = useRef(1)
@@ -345,7 +355,7 @@ export default function PagesPane({
     if (!el || !layout) return
     // currentPageRef still holds the page from BEFORE this relayout (only
     // updateRange moves it), which is exactly the page to land back on.
-    const key = `${rotation}:${spread}`
+    const key = `${rotation}:${spread}:${coverPage}`
     if (laidOutForRef.current !== null && laidOutForRef.current !== key) {
       pendingPageRef.current = currentPageRef.current
       anchorRef.current = null
@@ -370,7 +380,7 @@ export default function PagesPane({
       inner.style.transformOrigin = '0 0'
     }
     updateRangeRef.current()
-  }, [layout, scale, rotation, spread])
+  }, [layout, scale, rotation, spread, coverPage])
 
   const zoomTo = useCallback(
     (next: number, mode: FitMode, focalClientX?: number, focalClientY?: number) => {
@@ -425,7 +435,7 @@ export default function PagesPane({
   // Safe against loops: refit is a no-op once the scale already matches.
   useEffect(() => {
     if (fitMode !== 'custom') refitRef.current()
-  }, [fitMode, rotation, spread, marginGutter])
+  }, [fitMode, rotation, spread, coverPage, marginGutter])
 
   /** Commit a pinch: swap the cheap CSS transform for a crisp re-render at the
    *  accumulated scale. The transform is dropped by the layout effect above,

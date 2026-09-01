@@ -53,6 +53,9 @@ export interface ReadingPosition {
   rotation?: ViewRotation
   /** Two-page spread on? absent = false */
   spread?: boolean
+  /** In two-page spread, show page 1 alone so facing pages pair 2-3, 4-5, …
+   *  (Edge/Acrobat call it "show cover page separately"); absent = false */
+  coverPage?: boolean
 }
 
 /** A page the reader marked to come back to. Stored per file next to the

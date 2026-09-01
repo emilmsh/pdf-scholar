@@ -1731,6 +1731,18 @@ html.pen-near .draw-layer {
   color: var(--text-secondary);
 }
 
+/* The spread's cover sub-option: indented under its parent toggle, greyed out
+   (but still visible) while two-page view is off */
+.view-row-sub {
+  margin-top: 6px;
+  margin-left: 18px;
+}
+
+.view-row-sub.is-disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* Gear menu — the app's one settings surface */
 
 .menu-action {

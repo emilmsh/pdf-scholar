@@ -575,6 +575,15 @@ export const IconSpread = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** The spread's cover sub-option: page 1 alone on its own row, pairs below. */
+export const IconCoverPage = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="8" y="2.5" width="8" height="8.5" rx="1" />
+    <rect x="3" y="14" width="8" height="8" rx="1" />
+    <rect x="13" y="14" width="8" height="8" rx="1" />
+  </Svg>
+)
+
 /** The «Visning» menu: a page inside a frame — how the document is laid out in
  *  the window, as opposed to the gear's technical settings. */
 export const IconView = (p: IconProps): React.JSX.Element => (

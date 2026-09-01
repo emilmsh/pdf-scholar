@@ -82,6 +82,7 @@ import {
   shiftLayoutX,
   SIDE_PAD,
   SPREAD_GAP,
+  spreadRow,
   viewDeltaToPage,
   viewPointToPage,
   viewRectToPage,
@@ -459,6 +460,11 @@ export default function PdfViewer({
   const [spread, setSpread] = useState(initialPosition?.spread ?? false)
   const spreadRef = useRef(spread)
   spreadRef.current = spread
+  /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … so facing pages align
+   *  as printed. Persisted with the position like spread itself. */
+  const [coverPage, setCoverPage] = useState(initialPosition?.coverPage ?? false)
+  const coverPageRef = useRef(coverPage)
+  coverPageRef.current = coverPage
   const [containerWidth, setContainerWidth] = useState(0)
   const [range, setRange] = useState<[number, number]>([1, 1])
   const [currentPage, setCurrentPage] = useState(initialPosition?.page ?? 1)
@@ -657,10 +663,13 @@ export default function PdfViewer({
    *  reason — if the option exists at all it has to mean "this column". */
   const [paneBRotation, setPaneBRotation] = useState<ViewRotation>(0)
   const [paneBSpread, setPaneBSpread] = useState(false)
+  const [paneBCover, setPaneBCover] = useState(false)
   const paneBRotationRef = useRef(paneBRotation)
   paneBRotationRef.current = paneBRotation
   const paneBSpreadRef = useRef(paneBSpread)
   paneBSpreadRef.current = paneBSpread
+  const paneBCoverRef = useRef(paneBCover)
+  paneBCoverRef.current = paneBCover
   const paneBFitRef = useRef(paneBFit)
   paneBFitRef.current = paneBFit
   const paneBScaleRef = useRef(paneBScale)
@@ -696,6 +705,7 @@ export default function PdfViewer({
     fit: 'width' | 'page' | 'custom'
     rotation: ViewRotation
     spread: boolean
+    cover: boolean
     /** the divider's share too — a figure you gave 60 % of the width to comes
      *  back at 60 %, not squeezed back to half */
     share: number
@@ -711,6 +721,7 @@ export default function PdfViewer({
       fit: paneBFitRef.current,
       rotation: paneBRotationRef.current,
       spread: paneBSpreadRef.current,
+      cover: paneBCoverRef.current,
       share: panelWRef.current.pane
     }
   }, [])
@@ -749,6 +760,7 @@ export default function PdfViewer({
     // are indistinguishable at the moment a FRESH split opens
     setPaneBRotation(memory?.rotation ?? rotationRef.current)
     setPaneBSpread(memory?.spread ?? spreadRef.current)
+    setPaneBCover(memory?.cover ?? coverPageRef.current)
     setFitMode('width')
     setSplitOpen(true)
     // Land the column once it can be scrolled — on the remembered spot within
@@ -782,6 +794,7 @@ export default function PdfViewer({
     paneBMemoryRef.current = null
     setRotation(paneBRotationRef.current)
     setSpread(paneBSpreadRef.current)
+    setCoverPage(paneBCoverRef.current)
     // A fit mode is better recomputed for the full width than copied; an exact
     // hand-set zoom is the reader's number and is carried over verbatim.
     const bFit = paneBFitRef.current
@@ -1401,16 +1414,15 @@ export default function PdfViewer({
     // Fit against the page currently in view, not always page 1 — so a document
     // that mixes portrait and landscape pages fits the page you are actually
     // reading (fit-width on a wide page fills the width, not overflows it).
-    const idx = spread
-      ? clamp(currentPage - 1 - ((currentPage - 1) % 2), 0, sizes.length - 1)
-      : clamp(currentPage - 1, 0, sizes.length - 1)
-    const v0 = viewSize(sizes[idx].w, sizes[idx].h, rotation)
-    if (spread && idx + 1 < sizes.length) {
-      const v1 = viewSize(sizes[idx + 1].w, sizes[idx + 1].h, rotation)
+    const cur = clamp(currentPage - 1, 0, sizes.length - 1)
+    const row = spread ? spreadRow(cur, sizes.length, coverPage) : [cur]
+    const v0 = viewSize(sizes[row[0]].w, sizes[row[0]].h, rotation)
+    if (row.length > 1) {
+      const v1 = viewSize(sizes[row[1]].w, sizes[row[1]].h, rotation)
       return { w: v0.w + v1.w + SPREAD_GAP, h: Math.max(v0.h, v1.h) }
     }
     return { w: v0.w, h: v0.h }
-  }, [sizes, rotation, spread, currentPage])
+  }, [sizes, rotation, spread, coverPage, currentPage])
 
   // Margin view reserves its card column the same way SIDE_PAD reserves its
   // edges: subtracted from the width every layout/fit computation sees, so the
@@ -1440,18 +1452,25 @@ export default function PdfViewer({
 
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
-    const lay = buildRows(sizes, scale, rotation, spread, {
-      containerWidth: Math.max(containerWidth - marginGutter, 120),
-      pageGap: PAGE_GAP,
-      padTop: PAD_TOP,
-      padBottom: PAD_BOTTOM,
-      sidePad: SIDE_PAD,
-      spreadGap: SPREAD_GAP
-    })
+    const lay = buildRows(
+      sizes,
+      scale,
+      rotation,
+      spread,
+      {
+        containerWidth: Math.max(containerWidth - marginGutter, 120),
+        pageGap: PAGE_GAP,
+        padTop: PAD_TOP,
+        padBottom: PAD_BOTTOM,
+        sidePad: SIDE_PAD,
+        spreadGap: SPREAD_GAP
+      },
+      coverPage
+    )
     // A left-hand margin means the gutter sits BEFORE the pages: shift every
     // page right by the reserved width so the column has its space.
     return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0)
-  }, [sizes, scale, containerWidth, rotation, spread, marginGutter, marginView.side])
+  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -1516,7 +1535,8 @@ export default function PdfViewer({
           ...current,
           zoom: scaleRef.current,
           rotation: rotationRef.current,
-          spread: spreadRef.current
+          spread: spreadRef.current,
+          coverPage: coverPageRef.current
         })
       }
     }, 600)
@@ -2059,32 +2079,40 @@ export default function PdfViewer({
   /** The fit-mode scale for a hypothetical rotation/spread, or null when the
    *  zoom is 'custom' (left untouched). Reads live refs so it can be computed
    *  with the NEXT rotation/spread before the state has committed. */
-  const computeFitScale = useCallback((rot: ViewRotation, spr: boolean): number | null => {
-    const el = containerRef.current
-    const s = sizesRef.current
-    if (!el || fitModeRef.current === 'custom' || s.length === 0 || el.clientWidth === 0) return null
-    const v0 = viewSize(s[0].w, s[0].h, rot)
-    let dw = v0.w
-    let dh = v0.h
-    if (spr && s.length > 1) {
-      const v1 = viewSize(s[1].w, s[1].h, rot)
-      dw = v0.w + v1.w + SPREAD_GAP
-      dh = Math.max(v0.h, v1.h)
-    }
-    const fitW = (el.clientWidth - SIDE_PAD) / dw
-    const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / dh
-    return clamp(fitModeRef.current === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
-  }, [])
+  const computeFitScale = useCallback(
+    (rot: ViewRotation, spr: boolean, cov: boolean): number | null => {
+      const el = containerRef.current
+      const s = sizesRef.current
+      if (!el || fitModeRef.current === 'custom' || s.length === 0 || el.clientWidth === 0)
+        return null
+      // Reference row: the first PAIR the layout will show — with the cover
+      // alone that is pages 2-3, not the lone cover, or fit-width computed
+      // against the narrow cover row would overflow on every pair.
+      const row = spr ? spreadRow(cov && s.length > 1 ? 1 : 0, s.length, cov) : [0]
+      const v0 = viewSize(s[row[0]].w, s[row[0]].h, rot)
+      let dw = v0.w
+      let dh = v0.h
+      if (row.length > 1) {
+        const v1 = viewSize(s[row[1]].w, s[row[1]].h, rot)
+        dw = v0.w + v1.w + SPREAD_GAP
+        dh = Math.max(v0.h, v1.h)
+      }
+      const fitW = (el.clientWidth - SIDE_PAD) / dw
+      const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / dh
+      return clamp(fitModeRef.current === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
+    },
+    []
+  )
 
   /** Re-anchor the reading position across a rotation/spread relayout: capture
    *  the current page + fractional offset into restoreRef so the same spot is
    *  scrolled back after the layout rebuilds (batched with the state change so
    *  it happens in one relayout — pinch anchor stays cleared, no jump). */
   const reanchorFor = useCallback(
-    (rot: ViewRotation, spr: boolean): void => {
+    (rot: ViewRotation, spr: boolean, cov: boolean): void => {
       const cur = computeCurrent()
       pendingAnchorRef.current = null
-      const nextScale = computeFitScale(rot, spr)
+      const nextScale = computeFitScale(rot, spr, cov)
       if (nextScale !== null) setScale(nextScale)
       if (cur) {
         restoreRef.current = {
@@ -2092,7 +2120,8 @@ export default function PdfViewer({
           offset: cur.offset,
           zoom: nextScale ?? scaleRef.current,
           rotation: rot,
-          spread: spr
+          spread: spr,
+          coverPage: cov
         }
       }
     },
@@ -2123,7 +2152,7 @@ export default function PdfViewer({
         setPaneBRotation(next)
         return
       }
-      reanchorFor(next, spreadRef.current)
+      reanchorFor(next, spreadRef.current, coverPageRef.current)
       setRotation(next)
       schedulePositionSave()
     },
@@ -2150,8 +2179,22 @@ export default function PdfViewer({
       fitModeRef.current = 'page'
       setFitMode('page')
     }
-    reanchorFor(rotationRef.current, next)
+    reanchorFor(rotationRef.current, next, coverPageRef.current)
     setSpread(next)
+    schedulePositionSave()
+  }, [reanchorFor, schedulePositionSave])
+
+  /** The spread's cover sub-option (page 1 alone). Per column like spread
+   *  itself; only meaningful while the column's spread is on, which is why the
+   *  toolbar disables the toggle otherwise. */
+  const toggleCoverPage = useCallback(() => {
+    if (activePaneRef.current === 'b') {
+      setPaneBCover((c) => !c)
+      return
+    }
+    const next = !coverPageRef.current
+    reanchorFor(rotationRef.current, spreadRef.current, next)
+    setCoverPage(next)
     schedulePositionSave()
   }, [reanchorFor, schedulePositionSave])
 
@@ -2397,7 +2440,8 @@ export default function PdfViewer({
           ...current,
           zoom: scaleRef.current,
           rotation: rotationRef.current,
-          spread: spreadRef.current
+          spread: spreadRef.current,
+          coverPage: coverPageRef.current
         })
       onSavedAs(result.path)
       return
@@ -4351,9 +4395,10 @@ export default function PdfViewer({
     setAnnotsHidden(false)
     setActiveTool(null)
     setMarkupTool(null)
-    reanchorFor(0, false)
+    reanchorFor(0, false, false)
     setRotation(0)
     setSpread(false)
+    setCoverPage(false)
     setBubbleSizes(new Map())
     fitModeRef.current = 'page'
     setFitMode('page')
@@ -5238,6 +5283,10 @@ export default function PdfViewer({
         e.preventDefault()
         toggleSpread()
         break
+      case 'view.coverPage':
+        e.preventDefault()
+        toggleCoverPage()
+        break
       case 'view.present':
         e.preventDefault()
         enterPresentation()
@@ -5374,7 +5423,8 @@ export default function PdfViewer({
         ...current,
         zoom: scaleRef.current,
         rotation: rotationRef.current,
-        spread: spreadRef.current
+        spread: spreadRef.current,
+        coverPage: coverPageRef.current
       })
   }, [computeCurrent, payload.path])
   const flushPositionRef = useRef(flushPosition)
@@ -5597,8 +5647,10 @@ export default function PdfViewer({
           penPressure={prefs.input.penPressure}
           onPenPressureChange={setPenPressure}
           spread={splitOpen && activePane === 'b' ? paneBSpread : spread}
+          coverPage={splitOpen && activePane === 'b' ? paneBCover : coverPage}
           onRotate={rotateView}
           onToggleSpread={toggleSpread}
+          onToggleCoverPage={toggleCoverPage}
           onToolPrefChange={patchToolPref}
           onToolPrefReset={resetToolPref}
           textPref={textPref}
@@ -5903,6 +5955,7 @@ export default function PdfViewer({
               annotsHidden={annotsHidden}
               rotation={paneBRotation}
               spread={paneBSpread}
+              coverPage={paneBCover}
               scale={paneBScale}
               fitMode={paneBFit}
               onZoom={paneBZoom}
