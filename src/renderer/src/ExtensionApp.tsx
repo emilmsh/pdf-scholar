@@ -5,6 +5,7 @@ import { buildViewerUrl } from '../../shared/viewer-url'
 import { openInBrowserViewer } from './extension-api'
 import { insecureRetryUrl } from '../../shared/insecure-retry'
 import { errorText, setLanguage, t } from './i18n'
+import { applyPageTune } from './theme-tune'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import {
   checkForExtensionUpdate,
@@ -83,10 +84,17 @@ export default function ExtensionApp(): React.JSX.Element {
       day: ['#ededf0', '#1d1d1f'],
       sepia: ['#e9e6db', '#3d3929'],
       night: ['#21211f', '#eeece2'],
-      nightHc: ['#111113', '#f5f5f7']
+      nightHc: ['#111113', '#f5f5f7'],
+      custom: ['#ededf0', '#1d1d1f']
     }
     bridge.setTitleBarColors(...overlay[resolvedTheme])
   }, [resolvedTheme])
+
+  // Intensity/custom-tone override — mirrors App.tsx exactly (parity:
+  // docs/PLATFORMS.md holds the extension to the desktop's reading modes).
+  useEffect(() => {
+    applyPageTune(resolvedTheme, settings.themeTune, settings.customTone)
+  }, [resolvedTheme, settings.themeTune, settings.customTone])
 
   useEffect(() => {
     setLanguage(settings.language)

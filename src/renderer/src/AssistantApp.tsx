@@ -19,6 +19,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { AiImage, FilePayload, Settings, ThemeName } from '../../shared/types'
 import { bridge, isExtension } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
+import { applyPageTune } from './theme-tune'
 import { openDocument, isPasswordException } from './pdf-doc'
 import type { DocResources } from './pdf-doc'
 import { renderPagesAsImages } from './ai-page-images'
@@ -87,10 +88,17 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
       day: ['#ededf0', '#1d1d1f'],
       sepia: ['#e9e6db', '#3d3929'],
       night: ['#21211f', '#eeece2'],
-      nightHc: ['#111113', '#f5f5f7']
+      nightHc: ['#111113', '#f5f5f7'],
+      custom: ['#ededf0', '#1d1d1f']
     }
     bridge.setTitleBarColors(...overlay[resolvedTheme])
   }, [resolvedTheme])
+
+  // Intensity/custom-tone override — mirrors App.tsx (no page is mounted here,
+  // but the variables must never disagree between the two windows of one app).
+  useEffect(() => {
+    applyPageTune(resolvedTheme, settings.themeTune, settings.customTone)
+  }, [resolvedTheme, settings.themeTune, settings.customTone])
 
   useEffect(() => {
     setLanguage(settings.language)

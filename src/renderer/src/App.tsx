@@ -12,6 +12,7 @@ import { BREW_UPGRADE_COMMAND, RELEASES_PAGE_URL } from '../../shared/update-cha
 import { bridge, isElectron } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
+import { applyPageTune } from './theme-tune'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
 import TabBar from './components/TabBar'
@@ -114,6 +115,10 @@ export default function App(): React.JSX.Element {
 
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
+  /** Same pattern: the shell key handler is bound once per dep change and
+   *  must read the CURRENT theme when cycling, not the one at bind time. */
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
 
   const resolvedTheme: ThemeName =
     settings.theme === 'auto'
@@ -139,10 +144,21 @@ export default function App(): React.JSX.Element {
       day: ['#ededf0', '#1d1d1f'],
       sepia: ['#e9e6db', '#3d3929'],
       night: ['#21211f', '#eeece2'],
-      nightHc: ['#111113', '#f5f5f7']
+      nightHc: ['#111113', '#f5f5f7'],
+      custom: ['#ededf0', '#1d1d1f']
     }
     bridge.setTitleBarColors(...overlay[resolvedTheme])
   }, [resolvedTheme])
+
+  // Intensity/custom-tone override: inline --page-filter/--page-bg on <html>
+  // beats the theme block by cascade, and every consumer (page raster,
+  // thumbnails, marks, presentation, snip preview) reads the variables — so
+  // one write retunes them all. Untuned = the properties are REMOVED, so an
+  // untouched theme stays exactly the shipped CSS and a sepia tune can never
+  // leak into day.
+  useEffect(() => {
+    applyPageTune(resolvedTheme, settings.themeTune, settings.customTone)
+  }, [resolvedTheme, settings.themeTune, settings.customTone])
 
   // OS fullscreen hides the titlebar strip (the native controls hide too)
   const [fullscreen, setFullscreen] = useState(false)
@@ -633,6 +649,18 @@ export default function App(): React.JSX.Element {
           e.preventDefault()
           void openDialog()
           break
+        // Cycle the reading mode through the four core themes. App-level, not
+        // the viewer's switch: the theme is an app setting and the key must
+        // work with no document open. 'auto' and 'custom' are not IN the cycle
+        // (auto is a policy, custom is a menu choice) — from either, the first
+        // press lands on day, which indexOf's −1 gives for free.
+        case 'view.cycleTheme': {
+          e.preventDefault()
+          const order = ['day', 'sepia', 'night', 'nightHc'] as const
+          const at = (order as readonly string[]).indexOf(settingsRef.current.theme)
+          updateSettings({ theme: order[(at + 1) % order.length] })
+          break
+        }
         // Moving the active tab — the browser shortcut for the same thing
         case 'tab.moveLeft':
           moveActiveTab(-1)
@@ -647,7 +675,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, openDialog, moveTab])
+  }, [cycleTab, closeTab, openDialog, moveTab, updateSettings])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {

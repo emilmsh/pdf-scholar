@@ -5718,6 +5718,7 @@ export default function PdfViewer({
           pageCount={sizes.length}
           zoomPercent={scale > 0 ? Math.round(scale * 100) : 100}
           settings={settings}
+          resolvedTheme={resolvedTheme}
           sidebarOpen={tocPinned}
           canNavBack={activeNav.back.length > 0}
           canNavForward={activeNav.forward.length > 0}

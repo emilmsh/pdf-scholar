@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
+  CustomTone,
   FileError,
   LanguagePreference,
   Settings,
+  ThemeName,
   ThemePreference,
   UpdateCheckOutcome,
   UpdateUnsupportedReason,
   ZoteroInfo
 } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
+import { applyPageTune, CUSTOM_TONE_ORDER, customToneCss, TUNE_RANGE } from '../theme-tune'
 import { bridge, isElectron } from '../bridge'
 import {
   annotTypeLabel,
@@ -163,6 +166,9 @@ interface Props {
   pageCount: number
   zoomPercent: number
   settings: Settings
+  /** What 'auto' resolves to right now — the tune slider follows the theme the
+   *  reader actually SEES, not the stored preference. */
+  resolvedTheme: ThemeName
   sidebarOpen: boolean
   canNavBack: boolean
   canNavForward: boolean
@@ -303,8 +309,16 @@ const THEMES: { id: ThemePreference; labelKey: MsgKey }[] = [
   { id: 'sepia', labelKey: 'tb.themeSepia' },
   { id: 'night', labelKey: 'tb.themeNight' },
   { id: 'nightHc', labelKey: 'tb.themeNightHc' },
+  { id: 'custom', labelKey: 'tb.themeCustom' },
   { id: 'auto', labelKey: 'tb.themeAuto' }
 ]
+
+const TONE_LABELS: Record<CustomTone, MsgKey> = {
+  gray: 'tb.toneGray',
+  green: 'tb.toneGreen',
+  blue: 'tb.toneBlue',
+  sand: 'tb.toneSand'
+}
 
 const LANGUAGES: { id: LanguagePreference; label: string }[] = [
   // Language names stay in their own language — standard for language pickers
@@ -348,6 +362,7 @@ export default function Toolbar({
   pageCount,
   zoomPercent,
   settings,
+  resolvedTheme,
   sidebarOpen,
   canNavBack,
   canNavForward,
@@ -447,6 +462,10 @@ export default function Toolbar({
   // screen, windows) are separate surfaces: one is about how the PAPER looks,
   // the other about how it is laid out in the window.
   const [themeMenuOpen, setThemeMenuOpen] = useState(false)
+  /** Intensity slider mid-drag: previewed live via applyPageTune, but only
+   *  COMMITTED to settings on release — settings:set is a synchronous file
+   *  write per call, and a drag emits dozens of ticks. null = not dragging. */
+  const [tuneDraft, setTuneDraft] = useState<number | null>(null)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   // Save is a split button: the frequent action (write changes back to the
   // file) stays one click, the rare one (save a copy) moves behind the
@@ -1805,6 +1824,73 @@ export default function Toolbar({
                   <div className="theme-auto-hint">{t('tb.autoHint')}</div>
                 </div>
               )}
+
+              {/* Paper tone — only while the custom theme is the chosen one */}
+              {settings.theme === 'custom' && (
+                <div className="theme-auto-prefs">
+                  <div className="theme-auto-row">
+                    <span className="theme-auto-label">{t('tb.customTone')}</span>
+                    <div className="theme-auto-choices">
+                      {CUSTOM_TONE_ORDER.map((tone) => (
+                        <button
+                          key={tone}
+                          className={`tone-chip${settings.customTone === tone ? ' selected' : ''}`}
+                          style={{ background: customToneCss(tone, 1).bg }}
+                          onClick={() => onSettingsChange({ customTone: tone })}
+                        >
+                          {t(TONE_LABELS[tone])}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Intensity — only the themes with an axis worth dialling
+                  (sepia: paper warmth, night: brightness, custom: tone
+                  strength). Follows the RESOLVED theme so auto-sepia is
+                  tunable too. 100 % = the shipped look, exactly. */}
+              {(resolvedTheme === 'sepia' ||
+                resolvedTheme === 'night' ||
+                resolvedTheme === 'custom') &&
+                (() => {
+                  const key = resolvedTheme
+                  const range = TUNE_RANGE[key]
+                  const stored = settings.themeTune[key]
+                  const value = tuneDraft ?? (Number.isFinite(stored) ? stored : 1)
+                  const commit = (v: number): void => {
+                    setTuneDraft(null)
+                    if (v !== stored) onSettingsChange({ themeTune: { ...settings.themeTune, [key]: v } })
+                  }
+                  return (
+                    <div className="theme-tune">
+                      <div className="slider-label">
+                        <span title={t('tb.intensityTip')}>{t('tb.intensity')}</span>
+                        <output>{pct(value)}</output>
+                      </div>
+                      <input
+                        type="range"
+                        min={range.min}
+                        max={range.max}
+                        step={0.05}
+                        value={value}
+                        onChange={(e) => {
+                          const v = Number(e.target.value)
+                          setTuneDraft(v)
+                          applyPageTune(
+                            resolvedTheme,
+                            { ...settings.themeTune, [key]: v },
+                            settings.customTone
+                          )
+                        }}
+                        onPointerUp={() => tuneDraft != null && commit(tuneDraft)}
+                        onKeyUp={() => tuneDraft != null && commit(tuneDraft)}
+                        onBlur={() => tuneDraft != null && commit(tuneDraft)}
+                      />
+                      <ResetLink hidden={value === 1} onClick={() => commit(1)} />
+                    </div>
+                  )
+                })()}
 
               <div className="theme-menu-sep" />
 

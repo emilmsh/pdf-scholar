@@ -33,6 +33,7 @@
     "test:appender": "node scripts/test-appender.mjs",
     "test:cache": "node scripts/test-engine-cache.mjs",
     "test:rotation": "node scripts/test-rotation.mjs",
+    "test:theme-tune": "node scripts/test-theme-tune.mjs",
     "test:retrieval": "node scripts/test-ai-retrieval.mjs",
     "test:ai-chat": "node scripts/test-ai-chat.mjs",
     "test:model-curation": "node scripts/test-model-curation.mjs",

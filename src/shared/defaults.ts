@@ -16,6 +16,12 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: 'day',
   autoLight: 'day',
   autoDark: 'night',
+  // 1 = exactly the shipped look. Anything else is applied as an inline
+  // --page-filter/--page-bg override (renderer's theme-tune.ts), so the
+  // untouched default costs nothing and renders bit-identically to before.
+  themeTune: { sepia: 1, night: 1, custom: 1 },
+  customTone: 'gray',
+  nightKeepImages: false,
   keepAwake: false,
   language: 'auto',
   annotAuthor: '',

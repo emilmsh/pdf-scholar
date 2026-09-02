@@ -1,10 +1,26 @@
 // Types shared between the Electron main process, preload bridge and renderer.
 import type { PdfStandardFont } from '@embedpdf/models'
 
-/** 'night' is the softer dark mode; 'nightHc' is the high-contrast one */
-export type ThemeName = 'day' | 'sepia' | 'night' | 'nightHc'
+/** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
+ *  'custom' is the user-toned light mode (paper tone from `customTone`) */
+export type ThemeName = 'day' | 'sepia' | 'night' | 'nightHc' | 'custom'
 /** User's theme choice — 'auto' follows the OS light/dark setting */
 export type ThemePreference = ThemeName | 'auto'
+
+/** Paper tone of the 'custom' theme — a curated set, not a free colour picker,
+ *  so every choice is readable by construction (the actual colours and the
+ *  readability clamp live in the renderer's theme-tune.ts). */
+export type CustomTone = 'gray' | 'green' | 'blue' | 'sand'
+
+/** Per-theme intensity relative to the shipped look, 1 = exactly as shipped.
+ *  Only the themes with an axis worth dialling are here: sepia (paper warmth),
+ *  night (page brightness) and custom (tone strength) — day has nothing to
+ *  dial and nightHc is already maximum contrast. */
+export interface ThemeTune {
+  sepia: number
+  night: number
+  custom: number
+}
 
 /** UI language — 'auto' follows the OS/browser language */
 export type LanguagePreference = 'nb' | 'en' | 'auto'
@@ -15,6 +31,13 @@ export interface Settings {
   autoLight: 'day' | 'sepia'
   /** Which dark theme 'auto' resolves to when the OS is in dark mode */
   autoDark: 'night' | 'nightHc'
+  /** Intensity per tunable theme, 1 = the shipped look (see ThemeTune) */
+  themeTune: ThemeTune
+  /** Paper tone the 'custom' theme uses */
+  customTone: CustomTone
+  /** Night/Night+: keep raster images in their original colours (an unfiltered
+   *  overlay over the picture regions) instead of inverting them with the page */
+  nightKeepImages: boolean
   keepAwake: boolean
   language: LanguagePreference
   /** Name written into new annotations' author field (/T) — the standard PDF

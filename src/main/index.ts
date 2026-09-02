@@ -179,7 +179,8 @@ const TITLEBAR_COLORS: Record<string, { color: string; symbolColor: string }> = 
   day: { color: '#ededf0', symbolColor: '#1d1d1f' },
   sepia: { color: '#e9e6db', symbolColor: '#3d3929' },
   night: { color: '#21211f', symbolColor: '#eeece2' },
-  nightHc: { color: '#111113', symbolColor: '#f5f5f7' }
+  nightHc: { color: '#111113', symbolColor: '#f5f5f7' },
+  custom: { color: '#ededf0', symbolColor: '#1d1d1f' }
 }
 
 function initialTitleBarColors(): { color: string; symbolColor: string } {
