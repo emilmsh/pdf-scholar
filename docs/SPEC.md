@@ -4,14 +4,14 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 
 ## 1. Shell & Window
 - **Tab bar** at top for multiple open documents. Tab context menu: Rename (renames file), Reveal (show in Explorer), Close Other Tabs. Drag to reorder.
-- **Split view**: two documents, or two views of the same document, side by side; horizontal or vertical arrangement.
+- **Split view**: two documents, or two views of the same document, side by side; horizontal or vertical arrangement. *(Shipped: side by side — same document since v0.2x, two documents 2026-09-02 («Åpne i delt visning» on a tab, or drop a PDF on the column), with a «bytt plass» swap. A stacked/vertical arrangement remains unbuilt.)*
 - **Left sidebar** (toggle via panel icon) with exactly four tabs: **Thumbnails, Outline, Bookmarks, Annotations**.
 - **Top toolbar** grouped into task sections: Annotate | Edit | Fill & Sign | Export, with sidebar/layout controls on the left and search on the right. **Toolset** concept: named groups that expand inline; customization with ON TOOLBAR / MORE TOOLS drag sections and user-created toolsets.
 - **Distraction-free**: click the page center to hide/show all chrome. A page-number pill ("N of M") stays bottom-right (toggleable) and opens go-to-page when clicked. F11 full-screen removes everything.
 - Full **dark mode** app chrome, independent of page theme.
 
 ## 2. Reading & View Settings ("aA" popover)
-- **Themes: Day (default), Sepia, Night, Night+ (higher contrast), Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement).
+- **Themes: Day (default), Sepia, Night, Night+ (higher contrast), Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement). *(Shipped 2026-09-02 as an intensity slider for the themes with an axis worth dialling — Sepia and Night; Day has nothing to dial and Night+ is already maximum — plus «Egen», a custom light theme with four curated paper tones on the same slider, a night-mode toggle that keeps images in their original colours, and 'd' cycling the themes from the keyboard.)*
 - **Brightness slider** (in-app overlay).
 - **Scroll**: vertical + continuous (desktop default) or horizontal + single-page (page-flip). Two-page spread with "first page alone" toggle.
 - **Zoom**: ctrl+wheel / trackpad pinch; fit-width and fit-page snap modes.

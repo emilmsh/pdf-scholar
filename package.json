@@ -51,6 +51,7 @@
     "test:ai-settings": "node scripts/test-ai-settings.mjs",
     "test:quick-ai": "node scripts/test-quick-ai.mjs",
     "test:windows": "node scripts/test-multiwindow.mjs",
+    "test:split-docs": "node scripts/test-split-docs.mjs",
     "test:assistant": "node scripts/test-assistant-window.mjs",
     "test:torn-read": "node scripts/test-torn-read.mjs",
     "test:listing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-store-listing.ps1",

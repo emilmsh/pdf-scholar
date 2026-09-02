@@ -128,8 +128,13 @@ carries no picture of its own.)*
 - Smooth scrolling; zoom centres on the cursor or pinch point; fit width or
   whole page
 - Four themes — Day, Sepia on warm ivory, Night and Night+ (higher contrast) —
-  plus Auto, which follows the system setting. Contrast and brightness are
-  adjustable per theme
+  plus Auto, which follows the system setting, and «Egen»: a custom light theme
+  with a choice of four curated paper tones. Sepia, Night and the custom tone
+  take an intensity slider (100 % is the standard look); a keyboard shortcut
+  cycles the themes
+- Night mode can keep pictures in their original colours — figures and photos
+  stay true while the page inverts *(reader ask, 2026-09-02, same batch as the
+  intensity slider and the two-document split)*
 - Page rotation, two-page spread, full-screen presentation mode
 - Table of contents, thumbnails and bookmarks in one panel; the toolbar's page
   field jumps straight to a page number
@@ -155,9 +160,13 @@ carries no picture of its own.)*
 
 - Two columns of the same document, each with its own page, zoom and rotation —
   a table or figure can stay in view beside the text that discusses it
+- The second column can also hold ANOTHER document — right-click a tab and
+  choose «Åpne i delt visning», or drop a PDF on the column — so two papers can
+  be read and annotated side by side *(the top reader ask, 2026-09-02)*
+- «Bytt plass» trades the columns' sides, in both modes
 - Ctrl+click on an internal link opens its target in the other column
-- Annotations can be made in either column and appear in both; it is a single
-  document
+- Annotations can be made in either column and land in the document they are
+  made in; with one document open they appear in both — it is a single document
 - A closed column's page, zoom and width are restored when the split is
   reopened
 

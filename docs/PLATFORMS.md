@@ -165,6 +165,17 @@ regressions are treated as bugs, not as acceptable platform lag.
     identical on every platform — both columns share one annotation map in one
     component tree, with no IPC involved. `npm run test:windows` covers the
     Electron behaviour end to end (two real windows, verified with mupdf).
+    The TWO-DOCUMENT split (another file in the second column, 2026-09-02) is
+    renderer-only too, but its entry points are desktop-shaped: «Åpne i delt
+    visning» lives in the tab context menu and the drop-on-a-column gesture
+    needs a real file path, so the single-document extension never reaches it.
+    That is a genuine platform difference (the extension has no tabs), not a
+    parity regression — the same-document split behaves identically everywhere.
+    Within ONE desktop window the same file may be open both as a tab and in
+    another tab's split column: the renderer refcounts main's per-window
+    open-document bookkeeping (`doc-registry.ts`) and mirrors the cross-window
+    broadcasts on a local bus (`local-doc-events.ts`), so the draft-per-path
+    model above holds unchanged.
 12. **API-key protection is per-platform, because the platforms genuinely differ.**
     `KeyStorageMode` (`src/shared/types.ts`) names each case and the settings panel
     states the active one verbatim; do NOT collapse this back into a boolean or
