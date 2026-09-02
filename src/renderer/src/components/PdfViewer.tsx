@@ -605,6 +605,18 @@ export default function PdfViewer({
   const [splitOpen, setSplitOpen] = useState(false)
   const splitOpenRef = useRef(splitOpen)
   splitOpenRef.current = splitOpen
+  /** «Bytt plass»: which side each column sits on — a pure VISUAL order flip
+   *  (CSS order), never a move of documents or view state. One mechanism for
+   *  both split modes; pane A keeps owning the persisted reading position
+   *  wherever it sits. Resets when the split closes. */
+  const [paneOrder, setPaneOrder] = useState<'ab' | 'ba'>('ab')
+  useEffect(() => {
+    if (!splitOpen) setPaneOrder('ab')
+  }, [splitOpen])
+  const swapPanes = useCallback(() => {
+    if (!splitOpenRef.current) return
+    setPaneOrder((o) => (o === 'ab' ? 'ba' : 'ab'))
+  }, [])
   /** Each column's scroll API (see pane-handle.ts). Declared here so every
    *  go-to action below can address a column without knowing which one it is;
    *  filled in further down once both columns exist. */
@@ -5603,6 +5615,10 @@ export default function PdfViewer({
         e.preventDefault()
         toggleSplit()
         break
+      case 'view.swapPanes':
+        e.preventDefault()
+        swapPanes()
+        break
       case 'view.marginNotes':
         e.preventDefault()
         toggleMarginNotes()
@@ -6022,6 +6038,7 @@ export default function PdfViewer({
           onPresent={enterPresentation}
           onToggleFullscreen={toggleFullscreen}
           splitOpen={splitOpen}
+          onSwapPanes={swapPanes}
           onToggleSplit={toggleSplit}
           onClosePane={closePane}
           activePane={activePane}
@@ -6087,7 +6104,9 @@ export default function PdfViewer({
       <div
         className={`viewer-body${resizingPanel ? ' panel-resizing' : ''}${
           tocPeek && !tocPinned ? ' toc-peek' : ''
-        }${aiPeek && !aiPinned ? ' ai-peek' : ''}`}
+        }${aiPeek && !aiPinned ? ' ai-peek' : ''}${
+          splitOpen && paneOrder === 'ba' ? ' panes-swapped' : ''
+        }`}
         style={
           {
             '--sidebar-w': `${panelW.sidebar}px`,
@@ -6132,7 +6151,7 @@ export default function PdfViewer({
         />
         {tocPinned && (
           <div
-            className={`panel-resizer${resizingPanel === 'sidebar' ? ' active' : ''}`}
+            className={`panel-resizer panel-resizer-sidebar${resizingPanel === 'sidebar' ? ' active' : ''}`}
             title={t('viewer.resizerTip')}
             onPointerDown={(e) => beginPanelResize('sidebar', e)}
             onDoubleClick={() => resetPanelWidth('sidebar')}
@@ -6282,7 +6301,7 @@ export default function PdfViewer({
         {splitOpen && pdf && (!foreign || sessionB?.pdf) && (
           <>
             <div
-              className={`panel-resizer${resizingPanel === 'pane' ? ' active' : ''}`}
+              className={`panel-resizer panel-resizer-pane${resizingPanel === 'pane' ? ' active' : ''}`}
               title={t('viewer.resizerTip')}
               onPointerDown={(e) => beginPanelResize('pane', e)}
               onDoubleClick={() => resetPanelWidth('pane')}
@@ -6360,7 +6379,7 @@ export default function PdfViewer({
 
         {aiPinned && (
           <div
-            className={`panel-resizer${resizingPanel === 'ai' ? ' active' : ''}`}
+            className={`panel-resizer panel-resizer-ai${resizingPanel === 'ai' ? ' active' : ''}`}
             title={t('viewer.resizerTip')}
             onPointerDown={(e) => beginPanelResize('ai', e)}
             onDoubleClick={() => resetPanelWidth('ai')}

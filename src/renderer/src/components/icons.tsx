@@ -603,6 +603,16 @@ export const IconSplit = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** «Bytt plass»: two opposing arrows — the split's columns trading sides */
+export const IconSwapPanes = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M16.5 6.5 20 10l-3.5 3.5" />
+    <path d="M20 10H9" />
+    <path d="M7.5 10.5 4 14l3.5 3.5" />
+    <path d="M4 14h11" />
+  </Svg>
+)
+
 /** Counter-clockwise arrow with a tick start — "back to how it shipped" */
 export const IconKeyboard = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>

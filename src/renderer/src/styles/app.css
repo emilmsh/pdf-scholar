@@ -6224,6 +6224,38 @@ html.pen-near .draw-layer {
   border-left: 1px solid var(--border);
 }
 
+/* «Bytt plass»: the columns trade sides as a pure CSS order flip — documents,
+   view state and the persisted-position ownership all stay put. Explicit
+   orders on every element from pane B rightwards; the left sidebar and its
+   resizer keep order 0 and therefore stay left of everything ordered. The
+   divider line moves to pane B's other edge so it still sits BETWEEN the
+   columns. */
+.viewer-body.panes-swapped > .pages-host.pane-b {
+  order: 1;
+  border-left: none;
+  border-right: 1px solid var(--border);
+}
+
+.viewer-body.panes-swapped > .panel-resizer-pane {
+  order: 2;
+}
+
+.viewer-body.panes-swapped > .pages-host {
+  order: 3;
+}
+
+.viewer-body.panes-swapped > .pages-host.pane-b {
+  order: 1; /* repeated after the generic rule so specificity keeps B first */
+}
+
+.viewer-body.panes-swapped > .panel-resizer-ai {
+  order: 4;
+}
+
+.viewer-body.panes-swapped > .right-panel {
+  order: 5;
+}
+
 /* A column pulses when focus moves to it, or when a followed link lands in it.
    Deliberately TRANSIENT: the persistent "this column is active" signal lives in
    the toolbar (the column switcher), where it cannot intrude on the

@@ -100,6 +100,13 @@ export function usePanelWidths(
     // The split divider moves a share, so it needs the width it is dividing —
     // measured once at grab time, since nothing but the drag changes it.
     const total = panel === 'pane' ? pagesAreaWidthRef.current() : 0
+    // Which side pane B sits on is read from the DOM at grab time («Bytt
+    // plass» flips the columns with CSS order): dragging toward pane B always
+    // shrinks it, whichever side it is on.
+    const host = pagesHostRef.current
+    const bEl = host?.parentElement?.querySelector<HTMLElement>('.pages-host.pane-b')
+    const bOnLeft =
+      !!host && !!bEl && bEl.getBoundingClientRect().left < host.getBoundingClientRect().left
     setResizingPanel(panel)
     const onMove = (ev: PointerEvent): void => {
       const dx = ev.clientX - startX
@@ -107,7 +114,7 @@ export function usePanelWidths(
         if (total <= 0) return
         // Both columns keep the same px floor, expressed as a share of the area
         const floor = Math.min(PANEL_MIN.pane / total, 0.5)
-        const share = clamp((startW * total - dx) / total, floor, 1 - floor)
+        const share = clamp((startW * total + (bOnLeft ? dx : -dx)) / total, floor, 1 - floor)
         setPanelW((p) => (Math.abs(p.pane - share) < 0.0005 ? p : { ...p, pane: share }))
         return
       }

@@ -110,6 +110,7 @@ import {
   IconSignature,
   IconSparkle,
   IconSplit,
+  IconSwapPanes,
   IconNote,
   IconText,
   IconTrash,
@@ -285,6 +286,7 @@ interface Props {
    *  zoom are its own — so the toolbar's centre gains a column switcher, and its
    *  one cluster drives whichever column that switcher points at. */
   splitOpen: boolean
+  onSwapPanes(): void
   onToggleSplit(): void
   activePane: 'a' | 'b'
   onActivatePane(pane: 'a' | 'b'): void
@@ -440,6 +442,7 @@ export default function Toolbar({
   onPresent,
   onToggleFullscreen,
   splitOpen,
+  onSwapPanes,
   onToggleSplit,
   activePane,
   onActivatePane,
@@ -1503,6 +1506,17 @@ export default function Toolbar({
 
       <div className={`toolbar-group toolbar-center${splitOpen ? ' is-split' : ''}`}>
         {splitOpen && paneSwitch}
+        {/* «Bytt plass»: the columns trade sides. Lives with the switcher —
+            both are about which column is where. */}
+        {splitOpen && (
+          <button
+            className="tb-btn"
+            onClick={onSwapPanes}
+            title={withShortcut(t('tb.swapPanesTip'), 'view.swapPanes')}
+          >
+            <IconSwapPanes size={15} />
+          </button>
+        )}
         {centerCluster(splitOpen ? activePane : 'a')}
 
         {/* Zoom steps + page layout, docked right beside the zoom controls they

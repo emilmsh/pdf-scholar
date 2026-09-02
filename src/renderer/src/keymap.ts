@@ -53,6 +53,7 @@ export type CommandId =
   | 'view.spread'
   | 'view.coverPage'
   | 'view.split'
+  | 'view.swapPanes'
   | 'view.marginNotes'
   | 'view.togglePin'
   | 'view.cycleTheme'
@@ -195,6 +196,9 @@ const REGISTRY: readonly Command[] = [
   { id: 'view.spread', category: 'view', labelKey: 'keys.viewSpread', defaults: [] },
   { id: 'view.coverPage', category: 'view', labelKey: 'keys.viewCoverPage', defaults: [] },
   { id: 'view.split', category: 'view', labelKey: 'keys.viewSplit', defaults: ['s'] },
+  // Split-view companion: the two columns trade sides (a visual order flip).
+  // Shift+S so it reads as "the other S" — does nothing without a split.
+  { id: 'view.swapPanes', category: 'view', labelKey: 'keys.viewSwapPanes', defaults: ['shift+s'] },
   // Unbound as shipped, like the tools: the margin view arrived after the
   // reading letters were spoken for, and 'm' is the kind of key a reader should
   // get to spend themselves.
