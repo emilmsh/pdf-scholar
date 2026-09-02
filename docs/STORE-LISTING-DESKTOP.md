@@ -145,6 +145,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Turn pages with the arrow keys: ← and → jump to the top of the previous or next page — combined with "Fit page" this reads as a full-page view, with no mouse and no scrolling. In two-page view one press turns a whole spread, like leaves in a book
 • When the zoom is set to fit the width or the whole page, a page turn re-fits against the page you land on — a landscape page in a portrait document shows whole instead of running off the screen
 • The keys can be rebound in the keyboard shortcuts dialog — PgUp/PgDn work too, if you prefer them for turning pages
+• Since the last store release: two-page view can show the cover page separately (page 1 alone, pairs 2-3, 4-5 — like a bound book), the assistant's conversation can be saved as Markdown, and its header shows which model is answering
 ```
 
 **NO:**
@@ -152,6 +153,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Bla side for side med piltastene: ← og → hopper til toppen av forrige eller neste side — sammen med «Tilpass siden» blir det en helsidevisning, uten mus og uten scrolling. I topagevisning blar ett trykk et helt oppslag, som i en bok
 • Når zoomen er satt til å tilpasse bredden eller hele siden, tilpasses den på nytt mot siden du lander på — en liggende side i et stående dokument vises hel i stedet for å stikke utenfor skjermen
 • Tastene kan bindes om i hurtigtastdialogen — PgUp/PgDn virker også, om du heller vil bla med dem
+• Siden forrige butikkversjon: topagevisning kan vise forsiden alene (side 1 for seg selv, par 2-3, 4-5 — som i en innbundet bok), assistentens samtale kan lagres som Markdown, og topplinjen viser hvilken modell som svarer
 ```
 
 ---
