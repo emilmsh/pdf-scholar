@@ -172,16 +172,17 @@
   --swatch-night-fg: #eeece2; /* night --text */
   --swatch-nighthc-bg: #0a0a0b; /* nightHc --page-bg */
   --swatch-nighthc-fg: #f5f5f7; /* nightHc --text */
-  /* custom: the four curated paper tones (theme-tune.ts CUSTOM_TONES) as a
-     diagonal strip, hinting that this one is configurable */
+  /* custom («Farge»): the curated paper tones (theme-tune.ts CUSTOM_TONES,
+     sepia's cream first) as a diagonal strip — this one is configurable */
   --swatch-custom-bg: linear-gradient(
     105deg,
-    #ececee 0% 25%,
-    #e7efe4 25% 50%,
-    #e7edf5 50% 75%,
-    #f2ecdc 75% 100%
+    #f5efe3 0% 20%,
+    #ececee 20% 40%,
+    #e7efe4 40% 60%,
+    #e7edf5 60% 80%,
+    #f2ecdc 80% 100%
   );
-  --swatch-custom-fg: #1d1d1f; /* custom --text */
+  --swatch-custom-fg: #3d3929; /* sepia --text — the strip's default tone */
 }
 
 * {
@@ -1728,8 +1729,9 @@ html.pen-near .draw-layer {
   color: var(--swatch-custom-fg);
 }
 
-/* The custom theme's paper-tone picker: one colored chip per curated tone.
-   Tone colours arrive inline from theme-tune.ts — the single source. */
+/* The paper-tone pickers («Farge»'s light tones, night's dark ones): one
+   colored chip per curated tone. Tone colours arrive inline from
+   theme-tune.ts — the single source. */
 .tone-chip {
   flex: 1;
   padding: 6px 4px;
@@ -1737,6 +1739,10 @@ html.pen-near .draw-layer {
   border: 1.5px solid var(--border);
   font-size: 11px;
   color: #3a3a3e;
+}
+
+.tone-chip-dark {
+  color: #e6e6ea;
 }
 
 .tone-chip.selected {

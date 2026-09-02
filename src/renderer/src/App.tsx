@@ -12,7 +12,7 @@ import { BREW_UPGRADE_COMMAND, RELEASES_PAGE_URL } from '../../shared/update-cha
 import { bridge, isElectron } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
-import { applyPageTune } from './theme-tune'
+import { applyPageTune, tuneTitleBar } from './theme-tune'
 import { createDocRegistry } from './doc-registry'
 import { emitLocalDocEvent } from './local-doc-events'
 import { browserCurrentBytes } from './annotation-engine-browser'
@@ -195,10 +195,16 @@ export default function App(): React.JSX.Element {
   }, [])
 
   // Apply the resolved theme (all page recoloring lives in the theme's CSS)
-  // and recolor the native window-controls overlay to match. The colors
-  // MUST mirror --bg-titlebar / --text in app.css.
+  // plus the tone/strength override: inline --page-filter/--page-bg (and, for
+  // a tinted tone, the chrome variables) on <html> beat the theme block by
+  // cascade, and every consumer reads the variables — one write retunes them
+  // all. Untuned = the properties are REMOVED, so an untouched theme stays
+  // exactly the shipped CSS. The native window-controls overlay follows: the
+  // static map (MUST mirror --bg-titlebar / --text in app.css) unless the
+  // active tone derives its own pair.
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
+    applyPageTune(resolvedTheme, settings.themeTune, settings.customTone, settings.nightTone)
     const overlay: Record<ThemeName, [string, string]> = {
       day: ['#ededf0', '#1d1d1f'],
       sepia: ['#e9e6db', '#3d3929'],
@@ -206,18 +212,9 @@ export default function App(): React.JSX.Element {
       nightHc: ['#111113', '#f5f5f7'],
       custom: ['#ededf0', '#1d1d1f']
     }
-    bridge.setTitleBarColors(...overlay[resolvedTheme])
-  }, [resolvedTheme])
-
-  // Intensity/custom-tone override: inline --page-filter/--page-bg on <html>
-  // beats the theme block by cascade, and every consumer (page raster,
-  // thumbnails, marks, presentation, snip preview) reads the variables — so
-  // one write retunes them all. Untuned = the properties are REMOVED, so an
-  // untouched theme stays exactly the shipped CSS and a sepia tune can never
-  // leak into day.
-  useEffect(() => {
-    applyPageTune(resolvedTheme, settings.themeTune, settings.customTone)
-  }, [resolvedTheme, settings.themeTune, settings.customTone])
+    const toned = tuneTitleBar(resolvedTheme, settings.customTone, settings.nightTone)
+    bridge.setTitleBarColors(...(toned ?? overlay[resolvedTheme]))
+  }, [resolvedTheme, settings.themeTune, settings.customTone, settings.nightTone])
 
   // OS fullscreen hides the titlebar strip (the native controls hide too)
   const [fullscreen, setFullscreen] = useState(false)

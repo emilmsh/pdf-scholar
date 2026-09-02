@@ -51,10 +51,10 @@ const contrast = (bgHex, fgHex) => {
 }
 
 console.log('1) untouched defaults produce NO override')
-eq(T.pageTuneCss('sepia', TUNE({}), 'gray'), null, 'sepia @1 → null')
-eq(T.pageTuneCss('night', TUNE({}), 'gray'), null, 'night @1 → null')
-eq(T.pageTuneCss('day', TUNE({ sepia: 2, night: 1.5, custom: 2 }), 'gray'), null, 'day never overrides')
-eq(T.pageTuneCss('nightHc', TUNE({ night: 0.5 }), 'gray'), null, 'nightHc never overrides')
+eq(T.pageTuneCss('sepia', TUNE({}), 'gray', 'warm'), null, 'sepia @1 → null')
+eq(T.pageTuneCss('night', TUNE({}), 'gray', 'warm'), null, 'night @1 → null')
+eq(T.pageTuneCss('day', TUNE({ sepia: 2, night: 1.5, custom: 2 }), 'gray', 'blue'), null, 'day never overrides')
+eq(T.pageTuneCss('nightHc', TUNE({ night: 0.5 }), 'gray', 'blue'), null, 'nightHc never overrides')
 
 console.log('2) formulas at t=1 reproduce the shipped app.css values exactly')
 eq(T.sepiaTuneCss(1).filter, 'sepia(0.04)', 'sepia filter @1')
@@ -68,21 +68,26 @@ eq(T.nightTuneCss(1).bg, '#21211f', 'night paper @1')
 
 console.log('3) garbage degrades to the shipped look')
 for (const bad of [NaN, Infinity, -Infinity, 'x', null, undefined]) {
-  eq(T.pageTuneCss('sepia', TUNE({ sepia: bad }), 'gray'), null, `sepia tune=${bad} → null`)
-  eq(T.pageTuneCss('night', TUNE({ night: bad }), 'gray'), null, `night tune=${bad} → null`)
+  eq(T.pageTuneCss('sepia', TUNE({ sepia: bad }), 'gray', 'warm'), null, `sepia tune=${bad} → null`)
+  eq(T.pageTuneCss('night', TUNE({ night: bad }), 'gray', 'warm'), null, `night tune=${bad} → null`)
 }
 // Out-of-range clamps to the endpoint, not beyond
-eq(T.pageTuneCss('sepia', TUNE({ sepia: 99 }), 'gray').bg, T.sepiaTuneCss(2).bg, 'sepia clamps to 2')
+eq(T.pageTuneCss('sepia', TUNE({ sepia: 99 }), 'gray', 'warm').bg, T.sepiaTuneCss(2).bg, 'sepia clamps to 2')
 eq(
-  T.pageTuneCss('night', TUNE({ night: -3 }), 'gray').filter,
+  T.pageTuneCss('night', TUNE({ night: -3 }), 'gray', 'warm').filter,
   T.nightTuneCss(0.5).filter,
   'night clamps to 0.5'
 )
-// An unknown stored tone falls back to gray instead of crashing
+// An unknown stored tone falls back to the default (sepia/warm), not a crash
 eq(
-  T.pageTuneCss('custom', TUNE({}), 'plaid').bg,
-  T.customToneCss('gray', 1).bg,
-  'unknown tone → gray'
+  T.pageTuneCss('custom', TUNE({}), 'plaid', 'warm').bg,
+  T.customToneCss('sepia', 1).bg,
+  'unknown light tone → sepia'
+)
+eq(
+  T.pageTuneCss('night', TUNE({}), 'gray', 'tartan'),
+  null,
+  'unknown night tone → warm (no override at default strength)'
 )
 
 console.log('4) monotonicity: more intensity = warmer/darker paper, never a reversal')
@@ -107,14 +112,22 @@ for (let t = 0; t <= 2.001; t += 0.1) {
   }
 }
 
-console.log('6) every custom tone reads at AAA even at max intensity')
-const INK = '#1d1d1f' // custom theme --text (app.css)
+console.log('6) every light tone reads at AAA even at max strength — against ITS OWN ink')
 for (const tone of T.CUSTOM_TONE_ORDER) {
   const { bg, filter } = T.customToneCss(tone, 2)
-  eq(filter, 'none', `custom ${tone} uses the blend, not a filter`)
-  const c = contrast(bg, INK)
-  ok(c >= 7, `custom ${tone} @max: contrast ${c.toFixed(2)}:1 ≥ 7:1 (bg ${bg})`)
-  ok(luminance(bg) >= 0.75 - 1e-6, `custom ${tone} @max respects the luminance floor (bg ${bg})`)
+  if (tone === 'sepia') {
+    // The sepia tone rides the hand-calibrated sepia pipeline (warm filter tie)
+    eq(filter, T.sepiaTuneCss(2).filter, 'sepia tone keeps the sepia filter')
+  } else {
+    eq(filter, 'none', `custom ${tone} uses the blend, not a filter`)
+    ok(luminance(bg) >= 0.75 - 1e-6, `custom ${tone} @max respects the luminance floor (bg ${bg})`)
+  }
+  const chrome = T.customChromeCss(tone)
+  const ink = chrome['--text']
+  const c = contrast(bg, ink)
+  ok(c >= 7, `custom ${tone} @max: paper vs ink ${c.toFixed(2)}:1 ≥ 7:1 (bg ${bg}, ink ${ink})`)
+  const cChrome = contrast(chrome['--bg-chrome'], ink)
+  ok(cChrome >= 7, `custom ${tone}: chrome vs ink ${cChrome.toFixed(2)}:1 ≥ 7:1`)
   // And at strength 1 the tone is the curated colour verbatim
   const [r, g, b] = T.CUSTOM_TONES[tone].bg
   const hexOf = (v) => v.toString(16).padStart(2, '0')
@@ -124,6 +137,32 @@ for (const tone of T.CUSTOM_TONE_ORDER) {
 for (const tone of T.CUSTOM_TONE_ORDER) {
   eq(T.customToneCss(tone, 0).bg, '#ffffff', `custom ${tone} @0 → white`)
 }
+
+console.log('7) sepia under «Farge» is pixel-identical to the old Sepia theme')
+eq(T.customToneCss('sepia', 1).filter, 'sepia(0.04)', 'sepia tone filter @1')
+eq(T.customToneCss('sepia', 1).bg, '#f5efe3', 'sepia tone paper @1')
+eq(T.customChromeCss('sepia')['--bg-chrome'], '#f0eee6', 'sepia tone chrome verbatim')
+eq(T.customChromeCss('sepia')['--text'], '#3d3929', 'sepia tone ink verbatim')
+
+console.log('8) night tones: warm stays blend-free, tints screen and stay readable')
+eq(T.nightTuneCss(1, 'warm').blend, undefined, 'warm never sets a blend')
+for (const tone of T.NIGHT_TONE_ORDER) {
+  if (tone === 'warm') continue
+  const css = T.nightTuneCss(1, tone)
+  eq(css.blend, 'screen', `night ${tone} tints through screen`)
+  const chrome = T.nightChromeCss(tone)
+  ok(!!chrome, `night ${tone} derives a chrome`)
+  const c = contrast(css.bg, chrome['--text'])
+  ok(c >= 7, `night ${tone}: paper vs ink ${c.toFixed(2)}:1 ≥ 7:1 (bg ${css.bg})`)
+  const cChrome = contrast(chrome['--bg-chrome'], chrome['--text'])
+  ok(cChrome >= 7, `night ${tone}: chrome vs ink ${cChrome.toFixed(2)}:1 ≥ 7:1`)
+}
+eq(T.nightChromeCss('warm'), null, "warm's chrome is the shipped CSS block")
+// A tinted night tone overrides even at strength 1 (the tone is a choice)…
+ok(
+  T.pageTuneCss('night', TUNE({}), 'gray', 'blue')?.blend === 'screen',
+  'tinted night overrides at default strength'
+)
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

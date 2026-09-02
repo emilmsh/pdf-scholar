@@ -20,7 +20,8 @@ export const DEFAULT_SETTINGS: Settings = {
   // --page-filter/--page-bg override (renderer's theme-tune.ts), so the
   // untouched default costs nothing and renders bit-identically to before.
   themeTune: { sepia: 1, night: 1, custom: 1 },
-  customTone: 'gray',
+  customTone: 'sepia',
+  nightTone: 'warm',
   nightKeepImages: false,
   keepAwake: false,
   language: 'auto',

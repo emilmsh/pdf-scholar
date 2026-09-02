@@ -7,10 +7,18 @@ export type ThemeName = 'day' | 'sepia' | 'night' | 'nightHc' | 'custom'
 /** User's theme choice — 'auto' follows the OS light/dark setting */
 export type ThemePreference = ThemeName | 'auto'
 
-/** Paper tone of the 'custom' theme — a curated set, not a free colour picker,
- *  so every choice is readable by construction (the actual colours and the
- *  readability clamp live in the renderer's theme-tune.ts). */
-export type CustomTone = 'gray' | 'green' | 'blue' | 'sand'
+/** Paper tone of the 'custom' («Farge») theme — a curated set, not a free
+ *  colour picker, so every choice is readable by construction (the actual
+ *  colours and the readability clamp live in the renderer's theme-tune.ts).
+ *  'sepia' is the classic cream and the default: the old standalone Sepia
+ *  button folded into this picker (Emil, 2026-09-02) — the ThemeName 'sepia'
+ *  still exists for stored settings and the auto-mode light choice. */
+export type CustomTone = 'sepia' | 'gray' | 'green' | 'blue' | 'sand'
+
+/** Dark paper tone of the night theme — 'warm' is the shipped near-black,
+ *  the others tint the inverted page (curated in theme-tune.ts, same
+ *  no-free-colour-input rule as CustomTone). */
+export type NightTone = 'warm' | 'gray' | 'blue' | 'green'
 
 /** Per-theme intensity relative to the shipped look, 1 = exactly as shipped.
  *  Only the themes with an axis worth dialling are here: sepia (paper warmth),
@@ -33,8 +41,10 @@ export interface Settings {
   autoDark: 'night' | 'nightHc'
   /** Intensity per tunable theme, 1 = the shipped look (see ThemeTune) */
   themeTune: ThemeTune
-  /** Paper tone the 'custom' theme uses */
+  /** Paper tone the 'custom' («Farge») theme uses */
   customTone: CustomTone
+  /** Dark paper tone of the night theme ('warm' = the shipped look) */
+  nightTone: NightTone
   /** Night/Night+: keep raster images in their original colours (an unfiltered
    *  overlay over the picture regions) instead of inverting them with the page */
   nightKeepImages: boolean

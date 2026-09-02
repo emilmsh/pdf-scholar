@@ -5,7 +5,7 @@ import { buildViewerUrl } from '../../shared/viewer-url'
 import { openInBrowserViewer } from './extension-api'
 import { insecureRetryUrl } from '../../shared/insecure-retry'
 import { errorText, setLanguage, t } from './i18n'
-import { applyPageTune } from './theme-tune'
+import { applyPageTune, tuneTitleBar } from './theme-tune'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import {
   checkForExtensionUpdate,
@@ -78,8 +78,11 @@ export default function ExtensionApp(): React.JSX.Element {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  // Theme + tone override — mirrors App.tsx exactly (parity:
+  // docs/PLATFORMS.md holds the extension to the desktop's reading modes).
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
+    applyPageTune(resolvedTheme, settings.themeTune, settings.customTone, settings.nightTone)
     const overlay: Record<ThemeName, [string, string]> = {
       day: ['#ededf0', '#1d1d1f'],
       sepia: ['#e9e6db', '#3d3929'],
@@ -87,14 +90,9 @@ export default function ExtensionApp(): React.JSX.Element {
       nightHc: ['#111113', '#f5f5f7'],
       custom: ['#ededf0', '#1d1d1f']
     }
-    bridge.setTitleBarColors(...overlay[resolvedTheme])
-  }, [resolvedTheme])
-
-  // Intensity/custom-tone override — mirrors App.tsx exactly (parity:
-  // docs/PLATFORMS.md holds the extension to the desktop's reading modes).
-  useEffect(() => {
-    applyPageTune(resolvedTheme, settings.themeTune, settings.customTone)
-  }, [resolvedTheme, settings.themeTune, settings.customTone])
+    const toned = tuneTitleBar(resolvedTheme, settings.customTone, settings.nightTone)
+    bridge.setTitleBarColors(...(toned ?? overlay[resolvedTheme]))
+  }, [resolvedTheme, settings.themeTune, settings.customTone, settings.nightTone])
 
   useEffect(() => {
     setLanguage(settings.language)

@@ -127,11 +127,13 @@ carries no picture of its own.)*
 
 - Smooth scrolling; zoom centres on the cursor or pinch point; fit width or
   whole page
-- Four themes — Day, Sepia on warm ivory, Night and Night+ (higher contrast) —
-  plus Auto, which follows the system setting, and «Egen»: a custom light theme
-  with a choice of four curated paper tones. Sepia, Night and the custom tone
-  take an intensity slider (100 % is the standard look); a keyboard shortcut
-  cycles the themes
+- Four reading modes — Day, «Farge» (a light paper tone: the classic Sepia
+  cream plus gray, green, blue and sand), Night and Night+ (higher contrast) —
+  plus Auto, which follows the system setting. Night has its own dark tones
+  (warm, gray, blue, green). The tinted modes take a strength slider — tint
+  strength for the light tones, brightness for night; 100 % is the standard
+  look — and the UI chrome follows the chosen tone, the way Sepia's cream
+  chrome always did. A keyboard shortcut cycles the modes
 - Night mode can keep pictures in their original colours — figures and photos
   stay true while the page inverts *(reader ask, 2026-09-02, same batch as the
   intensity slider and the two-document split)*
