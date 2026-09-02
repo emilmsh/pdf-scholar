@@ -302,8 +302,13 @@ open here for reading and annotation. Marks you save are standard PDF annotation
 written into the file itself, so Zotero's own reader shows them — read-only, with a
 lock icon — and its File → "Import Annotations…" converts the highlights and
 underlines into native, editable Zotero annotations (text boxes and ink are not
-importable on Zotero's side). With Zotero sync, the annotated file itself follows to
-your other devices.
+importable on Zotero's side). Importing *moves* them: Zotero strips the annotations
+from the PDF file and keeps them in its database from then on — its import dialog
+says so. If you keep reading in PDF Scholar, skip the import; the annotations stay
+in the file, Zotero's reader still shows them, and with Zotero sync the annotated
+file itself follows to your other devices. Import when you want to work with the
+annotations inside Zotero — editing them there, or extracting them into a note — and
+use Zotero's File → "Export PDF…" if you later need a copy with them re-embedded.
 
 A document that lives in a Zotero library also gets a Zotero section in the save
 button's menu: show the item in Zotero, or copy an in-text citation or full reference
