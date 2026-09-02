@@ -367,4 +367,4 @@ verifier and ships with no release build.)
 
 <sub>Built by [Emil Mathias Strøm Halseth](https://emilmsh.github.io/), who reads
 PDFs for a living, with assistance from [Claude Code](https://claude.com/claude-code).
-Logo by Elisabeth Walle.</sub>
+Logo by [Elisabeth Walle](https://www.linkedin.com/in/elisabeth-walle-239028140/).</sub>

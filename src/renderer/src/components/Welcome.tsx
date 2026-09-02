@@ -210,7 +210,12 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent, resume }:
         </div>
 
         <p className="welcome-credit">
-          <span>{t('welcome.logoCredit')}</span>
+          <button
+            className="welcome-credit-link"
+            onClick={() => bridge.openExternal('https://www.linkedin.com/in/elisabeth-walle-239028140/')}
+          >
+            {t('welcome.logoCredit')}
+          </button>
           <span className="welcome-credit-sep">·</span>
           <button
             className="welcome-sponsor"

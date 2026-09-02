@@ -787,8 +787,17 @@ button {
   color: var(--text-secondary);
 }
 
-.welcome-credit > span:first-child {
+.welcome-credit-link {
+  color: var(--text-secondary);
   opacity: 0.65;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.welcome-credit-link:hover {
+  opacity: 1;
+  background: var(--hover);
 }
 
 .welcome-credit-sep {

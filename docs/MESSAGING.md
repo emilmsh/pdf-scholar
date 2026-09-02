@@ -47,7 +47,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
 | Author | Emil Mathias Strøm Halseth, who reads PDFs for a living — full name wherever he is credited. Where the author is named in long form (README footer, landing footer), the approved signature is verbatim: "Built by Emil Mathias Strøm Halseth, who reads PDFs for a living, with assistance from Claude Code." (Emil's wording, 2026-08-04 — no stronger Claude credit than "assistance".) The store copyright line stays author-only |
-| Logo | Elisabeth Walle — credit her wherever the logo appears |
+| Logo | Elisabeth Walle — credit her wherever the logo appears, and link her name to <https://www.linkedin.com/in/elisabeth-walle-239028140/> on every surface that supports links |
 
 ---
 
