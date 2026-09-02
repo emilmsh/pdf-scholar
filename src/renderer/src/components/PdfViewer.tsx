@@ -2291,6 +2291,12 @@ export default function PdfViewer({
   const annotsHiddenRef = useRef(annotsHidden)
   annotsHiddenRef.current = annotsHidden
 
+  // «Behold bildefarger» resolved against the theme actually showing: the
+  // setting is night-only by meaning, so day/sepia render nothing extra even
+  // while the preference stays saved for the next night session
+  const keepImageColors =
+    settings.nightKeepImages && (resolvedTheme === 'night' || resolvedTheme === 'nightHc')
+
   // ---------- Save model (dirty = unsaved draft exists) ----------
 
   const [dirty, setDirty] = useState(false)
@@ -5966,6 +5972,7 @@ export default function PdfViewer({
                     active={active}
                     annotations={annots.get(pageNumber) ?? EMPTY_ANNOTS}
                     hideAnnots={annotsHidden}
+                    keepImageColors={keepImageColors}
                     selectedId={selected?.pageNumber === pageNumber ? selected.localId : null}
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
@@ -6072,6 +6079,7 @@ export default function PdfViewer({
               sizes={sizes}
               annots={annots}
               annotsHidden={annotsHidden}
+              keepImageColors={keepImageColors}
               rotation={paneBRotation}
               spread={paneBSpread}
               coverPage={paneBCover}

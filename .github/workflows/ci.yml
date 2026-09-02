@@ -52,6 +52,9 @@ jobs:
       # Theme intensity/custom-tone formulas: tune=1 must produce NO override
       # (shipped CSS renders untouched) and every custom tone stays AAA-readable
       - run: npm run test:theme-tune
+      # «Behold bildefarger»: the CTM walk that finds raster-image regions
+      # (night mode repaints them unfiltered), incl. the scanned-page guard
+      - run: npm run test:image-regions
       # BM25 excerpt fallback for documents beyond the model's context window:
       # budget bounds, real-page markers, char→quote citation conversion
       - run: npm run test:retrieval

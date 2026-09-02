@@ -63,6 +63,8 @@ interface Props {
   /** Live annotation map, shared with the main column — never copied */
   annots: ReadonlyMap<number, PageAnnotation[]>
   annotsHidden: boolean
+  /** «Behold bildefarger» resolved against the active theme (viewer-computed) */
+  keepImageColors: boolean
   rotation: ViewRotation
   spread: boolean
   /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … */
@@ -147,6 +149,7 @@ export default function PagesPane({
   sizes,
   annots,
   annotsHidden,
+  keepImageColors,
   rotation,
   spread,
   coverPage,
@@ -680,6 +683,7 @@ export default function PagesPane({
                   active={pageNumber >= range[0] && pageNumber <= range[1]}
                   annotations={annots.get(pageNumber) ?? EMPTY_ANNOTS}
                   hideAnnots={annotsHidden}
+                  keepImageColors={keepImageColors}
                   selectedId={selected?.pageNumber === pageNumber ? selected.localId : null}
                   searchRects={searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS}
                   searchAllRects={searchAllHits?.get(pageNumber) ?? EMPTY_RECTS}

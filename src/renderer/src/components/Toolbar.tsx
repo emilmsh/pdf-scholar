@@ -1905,6 +1905,20 @@ export default function Toolbar({
                 {annotsHidden ? <IconEyeOff size={15} /> : <IconEye size={15} />}
                 {t('tb.hideAnnots')}
               </label>
+              {/* Night themes invert the whole page raster — this repaints the
+                  picture regions in their original colours. Only offered while
+                  a night theme is what the reader sees: in day/sepia nothing
+                  is inverted, so the toggle would be a no-op checkbox. */}
+              {(resolvedTheme === 'night' || resolvedTheme === 'nightHc') && (
+                <label className="theme-menu-toggle" title={t('tb.keepImageColorsTip')}>
+                  <input
+                    type="checkbox"
+                    checked={settings.nightKeepImages}
+                    onChange={(e) => onSettingsChange({ nightKeepImages: e.target.checked })}
+                  />
+                  {t('tb.keepImageColors')}
+                </label>
+              )}
               <label className="theme-menu-toggle">
                 <input
                   type="checkbox"

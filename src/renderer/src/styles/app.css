@@ -2411,6 +2411,21 @@ html.pen-near .draw-layer {
   filter: var(--page-filter);
 }
 
+/* «Behold bildefarger» (night themes): the page's image regions repainted from
+   the SAME bitmap on a layer the night filter does not reach — a sibling of
+   .page-raster, so the filter can't inherit, and BELOW the marks layer so ink
+   drawn over a figure still follows the theme. NO z-index: DOM order paints
+   it over the raster, and z:auto keeps it under the text layer (z:2). The
+   canvas stretches to the page box exactly like the raster canvas, so the
+   mid-zoom bitmap-reuse path keeps the two aligned without a redraw. */
+.image-color-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .annot {
   position: absolute;
   border-radius: 1px;

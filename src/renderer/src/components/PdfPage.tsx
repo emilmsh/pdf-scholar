@@ -1,10 +1,12 @@
 import { memo, useEffect, useRef } from 'react'
-import { AnnotationMode, TextLayer } from 'pdfjs-dist'
+import { AnnotationMode, OPS, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
 import { annotationCss, arrowHeadPoints, arrowShaftEnd, isTextMarkup, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData, textFontCss } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
+import { pageImageRects } from '../image-regions'
+import type { OpsTable } from '../image-regions'
 import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
@@ -68,6 +70,9 @@ interface Props {
   /** Hide all annotations: skips the overlay and re-renders the canvas
    *  without the file's annotation appearances */
   hideAnnots: boolean
+  /** Night themes: draw the page's raster-image regions again, unfiltered, so
+   *  photos and figures keep their original colours while the page inverts */
+  keepImageColors: boolean
   /** Local id of the selected annotation on THIS page, or null — passed per
    *  page (not the whole `selected` object) so unrelated pages don't re-render */
   selectedId: string | null
@@ -157,6 +162,7 @@ function PdfPage({
   active,
   annotations,
   hideAnnots,
+  keepImageColors,
   selectedId,
   searchRects,
   searchAllRects,
@@ -183,6 +189,8 @@ function PdfPage({
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
   const linkRef = useRef<HTMLDivElement>(null)
+  /** «Behold bildefarger»: an unfiltered canvas clipped to the image regions */
+  const imageOverlayRef = useRef<HTMLCanvasElement>(null)
   const drawSvgRef = useRef<SVGSVGElement>(null)
   // The built text layer + its page, kept so a zoom can call the cheap
   // TextLayer.update() instead of rebuilding. scaleRef/rotationRef let the
@@ -272,7 +280,15 @@ function PdfPage({
     if (!active) {
       host.replaceChildren() // free the bitmap when far outside the viewport
       rasterInfoRef.current = null
+      if (imageOverlayRef.current) {
+        imageOverlayRef.current.hidden = true
+        imageOverlayRef.current.width = 0 // free the overlay bitmap too
+      }
       return
+    }
+    if (!keepImageColors && imageOverlayRef.current) {
+      imageOverlayRef.current.hidden = true
+      imageOverlayRef.current.width = 0
     }
 
     let cancelled = false
@@ -362,7 +378,12 @@ function PdfPage({
      *  flash for a frame. Resize + drawImage run in one synchronous task, so
      *  the compositor never sees an intermediate state. First render (or
      *  reactivation after scroll-out) has no canvas yet — append then. */
-    const show = (canvas: HTMLCanvasElement, dpr: number): void => {
+    const show = (
+      canvas: HTMLCanvasElement,
+      dpr: number,
+      page: PDFPageProxy,
+      viewport: ReturnType<PDFPageProxy['getViewport']>
+    ): void => {
       const shown = host.firstElementChild
       if (shown instanceof HTMLCanvasElement) {
         shown.width = canvas.width
@@ -372,6 +393,62 @@ function PdfPage({
         host.replaceChildren(canvas)
       }
       rasterInfoRef.current = { scale, dpr, rotation, hideAnnots }
+      drawImageOverlay(canvas, page, viewport)
+    }
+
+    /** «Behold bildefarger»: repaint the image regions from the SAME bitmap
+     *  onto the unfiltered overlay canvas. The CSS night filter never changes
+     *  the canvas pixels, so the original colours are simply drawn again on a
+     *  layer the filter does not reach, clipped to where the images are. Both
+     *  canvases stretch to the same CSS box, so a zoom-out that reuses the
+     *  displayed bitmap (no show()) keeps them aligned for free. */
+    const drawImageOverlay = (
+      source: HTMLCanvasElement,
+      page: PDFPageProxy,
+      viewport: ReturnType<PDFPageProxy['getViewport']>
+    ): void => {
+      const overlay = imageOverlayRef.current
+      if (!overlay) return
+      if (!keepImageColors) {
+        overlay.hidden = true
+        return
+      }
+      void pageImageRects(page, OPS as unknown as OpsTable).then((rects) => {
+        if (cancelled || !keepImageColors) return
+        if (rects.length === 0) {
+          overlay.hidden = true
+          return
+        }
+        overlay.width = source.width // also clears any previous frame
+        overlay.height = source.height
+        const ctx = overlay.getContext('2d')
+        if (!ctx) return
+        // Actual bitmap px per viewport CSS px (accounts for the floor() in
+        // the canvas sizing and PDFium's own rounding)
+        const sx = source.width / viewport.width
+        const sy = source.height / viewport.height
+        ctx.save()
+        ctx.beginPath()
+        for (const r of rects) {
+          // All four corners through the viewport transform (intrinsic /Rotate
+          // + view rotation + scale in one map), then the AABB
+          const corners = [
+            viewport.convertToViewportPoint(r.x0, r.y0),
+            viewport.convertToViewportPoint(r.x1, r.y0),
+            viewport.convertToViewportPoint(r.x0, r.y1),
+            viewport.convertToViewportPoint(r.x1, r.y1)
+          ]
+          const xs = corners.map((c) => c[0] * sx)
+          const ys = corners.map((c) => c[1] * sy)
+          const x = Math.min(...xs)
+          const y = Math.min(...ys)
+          ctx.rect(x, y, Math.max(...xs) - x, Math.max(...ys) - y)
+        }
+        ctx.clip()
+        ctx.drawImage(source, 0, 0)
+        ctx.restore()
+        overlay.hidden = false
+      })
     }
 
     ;(async () => {
@@ -410,7 +487,7 @@ function PdfPage({
         settleTimer = window.setTimeout(() => {
           void (async () => {
             const bitmap = await renderBitmap(page, viewport, baseDpr)
-            if (bitmap && !cancelled) show(bitmap, baseDpr)
+            if (bitmap && !cancelled) show(bitmap, baseDpr, page, viewport)
           })().catch(onRasterError)
         }, SETTLE_MS)
       }
@@ -432,12 +509,19 @@ function PdfPage({
         const have = prev.scale * prev.dpr
         const need = scale * baseDpr
         if (have >= need && have <= need * MAX_OVERSAMPLE) {
+          // No new bitmap, but the overlay may still need a (re)draw — the
+          // toggle flipping on re-runs this effect down this exact path, and
+          // the sx/sy mapping inside handles the density mismatch.
+          const shown = host.firstElementChild
+          if (keepImageColors && shown instanceof HTMLCanvasElement) {
+            drawImageOverlay(shown, page, viewport)
+          }
           if (have > need * (1 + 1e-6)) settleToExact()
           return
         }
       }
       const bitmap = await renderBitmap(page, viewport, baseDpr)
-      if (bitmap && !cancelled) show(bitmap, baseDpr)
+      if (bitmap && !cancelled) show(bitmap, baseDpr, page, viewport)
     })().catch(onRasterError)
 
     return () => {
@@ -445,7 +529,7 @@ function PdfPage({
       window.clearTimeout(settleTimer)
       renderTask?.cancel()
     }
-  }, [pdf, docKey, pageNumber, scale, rotation, active, hideAnnots])
+  }, [pdf, docKey, pageNumber, scale, rotation, active, hideAnnots, keepImageColors])
 
   // ---- Text layer + clickable links ----
   // Built ONCE per page/rotation, NOT per zoom. pdf.js v6 lays spans out in
@@ -898,6 +982,14 @@ function PdfPage({
           </div>
         )}
       </div>
+      {/* «Behold bildefarger»: the image regions repainted UNFILTERED. A
+          sibling of .page-raster (the filter does not inherit across), below
+          the marks layer so ink drawn over a figure still recolours with the
+          theme. Hidden and 0-sized unless the toggle is on and the page has
+          regions — the effect owns it imperatively, in step with the raster. */}
+      {keepImageColors && (
+        <canvas ref={imageOverlayRef} className="image-color-overlay" hidden />
+      )}
       {otherMarks.length > 0 && (
         <div className="annot-overlay annot-marks">
           {otherMarks.map((a) => (
