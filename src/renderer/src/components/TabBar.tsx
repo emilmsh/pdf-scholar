@@ -38,6 +38,10 @@ interface Props {
   onMoveToNewWindow(id: string, path: string): void
   /** Re-read the file from disk and remount the viewer (external updates) */
   onReload(id: string, path: string): void
+  /** Show this tab's file in the ACTIVE tab's second split column — the two-
+   *  document split's main entry point. Only offered while some other tab is
+   *  active (a document to sit beside) — the tab itself stays open. */
+  onOpenInSplit(path: string): void
 }
 
 /** Tiny scroll glyph shown at the left of the titlebar (matches the app icon) */
@@ -64,7 +68,8 @@ export default function TabBar({
   onReorder,
   onCloseMany,
   onMoveToNewWindow,
-  onReload
+  onReload,
+  onOpenInSplit
 }: Props): React.JSX.Element {
   useLang()
   const [menu, setMenu] = useState<{ x: number; y: number; tab: TabInfo } | null>(null)
@@ -238,6 +243,20 @@ export default function TabBar({
           >
             {t('tabs.openInNewWindow')}
           </button>
+          {/* Two-document split: this file beside the ACTIVE tab's document.
+              Needs another tab to sit beside — tabs are unique per path, so a
+              non-active right-clicked tab is always a different file. */}
+          {activeId !== null && menu.tab.id !== activeId && (
+            <button
+              className="menu-item"
+              onClick={() => {
+                onOpenInSplit(menu.tab.path)
+                setMenu(null)
+              }}
+            >
+              {t('tabs.openInSplit')}
+            </button>
+          )}
           <button
             className="menu-item"
             onClick={() => {

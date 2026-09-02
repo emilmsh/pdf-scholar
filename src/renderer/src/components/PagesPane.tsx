@@ -65,6 +65,11 @@ interface Props {
   annotsHidden: boolean
   /** «Behold bildefarger» resolved against the active theme (viewer-computed) */
   keepImageColors: boolean
+  /** A PDF file was dropped on THIS column — the viewer decides what that
+   *  means (desktop: show it here as the split's other document). Return true
+   *  to consume the drop; false lets it bubble to App's open-a-tab handler
+   *  (e.g. in the browser, where a dropped file has no real path). */
+  onFileDrop?: ((file: File) => boolean) | undefined
   rotation: ViewRotation
   spread: boolean
   /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … */
@@ -150,6 +155,7 @@ export default function PagesPane({
   annots,
   annotsHidden,
   keepImageColors,
+  onFileDrop,
   rotation,
   spread,
   coverPage,
@@ -641,7 +647,21 @@ export default function PagesPane({
   }, [onScroll])
 
   return (
-    <div className={`pages-host pane-b${flash ? ' pane-flash' : ''}`}>
+    <div
+      className={`pages-host pane-b${flash ? ' pane-flash' : ''}`}
+      onDragOver={onFileDrop ? (e) => e.preventDefault() : undefined}
+      onDrop={
+        onFileDrop
+          ? (e) => {
+              const file = e.dataTransfer.files[0]
+              if (!file || !file.name.toLowerCase().endsWith('.pdf')) return
+              if (!onFileDrop(file)) return // unhandled — App's open-a-tab takes it
+              e.preventDefault()
+              e.stopPropagation()
+            }
+          : undefined
+      }
+    >
       <div
         className={`pages${drawTool ? ' drawing' : ''}`}
         data-pane="b"

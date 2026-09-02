@@ -291,6 +291,10 @@ interface Props {
   /** Close one named column, keeping the other's content */
   onClosePane(pane: 'a' | 'b'): void
   panePage: number
+  /** Pane B's page count when it shows a DIFFERENT document (two-file split);
+   *  undefined = same document, the shared pageCount applies (`| undefined`:
+   *  forwarded unconditionally under exactOptionalPropertyTypes) */
+  panePageCount?: number | undefined
   paneZoomPercent: number
   paneFitMode: 'width' | 'page' | 'custom'
   paneFitTarget: 'width' | 'page'
@@ -441,6 +445,7 @@ export default function Toolbar({
   onActivatePane,
   onClosePane,
   panePage,
+  panePageCount,
   paneZoomPercent,
   paneFitMode,
   paneFitTarget,
@@ -750,7 +755,7 @@ export default function Toolbar({
             aria-label={t('tb.goToPage')}
             title={withShortcut(t('tb.goToPage'), 'nav.gotoPage')}
           />
-          <span>/ {pageCount || '–'}</span>
+          <span>/ {(isB ? (panePageCount ?? pageCount) : pageCount) || '–'}</span>
         </div>
 
         <div className="toolbar-sep" />

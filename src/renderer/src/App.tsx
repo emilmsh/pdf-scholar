@@ -28,6 +28,12 @@ interface OpenTab {
   /** Bumped when the file is re-opened with fresh bytes (e.g. from Explorer
    *  after an external update) — keys the viewer so it remounts and reloads */
   epoch: number
+  /** A DIFFERENT file shown in this tab's second split column («Åpne i delt
+   *  visning»). null = the split, if open, shows `payload` — exactly the
+   *  behaviour the split always had. The same path may simultaneously be open
+   *  as its own tab: main keeps one draft per path, the local doc bus keeps
+   *  the two views converged, and docRegistry keeps the bookkeeping honest. */
+  splitDoc: { payload: FilePayload; initialPosition: ReadingPosition | null } | null
 }
 
 
@@ -123,6 +129,23 @@ export default function App(): React.JSX.Element {
 
   const setTabDirty = useCallback((id: string, dirty: boolean) => {
     setDirtyTabs((prev) => {
+      if (prev.has(id) === dirty) return prev
+      const next = new Set(prev)
+      if (dirty) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }, [])
+
+  /** Tab ids whose SPLIT document (a different file in the second column) has
+   *  unsaved changes — tracked apart from dirtyTabs because closing must be
+   *  able to prompt for each document by name. */
+  const [splitDirtyTabs, setSplitDirtyTabs] = useState<ReadonlySet<string>>(new Set())
+  const splitDirtyTabsRef = useRef(splitDirtyTabs)
+  splitDirtyTabsRef.current = splitDirtyTabs
+
+  const setSplitTabDirty = useCallback((id: string, dirty: boolean) => {
+    setSplitDirtyTabs((prev) => {
       if (prev.has(id) === dirty) return prev
       const next = new Set(prev)
       if (dirty) next.add(id)
@@ -240,7 +263,11 @@ export default function App(): React.JSX.Element {
     setTabs((prev) => {
       const index = prev.findIndex((t) => t.id === id)
       const closing = prev[index]
-      if (closing) docRegistry.release(closing.payload.path)
+      if (closing) {
+        docRegistry.release(closing.payload.path)
+        // The split column's document is a viewer of its own path too
+        if (closing.splitDoc) docRegistry.release(closing.splitDoc.payload.path)
+      }
       const next = prev.filter((t) => t.id !== id)
       setActiveId((current) => {
         if (current !== id) return current
@@ -249,6 +276,12 @@ export default function App(): React.JSX.Element {
       return next
     })
     setDirtyTabs((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+    setSplitDirtyTabs((prev) => {
       if (!prev.has(id)) return prev
       const next = new Set(prev)
       next.delete(id)
@@ -361,7 +394,13 @@ export default function App(): React.JSX.Element {
         return
       }
       const initialPosition = await bridge.getPosition(payload.path)
-      const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition, epoch: 0 }
+      const tab: OpenTab = {
+        id: `tab-${++tabCounter}`,
+        payload,
+        initialPosition,
+        epoch: 0,
+        splitDoc: null
+      }
       docRegistry.acquire(payload.path)
       setTabs((prev) => [...prev, tab])
       goToTab(tab.id)
@@ -397,6 +436,114 @@ export default function App(): React.JSX.Element {
     [confirmExternalUpdateVerdict, setTabDirty, goToTab]
   )
 
+  /** Close the split column's document (a different file in pane B): the same
+   *  unsaved-changes guard a tab close runs, but only when this pane is the
+   *  LAST viewer of the path in this window — a tab still showing the same
+   *  file keeps the draft alive, so there is nothing to ask about yet.
+   *  Resolves to whether the pane actually closed. */
+  const closeSplitDoc = useCallback(
+    async (tabId: string): Promise<boolean> => {
+      const tab = tabsRef.current.find((t) => t.id === tabId)
+      const split = tab?.splitDoc
+      if (!tab || !split) return true
+      const path = split.payload.path
+      if (docRegistry.count(path) <= 1 && splitDirtyTabsRef.current.has(tabId)) {
+        const outcome = await confirmCloseVerdict(path, split.payload.name)
+        if (outcome.verdict === 'cancel') {
+          reportCloseFailure(outcome)
+          return false
+        }
+      }
+      docRegistry.release(path)
+      setSplitTabDirty(tabId, false)
+      setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, splitDoc: null } : t)))
+      return true
+    },
+    [confirmCloseVerdict, reportCloseFailure, setSplitTabDirty]
+  )
+
+  /** «Åpne i delt visning»: show `path` in the second column of `hostTabId`.
+   *  Fresh readFile — main resolves any existing draft behind it, so the pane
+   *  shows the file's live edited state. The source tab (if any) stays open:
+   *  same model as two windows on one file, one draft in main, views converge
+   *  over the doc buses. */
+  const openInSplit = useCallback(
+    async (hostTabId: string, path: string) => {
+      const host = tabsRef.current.find((t) => t.id === hostTabId)
+      if (!host) return
+      // Same file as the host document: that is the plain same-file split —
+      // the viewer opens it itself (the entry points already route there)
+      if (host.payload.path === path) return
+      if (host.splitDoc) {
+        if (host.splitDoc.payload.path === path) {
+          goToTab(hostTabId)
+          return
+        }
+        // Replacing a foreign split runs its close guard first
+        if (!(await closeSplitDoc(hostTabId))) return
+      }
+      const result = await bridge.readFile(path)
+      if ('error' in result) {
+        setError(t('app.openFailed', { error: errorText(result) }))
+        return
+      }
+      const initialPosition = await bridge.getPosition(path)
+      docRegistry.acquire(path)
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === hostTabId ? { ...t, splitDoc: { payload: result, initialPosition } } : t
+        )
+      )
+      goToTab(hostTabId)
+    },
+    [closeSplitDoc, goToTab]
+  )
+
+  /** Closing pane A while pane B shows a different file: the reader is keeping
+   *  the OTHER document, so it takes over the tab. If it already has a tab of
+   *  its own, the host tab simply closes and that tab comes forward. */
+  const promoteSplitDoc = useCallback(
+    async (tabId: string) => {
+      const tab = tabsRef.current.find((t) => t.id === tabId)
+      const split = tab?.splitDoc
+      if (!tab || !split) return
+      const yTab = tabsRef.current.find(
+        (t) => t.id !== tabId && t.payload.path === split.payload.path
+      )
+      if (yTab) {
+        // closeTabAwait handles both documents' guards (split prompt is
+        // skipped — Y's own tab keeps its draft alive)
+        const closed = await closeTabAwaitRef.current(tabId)
+        if (closed) goToTab(yTab.id)
+        return
+      }
+      // The host document leaves this window — guard its draft if this viewer
+      // is the last one showing it
+      if (dirtyTabsRef.current.has(tabId) && docRegistry.count(tab.payload.path) <= 1) {
+        const outcome = await confirmCloseVerdict(tab.payload.path, tab.payload.name)
+        if (outcome.verdict === 'cancel') {
+          reportCloseFailure(outcome)
+          return
+        }
+      }
+      const result = await bridge.readFile(split.payload.path)
+      if ('error' in result) return
+      const initialPosition = await bridge.getPosition(split.payload.path)
+      docRegistry.release(tab.payload.path)
+      // The pane's acquire on Y carries over to the tab — no registry change
+      setTabs((prev) =>
+        prev.map((t) =>
+          t.id === tabId
+            ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1, splitDoc: null }
+            : t
+        )
+      )
+      setTabDirty(tabId, false)
+      setSplitTabDirty(tabId, false)
+    },
+    [confirmCloseVerdict, reportCloseFailure, setTabDirty, setSplitTabDirty, goToTab]
+  )
+
   /** Close with the unsaved-changes prompt when the tab is dirty. Resolves to
    *  whether the tab actually went away, so a bulk close can ask about one tab at
    *  a time instead of stacking a dialog per dirty document. */
@@ -404,6 +551,9 @@ export default function App(): React.JSX.Element {
     async (id: string): Promise<boolean> => {
       const tab = tabsRef.current.find((t) => t.id === id)
       if (!tab) return false
+      // The split column's document first, sequentially — two unsaved
+      // documents must not stack two dialogs (same rule closeTabs follows)
+      if (tab.splitDoc && !(await closeSplitDoc(id))) return false
       if (!dirtyTabsRef.current.has(id)) {
         reallyCloseTab(id)
         return true
@@ -416,8 +566,12 @@ export default function App(): React.JSX.Element {
       reallyCloseTab(id)
       return true
     },
-    [reallyCloseTab, confirmCloseVerdict, reportCloseFailure]
+    [reallyCloseTab, confirmCloseVerdict, reportCloseFailure, closeSplitDoc]
   )
+  /** promoteSplitDoc needs closeTabAwait, which is declared after it — the ref
+   *  breaks the cycle the same way the viewer's late-bound refs do. */
+  const closeTabAwaitRef = useRef<(id: string) => Promise<boolean>>(() => Promise.resolve(false))
+  closeTabAwaitRef.current = closeTabAwait
 
   const closeTab = useCallback(
     (id: string) => {
@@ -730,7 +884,9 @@ export default function App(): React.JSX.Element {
           id: t.id,
           name: t.payload.name,
           path: t.payload.path,
-          dirty: dirtyTabs.has(t.id)
+          // Either document in the tab (its own, or the split column's other
+          // file) having unsaved changes lights the dot
+          dirty: dirtyTabs.has(t.id) || splitDirtyTabs.has(t.id)
         }))}
         // No tab is the current one while the library is showing — the strip
         // stays, so the open documents are visible and one click away from
@@ -760,6 +916,10 @@ export default function App(): React.JSX.Element {
         onCloseMany={(ids) => void closeTabs(ids)}
         onMoveToNewWindow={moveToNewWindow}
         onReload={(id, path) => void reloadTab(id, path)}
+        onOpenInSplit={(path) => {
+          const host = activeIdRef.current
+          if (host && !atLibraryRef.current) void openInSplit(host, path)
+        }}
       />
 
       {/* One stack, always. The documents are NEVER unmounted to show the
@@ -788,6 +948,11 @@ export default function App(): React.JSX.Element {
                 onExternalSaveConflict={handleSaveExternalConflict}
                 onClose={() => closeTab(tab.id)}
                 onLeaveDocument={() => setAtLibrary(true)}
+                splitDoc={tab.splitDoc}
+                onSplitDirtyChange={(dirty) => setSplitTabDirty(tab.id, dirty)}
+                onRequestCloseSplitDoc={() => void closeSplitDoc(tab.id)}
+                onRequestPromoteSplitDoc={() => void promoteSplitDoc(tab.id)}
+                onRequestOpenInSplit={(path) => void openInSplit(tab.id, path)}
               />
             </div>
           )

@@ -70,6 +70,7 @@ import type {
 } from '../annotations'
 import { collectAnnotations } from '../doc-load'
 import { emitLocalDocEvent, onLocalDocEvent } from '../local-doc-events'
+import { useSplitDocSession } from '../hooks/useSplitDocSession'
 import {
   buildRows,
   flipTarget,
@@ -364,6 +365,21 @@ interface Props {
    *  current file's path and this action. Desktop leaves it undefined — the tab
    *  bar already carries the file identity. */
   onOpenFile?(): void
+  /** A DIFFERENT file for the second split column (App-owned; «Åpne i delt
+   *  visning»). null/undefined = the split shows this document, as always.
+   *  All five are optional so single-document hosts (the extension) need not
+   *  wire what they cannot reach. */
+  splitDoc?: { payload: FilePayload; initialPosition: ReadingPosition | null } | null
+  /** Unsaved-changes state of the split column's document */
+  onSplitDirtyChange?(dirty: boolean): void
+  /** Close the split document (App runs its unsaved guard, then clears
+   *  splitDoc — the viewer closes the column when the prop goes null) */
+  onRequestCloseSplitDoc?(): void
+  /** Pane A was closed while pane B shows another file — that file takes over
+   *  the tab (App swaps the payload and remounts) */
+  onRequestPromoteSplitDoc?(): void
+  /** A file was dropped on the second column — show it there */
+  onRequestOpenInSplit?(path: string): void
 }
 
 /** Load a PDF blob in an offscreen frame and ask it to print.
@@ -429,7 +445,12 @@ export default function PdfViewer({
   onExternalSaveConflict,
   onClose,
   onLeaveDocument,
-  onOpenFile
+  onOpenFile,
+  splitDoc,
+  onSplitDirtyChange,
+  onRequestCloseSplitDoc,
+  onRequestPromoteSplitDoc,
+  onRequestOpenInSplit
 }: Props): React.JSX.Element {
   useLang()
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -644,6 +665,17 @@ export default function PdfViewer({
     flashPaneRef.current(pane)
   }, [])
 
+  /** The active pane, EXCEPT when it shows a different document: search hits,
+   *  outline entries, note cards and citation chips all belong to the MAIN
+   *  document, and landing one in a column showing another file is the silent
+   *  wrong-document class of bug — so those navigations dispatch through this,
+   *  never through activePaneRef directly. Pane-generic actions (zoom, rotate,
+   *  page turn) keep using activePaneRef: they mean "this column" either way. */
+  const mainDocPane = useCallback((): PaneId => {
+    const pane = activePaneRef.current
+    return pane === 'b' && sessionBRef.current ? 'a' : pane
+  }, [])
+
   /** Pane B's page + zoom. Held HERE, not inside PagesPane, because the
    *  toolbar's second centre cluster drives them — exactly the same controls
    *  pane A gets, which is the whole point of the symmetry. */
@@ -704,7 +736,36 @@ export default function PdfViewer({
     share: number
   } | null>(null)
 
+  // ---------- The split column's OTHER document («Åpne i delt visning») ----------
+  // App owns WHICH file sits in pane B (splitDoc); this viewer owns HOW it
+  // renders. Same-file mode: `foreign` is null, the session hook returns null,
+  // and every pane-B binding below falls back to the primary document exactly
+  // as it always has — the two modes share 100 % of the pane mechanics.
+  const foreign = splitDoc && splitDoc.payload.path !== payload.path ? splitDoc : null
+  const onSplitDocFailedRef = useRef<(message: string) => void>(() => {})
+  const onSplitDocFailed = useCallback((m: string) => onSplitDocFailedRef.current(m), [])
+  const sessionB = useSplitDocSession(foreign?.payload ?? null, onSplitDocFailed)
+  const sessionBRef = useRef(sessionB)
+  sessionBRef.current = sessionB
+  const foreignRef = useRef(foreign)
+  foreignRef.current = foreign
+  const onRequestCloseSplitDocRef = useRef(onRequestCloseSplitDoc)
+  onRequestCloseSplitDocRef.current = onRequestCloseSplitDoc
+  const onRequestPromoteSplitDocRef = useRef(onRequestPromoteSplitDoc)
+  onRequestPromoteSplitDocRef.current = onRequestPromoteSplitDoc
+
+  // Mirror the split document's dirty flag up to App (same shape as the
+  // primary's onDirtyChange effect, same reason: never from a state updater)
+  const sessionBDirty = sessionB?.dirty ?? false
+  useEffect(() => {
+    onSplitDirtyChange?.(sessionBDirty)
+  }, [sessionBDirty, onSplitDirtyChange])
+
   const rememberPaneB = useCallback(() => {
+    // Same-file memory only: a foreign document's place is persisted per path
+    // (bridge.setPosition), and resurrecting the OTHER FILE from S would make
+    // the plain split button mean two different things.
+    if (foreignRef.current) return
     const pos = handleForRef.current('b')?.position()
     if (!pos) return
     paneBMemoryRef.current = {
@@ -729,6 +790,14 @@ export default function PdfViewer({
   // updates from inside one. Doing that dropped the symmetric-width update, so
   // the split opened lopsided (398/1199 instead of 799/799).
   const toggleSplit = useCallback(() => {
+    // With another file in the column, the split button/'s' means "close that
+    // document" — App runs its unsaved guard and clears splitDoc; the effect
+    // below closes the column when the prop goes null. The button stays an
+    // instant same-file split whenever no foreign document is present.
+    if (foreignRef.current) {
+      onRequestCloseSplitDocRef.current?.()
+      return
+    }
     if (splitOpenRef.current) {
       rememberPaneB()
       setSplitOpen(false)
@@ -774,6 +843,15 @@ export default function PdfViewer({
    * to keep, now filling the window.
    */
   const closePane = useCallback((pane: PaneId) => {
+    // Foreign document in the column: closing the RIGHT half closes that
+    // document (guarded by App); closing the LEFT half keeps the other file —
+    // it takes over the tab (promote). Both route through App because both may
+    // need an unsaved-changes prompt for a whole document.
+    if (foreignRef.current) {
+      if (pane === 'b') onRequestCloseSplitDocRef.current?.()
+      else onRequestPromoteSplitDocRef.current?.()
+      return
+    }
     if (pane === 'b') {
       // Same gesture as toggling the split off, so it remembers the same way
       rememberPaneB()
@@ -801,6 +879,47 @@ export default function PdfViewer({
       schedulePositionSaveRef.current()
     })
   }, [paneBPage, rememberPaneB])
+  // Open the column when a foreign document arrives; close it when App clears
+  // splitDoc (close/promote both land here). Pane B's view state is seeded
+  // from the OTHER file's persisted reading position at a fresh fit — and the
+  // same-file memory (paneBMemoryRef) is deliberately not touched, so S after
+  // a foreign split still reopens the figure you had parked there before it.
+  const wasForeignRef = useRef(false)
+  useEffect(() => {
+    if (foreign) {
+      wasForeignRef.current = true
+      const pos = foreign.initialPosition
+      setPaneBPage(pos?.page ?? 1)
+      setPaneBScale(0) // 0 = PagesPane picks a fresh fit for the column width
+      setPaneBFit('width')
+      setPaneBRotation(pos?.rotation ?? 0)
+      setPaneBSpread(pos?.spread ?? false)
+      setPaneBCover(pos?.coverPage ?? false)
+      if (!splitOpenRef.current) {
+        setPanelW((p) => (p.pane === 0.5 ? p : { ...p, pane: 0.5 }))
+        window.setTimeout(persistPanelWidths, 0)
+        setFitMode('width')
+        setSplitOpen(true)
+      }
+      setActivePane('b')
+      flashPaneRef.current('b')
+      whenPaneReadyRef.current('b', () =>
+        handleForRef.current('b')?.scrollToPage(pos?.page ?? 1, pos?.offset ?? 0)
+      )
+      return
+    }
+    if (wasForeignRef.current) {
+      wasForeignRef.current = false
+      if (splitOpenRef.current) {
+        setSplitOpen(false)
+        setActivePane('a')
+      }
+    }
+    // persistPanelWidths is declared below (usePanelWidths) — deliberately not
+    // a dep: it is stable, and naming it here would be a TDZ read at render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [foreign])
+
   /** Navigation history PER COLUMN — see the pushBack/navStep block below */
   const [navStacks, setNavStacks] = useState<
     Record<PaneId, { back: NavPosition[]; forward: NavPosition[] }>
@@ -1666,12 +1785,41 @@ export default function PdfViewer({
   /** Pane B scrolling: the same floating-bubble hygiene as pane A (a popover
    *  anchored to a screen point must not stay behind while the page moves under
    *  it), minus the reading-position save — the position persisted per file is
-   *  the main column's, which is what re-opening the document restores. */
+   *  the main column's, which is what re-opening the document restores.
+   *  EXCEPT with a foreign document: then the column IS that file's only view
+   *  here, and its place is saved per path exactly like a tab's would be. */
+  const paneBPosTimerRef = useRef<number | null>(null)
+  const savePaneBPosition = useCallback(() => {
+    const session = sessionBRef.current
+    if (!session) return
+    const pos = handleForRef.current('b')?.position()
+    if (!pos) return
+    bridge.setPosition(session.path, {
+      page: pos.page,
+      offset: pos.offset,
+      zoom: paneBScaleRef.current,
+      rotation: paneBRotationRef.current,
+      spread: paneBSpreadRef.current,
+      coverPage: paneBCoverRef.current
+    })
+  }, [])
   const onPaneBScroll = useCallback(() => {
     setMenu((m) => (m ? null : m))
     setAnnotPopover((p) => (p ? null : p))
     if (immersiveRef.current) wakeHudRef.current()
-  }, [])
+    if (sessionBRef.current) {
+      if (paneBPosTimerRef.current) window.clearTimeout(paneBPosTimerRef.current)
+      paneBPosTimerRef.current = window.setTimeout(savePaneBPosition, 600)
+    }
+  }, [savePaneBPosition])
+  // View changes (zoom/rotation/spread) save too — scroll alone would miss a
+  // rotate right before the column closes
+  const sessionBPath = sessionB?.path ?? null
+  useEffect(() => {
+    if (!sessionBPath) return
+    const timer = window.setTimeout(savePaneBPosition, 400)
+    return () => window.clearTimeout(timer)
+  }, [sessionBPath, paneBScale, paneBRotation, paneBSpread, paneBCover, savePaneBPosition])
 
   const wakeHudRef = useRef<() => void>(() => {})
 
@@ -2120,6 +2268,14 @@ export default function PdfViewer({
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
     toastTimerRef.current = window.setTimeout(() => setToast(null), 2600)
   }, [])
+
+  // The split document could not open (encrypted, broken): say why and hand
+  // the close back to App. Late-bound because showToast is declared here while
+  // the session hook runs far above.
+  onSplitDocFailedRef.current = (message: string) => {
+    showToast(message)
+    onRequestCloseSplitDocRef.current?.()
+  }
 
   // ---------- Rotation + spread (view actions) ----------
 
@@ -3733,13 +3889,34 @@ export default function PdfViewer({
     }
   }, [pagePointFromClient])
 
+  /** The annotation records of the document a PANE shows: pane B resolves to
+   *  its own session's map when it holds another file. Every DOM-driven
+   *  handler below goes through this instead of annotsRef directly, so a hit
+   *  test can never match page 3 of the WRONG document. */
+  const annotsFor = useCallback((pane: PaneId, pageNumber: number): PageAnnotation[] => {
+    const session = pane === 'b' ? sessionBRef.current : null
+    if (session) return session.annots.get(pageNumber) ?? []
+    return annotsRef.current.get(pageNumber) ?? []
+  }, [])
+  /** True when the element sits in a column showing ANOTHER document. Phase
+   *  one of the two-document split reads that document; the selection/edit
+   *  surfaces (popovers, drags, editors) stay with the main document until the
+   *  write path routes per document too. */
+  const elIsForeign = useCallback(
+    (el: Element | null | undefined): boolean => paneOfEl(el) === 'b' && !!sessionBRef.current,
+    []
+  )
+
   const onContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
       if (drawToolRef.current) return
+      // The context menu's actions (markup, AI, annotation edits) all address
+      // the main document — suppress it over a foreign column
+      if (elIsForeign(e.target as Element)) return
       openMenuAt(e.clientX, e.clientY, e.target)
     },
-    [openMenuAt]
+    [openMenuAt, elIsForeign]
   )
 
   // The menu pops up right after finishing a text selection;
@@ -3768,6 +3945,12 @@ export default function PdfViewer({
           setSelected(null)
           return
         }
+        // Selection/popovers address the main document; a click in a foreign
+        // column only clears them (phase two routes edits per document)
+        if (elIsForeign(pageEl)) {
+          setSelected(null)
+          return
+        }
         const pageNumber = Number(pageEl.dataset.page)
         if (annotsHiddenRef.current) return
         const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
@@ -3788,7 +3971,7 @@ export default function PdfViewer({
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect]
+    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect, elIsForeign]
   )
 
   // Double-click a text box to re-open it in the editor (edit text + resize the
@@ -3797,7 +3980,7 @@ export default function PdfViewer({
     (e: React.MouseEvent) => {
       if (drawToolRef.current || markupToolRef.current) return
       const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
-      if (!pageEl) return
+      if (!pageEl || elIsForeign(pageEl)) return
       const pageNumber = Number(pageEl.dataset.page)
       const [px, py] = pagePointFromClient(e.clientX, e.clientY, pageEl)
       const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
@@ -3806,7 +3989,7 @@ export default function PdfViewer({
         openFreeTextEditor(pageNumber, hit)
       }
     },
-    [pagePointFromClient, openFreeTextEditor]
+    [pagePointFromClient, openFreeTextEditor, elIsForeign]
   )
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -3823,7 +4006,7 @@ export default function PdfViewer({
     // same press would arm a MOVE as well, and the two would fight.
     if (annotResizeRef.current || markupEditRef.current) return
     const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
-    if (!pageEl) return
+    if (!pageEl || elIsForeign(pageEl)) return
     const pageNumber = Number(pageEl.dataset.page)
     const [hx, hy] = pagePointFromClient(e.clientX, e.clientY, pageEl)
     const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], hx, hy)
@@ -3840,7 +4023,7 @@ export default function PdfViewer({
       }
       e.preventDefault()
     }
-  }, [pagePointFromClient])
+  }, [pagePointFromClient, elIsForeign])
 
   // ---------- Hover comment tooltip ----------
 
@@ -3870,7 +4053,8 @@ export default function PdfViewer({
     }
     const pageNumber = Number(pageEl.dataset.page)
     const [hx, hy] = pagePointFromClient(e.clientX, e.clientY, pageEl)
-    const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], hx, hy)
+    // annotsFor: tooltips read whatever document the hovered COLUMN shows
+    const hit = annotationHitTest(annotsFor(paneOfEl(pageEl), pageNumber), hx, hy)
     const text = hit?.type !== 'freetext' ? hit?.contents?.trim() : undefined
     if (text) {
       setHoverTip((tip) =>
@@ -3879,7 +4063,7 @@ export default function PdfViewer({
     } else {
       setHoverTip((tip) => (tip ? null : tip))
     }
-  }, [pagePointFromClient])
+  }, [pagePointFromClient, annotsFor])
 
   // ---------- Annotation dragging (note bubbles + geometric shapes) ----------
 
@@ -4555,10 +4739,11 @@ export default function PdfViewer({
     },
     [pushBack]
   )
-  /** Sidebar/thumbnail jumps go to the column being worked in */
+  /** Sidebar/thumbnail jumps go to the column being worked in — unless that
+   *  column shows a different document (thumbnails are the main document's) */
   const jumpToPage = useCallback(
-    (page: number) => jumpToPageIn(activePaneRef.current, page),
-    [jumpToPageIn]
+    (page: number) => jumpToPageIn(mainDocPane(), page),
+    [jumpToPageIn, mainDocPane]
   )
   goToPaneBPageRef.current = (page: number) => jumpToPageIn('b', page)
 
@@ -4657,30 +4842,36 @@ export default function PdfViewer({
     },
     [jumpToAnnotIn]
   )
-  /** The tab serves whichever column is being worked in */
+  /** The tab serves whichever column is being worked in (main document) */
   const jumpSelectAnnot = useCallback(
     (pageNumber: number, record: PageAnnotation) =>
-      jumpSelectAnnotIn(activePaneRef.current, pageNumber, record),
-    [jumpSelectAnnotIn]
+      jumpSelectAnnotIn(mainDocPane(), pageNumber, record),
+    [jumpSelectAnnotIn, mainDocPane]
   )
 
-  /** Resolve a pdf.js destination and scroll the given column to it. */
+  /** Resolve a pdf.js destination and scroll the given column to it. The
+   *  destination belongs to whatever DOCUMENT the column shows — a foreign
+   *  pane B resolves against its own session, everything else against the
+   *  tab's document. */
   const jumpToDestIn = useCallback(
     async (pane: PaneId, dest: unknown) => {
       const handle = handleForRef.current(pane)
-      if (!pdf || !handle?.ready()) return
+      const session = pane === 'b' ? sessionBRef.current : null
+      const doc = session?.pdf ?? pdf
+      const paneSizes = session ? session.sizes : sizesRef.current
+      if (!doc || !handle?.ready()) return
       try {
         const explicit =
-          typeof dest === 'string' ? await pdf.getDestination(dest) : (dest as unknown[] | null)
+          typeof dest === 'string' ? await doc.getDestination(dest) : (dest as unknown[] | null)
         if (!Array.isArray(explicit) || explicit.length === 0) return
         const ref = explicit[0]
-        const pageIndex = typeof ref === 'number' ? ref : await pdf.getPageIndex(ref as never)
-        if (pageIndex < 0 || pageIndex >= sizesRef.current.length) return
+        const pageIndex = typeof ref === 'number' ? ref : await doc.getPageIndex(ref as never)
+        if (pageIndex < 0 || pageIndex >= paneSizes.length) return
         pushBack(pane)
         // XYZ destinations carry a precise y in PDF user space (bottom-up)
         const destName = (explicit[1] as { name?: string } | undefined)?.name
         if (destName === 'XYZ' && typeof explicit[3] === 'number') {
-          const size = sizesRef.current[pageIndex]
+          const size = paneSizes[pageIndex]
           handle.scrollToPageY(pageIndex + 1, clamp(size.h - explicit[3], 0, size.h), 8)
         } else {
           handle.scrollToPage(pageIndex + 1)
@@ -4691,10 +4882,11 @@ export default function PdfViewer({
     },
     [pdf, pushBack]
   )
-  /** Outline entries in the sidebar move the column being worked in */
+  /** Outline entries in the sidebar move the column being worked in (the
+   *  outline is the main document's — never a column showing another file) */
   const jumpToDest = useCallback(
-    (dest: unknown) => jumpToDestIn(activePaneRef.current, dest),
-    [jumpToDestIn]
+    (dest: unknown) => jumpToDestIn(mainDocPane(), dest),
+    [jumpToDestIn, mainDocPane]
   )
 
   /**
@@ -4737,6 +4929,13 @@ export default function PdfViewer({
    */
   const followLinkFrom = useCallback(
     (from: PaneId, dest: unknown, toOtherPane: boolean) => {
+      // With two DIFFERENT documents open the destination only exists in the
+      // source column's file — "show it over there" would land it in the wrong
+      // document, so the gesture degrades to a plain in-place follow.
+      if (toOtherPane && sessionBRef.current) {
+        void jumpToDestIn(from, dest)
+        return
+      }
       if (!toOtherPane) {
         void jumpToDestIn(from, dest)
         return
@@ -4804,8 +5003,9 @@ export default function PdfViewer({
       const texts = pageTextsRef.current
       if (!texts || matches.length === 0) return
       // Search moves the column being worked in — the active one — so a hit
-      // never yanks the column you were using as a reference.
-      const pane = activePaneRef.current
+      // never yanks the column you were using as a reference. (Main document:
+      // a column showing another file can never receive a hit.)
+      const pane = mainDocPane()
       const handle = handleForRef.current(pane)
       const el = handle?.el()
       if (!handle?.ready() || !el) return
@@ -4877,7 +5077,7 @@ export default function PdfViewer({
       setSearchAllHits(null)
       return
     }
-    const pane = activePaneRef.current
+    const pane = mainDocPane() // main document only — never a foreign column
     const paneRotation = pane === 'b' ? paneBRotationRef.current : rotationRef.current
     // Rects measured in another rotation (or column) are simply wrong, not
     // stale-but-close, so drop them before the async work rather than after.
@@ -5101,7 +5301,8 @@ export default function PdfViewer({
       const texts = pageTextsRef.current
       if (!texts) return
       // Like search: the cited passage opens in the column being worked in
-      const pane = activePaneRef.current
+      // (main document — citations resolve against the tab's own text)
+      const pane = mainDocPane()
       const handle = handleForRef.current(pane)
       const el = handle?.el()
       if (!handle?.ready() || !el) return
@@ -5829,6 +6030,7 @@ export default function PdfViewer({
           paneZoomPercent={paneBScale > 0 ? Math.round(paneBScale * 100) : 100}
           paneFitMode={paneBFit}
           paneFitTarget={paneBFitTarget}
+          panePageCount={sessionB ? sessionB.sizes.length : undefined}
           onPaneGoToPage={goToPaneBPage}
           onPaneZoomTo={(percent) => paneBZoom(clamp(percent / 100, ZOOM_MIN, ZOOM_MAX), 'custom')}
           onPaneZoomIn={() => paneBZoom(clamp(paneBScale * 1.15, ZOOM_MIN, ZOOM_MAX), 'custom')}
@@ -6074,8 +6276,10 @@ export default function PdfViewer({
 
         {/* Split view: a full second column, mounted only while open so closing
             it frees every page canvas. Same tools, same annotation map, same
-            save — only page and zoom are its own. */}
-        {splitOpen && pdf && (
+            save — only page and zoom are its own. With a FOREIGN document
+            (splitDoc) the column binds to its own session instead: own proxy,
+            own annots, own dirty — every pane mechanic below is shared. */}
+        {splitOpen && pdf && (!foreign || sessionB?.pdf) && (
           <>
             <div
               className={`panel-resizer${resizingPanel === 'pane' ? ' active' : ''}`}
@@ -6084,12 +6288,24 @@ export default function PdfViewer({
               onDoubleClick={() => resetPanelWidth('pane')}
             />
             <PagesPane
-              pdf={pdf}
-              docKey={payload.path}
-              sizes={sizes}
-              annots={annots}
+              pdf={sessionB?.pdf ?? pdf}
+              docKey={sessionB ? sessionB.path : payload.path}
+              sizes={sessionB ? sessionB.sizes : sizes}
+              annots={sessionB ? sessionB.annots : annots}
               annotsHidden={annotsHidden}
               keepImageColors={keepImageColors}
+              onFileDrop={
+                onRequestOpenInSplit &&
+                ((file: File) => {
+                  // Desktop only: the split's other document is addressed by
+                  // path (main resolves drafts behind it). A browser drop has
+                  // no real path — let it bubble to App's open-a-tab handler.
+                  const realPath = bridge.getPathForFile(file)
+                  if (!realPath || realPath === payload.path) return false
+                  onRequestOpenInSplit(realPath)
+                  return true
+                })
+              }
               rotation={paneBRotation}
               spread={paneBSpread}
               coverPage={paneBCover}
@@ -6098,12 +6314,16 @@ export default function PdfViewer({
               onZoom={paneBZoom}
               onPageChange={setPaneBPage}
               flash={paneFlash === 'b'}
-              drawTool={drawTool}
+              // Foreign column reads in phase one — the write/selection
+              // surfaces route per document in the next phase
+              drawTool={foreign ? null : drawTool}
               fingerDraws={prefs.input.fingerDraws}
               penPressure={prefs.input.penPressure}
-              selected={selected}
-              searchHits={searchHits}
-              searchAllHits={searchAllHits?.pane === 'b' ? searchAllHits.byPage : null}
+              selected={foreign ? null : selected}
+              searchHits={foreign ? null : searchHits}
+              searchAllHits={
+                !foreign && searchAllHits?.pane === 'b' ? searchAllHits.byPage : null
+              }
               onContextMenu={onContextMenu}
               onMouseUp={onMouseUp}
               onMouseDown={onMouseDown}
@@ -6115,7 +6335,7 @@ export default function PdfViewer({
               onErase={onEraseAt}
               onShapeComplete={onShapeComplete}
               onPlaceText={onPlaceText}
-              marginView={marginViewConfig}
+              marginView={foreign ? null : marginViewConfig}
               onMarginCommit={onMarginCommit}
               onMarginSelect={onMarginSelect}
               onMarginDelete={onMarginDelete}
@@ -6123,13 +6343,17 @@ export default function PdfViewer({
               onMarginJump={(p, r) => jumpSelectAnnotIn('b', p, r)}
               onResizeStart={onResizeStart}
               onMarkupEndStart={onMarkupEndStart}
-              markupPreview={markupPreview?.pane === 'b' ? markupPreview.byPage : null}
+              markupPreview={
+                !foreign && markupPreview?.pane === 'b' ? markupPreview.byPage : null
+              }
               onExternalLink={onExternalLink}
               onInternalLink={onPaneBInternalLink}
               onHandle={(h) => {
                 paneBHandleRef.current = h
               }}
-              overlay={({ layout: lay, scale: s }) => paneOverlay('b', lay, s, paneBRotation)}
+              overlay={({ layout: lay, scale: s }) =>
+                foreign ? null : paneOverlay('b', lay, s, paneBRotation)
+              }
             />
           </>
         )}
