@@ -209,12 +209,22 @@ they do not.
 
 1. Google Cloud Console → new (or existing) project → enable the **Chrome Web
    Store API**.
-2. Configure the OAuth consent screen (**External**), then create an OAuth
-   client of type **Web application** with
-   `https://developers.google.com/oauthplayground` as an authorised redirect URI.
+2. Configure the OAuth consent screen (**External**; lives under "Google Auth
+   Platform" since 2025), then create an OAuth client of type **Web
+   application** with `https://developers.google.com/oauthplayground` as an
+   authorised redirect URI.
 3. Mint a refresh token in the OAuth Playground with scope
-   `https://www.googleapis.com/auth/chromewebstore`. Set the consent screen to
-   **In production** first — a token issued in Testing mode expires after 7 days.
+   `https://www.googleapis.com/auth/chromewebstore`. Set the app to
+   **In production** first (Audience page) — a token issued in Testing mode
+   expires after 7 days. Two traps on the way there (hit 2026-09-02):
+   **do not upload an app logo** — a logo forces the app through brand
+   verification once it leaves Testing; and the greyed-out **Publish app**
+   button demands MORE than the starred fields — Branding also needs a
+   homepage URL, a privacy-policy URL and their domains under Authorized
+   domains (we use the landing page, `docs/PRIVACY.md`'s github.com URL,
+   and the domains `emilmsh.github.io` + `github.com`). The "configuration
+   is incomplete" banner misleadingly points at fields that look complete;
+   hovering the disabled button names the real ones.
 4. Publisher ID: Developer Dashboard → **Publisher settings**.
 5. Repo secrets: `CWS_PUBLISHER_ID`, `CWS_CLIENT_ID`, `CWS_CLIENT_SECRET`,
    `CWS_REFRESH_TOKEN` (item ID defaults to
