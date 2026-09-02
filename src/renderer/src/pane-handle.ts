@@ -27,6 +27,11 @@ export interface PaneHandle {
    *  top edge. Used by search (a third of the way down, so the hit has context
    *  above it) and by XYZ link destinations (which name an exact y). */
   scrollToPageY(page: number, pageY: number, fromTop: number): void
+  /** Book-style page turn (←/→): land the previous/next layout row's top at
+   *  the viewport top — a whole spread at a time in two-page view. In a fit
+   *  mode the column re-fits against the landing row first, so "fit page +
+   *  turn" always shows the whole page it turned to. No-op at either end. */
+  flipPage(dir: -1 | 1): void
   /** Where the reader is in this column: page + fractional offset into it */
   position(): { page: number; offset: number } | null
   /** The scroll container — for finding this column's page/text elements */
@@ -48,6 +53,9 @@ interface Deps {
    *  a scroll event does not fire for an assignment to scrollTop in every path,
    *  and the target page has to render before anything can refine against it. */
   afterScroll(): void
+  /** The column's own page-turn logic — it lives with the column because a
+   *  turn in a fit mode re-fits, and only the column knows its fit machinery. */
+  flipPage(dir: -1 | 1): void
 }
 
 export function makePaneHandle(deps: Deps): PaneHandle {
@@ -56,6 +64,7 @@ export function makePaneHandle(deps: Deps): PaneHandle {
     el: deps.el,
     scale: deps.scale,
     rotation: deps.rotation,
+    flipPage: deps.flipPage,
     position() {
       const el = deps.el()
       const lay = deps.layout()

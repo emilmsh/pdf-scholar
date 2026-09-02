@@ -227,6 +227,24 @@ export function spreadRow(i: number, n: number, cover: boolean): number[] {
   return s + 1 < n && !(cover && s === 0) ? [s, s + 1] : [s]
 }
 
+/** Page index a book-style page turn lands on: the first page of the row
+ *  before/after the row that holds index i — so in spread mode a turn moves a
+ *  whole spread and the left/right pairing never changes, exactly like leaves
+ *  in a bound book. null at either end of the document (a turn never wraps). */
+export function flipTarget(
+  i: number,
+  dir: -1 | 1,
+  n: number,
+  spread: boolean,
+  cover: boolean
+): number | null {
+  if (n === 0) return null
+  const row = spread ? spreadRow(i, n, cover) : [i]
+  const step = dir > 0 ? row[row.length - 1] + 1 : row[0] - 1
+  if (step < 0 || step >= n) return null
+  return spread ? spreadRowStart(step, cover) : step
+}
+
 /**
  * Vertical stack of rows. In single mode each row is one page; in spread mode
  * pages pair up strictly (1-2, 3-4, …), or — with `cover` — page 1 stands

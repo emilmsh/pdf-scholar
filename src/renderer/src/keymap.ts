@@ -41,6 +41,8 @@ export type CommandId =
   // Navigation
   | 'nav.back'
   | 'nav.forward'
+  | 'nav.prevPage'
+  | 'nav.nextPage'
   | 'nav.gotoPage'
   | 'doc.bookmark'
   // View
@@ -172,6 +174,12 @@ const REGISTRY: readonly Command[] = [
   // ---------- Navigation ----------
   { id: 'nav.back', category: 'nav', labelKey: 'keys.navBack', defaults: ['alt+arrowleft'] },
   { id: 'nav.forward', category: 'nav', labelKey: 'keys.navForward', defaults: ['alt+arrowright'] },
+  // Book-style page turns (Karl Whelan's ask, 2026-09-02): with a fit zoom this
+  // reads as a full-page view without ever leaving continuous scroll. Bare ←/→
+  // was doing nothing vertically, so the keys were free — and unbinding the
+  // pair hands them back to the browser's native horizontal panning.
+  { id: 'nav.prevPage', category: 'nav', labelKey: 'keys.navPrevPage', defaults: ['arrowleft'] },
+  { id: 'nav.nextPage', category: 'nav', labelKey: 'keys.navNextPage', defaults: ['arrowright'] },
   // Owned by the toolbar, not the viewer: the command focuses the page field, so
   // it lives where that field lives. whileTyping, because a caret already parked
   // in some other field is exactly when you want to jump to the page box.
@@ -256,8 +264,11 @@ export function commandById(id: CommandId): Command | undefined {
 
 /** Keys that a chord may not use on their own. Bare, each one already has a job
  *  the app cannot take away — Escape backs out of everything, Tab moves focus,
- *  Enter presses the focused button, and the arrows, Space, PageUp/Down,
- *  Home/End scroll the document. With a modifier they are all fair game. */
+ *  Enter presses the focused button, and ↑/↓, Space, Home/End scroll the
+ *  document. With a modifier they are all fair game. ←/→ and PageUp/Down are
+ *  deliberately NOT here: the page-turn commands ship on bare ←/→, and a
+ *  reader who would rather turn pages with PageUp/Down (or reclaim ←/→ for
+ *  native horizontal panning) must be able to say so. */
 const RESERVED_BARE = new Set([
   'escape',
   'tab',
@@ -265,10 +276,6 @@ const RESERVED_BARE = new Set([
   'space',
   'arrowup',
   'arrowdown',
-  'arrowleft',
-  'arrowright',
-  'pageup',
-  'pagedown',
   'home',
   'end'
 ])

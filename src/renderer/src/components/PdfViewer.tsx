@@ -72,6 +72,7 @@ import type {
 } from '../annotations'
 import {
   buildRows,
+  flipTarget,
   GESTURE_SETTLE,
   MARGIN_NOTES_W,
   PAD_BOTTOM,
@@ -1134,6 +1135,9 @@ export default function PdfViewer({
     fx: number
     fy: number
   } | null>(null)
+  /** Page index a page turn should land on once its re-fit relayout is in —
+   *  the tops move with the new scale, so the scroll must wait for them. */
+  const flipLandRef = useRef<number | null>(null)
   const saveTimerRef = useRef<number | null>(null)
   const toastTimerRef = useRef<number | null>(null)
   const gestureRef = useRef<{
@@ -1409,12 +1413,13 @@ export default function PdfViewer({
   // View-space reference dimensions (page units) that fit-width/fit-page zoom
   // against: the first page under the current rotation, widened to a pair when
   // spread is on.
-  const fitDenom = useCallback((): { w: number; h: number } => {
+  const fitDenom = useCallback((forPage?: number): { w: number; h: number } => {
     if (sizes.length === 0) return { w: 1, h: 1 }
     // Fit against the page currently in view, not always page 1 — so a document
     // that mixes portrait and landscape pages fits the page you are actually
     // reading (fit-width on a wide page fills the width, not overflows it).
-    const cur = clamp(currentPage - 1, 0, sizes.length - 1)
+    // A page turn passes the page it is about to land on instead.
+    const cur = clamp((forPage ?? currentPage) - 1, 0, sizes.length - 1)
     const row = spread ? spreadRow(cur, sizes.length, coverPage) : [cur]
     const v0 = viewSize(sizes[row[0]].w, sizes[row[0]].h, rotation)
     if (row.length > 1) {
@@ -1512,6 +1517,7 @@ export default function PdfViewer({
   // The first column's scroll API, built from the same refs its own code uses.
   // Both columns hand out an identical interface, so `handleFor` below is the
   // only place that has to know there are two of them at all.
+  const flipARef = useRef<(dir: -1 | 1) => void>(() => {})
   const paneAHandle = useMemo(
     () =>
       makePaneHandle({
@@ -1520,7 +1526,8 @@ export default function PdfViewer({
         scale: () => scaleRef.current,
         rotation: () => rotationRef.current,
         sizes: () => sizesRef.current,
-        afterScroll: () => updateRangeRef.current()
+        afterScroll: () => updateRangeRef.current(),
+        flipPage: (dir) => flipARef.current(dir)
       }),
     []
   )
@@ -1552,6 +1559,11 @@ export default function PdfViewer({
       restoreRef.current = null
       const page = clamp(pos.page, 1, layout.tops.length)
       el.scrollTop = layout.tops[page - 1] + pos.offset * layout.heights[page - 1] - 8
+    }
+    if (flipLandRef.current !== null) {
+      const i = clamp(flipLandRef.current, 0, layout.tops.length - 1)
+      flipLandRef.current = null
+      el.scrollTop = Math.max(0, layout.tops[i] - 8)
     }
     updateRange()
   }, [layout, sizes, scale, updateRange])
@@ -1738,6 +1750,49 @@ export default function PdfViewer({
     const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
     zoomTo(Math.min(fitW, fitH))
   }, [sizes, zoomTo, fitDenom])
+
+  /** Book-style page turn (←/→): the previous/next row's top lands at the
+   *  viewport top — a whole spread at a time in two-page view, so the
+   *  left/right pairing never changes. In a fit mode the zoom re-fits against
+   *  the LANDING row first (only here — never while scrolling — so a mixed
+   *  portrait/landscape document keeps the fit's promise on every turn). */
+  const flipA = useCallback(
+    (dir: -1 | 1) => {
+      const el = containerRef.current
+      const lay = layoutRef.current
+      const cur = computeCurrent()
+      if (!el || !lay || !cur) return
+      const target = flipTarget(
+        cur.page - 1,
+        dir,
+        sizesRef.current.length,
+        spreadRef.current,
+        coverPageRef.current
+      )
+      if (target === null) return
+      const mode = fitModeRef.current
+      if (mode !== 'custom') {
+        const denom = fitDenom(target + 1)
+        const fitW = (el.clientWidth - SIDE_PAD - marginGutterRef.current) / denom.w
+        const fitH = (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
+        const next = clamp(mode === 'width' ? fitW : Math.min(fitW, fitH), ZOOM_MIN, ZOOM_MAX)
+        const prev = scaleRef.current
+        if (prev > 0 && Math.abs(next - prev) / prev >= 0.002) {
+          // Land after the relayout, not before — the tops move with the scale.
+          pendingAnchorRef.current = null
+          flipLandRef.current = target
+          setScale(next)
+          schedulePositionSave()
+          return
+        }
+      }
+      el.scrollTop = Math.max(0, lay.tops[target] - 8)
+      updateRangeRef.current()
+      schedulePositionSave()
+    },
+    [computeCurrent, fitDenom, schedulePositionSave]
+  )
+  flipARef.current = flipA
 
   // Re-fit when the usable width changes (a side panel pinned open/closed, or
   // the window resized). In a fit mode the page rescales to the new width and
@@ -5196,6 +5251,23 @@ export default function PdfViewer({
         e.preventDefault()
         goForward()
         break
+      case 'nav.prevPage':
+      case 'nav.nextPage': {
+        // Menus, dialogs and native selects own their arrow keys — a page
+        // turning under an open menu is never what the keypress meant.
+        const target = e.target instanceof HTMLElement ? e.target : null
+        if (
+          target &&
+          (target.tagName === 'SELECT' ||
+            target.closest('[role="menu"],[role="dialog"],[role="listbox"]'))
+        )
+          return
+        e.preventDefault()
+        handleForRef.current(activePaneRef.current)?.flipPage(
+          command === 'nav.nextPage' ? 1 : -1
+        )
+        break
+      }
       case 'file.save':
         e.preventDefault()
         // Save over the current file when there is something to save. Desktop

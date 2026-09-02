@@ -37,6 +37,7 @@ import {
   shiftLayoutX,
   SIDE_PAD,
   SPREAD_GAP,
+  flipTarget,
   spreadRow,
   viewSize
 } from '../rotation'
@@ -567,6 +568,38 @@ export default function PagesPane({
     }
   }, [beginGesture, drawTool])
 
+  /** Book-style page turn, same contract as the main column's: land the
+   *  previous/next row's top, a whole spread at a time, and in a fit mode
+   *  re-fit against the landing row first (only on a turn — never mid-scroll). */
+  const flipPage = (dir: -1 | 1): void => {
+    const el = containerRef.current
+    const lay = layoutRef.current
+    if (!el || !lay) return
+    const target = flipTarget(currentPageRef.current - 1, dir, sizes.length, spread, coverPage)
+    if (target === null) return
+    if (fitMode !== 'custom') {
+      const denom = fitDenom(target + 1)
+      const usable = el.clientWidth - SIDE_PAD - marginGutterRef.current
+      const next = clampZoom(
+        fitMode === 'width'
+          ? usable / denom.w
+          : Math.min(usable / denom.w, (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h)
+      )
+      const prev = scaleRef.current
+      if (prev > 0 && Math.abs(next - prev) / prev >= 0.002) {
+        // Land after the relayout, not before — the tops move with the scale.
+        anchorRef.current = null
+        pendingPageRef.current = target + 1
+        onZoomRef.current(next, fitMode)
+        return
+      }
+    }
+    el.scrollTop = Math.max(0, lay.tops[target] - 8)
+    updateRangeRef.current()
+  }
+  const flipPageRef = useRef(flipPage)
+  flipPageRef.current = flipPage
+
   // This column's scroll API, published upward so the viewer can aim any go-to
   // action at it. Rebuilt only when `sizes` changes — everything else is read
   // through refs, so the handle identity stays stable.
@@ -581,7 +614,8 @@ export default function PagesPane({
       scale: () => scaleRef.current,
       rotation: () => rotationRef.current,
       sizes: () => sizesRef.current,
-      afterScroll: () => updateRangeRef.current()
+      afterScroll: () => updateRangeRef.current(),
+      flipPage: (dir) => flipPageRef.current(dir)
     })
     onHandleRef.current(handle)
     return () => onHandleRef.current(null)

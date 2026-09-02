@@ -762,6 +762,8 @@ const nb = {
 
   'keys.navBack': 'Tilbake (etter et lenkehopp)',
   'keys.navForward': 'Fram igjen',
+  'keys.navPrevPage': 'Bla til forrige side',
+  'keys.navNextPage': 'Bla til neste side',
   'keys.navGotoPage': 'Gå til side',
   'keys.docBookmark': 'Bokmerk siden du leser',
 
@@ -1539,6 +1541,8 @@ const en: Dict = {
 
   'keys.navBack': 'Back (after a link jump)',
   'keys.navForward': 'Forward again',
+  'keys.navPrevPage': 'Turn to the previous page',
+  'keys.navNextPage': 'Turn to the next page',
   'keys.navGotoPage': 'Go to page',
   'keys.docBookmark': 'Bookmark the page you are reading',
 

@@ -205,6 +205,58 @@ console.log('6) buildRows cover mode: page 1 alone, pairs 2-3, 4-5 …')
   }
 }
 
+console.log('7) flipTarget: page turns move one layout row, never rewrap, never wrap around')
+{
+  const opts = { containerWidth: 1000, pageGap: 16, padTop: 28, padBottom: 28, sidePad: 64, spreadGap: 24 }
+  const page = { w: 600, h: 800 }
+  const mk = (n) => Array.from({ length: n }, () => page)
+
+  // Single mode: plain ±1, null at the ends
+  ok(R.flipTarget(2, 1, 10, false, false) === 3, 'single: 3 → 4')
+  ok(R.flipTarget(2, -1, 10, false, false) === 1, 'single: 3 → 2')
+  ok(R.flipTarget(0, -1, 10, false, false) === null, 'single: no turn before page 1')
+  ok(R.flipTarget(9, 1, 10, false, false) === null, 'single: no turn past the last page')
+  ok(R.flipTarget(0, 1, 0, false, false) === null, 'empty document: no turn')
+
+  // Spread, no cover (rows 0-1, 2-3, 4): a turn moves a whole spread and lands
+  // on the row's FIRST page, from either page of the current row
+  ok(R.flipTarget(0, 1, 5, true, false) === 2, 'spread: row 1-2 → row 3-4')
+  ok(R.flipTarget(1, 1, 5, true, false) === 2, 'spread: right page turns the same spread')
+  ok(R.flipTarget(2, -1, 5, true, false) === 0, 'spread: row 3-4 → row 1-2')
+  ok(R.flipTarget(4, -1, 5, true, false) === 2, 'spread: lone last page → row 3-4')
+  ok(R.flipTarget(4, 1, 5, true, false) === null, 'spread: no turn past the last row')
+  ok(R.flipTarget(1, -1, 5, true, false) === null, 'spread: no turn before the first row')
+
+  // Cover mode (rows 1 | 2-3 | 4-5): the pairing survives every turn
+  ok(R.flipTarget(0, 1, 5, true, true) === 1, 'cover: cover → row 2-3')
+  ok(R.flipTarget(1, 1, 5, true, true) === 3, 'cover: row 2-3 → row 4-5')
+  ok(R.flipTarget(2, 1, 5, true, true) === 3, 'cover: from page 3 too')
+  ok(R.flipTarget(3, -1, 5, true, true) === 1, 'cover: row 4-5 → row 2-3')
+  ok(R.flipTarget(1, -1, 5, true, true) === 0, 'cover: row 2-3 → cover')
+  ok(R.flipTarget(3, 1, 5, true, true) === null, 'cover: no turn past the last row')
+
+  // Against the layout itself: for every document shape, turning forward walks
+  // the rows buildRows draws, first page by first page — and next-then-prev
+  // always returns to the same row start (turns are involutive at row level)
+  for (const n of [1, 2, 3, 4, 5, 6, 7]) {
+    for (const spread of [false, true]) {
+      for (const cover of spread ? [false, true] : [false]) {
+        const lay = R.buildRows(mk(n), 1, 0, spread, opts, cover)
+        const starts = lay.rows.map((r) => r.pages[0].index)
+        for (let r = 0; r < starts.length; r++) {
+          const fwd = R.flipTarget(starts[r], 1, n, spread, cover)
+          const want = r + 1 < starts.length ? starts[r + 1] : null
+          ok(fwd === want, `walk n=${n} spread=${spread} cover=${cover} row ${r}: fwd ${fwd} want ${want}`)
+          if (fwd !== null) {
+            const back = R.flipTarget(fwd, -1, n, spread, cover)
+            ok(back === starts[r], `roundtrip n=${n} spread=${spread} cover=${cover} row ${r}`)
+          }
+        }
+      }
+    }
+  }
+}
+
 if (failures === 0) {
   console.log('\nALL ROTATION ROUND-TRIPS PASS ✓')
   process.exit(0)
