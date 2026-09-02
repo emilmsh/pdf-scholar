@@ -5326,31 +5326,42 @@ export default function PdfViewer({
         e.preventDefault()
         searchStep(-1)
         break
+      // The zoom family follows the ACTIVE column, like rotate/spread/page-turn
+      // above — 'w' with the right column active used to re-fit the left one
+      // (feedback, 2026-09-02). Same routing the toolbar's centre cluster uses.
       case 'zoom.in':
         e.preventDefault()
-        manualZoom(scaleRef.current * 1.15)
+        if (activePaneRef.current === 'b')
+          paneBZoom(clamp(paneBScaleRef.current * 1.15, ZOOM_MIN, ZOOM_MAX), 'custom')
+        else manualZoom(scaleRef.current * 1.15)
         break
       case 'zoom.out':
         e.preventDefault()
-        manualZoom(scaleRef.current / 1.15)
+        if (activePaneRef.current === 'b')
+          paneBZoom(clamp(paneBScaleRef.current / 1.15, ZOOM_MIN, ZOOM_MAX), 'custom')
+        else manualZoom(scaleRef.current / 1.15)
         break
       case 'zoom.actual':
         // Actual size (100%), matching standard PDF-reader convention
         e.preventDefault()
-        manualZoom(1)
+        if (activePaneRef.current === 'b') paneBZoom(1, 'custom')
+        else manualZoom(1)
         break
       case 'zoom.fitToggle':
         e.preventDefault()
-        if (fitTarget === 'page') fitPage()
+        if (activePaneRef.current === 'b') setPaneBFit(paneBFitRef.current === 'width' ? 'page' : 'width')
+        else if (fitTarget === 'page') fitPage()
         else fitWidth()
         break
       case 'zoom.fitWidth':
         e.preventDefault()
-        fitWidth()
+        if (activePaneRef.current === 'b') setPaneBFit('width')
+        else fitWidth()
         break
       case 'zoom.fitPage':
         e.preventDefault()
-        fitPage()
+        if (activePaneRef.current === 'b') setPaneBFit('page')
+        else fitPage()
         break
       case 'view.rotateRight':
         e.preventDefault()
