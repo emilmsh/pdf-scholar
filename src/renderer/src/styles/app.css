@@ -1183,6 +1183,16 @@ button {
   border-radius: 2px 0 0 2px;
 }
 
+/* The host is pointer-events: none (the overlay rule above), so the EMPTY
+   stretches of strip need their own hit surface — it exists for the strip's
+   right-click menu and handles nothing itself; every event bubbles on. Sits
+   under the cards and the leader SVG in the stacking order. */
+.margin-strip-hit {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+
 /* Leader lines + anchor outline for hovered/selected cards. Reaches INTO the
    page (negative x / beyond the width), so overflow must stay visible. */
 .margin-note-leads {
@@ -5322,6 +5332,8 @@ html.pen-near .draw-layer {
 .tb-split {
   display: inline-flex;
   align-items: center;
+  /* Anchors the Zotero badge's absolute corner */
+  position: relative;
 }
 
 .tb-chevron {
@@ -5878,6 +5890,38 @@ html.pen-near .draw-layer {
   right: auto;
   padding: 6px;
   white-space: nowrap;
+}
+
+/* The Zotero metadata line is the one long text in this nowrap-sized menu: an
+   unwrapped title once sized the whole menu past the window edge, and the
+   toolbar's overflow measurement counted that width and folded half the
+   toolbar into «…». Wrap it inside a fixed width and clamp the tail. */
+.save-menu .menu-hint {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 216px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* A document living in a Zotero library: a quiet Z on the save split, marking
+   where the Zotero actions live (Emil's ask, 2026-09-02). Non-interactive —
+   the chevron beneath it is the click target. */
+.tb-zotero-badge {
+  position: absolute;
+  top: 1px;
+  right: -4px;
+  padding: 0 2.5px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 8.5px;
+  font-weight: 700;
+  line-height: 11px;
+  pointer-events: none;
 }
 
 .tb-save.has-changes {

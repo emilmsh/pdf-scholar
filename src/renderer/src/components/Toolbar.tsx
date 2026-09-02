@@ -1697,6 +1697,13 @@ export default function Toolbar({
                 <IconSave />
               </button>
               {chevron}
+              {/* Quiet marker: this document lives in a Zotero library, and the
+                  menu behind the chevron carries its Zotero actions */}
+              {zoteroKey && (
+                <span className="tb-zotero-badge" aria-hidden="true">
+                  Z
+                </span>
+              )}
               {saveMenuOpen && (
                 <div className="theme-menu save-menu">
                   <button
