@@ -36,7 +36,7 @@ export type LanguagePreference = 'nb' | 'en' | 'auto'
 export interface Settings {
   theme: ThemePreference
   /** Which light theme 'auto' resolves to when the OS is in light mode */
-  autoLight: 'day' | 'sepia'
+  autoLight: 'day' | 'sepia' | 'custom'
   /** Which dark theme 'auto' resolves to when the OS is in dark mode */
   autoDark: 'night' | 'nightHc'
   /** Intensity per tunable theme, 1 = the shipped look (see ThemeTune) */

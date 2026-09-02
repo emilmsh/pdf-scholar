@@ -491,7 +491,7 @@ export default function Toolbar({
   /** Intensity slider mid-drag: previewed live via applyPageTune, but only
    *  COMMITTED to settings on release — settings:set is a synchronous file
    *  write per call, and a drag emits dozens of ticks. null = not dragging. */
-  const [tuneDraft, setTuneDraft] = useState<number | null>(null)
+  const [tuneDraft, setTuneDraft] = useState<{ key: 'sepia' | 'night' | 'custom'; value: number } | null>(null)
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   // Save is a split button: the frequent action (write changes back to the
   // file) stays one click, the rare one (save a copy) moves behind the
@@ -1845,15 +1845,27 @@ export default function Toolbar({
                   <div className="theme-auto-row">
                     <span className="theme-auto-label">{t('tb.autoLight')}</span>
                     <div className="theme-auto-choices">
-                      {(['day', 'sepia'] as const).map((id) => (
-                        <button
-                          key={id}
-                          className={`theme-chip theme-${id}${settings.autoLight === id ? ' selected' : ''}`}
-                          onClick={() => onSettingsChange({ autoLight: id })}
-                        >
-                          {t(id === 'day' ? 'tb.themeDay' : 'tb.themeSepia')}
-                        </button>
-                      ))}
+                      {/* Dag / Farge — «Farge» is the tinted light mode with its
+                          chosen tone. A stored legacy 'sepia' reads as Farge. */}
+                      {(['day', 'custom'] as const).map((id) => {
+                        const selected =
+                          settings.autoLight === id || (id === 'custom' && settings.autoLight === 'sepia')
+                        return (
+                          <button
+                            key={id}
+                            className={`theme-chip theme-${id}${selected ? ' selected' : ''}`}
+                            onClick={() =>
+                              onSettingsChange(
+                                id === 'custom' && settings.autoLight === 'sepia'
+                                  ? { autoLight: 'custom', customTone: 'sepia' }
+                                  : { autoLight: id }
+                              )
+                            }
+                          >
+                            {t(id === 'day' ? 'tb.themeDay' : 'tb.themeCustom')}
+                          </button>
+                        )
+                      })}
                     </div>
                   </div>
                   <div className="theme-auto-row">
@@ -1874,78 +1886,40 @@ export default function Toolbar({
                 </div>
               )}
 
-              {/* Paper tone — while «Farge» (or a stored legacy Sepia) is chosen */}
-              {(settings.theme === 'custom' || settings.theme === 'sepia') && (
-                <div className="theme-auto-prefs">
-                  <div className="theme-auto-row">
-                    <span className="theme-auto-label">{t('tb.customTone')}</span>
-                    <div className="theme-auto-choices">
-                      {CUSTOM_TONE_ORDER.map((tone) => {
-                        const active =
-                          settings.theme === 'sepia' ? tone === 'sepia' : settings.customTone === tone
-                        return (
-                          <button
-                            key={tone}
-                            className={`tone-chip${active ? ' selected' : ''}`}
-                            style={{ background: customToneCss(tone, 1).bg }}
-                            onClick={() => onSettingsChange({ theme: 'custom', customTone: tone })}
-                          >
-                            {t(TONE_LABELS[tone])}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
+              {(() => {
+                // Which tone rows and strength sliders the menu shows. An explicit
+                // theme shows its own; Auto shows BOTH halves it may resolve to
+                // (Emil, 2026-09-02 — auto showed only the half on screen, so the
+                // night brightness was unreachable by day).
+                const inAuto = settings.theme === 'auto'
+                const lightPick =
+                  settings.theme === 'custom' || settings.theme === 'sepia'
+                    ? settings.theme
+                    : inAuto && (settings.autoLight === 'custom' || settings.autoLight === 'sepia')
+                      ? settings.autoLight
+                      : null
+                const showNightTones = settings.theme === 'night' || (inAuto && settings.autoDark === 'night')
+                const activeLightTone: CustomTone | null =
+                  lightPick === 'sepia' ? 'sepia' : lightPick === 'custom' ? settings.customTone : null
 
-              {/* Dark paper tone — night mode's own tints (warm = the classic) */}
-              {settings.theme === 'night' && (
-                <div className="theme-auto-prefs">
-                  <div className="theme-auto-row">
-                    <span className="theme-auto-label">{t('tb.customTone')}</span>
-                    <div className="theme-auto-choices">
-                      {NIGHT_TONE_ORDER.map((tone) => {
-                        const [r, g, b] = NIGHT_TONES[tone].bg
-                        return (
-                          <button
-                            key={tone}
-                            className={`tone-chip tone-chip-dark${settings.nightTone === tone ? ' selected' : ''}`}
-                            style={{ background: `rgb(${r}, ${g}, ${b})` }}
-                            onClick={() => onSettingsChange({ nightTone: tone })}
-                          >
-                            {t(NIGHT_TONE_LABELS[tone])}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Intensity — only the themes with an axis worth dialling
-                  (sepia: paper warmth, night: brightness, custom: tone
-                  strength). Follows the RESOLVED theme so auto-sepia is
-                  tunable too. 100 % = the shipped look, exactly. */}
-              {(resolvedTheme === 'sepia' ||
-                resolvedTheme === 'night' ||
-                resolvedTheme === 'custom') &&
-                (() => {
-                  const key = resolvedTheme
+                /** One strength slider. Live preview only while the axis is the
+                 *  theme on screen; otherwise it just commits. */
+                const slider = (key: 'sepia' | 'night' | 'custom'): React.JSX.Element => {
                   const range = TUNE_RANGE[key]
                   const stored = settings.themeTune[key]
-                  const value = tuneDraft ?? (Number.isFinite(stored) ? stored : 1)
+                  const draft = tuneDraft?.key === key ? tuneDraft.value : null
+                  const value = draft ?? (Number.isFinite(stored) ? stored : 1)
                   const commit = (v: number): void => {
                     setTuneDraft(null)
                     if (v !== stored) onSettingsChange({ themeTune: { ...settings.themeTune, [key]: v } })
                   }
-                  // Named for what it actually adjusts (Emil, 2026-09-02):
-                  // night moves the page's brightness, the light tones move
-                  // how strongly the tone colours the paper.
+                  // Named for what it actually adjusts: night moves the page's
+                  // brightness, the light tones move how strongly the tone
+                  // colours the paper.
                   const axisLabel = key === 'night' ? 'tb.tuneBrightness' : 'tb.tuneTint'
                   const axisTip = key === 'night' ? 'tb.tuneBrightnessTip' : 'tb.tuneTintTip'
                   return (
-                    <div className="theme-tune">
+                    <div className="theme-tune" key={key}>
                       <div className="slider-label">
                         <span title={t(axisTip)}>{t(axisLabel)}</span>
                         <output>{pct(value)}</output>
@@ -1958,23 +1932,82 @@ export default function Toolbar({
                         value={value}
                         onChange={(e) => {
                           const v = Number(e.target.value)
-                          setTuneDraft(v)
-                          applyPageTune(
-                            resolvedTheme,
-                            { ...settings.themeTune, [key]: v },
-                            settings.customTone,
-                            settings.nightTone
-                          )
+                          setTuneDraft({ key, value: v })
+                          if (key === resolvedTheme) {
+                            applyPageTune(
+                              resolvedTheme,
+                              { ...settings.themeTune, [key]: v },
+                              settings.customTone,
+                              settings.nightTone
+                            )
+                          }
                         }}
-                        onPointerUp={() => tuneDraft != null && commit(tuneDraft)}
-                        onKeyUp={() => tuneDraft != null && commit(tuneDraft)}
-                        onBlur={() => tuneDraft != null && commit(tuneDraft)}
+                        onPointerUp={() => draft != null && commit(draft)}
+                        onKeyUp={() => draft != null && commit(draft)}
+                        onBlur={() => draft != null && commit(draft)}
                       />
                       <ResetLink hidden={value === 1} onClick={() => commit(1)} />
                     </div>
                   )
-                })()}
+                }
 
+                return (
+                  <>
+                    {/* Light paper tone — under «Farge» (or a stored legacy Sepia) */}
+                    {lightPick && (
+                      <div className="theme-auto-prefs">
+                        <div className="theme-auto-row">
+                          <span className="theme-auto-label">{t('tb.customTone')}</span>
+                          <div className="theme-auto-choices">
+                            {CUSTOM_TONE_ORDER.map((tone) => (
+                              <button
+                                key={tone}
+                                className={`tone-chip${activeLightTone === tone ? ' selected' : ''}`}
+                                style={{ background: customToneCss(tone, 1).bg }}
+                                onClick={() =>
+                                  onSettingsChange(
+                                    inAuto
+                                      ? { autoLight: 'custom', customTone: tone }
+                                      : { theme: 'custom', customTone: tone }
+                                  )
+                                }
+                              >
+                                {t(TONE_LABELS[tone])}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {lightPick && slider(lightPick === 'sepia' ? 'sepia' : 'custom')}
+
+                    {/* Dark paper tone — night mode's own tints */}
+                    {showNightTones && (
+                      <div className="theme-auto-prefs">
+                        <div className="theme-auto-row">
+                          <span className="theme-auto-label">{t('tb.customTone')}</span>
+                          <div className="theme-auto-choices">
+                            {NIGHT_TONE_ORDER.map((tone) => {
+                              const [r, g, b] = NIGHT_TONES[tone].bg
+                              return (
+                                <button
+                                  key={tone}
+                                  className={`tone-chip tone-chip-dark${settings.nightTone === tone ? ' selected' : ''}`}
+                                  style={{ background: `rgb(${r}, ${g}, ${b})` }}
+                                  onClick={() => onSettingsChange({ nightTone: tone })}
+                                >
+                                  {t(NIGHT_TONE_LABELS[tone])}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {showNightTones && slider('night')}
+                  </>
+                )
+              })()}
               <div className="theme-menu-sep" />
 
               {/* Both of these shape the READING experience rather than the

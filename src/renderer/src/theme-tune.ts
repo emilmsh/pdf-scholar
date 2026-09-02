@@ -38,14 +38,29 @@ export const CUSTOM_TONES: Record<CustomTone, { bg: readonly [number, number, nu
 export const CUSTOM_TONE_ORDER: readonly CustomTone[] = ['sepia', 'gray', 'green', 'blue', 'sand']
 
 /** The dark paper tones for night mode. 'warm' is the shipped near-black
- *  (#21211f) and stays on the untouched CSS path; the others tint the page
- *  through a screen blend — the exact mirror of how sepia's multiply tints
- *  white paper cream: dark pixels take the tone, the light text barely moves. */
+ *  (#21211f, labelled «Standard» — it IS faintly warm, Claude's dark palette,
+ *  but that is a fact nobody needs) and stays on the untouched CSS path; the
+ *  others tint the page through a screen blend — the exact mirror of how
+ *  sepia's multiply tints white paper cream: dark pixels take the tone, the
+ *  light text barely moves. Saturated on purpose: screen against the near-
+ *  black inverted paper dilutes a tone, so a pale one reads as nothing (Emil,
+ *  2026-09-02 — first cut moved the UI and barely the page). */
 export const NIGHT_TONES: Record<NightTone, { bg: readonly [number, number, number] }> = {
   warm: { bg: [33, 33, 31] }, // #21211f — the shipped night paper
-  gray: { bg: [33, 34, 37] }, // #212225
-  blue: { bg: [29, 36, 51] }, // #1d2433
-  green: { bg: [29, 42, 34] } // #1d2a22
+  gray: { bg: [30, 33, 39] }, // #1e2127 — cool neutral, the counterpart of warm
+  blue: { bg: [24, 40, 70] }, // #182846
+  green: { bg: [24, 46, 32] } // #182e20
+}
+
+/** What the page's inverted white paper (~#1c1c1c, see the night block's
+ *  calibration note) becomes under the screen blend with a tone — the colour
+ *  the reader actually sees as paper. The chrome derives from THIS, not from
+ *  the tone itself, so UI and page land in the same family by construction. */
+export function nightPaper(tone: NightTone): [number, number, number] {
+  const [r, g, b] = NIGHT_TONES[safeNightTone(tone)].bg
+  const base = 28 / 255
+  const screen = (c: number): number => channel(255 * (1 - (1 - base) * (1 - c / 255)))
+  return [screen(r), screen(g), screen(b)]
 }
 
 export const NIGHT_TONE_ORDER: readonly NightTone[] = ['warm', 'gray', 'blue', 'green']
@@ -215,14 +230,16 @@ export function customChromeCss(tone: CustomTone): ChromeCss {
  *  warm block's #eeece2 is exactly that shape). */
 export function nightChromeCss(tone: NightTone): ChromeCss | null {
   if (safeNightTone(tone) === 'warm') return null
-  const [r, g, b] = NIGHT_TONES[safeNightTone(tone)].bg
+  // From the paper the reader SEES (the screen result), not the raw tone —
+  // otherwise the UI ends up a deeper colour than the page it frames
+  const [r, g, b] = nightPaper(tone)
   const scale = (k: number): string => hex(r * k, g * k, b * k)
   const towardWhite = (k: number): string =>
     hex(r + (255 - r) * k, g + (255 - g) * k, b + (255 - b) * k)
   return {
-    '--bg-chrome': scale(1.16),
-    '--bg-canvas': scale(0.85),
-    '--bg-elevated': scale(1.45),
+    '--bg-chrome': scale(1.12),
+    '--bg-canvas': scale(0.82),
+    '--bg-elevated': scale(1.35),
     '--bg-titlebar': hex(r, g, b),
     '--text': towardWhite(0.88),
     '--text-secondary': towardWhite(0.55),

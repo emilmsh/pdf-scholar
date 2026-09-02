@@ -158,6 +158,16 @@ for (const tone of T.NIGHT_TONE_ORDER) {
   ok(cChrome >= 7, `night ${tone}: chrome vs ink ${cChrome.toFixed(2)}:1 ≥ 7:1`)
 }
 eq(T.nightChromeCss('warm'), null, "warm's chrome is the shipped CSS block")
+// The chrome is built from the VISIBLE paper (the screen result), so UI and
+// page share a family — the titlebar equals that paper exactly
+for (const tone of ['gray', 'blue', 'green']) {
+  const [r, g, b] = T.nightPaper(tone)
+  const hexOf = (v) => v.toString(16).padStart(2, '0')
+  eq(T.nightChromeCss(tone)['--bg-titlebar'], `#${hexOf(r)}${hexOf(g)}${hexOf(b)}`, `night ${tone}: titlebar = visible paper`)
+  // …and the tint is actually visible: the paper differs from neutral by a margin
+  const spread = Math.max(r, g, b) - Math.min(r, g, b)
+  ok(tone === 'gray' ? spread <= 12 : spread >= 20, `night ${tone}: tint spread ${spread} (${tone === 'gray' ? 'near-neutral' : 'clearly tinted'})`)
+}
 // A tinted night tone overrides even at strength 1 (the tone is a choice)…
 ok(
   T.pageTuneCss('night', TUNE({}), 'gray', 'blue')?.blend === 'screen',

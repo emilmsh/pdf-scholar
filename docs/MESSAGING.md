@@ -130,7 +130,7 @@ carries no picture of its own.)*
 - Four reading modes — Day, «Farge» (a light paper tone: the classic Sepia
   cream plus gray, green, blue and sand), Night and Night+ (higher contrast) —
   plus Auto, which follows the system setting. Night has its own dark tones
-  (warm, gray, blue, green). The tinted modes take a strength slider — tint
+  (the standard near-black, gray, blue, green). The tinted modes take a strength slider — tint
   strength for the light tones, brightness for night; 100 % is the standard
   look — and the UI chrome follows the chosen tone, the way Sepia's cream
   chrome always did. A keyboard shortcut cycles the modes
