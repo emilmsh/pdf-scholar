@@ -134,6 +134,8 @@ interface Props {
   onMarginCommit(pageNumber: number, localId: string, text: string): void
   onMarginSelect(pageNumber: number, localId: string): void
   onMarginDelete(pageNumber: number, localId: string): void
+  /** Right-click on the margin strip: offer to hide the view (viewport coords) */
+  onMarginMenu(x: number, y: number): void
 }
 
 interface Cancellable {
@@ -175,7 +177,8 @@ function PdfPage({
   marginView,
   onMarginCommit,
   onMarginSelect,
-  onMarginDelete
+  onMarginDelete,
+  onMarginMenu
 }: Props): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
@@ -1015,6 +1018,7 @@ function PdfPage({
           onCommit={onMarginCommit}
           onSelect={onMarginSelect}
           onDelete={onMarginDelete}
+          onMenu={onMarginMenu}
         />
       )}
     </div>

@@ -139,6 +139,7 @@ import { NotePopover, SelectionMenu } from './SelectionMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
 import { errorText, locale, t, useLang } from '../i18n'
+import { useDismissable } from '../useDismissable'
 import {
   buildPageText,
   buildPageTexts,
@@ -512,6 +513,14 @@ export default function PdfViewer({
   )
   const marginViewRef = useRef(marginView)
   marginViewRef.current = marginView
+  /** Right-click on the margin strip: a small menu at the cursor OFFERING to
+   *  hide the view — a choice, never an immediate close (Emil, 2026-09-02).
+   *  Esc/outside-click dismissal via useDismissable, per the standing rule. */
+  const [marginMenu, setMarginMenu] = useState<{ x: number; y: number } | null>(null)
+  const marginMenuRef = useRef<HTMLDivElement>(null)
+  const onMarginMenu = useCallback((x: number, y: number) => setMarginMenu({ x, y }), [])
+  const closeMarginMenu = useCallback(() => setMarginMenu(null), [])
+  useDismissable(marginMenuRef, marginMenu !== null, closeMarginMenu)
   /** Acrobat-style one-page-at-a-time slideshow (own fullscreen overlay) */
   const [presentation, setPresentation] = useState(false)
   const presentationRef = useRef(presentation)
@@ -5978,6 +5987,7 @@ export default function PdfViewer({
                     onMarginCommit={onMarginCommit}
                     onMarginSelect={onMarginSelect}
                     onMarginDelete={onMarginDelete}
+                    onMarginMenu={onMarginMenu}
                   />
                 )
               })}
@@ -6002,6 +6012,30 @@ export default function PdfViewer({
             side={marginViewConfig.side}
             onJump={(p, r) => jumpSelectAnnotIn('a', p, r)}
           />
+        )}
+        {/* The margin strip's right-click menu (fixed at the cursor; the strip
+            itself reported viewport coordinates). One choice, not an action —
+            hiding the view on the raw right-click was tried and felt like the
+            app snatching the margin away. */}
+        {marginMenu && (
+          <div
+            ref={marginMenuRef}
+            className="tab-menu"
+            style={{
+              left: Math.min(marginMenu.x, window.innerWidth - 220),
+              top: Math.min(marginMenu.y, window.innerHeight - 48)
+            }}
+          >
+            <button
+              className="menu-item"
+              onClick={() => {
+                setMarginMenu(null)
+                patchMarginView({ on: false })
+              }}
+            >
+              {t('margin.hide')}
+            </button>
+          </div>
         )}
         <OverlayScrollbars
           scrollRef={containerRef}
@@ -6055,6 +6089,7 @@ export default function PdfViewer({
               onMarginCommit={onMarginCommit}
               onMarginSelect={onMarginSelect}
               onMarginDelete={onMarginDelete}
+              onMarginMenu={onMarginMenu}
               onMarginJump={(p, r) => jumpSelectAnnotIn('b', p, r)}
               onResizeStart={onResizeStart}
               onMarkupEndStart={onMarkupEndStart}

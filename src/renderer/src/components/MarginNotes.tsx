@@ -278,6 +278,10 @@ interface Props {
   onCommit(pageNumber: number, localId: string, text: string): void
   onSelect(pageNumber: number, localId: string): void
   onDelete(pageNumber: number, localId: string): void
+  /** Right-click anywhere on the strip: the viewer shows a small menu there
+   *  offering to hide the margin view — a choice, never an immediate close
+   *  (Emil, 2026-09-02). Coordinates are viewport (clientX/Y). */
+  onMenu(x: number, y: number): void
 }
 
 /** The per-page flow strip (rendered inside .pdf-page). Always visible while
@@ -293,7 +297,8 @@ export default function MarginNotes({
   selectedId,
   onCommit,
   onSelect,
-  onDelete
+  onDelete,
+  onMenu
 }: Props): React.JSX.Element | null {
   useLang()
   const hostRef = useRef<HTMLDivElement>(null)
@@ -353,7 +358,28 @@ export default function MarginNotes({
   const active = items.filter(({ a }) => a.id === hoveredId || a.id === selectedId)
 
   return (
-    <div className={`margin-notes side-${view.side}`} ref={hostRef}>
+    <div
+      className={`margin-notes side-${view.side}`}
+      ref={hostRef}
+      // Right-click on the strip (cards included — it is all "the margin")
+      // asks the viewer to offer hiding the view. Inside a comment's textarea
+      // the browser's own menu is wanted instead (paste!) — stopPropagation
+      // without preventDefault shields it from the pages container, whose
+      // handler preventDefaults everything to open the page menu.
+      onContextMenu={(e) => {
+        if (e.target instanceof HTMLTextAreaElement) {
+          e.stopPropagation()
+          return
+        }
+        e.preventDefault()
+        e.stopPropagation()
+        onMenu(e.clientX, e.clientY)
+      }}
+    >
+      {/* The host is pointer-events: none (the standing overlay rule), so the
+          EMPTY stretches of strip need their own hit surface for the
+          right-click above; everything else bubbles through untouched. */}
+      <div className="margin-strip-hit" />
       {/* Leader lines + anchor outline for the hovered/selected cards — the
           answer to "where in the document does this comment point?" */}
       <svg className="margin-note-leads" aria-hidden="true">

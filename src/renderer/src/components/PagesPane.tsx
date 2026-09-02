@@ -124,6 +124,8 @@ interface Props {
   onMarginCommit(pageNumber: number, localId: string, text: string): void
   onMarginSelect(pageNumber: number, localId: string): void
   onMarginDelete(pageNumber: number, localId: string): void
+  /** Right-click on the margin strip: offer to hide the view (viewport coords) */
+  onMarginMenu(x: number, y: number): void
   /** Margin jump arrow clicked in THIS column: select + scroll it here */
   onMarginJump(pageNumber: number, record: PageAnnotation): void
   onExternalLink(url: string): void
@@ -177,6 +179,7 @@ export default function PagesPane({
   onMarginCommit,
   onMarginSelect,
   onMarginDelete,
+  onMarginMenu,
   onMarginJump,
   onExternalLink,
   onInternalLink,
@@ -702,6 +705,7 @@ export default function PagesPane({
                   onMarginCommit={onMarginCommit}
                   onMarginSelect={onMarginSelect}
                   onMarginDelete={onMarginDelete}
+                  onMarginMenu={onMarginMenu}
                 />
               )
             })}
