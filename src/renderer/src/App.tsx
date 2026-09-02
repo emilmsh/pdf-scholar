@@ -705,6 +705,10 @@ export default function App(): React.JSX.Element {
         onNewWindow={() => bridge.newWindow()}
         onOpenInNewWindow={(path) => bridge.newWindow(path)}
         onShowInFolder={(path) => bridge.showInFolder(path)}
+        // Fire-and-forget: zotero:// works without the local API, and the tab
+        // menu has no hint surface — the save menu's Zotero section is where
+        // failures get named.
+        onShowInZotero={(path) => void bridge.zoteroSelect(path)}
         onTabDragOut={(id, path) => void moveTabOut(id, path)}
         onReorder={moveTab}
         onCloseMany={(ids) => void closeTabs(ids)}

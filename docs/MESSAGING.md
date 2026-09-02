@@ -46,6 +46,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | Browser extension | **Beta — and live in BOTH stores** (confirmed 2026-08-12). Edge Add-ons: `https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc`. Chrome Web Store: `https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd`. One click, self-updating — this is the install to lead with, and the Load-unpacked route is now only for running a build newer than the stores carry. **Both listings lag the current release** while their updates sit in review, so never name a version on a store surface |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
+| Zotero | Works as Zotero's external PDF reader (Zotero 7+, its "Open PDFs using" setting). A document living in a Zotero library gets a Zotero section in the save menu — show the item in Zotero, copy an in-text citation or full reference (APA), fetched from Zotero's **local** API on the same machine (no account, no network; the user enables the API once in Zotero's Advanced settings). Annotations saved into the file are standard PDF annots, which Zotero's own «Import Annotations…» adopts — highlights and underlines; text boxes and ink are not importable on Zotero's side, and that boundary is Zotero's to claim, not ours to hide. Covers stored attachments in My Library; linked-file attachments are not detected |
 | Author | Emil Mathias Strøm Halseth, who reads PDFs for a living — full name wherever he is credited. Where the author is named in long form (README footer, landing footer), the approved signature is verbatim: "Built by Emil Mathias Strøm Halseth, who reads PDFs for a living, with assistance from Claude Code." (Emil's wording, 2026-08-04 — no stronger Claude credit than "assistance".) The store copyright line stays author-only |
 | Logo | Elisabeth Walle — credit her wherever the logo appears, and link her name to <https://www.linkedin.com/in/elisabeth-walle-239028140/> on every surface that supports links |
 
@@ -218,10 +219,16 @@ kommentarene satt i en utvidet marg.
   Markdown or HTML
 - An optional name in settings fills the standard PDF author field on new
   annotations; left empty, they stay unsigned
+- A document from a Zotero library gets a Zotero section in the save menu —
+  show the item in Zotero, or copy its citation or full reference, fetched
+  from Zotero's local API on the same machine *(landing page: merged into the
+  standard-annotations bullet, not a bullet of its own — the pillar is at its
+  six-point ceiling)*
 - Edits are held in a draft until saved; closing prompts, and the draft
   survives a crash
 - *Supporting, never the headline:* marks are standard PDF annotations with
-  appearance streams and open correctly in other readers
+  appearance streams and open correctly in other readers — Zotero included,
+  whose «Import Annotations…» adopts the highlights and underlines
 
 ### 4. Search
 

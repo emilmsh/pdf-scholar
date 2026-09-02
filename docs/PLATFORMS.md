@@ -266,6 +266,27 @@ regressions are treated as bugs, not as acceptable platform lag.
     `npm run test:assistant` (desktop session) and the URL forms by
     `npm run test:viewer-url` (CI).
 
+18. **Zotero-awareness is path-based, so each platform sees what its file
+    identity exposes.** A document whose path matches Zotero's storage layout
+    (`…/storage/<8-char KEY>/file.pdf` — detection in `shared/zotero.ts`) gets
+    a Zotero section in the save menu (reveal the item via `zotero://select`,
+    copy a citation/reference fetched from Zotero's local API on
+    `127.0.0.1:23119`) and a «Vis i Zotero» row in the tab context menu.
+    Desktop: full support — HTTP runs in MAIN (the local API's CORS behaviour
+    is undocumented), and the `zotero://` URL is built in main from a validated
+    8-char key per the `shell:open-external` rule. Extension: identical for
+    PDFs opened by navigating to a `file://` URL inside a storage folder — the
+    viewer page fetches `127.0.0.1` itself (CORS-exempt via the manifest's host
+    permissions, the same fact as §14) and hands `zotero://` to the browser's
+    own external-protocol prompt (browser-dependent; if a browser refuses
+    protocol navigation from extension pages, that one row hides there).
+    `fsa:`-picked files expose only a basename and http(s) PDFs are not local
+    files, so they show no Zotero UI — a File System Access limitation, not a
+    closable gap. dev:web: none (no real paths). Zero-UI-when-inapplicable is
+    the parity invariant, the same shape as §10. The mapping (path → key →
+    citation, error codes, caching) is shared logic covered keylessly by
+    `npm run test:zotero` (CI).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

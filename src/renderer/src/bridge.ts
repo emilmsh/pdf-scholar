@@ -167,6 +167,11 @@ export const webApi: PdfxApi = {
   saveFileAs: async (defaultName, data) => downloadBlob(defaultName, data),
   saveDocumentBytes: async (_path, name, data) => downloadBlob(name, data),
   showInFolder: () => {},
+  // Zotero lives on the desktop's filesystem; the preview's paths are
+  // basenames/URLs, so the shared path detection can never match and no
+  // Zotero UI ever renders here (docs/PLATFORMS.md).
+  zoteroInfo: async () => null,
+  zoteroSelect: async () => ({ error: 'Zotero unavailable in the web preview' }),
   setFullscreen: (on) => {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})

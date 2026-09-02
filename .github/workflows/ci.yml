@@ -68,6 +68,9 @@ jobs:
       # The extension's redirect-rule → viewer-page URL handoff: a regression is
       # invisible until one specific kind of link (signed, tracker-tagged) breaks
       - run: npm run test:viewer-url
+      # The Zotero mapping (path → item key → citation): pure logic with fetch
+      # injected, so the two-request client and its error codes run keylessly
+      - run: npm run test:zotero
       # The one place the app proposes dropping encryption: which failures earn
       # the offer at all, and that the rewrite touches the scheme and nothing else
       - run: npm run test:insecure-retry

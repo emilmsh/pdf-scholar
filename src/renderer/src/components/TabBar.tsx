@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { zoteroKeyFromPath } from '../../../shared/zotero'
 import { t, useLang } from '../i18n'
 import { withShortcut } from '../keymap'
 import { IconChevronDown } from './icons'
@@ -22,6 +23,11 @@ interface Props {
   onNewWindow(): void
   onOpenInNewWindow(path: string): void
   onShowInFolder(path: string): void
+  /** Reveal the tab's document in the Zotero client. The row renders only for
+   *  files in Zotero's storage layout (pure path check) — and it is the
+   *  SECONDARY home for the action; the save menu's Zotero section is the
+   *  visible one (no feature lives only in a context menu). */
+  onShowInZotero(path: string): void
   /** A tab was dragged out and released — main decides where it lands */
   onTabDragOut(id: string, path: string): void
   /** A tab was dragged onto another position within this bar */
@@ -53,6 +59,7 @@ export default function TabBar({
   onNewWindow,
   onOpenInNewWindow,
   onShowInFolder,
+  onShowInZotero,
   onTabDragOut,
   onReorder,
   onCloseMany,
@@ -240,6 +247,17 @@ export default function TabBar({
           >
             {t('tabs.showInFolder')}
           </button>
+          {zoteroKeyFromPath(menu.tab.path) !== null && (
+            <button
+              className="menu-item"
+              onClick={() => {
+                onShowInZotero(menu.tab.path)
+                setMenu(null)
+              }}
+            >
+              {t('zotero.show')}
+            </button>
+          )}
           {/* Touch has no HTML5 drag, and a keyboard has no cursor: the same
               reorder lives here (long-press opens this menu) and on
               Ctrl+Shift+PageUp/PageDown. */}

@@ -30,6 +30,7 @@ import type {
 import type { FetchFailure } from '../../shared/insecure-retry'
 import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
+import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
 import { subscribeAssistantJumps } from './assistant-channel'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
@@ -56,6 +57,10 @@ const K_RECENTS = 'pdfx-recents'
 /** Why the last document was handed to the browser's own reader — the only trace
  *  of a hand-off that is deliberately invisible (see openInBrowserViewer). */
 const K_LAST_FALLBACK = 'pdfx-last-fallback'
+
+/** One Zotero client per viewer page — the success cache lives as long as the
+ *  tab, which mirrors main's per-app-instance cache on desktop. */
+const zoteroClient = createZoteroClient(httpZoteroFetch)
 
 
 /** File System Access handles from in-app "Open" — keyed by the path we return,
@@ -187,6 +192,25 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       } catch {
         return null // user cancelled the picker
       }
+    },
+
+    // ---------- Zotero ----------
+
+    // Works for PDFs opened by NAVIGATING to a file inside Zotero's storage
+    // folder: the file:// URL carries the real path (the shared detection
+    // percent-decodes it), and the manifest's host permissions make the
+    // 127.0.0.1:23119 fetch CORS-exempt — so this platform runs the same shared
+    // client as desktop, just from the page. fsa:-picked files expose only a
+    // basename and http(s) PDFs are not local files, so detection returns null
+    // and no Zotero UI renders for them (docs/PLATFORMS.md).
+    zoteroInfo: (path: string) => zoteroClient.info(path),
+    zoteroSelect: async (path: string) => {
+      const url = zoteroClient.selectUrl(path)
+      if (!url) return { error: 'not a Zotero storage path' }
+      // Navigating to an external-protocol URL never leaves the page: the
+      // browser shows its own «Open Zotero?» prompt (or silently refuses).
+      window.location.assign(url)
+      return { ok: true }
     },
 
     // ---------- Tabs / windows ----------

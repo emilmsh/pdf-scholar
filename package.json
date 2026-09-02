@@ -39,6 +39,7 @@
     "test:streams": "node scripts/test-stream-replay.mjs",
     "test:live": "node scripts/test-live.mjs",
     "test:viewer-url": "node scripts/test-viewer-url.mjs",
+    "test:zotero": "node scripts/test-zotero.mjs",
     "test:insecure-retry": "node scripts/test-insecure-retry.mjs",
     "test:file-access": "node scripts/test-file-access.mjs",
     "test:update-channel": "node scripts/test-update-channel.mjs",

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
+  FileError,
   LanguagePreference,
   Settings,
   ThemePreference,
   UpdateCheckOutcome,
-  UpdateUnsupportedReason
+  UpdateUnsupportedReason,
+  ZoteroInfo
 } from '../../../shared/types'
+import { zoteroKeyFromPath } from '../../../shared/zotero'
 import { bridge, isElectron } from '../bridge'
 import {
   annotTypeLabel,
@@ -37,7 +40,7 @@ import {
   toolPrefIsDefault
 } from '../tool-prefs'
 import type { DrawPrefKey, EraserScope, MarkupPref, TextPref, ToolPref } from '../tool-prefs'
-import { t, useLang } from '../i18n'
+import { errorText, t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import type { SavedSignature } from '../signatures'
 import { READ_ALOUD } from '../flags'
@@ -55,7 +58,9 @@ import {
 import {
   IconArrowLeft,
   IconArrowRight,
+  IconBook,
   IconChevronDown,
+  IconCopy,
   IconEraser,
   IconEye,
   IconEyeOff,
@@ -110,6 +115,17 @@ import {
 } from './icons'
 
 export type ToolName = DrawToolType
+
+/** «Halseth & Wu (2026) — Title», from whatever fields the Zotero item actually
+ *  has; falls back to the formatted citation for a bare item. */
+function zoteroLine(info: ZoteroInfo): string {
+  const names =
+    info.creators.length > 2
+      ? `${info.creators[0]} ${t('zotero.etAl')}`
+      : info.creators.join(' & ')
+  const head = [names, info.year ? `(${info.year})` : ''].filter(Boolean).join(' ')
+  return [head, info.title].filter(Boolean).join(' — ') || info.citation
+}
 
 const SHAPE_ICONS: Record<ShapeToolType, (p: { size?: number }) => React.JSX.Element> = {
   square: IconShapeSquare,
@@ -204,6 +220,10 @@ interface Props {
   fitTarget: 'width' | 'page'
   onSettingsChange(patch: Partial<Settings>): void
   onToggleSearch(): void
+  /** Absolute path/URL of the open document. Feeds the save menu's Zotero
+   *  section, whose existence is a pure path check (shared/zotero.ts) — no
+   *  IPC or network unless the menu opens over a detected file. */
+  filePath: string
   /** Unsaved annotation changes exist (enables the save button) */
   dirty: boolean
   onSave(): void
@@ -370,6 +390,7 @@ export default function Toolbar({
   fitTarget,
   onSettingsChange,
   onToggleSearch,
+  filePath,
   dirty,
   onSave,
   onSaveAs,
@@ -431,6 +452,35 @@ export default function Toolbar({
   // file) stays one click, the rare one (save a copy) moves behind the
   // chevron — one glyph less in a row of three disk-like icons.
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
+  // The Zotero section of that menu. Whether it exists at all is a pure path
+  // check; the localhost fetch runs only while the menu is OPEN over a detected
+  // file — never on document open. Every open re-asks: successes are cached
+  // platform-side (instant), failures retry naturally (the user may have
+  // started Zotero since last time).
+  const zoteroKey = zoteroKeyFromPath(filePath)
+  const [zoteroFetch, setZoteroFetch] = useState<{
+    loading: boolean
+    result: ZoteroInfo | FileError | null
+  }>({ loading: false, result: null })
+  const [zoteroCopied, setZoteroCopied] = useState<'citation' | 'bib' | null>(null)
+  useEffect(() => {
+    if (!saveMenuOpen || !zoteroKey) return undefined
+    let stale = false
+    setZoteroFetch({ loading: true, result: null })
+    setZoteroCopied(null)
+    void bridge.zoteroInfo(filePath).then((result) => {
+      if (!stale) setZoteroFetch({ loading: false, result })
+    })
+    return () => {
+      stale = true
+    }
+  }, [saveMenuOpen, zoteroKey, filePath])
+  const zoteroCopy = (kind: 'citation' | 'bib', text: string): void => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setZoteroCopied(kind)
+      window.setTimeout(() => setZoteroCopied((c) => (c === kind ? null : c)), 1500)
+    })
+  }
   // The gear menu: the app's technical surface (language, annotation
   // visibility, AI setup, update check, reset, version/about)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
@@ -1542,7 +1592,10 @@ export default function Toolbar({
         <div className="toolbar-sep" />
 
         {/* Everything that sends the document OUT of the app lives under this
-            one button: save, save a copy, print. Print used to be its own icon
+            one button: save, save a copy, print — and, for a file living in a
+            Zotero library, the Zotero section (reveal the item, copy its
+            citation): a citation headed for a manuscript and a hand-off to the
+            Zotero client qualify the same way print does. Print used to be its own icon
             and was one of the first three to fold into "…" at any normal window
             width — a top-five action, in a menu, by accident (Emil, 2026-08-09).
             It costs a click here, which a thing nobody does twice a minute can
@@ -1563,6 +1616,61 @@ export default function Toolbar({
               {t('tb.print')}
             </button>
           )
+          // Zotero rows, only for a file living in Zotero's storage layout.
+          // They belong in this menu because it is the document's out-of-the-app
+          // surface (save a copy, print) — a citation headed for a manuscript
+          // and a hand-off to the Zotero client both qualify. The section is on
+          // the canSaveInPlace branch alone: dev:web paths are basenames/URLs,
+          // so the detection can never match there anyway.
+          const zInfo =
+            zoteroFetch.result && !('error' in zoteroFetch.result) ? zoteroFetch.result : null
+          const zErr =
+            zoteroFetch.result && 'error' in zoteroFetch.result ? zoteroFetch.result : null
+          const zoteroSection = zoteroKey ? (
+            <>
+              <div className="theme-menu-sep" />
+              <div className="theme-menu-label">Zotero</div>
+              {(zoteroFetch.loading || zInfo || zErr) && (
+                <div className="menu-hint">
+                  {zoteroFetch.loading
+                    ? t('zotero.loading')
+                    : zErr
+                      ? errorText(zErr)
+                      : zInfo
+                        ? zoteroLine(zInfo)
+                        : ''}
+                </div>
+              )}
+              <button
+                className="menu-action"
+                onClick={() => {
+                  void bridge.zoteroSelect(filePath).then((r) => {
+                    if (r && 'error' in r) setZoteroFetch({ loading: false, result: r })
+                    else setSaveMenuOpen(false)
+                  })
+                }}
+              >
+                <IconBook size={15} />
+                {t('zotero.show')}
+              </button>
+              <button
+                className="menu-action"
+                disabled={!zInfo?.citation}
+                onClick={() => zInfo && zoteroCopy('citation', zInfo.citation)}
+              >
+                <IconCopy size={15} />
+                {zoteroCopied === 'citation' ? t('doc.copied') : t('zotero.copyCitation')}
+              </button>
+              <button
+                className="menu-action"
+                disabled={!zInfo?.bib}
+                onClick={() => zInfo && zoteroCopy('bib', zInfo.bib)}
+              >
+                <IconCopy size={15} />
+                {zoteroCopied === 'bib' ? t('doc.copied') : t('zotero.copyReference')}
+              </button>
+            </>
+          ) : null
           const chevron = (
             <button
               className={`tb-chevron${saveMenuOpen ? ' is-active' : ''}`}
@@ -1603,6 +1711,7 @@ export default function Toolbar({
                     {isElectron ? t('tb.saveAs') : t('tb.saveCopy')}
                   </button>
                   {printRow}
+                  {zoteroSection}
                 </div>
               )}
             </span>

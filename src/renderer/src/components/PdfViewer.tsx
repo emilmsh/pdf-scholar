@@ -5740,6 +5740,7 @@ export default function PdfViewer({
           fitTarget={fitTarget}
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
+          filePath={payload.path}
           dirty={dirty}
           onSave={() => void saveDocument()}
           onSaveAs={() => void saveDocumentAs()}

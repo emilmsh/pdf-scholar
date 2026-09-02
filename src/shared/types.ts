@@ -143,12 +143,37 @@ export type AiErrorCode =
  *  FileAccessNotice. */
 export type ExtensionErrorCode = 'ext-file-access'
 
+/** And for the Zotero bridge (src/shared/zotero.ts): what the localhost API's
+ *  answer — or its absence — means. Whole sentences under the `zoterr.*` i18n
+ *  prefix, shown standalone as the hint row in the save menu's Zotero section;
+ *  `errorText` routes on the `zotero-` stem. */
+export type ZoteroErrorCode = 'zotero-off' | 'zotero-api-disabled' | 'zotero-item-unknown'
+
+/** What the app knows about a document living in Zotero's storage layout
+ *  (…/storage/<KEY>/file.pdf — the folder name IS the attachment item's key).
+ *  Metadata and both citation forms come from Zotero's local API, flattened to
+ *  plain text (the CSL HTML stripped). */
+export interface ZoteroInfo {
+  attachmentKey: string
+  /** The bibliographic item the attachment hangs under; null = standalone */
+  parentKey: string | null
+  title: string
+  /** Creator family names, in order — the renderer formats the summary, since
+   *  only it knows the UI language («A mfl.» vs «A et al.») */
+  creators: string[]
+  year: string
+  /** In-text citation in the fixed style (APA), e.g. «(Vaswani et al., 2017)» */
+  citation: string
+  /** Full bibliography entry in the same style */
+  bib: string
+}
+
 export interface FileError {
   /** Always set: the fallback text, and what goes in the log */
   error: string
   /** Set when the failure is one of the recognised kinds above, so the renderer
    *  can show its own translation rather than this string. */
-  code?: EngineErrorCode | AiErrorCode | ExtensionErrorCode | undefined
+  code?: EngineErrorCode | AiErrorCode | ExtensionErrorCode | ZoteroErrorCode | undefined
 }
 
 /** A partial update where "not changing this field" may be written as an explicit
@@ -746,6 +771,17 @@ export interface PdfxApi {
   ): Promise<{ path: string } | FileError | null>
   /** Reveal the file in Windows File Explorer */
   showInFolder(path: string): void
+  /** Zotero metadata for a file in Zotero's storage layout (see ZoteroInfo).
+   *  null = not such a path, or this platform cannot tell — show no Zotero UI
+   *  at all. A FileError with a zotero-* code = the file IS Zotero's, but the
+   *  local API said no (Zotero not running / API toggle off / unknown item). */
+  zoteroInfo(path: string): Promise<ZoteroInfo | FileError | null>
+  /** Reveal the item in the Zotero client (zotero://select). The zotero:// URL
+   *  is built platform-side from a validated 8-char key derived from the path —
+   *  the renderer never supplies a URL (the shell:open-external rule in
+   *  src/main/index.ts). Works with the local API off; prefers the parent item
+   *  when a completed zoteroInfo call has resolved it. */
+  zoteroSelect(path: string): Promise<{ ok: true } | FileError>
   setFullscreen(on: boolean): void
   /** Notifies when the window enters/leaves OS fullscreen */
   onFullScreen(cb: (fullscreen: boolean) => void): () => void

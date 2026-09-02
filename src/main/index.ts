@@ -61,6 +61,7 @@ import {
   setPosition
 } from './storage'
 import { initUpdater } from './updater'
+import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
 // carry the state file over so recents, positions and encrypted AI keys
@@ -1053,6 +1054,26 @@ function registerIpc(): void {
   // whose address is a constant HERE, never a URL the renderer supplies.
   ipcMain.on('shell:show-in-folder', (_e, path: string) => {
     if (typeof path === 'string' && existsSync(path)) shell.showItemInFolder(path)
+  })
+
+  // The Zotero handoff follows that same rule: the zotero:// URL is built HERE
+  // from a validated 8-char item key derived from the document's own path —
+  // the renderer supplies a path it already holds, never a URL. Metadata comes
+  // from Zotero's local API on 127.0.0.1 (src/main/zotero.ts).
+  ipcMain.handle('zotero:info', (_e, path: string) =>
+    typeof path === 'string' ? zoteroInfo(path) : null
+  )
+  ipcMain.handle('zotero:select', async (_e, path: string) => {
+    const url = typeof path === 'string' ? zoteroSelectUrlFor(path) : null
+    if (!url) return { error: 'not a Zotero storage path' }
+    try {
+      await shell.openExternal(url)
+      return { ok: true }
+    } catch {
+      // No zotero:// handler on this machine — Zotero isn't installed (or its
+      // protocol registration broke). Same remedy as «not running»: start it.
+      return { error: 'no handler registered for zotero://', code: 'zotero-off' }
+    }
   })
 
   ipcMain.handle('file:save-text', async (e, defaultName: string, content: string | Uint8Array) => {

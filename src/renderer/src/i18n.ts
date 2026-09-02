@@ -4,7 +4,7 @@
 // enough). Non-React modules (exports, prompts) call t() at use time.
 import { useSyncExternalStore } from 'react'
 
-import type { AiErrorCode, ExtensionErrorCode, FileError } from '../../shared/types'
+import type { AiErrorCode, ExtensionErrorCode, FileError, ZoteroErrorCode } from '../../shared/types'
 
 export type Lang = 'nb' | 'en'
 /** User's choice — 'auto' follows the OS/browser language */
@@ -103,6 +103,20 @@ const nb = {
   // One per ExtensionErrorCode. Fragments like engine.* — the full instructions
   // live in the notice the shell raises alongside (fileaccess.* below).
   'exterr.ext-file-access': 'nettleseren gir ikke utvidelsen tilgang til lokale filer ennå',
+
+  // Zotero (the save menu's Zotero section + the tab context menu). The
+  // zoterr.* entries are whole sentences shown standalone as the hint row.
+  // Zotero's own setting names are quoted in English — its nb localisation
+  // is unverified, and a mistranslated trail helps nobody.
+  'zotero.show': 'Vis i Zotero',
+  'zotero.copyCitation': 'Kopier sitering',
+  'zotero.copyReference': 'Kopier referanse',
+  'zotero.loading': 'Henter fra Zotero …',
+  'zotero.etAl': 'mfl.',
+  'zoterr.zotero-off': 'Zotero kjører ikke — start Zotero og prøv igjen.',
+  'zoterr.zotero-api-disabled':
+    'Skru på API-tilgang i Zotero: Settings → Advanced → «Allow other applications on this computer to communicate with Zotero».',
+  'zoterr.zotero-item-unknown': 'Fant ikke dokumentet i Zotero-biblioteket.',
 
   // «Gi tilgang til URL-adresser for fil» — the one permission a store install
   // cannot arrive with, and no extension can grant itself. The label is quoted
@@ -934,6 +948,16 @@ const en: Dict = {
   'aierr.ai-aborted': 'Stopped',
   'exterr.ext-file-access': 'the browser does not let the extension read local files yet',
 
+  'zotero.show': 'Show in Zotero',
+  'zotero.copyCitation': 'Copy citation',
+  'zotero.copyReference': 'Copy reference',
+  'zotero.loading': 'Fetching from Zotero …',
+  'zotero.etAl': 'et al.',
+  'zoterr.zotero-off': 'Zotero is not running — start Zotero and try again.',
+  'zoterr.zotero-api-disabled':
+    'Enable API access in Zotero: Settings → Advanced → “Allow other applications on this computer to communicate with Zotero”.',
+  'zoterr.zotero-item-unknown': 'The document was not found in the Zotero library.',
+
   'fileaccess.title': 'Allow local PDFs',
   'fileaccess.blockedTitle': 'This PDF lives on your own machine',
   'fileaccess.body':
@@ -1681,13 +1705,18 @@ export function locale(): string {
  *  a translated sentence. */
 export function errorText(e: FileError): string {
   if (!e.code) return e.error
-  // Three prefixes because the families read differently: `engine.*` and
+  // Four prefixes because the families read differently: `engine.*` and
   // `exterr.*` entries are lowercase fragments spliced into a toast sentence,
-  // `aierr.*` entries are whole sentences shown on their own in a chat bubble.
+  // `aierr.*` and `zoterr.*` entries are whole sentences shown on their own
+  // (a chat bubble; the save menu's Zotero hint row).
   if (isAiErrorCode(e.code)) return t(`aierr.${e.code}`)
   if (isExtensionErrorCode(e.code)) return t(`exterr.${e.code}`)
+  if (isZoteroErrorCode(e.code)) return t(`zoterr.${e.code}`)
   return t(`engine.${e.code}`)
 }
+
+const isZoteroErrorCode = (code: NonNullable<FileError['code']>): code is ZoteroErrorCode =>
+  code.startsWith('zotero-')
 
 const isAiErrorCode = (code: NonNullable<FileError['code']>): code is AiErrorCode =>
   code.startsWith('ai-')

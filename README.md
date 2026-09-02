@@ -294,6 +294,25 @@ out instead. The settings panel names the case that applies on your machine, and
 provider's console is worth setting either way: no local storage can stop a program that
 is already running as you from asking for the key to be decrypted.
 
+### Working with Zotero
+
+PDF Scholar works as an external reader for [Zotero](https://www.zotero.org/): in
+Zotero's settings (General → "Open PDFs using"), choose PDF Scholar, and library PDFs
+open here for reading and annotation. Marks you save are standard PDF annotations
+written into the file itself, so Zotero's own reader shows them — read-only, with a
+lock icon — and its File → "Import Annotations…" converts the highlights and
+underlines into native, editable Zotero annotations (text boxes and ink are not
+importable on Zotero's side). With Zotero sync, the annotated file itself follows to
+your other devices.
+
+A document that lives in a Zotero library also gets a Zotero section in the save
+button's menu: show the item in Zotero, or copy an in-text citation or full reference
+(APA). The metadata comes from Zotero's local API on your own machine — enable it once
+in Zotero under Settings → Advanced → "Allow other applications on this computer to
+communicate with Zotero"; without it, "Show in Zotero" still works. This covers stored
+attachments in My Library; linked-file attachments (a linked base directory) carry no
+item key in their path and are not detected.
+
 ## Development
 
 ```bash
