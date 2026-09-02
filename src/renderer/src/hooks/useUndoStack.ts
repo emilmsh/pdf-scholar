@@ -26,6 +26,11 @@ export interface UndoStack {
   performUndoRedo(direction: 'undo' | 'redo'): Promise<void>
   /** Stack depths, for enabling the toolbar buttons */
   undoDepths: { undo: number; redo: number }
+  /** Drop every entry belonging to `doc` — called when the split column's
+   *  document closes: its session (and the annots map an undo would patch) is
+   *  gone, and a Ctrl+Z that silently writes into a closed document is worse
+   *  than a shorter history. Batches are filtered per inner entry. */
+  purgeDoc(doc: 'main' | 'split'): void
 }
 
 export function useUndoStack(
@@ -89,5 +94,22 @@ export function useUndoStack(
     [engineCreate, engineDelete, engineChange, syncUndoDepths]
   )
 
-  return { pushUndo, performUndoRedo, undoDepths }
+  const purgeDoc = useCallback(
+    (doc: 'main' | 'split') => {
+      const belongs = (e: UndoEntry): boolean =>
+        e.kind === 'batch' ? e.entries.some(belongs) : (e.handle.doc ?? 'main') === doc
+      const strip = (list: UndoEntry[]): UndoEntry[] =>
+        list
+          .map((e) =>
+            e.kind === 'batch' ? { ...e, entries: e.entries.filter((i) => !belongs(i)) } : e
+          )
+          .filter((e) => (e.kind === 'batch' ? e.entries.length > 0 : !belongs(e)))
+      undoStackRef.current = strip(undoStackRef.current)
+      redoStackRef.current = strip(redoStackRef.current)
+      syncUndoDepths()
+    },
+    [syncUndoDepths]
+  )
+
+  return { pushUndo, performUndoRedo, undoDepths, purgeDoc }
 }

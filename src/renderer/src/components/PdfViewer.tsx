@@ -290,11 +290,21 @@ export interface AnnotPatch {
   translate?: { dx: number; dy: number }
 }
 
+/** Which document an annotation action addresses: the tab's own document, or
+ *  the OTHER file shown in the split column. Threaded through handles,
+ *  selection and popovers so a page number can never be applied to the wrong
+ *  document — both files have a page 3. */
+export type DocId = 'main' | 'split'
+
 /** Mutable identity for an annotation across undo/redo and document reloads */
 export interface AnnotHandle {
   pageNumber: number
   localId: string
   fileId: number | null
+  /** absent = 'main' (the shape every handle had before the two-file split);
+   *  `| undefined` because handles are built with a possibly-absent doc under
+   *  exactOptionalPropertyTypes */
+  doc?: DocId | undefined
 }
 
 export type UndoEntry =
@@ -316,6 +326,8 @@ interface NavPosition {
 interface NoteDraft {
   x: number
   y: number
+  /** absent = 'main' — the document the note lands in */
+  doc?: DocId | undefined
   /** Markup rect (viewport coords) to open clear of, so it stays readable */
   avoid?: { top: number; bottom: number; left: number } | null
   pageNumber: number
@@ -572,6 +584,8 @@ export default function PdfViewer({
     avoid?: { top: number; bottom: number; left: number } | null
     pageNumber: number
     localId: string
+    /** absent = 'main' — which document the annotation lives in */
+    doc?: DocId | undefined
     /** Land keyboard focus in the comment field on open (comment action) */
     focusText?: boolean
   } | null>(null)
@@ -591,7 +605,12 @@ export default function PdfViewer({
   }, [])
   /** Selected annotation (accent frame). Outlives the popover — scrolling
    *  closes the popover but keeps the frame, per ux-planer.md §1. */
-  const [selected, setSelected] = useState<{ pageNumber: number; localId: string } | null>(null)
+  const [selected, setSelected] = useState<{
+    pageNumber: number
+    localId: string
+    /** absent = 'main' — only split-column marks carry 'split' */
+    doc?: DocId | undefined
+  } | null>(null)
   const selectedRef = useRef(selected)
   selectedRef.current = selected
   /** Side panels pinned open (persistent toggle from the toolbar or the edge
@@ -687,6 +706,14 @@ export default function PdfViewer({
     const pane = activePaneRef.current
     return pane === 'b' && sessionBRef.current ? 'a' : pane
   }, [])
+
+  /** The DOCUMENT a pane shows: 'split' only for a pane-B column holding
+   *  another file. The inverse companion of mainDocPane — write paths use it
+   *  to stamp handles with the document a gesture actually touched. */
+  const docOf = useCallback(
+    (pane: PaneId): DocId => (pane === 'b' && sessionBRef.current ? 'split' : 'main'),
+    []
+  )
 
   /** Pane B's page + zoom. Held HERE, not inside PagesPane, because the
    *  toolbar's second centre cluster drives them — exactly the same controls
@@ -897,6 +924,7 @@ export default function PdfViewer({
   // same-file memory (paneBMemoryRef) is deliberately not touched, so S after
   // a foreign split still reopens the figure you had parked there before it.
   const wasForeignRef = useRef(false)
+  const purgeUndoDocRef = useRef<(doc: DocId) => void>(() => {})
   useEffect(() => {
     if (foreign) {
       wasForeignRef.current = true
@@ -922,6 +950,14 @@ export default function PdfViewer({
     }
     if (wasForeignRef.current) {
       wasForeignRef.current = false
+      // The split document is gone: undo entries addressed to it would write
+      // into a closed session, and split-tagged chrome would point at pages
+      // that no longer mean the same thing.
+      purgeUndoDocRef.current('split')
+      setSelected((sel) => (sel?.doc === 'split' ? null : sel))
+      setAnnotPopover((pop) => (pop?.doc === 'split' ? null : pop))
+      setFreeTextDraft((draft) => (draft?.pane === 'b' ? null : draft))
+      setNoteDraft((draft) => (draft?.doc === 'split' ? null : draft))
       if (splitOpenRef.current) {
         setSplitOpen(false)
         setActivePane('a')
@@ -1210,8 +1246,18 @@ export default function PdfViewer({
   const rotationOfPageElRef = useRef(rotationOfPageEl)
   rotationOfPageElRef.current = rotationOfPageEl
 
+  /** Page sizes of the DOCUMENT the element's column shows: with another file
+   *  in pane B, its own session's sizes — sample A4 and a US-letter primary
+   *  differ by ~3 %, exactly enough for hit tests to miss by a stroke width. */
+  const sizesOfPageEl = (pageEl: HTMLElement): { w: number; h: number }[] => {
+    const session = paneOfEl(pageEl) === 'b' ? sessionBRef.current : null
+    return session ? session.sizes : sizesRef.current
+  }
+  const sizesOfPageElRef = useRef(sizesOfPageEl)
+  sizesOfPageElRef.current = sizesOfPageEl
+
   const scaleOfPageEl = (pageEl: HTMLElement): number => {
-    const size = sizesRef.current[Number(pageEl.dataset.page) - 1]
+    const size = sizesOfPageElRef.current(pageEl)[Number(pageEl.dataset.page) - 1]
     if (!size) return scaleRef.current
     const v = viewSize(size.w, size.h, rotationOfPageElRef.current(pageEl))
     const w = pageEl.getBoundingClientRect().width
@@ -2701,6 +2747,37 @@ export default function PdfViewer({
     []
   )
 
+  /** Everything an engine write needs, resolved per DOCUMENT: the tab's own
+   *  (state, path, reload — exactly what the helpers always used) or the split
+   *  column's session. Returns null when a 'split' handle outlives its session
+   *  (the column closed mid-flight) — callers drop the operation rather than
+   *  write into the wrong file. */
+  const docCtxFor = useCallback(
+    (doc: DocId | undefined) => {
+      if (doc === 'split') {
+        const session = sessionBRef.current
+        if (!session) return null
+        return {
+          path: session.path,
+          mutatePage: session.mutatePage,
+          markDirty: session.markDirty,
+          reload: session.reload,
+          annotsOf: (pageNumber: number) => session.annots.get(pageNumber) ?? [],
+          emitChanged: () => emitLocalDocEvent(session.path, 'changed', session.sender)
+        }
+      }
+      return {
+        path: payload.path,
+        mutatePage,
+        markDirty: () => markDirtyRef.current(),
+        reload: reloadDocument,
+        annotsOf: (pageNumber: number) => annotsRef.current.get(pageNumber) ?? [],
+        emitChanged: emitDocChanged
+      }
+    },
+    [payload.path, mutatePage, reloadDocument, emitDocChanged]
+  )
+
   // Annotations are identified across undo/redo cycles by a mutable handle:
   // re-creating an annotation gives it a NEW PDF object number, and a document
   // reload regenerates local ids — the handle tracks both.
@@ -2712,9 +2789,10 @@ export default function PdfViewer({
 
   const findRecord = useCallback(
     (handle: AnnotHandle): PageAnnotation | null =>
-      (annotsRef.current.get(handle.pageNumber) ?? []).find((r) => matchesHandle(r, handle)) ??
-      null,
-    [matchesHandle]
+      (docCtxFor(handle.doc)?.annotsOf(handle.pageNumber) ?? []).find((r) =>
+        matchesHandle(r, handle)
+      ) ?? null,
+    [matchesHandle, docCtxFor]
   )
 
   /** A rejected write and an {error} result mean the same thing to the user:
@@ -2730,17 +2808,19 @@ export default function PdfViewer({
   /** Add + persist an annotation (used by user actions, redo-create, undo-delete) */
   const engineCreate = useCallback(
     async (handle: AnnotHandle, snapshot: PageAnnotation) => {
+      const ctx = docCtxFor(handle.doc)
+      if (!ctx) return
       const record: PageAnnotation = {
         ...snapshot,
         id: handle.localId,
         fileId: null,
         source: 'session'
       }
-      mutatePage(handle.pageNumber, (list) => [...list, record])
+      ctx.mutatePage(handle.pageNumber, (list) => [...list, record])
       pendingWritesRef.current += 1
       const result = await bridge
         .annotate({
-          path: payload.path,
+          path: ctx.path,
           pageIndex: handle.pageNumber - 1,
           type: snapshot.type,
           quads: snapshot.quads,
@@ -2764,17 +2844,17 @@ export default function PdfViewer({
         })
       if ('error' in result) {
         showToast(t('viewer.annotSaveFailed', { error: errorText(result) }))
-        mutatePage(handle.pageNumber, (list) => list.filter((r) => r.id !== handle.localId))
+        ctx.mutatePage(handle.pageNumber, (list) => list.filter((r) => r.id !== handle.localId))
       } else {
         handle.fileId = result.id
-        markDirtyRef.current()
-        emitDocChanged()
-        mutatePage(handle.pageNumber, (list) =>
+        ctx.markDirty()
+        ctx.emitChanged()
+        ctx.mutatePage(handle.pageNumber, (list) =>
           list.map((r) => (r.id === handle.localId ? { ...r, fileId: result.id } : r))
         )
       }
     },
-    [payload.path, mutatePage, showToast, asWriteError, emitDocChanged]
+    [docCtxFor, showToast, asWriteError]
   )
 
   /** The delete write itself, with no opinion about how to report it. Split out
@@ -2783,15 +2863,17 @@ export default function PdfViewer({
    *  each ONCE at the end — a hundred marks must not mean a hundred reloads. */
   const deleteOneAnnotation = useCallback(
     async (handle: AnnotHandle): Promise<{ failed: FileError | null; wasFilePainted: boolean }> => {
+      const ctx = docCtxFor(handle.doc)
+      if (!ctx) return { failed: null, wasFilePainted: false }
       const wasFilePainted = findRecord(handle)?.source === 'file'
-      mutatePage(handle.pageNumber, (list) => list.filter((r) => !matchesHandle(r, handle)))
+      ctx.mutatePage(handle.pageNumber, (list) => list.filter((r) => !matchesHandle(r, handle)))
       // Never written to the file, so there is nothing to delete and nothing to
       // dirty — the optimistic removal above was the whole operation.
       if (handle.fileId === null) return { failed: null, wasFilePainted: false }
       pendingWritesRef.current += 1
       const result = await bridge
         .deleteAnnotation({
-          path: payload.path,
+          path: ctx.path,
           pageIndex: handle.pageNumber - 1,
           id: handle.fileId
         })
@@ -2800,27 +2882,29 @@ export default function PdfViewer({
           pendingWritesRef.current -= 1
         })
       if ('error' in result) return { failed: result, wasFilePainted: false }
-      markDirtyRef.current()
-      emitDocChanged()
+      ctx.markDirty()
+      ctx.emitChanged()
       return { failed: null, wasFilePainted }
     },
-    [payload.path, mutatePage, matchesHandle, findRecord, asWriteError, emitDocChanged]
+    [docCtxFor, matchesHandle, findRecord, asWriteError]
   )
 
   const engineDelete = useCallback(
     async (handle: AnnotHandle) => {
       const { failed, wasFilePainted } = await deleteOneAnnotation(handle)
       if (failed) showToast(t('viewer.annotDeleteFailed', { error: errorText(failed) }))
-      else if (wasFilePainted) void reloadDocument()
+      else if (wasFilePainted) void docCtxFor(handle.doc)?.reload()
     },
-    [deleteOneAnnotation, showToast, reloadDocument]
+    [deleteOneAnnotation, showToast, docCtxFor]
   )
 
   const engineChange = useCallback(
     async (handle: AnnotHandle, patch: AnnotPatch) => {
+      const ctx = docCtxFor(handle.doc)
+      if (!ctx) return
       const record = findRecord(handle)
       const wasFilePainted = record?.source === 'file'
-      mutatePage(handle.pageNumber, (list) =>
+      ctx.mutatePage(handle.pageNumber, (list) =>
         list.map((r) => (matchesHandle(r, handle) ? { ...r, ...patch } : r))
       )
       if (handle.fileId === null) {
@@ -2837,7 +2921,7 @@ export default function PdfViewer({
       pendingWritesRef.current += 1
       const result = await bridge
         .updateAnnotation({
-          path: payload.path,
+          path: ctx.path,
           pageIndex: handle.pageNumber - 1,
           id: handle.fileId,
           color: patch.color,
@@ -2854,15 +2938,15 @@ export default function PdfViewer({
         })
       if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: errorText(result) }))
       else {
-        markDirtyRef.current()
-        emitDocChanged()
+        ctx.markDirty()
+        ctx.emitChanged()
         // 'file' annots are painted by pdf.js from the file — refresh the canvas
         if (wasFilePainted && (patch.color || patch.quads || patch.strokes || patch.translate)) {
-          void reloadDocument()
+          void ctx.reload()
         }
       }
     },
-    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument, asWriteError, emitDocChanged]
+    [docCtxFor, matchesHandle, findRecord, showToast, asWriteError]
   )
 
   // Another window annotated the same file. Both windows write into the ONE
@@ -2930,11 +3014,12 @@ export default function PdfViewer({
 
   // ---------- Undo / redo ----------
 
-  const { pushUndo, performUndoRedo, undoDepths } = useUndoStack(
+  const { pushUndo, performUndoRedo, undoDepths, purgeDoc } = useUndoStack(
     engineCreate,
     engineDelete,
     engineChange
   )
+  purgeUndoDocRef.current = purgeDoc
 
   // ---------- User-facing annotation actions ----------
 
@@ -2957,9 +3042,18 @@ export default function PdfViewer({
         font?: PdfStandardFont | undefined
         blend?: 'multiply' | undefined
         imageUrl?: string | undefined
-      }
+      },
+      /** Which document the mark lands in. Default: the document of the pane
+       *  being worked in — correct for every tool gesture, since the capture-
+       *  phase pointerdown set activePane before the gesture began. */
+      doc?: DocId
     ): AnnotHandle => {
-      const handle: AnnotHandle = { pageNumber, localId: nextAnnotationId(), fileId: null }
+      const handle: AnnotHandle = {
+        pageNumber,
+        localId: nextAnnotationId(),
+        fileId: null,
+        doc: doc ?? docOf(activePaneRef.current)
+      }
       // Author = the user's own name from settings; empty writes no /T at all
       // (the app has no accounts, so a made-up default would just be noise in
       // other readers and in the exports)
@@ -2989,12 +3083,14 @@ export default function PdfViewer({
       void engineCreate(handle, snapshot)
       return handle
     },
-    [pushUndo, engineCreate]
+    [pushUndo, engineCreate, docOf]
   )
 
   const changeAnnotation = useCallback(
-    (pageNumber: number, record: PageAnnotation, patch: AnnotPatch) => {
-      const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId }
+    // doc defaults to 'main': every non-main caller reaches a record through
+    // tagged state (selection, popover, an armed drag) and passes it on.
+    (pageNumber: number, record: PageAnnotation, patch: AnnotPatch, doc?: DocId) => {
+      const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId, doc }
       const before: AnnotPatch = {}
       if (patch.color) before.color = record.color
       if (patch.contents !== undefined) before.contents = record.contents ?? ''
@@ -3013,8 +3109,8 @@ export default function PdfViewer({
   )
 
   const removeAnnotation = useCallback(
-    (pageNumber: number, record: PageAnnotation) => {
-      const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId }
+    (pageNumber: number, record: PageAnnotation, doc?: DocId) => {
+      const handle: AnnotHandle = { pageNumber, localId: record.id, fileId: record.fileId, doc }
       pushUndo({ kind: 'delete', handle, snapshot: { ...record } })
       setAnnotPopover(null)
       setSelected((s) => (s && s.localId === record.id ? null : s))
@@ -3089,7 +3185,10 @@ export default function PdfViewer({
 
   const eraseAt = useCallback(
     (pageNumber: number, x: number, y: number) => {
-      const list = annotsRef.current.get(pageNumber) ?? []
+      // The eraser works in the pane being drawn in — which may be the split
+      // column's other document
+      const doc = docOf(activePaneRef.current)
+      const list = docCtxFor(doc)?.annotsOf(pageNumber) ?? []
       // Ink strokes first (path-precise hit), then the wider bbox pass. Scope
       // decides what the second pass may touch: 'draw' keeps the eraser to
       // marks made by hand (ink + shapes), which is what its tooltip has always
@@ -3099,7 +3198,7 @@ export default function PdfViewer({
         const record = list[i]
         if (record.type !== 'ink') continue
         if (inkHitTest(record, x, y, 4)) {
-          removeAnnotation(pageNumber, record)
+          removeAnnotation(pageNumber, record, doc)
           return
         }
       }
@@ -3108,9 +3207,9 @@ export default function PdfViewer({
           ? list
           : list.filter((a) => ERASER_DRAWN_TYPES.has(a.type))
       const hit = annotationAtPoint(erasable, x, y)
-      if (hit) removeAnnotation(pageNumber, hit)
+      if (hit) removeAnnotation(pageNumber, hit, doc)
     },
-    [removeAnnotation]
+    [removeAnnotation, docOf, docCtxFor]
   )
 
   const completeShape = useCallback(
@@ -3174,7 +3273,9 @@ export default function PdfViewer({
       // Clicking an existing text box with the tool armed edits that box —
       // stacking a fresh draft on top of it is never what the user meant.
       const existing = annotationHitTest(
-        (annotsRef.current.get(pageNumber) ?? []).filter((a) => a.type === 'freetext'),
+        (docCtxFor(docOf(activePaneRef.current))?.annotsOf(pageNumber) ?? []).filter(
+          (a) => a.type === 'freetext'
+        ),
         x,
         y
       )
@@ -3193,7 +3294,7 @@ export default function PdfViewer({
         pane: activePaneRef.current
       })
     },
-    [openFreeTextEditor]
+    [openFreeTextEditor, docCtxFor, docOf]
   )
 
   // Commit the editor. `wPt`/`hPt` are the editor's drag-resized box in page
@@ -3217,23 +3318,31 @@ export default function PdfViewer({
       const w = Math.max(wDrag, min.w)
       const h = Math.max(hDrag, min.h)
       const rect = { x: freeTextDraft.x, y: freeTextDraft.y, w, h }
+      // The draft carries its pane — the document is whatever that pane shows
+      const doc = docOf(freeTextDraft.pane)
       if (freeTextDraft.editingId) {
         // A re-opened box keeps its OWN face and size; the tool's current ones
         // belong to the next box, not to this one.
-        const record = (annotsRef.current.get(freeTextDraft.pageNumber) ?? []).find(
+        const record = (docCtxFor(doc)?.annotsOf(freeTextDraft.pageNumber) ?? []).find(
           (r) => r.id === freeTextDraft.editingId
         )
         if (record) {
-          changeAnnotation(freeTextDraft.pageNumber, record, { quads: [rect], contents: text })
+          changeAnnotation(freeTextDraft.pageNumber, record, { quads: [rect], contents: text }, doc)
         }
         setFreeTextDraft(null)
         return
       }
       const pref = prefsRef.current.text
-      const handle = persistAnnotation(freeTextDraft.pageNumber, 'freetext', [rect], pref.color, 1, text, {
-        fontSize: pref.fontSize,
-        font: pref.font
-      })
+      const handle = persistAnnotation(
+        freeTextDraft.pageNumber,
+        'freetext',
+        [rect],
+        pref.color,
+        1,
+        text,
+        { fontSize: pref.fontSize, font: pref.font },
+        doc
+      )
       setFreeTextDraft(null)
       // Text boxes are one-shot: unlike pen strokes, nobody places several in
       // a row, and a lingering armed tool blocks selecting/moving the new box
@@ -3241,9 +3350,9 @@ export default function PdfViewer({
       // Select the fresh box so the frame + corner handles appear at once —
       // the affordance that says "this can be moved and resized" (Fredrik
       // never discovered it when the box just sat there as flat text)
-      setSelected({ pageNumber: freeTextDraft.pageNumber, localId: handle.localId })
+      setSelected({ pageNumber: freeTextDraft.pageNumber, localId: handle.localId, doc })
     },
-    [freeTextDraft, persistAnnotation, changeAnnotation]
+    [freeTextDraft, persistAnnotation, changeAnnotation, docCtxFor, docOf]
   )
 
   // Stable identities for PdfPage (fresh callbacks would re-render canvases)
@@ -3299,9 +3408,15 @@ export default function PdfViewer({
   /** Selection rects per page, for every rendered page the selection touches.
    *  Walks BOTH panes — a selection lives in whichever pane the user dragged in,
    *  and each pane divides by its own scale. */
-  const collectSelectionRects = useCallback((): { pageNumber: number; rects: PageRect[] }[] => {
+  const collectSelectionRects = useCallback((): {
+    pageNumber: number
+    rects: PageRect[]
+    /** The document the selected page belongs to — pane B's own when it shows
+     *  another file, so a markup lands in the file the words are in. */
+    doc: DocId
+  }[] => {
     const sel = window.getSelection()
-    const out: { pageNumber: number; rects: PageRect[] }[] = []
+    const out: { pageNumber: number; rects: PageRect[]; doc: DocId }[] = []
     if (!sel || sel.isCollapsed) return out
     for (const pageEl of allPageElsRef.current()) {
       // selectionRectsForPage divides client offsets by scale → VIEW-space
@@ -3310,7 +3425,8 @@ export default function PdfViewer({
       const viewRects = selectionRectsForPage(sel, pageEl, scaleOfPageElRef.current(pageEl))
       if (!viewRects) continue
       const pageNumber = Number(pageEl.dataset.page)
-      const size = sizesRef.current[pageNumber - 1]
+      const doc = docOf(paneOfEl(pageEl))
+      const size = (doc === 'split' ? sessionBRef.current?.sizes : sizesRef.current)?.[pageNumber - 1]
       const rot = rotationOfPageElRef.current(pageEl)
       const rects =
         size && rot !== 0
@@ -3320,11 +3436,11 @@ export default function PdfViewer({
       // pane, and the panes never overlap on screen, so clipping against the
       // other pane's copy of the same page yields nothing. If that ever stops
       // holding, one page must still produce ONE markup, not two.
-      if (out.some((o) => o.pageNumber === pageNumber)) continue
-      out.push({ pageNumber, rects })
+      if (out.some((o) => o.pageNumber === pageNumber && o.doc === doc)) continue
+      out.push({ pageNumber, rects, doc })
     }
     return out
-  }, [])
+  }, [docOf])
 
   const applyMarkup = useCallback(
     (
@@ -3338,8 +3454,8 @@ export default function PdfViewer({
       // right-click menu and one made with the armed toolbar tool are the same
       // annotation, not two different-looking ones.
       const opacity = prefsRef.current.markup[type].opacity
-      for (const { pageNumber, rects } of perPage) {
-        void persistAnnotation(pageNumber, type, rects, color, opacity)
+      for (const { pageNumber, rects, doc } of perPage) {
+        void persistAnnotation(pageNumber, type, rects, color, opacity, undefined, undefined, doc)
       }
       window.getSelection()?.removeAllRanges()
     },
@@ -3381,17 +3497,31 @@ export default function PdfViewer({
           if (perPage.length === 0) break
           const { color, opacity } = prefsRef.current.markup.highlight
           let lastHandle: AnnotHandle | null = null
-          for (const { pageNumber, rects } of perPage) {
-            lastHandle = persistAnnotation(pageNumber, 'highlight', rects, color, opacity)
+          for (const { pageNumber, rects, doc } of perPage) {
+            lastHandle = persistAnnotation(
+              pageNumber,
+              'highlight',
+              rects,
+              color,
+              opacity,
+              undefined,
+              undefined,
+              doc
+            )
           }
           if (lastHandle) {
-            setSelected({ pageNumber: lastHandle.pageNumber, localId: lastHandle.localId })
+            setSelected({
+              pageNumber: lastHandle.pageNumber,
+              localId: lastHandle.localId,
+              doc: lastHandle.doc
+            })
             setAnnotPopover({
               x,
               y,
               avoid,
               pageNumber: lastHandle.pageNumber,
               localId: lastHandle.localId,
+              doc: lastHandle.doc,
               focusText: true
             })
           }
@@ -3412,6 +3542,7 @@ export default function PdfViewer({
                 x: menu.x,
                 y: menu.y,
                 avoid,
+                doc: last.doc,
                 pageNumber: last.pageNumber,
                 anchor: { x: r.x + r.w + 4, y: r.y, w: 20, h: 20 }
               })
@@ -3741,7 +3872,8 @@ export default function PdfViewer({
           [0, 0, 0],
           1,
           undefined,
-          { imageUrl: sig.dataUrl }
+          { imageUrl: sig.dataUrl },
+          docOf(paneOfEl(el))
         )
         setArmedSignature(null)
         return
@@ -3776,6 +3908,7 @@ export default function PdfViewer({
           setNoteDraft({
             x: clientX,
             y: clientY,
+            doc: docOf(paneOfEl(el)),
             pageNumber: Number(el.dataset.page),
             anchor: { x: px, y: py, w: 20, h: 20 }
           })
@@ -3803,7 +3936,16 @@ export default function PdfViewer({
   const saveNote = useCallback(
     (text: string) => {
       if (!noteDraft) return
-      void persistAnnotation(noteDraft.pageNumber, 'note', [noteDraft.anchor], NOTE_COLOR, 1, text)
+      void persistAnnotation(
+        noteDraft.pageNumber,
+        'note',
+        [noteDraft.anchor],
+        NOTE_COLOR,
+        1,
+        text,
+        undefined,
+        noteDraft.doc
+      )
       setNoteDraft(null)
       window.getSelection()?.removeAllRanges()
     },
@@ -3822,7 +3964,7 @@ export default function PdfViewer({
       const vx = (clientX - rect.left) / s
       const vy = (clientY - rect.top) / s
       const pageNumber = Number(pageEl.dataset.page)
-      const size = sizesRef.current[pageNumber - 1]
+      const size = sizesOfPageElRef.current(pageEl)[pageNumber - 1]
       if (!size) return [vx, vy]
       return viewPointToPage(vx, vy, size.w, size.h, rotationOfPageElRef.current(pageEl))
     },
@@ -3839,8 +3981,9 @@ export default function PdfViewer({
     (pageNumber: number, record: PageAnnotation): { top: number; bottom: number; left: number } | null => {
       if (record.quads.length === 0) return null
       const el = allPageElsRef.current().find((p) => Number(p.dataset.page) === pageNumber)
-      const size = sizes[pageNumber - 1]
-      if (!el || !size) return null
+      if (!el) return null
+      const size = sizesOfPageElRef.current(el)[pageNumber - 1]
+      if (!size) return null
       const scale = scaleOfPageElRef.current(el)
       const v = pageRectToView(quadsUnion(record.quads), size.w, size.h, rotationOfPageElRef.current(el))
       const r = el.getBoundingClientRect()
@@ -3949,6 +4092,10 @@ export default function PdfViewer({
             applyMarkup(mt, prefsRef.current.markup[mt].color)
             return
           }
+          // The selection menu's AI actions ask about the TAB's document — over
+          // the split column's other file they would answer from the wrong one,
+          // so the menu stays home there (armed tools above still work).
+          if (elIsForeign(target as Element)) return
           openMenuAt(clientX, clientY, target)
           return
         }
@@ -3957,33 +4104,30 @@ export default function PdfViewer({
           setSelected(null)
           return
         }
-        // Selection/popovers address the main document; a click in a foreign
-        // column only clears them (phase two routes edits per document)
-        if (elIsForeign(pageEl)) {
-          setSelected(null)
-          return
-        }
+        const pane = paneOfEl(pageEl)
+        const doc = docOf(pane)
         const pageNumber = Number(pageEl.dataset.page)
         if (annotsHiddenRef.current) return
         const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
-        const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
+        const hit = annotationHitTest(annotsFor(pane, pageNumber), px, py)
         if (hit) {
           // Single click SELECTS a text box (frame +
           // drag-to-move); double-click opens the text editor.
-          setSelected({ pageNumber, localId: hit.id })
+          setSelected({ pageNumber, localId: hit.id, doc })
           setAnnotPopover({
             x: clientX,
             y: clientY,
             avoid: annotAvoidRect(pageNumber, hit),
             pageNumber,
-            localId: hit.id
+            localId: hit.id,
+            doc
           })
         } else {
           setSelected(null)
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect, elIsForeign]
+    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect, annotsFor, docOf, elIsForeign]
   )
 
   // Double-click a text box to re-open it in the editor (edit text + resize the
@@ -3992,16 +4136,16 @@ export default function PdfViewer({
     (e: React.MouseEvent) => {
       if (drawToolRef.current || markupToolRef.current) return
       const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
-      if (!pageEl || elIsForeign(pageEl)) return
+      if (!pageEl) return
       const pageNumber = Number(pageEl.dataset.page)
       const [px, py] = pagePointFromClient(e.clientX, e.clientY, pageEl)
-      const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
+      const hit = annotationHitTest(annotsFor(paneOfEl(pageEl), pageNumber), px, py)
       if (hit && hit.type === 'freetext') {
         e.preventDefault()
         openFreeTextEditor(pageNumber, hit)
       }
     },
-    [pagePointFromClient, openFreeTextEditor, elIsForeign]
+    [pagePointFromClient, openFreeTextEditor, annotsFor]
   )
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -4018,10 +4162,10 @@ export default function PdfViewer({
     // same press would arm a MOVE as well, and the two would fight.
     if (annotResizeRef.current || markupEditRef.current) return
     const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
-    if (!pageEl || elIsForeign(pageEl)) return
+    if (!pageEl) return
     const pageNumber = Number(pageEl.dataset.page)
     const [hx, hy] = pagePointFromClient(e.clientX, e.clientY, pageEl)
-    const hit = annotationHitTest(annotsRef.current.get(pageNumber) ?? [], hx, hy)
+    const hit = annotationHitTest(annotsFor(paneOfEl(pageEl), pageNumber), hx, hy)
     if (hit && isMovableAnnotation(hit) && hit.quads[0]) {
       annotDragRef.current = {
         pageNumber,
@@ -4035,7 +4179,7 @@ export default function PdfViewer({
       }
       e.preventDefault()
     }
-  }, [pagePointFromClient, elIsForeign])
+  }, [pagePointFromClient, annotsFor])
 
   // ---------- Hover comment tooltip ----------
 
@@ -4169,6 +4313,7 @@ export default function PdfViewer({
         // text box opens the editor (the touch stand-in for double-click).
         if (e.pointerType === 'touch') {
           const sel = selectedRef.current
+          const doc = docOf(drag.pane)
           if (
             drag.record.type === 'freetext' &&
             sel?.pageNumber === drag.pageNumber &&
@@ -4176,13 +4321,14 @@ export default function PdfViewer({
           ) {
             openFreeTextEditor(drag.pageNumber, drag.record)
           } else {
-            setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id })
+            setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id, doc })
             setAnnotPopover({
               x: e.clientX,
               y: e.clientY,
               avoid: annotAvoidRect(drag.pageNumber, drag.record),
               pageNumber: drag.pageNumber,
-              localId: drag.record.id
+              localId: drag.record.id,
+              doc
             })
           }
         }
@@ -4203,8 +4349,8 @@ export default function PdfViewer({
           s.map(([px, py]) => [px + dx, py + dy] as [number, number])
         )
       }
-      setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id })
-      changeAnnotation(drag.pageNumber, drag.record, patch)
+      setSelected({ pageNumber: drag.pageNumber, localId: drag.record.id, doc: docOf(drag.pane) })
+      changeAnnotation(drag.pageNumber, drag.record, patch, docOf(drag.pane))
     }
     const onCancel = (): void => {
       if (!annotDragRef.current) return
@@ -4219,7 +4365,7 @@ export default function PdfViewer({
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
     }
-  }, [active, dragTarget, changeAnnotation, openFreeTextEditor, annotAvoidRect])
+  }, [active, dragTarget, changeAnnotation, openFreeTextEditor, annotAvoidRect, docOf])
 
   // ---------- Annotation resizing (corner handles + line endpoints) ----------
   //
@@ -4257,7 +4403,11 @@ export default function PdfViewer({
       clientX: number,
       clientY: number
     ): { rect: PageRect; strokes?: [number, number][][] } => {
-      const size = sizes[rs.pageNumber - 1]
+      // The clamp box comes from the document the pane SHOWS — pane B's own
+      // page sizes when it holds another file
+      const size = (rs.pane === 'b' && sessionBRef.current
+        ? sessionBRef.current.sizes
+        : sizes)[rs.pageNumber - 1]
       const maxW = size?.w ?? Infinity
       const maxH = size?.h ?? Infinity
       const dx = (clientX - rs.startClientX) / rs.scale
@@ -4383,10 +4533,10 @@ export default function PdfViewer({
         Math.abs(next.rect.w - before.w) < 0.01 &&
         Math.abs(next.rect.h - before.h) < 0.01
       if (same) return
-      setSelected({ pageNumber: rs.pageNumber, localId: rs.record.id })
+      setSelected({ pageNumber: rs.pageNumber, localId: rs.record.id, doc: docOf(rs.pane) })
       const patch: AnnotPatch = { quads: [next.rect] }
       if (next.strokes) patch.strokes = next.strokes
-      changeAnnotation(rs.pageNumber, rs.record, patch)
+      changeAnnotation(rs.pageNumber, rs.record, patch, docOf(rs.pane))
     }
     const onCancel = (): void => {
       if (!annotResizeRef.current) return
@@ -4401,7 +4551,7 @@ export default function PdfViewer({
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
     }
-  }, [active, resizeTarget, changeAnnotation])
+  }, [active, resizeTarget, changeAnnotation, docOf])
 
   /** ONE page's text, for the interactive path. The whole-document pass is far
    *  too slow to sit inside a gesture — a 15-page paper takes over a second, and
@@ -4465,7 +4615,7 @@ export default function PdfViewer({
   // text now: the drag needs it, and starting the pass on pointerdown loses a
   // race against the hand on any document of a serious size.
   useEffect(() => {
-    if (!selected) return
+    if (!selected || selected.doc === 'split') return
     const record = annotsRef.current.get(selected.pageNumber)?.find((r) => r.id === selected.localId)
     if (record && isTextMarkup(record)) ensureOnePageText(selected.pageNumber)
   }, [selected, ensureOnePageText])
@@ -4474,6 +4624,11 @@ export default function PdfViewer({
     (pageNumber: number, record: PageAnnotation, end: 'start' | 'end', e: React.PointerEvent) => {
       const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
       if (!pageEl || !pdf) return
+      // Boundary: end-dragging reads the covered words back from the page's
+      // extracted TEXT, and the text pipeline (pageTextFor/buildPageText) is
+      // the main document's. A split-doc markup can be recoloured, moved,
+      // commented and deleted — re-covering different words means remaking it.
+      if (elIsForeign(pageEl)) return
       // The properties popover opens right under the mark it belongs to, which is
       // exactly where the text you are extending onto lives. Get it out of the
       // way for the duration of the drag (measured: it swallowed the pointer).
@@ -4495,7 +4650,7 @@ export default function PdfViewer({
       }
       ensureOnePageText(pageNumber)
     },
-    [ensureOnePageText]
+    [ensureOnePageText, elIsForeign]
   )
 
   useEffect(() => {
@@ -5536,10 +5691,10 @@ export default function PdfViewer({
         const target = selected ?? annotPopover
         if (!target) return
         e.preventDefault()
-        const record = (annotsRef.current.get(target.pageNumber) ?? []).find(
+        const record = (docCtxFor(target.doc)?.annotsOf(target.pageNumber) ?? []).find(
           (r) => r.id === target.localId
         )
-        if (record) removeAnnotation(target.pageNumber, record)
+        if (record) removeAnnotation(target.pageNumber, record, target.doc)
         break
       }
       case 'search.open':
@@ -5885,8 +6040,11 @@ export default function PdfViewer({
         dragGhost.pane === pane &&
         (() => {
           // The ghost is stored in page space; rotate it to view space so it
-          // tracks the pointer under rotation.
-          const size = sizes[dragGhost.pageNumber - 1]
+          // tracks the pointer under rotation. Sizes come from the document
+          // the pane SHOWS (pane B's own when it holds another file).
+          const size = (pane === 'b' && sessionB ? sessionB.sizes : sizes)[
+            dragGhost.pageNumber - 1
+          ]
           const gv = size
             ? pageRectToView(
                 { x: dragGhost.x, y: dragGhost.y, w: dragGhost.w, h: dragGhost.h },
@@ -6204,7 +6362,11 @@ export default function PdfViewer({
                     annotations={annots.get(pageNumber) ?? EMPTY_ANNOTS}
                     hideAnnots={annotsHidden}
                     keepImageColors={keepImageColors}
-                    selectedId={selected?.pageNumber === pageNumber ? selected.localId : null}
+                    selectedId={
+                      selected?.pageNumber === pageNumber && selected.doc !== 'split'
+                        ? selected.localId
+                        : null
+                    }
                     searchRects={
                       searchHits?.pageNumber === pageNumber ? searchHits.rects : EMPTY_RECTS
                     }
@@ -6333,12 +6495,14 @@ export default function PdfViewer({
               onZoom={paneBZoom}
               onPageChange={setPaneBPage}
               flash={paneFlash === 'b'}
-              // Foreign column reads in phase one — the write/selection
-              // surfaces route per document in the next phase
-              drawTool={foreign ? null : drawTool}
+              drawTool={drawTool}
               fingerDraws={prefs.input.fingerDraws}
               penPressure={prefs.input.penPressure}
-              selected={foreign ? null : selected}
+              // The frame follows the document the column shows — a selection
+              // in one file must never draw on the other's page numbers
+              selected={
+                selected && (selected.doc === 'split') === !!foreign ? selected : null
+              }
               searchHits={foreign ? null : searchHits}
               searchAllHits={
                 !foreign && searchAllHits?.pane === 'b' ? searchAllHits.byPage : null
@@ -6370,9 +6534,7 @@ export default function PdfViewer({
               onHandle={(h) => {
                 paneBHandleRef.current = h
               }}
-              overlay={({ layout: lay, scale: s }) =>
-                foreign ? null : paneOverlay('b', lay, s, paneBRotation)
-              }
+              overlay={({ layout: lay, scale: s }) => paneOverlay('b', lay, s, paneBRotation)}
             />
           </>
         )}
@@ -6581,7 +6743,9 @@ export default function PdfViewer({
       )}
       {annotPopover &&
         (() => {
-          const record = (annots.get(annotPopover.pageNumber) ?? []).find(
+          const popoverAnnots =
+            annotPopover.doc === 'split' ? (sessionB?.annots ?? annots) : annots
+          const record = (popoverAnnots.get(annotPopover.pageNumber) ?? []).find(
             (r) => r.id === annotPopover.localId
           )
           if (!record) return null
@@ -6592,7 +6756,9 @@ export default function PdfViewer({
               avoid={annotPopover.avoid}
               focusText={annotPopover.focusText}
               annotation={record}
-              onColor={(color) => changeAnnotation(annotPopover.pageNumber, record, { color })}
+              onColor={(color) =>
+                changeAnnotation(annotPopover.pageNumber, record, { color }, annotPopover.doc)
+              }
               onFont={(font) => {
                 // Re-measure in the NEW face before sending: Courier is far
                 // wider than Helvetica at the same size, so keeping the old box
@@ -6606,15 +6772,17 @@ export default function PdfViewer({
                 const min = freetextMinSize(record.contents ?? '', record.fontSize ?? 12, q.w, font)
                 const w = Math.max(q.w, min.w)
                 const h = Math.max(q.h, min.h)
-                changeAnnotation(annotPopover.pageNumber, record, {
-                  font,
-                  ...(w !== q.w || h !== q.h ? { quads: [{ ...q, w, h }] } : {})
-                })
+                changeAnnotation(
+                  annotPopover.pageNumber,
+                  record,
+                  { font, ...(w !== q.w || h !== q.h ? { quads: [{ ...q, w, h }] } : {}) },
+                  annotPopover.doc
+                )
               }}
               onContents={(contents) =>
-                changeAnnotation(annotPopover.pageNumber, record, { contents })
+                changeAnnotation(annotPopover.pageNumber, record, { contents }, annotPopover.doc)
               }
-              onDelete={() => removeAnnotation(annotPopover.pageNumber, record)}
+              onDelete={() => removeAnnotation(annotPopover.pageNumber, record, annotPopover.doc)}
               onClose={() => setAnnotPopover(null)}
               size={bubbleSizes.get(annotPopover.localId) ?? null}
               onResize={(size) => setBubbleSize(annotPopover.localId, size)}

@@ -20,7 +20,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { FilePayload } from '../../../shared/types'
 import type { PageAnnotation } from '../annotations'
 import { bridge, isElectron } from '../bridge'
-import { browserCurrentBytes } from '../annotation-engine-browser'
+import { browserCurrentBytes, hasBrowserDoc, registerBrowserDoc } from '../annotation-engine-browser'
 import { openDocument, isPasswordException } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { collectAnnotations } from '../doc-load'
@@ -44,6 +44,10 @@ export interface SplitDocSession {
   reload(): Promise<void>
   /** Mark the session dirty from a write routed on its behalf. */
   markDirty(): void
+  /** Immutably patch one page's annotation list (the split-document twin of
+   *  the viewer's own mutatePage — engine writes route through whichever one
+   *  matches the handle's document). */
+  mutatePage(pageNumber: number, fn: (list: PageAnnotation[]) => PageAnnotation[]): void
 }
 
 const EMPTY_ANNOTS: ReadonlyMap<number, PageAnnotation[]> = new Map()
@@ -105,10 +109,32 @@ export function useSplitDocSession(
 
   const markDirty = useCallback(() => setDirty(true), [])
 
+  const mutatePage = useCallback(
+    (pageNumber: number, fn: (list: PageAnnotation[]) => PageAnnotation[]) => {
+      setAnnots((prev) => {
+        const next = new Map(prev)
+        const list = fn(prev.get(pageNumber) ?? [])
+        if (list.length > 0) next.set(pageNumber, list)
+        else next.delete(pageNumber)
+        return next
+      })
+    },
+    []
+  )
+
   // ---------- Load ----------
   useEffect(() => {
     if (!payload) return
     let destroyed = false
+    // Browser/extension: annotation writes go through the in-memory twin.
+    // Register only when the path has no entry (a tab on the same file owns
+    // the live one — re-registering would drop its unsaved engine edits), and
+    // never release: releasing could kill a tab's document, and the desktop
+    // engine opens per path in main and needs neither. Dev-web nicety; the
+    // desktop reference platform never reaches this branch's downside.
+    if (!isElectron && !hasBrowserDoc(payload.path)) {
+      registerBrowserDoc(payload.path, payload.data)
+    }
     ;(async () => {
       const resources = openDocument(payload.data.slice())
       resourcesRef.current = resources
@@ -201,6 +227,7 @@ export function useSplitDocSession(
     dirty,
     sender: senderRef.current,
     reload,
-    markDirty
+    markDirty,
+    mutatePage
   }
 }

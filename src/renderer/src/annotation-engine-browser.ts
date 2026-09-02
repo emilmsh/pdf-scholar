@@ -92,6 +92,14 @@ export function registerBrowserDoc(path: string, bytes: Uint8Array, password?: s
   docs.set(path, { bytes, open: null, password })
 }
 
+/** Whether `path` already has a registered twin. The split-document session
+ *  registers only when nothing is there: re-registering would drop a live
+ *  engine document — and with it the unsaved edits a tab on the same path is
+ *  holding in memory. */
+export function hasBrowserDoc(path: string): boolean {
+  return docs.has(path)
+}
+
 /** The password `path` was unlocked with, for the paths that need to re-open the
  *  same bytes themselves (margin export). */
 export function browserDocPassword(path: string): string | undefined {
