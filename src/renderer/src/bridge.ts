@@ -17,6 +17,7 @@ import { buildAssistantHash } from '../../shared/viewer-url'
 import { version as appVersion } from '../../../package.json'
 import { DEFAULT_SETTINGS } from '../../shared/defaults'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
+import { AI_ERRORS } from '../../shared/engine-errors'
 import {
   browserApplyAnnotation,
   browserDeleteAnnotation,
@@ -211,7 +212,8 @@ export const webApi: PdfxApi = {
       models: { ...current.models, ...patch.models },
       azure: { ...current.azure, ...patch.azure },
       compat: { ...current.compat, ...patch.compat },
-      thinking: patch.thinking ?? current.thinking
+      thinking: patch.thinking ?? current.thinking,
+      access: patch.access ?? current.access
     }
     localStorage.setItem('pdfx-web-ai', JSON.stringify(next))
     return {
@@ -226,6 +228,9 @@ export const webApi: PdfxApi = {
   aiRefreshModels: async () => webApi.aiGetConfig(),
   aiChat: async (request): Promise<AiChatResult> => {
     const config = loadWebAiConfig()
+    // Dead-man switch: the mock sends nothing anywhere, but honouring the mode
+    // here keeps the preview behaving exactly like the real transports.
+    if (config.access === 'off') return AI_ERRORS.disabled
     if (config.provider !== 'mock') {
       return { error: t('ai.mockOnlyWeb') }
     }
@@ -337,7 +342,8 @@ function loadWebAiConfig(): AiConfig {
     models: { ...DEFAULT_AI_MODELS },
     azure: { endpoint: '', deployment: '', apiVersion: '' },
     compat: { baseUrl: '' },
-    thinking: 'medium'
+    thinking: 'medium',
+    access: 'on'
   }
   try {
     const parsed = JSON.parse(localStorage.getItem('pdfx-web-ai') ?? '{}')

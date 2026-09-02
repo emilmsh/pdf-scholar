@@ -3944,6 +3944,53 @@ html.pen-near .draw-layer {
 .ai-notice p {
   margin: 0;
 }
+
+/* «Bekreft hver forespørsel»: the strip above the composer that stages a send.
+   Accent-tinted like .ai-key-callout — it is asking for a decision. */
+.ai-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 9px;
+  font-size: calc(12px * var(--ai-scale, 1));
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.ai-confirm-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ai-confirm-actions button {
+  padding: 4px 10px;
+  font-size: calc(12px * var(--ai-scale, 1));
+}
+
+/* The dead-man switch is on: the notice that stands in for the composer */
+.ai-off-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ai-off-notice p {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-off-notice button {
+  padding: 4px 10px;
+  font-size: calc(12px * var(--ai-scale, 1));
+  white-space: nowrap;
+}
 /* "From page N to M" + the attach button, on one line in a narrow panel. Sits
    above the composer whenever the document has no text layer, so the next pages
    can be attached at any point in the conversation. */
@@ -4825,6 +4872,28 @@ html.pen-near .draw-layer {
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 7px;
+}
+
+/* The staged request («Bekreft hver forespørsel») and the switched-off notice:
+   the body says what would be sent — or that nothing will be — before anything
+   streams */
+.ai-quick-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: calc(12.5px * var(--ai-scale, 1));
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ai-quick-stage p {
+  margin: 0;
+}
+
+.ai-quick-stage-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .ai-quick-actions {

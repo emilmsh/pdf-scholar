@@ -214,6 +214,7 @@ function configView(): AiConfigView {
     azure: { ...ai.azure },
     compat: { ...ai.compat },
     thinking: ai.thinking,
+    access: ai.access,
     hasKey,
     keyStorage: keyStorageMode(),
     keysSupported: true,
@@ -264,6 +265,7 @@ export function registerAiIpc(): void {
         azure: patch.azure,
         compat: patch.compat,
         thinking: patch.thinking,
+        access: patch.access,
         keys: encryptedKeys
       })
       saveState()
@@ -300,6 +302,10 @@ export function registerAiIpc(): void {
   })
 
   ipcMain.handle('ai:chat', async (e: IpcMainInvokeEvent, req: AiChatRequest): Promise<AiChatResult> => {
+    // The dead-man switch, checked before ANYTHING else (even the dev-only
+    // fixture replay): with access 'off' this handler is the guarantee that no
+    // request leaves the machine, whatever the renderer thought it was doing.
+    if (getState().ai.access === 'off') return AI_ERRORS.disabled
     const sender = e.sender
     const controller = new AbortController()
     const requestKey = `${sender.id}:${req.requestId}`

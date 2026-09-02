@@ -42,7 +42,8 @@ const DEFAULT_CONFIG: AiConfig = {
   models: { ...DEFAULT_AI_MODELS },
   azure: { endpoint: '', deployment: '', apiVersion: '' },
   compat: { baseUrl: '' },
-  thinking: 'medium'
+  thinking: 'medium',
+  access: 'on'
 }
 
 type Keys = Partial<Record<AiProviderId, string>>
@@ -105,6 +106,7 @@ async function toView(config: AiConfig, keys: Keys, catalog: AiModelCatalog): Pr
     azure: { ...config.azure },
     compat: { ...config.compat },
     thinking: config.thinking,
+    access: config.access,
     hasKey,
     keyStorage: (await sealingAvailable()) ? 'browser-nonextractable' : 'session-only',
     keysSupported: true,
@@ -168,7 +170,8 @@ export function createExtensionAi(): Pick<
         models: { ...current.models, ...patch.models },
         azure: { ...current.azure, ...patch.azure },
         compat: { ...current.compat, ...patch.compat },
-        thinking: patch.thinking ?? current.thinking
+        thinking: patch.thinking ?? current.thinking,
+        access: patch.access ?? current.access
       }
       store.set(K_AI_CONFIG, next)
       if (patch.keys) {
@@ -224,6 +227,9 @@ export function createExtensionAi(): Pick<
 
     aiChat: async (request: AiChatRequest): Promise<AiChatResult> => {
       const [config, stored] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
+      // Dead-man switch, checked before any key is unsealed or provider named —
+      // same contract as the desktop's ai:chat handler.
+      if (config.access === 'off') return AI_ERRORS.disabled
       const usable = await usableKeys(stored)
       const key = usable[config.provider]?.trim() ?? ''
       if (PROVIDER_PROFILES[config.provider].keyRequired && !key) {

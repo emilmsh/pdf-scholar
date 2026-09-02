@@ -267,8 +267,12 @@ that.)*
   goes to the passage the claim came from
 - Structured article summaries — research question, method, data, findings,
   limitations
-- A figure or region can be cropped into the chat and asked about; nothing is
-  sent until a question is asked
+- A figure or region can be cropped into the chat and asked about — staged in
+  the composer until you press send. *(The quick «Forklar utsnitt» path is the
+  exception: it sends the crop as soon as the region is drawn — the action IS
+  the request. Never claim "nothing is sent until a question is asked" about
+  cropping in general; PRIVACY.md states the sending rules and copy must not
+  exceed it.)*
 - Questions about your own annotations ("summarize what I've highlighted")
 - Scanned documents are identified as such rather than answered about blindly;
   a page range can be attached as images instead
@@ -318,6 +322,14 @@ app looks like.)*
   network access
 - Assistant requests go directly to the chosen provider, under your key and
   that provider's terms — there is no intermediary server
+- An AI action normally attaches the whole document text (an excerpt for very
+  long documents), and the answer labels what rode along — say "document
+  content is sent when you use an AI action", never "only when you ask a
+  question": several actions fire on one click
+- An AI access switch in settings: **Confirm every request** stages each
+  request and names the model and what is about to be attached before anything
+  is sent; **Off** blocks every AI request in the transport layer, so a stored
+  key cannot leak content by accident
 - With a local model (Ollama, LM Studio), questions also stay on the machine
 - The key is stored in the platform's own key store; the exact mode differs per
   platform and the settings panel names the one in force. See "Wording we do not

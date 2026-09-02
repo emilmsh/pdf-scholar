@@ -6,7 +6,10 @@
 // capability profile (no web-search globe for compat; snip/attach stay
 // enabled while vision is unknown), and the model menu keeps the configured
 // id pickable with the server offline and hides the reasoning selector for a
-// non-reasoning id.
+// non-reasoning id. Then KI-tilgang, the dead-man switch: 'off' must gate the
+// transport itself (a direct window.api.aiChat answers ai-disabled) and swap
+// the composer for the off notice, and 'confirm' must stage every send behind
+// the strip that names the receiving model.
 //
 // Run: npm run build && npm run test:ai-settings
 // Desktop-session test (CDP against the built app) — same harness as
@@ -66,10 +69,13 @@ try {
     }
   `, PRELUDE)
   ok(settings.settingsShown, 'keyless start lands in the AI settings')
-  ok(settings.groups === 9, `nine provider groups render, ranked (got ${settings.groups})`)
+  // KI-tilgang (the access switch) sits first, then the nine provider groups
+  ok(settings.groups === 10, `access group + nine provider groups render (got ${settings.groups})`)
   ok(
-    settings.groupNames[0] === 'OpenAI' && /Gemini/.test(settings.groupNames[2] ?? ''),
-    `ranked order: OpenAI first, Gemini third (got ${settings.groupNames.slice(0, 3).join(' | ')})`
+    /KI-tilgang|AI access/.test(settings.groupNames[0] ?? '') &&
+      settings.groupNames[1] === 'OpenAI' &&
+      /Gemini/.test(settings.groupNames[3] ?? ''),
+    `ranked order: access first, then OpenAI, Gemini third provider (got ${settings.groupNames.slice(0, 4).join(' | ')})`
   )
   ok(
     ['OpenRouter', 'xAI (Grok)', 'Mistral', 'Groq'].every((n) => settings.groupNames.includes(n)),
@@ -140,6 +146,93 @@ try {
   ok(menu.selected === 'compat:llama3.1', `configured compat model is the picked row (got ${menu.selected})`)
   ok(menu.hasCompatOption, 'configured id stays pickable with the server offline')
   ok(menu.selects === 0, `reasoning selector hidden for a non-reasoning compat id (selects: ${menu.selects})`)
+
+  // ---------- KI-tilgang (the dead-man switch) ----------
+  // The settings select carries the mode; 'off' must gate the TRANSPORT (a
+  // direct window.api.aiChat, no UI involved, answers ai-disabled) and swap the
+  // composer for the off notice; 'confirm' must stage a send behind the strip.
+  await evaluate(send, `
+    document.querySelector('.ai-model-more').click()
+    for (let i = 0; i < 50 && !document.querySelector('.ai-settings'); i++) await sleep(100)
+  `, PRELUDE)
+  const accessUi = await evaluate(send, `
+    const group = [...document.querySelectorAll('.ai-settings .ai-field-group')]
+      .find((g) => g.querySelector('select') && [...g.querySelectorAll('option')].some((o) => /Bekreft|Confirm/.test(o.textContent)))
+    return {
+      hasAccessSelect: !!group,
+      options: group ? [...group.querySelectorAll('option')].map((o) => o.textContent) : [],
+      hint: group?.querySelector('.ai-field-hint')?.textContent ?? ''
+    }
+  `, PRELUDE)
+  ok(accessUi.hasAccessSelect, 'the KI-tilgang select renders in settings')
+  ok(accessUi.options.length === 3, `three modes offered (got ${accessUi.options.length})`)
+  ok(
+    /hele dokumentteksten|whole document text/.test(accessUi.hint),
+    'the hint discloses that the whole document text is sent'
+  )
+
+  // Switch OFF and save: the transport must refuse before any provider is named
+  await evaluate(send, `
+    const group = [...document.querySelectorAll('.ai-settings .ai-field-group')]
+      .find((g) => g.querySelector('select') && [...g.querySelectorAll('option')].some((o) => /Bekreft|Confirm/.test(o.textContent)))
+    const sel = group.querySelector('select')
+    sel.value = 'off'
+    sel.dispatchEvent(new Event('change', { bubbles: true }))
+    await sleep(100)
+    document.querySelector('.ai-settings-actions .btn-primary').click()
+    for (let i = 0; i < 60 && document.querySelector('.ai-settings'); i++) await sleep(200)
+  `, PRELUDE)
+  const off = await evaluate(send, `
+    const gate = await window.api.aiChat({ requestId: 990001, system: 'x', messages: [{ role: 'user', text: 'ping' }], document: null })
+    return {
+      gateCode: gate.code ?? '',
+      offNotice: !!document.querySelector('.ai-off-notice'),
+      composerGone: !document.querySelector('.ai-composer'),
+      suggestionsGone: !document.querySelector('.ai-suggestions')
+    }
+  `, PRELUDE)
+  ok(off.gateCode === 'ai-disabled', `off gates the transport itself: aiChat answers ai-disabled (got "${off.gateCode}")`)
+  ok(off.offNotice, 'the composer gives way to the off notice')
+  ok(off.composerGone && off.suggestionsGone, 'composer and one-click suggestions are gone while off')
+
+  // Switch to CONFIRM via the notice's own door, then a send must stage first
+  await evaluate(send, `
+    document.querySelector('.ai-off-notice button').click()
+    for (let i = 0; i < 50 && !document.querySelector('.ai-settings'); i++) await sleep(100)
+    const group = [...document.querySelectorAll('.ai-settings .ai-field-group')]
+      .find((g) => g.querySelector('select') && [...g.querySelectorAll('option')].some((o) => /Bekreft|Confirm/.test(o.textContent)))
+    const sel = group.querySelector('select')
+    sel.value = 'confirm'
+    sel.dispatchEvent(new Event('change', { bubbles: true }))
+    await sleep(100)
+    document.querySelector('.ai-settings-actions .btn-primary').click()
+    for (let i = 0; i < 60 && document.querySelector('.ai-settings'); i++) await sleep(200)
+    const ta = document.querySelector('.ai-composer textarea')
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, 'Stages, not sends')
+    ta.dispatchEvent(new Event('input', { bubbles: true }))
+    await sleep(100)
+    document.querySelector('.ai-composer .ai-send').click()
+    await sleep(300)
+  `, PRELUDE)
+  const confirm = await evaluate(send, `
+    return {
+      strip: document.querySelector('.ai-confirm')?.textContent ?? '',
+      taDisabled: document.querySelector('.ai-composer textarea')?.disabled ?? false,
+      sentAlready: document.querySelectorAll('.ai-msg').length
+    }
+  `, PRELUDE)
+  ok(/Llama3.1/.test(confirm.strip), `the strip names the receiving model (got "${confirm.strip.slice(0, 60)}")`)
+  ok(confirm.taDisabled, 'the composer is held while the send is staged')
+  ok(confirm.sentAlready === 0, 'nothing was sent before the strip was answered')
+  // Confirming fires the real request (the offline compat server answers with
+  // a named failure — which is the proof the transport was actually reached)
+  const fired = await evaluate(send, `
+    const go = [...document.querySelectorAll('.ai-confirm button')].find((b) => /^(Send)$/.test(b.textContent))
+    go.click()
+    for (let i = 0; i < 60 && !document.querySelector('.ai-msg.ai-assistant'); i++) await sleep(200)
+    return { msgs: document.querySelectorAll('.ai-msg').length, stripGone: !document.querySelector('.ai-confirm') }
+  `, PRELUDE)
+  ok(fired.stripGone && fired.msgs >= 2, `confirming sends for real (got ${fired.msgs} messages)`)
 
   console.log(failures === 0 ? '\ntest-ai-settings: all checks passed' : `\ntest-ai-settings: ${failures} check(s) FAILED`)
   process.exitCode = failures === 0 ? 0 : 1

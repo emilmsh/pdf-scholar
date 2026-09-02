@@ -167,6 +167,7 @@ export type AiErrorCode =
   | 'ai-stream-aborted'
   | 'ai-provider-unknown'
   | 'ai-aborted'
+  | 'ai-disabled'
 
 /** And the same for the browser-extension target, where the sandbox refuses in
  *  ways neither the engine nor a provider can. These are fragments like the
@@ -452,6 +453,17 @@ export type AiProviderId =
 /** How hard the model should reason; mapped per provider/model in main */
 export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
 
+/** The dead-man switch over every AI request. Enforced where the request
+ *  actually leaves (main's ai:chat handler, the extension's aiChat, the web
+ *  mock) — hiding buttons is a courtesy, this is the guarantee.
+ *  - 'on': AI actions fire when used (the pre-existing behaviour, and the
+ *    default — a stored key means the user has set the assistant up).
+ *  - 'confirm': every request pauses for an explicit go-ahead that names the
+ *    model and what is about to be attached, including one-click actions that
+ *    otherwise send on selection (Forklar, Oppsummer, snip-to-explain).
+ *  - 'off': no request is sent at all; transports answer `ai-disabled`. */
+export type AiAccessMode = 'on' | 'confirm' | 'off'
+
 export interface AiConfig {
   provider: AiProviderId
   /** Model id/deployment per provider */
@@ -466,6 +478,8 @@ export interface AiConfig {
   compat: { baseUrl: string }
   /** Reasoning effort (default 'medium') */
   thinking: ThinkingLevel
+  /** The dead-man switch: 'on' | 'confirm' | 'off' (default 'on') */
+  access: AiAccessMode
 }
 
 /** Capability summary for an Anthropic model, normalized from the Models API's

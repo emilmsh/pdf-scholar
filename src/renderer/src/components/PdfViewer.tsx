@@ -4,6 +4,7 @@ import { isPasswordException, openDocument } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { renderPagesAsImages as renderAiPageImages } from '../ai-page-images'
 import type {
+  AiAccessMode,
   AiCitation,
   AiImage,
   AnnotationType,
@@ -1153,7 +1154,7 @@ export default function PdfViewer({
   // Semantic (AI) search mode alongside exact text search
   const [searchMode, setSearchMode] = useState<'text' | 'ai'>('text')
   const [semantic, setSemantic] = useState<{
-    status: 'idle' | 'running' | 'done' | 'noKey' | 'noText' | 'error'
+    status: 'idle' | 'running' | 'done' | 'noKey' | 'noText' | 'error' | 'off' | 'confirm'
     hits: { label: string; citation: AiCitation; pageNumber: number | null }[]
     index: number
     note: string | null
@@ -1173,6 +1174,21 @@ export default function PdfViewer({
   const [aiPinned, setAiPinned] = useState(false)
   const aiPinnedRef = useRef(aiPinned)
   aiPinnedRef.current = aiPinned
+  // The dead-man switch (KI-tilgang), cached so menus can hide their AI entries
+  // without an IPC roundtrip per open. A courtesy only — the transports enforce
+  // the mode on every request regardless. Refreshed when the settings save
+  // (AiSettings dispatches pdfx:ai-config).
+  const [aiAccess, setAiAccess] = useState<AiAccessMode>('on')
+  const aiAccessRef = useRef(aiAccess)
+  aiAccessRef.current = aiAccess
+  useEffect(() => {
+    const refresh = (): void => {
+      void bridge.aiGetConfig().then((c) => setAiAccess(c.access))
+    }
+    refresh()
+    window.addEventListener('pdfx:ai-config', refresh)
+    return () => window.removeEventListener('pdfx:ai-config', refresh)
+  }, [])
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
   /** Snip-to-explain: armed from toolbar/menu ('quick' → popover) or from
@@ -5328,13 +5344,23 @@ export default function PdfViewer({
 
   // ---------- Semantic (AI) search ----------
 
-  const runSemanticSearch = useCallback(async (queryOverride?: string) => {
+  const runSemanticSearch = useCallback(async (queryOverride?: string, confirmed = false) => {
     if (!pdf) return
     const query = (queryOverride ?? searchQuery).trim()
     if (!query) return
     const config = await bridge.aiGetConfig()
+    // The dead-man switch: 'off' says so where the results would have been;
+    // 'confirm' stages the search until the note's own Send is pressed.
+    if (config.access === 'off') {
+      setSemantic({ status: 'off', hits: [], index: -1, note: null })
+      return
+    }
     if (!config.hasKey[config.provider]) {
       setSemantic({ status: 'noKey', hits: [], index: -1, note: null })
+      return
+    }
+    if (config.access === 'confirm' && !confirmed) {
+      setSemantic({ status: 'confirm', hits: [], index: -1, note: null })
       return
     }
     const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
@@ -5844,6 +5870,8 @@ export default function PdfViewer({
         break
       case 'tool.snip':
         e.preventDefault()
+        // Dead-man switch on: don't arm a tool whose whole purpose is a request
+        if (aiAccessRef.current === 'off') break
         setSnip((s) => (s ? null : { target: 'quick' }))
         break
       default:
@@ -6666,7 +6694,8 @@ export default function PdfViewer({
           aiIndex={semantic.index}
           aiNote={semantic.note}
           aiModelName={semanticModelName}
-          onAiSearch={() => void runSemanticSearch()}
+          onAiSearch={(confirmed) => void runSemanticSearch(undefined, confirmed)}
+          onAiCancel={() => setSemantic({ status: 'idle', hits: [], index: -1, note: null })}
           onAiPick={pickSemanticHit}
           onOpenAiSettings={() => {
             closeSearch()
@@ -6682,7 +6711,7 @@ export default function PdfViewer({
         />
       )}
 
-      {menu && <SelectionMenu menu={menu} onAction={onMenuAction} />}
+      {menu && <SelectionMenu menu={menu} onAction={onMenuAction} aiEnabled={aiAccess !== 'off'} />}
       {snip && <SnipOverlay onDone={onSnipDone} onCancel={() => setSnip(null)} />}
       {/* Armed text tool: the same pill the note tool shows, and it says out
           loud that the box stays movable/resizable — the part of the tool

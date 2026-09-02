@@ -1,6 +1,6 @@
 # PDF Scholar — Privacy Policy
 
-_Last updated: 2026-07-26_
+_Last updated: 2026-09-02_
 
 PDF Scholar (the desktop app and the browser extension) is a local-first PDF
 reader and annotator. **It collects no data about you.**
@@ -17,13 +17,44 @@ reader and annotator. **It collects no data about you.**
 
 ## AI assistant (optional, off by default)
 
-The AI features only work if you enter **your own API key** for a provider
-(Anthropic, OpenAI or Azure OpenAI). When — and only when — you explicitly ask
-the assistant a question, the relevant document text is sent **directly from
-your machine to that provider** under your key and their privacy terms. There is
-no intermediary server operated by PDF Scholar. Your key is sent to that one
-provider, as the credential on your own request, and to no one else — never to
-us.
+The AI features only work if you enter **your own API key** for a provider, or
+point the app at a local model server. Nothing is sent in the background:
+document content leaves your machine only when you use an AI action, and each
+request goes **directly from your machine to the provider you chose** under
+your key and their privacy terms. There is no intermediary server operated by
+PDF Scholar. Your key is sent to that one provider, as the credential on your
+own request, and to no one else — never to us.
+
+**What an AI action sends.** Asking the assistant a question, the one-click
+document summary, the AI search, and the quick actions on a selected passage or
+a snipped region all send document content with the request. Normally that is
+the **whole extractable text** of the document (for documents larger than the
+model's context window, an automatically chosen excerpt of the pages) — plus,
+depending on the action, the selected text, your question and the conversation
+so far, your annotations (for the annotations question), or images: a snipped
+region, or pages you attach so a scanned document can be read. Note that some
+quick actions (Explain, Simplify, Critique, Find the reference,
+snip-to-explain) fire as soon as they are chosen — choosing the action **is**
+the request. The assistant labels what rides along (a "whole document" or
+excerpt chip on the answer). The optional web search — off by default — lets
+the provider run searches on its side while it answers, and those search
+queries can be derived from the document.
+
+**Who receives it.** The provider you configured: Anthropic, OpenAI,
+Azure OpenAI, OpenRouter, Google Gemini, xAI (Grok), Mistral, Groq, or any
+OpenAI-compatible endpoint you point the app at. With a **local** server
+(Ollama, LM Studio) the content stays on your machine. What a hosted provider
+does with received content — retention, training, region — is governed by your
+agreement with that provider, not by the app.
+
+**The AI access switch.** The AI settings hold a three-position switch: **On**
+(AI actions fire when used), **Confirm every request** (every request —
+including the one-click actions — pauses first and names the model and what is
+about to be attached), and **Off** (no request is sent at all: the app refuses
+in the transport layer, not just in the interface, so a stored key cannot leak
+content by accident). If your licence to a document does not permit sharing it
+with an AI service, use Confirm or Off — the app cannot know what your
+subscriptions and licences allow.
 
 How the key is protected where it is stored depends on what the platform offers,
 and the app uses the strongest option available on each. The assistant's key

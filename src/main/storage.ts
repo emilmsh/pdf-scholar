@@ -48,6 +48,7 @@ const DEFAULT_AI: StoredAiConfig = {
   azure: { endpoint: '', deployment: '', apiVersion: '' },
   compat: { baseUrl: '' },
   thinking: 'medium',
+  access: 'on',
   keys: {
     anthropic: '',
     openai: '',
@@ -82,6 +83,7 @@ export function mergeAiConfig(
     azure: { ...base.azure, ...patch.azure },
     compat: { ...base.compat, ...patch.compat },
     thinking: patch.thinking ?? base.thinking,
+    access: patch.access ?? base.access,
     keys: { ...base.keys, ...patch.keys }
   }
 }

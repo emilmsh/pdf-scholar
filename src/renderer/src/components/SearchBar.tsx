@@ -21,8 +21,9 @@ interface Props {
   /** Search mode: exact text or AI-semantic */
   mode: 'text' | 'ai'
   onModeChange(mode: 'text' | 'ai'): void
-  /** AI-mode state (only meaningful when mode === 'ai') */
-  aiStatus: 'idle' | 'running' | 'done' | 'noKey' | 'noText' | 'error'
+  /** AI-mode state (only meaningful when mode === 'ai'). 'off' = the dead-man
+   *  switch is on; 'confirm' = the search is staged awaiting the note's Send */
+  aiStatus: 'idle' | 'running' | 'done' | 'noKey' | 'noText' | 'error' | 'off' | 'confirm'
   aiHits: SemanticHitView[]
   aiIndex: number
   aiNote: string | null
@@ -30,7 +31,10 @@ interface Props {
    *  model it is about to spend the user's key on (same transparency rule as
    *  every other AI surface). Empty when no model is configured yet. */
   aiModelName: string
-  onAiSearch(): void
+  /** confirmed=true only from the staged note's own Send button */
+  onAiSearch(confirmed?: boolean): void
+  /** Dismiss a staged ('confirm') search without sending it */
+  onAiCancel(): void
   onAiPick(index: number): void
   onOpenAiSettings(): void
   onQueryChange(query: string): void
@@ -56,6 +60,7 @@ export default function SearchBar({
   aiNote,
   aiModelName,
   onAiSearch,
+  onAiCancel,
   onAiPick,
   onOpenAiSettings,
   onQueryChange,
@@ -236,7 +241,7 @@ export default function SearchBar({
           </>
         )}
         {isAi && aiStatus !== 'running' && (
-          <button className="tb-btn" onClick={onAiSearch} disabled={query.trim() === ''} title={t('search.modeAiTip')}>
+          <button className="tb-btn" onClick={() => onAiSearch()} disabled={query.trim() === ''} title={t('search.modeAiTip')}>
             ✦
           </button>
         )}
@@ -297,6 +302,28 @@ export default function SearchBar({
           {t('search.aiNoKey')}{' '}
           <button className="search-ai-link" onClick={onOpenAiSettings}>
             {t('search.aiOpenSettings')}
+          </button>
+        </div>
+      )}
+      {isAi && aiStatus === 'off' && (
+        <div className="search-ai-note">
+          {t('search.aiOff')}{' '}
+          <button className="search-ai-link" onClick={onOpenAiSettings}>
+            {t('search.aiOpenSettings')}
+          </button>
+        </div>
+      )}
+      {/* «Bekreft hver forespørsel»: the staged search says what would be sent
+          and to which model, and waits for its own Send */}
+      {isAi && aiStatus === 'confirm' && (
+        <div className="search-ai-note">
+          {t('ai.confirmSearch', { name: aiModelName })}{' '}
+          <button className="search-ai-link" onClick={() => onAiSearch(true)}>
+            {t('ai.confirmGo')}
+          </button>
+          {' · '}
+          <button className="search-ai-link" onClick={onAiCancel}>
+            {t('app.cancel')}
           </button>
         </div>
       )}

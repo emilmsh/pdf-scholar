@@ -16,8 +16,9 @@
 //     single height guess drifts offscreen. Once the user has dragged it, their
 //     position wins and growth only re-clamps to the viewport edges.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { AiCitation, AiContentPart, AiImage } from '../../../shared/types'
+import type { AiAccessMode, AiCitation, AiContentPart, AiImage } from '../../../shared/types'
 import { bridge } from '../bridge'
+import { prettyModelName, providerLabels } from './ai-models'
 import {
   askSystem,
   askUserMessage,
@@ -112,7 +113,38 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const [question, setQuestion] = useState('')
   /** Ask mode waits for the user's question before firing the request */
   const [asked, setAsked] = useState<string | null>(null)
-  const active = !isAsk || asked !== null
+  // The dead-man switch (KI-tilgang): nothing fires until the mode is KNOWN.
+  // 'off' shows a notice instead of a request; 'confirm' stages the request in
+  // the body — naming the model and what is about to be attached — until the
+  // user says send. null = config not read yet (a single fast IPC roundtrip).
+  const [access, setAccess] = useState<AiAccessMode | null>(null)
+  const [confirmed, setConfirmed] = useState(false)
+  /** What the confirm step names as the receiver: the model, or the provider */
+  const [receiverName, setReceiverName] = useState('')
+  useEffect(() => {
+    let stale = false
+    void bridge.aiGetConfig().then((c) => {
+      if (stale) return
+      const model =
+        c.provider === 'azure' ? c.azure.deployment : prettyModelName(c.provider, c.models[c.provider] ?? '')
+      setReceiverName(model || (providerLabels().find((p) => p.id === c.provider)?.label ?? c.provider))
+      setAccess(c.access)
+    })
+    return () => {
+      stale = true
+    }
+  }, [])
+  const armed = access === 'on' || (access === 'confirm' && confirmed)
+  const active = armed && (!isAsk || asked !== null)
+  /** The staged request is described before it exists: what rides along */
+  const confirmText = isFigure
+    ? t('ai.confirmFigure', { name: receiverName })
+    : usesDocument
+      ? t('ai.confirmDoc', { name: receiverName })
+      : t('ai.confirmSel', { name: receiverName })
+  /** The whole document went with the request (excerptInfo names the excerpt
+   *  case instead) — the chip that makes the non-obvious attachment visible */
+  const [wholeDoc, setWholeDoc] = useState(false)
 
   // Same rule as the panel: past WAIT_HINT_S the wait becomes visible, and only
   // while there is nothing else to show. `thinking` is deliberately not part of
@@ -158,6 +190,13 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
           [asked ?? '', state.selection].filter(Boolean).join('\n'),
           config.catalog
         )
+      }
+      if (stale) return
+      // Say what rides along while the answer streams, not after: the excerpt
+      // chip (or the whole-document one) describes the REQUEST, not the answer.
+      if (prep) {
+        if (prep.excerpt) setExcerptInfo(prep.excerpt)
+        else setWholeDoc(true)
       }
       const result = await bridge.aiChat({
         requestId,
@@ -207,7 +246,6 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         setText(full)
         setParts(parts)
         setMeta(formatTokens(result.usage))
-        if (prep?.excerpt) setExcerptInfo(prep.excerpt)
       }
     })()
     return () => {
@@ -251,7 +289,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
       const next = draggedRef.current && p ? clampTo(p.left, p.top) : clampTo(state.x, state.y + 10)
       return p && p.left === next.left && p.top === next.top ? p : next
     })
-  }, [state.x, state.y, text, parts, asked, error, sizeBump])
+  }, [state.x, state.y, text, parts, asked, error, sizeBump, access, confirmed])
 
   // Esc and clicks outside dismiss the popover — the Lukk button must never
   // be the only way out (it once sat offscreen and trapped the bubble open)
@@ -319,7 +357,12 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         />
       )}
       <div className="ai-quick-body">
-        {!active ? (
+        {access === 'off' ? (
+          // The dead-man switch is on: say so instead of asking anything
+          <div className="ai-quick-stage">
+            <p>{t('ai.offNotice')}</p>
+          </div>
+        ) : isAsk && asked === null ? (
           <div className="ai-quick-ask">
             <input
               type="text"
@@ -343,6 +386,21 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             >
               <IconSend size={15} />
             </button>
+          </div>
+        ) : access === 'confirm' && !confirmed ? (
+          // «Bekreft hver forespørsel»: the request is staged, not sent — the
+          // stage names the model and exactly what would ride along
+          <div className="ai-quick-stage">
+            {isAsk && <div className="ai-quick-question">{asked}</div>}
+            <p>{confirmText}</p>
+            <div className="ai-quick-stage-actions">
+              <button className="btn-secondary" onClick={onClose}>
+                {t('app.cancel')}
+              </button>
+              <button className="btn-primary" onClick={() => setConfirmed(true)}>
+                {t('ai.confirmGo')}
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -375,6 +433,14 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         {excerptInfo && (
           <span className="ai-meta ai-excerpt-chip" title={t('ai.excerptTip')}>
             {t('ai.excerptChip', { included: excerptInfo.included, total: excerptInfo.total })}
+          </span>
+        )}
+        {/* Reference lookup, critique and free-form questions attach the whole
+            document — a label points at the selection, so say out loud that the
+            full text went along (the excerpt chip covers the huge-document case) */}
+        {wholeDoc && (
+          <span className="ai-meta ai-excerpt-chip" title={t('ai.wholeDocTip')}>
+            {t('ai.wholeDocChip')}
           </span>
         )}
         {meta && <span className="ai-meta">{meta}</span>}

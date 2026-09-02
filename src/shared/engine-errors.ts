@@ -133,6 +133,14 @@ export const ENGINE_ERRORS = {
  *  provider core both call (src/shared/ai-chat.ts) — which cannot import i18n
  *  because it runs in Electron main AND in the extension page. */
 export const AI_ERRORS = {
+  /** The dead-man switch (AiConfig.access === 'off'): the transport refuses
+   *  before any provider is contacted. Every aiChat implementation must check
+   *  this FIRST — the renderer hiding its buttons is a courtesy, this is the
+   *  guarantee that nothing leaves the machine while AI is switched off. */
+  disabled: {
+    code: 'ai-disabled',
+    error: 'KI-funksjonene er slått av i KI-innstillingene, så ingen forespørsel ble sendt.'
+  },
   keyMissing: {
     code: 'ai-key-missing',
     error: 'Ingen API-nøkkel er lagret for valgt leverandør. Åpne KI-innstillingene.'

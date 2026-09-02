@@ -741,26 +741,48 @@ export default function AiPanel({
   // (mirroring the left sidebar) so opening never mounts a fresh tree. All
   // fetch/focus effects above stay gated on `open`.
   const providerLabel = providerLabels().find((p) => p.id === config?.provider)?.label ?? ''
+  /** What the confirm strip names as the receiver: the model, or the provider */
+  const receiverName = config
+    ? (config.provider === 'azure'
+        ? config.azure.deployment
+        : prettyModelName(config.provider, config.models[config.provider] ?? '')) || providerLabel
+    : ''
+
+  // «Bekreft hver forespørsel» (AiConfig.access 'confirm'): every send is
+  // staged as a thunk and a strip above the composer asks first. A thunk
+  // rather than message args, so cancelling loses nothing — the composer text
+  // and staged attachments are untouched until the user says send.
+  const [pendingSend, setPendingSend] = useState<{ run: () => void } | null>(null)
+  const needsConfirm = config?.access === 'confirm'
+  const stageOrRun = useCallback(
+    (run: () => void) => {
+      if (needsConfirm) setPendingSend({ run })
+      else run()
+    },
+    [needsConfirm]
+  )
 
   /** Composer send: takes the staged images/annotations along and clears them.
    *  Staged annotations append the block to the message at send time; the chat
    *  bubble shows only the user's (editable) question. */
   const sendFromComposer = useCallback(() => {
     if (!input.trim() || busy) return
-    const imgs = pendingImages
-    setPendingImages([])
-    setStagedPages([])
-    if (annotsStaged) {
-      setAnnotsStaged(false)
-      void (async () => {
-        const block = await getAnnotationsText()
-        const text = block ? annotationsQuestion(input, block) : input
-        void send(text, block ? input.trim() : undefined, imgs.length > 0 ? imgs : undefined)
-      })()
-      return
-    }
-    void send(input, undefined, imgs.length > 0 ? imgs : undefined)
-  }, [input, busy, pendingImages, annotsStaged, getAnnotationsText, send])
+    stageOrRun(() => {
+      const imgs = pendingImages
+      setPendingImages([])
+      setStagedPages([])
+      if (annotsStaged) {
+        setAnnotsStaged(false)
+        void (async () => {
+          const block = await getAnnotationsText()
+          const text = block ? annotationsQuestion(input, block) : input
+          void send(text, block ? input.trim() : undefined, imgs.length > 0 ? imgs : undefined)
+        })()
+        return
+      }
+      void send(input, undefined, imgs.length > 0 ? imgs : undefined)
+    })
+  }, [input, busy, pendingImages, annotsStaged, getAnnotationsText, send, stageOrRun])
 
   // Whether the selected model can read images. Per-model knowledge exists
   // only for the compat catalog (Ollama reports capabilities); everything else
@@ -886,10 +908,31 @@ export default function AiPanel({
             ))}
           </div>
         )}
+        {pendingSend && (
+          <div className="ai-confirm">
+            <span>{t('ai.confirmChat', { name: receiverName })}</span>
+            <div className="ai-confirm-actions">
+              <button className="btn-secondary" onClick={() => setPendingSend(null)}>
+                {t('app.cancel')}
+              </button>
+              <button
+                className="btn-primary"
+                onClick={() => {
+                  const staged = pendingSend
+                  setPendingSend(null)
+                  staged.run()
+                }}
+              >
+                {t('ai.confirmGo')}
+              </button>
+            </div>
+          </div>
+        )}
         <textarea
           ref={inputRef}
           value={input}
           rows={1}
+          disabled={!!pendingSend}
           placeholder={t('ai.composerPlaceholder')}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
@@ -973,7 +1016,7 @@ export default function AiPanel({
             <button
               className="ai-send"
               title={t('ai.sendTip')}
-              disabled={!input.trim()}
+              disabled={!input.trim() || !!pendingSend}
               onClick={sendFromComposer}
             >
               <IconSend size={15} />
@@ -984,23 +1027,43 @@ export default function AiPanel({
     </footer>
   )
 
+  // The dead-man switch is on: the composer gives way to a notice with the way
+  // back (the panel stays reachable on purpose — it is the door to settings)
+  const aiOff = config?.access === 'off'
+  const offNotice = (
+    <div className="ai-notice ai-off-notice">
+      <p>{t('ai.offNotice')}</p>
+      <button
+        className="btn-secondary"
+        onClick={() => {
+          setShowSettings(true)
+          setShowHistory(false)
+        }}
+      >
+        {t('ai.openSettings')}
+      </button>
+    </div>
+  )
+
   const suggestionsBlock = (
     <div className="ai-suggestions">
+      {/* One-click sends, so they go through stageOrRun: in confirm mode the
+          strip above the composer asks before anything leaves */}
       <button
         className="ai-summary-btn"
         title={t('ai.summaryTip')}
-        onClick={() => void send(summaryPrompt(), t('ai.summaryBtn'))}
+        onClick={() => stageOrRun(() => void send(summaryPrompt(), t('ai.summaryBtn')))}
       >
         <IconSummary size={15} />
         {t('ai.summaryBtn')}
       </button>
       {hasAnnotations && (
-        <button title={t('ai.annotsTip')} onClick={() => void sendAnnots()}>
+        <button title={t('ai.annotsTip')} onClick={() => stageOrRun(() => void sendAnnots())}>
           {t('ai.annotsBtn')}
         </button>
       )}
       {suggestions().map((s) => (
-        <button key={s} onClick={() => void send(s)}>
+        <button key={s} onClick={() => stageOrRun(() => void send(s))}>
           {s}
         </button>
       ))}
@@ -1140,7 +1203,7 @@ export default function AiPanel({
               <IconSparkle size={22} />
               <p>{t('ai.emptyIntro')}</p>
             </div>
-            {config?.keysSupported && (config.provider === 'mock' || !config.hasKey[config.provider]) && (
+            {config?.keysSupported && !aiOff && (config.provider === 'mock' || !config.hasKey[config.provider]) && (
               <div className="ai-key-callout">
                 <p>{t(config.provider === 'mock' ? 'ai.calloutMock' : 'ai.calloutNoKey')}</p>
                 <button
@@ -1159,9 +1222,9 @@ export default function AiPanel({
                 <p>{t('ai.calloutNoText')}</p>
               </div>
             )}
-            {composer}
+            {aiOff ? offNotice : composer}
             {/* "Summarize the document" is a dead end without a text layer */}
-            {docRef.current?.hasText !== false && suggestionsBlock}
+            {!aiOff && docRef.current?.hasText !== false && suggestionsBlock}
           </div>
         </div>
       ) : (
@@ -1238,7 +1301,7 @@ export default function AiPanel({
             )}
           </div>
 
-          {composer}
+          {aiOff ? offNotice : composer}
           {totalUsage !== null && (
             <div className="ai-total">{t('ai.totalTokens', { tokens: formatTokens(totalUsage) })}</div>
           )}

@@ -216,9 +216,12 @@ export type MenuAction =
 interface MenuProps {
   menu: MenuState
   onAction(action: MenuAction): void
+  /** false while the dead-man switch is off — hides every AI entry (the chip
+   *  grid, snip-to-explain) rather than offering actions that cannot fire */
+  aiEnabled: boolean
 }
 
-export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element {
+export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.JSX.Element {
   useLang()
   const isSelection = menu.mode === 'selection'
   // Draggable, like the note and comment bubbles: this menu is the tallest
@@ -314,51 +317,55 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           <button className="menu-item" onClick={() => onAction({ kind: 'copy' })}>
             <span className="menu-icon"><IconCopy size={15} /></span> {t('menu.copy')}
           </button>
-          <div className="menu-sep" />
-          <div className="menu-section-label">
-            <IconSparkle size={11} />
-            {t('menu.aiSection')}
-          </div>
-          {/* All assistant actions are siblings of one gesture ("ask the
-              assistant about this selection") — one uniform chip grid, where
-              «Spør …» opens the popover with a free-form question box */}
-          <div className="menu-ai-grid">
-            <button
-              className="menu-ai-chip"
-              title={t('menu.aiExplainTip')}
-              onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
-            >
-              {t('menu.aiExplain')}
-            </button>
-            <button
-              className="menu-ai-chip"
-              title={t('menu.aiSimplifyTip')}
-              onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
-            >
-              {t('menu.aiSimplify')}
-            </button>
-            <button
-              className="menu-ai-chip"
-              title={t('menu.aiCritiqueTip')}
-              onClick={() => onAction({ kind: 'critique' })}
-            >
-              {t('menu.aiCritique')}
-            </button>
-            <button
-              className="menu-ai-chip"
-              title={t('menu.aiReferenceTip')}
-              onClick={() => onAction({ kind: 'reference' })}
-            >
-              {t('menu.aiReference')}
-            </button>
-            <button
-              className="menu-ai-chip menu-ai-chip-wide"
-              title={t('menu.aiAskTip')}
-              onClick={() => onAction({ kind: 'ask' })}
-            >
-              {t('menu.aiAsk')}
-            </button>
-          </div>
+          {aiEnabled && (
+            <>
+              <div className="menu-sep" />
+              <div className="menu-section-label">
+                <IconSparkle size={11} />
+                {t('menu.aiSection')}
+              </div>
+              {/* All assistant actions are siblings of one gesture ("ask the
+                  assistant about this selection") — one uniform chip grid, where
+                  «Spør …» opens the popover with a free-form question box */}
+              <div className="menu-ai-grid">
+                <button
+                  className="menu-ai-chip"
+                  title={t('menu.aiExplainTip')}
+                  onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
+                >
+                  {t('menu.aiExplain')}
+                </button>
+                <button
+                  className="menu-ai-chip"
+                  title={t('menu.aiSimplifyTip')}
+                  onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
+                >
+                  {t('menu.aiSimplify')}
+                </button>
+                <button
+                  className="menu-ai-chip"
+                  title={t('menu.aiCritiqueTip')}
+                  onClick={() => onAction({ kind: 'critique' })}
+                >
+                  {t('menu.aiCritique')}
+                </button>
+                <button
+                  className="menu-ai-chip"
+                  title={t('menu.aiReferenceTip')}
+                  onClick={() => onAction({ kind: 'reference' })}
+                >
+                  {t('menu.aiReference')}
+                </button>
+                <button
+                  className="menu-ai-chip menu-ai-chip-wide"
+                  title={t('menu.aiAskTip')}
+                  onClick={() => onAction({ kind: 'ask' })}
+                >
+                  {t('menu.aiAsk')}
+                </button>
+              </div>
+            </>
+          )}
           <div className="menu-sep" />
           <button className="menu-item" onClick={() => onAction({ kind: 'search' })}>
             <span className="menu-icon"><IconGlobe size={15} /></span> {t('menu.webSearch')}
@@ -380,9 +387,11 @@ export function SelectionMenu({ menu, onAction }: MenuProps): React.JSX.Element 
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
             <span className="menu-icon"><IconNote size={15} /></span> {t('menu.newNoteHere')}
           </button>
-          <button className="menu-item" title={t('menu.snipTip')} onClick={() => onAction({ kind: 'snip' })}>
-            <span className="menu-icon"><IconSparkle size={15} /></span> {t('menu.snip')}
-          </button>
+          {aiEnabled && (
+            <button className="menu-item" title={t('menu.snipTip')} onClick={() => onAction({ kind: 'snip' })}>
+              <span className="menu-icon"><IconSparkle size={15} /></span> {t('menu.snip')}
+            </button>
+          )}
         </>
       )}
     </div>

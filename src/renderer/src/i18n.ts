@@ -100,6 +100,8 @@ const nb = {
   'aierr.ai-stream-aborted': 'Strømmen ble avbrutt uten fullført svar.',
   'aierr.ai-provider-unknown': 'Ukjent feil fra leverandøren.',
   'aierr.ai-aborted': 'Avbrutt',
+  'aierr.ai-disabled':
+    'KI-funksjonene er slått av i KI-innstillingene, så ingen forespørsel ble sendt.',
   // One per ExtensionErrorCode. Fragments like engine.* — the full instructions
   // live in the notice the shell raises alongside (fileaccess.* below).
   'exterr.ext-file-access': 'nettleseren gir ikke utvidelsen tilgang til lokale filer ennå',
@@ -517,6 +519,7 @@ const nb = {
   'search.aiHits': '{count} steder',
   'search.aiNoHits': 'Fant ingen steder for dette',
   'search.aiNoKey': 'Ingen API-nøkkel er lagret for KI-leverandøren.',
+  'search.aiOff': 'KI-funksjonene er slått av.',
   'search.aiOpenSettings': 'Åpne KI-innstillinger',
   'search.searchError': 'KI-søket feilet',
   'search.historyClear': 'Tøm søkehistorikk',
@@ -615,6 +618,25 @@ const nb = {
   'ai.excerptLangHint':
     'Tips: still spørsmål på dokumentets eget språk — sideutvalget bygger på tekstlikhet og treffer bedre da.',
   'ai.excerptSearchNote': 'Stort dokument: søket gikk i et utdrag av sidene. Søk gjerne på dokumentets språk.',
+  'ai.wholeDocChip': 'Hele dokumentet legges ved',
+  'ai.wholeDocTip':
+    'Denne handlingen legger ved hele dokumentteksten, så svaret kan bygge på hele artikkelen — ikke bare markeringen. For dokumenter større enn modellens kontekstvindu sendes et utdrag i stedet.',
+  // The dead-man switch (KI-tilgang) — settings labels, the per-request
+  // confirmations, and the switched-off notices
+  'ai.accessTitle': 'KI-tilgang',
+  'ai.accessOn': 'På',
+  'ai.accessConfirm': 'Bekreft hver forespørsel',
+  'ai.accessOff': 'Av',
+  'ai.accessHint':
+    'KI-handlinger sender innhold fra dokumentet til valgt leverandør — normalt hele dokumentteksten, for svært lange dokumenter et utdrag. «Bekreft hver forespørsel» viser hva som legges ved før noe sendes; «Av» garanterer at ingen forespørsel forlater maskinen.',
+  'ai.offNotice': 'KI-funksjonene er slått av, så ingenting sendes til noen KI-leverandør.',
+  'ai.openSettings': 'Åpne KI-innstillinger',
+  'ai.confirmChat': 'Sender spørsmålet, samtalen og dokumentteksten til {name}.',
+  'ai.confirmSel': 'Sender markeringen og tekst fra samme side til {name}.',
+  'ai.confirmDoc': 'Sender markeringen og hele dokumentteksten til {name}.',
+  'ai.confirmFigure': 'Sender utsnittet og tekst fra siden til {name}.',
+  'ai.confirmSearch': 'Sender søket og dokumentteksten til {name}.',
+  'ai.confirmGo': 'Send',
   'ai.sourceChip': 'kilde',
   'ai.chipTip': 'Hopp til kilden i dokumentet',
   'ai.providerMock': 'Test uten nøkkel (mock)',
@@ -967,6 +989,7 @@ const en: Dict = {
   'aierr.ai-stream-aborted': 'The stream ended without a complete answer.',
   'aierr.ai-provider-unknown': 'Unknown error from the provider.',
   'aierr.ai-aborted': 'Stopped',
+  'aierr.ai-disabled': 'AI features are switched off in the AI settings, so no request was sent.',
   'exterr.ext-file-access': 'the browser does not let the extension read local files yet',
 
   'zotero.show': 'Show in Zotero',
@@ -1348,6 +1371,7 @@ const en: Dict = {
   'search.aiHits': '{count} passages',
   'search.aiNoHits': 'No passages found for this',
   'search.aiNoKey': 'No API key is stored for the AI provider.',
+  'search.aiOff': 'AI features are switched off.',
   'search.aiOpenSettings': 'Open AI settings',
   'search.searchError': 'AI search failed',
   'search.historyClear': 'Clear search history',
@@ -1436,6 +1460,23 @@ const en: Dict = {
     "Tip: ask in the document's own language — the page selection is based on text similarity and lands better that way.",
   'ai.excerptSearchNote':
     "Large document: the search ran over an excerpt of the pages. Searching in the document's language works best.",
+  'ai.wholeDocChip': 'Attaches the whole document',
+  'ai.wholeDocTip':
+    "This action attaches the whole document text, so the answer can draw on the full paper — not only the selection. For documents larger than the model's context window an excerpt is sent instead.",
+  'ai.accessTitle': 'AI access',
+  'ai.accessOn': 'On',
+  'ai.accessConfirm': 'Confirm every request',
+  'ai.accessOff': 'Off',
+  'ai.accessHint':
+    'AI actions send content from the document to the chosen provider — normally the whole document text, an excerpt for very long documents. "Confirm every request" shows what is attached before anything is sent; "Off" guarantees no request leaves the machine.',
+  'ai.offNotice': 'AI features are switched off, so nothing is sent to any AI provider.',
+  'ai.openSettings': 'Open AI settings',
+  'ai.confirmChat': 'Sends the question, the conversation and the document text to {name}.',
+  'ai.confirmSel': 'Sends the selection and text from the same page to {name}.',
+  'ai.confirmDoc': 'Sends the selection and the whole document text to {name}.',
+  'ai.confirmFigure': 'Sends the snip and text from the page to {name}.',
+  'ai.confirmSearch': 'Sends the search and the document text to {name}.',
+  'ai.confirmGo': 'Send',
   'ai.sourceChip': 'source',
   'ai.chipTip': 'Jump to the source in the document',
   'ai.providerMock': 'Test without a key (mock)',

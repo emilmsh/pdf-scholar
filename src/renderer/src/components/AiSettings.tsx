@@ -8,7 +8,7 @@
 // on save and reads back only `hasKey` flags. Keep it that way — no key value
 // may be held in renderer state beyond the field the user is typing into.
 import { useEffect, useState } from 'react'
-import type { AiConfigView, AiProviderId } from '../../../shared/types'
+import type { AiAccessMode, AiConfigView, AiProviderId } from '../../../shared/types'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
@@ -49,6 +49,7 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
   const [apiVersion, setApiVersion] = useState(config.azure.apiVersion)
   const [compatUrl, setCompatUrl] = useState(config.compat.baseUrl)
   const [compatModel, setCompatModel] = useState(config.models.compat)
+  const [access, setAccess] = useState<AiAccessMode>(config.access)
   const [saving, setSaving] = useState(false)
   const [ollamaFound, setOllamaFound] = useState(false)
 
@@ -81,7 +82,8 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
       // apiVersion '' = use the app's built-in default (placeholder shows it)
       azure: { endpoint: endpoint.trim(), deployment: deployment.trim(), apiVersion: apiVersion.trim() },
       compat: { baseUrl: compatUrl.trim() },
-      models: { ...config.models, compat: compatModel.trim() }
+      models: { ...config.models, compat: compatModel.trim() },
+      access
     }
     for (const { id } of keyProviders()) {
       if (keys[id].trim()) (patch.keys ??= {})[id] = keys[id].trim()
@@ -108,6 +110,9 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
     // first time it opens.
     if (patch.keys || compatChanged) next = await bridge.aiRefreshModels(true)
     setSaving(false)
+    // The viewer caches the access mode for its menus (the AI section of the
+    // selection menu, the snip shortcut) — tell it the config moved.
+    window.dispatchEvent(new CustomEvent('pdfx:ai-config'))
     onSaved(next)
   }
 
@@ -127,6 +132,20 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
 
   return (
     <div className="ai-settings">
+      {/* The dead-man switch first: what may be sent at all is decided before
+          any key is entered. The hint doubles as the disclosure of WHAT an AI
+          action sends — normally the whole document text. */}
+      <div className="ai-field-group">
+        <label className="ai-field">
+          <span>{t('ai.accessTitle')}</span>
+          <select value={access} onChange={(e) => setAccess(e.target.value as AiAccessMode)}>
+            <option value="on">{t('ai.accessOn')}</option>
+            <option value="confirm">{t('ai.accessConfirm')}</option>
+            <option value="off">{t('ai.accessOff')}</option>
+          </select>
+        </label>
+        <p className="ai-field-hint">{t('ai.accessHint')}</p>
+      </div>
       <div className="ai-settings-heading">{t('ai.keysTitle')}</div>
       <p className="ai-field-hint">
         {t('ai.keyCapHint')}{' '}
