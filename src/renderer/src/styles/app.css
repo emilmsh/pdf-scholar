@@ -3421,6 +3421,13 @@ html.pen-near .draw-layer {
   animation: toast-in 0.25s ease;
 }
 
+/* App-level toast (the theme-cycle indicator): .toast is absolute inside the
+   viewer's positioned host — this one must float over whatever is showing,
+   the library included, so it pins to the window instead. */
+.toast.app-toast {
+  position: fixed;
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;

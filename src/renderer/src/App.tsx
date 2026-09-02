@@ -120,6 +120,24 @@ export default function App(): React.JSX.Element {
     () => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
   )
   const [error, setError] = useState<string | null>(null)
+  /** «Dag» / «Sepia» / … flashed briefly when 'd' cycles the reading mode.
+   *  The keyboard path needs it: the menu shows its own selection state, but a
+   *  keypress recolours the page with nothing saying which mode you landed in
+   *  (Emil, 2026-09-02). App-level like the shortcut itself, so it also works
+   *  from the library. */
+  const [themeToast, setThemeToast] = useState<string | null>(null)
+  const themeToastTimerRef = useRef<number | null>(null)
+  const flashThemeName = useCallback((name: string) => {
+    setThemeToast(name)
+    if (themeToastTimerRef.current) window.clearTimeout(themeToastTimerRef.current)
+    themeToastTimerRef.current = window.setTimeout(() => setThemeToast(null), 1400)
+  }, [])
+  useEffect(
+    () => () => {
+      if (themeToastTimerRef.current) window.clearTimeout(themeToastTimerRef.current)
+    },
+    []
+  )
   /** Active tab is in presentation mode → tuck the tab bar too */
   const [presenting, setPresenting] = useState(false)
   /** Tab ids with unsaved annotation changes (save model) */
@@ -829,8 +847,16 @@ export default function App(): React.JSX.Element {
         case 'view.cycleTheme': {
           e.preventDefault()
           const order = ['day', 'sepia', 'night', 'nightHc'] as const
+          const labels = {
+            day: 'tb.themeDay',
+            sepia: 'tb.themeSepia',
+            night: 'tb.themeNight',
+            nightHc: 'tb.themeNightHc'
+          } as const
           const at = (order as readonly string[]).indexOf(settingsRef.current.theme)
-          updateSettings({ theme: order[(at + 1) % order.length] })
+          const next = order[(at + 1) % order.length]
+          updateSettings({ theme: next })
+          flashThemeName(t(labels[next]))
           break
         }
         // Moving the active tab — the browser shortcut for the same thing
@@ -847,7 +873,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, openDialog, moveTab, updateSettings])
+  }, [cycleTab, closeTab, openDialog, moveTab, updateSettings, flashThemeName])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -876,6 +902,13 @@ export default function App(): React.JSX.Element {
           <button onClick={() => setError(null)} aria-label="Lukk">
             ✕
           </button>
+        </div>
+      )}
+      {/* The reading mode 'd' just landed in — keyed so a rapid cycle replays
+          the pop-in per step instead of one long static pill */}
+      {themeToast && (
+        <div key={themeToast} className="toast app-toast" role="status">
+          {themeToast}
         </div>
       )}
 
