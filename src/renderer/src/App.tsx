@@ -13,6 +13,8 @@ import { bridge, isElectron } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
 import { applyPageTune } from './theme-tune'
+import { createDocRegistry } from './doc-registry'
+import { emitLocalDocEvent } from './local-doc-events'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
 import TabBar from './components/TabBar'
@@ -30,6 +32,22 @@ interface OpenTab {
 
 
 let tabCounter = 0
+
+/** Refcounted wrapper around main's per-window open-document Set — a path can
+ *  be on screen twice in one window (its own tab + another tab's split pane),
+ *  and main must hear docClosed only when the LAST viewer goes away. One per
+ *  window: each window is its own renderer process, so module scope is right. */
+const docRegistry = createDocRegistry(
+  (path) => bridge.docOpened(path),
+  (path) => bridge.docClosed(path)
+)
+
+/** App-level draft retirements (discard flows) travel the local bus too, so a
+ *  split pane showing the same path re-reads instead of showing dead marks. */
+const discardDraft = async (path: string): Promise<void> => {
+  await bridge.docDiscard(path)
+  emitLocalDocEvent(path, 'draft-ended', null)
+}
 
 /** A copyable shell command inside the update notice. macOS only in practice:
  *  that build detects updates but can't install them (docs/PLATFORMS.md §1), so
@@ -222,7 +240,7 @@ export default function App(): React.JSX.Element {
     setTabs((prev) => {
       const index = prev.findIndex((t) => t.id === id)
       const closing = prev[index]
-      if (closing) bridge.docClosed(closing.payload.path)
+      if (closing) docRegistry.release(closing.payload.path)
       const next = prev.filter((t) => t.id !== id)
       setActiveId((current) => {
         if (current !== id) return current
@@ -330,7 +348,7 @@ export default function App(): React.JSX.Element {
             goToTab(existing.id)
             return
           }
-          await bridge.docDiscard(existing.payload.path)
+          await discardDraft(existing.payload.path)
           setTabDirty(existing.id, false)
         }
         goToTab(existing.id)
@@ -344,7 +362,7 @@ export default function App(): React.JSX.Element {
       }
       const initialPosition = await bridge.getPosition(payload.path)
       const tab: OpenTab = { id: `tab-${++tabCounter}`, payload, initialPosition, epoch: 0 }
-      bridge.docOpened(payload.path)
+      docRegistry.acquire(payload.path)
       setTabs((prev) => [...prev, tab])
       goToTab(tab.id)
       setError(null)
@@ -363,7 +381,7 @@ export default function App(): React.JSX.Element {
       const verdict = await confirmExternalUpdateVerdict(path, name)
       if (verdict === 'cancel') return verdict
       const existing = tabsRef.current.find((t) => t.payload.path === path)
-      await bridge.docDiscard(path)
+      await discardDraft(path)
       if (existing) setTabDirty(existing.id, false)
       const result = await bridge.readFile(path)
       if (existing && !('error' in result)) {
@@ -496,15 +514,15 @@ export default function App(): React.JSX.Element {
       // the path — tabs must stay unique per path.
       const other = tabsRef.current.find((t) => t.id !== id && t.payload.path === newPath)
       if (other) {
-        await bridge.docDiscard(newPath)
+        await discardDraft(newPath)
         reallyCloseTab(other.id)
       }
       const result = await bridge.readFile(newPath)
       if ('error' in result) return // the copy is safely on disk; stay on the original
-      await bridge.docDiscard(oldPath)
+      await discardDraft(oldPath)
       if (oldPath !== newPath) {
-        bridge.docClosed(oldPath)
-        bridge.docOpened(newPath)
+        docRegistry.release(oldPath)
+        docRegistry.acquire(newPath)
       }
       const initialPosition = await bridge.getPosition(newPath)
       setTabs((prev) =>
@@ -542,7 +560,7 @@ export default function App(): React.JSX.Element {
         }
         // 'save' (copy flushed elsewhere) or 'discard': the old draft is no
         // longer needed — drop it and fall through to load the fresh bytes.
-        await bridge.docDiscard(path)
+        await discardDraft(path)
         setTabDirty(existing.id, false)
       }
       // Existing-but-clean tabs fall through: re-read so an externally updated

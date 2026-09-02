@@ -32,7 +32,6 @@ import {
   annotationHitTest,
   clearCustomColors,
   freetextMinSize,
-  fromPdfJsAnnotation,
   inkHitTest,
   inkPad,
   inkQuad,
@@ -66,10 +65,11 @@ import type {
   DrawToolType,
   MarkupToolType,
   PageAnnotation,
-  PdfJsAnnotationData,
   ResizeHandle,
   ShapeToolType
 } from '../annotations'
+import { collectAnnotations } from '../doc-load'
+import { emitLocalDocEvent, onLocalDocEvent } from '../local-doc-events'
 import {
   buildRows,
   flipTarget,
@@ -180,23 +180,6 @@ function loadFailure(err: unknown, bytes: Uint8Array): Error {
   console.error(`[pdfx] document load failed: ${message} — ${shape}`)
   return new Error(`${message} ${shape}`)
 }
-
-async function collectAnnotations(
-  doc: PDFDocumentProxy
-): Promise<Map<number, PageAnnotation[]>> {
-  const map = new Map<number, PageAnnotation[]>()
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i)
-    const pageHeight = page.getViewport({ scale: 1 }).height
-    const raw = (await page.getAnnotations()) as PdfJsAnnotationData[]
-    const records = raw
-      .map((r) => fromPdfJsAnnotation(r, pageHeight))
-      .filter((r): r is PageAnnotation => r !== null)
-    if (records.length > 0) map.set(i, records)
-  }
-  return map
-}
-
 
 const EMPTY_ANNOTS: PageAnnotation[] = []
 const EMPTY_RECTS: PageRect[] = []
@@ -2303,6 +2286,15 @@ export default function PdfViewer({
   const markDirtyRef = useRef<() => void>(() => {})
   markDirtyRef.current = () => setDirty(true)
 
+  /** This viewer's identity on the intra-window doc bus — its own writes must
+   *  never bounce back as a reload (mirrors how main only notifies OTHER
+   *  windows). See local-doc-events.ts. */
+  const docEventSenderRef = useRef<symbol>(Symbol('pdf-viewer'))
+  const emitDocChanged = useCallback(
+    () => emitLocalDocEvent(payload.path, 'changed', docEventSenderRef.current),
+    [payload.path]
+  )
+
   // Mirror the dirty flag up to App from an effect. Calling onDirtyChange
   // inside the setDirty updater looked equivalent, but React runs updaters
   // DURING render — updating App mid-render trips "Cannot update a component
@@ -2399,6 +2391,9 @@ export default function PdfViewer({
         return
       }
       setDirty(false)
+      // The draft is retired — another viewer of this path in THIS window
+      // (a split pane) must clear its dirty flag too, like another window would
+      emitLocalDocEvent(payload.path, 'draft-ended', docEventSenderRef.current)
       showToast(t('viewer.saved'))
       return
     }
@@ -2418,6 +2413,7 @@ export default function PdfViewer({
       return
     }
     setDirty(false)
+    emitLocalDocEvent(payload.path, 'draft-ended', docEventSenderRef.current)
     showToast(t('viewer.saved'))
   }, [payload.path, payload.name, payload.data, showToast, onExternalSaveConflict])
 
@@ -2604,12 +2600,13 @@ export default function PdfViewer({
       } else {
         handle.fileId = result.id
         markDirtyRef.current()
+        emitDocChanged()
         mutatePage(handle.pageNumber, (list) =>
           list.map((r) => (r.id === handle.localId ? { ...r, fileId: result.id } : r))
         )
       }
     },
-    [payload.path, mutatePage, showToast, asWriteError]
+    [payload.path, mutatePage, showToast, asWriteError, emitDocChanged]
   )
 
   /** The delete write itself, with no opinion about how to report it. Split out
@@ -2636,9 +2633,10 @@ export default function PdfViewer({
         })
       if ('error' in result) return { failed: result, wasFilePainted: false }
       markDirtyRef.current()
+      emitDocChanged()
       return { failed: null, wasFilePainted }
     },
-    [payload.path, mutatePage, matchesHandle, findRecord, asWriteError]
+    [payload.path, mutatePage, matchesHandle, findRecord, asWriteError, emitDocChanged]
   )
 
   const engineDelete = useCallback(
@@ -2689,13 +2687,14 @@ export default function PdfViewer({
       if ('error' in result) showToast(t('viewer.annotChangeFailed', { error: errorText(result) }))
       else {
         markDirtyRef.current()
+        emitDocChanged()
         // 'file' annots are painted by pdf.js from the file — refresh the canvas
         if (wasFilePainted && (patch.color || patch.quads || patch.strokes || patch.translate)) {
           void reloadDocument()
         }
       }
     },
-    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument, asWriteError]
+    [payload.path, mutatePage, matchesHandle, findRecord, showToast, reloadDocument, asWriteError, emitDocChanged]
   )
 
   // Another window annotated the same file. Both windows write into the ONE
@@ -2739,9 +2738,19 @@ export default function PdfViewer({
       setDirty(false)
       arm()
     })
+    // The intra-window sibling of the two above: the same document changed in
+    // THIS window (another tab's split pane, or an app-level discard). Same
+    // handling — the draft in main is the truth, re-read it — and own events
+    // are ignored so a write never reloads the viewer that made it.
+    const offLocal = onLocalDocEvent((path, kind, sender) => {
+      if (path !== payload.path || sender === docEventSenderRef.current) return
+      setDirty(kind === 'changed')
+      arm()
+    })
     return () => {
       offChanged()
       offEnded()
+      offLocal()
     }
   }, [payload.path, reloadDocument])
   useEffect(
@@ -5935,6 +5944,7 @@ export default function PdfViewer({
         <div
           className={`pages${drawTool ? ' drawing' : ''}`}
           data-pane="a"
+          data-dockey={payload.path}
           data-rotation={rotation}
           ref={containerRef}
           tabIndex={-1}

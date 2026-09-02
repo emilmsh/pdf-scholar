@@ -645,6 +645,7 @@ export default function PagesPane({
       <div
         className={`pages${drawTool ? ' drawing' : ''}`}
         data-pane="b"
+        data-dockey={docKey}
         // Published so PdfViewer's pointer handlers can map a click in THIS
         // column into page space at its own zoom and orientation
         data-rotation={rotation}

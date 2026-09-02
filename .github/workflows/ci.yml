@@ -55,6 +55,9 @@ jobs:
       # «Behold bildefarger»: the CTM walk that finds raster-image regions
       # (night mode repaints them unfiltered), incl. the scanned-page guard
       - run: npm run test:image-regions
+      # The refcount that lets one window show a path twice (tab + split pane)
+      # while main still hears exactly one docOpened/docClosed pair
+      - run: npm run test:doc-registry
       # BM25 excerpt fallback for documents beyond the model's context window:
       # budget bounds, real-page markers, char→quote citation conversion
       - run: npm run test:retrieval
