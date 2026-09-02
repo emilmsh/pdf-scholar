@@ -75,6 +75,11 @@ export function MarginCard({
   onSelect(pageNumber: number, localId: string): void
   onDelete(pageNumber: number, localId: string): void
 }): React.JSX.Element {
+  // Whether the card's textarea was ALREADY focused when the pointer went down.
+  // Read at contextmenu time, when the browser has long since focused the
+  // textarea from the right-click itself — checking activeElement there would
+  // always say "editing" and the delete below would never fire on the text.
+  const editingAtPointerDown = useRef(false)
   return (
     <div
       // Contents in the key (set by the callers): an external text change
@@ -83,9 +88,23 @@ export function MarginCard({
       className={`margin-note-card${selected ? ' is-selected' : ''}`}
       // The pages container owns drag/selection gestures on everything under
       // it — a click in a card is typing or navigation, not panning.
-      onPointerDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => {
+        e.stopPropagation()
+        editingAtPointerDown.current =
+          e.target instanceof HTMLTextAreaElement && document.activeElement === e.target
+      }}
       onMouseDown={(e) => e.stopPropagation()}
       onDoubleClick={(e) => e.stopPropagation()}
+      // Right-click deletes the card — the same action as the corner ×, without
+      // hunting for a hover control (Emil, 2026-09-02); Ctrl+Z brings it back.
+      // While the comment is being EDITED the native menu stays, so right-click
+      // paste into the text keeps working; long-press is the touch path.
+      onContextMenu={(e) => {
+        if (editingAtPointerDown.current) return
+        e.preventDefault()
+        e.stopPropagation()
+        onDelete(pageNumber, a.id)
+      }}
       {...extraProps}
       style={{ borderLeftColor: rgbCss(a.color, 1), ...extraProps?.style }}
     >
