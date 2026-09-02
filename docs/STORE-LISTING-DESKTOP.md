@@ -138,20 +138,20 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.42.0
+## What's new in this version (≤ 1 500 chars) — v0.43.0
 
 **EN:**
 ```
-• Two-page view can show the cover page separately: page 1 stands alone and facing pages pair up 2-3, 4-5 — the way they sit in a bound book. The toggle lives under the two-page option in the view menu, works per column in split view, and is remembered with your reading position
-• The assistant's conversation can be saved as Markdown — questions, answers and citations leave the panel as a file you can keep
-• The assistant's header now shows which model is answering
+• Turn pages with the arrow keys: ← and → jump to the top of the previous or next page — combined with "Fit page" this reads as a full-page view, with no mouse and no scrolling. In two-page view one press turns a whole spread, like leaves in a book
+• When the zoom is set to fit the width or the whole page, a page turn re-fits against the page you land on — a landscape page in a portrait document shows whole instead of running off the screen
+• The keys can be rebound in the keyboard shortcuts dialog — PgUp/PgDn work too, if you prefer them for turning pages
 ```
 
 **NO:**
 ```
-• Topagevisning kan vise forsiden alene: side 1 står for seg selv og motstående sider pares 2-3, 4-5 — slik de ligger i en innbundet bok. Bryteren ligger under topage-valget i visningsmenyen, virker per kolonne i delt visning, og huskes med leseposisjonen
-• Assistentens samtale kan lagres som Markdown — spørsmål, svar og kildehenvisninger blir en fil du kan beholde
-• Assistentens topplinje viser nå hvilken modell som svarer
+• Bla side for side med piltastene: ← og → hopper til toppen av forrige eller neste side — sammen med «Tilpass siden» blir det en helsidevisning, uten mus og uten scrolling. I topagevisning blar ett trykk et helt oppslag, som i en bok
+• Når zoomen er satt til å tilpasse bredden eller hele siden, tilpasses den på nytt mot siden du lander på — en liggende side i et stående dokument vises hel i stedet for å stikke utenfor skjermen
+• Tastene kan bindes om i hurtigtastdialogen — PgUp/PgDn virker også, om du heller vil bla med dem
 ```
 
 ---
