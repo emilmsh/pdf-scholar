@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
+import { bridge } from '../bridge'
+import { TAB_DRAG_MIME } from '../drag-types'
 import { t, useLang } from '../i18n'
 import { withShortcut } from '../keymap'
 import { IconChevronDown } from './icons'
@@ -73,6 +75,27 @@ export default function TabBar({
 }: Props): React.JSX.Element {
   useLang()
   const [menu, setMenu] = useState<{ x: number; y: number; tab: TabInfo } | null>(null)
+  // «Vis i Zotero» in that menu: instant for a storage-layout path, and for a
+  // linked attachment the platform is asked (cached there after the first ask
+  // the toolbar's badge already made) — so the row appears a beat late at
+  // worst, and never for a file Zotero does not know.
+  const [menuZotero, setMenuZotero] = useState(false)
+  useEffect(() => {
+    if (!menu) return undefined
+    const path = menu.tab.path
+    if (zoteroKeyFromPath(path) !== null) {
+      setMenuZotero(true)
+      return undefined
+    }
+    setMenuZotero(false)
+    let stale = false
+    void bridge.zoteroInfo(path).then((r) => {
+      if (!stale) setMenuZotero(r !== null && !('error' in r))
+    })
+    return () => {
+      stale = true
+    }
+  }, [menu])
   /** The "all tabs" list, opened from the chevron at the end of the strip */
   const [allOpen, setAllOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -134,6 +157,9 @@ export default function TabBar({
             // from cancelling the drag.
             e.dataTransfer.effectAllowed = 'move'
             e.dataTransfer.setData('text/plain', tab.path)
+            // …and under our own type, which a pages column reads as «open this
+            // document beside mine» — text/plain alone could be anything
+            e.dataTransfer.setData(TAB_DRAG_MIME, tab.path)
             setDraggingId(tab.id)
           }}
           // Dragging ACROSS the bar reorders, live, the way browsers do. Dropping
@@ -266,7 +292,7 @@ export default function TabBar({
           >
             {t('tabs.showInFolder')}
           </button>
-          {zoteroKeyFromPath(menu.tab.path) !== null && (
+          {menuZotero && (
             <button
               className="menu-item"
               onClick={() => {

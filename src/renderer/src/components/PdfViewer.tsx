@@ -19,6 +19,8 @@ import type {
   ViewRotation
 } from '../../../shared/types'
 import { bridge, isElectron, isExtension } from '../bridge'
+import { isSharedWith, markSharedWith } from '../ai-sharing'
+import { useDropTarget } from './useDropTarget'
 import { prettyModelName } from './ai-models'
 import { bubblesWhileTyping, commandForEvent, isKeyboardCaptured, shortcutLabel } from '../keymap'
 import { READ_ALOUD } from '../flags'
@@ -391,8 +393,14 @@ interface Props {
   /** Pane A was closed while pane B shows another file — that file takes over
    *  the tab (App swaps the payload and remounts) */
   onRequestPromoteSplitDoc?(): void
-  /** A file was dropped on the second column — show it there */
+  /** A file was dropped on the second column, or a tab on either column — show
+   *  that document in the split */
   onRequestOpenInSplit?(path: string): void
+  /** Desktop: the other open documents, listed under «Åpne i delt visning» in
+   *  the view menu */
+  splitCandidates?: { name: string; path: string }[] | undefined
+  /** «Annen fil …» in that menu — App shows the picker and opens the pick in the split */
+  onRequestOpenOtherInSplit?: (() => void) | undefined
 }
 
 /** Load a PDF blob in an offscreen frame and ask it to print.
@@ -463,7 +471,9 @@ export default function PdfViewer({
   onSplitDirtyChange,
   onRequestCloseSplitDoc,
   onRequestPromoteSplitDoc,
-  onRequestOpenInSplit
+  onRequestOpenInSplit,
+  splitCandidates,
+  onRequestOpenOtherInSplit
 }: Props): React.JSX.Element {
   useLang()
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
@@ -872,6 +882,22 @@ export default function PdfViewer({
     )
   }, [currentPage, rememberPaneB])
   toggleSplitRef.current = toggleSplit
+
+  /** A tab dragged into either column: its document opens beside this one.
+   *  The host's own tab dropped in means the plain same-file split. */
+  const dropTabIntoSplit = useCallback(
+    (path: string) => {
+      if (path === payload.path) {
+        if (!splitOpenRef.current) toggleSplit()
+        return
+      }
+      onRequestOpenInSplit?.(path)
+    },
+    [payload.path, toggleSplit, onRequestOpenInSplit]
+  )
+  // Pane A takes tabs only: a FILE dropped there still opens a tab (App's
+  // handler), the behaviour it always had
+  const paneADrop = useDropTarget(onRequestOpenInSplit ? dropTabIntoSplit : undefined, undefined)
 
   /**
    * Close ONE named column and keep the other's content — "lukk det panelet man
@@ -3625,7 +3651,7 @@ export default function PdfViewer({
             } catch {
               /* context is best-effort */
             }
-            setAiQuick({ x, y, mode, selection: selText, pageNumber, pageContext })
+            setAiQuick({ x, y, mode, selection: selText, pageNumber, pageContext, docPath: payload.path })
           })()
           break
         }
@@ -3667,7 +3693,16 @@ export default function PdfViewer({
             } catch {
               /* context is best-effort */
             }
-            setAiQuick({ x, y, mode, selection: selText, pageNumber, pageContext, document })
+            setAiQuick({
+              x,
+              y,
+              mode,
+              selection: selText,
+              pageNumber,
+              pageContext,
+              document,
+              docPath: payload.path
+            })
           })()
           break
         }
@@ -3754,7 +3789,8 @@ export default function PdfViewer({
             selection: '',
             pageNumber,
             pageContext,
-            image
+            image,
+            docPath: payload.path
           })
         } catch {
           /* a cancelled/failed render just drops the snip */
@@ -5359,7 +5395,9 @@ export default function PdfViewer({
       setSemantic({ status: 'noKey', hits: [], index: -1, note: null })
       return
     }
-    if (config.access === 'confirm' && !confirmed) {
+    // …once per document and provider: a search after a chat about the same
+    // paper with the same provider shares nothing new (ai-sharing.ts)
+    if (config.access === 'confirm' && !confirmed && !isSharedWith(payload.path, config.provider)) {
       setSemantic({ status: 'confirm', hits: [], index: -1, note: null })
       return
     }
@@ -5371,6 +5409,7 @@ export default function PdfViewer({
       return
     }
     setSemantic({ status: 'running', hits: [], index: -1, note: null })
+    markSharedWith(payload.path, config.provider)
     const doc = buildAiDocument(pages)
     // Above the model's context window the search runs over a BM25 excerpt
     // keyed on the query (ai-retrieval.ts); a note under the results says so.
@@ -6226,6 +6265,15 @@ export default function PdfViewer({
           splitOpen={splitOpen}
           onSwapPanes={swapPanes}
           onToggleSplit={toggleSplit}
+          splitCandidates={
+            onRequestOpenInSplit && onRequestOpenOtherInSplit
+              ? {
+                  docs: splitCandidates ?? [],
+                  onOpen: onRequestOpenInSplit,
+                  onOpenOther: onRequestOpenOtherInSplit
+                }
+              : undefined
+          }
           onClosePane={closePane}
           activePane={activePane}
           onActivatePane={activatePane}
@@ -6347,7 +6395,13 @@ export default function PdfViewer({
         <div
           className={`pages-host${paneFlash === 'a' ? ' pane-flash' : ''}`}
           ref={pagesHostRef}
+          {...paneADrop.handlers}
         >
+          {paneADrop.hint && (
+            <div className="pane-drop-hint">
+              <span>{t('viewer.dropSplitHint')}</span>
+            </div>
+          )}
         <div
           className={`pages${drawTool ? ' drawing' : ''}`}
           data-pane="a"
@@ -6503,6 +6557,7 @@ export default function PdfViewer({
               annots={sessionB ? sessionB.annots : annots}
               annotsHidden={annotsHidden}
               keepImageColors={keepImageColors}
+              onTabDrop={onRequestOpenInSplit ? dropTabIntoSplit : undefined}
               onFileDrop={
                 onRequestOpenInSplit &&
                 ((file: File) => {

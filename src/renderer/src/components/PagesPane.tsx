@@ -22,6 +22,8 @@
 // discusses it stays readable on the other. The first column's are the ones
 // persisted with the reading position; this one's live for the session.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { t } from '../i18n'
+import { useDropTarget } from './useDropTarget'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
@@ -70,6 +72,8 @@ interface Props {
    *  to consume the drop; false lets it bubble to App's open-a-tab handler
    *  (e.g. in the browser, where a dropped file has no real path). */
   onFileDrop?: ((file: File) => boolean) | undefined
+  /** A tab from the strip was dropped on THIS column — open its document here */
+  onTabDrop?: ((path: string) => void) | undefined
   rotation: ViewRotation
   spread: boolean
   /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … */
@@ -156,6 +160,7 @@ export default function PagesPane({
   annotsHidden,
   keepImageColors,
   onFileDrop,
+  onTabDrop,
   rotation,
   spread,
   coverPage,
@@ -646,22 +651,17 @@ export default function PagesPane({
     onScroll()
   }, [onScroll])
 
+  // A tab dragged in from the strip, or a PDF from the OS: both mean «show that
+  // document in this column», and both get the same hint while hovering
+  const drop = useDropTarget(onTabDrop, onFileDrop)
+
   return (
-    <div
-      className={`pages-host pane-b${flash ? ' pane-flash' : ''}`}
-      onDragOver={onFileDrop ? (e) => e.preventDefault() : undefined}
-      onDrop={
-        onFileDrop
-          ? (e) => {
-              const file = e.dataTransfer.files[0]
-              if (!file || !file.name.toLowerCase().endsWith('.pdf')) return
-              if (!onFileDrop(file)) return // unhandled — App's open-a-tab takes it
-              e.preventDefault()
-              e.stopPropagation()
-            }
-          : undefined
-      }
-    >
+    <div className={`pages-host pane-b${flash ? ' pane-flash' : ''}`} {...drop.handlers}>
+      {drop.hint && (
+        <div className="pane-drop-hint">
+          <span>{t('viewer.dropSplitHint')}</span>
+        </div>
+      )}
       <div
         className={`pages${drawTool ? ' drawing' : ''}`}
         data-pane="b"

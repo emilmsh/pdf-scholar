@@ -18,6 +18,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { AiAccessMode, AiCitation, AiContentPart, AiImage } from '../../../shared/types'
 import { bridge } from '../bridge'
+import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { prettyModelName, providerLabels } from './ai-models'
 import {
   askSystem,
@@ -70,6 +71,8 @@ export interface AiQuickState {
   document?: { title: string; pages: PageText[]; doc: AiDocument } | null
   /** Figure mode: the snipped page region, sent as an image */
   image?: AiImage
+  /** The document's path — what «Bekreft før deling» remembers a disclosure by */
+  docPath: string
 }
 
 const quickTitle = (mode: AiQuickState['mode']): string =>
@@ -119,6 +122,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   // user says send. null = config not read yet (a single fast IPC roundtrip).
   const [access, setAccess] = useState<AiAccessMode | null>(null)
   const [confirmed, setConfirmed] = useState(false)
+  const [provider, setProvider] = useState('')
   /** What the confirm step names as the receiver: the model, or the provider */
   const [receiverName, setReceiverName] = useState('')
   useEffect(() => {
@@ -128,6 +132,9 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
       const model =
         c.provider === 'azure' ? c.azure.deployment : prettyModelName(c.provider, c.models[c.provider] ?? '')
       setReceiverName(model || (providerLabels().find((p) => p.id === c.provider)?.label ?? c.provider))
+      setProvider(c.provider)
+      // Already shared with this provider in this window: no second asking
+      if (c.access === 'confirm' && isSharedWith(state.docPath, c.provider)) setConfirmed(true)
       setAccess(c.access)
     })
     return () => {
@@ -198,6 +205,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         if (prep.excerpt) setExcerptInfo(prep.excerpt)
         else setWholeDoc(true)
       }
+      if (provider) markSharedWith(state.docPath, provider)
       const result = await bridge.aiChat({
         requestId,
         system:
@@ -388,7 +396,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             </button>
           </div>
         ) : access === 'confirm' && !confirmed ? (
-          // «Bekreft hver forespørsel»: the request is staged, not sent — the
+          // «Bekreft før deling»: the request is staged, not sent — the
           // stage names the model and exactly what would ride along
           <div className="ai-quick-stage">
             {isAsk && <div className="ai-quick-question">{asked}</div>}

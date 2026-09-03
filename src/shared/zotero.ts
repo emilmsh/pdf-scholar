@@ -3,14 +3,19 @@
 //
 // Zotero lays every *stored* attachment out as <data-dir>/storage/<KEY>/<file>,
 // where <KEY> is the attachment item's 8-char key — the path alone identifies
-// the item, no lookup needed. («Linked» attachments live wherever the user put
-// them, carry no key in the path, and are deliberately not detected.) Everything
-// beyond the key — the parent item, its title, a formatted citation — comes from
-// Zotero's local HTTP API on 127.0.0.1:23119, which serves the user's own
-// database unauthenticated once enabled (Zotero Settings → Advanced → "Allow
-// other applications on this computer to communicate with Zotero"; 403 when
-// off). The zotero:// URI scheme is registered by the Zotero client itself, so
-// «Vis i Zotero» works even with that API switched off.
+// the item, no lookup needed. «Linked» attachments (ZotFile-style libraries, a
+// base directory on a synced drive) live wherever the user put them and carry
+// no key in the path, so for those the library's own attachment list is asked:
+// fetched once per session in pages of 100 and indexed by filename, the file
+// on disk is matched to the record whose path ends the same way (2026-09-03 —
+// Emil's whole library is linked, and v0.44.0 showed it no Zotero UI at all).
+// Everything beyond the key — the parent item, its title, a formatted citation
+// — comes from Zotero's local HTTP API on 127.0.0.1:23119, which serves the
+// user's own database unauthenticated once enabled (Zotero Settings → Advanced
+// → "Allow other applications on this computer to communicate with Zotero";
+// 403 when off). The zotero:// URI scheme is registered by the Zotero client
+// itself, so «Vis i Zotero» works even with that API switched off — for a
+// storage path; a linked file needs the lookup first.
 //
 // Everything here is pure parsing/URL-building, plus the two-request client with
 // fetch INJECTED — so scripts/test-zotero.mjs proves the whole mapping without
@@ -50,6 +55,72 @@ export function zoteroKeyFromPath(path: string): string | null {
  *  arbitrary URL out of renderer input. */
 export function zoteroSelectUrl(key: string): string | null {
   return isZoteroKey(key) ? `zotero://select/library/items/${key}` : null
+}
+
+// ---------- Paths of linked attachments ----------
+
+/** A path as segments, most significant last: file:// URLs decoded, both
+ *  separators, Zotero's `attachments:` (relative to its linked-attachment
+ *  base directory) and `storage:` prefixes dropped, empty segments skipped. */
+export function pathSegments(path: string): string[] {
+  let p = path
+  if (/^file:/i.test(p)) {
+    try {
+      p = decodeURIComponent(p)
+    } catch {
+      // Malformed escapes: segment the raw form
+    }
+    p = p.replace(/^file:\/*/i, '')
+  }
+  p = p.replace(/^(attachments|storage):/i, '')
+  return p.split(/[\\/]+/).filter((s) => s.length > 0)
+}
+
+/** The file's own name — the one thing a linked attachment's Zotero record
+ *  and its path on disk are guaranteed to share. */
+export function pathBasename(path: string): string {
+  const segs = pathSegments(path)
+  return segs[segs.length - 1] ?? ''
+}
+
+/** How many trailing segments two paths share, case-insensitively (Windows
+ *  filesystems are). 0 when even the filename differs; the basename alone is
+ *  1. Decides between records that share a filename — the one that also shares
+ *  the folder above wins. */
+export function pathTailMatch(a: string, b: string): number {
+  const x = pathSegments(a)
+  const y = pathSegments(b)
+  let n = 0
+  while (n < x.length && n < y.length) {
+    if (x[x.length - 1 - n]!.toLowerCase() !== y[y.length - 1 - n]!.toLowerCase()) break
+    n += 1
+  }
+  return n
+}
+
+export interface LinkedAttachment {
+  key: string
+  parentKey: string | null
+  /** Zotero's own path field: `attachments:rel/path.pdf` or an absolute path */
+  path: string
+}
+
+/** One page of GET /items?itemType=attachment: how many records it held (the
+ *  pager stops on a short page) and the linked-file ones among them, since
+ *  stored attachments are matched by path and never need this list. */
+export function parseAttachmentList(json: unknown): { count: number; linked: LinkedAttachment[] } {
+  if (!Array.isArray(json)) return { count: 0, linked: [] }
+  const linked: LinkedAttachment[] = []
+  for (const it of json) {
+    const d = obj(obj(it)?.data)
+    if (!d || str(d.linkMode) !== 'linked_file') continue
+    const key = str(d.key)
+    const path = str(d.path)
+    if (!isZoteroKey(key) || !path) continue
+    const parent = str(d.parentItem)
+    linked.push({ key, parentKey: isZoteroKey(parent) ? parent : null, path })
+  }
+  return { count: json.length, linked }
 }
 
 // ---------- Local-API response parsing ----------
@@ -160,40 +231,115 @@ export interface ZoteroFetchOutcome {
 export type ZoteroFetchJson = (url: string) => Promise<ZoteroFetchOutcome>
 
 export interface ZoteroClient {
-  /** ZoteroInfo for a storage-path file; null = not such a path (show no
-   *  Zotero UI); FileError with a zotero-* code = it IS Zotero's file but the
-   *  local API said no. Successes are cached for the session; failures are
-   *  not, so the next menu open retries (the user may have started Zotero). */
+  /** ZoteroInfo for a file Zotero knows; null = not Zotero's file as far as
+   *  can be told (show no Zotero UI); FileError with a zotero-* code = it IS
+   *  Zotero's file but the local API said no. A storage path is Zotero's by
+   *  construction, so there a refused connection is a named failure; a linked
+   *  file can only be recognised THROUGH the API, so with Zotero off it reads
+   *  as «not Zotero's» — nothing shows, and the next call asks again.
+   *  Successes are cached for the session; failures never are. */
   info(path: string): Promise<ZoteroInfo | FileError | null>
   /** zotero://select URL for the file — the parent item when a completed
    *  info() has resolved it, else the attachment key straight from the path
-   *  (which is why this works with the local API off). Null off storage paths. */
+   *  (which is why this works with the local API off). Null off storage paths
+   *  until info() has resolved a linked file. */
   selectUrl(path: string): string | null
 }
 
+/** The local API caps a page at 100 — the web API's limit, mirrored. */
+export const ZOTERO_PAGE = 100
+/** A miss against an index older than this rebuilds it first — the file may
+ *  have been added to Zotero since. Hits never wait. */
+const INDEX_STALE_MS = 5 * 60_000
+
 export function createZoteroClient(fetchJson: ZoteroFetchJson): ZoteroClient {
   const cache = new Map<string, ZoteroInfo>()
+  /** Linked files, resolved: keyed by the path as the caller gave it */
+  const linkedByPath = new Map<string, ZoteroInfo>()
+  /** Every linked attachment in the library, by lower-cased filename */
+  let index: { byName: Map<string, LinkedAttachment[]>; builtAt: number } | null = null
+
+  /** Page through the attachment list. Returns the HTTP status that stopped
+   *  it (200 = complete; anything else leaves the old index, if any, in place). */
+  async function buildIndex(): Promise<number | null> {
+    const byName = new Map<string, LinkedAttachment[]>()
+    for (let start = 0; ; start += ZOTERO_PAGE) {
+      const page = await fetchJson(
+        `${ZOTERO_LOCAL_API}/items?itemType=attachment&limit=${ZOTERO_PAGE}&start=${start}&format=json`
+      )
+      if (page.status !== 200) return page.status
+      const { count, linked } = parseAttachmentList(page.json)
+      for (const a of linked) {
+        const name = pathBasename(a.path).toLowerCase()
+        if (!name) continue
+        const list = byName.get(name)
+        if (list) list.push(a)
+        else byName.set(name, [a])
+      }
+      if (count < ZOTERO_PAGE) break
+    }
+    index = { byName, builtAt: Date.now() }
+    return 200
+  }
+
+  /** The library record a linked file on disk belongs to, or null */
+  async function findLinked(path: string): Promise<LinkedAttachment | null> {
+    const name = pathBasename(path).toLowerCase()
+    if (!name) return null
+    if (!index && (await buildIndex()) !== 200) return null
+    let candidates = index!.byName.get(name) ?? []
+    if (candidates.length === 0 && Date.now() - index!.builtAt > INDEX_STALE_MS) {
+      await buildIndex() // a failure keeps the old index — still a miss below
+      candidates = index!.byName.get(name) ?? []
+    }
+    let best: LinkedAttachment | null = null
+    let bestScore = 0
+    for (const c of candidates) {
+      const score = pathTailMatch(path, c.path)
+      if (score > bestScore) {
+        best = c
+        bestScore = score
+      }
+    }
+    return best
+  }
+
+  async function fetchInfo(attachmentKey: string, parentKey: string | null): Promise<ZoteroInfo | FileError> {
+    const item = await fetchJson(
+      `${ZOTERO_LOCAL_API}/items/${parentKey ?? attachmentKey}?include=data,bib,citation&style=${ZOTERO_CITATION_STYLE}`
+    )
+    if (item.status !== 200) return zoteroError(item.status)
+    return { attachmentKey, parentKey, ...parseZoteroItem(item.json) }
+  }
+
   return {
     async info(path) {
       const key = zoteroKeyFromPath(path)
-      if (!key) return null
-      const hit = cache.get(key)
-      if (hit) return hit
-      const att = await fetchJson(`${ZOTERO_LOCAL_API}/items/${key}`)
-      if (att.status !== 200) return zoteroError(att.status)
-      const { parentKey } = parseAttachmentItem(att.json)
-      const item = await fetchJson(
-        `${ZOTERO_LOCAL_API}/items/${parentKey ?? key}?include=data,bib,citation&style=${ZOTERO_CITATION_STYLE}`
-      )
-      if (item.status !== 200) return zoteroError(item.status)
-      const info: ZoteroInfo = { attachmentKey: key, parentKey, ...parseZoteroItem(item.json) }
-      cache.set(key, info)
+      if (key) {
+        const hit = cache.get(key)
+        if (hit) return hit
+        const att = await fetchJson(`${ZOTERO_LOCAL_API}/items/${key}`)
+        if (att.status !== 200) return zoteroError(att.status)
+        const { parentKey } = parseAttachmentItem(att.json)
+        const info = await fetchInfo(key, parentKey)
+        if (!('error' in info)) cache.set(key, info)
+        return info
+      }
+      // Not a storage path: maybe a linked attachment. The path says nothing,
+      // so the library is asked — nothing shows unless it answers with a match.
+      const linkedHit = linkedByPath.get(path)
+      if (linkedHit) return linkedHit
+      const att = await findLinked(path)
+      if (!att) return null
+      const info = await fetchInfo(att.key, att.parentKey)
+      if (!('error' in info)) linkedByPath.set(path, info)
       return info
     },
     selectUrl(path) {
       const key = zoteroKeyFromPath(path)
-      if (!key) return null
-      return zoteroSelectUrl(cache.get(key)?.parentKey ?? key)
+      if (key) return zoteroSelectUrl(cache.get(key)?.parentKey ?? key)
+      const linked = linkedByPath.get(path)
+      return linked ? zoteroSelectUrl(linked.parentKey ?? linked.attachmentKey) : null
     }
   }
 }

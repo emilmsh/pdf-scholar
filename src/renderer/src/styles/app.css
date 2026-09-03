@@ -1883,6 +1883,42 @@ html.pen-near .draw-layer {
   color: var(--accent);
 }
 
+/* A document name inside a menu row: one line, cut with an ellipsis rather
+   than widening the menu (the view menu's «Åpne i delt visning» list) */
+.menu-action-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Drop target hint: a tab from the strip (or, on the second column, a PDF from
+   the OS) hovering over a pages column — «Slipp for å åpne i delt visning».
+   Pointer-events none so the drop lands on the column beneath. */
+.pane-drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  outline: 2px dashed var(--accent);
+  outline-offset: -8px;
+}
+
+.pane-drop-hint > span {
+  background: var(--bg-elevated);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-menu);
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
 /* The toolbar's "…" overflow dropdown (narrow screens): a compact action list,
    narrower than the settings/theme menus. */
 .overflow-menu {

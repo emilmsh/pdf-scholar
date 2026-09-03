@@ -483,7 +483,7 @@ export default function App(): React.JSX.Element {
    *  same model as two windows on one file, one draft in main, views converge
    *  over the doc buses. */
   const openInSplit = useCallback(
-    async (hostTabId: string, path: string) => {
+    async (hostTabId: string, path: string, picked?: FilePayload) => {
       const host = tabsRef.current.find((t) => t.id === hostTabId)
       if (!host) return
       // Same file as the host document: that is the plain same-file split —
@@ -497,7 +497,7 @@ export default function App(): React.JSX.Element {
         // Replacing a foreign split runs its close guard first
         if (!(await closeSplitDoc(hostTabId))) return
       }
-      const result = await bridge.readFile(path)
+      const result = picked ?? (await bridge.readFile(path))
       if ('error' in result) {
         setError(t('app.openFailed', { error: errorText(result) }))
         return
@@ -512,6 +512,21 @@ export default function App(): React.JSX.Element {
       goToTab(hostTabId)
     },
     [closeSplitDoc, goToTab]
+  )
+
+  /** «Annen fil …» under «Åpne i delt visning» in the view menu: pick a PDF and
+   *  show it in the host tab's split column */
+  const openOtherInSplit = useCallback(
+    async (hostTabId: string) => {
+      const result = await bridge.openFileDialog()
+      if (!result) return
+      if ('error' in result) {
+        setError(t('app.openFailed', { error: errorText(result) }))
+        return
+      }
+      await openInSplit(hostTabId, result.path, result)
+    },
+    [openInSplit]
   )
 
   /** Closing pane A while pane B shows a different file: the reader is keeping
@@ -983,6 +998,14 @@ export default function App(): React.JSX.Element {
                 onRequestCloseSplitDoc={() => void closeSplitDoc(tab.id)}
                 onRequestPromoteSplitDoc={() => void promoteSplitDoc(tab.id)}
                 onRequestOpenInSplit={(path) => void openInSplit(tab.id, path)}
+                splitCandidates={
+                  isElectron
+                    ? tabs
+                        .filter((o) => o.id !== tab.id)
+                        .map((o) => ({ name: o.payload.name, path: o.payload.path }))
+                    : undefined
+                }
+                onRequestOpenOtherInSplit={isElectron ? () => void openOtherInSplit(tab.id) : undefined}
               />
             </div>
           )

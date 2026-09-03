@@ -166,6 +166,9 @@ const nb = {
   'tabs.openInNewWindow': 'Åpne i nytt vindu',
   'tabs.openInSplit': 'Åpne i delt visning',
   'tb.swapPanesTip': 'Bytt plass på kolonnene',
+  'tb.splitOtherFile': 'Annen fil …',
+  'tb.splitDropHint': 'Eller dra en fane inn i visningen',
+  'viewer.dropSplitHint': 'Slipp for å åpne i delt visning',
   'split.docEncrypted': 'Passordbeskyttede filer kan ikke åpnes i delt visning — åpne den i egen fane.',
   'split.docFailed': 'Filen kunne ikke vises i delt visning.',
   'tabs.reload': 'Last inn på nytt',
@@ -280,7 +283,7 @@ const nb = {
   'tb.split': 'Delt visning',
   // No «(S)» here: withShortcut appends the LIVE binding, which the reader may
   // have changed (see keymap.ts)
-  'tb.splitTip': 'Delt visning — samme dokument i to kolonner, hver med egen side og zoom',
+  'tb.splitTip': 'Delt visning — to kolonner, hver med egen side og zoom. Et annet dokument: dra fanen inn i visningen, eller velg det i visningsmenyen',
   'tb.marginNotes': 'Vis kommentarer i margen',
   'tb.marginNotesTip': 'Vis kommentarer i margen — notater og kommentarer som tekst ved siden av siden',
   'margin.sideLabel': 'Side',
@@ -621,14 +624,15 @@ const nb = {
   'ai.wholeDocChip': 'Hele dokumentet legges ved',
   'ai.wholeDocTip':
     'Denne handlingen legger ved hele dokumentteksten, så svaret kan bygge på hele artikkelen — ikke bare markeringen. For dokumenter større enn modellens kontekstvindu sendes et utdrag i stedet.',
-  // The dead-man switch (KI-tilgang) — settings labels, the per-request
-  // confirmations, and the switched-off notices
+  // The dead-man switch (KI-tilgang) — settings labels, the before-sharing
+  // confirmations (once per document and provider, ai-sharing.ts), and the
+  // switched-off notices
   'ai.accessTitle': 'KI-tilgang',
   'ai.accessOn': 'På',
-  'ai.accessConfirm': 'Bekreft hver forespørsel',
+  'ai.accessConfirm': 'Bekreft før deling',
   'ai.accessOff': 'Av',
   'ai.accessHint':
-    'KI-handlinger sender innhold fra dokumentet til valgt leverandør — normalt hele dokumentteksten, for svært lange dokumenter et utdrag. «Bekreft hver forespørsel» viser hva som legges ved før noe sendes; «Av» garanterer at ingen forespørsel forlater maskinen.',
+    'KI-handlinger sender innhold fra dokumentet til valgt leverandør — normalt hele dokumentteksten, for svært lange dokumenter et utdrag. «Bekreft før deling» spør første gang et dokument sendes til en leverandør i denne økten, og viser hva som legges ved; oppfølgingsspørsmål går uten spørsmål. «Av» garanterer at ingen forespørsel forlater maskinen.',
   'ai.offNotice': 'KI-funksjonene er slått av, så ingenting sendes til noen KI-leverandør.',
   'ai.openSettings': 'Åpne KI-innstillinger',
   'ai.confirmChat': 'Sender spørsmålet, samtalen og dokumentteksten til {name}.',
@@ -1041,6 +1045,9 @@ const en: Dict = {
   'tabs.openInNewWindow': 'Open in new window',
   'tabs.openInSplit': 'Open in split view',
   'tb.swapPanesTip': 'Swap the columns',
+  'tb.splitOtherFile': 'Another file …',
+  'tb.splitDropHint': 'Or drag a tab into the view',
+  'viewer.dropSplitHint': 'Drop to open in split view',
   'split.docEncrypted': 'Password-protected files cannot open in split view — open it in its own tab.',
   'split.docFailed': 'The file could not be shown in split view.',
   'tabs.reload': 'Reload',
@@ -1145,7 +1152,7 @@ const en: Dict = {
   'tb.zoom': 'Zoom',
   'tb.pageLayout': 'Page layout',
   'tb.split': 'Split view',
-  'tb.splitTip': 'Split view — the same document in two columns, each with its own page and zoom',
+  'tb.splitTip': 'Split view — two columns, each with its own page and zoom. Another document: drag its tab into the view, or pick it in the view menu',
   'tb.marginNotes': 'Show comments in the margin',
   'tb.marginNotesTip': 'Show comments in the margin — notes and comments as text beside the page',
   'margin.sideLabel': 'Side',
@@ -1465,10 +1472,10 @@ const en: Dict = {
     "This action attaches the whole document text, so the answer can draw on the full paper — not only the selection. For documents larger than the model's context window an excerpt is sent instead.",
   'ai.accessTitle': 'AI access',
   'ai.accessOn': 'On',
-  'ai.accessConfirm': 'Confirm every request',
+  'ai.accessConfirm': 'Confirm before sharing',
   'ai.accessOff': 'Off',
   'ai.accessHint':
-    'AI actions send content from the document to the chosen provider — normally the whole document text, an excerpt for very long documents. "Confirm every request" shows what is attached before anything is sent; "Off" guarantees no request leaves the machine.',
+    'AI actions send content from the document to the chosen provider — normally the whole document text, an excerpt for very long documents. "Confirm before sharing" asks the first time a document is sent to a provider in this session, and shows what is attached; follow-up questions pass without asking. "Off" guarantees no request leaves the machine.',
   'ai.offNotice': 'AI features are switched off, so nothing is sent to any AI provider.',
   'ai.openSettings': 'Open AI settings',
   'ai.confirmChat': 'Sends the question, the conversation and the document text to {name}.',

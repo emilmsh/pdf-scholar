@@ -344,6 +344,62 @@ try {
     panes.length === 2 && panes[0].dockey === panes[1].dockey && panes[0].dockey === FILE_A,
     JSON.stringify(panes)
   )
+
+  // ---- 8. the view menu lists document B under «Åpne i delt visning» — the
+  // two-document split's visible home (the tab menu alone went unfound)
+  await evalIn(W, `ui.key('s'); await ui.settle(500); return null`) // close the same-file split
+  const viaMenu = await evalIn(W, `
+    const btn = [...document.querySelectorAll('.tb-btn')].find((b) => /^(Zoom og sidevisning|Zoom and page layout)/.test(b.title || ''));
+    if (!btn) throw new Error('view menu button not found');
+    click(btn); await ui.settle(300);
+    const rows = [...document.querySelectorAll('.view-menu .menu-action')];
+    const row = rows.find((b) => /pdfx-splitdocs-annen/.test(b.title || ''));
+    if (!row) throw new Error('no row for document B in the view menu; rows: ' + rows.map((r) => (r.textContent || '').trim()).join(' | '));
+    const other = rows.some((b) => /Annen fil|Another file/.test(b.textContent || ''));
+    click(row); await ui.settle(900);
+    return { other, panes: ui.panes(), menuGone: !document.querySelector('.view-menu') };
+  `)
+  check('the view menu offers «Annen fil …» too', viaMenu.other)
+  check(
+    'choosing document B in the view menu opens it beside A',
+    viaMenu.panes.length === 2 && viaMenu.panes.find((p) => p.pane === 'b')?.dockey === FILE_B,
+    JSON.stringify(viaMenu.panes)
+  )
+  check('the menu closes on the choice', viaMenu.menuGone)
+
+  // ---- 9. dragging B's tab into the view: a hint while it hovers, B beside A on drop
+  await evalIn(W, `ui.key('s'); return null`) // 's' closes the foreign document
+  ok = false
+  for (let i = 0; i < 20; i++) {
+    panes = await evalIn(W, `return ui.panes()`)
+    if (panes.length === 1) {
+      ok = true
+      break
+    }
+    await sleep(400)
+  }
+  check('the foreign split is closed before the drag', ok, JSON.stringify(panes))
+  const viaDrop = await evalIn(W, `
+    const pane = document.querySelector('.tab-view.active .pages-host');
+    const dt = new DataTransfer();
+    dt.setData('text/plain', ${JSON.stringify(FILE_B)});
+    dt.setData('application/x-pdf-scholar-tab', ${JSON.stringify(FILE_B)});
+    const ev = (type) => new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+    pane.dispatchEvent(ev('dragenter'));
+    pane.dispatchEvent(ev('dragover'));
+    await ui.settle(150);
+    const hint = document.querySelector('.pane-drop-hint')?.textContent || '';
+    pane.dispatchEvent(ev('drop'));
+    await ui.settle(900);
+    return { hint, panes: ui.panes(), hintGone: !document.querySelector('.pane-drop-hint') };
+  `)
+  check('a tab over the column shows the drop hint', /delt visning|split view/i.test(viaDrop.hint), viaDrop.hint)
+  check(
+    'dropping the tab opens document B beside A',
+    viaDrop.panes.length === 2 && viaDrop.panes.find((p) => p.pane === 'b')?.dockey === FILE_B,
+    JSON.stringify(viaDrop.panes)
+  )
+  check('the hint is gone after the drop', viaDrop.hintGone)
 } catch (err) {
   failures++
   console.error('FAIL  unexpected error:', err)

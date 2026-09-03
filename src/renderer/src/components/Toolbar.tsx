@@ -118,6 +118,7 @@ import {
   IconSignature,
   IconSparkle,
   IconSplit,
+  IconFolderOpen,
   IconSwapPanes,
   IconNote,
   IconText,
@@ -296,6 +297,13 @@ interface Props {
   splitOpen: boolean
   onSwapPanes(): void
   onToggleSplit(): void
+  /** Desktop: the OTHER documents open in this window, offered under «Åpne i
+   *  delt visning» in the view menu together with a file picker — the visible
+   *  home of the two-document split (the tab menu and dragging a tab into a
+   *  column are the fast paths). Undefined where the platform has no tabs. */
+  splitCandidates?:
+    | { docs: { name: string; path: string }[]; onOpen(path: string): void; onOpenOther(): void }
+    | undefined
   activePane: 'a' | 'b'
   onActivatePane(pane: 'a' | 'b'): void
   /** Close one named column, keeping the other's content */
@@ -462,6 +470,7 @@ export default function Toolbar({
   splitOpen,
   onSwapPanes,
   onToggleSplit,
+  splitCandidates,
   activePane,
   onActivatePane,
   onClosePane,
@@ -497,29 +506,41 @@ export default function Toolbar({
   // file) stays one click, the rare one (save a copy) moves behind the
   // chevron — one glyph less in a row of three disk-like icons.
   const [saveMenuOpen, setSaveMenuOpen] = useState(false)
-  // The Zotero section of that menu. Whether it exists at all is a pure path
-  // check; the localhost fetch runs only while the menu is OPEN over a detected
-  // file — never on document open. Every open re-asks: successes are cached
-  // platform-side (instant), failures retry naturally (the user may have
-  // started Zotero since last time).
+  // The Zotero section of that menu. A storage-layout path is Zotero's by
+  // construction (instant badge, pure path check); a LINKED attachment's path
+  // says nothing, so the platform is asked once per document — it matches the
+  // filename against the library's attachment list, cached platform-side. The
+  // section shows on a resolved item, or on a named failure for a storage path
+  // (the path itself is the proof there). Failures are never cached, so opening
+  // the menu re-asks — the user may have started Zotero since.
   const zoteroKey = zoteroKeyFromPath(filePath)
   const [zoteroFetch, setZoteroFetch] = useState<{
     loading: boolean
     result: ZoteroInfo | FileError | null
   }>({ loading: false, result: null })
   const [zoteroCopied, setZoteroCopied] = useState<'citation' | 'bib' | null>(null)
-  useEffect(() => {
-    if (!saveMenuOpen || !zoteroKey) return undefined
+  const zoteroResolved = zoteroFetch.result !== null && !('error' in zoteroFetch.result)
+  const zoteroHit = zoteroKey !== null || zoteroFetch.result !== null
+  const askZotero = useCallback(() => {
     let stale = false
-    setZoteroFetch({ loading: true, result: null })
-    setZoteroCopied(null)
+    setZoteroFetch((z) => ({ loading: true, result: z.result }))
     void bridge.zoteroInfo(filePath).then((result) => {
       if (!stale) setZoteroFetch({ loading: false, result })
     })
     return () => {
       stale = true
     }
-  }, [saveMenuOpen, zoteroKey, filePath])
+  }, [filePath])
+  useEffect(() => {
+    setZoteroFetch({ loading: false, result: null })
+    setZoteroCopied(null)
+    return askZotero()
+  }, [askZotero])
+  useEffect(() => {
+    if (!saveMenuOpen || zoteroResolved) return undefined
+    setZoteroCopied(null)
+    return askZotero()
+  }, [saveMenuOpen, zoteroResolved, askZotero])
   const zoteroCopy = (kind: 'citation' | 'bib', text: string): void => {
     void navigator.clipboard.writeText(text).then(() => {
       setZoteroCopied(kind)
@@ -1621,6 +1642,42 @@ export default function Toolbar({
                 <IconCoverPage size={15} />
                 {t('tb.coverPage')}
               </label>
+
+              {/* The two-document split's visible home (Emil, 2026-09-03: it lived
+                  in the tab's right-click menu alone and went unfound). Same
+                  words as that menu — «Åpne i delt visning» — the other open
+                  documents by name, a file picker, and the drag gesture named. */}
+              {splitCandidates && (
+                <>
+                  <div className="theme-menu-sep" />
+                  <div className="theme-menu-label">{t('tabs.openInSplit')}</div>
+                  {splitCandidates.docs.map((d) => (
+                    <button
+                      key={d.path}
+                      className="menu-action"
+                      title={d.path}
+                      onClick={() => {
+                        setViewMenuOpen(false)
+                        splitCandidates.onOpen(d.path)
+                      }}
+                    >
+                      <IconSplit size={15} />
+                      <span className="menu-action-text">{d.name}</span>
+                    </button>
+                  ))}
+                  <button
+                    className="menu-action"
+                    onClick={() => {
+                      setViewMenuOpen(false)
+                      splitCandidates.onOpenOther()
+                    }}
+                  >
+                    <IconFolderOpen size={15} />
+                    {t('tb.splitOtherFile')}
+                  </button>
+                  <div className="menu-hint">{t('tb.splitDropHint')}</div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1682,7 +1739,7 @@ export default function Toolbar({
             zoteroFetch.result && !('error' in zoteroFetch.result) ? zoteroFetch.result : null
           const zErr =
             zoteroFetch.result && 'error' in zoteroFetch.result ? zoteroFetch.result : null
-          const zoteroSection = zoteroKey ? (
+          const zoteroSection = zoteroHit ? (
             <>
               <div className="theme-menu-sep" />
               <div className="theme-menu-label">Zotero</div>
@@ -1755,7 +1812,7 @@ export default function Toolbar({
               {chevron}
               {/* Quiet marker: this document lives in a Zotero library, and the
                   menu behind the chevron carries its Zotero actions */}
-              {zoteroKey && (
+              {zoteroHit && (
                 <span className="tb-zotero-badge" aria-hidden="true">
                   Z
                 </span>

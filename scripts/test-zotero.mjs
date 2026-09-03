@@ -211,13 +211,117 @@ function scriptedFetch(script) {
   const client = Z.createZoteroClient(scriptedFetch([]).fetchJson)
   eq((await client.info(PATH)).code, 'zotero-item-unknown', '404 → zotero-item-unknown')
 }
-// Off a storage path nothing fetches and nothing renders
+// Off a storage path the LIBRARY is asked (linked attachments carry no key):
+// one listing, no match → null, and nothing else is fetched
 {
-  const f = scriptedFetch([])
+  const f = scriptedFetch([['itemType=attachment', { status: 200, json: [] }]])
   const client = Z.createZoteroClient(f.fetchJson)
-  eq(await client.info('C:\\papers\\loose.pdf'), null, 'non-storage path → null')
+  eq(await client.info('C:\\papers\\loose.pdf'), null, 'non-storage path, not in the library → null')
   eq(client.selectUrl('C:\\papers\\loose.pdf'), null, 'non-storage path → no select URL')
-  eq(f.calls.length, 0, 'no requests for a non-storage path')
+  eq(f.calls.length, 1, 'exactly one listing request, no item request')
+}
+
+// --- Linked attachments: path helpers -------------------------------------------
+eq(Z.pathBasename('G:\\Min disk\\Library\\Research Papers\\Foo (2022) - Bar.pdf'), 'Foo (2022) - Bar.pdf', 'basename: Windows path')
+eq(Z.pathBasename('attachments:Research Papers/ICA/Foo.pdf'), 'Foo.pdf', 'basename: Zotero attachments: prefix')
+eq(Z.pathBasename('file:///G:/Min%20disk/Library/Foo%20Bar.pdf'), 'Foo Bar.pdf', 'basename: file URL, percent-decoded')
+eq(Z.pathSegments('attachments:Research Papers/ICA/Foo.pdf').join('|'), 'Research Papers|ICA|Foo.pdf', 'segments drop the prefix')
+eq(Z.pathTailMatch('G:\\Lib\\Research Papers\\ICA\\Foo.pdf', 'attachments:Research Papers/ICA/Foo.pdf'), 3, 'tail match: three shared segments')
+eq(Z.pathTailMatch('G:\\Lib\\Old\\Foo.pdf', 'attachments:Research Papers/ICA/Foo.pdf'), 1, 'tail match: filename only')
+eq(Z.pathTailMatch('G:\\Lib\\ICA\\foo.PDF', 'attachments:ICA/Foo.pdf'), 2, 'tail match is case-insensitive')
+eq(Z.pathTailMatch('G:\\Lib\\ICA\\Other.pdf', 'attachments:ICA/Foo.pdf'), 0, 'different filename → 0')
+{
+  const page = Z.parseAttachmentList([
+    { data: { key: 'WE23ALSN', linkMode: 'linked_file', path: 'attachments:A/Foo.pdf', parentItem: '9JV4599V' } },
+    { data: { key: 'ABCD2345', linkMode: 'imported_file', path: 'storage:Foo.pdf', parentItem: '9JV4599V' } },
+    { data: { key: 'bad', linkMode: 'linked_file', path: 'attachments:B/Bar.pdf' } },
+    { data: { key: 'D7GWCMYP', linkMode: 'linked_file', path: 'C:\\abs\\Baz.pdf' } }
+  ])
+  eq(page.count, 4, 'attachment page: count is the raw page length')
+  eq(page.linked.map((a) => a.key).join(','), 'WE23ALSN,D7GWCMYP', 'attachment page: linked files only, bad keys dropped')
+  eq(page.linked[1].parentKey, null, 'attachment page: standalone linked file has no parent')
+  eq(Z.parseAttachmentList({ nope: true }).count, 0, 'attachment page: non-array → empty')
+}
+
+// --- Linked attachments: the client --------------------------------------------
+const LINKED = 'G:\\Min disk\\Library\\Research Papers\\ICA Papers\\Foo (2022) - Bar.pdf'
+const listing = [
+  { data: { key: 'AAAA1111', linkMode: 'linked_file', path: 'attachments:Old/Foo (2022) - Bar.pdf', parentItem: 'PPPP1111' } },
+  { data: { key: 'WE23ALSN', linkMode: 'linked_file', path: 'attachments:Research Papers/ICA Papers/Foo (2022) - Bar.pdf', parentItem: '9JV4599V' } },
+  { data: { key: 'BBBB2222', linkMode: 'linked_file', path: 'attachments:Other.pdf' } }
+]
+// Two records share the filename; the one that also shares the folder wins
+{
+  const f = scriptedFetch([
+    ['itemType=attachment', { status: 200, json: listing }],
+    ['/items/9JV4599V?include=', { status: 200, json: item({ title: 'Bar', date: '2022', creators: [{ lastName: 'Foo' }] }, '<span>(Foo, 2022)</span>', '<div>Foo (2022). Bar.</div>') }],
+    ['/items/BBBB2222?include=', { status: 200, json: item({ title: 'Other' }, '', '') }]
+  ])
+  const client = Z.createZoteroClient(f.fetchJson)
+  eq(client.selectUrl(LINKED), null, 'linked file before info(): no select URL yet')
+  const info = await client.info(LINKED)
+  eq(info.attachmentKey, 'WE23ALSN', 'linked: the record sharing the folder wins over the same filename elsewhere')
+  eq(info.parentKey, '9JV4599V', 'linked: parent resolved')
+  eq(info.citation, '(Foo, 2022)', 'linked: citation flattened')
+  eq(f.calls.length, 2, 'linked: one listing page + one item request')
+  await client.info(LINKED)
+  eq(f.calls.length, 2, 'linked: success cached — no further requests')
+  eq(client.selectUrl(LINKED), 'zotero://select/library/items/9JV4599V', 'linked after info(): parent key')
+  // A second linked file reuses the index: one item request, no new listing
+  const info2 = await client.info('G:\\Min disk\\Library\\Other.pdf')
+  eq(info2.attachmentKey, 'BBBB2222', 'linked: second file found in the cached index')
+  eq(info2.parentKey, null, 'linked: standalone attachment cites itself')
+  eq(f.calls.length, 3, 'linked: the index is built once per session')
+  eq(f.calls[2].includes('/items/BBBB2222?include='), true, 'linked standalone: cites the attachment item')
+}
+// The extension's file:// form resolves the same record
+{
+  const f = scriptedFetch([
+    ['itemType=attachment', { status: 200, json: listing }],
+    ['?include=', { status: 200, json: item({ title: 'Bar' }, '', '') }]
+  ])
+  const client = Z.createZoteroClient(f.fetchJson)
+  const info = await client.info('file:///G:/Min%20disk/Library/Research%20Papers/ICA%20Papers/Foo%20(2022)%20-%20Bar.pdf')
+  eq(info.attachmentKey, 'WE23ALSN', 'linked: file:// URL resolves the same record')
+}
+// The listing pages: a full page asks for the next, a short one stops
+{
+  const full = Array.from({ length: Z.ZOTERO_PAGE }, (_, i) => ({
+    data: { key: 'K' + String(i).padStart(7, '0'), linkMode: 'linked_file', path: 'attachments:p' + i + '.pdf' }
+  }))
+  const f = scriptedFetch([
+    ['start=0&', { status: 200, json: full }],
+    ['start=100&', { status: 200, json: listing }],
+    ['?include=', { status: 200, json: item({ title: 'Bar' }, '', '') }]
+  ])
+  const client = Z.createZoteroClient(f.fetchJson)
+  const info = await client.info(LINKED)
+  eq(info.attachmentKey, 'WE23ALSN', 'paging: a record on the second page is found')
+  eq(f.calls.filter((u) => u.includes('itemType=attachment')).length, 2, 'paging: two listing requests, stopped on the short page')
+}
+// Zotero off: a linked file cannot be recognised → null (no error UI), and the
+// next call asks again — the user may have started Zotero since
+{
+  const f = scriptedFetch([['itemType=attachment', { status: null, json: null }]])
+  const client = Z.createZoteroClient(f.fetchJson)
+  eq(await client.info(LINKED), null, 'linked with Zotero off → null, not an error')
+  eq(await client.info(LINKED), null, 'linked with Zotero off → still null')
+  eq(f.calls.length, 2, 'linked with Zotero off: the listing is retried, never cached')
+}
+// API disabled (403) reads the same way for a linked file
+{
+  const client = Z.createZoteroClient(scriptedFetch([['itemType=attachment', { status: 403, json: null }]]).fetchJson)
+  eq(await client.info(LINKED), null, 'linked with the API disabled → null')
+}
+// The record matched but its item cannot be read: it IS Zotero's file, so the
+// failure is named like a storage path's
+{
+  const f = scriptedFetch([
+    ['itemType=attachment', { status: 200, json: listing }],
+    ['?include=', { status: 404, json: null }]
+  ])
+  const client = Z.createZoteroClient(f.fetchJson)
+  eq((await client.info(LINKED)).code, 'zotero-item-unknown', 'linked: matched record, item 404 → named failure')
 }
 
 if (failures === 0) {

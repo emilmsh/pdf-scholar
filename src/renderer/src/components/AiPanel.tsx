@@ -21,6 +21,7 @@ import type {
 } from '../../../shared/types'
 import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { bridge } from '../bridge'
+import { isSharedWith, markSharedWith } from '../ai-sharing'
 import {
   annotationsDefaultQuestion,
   annotationsQuestion,
@@ -748,18 +749,25 @@ export default function AiPanel({
         : prettyModelName(config.provider, config.models[config.provider] ?? '')) || providerLabel
     : ''
 
-  // «Bekreft hver forespørsel» (AiConfig.access 'confirm'): every send is
-  // staged as a thunk and a strip above the composer asks first. A thunk
-  // rather than message args, so cancelling loses nothing — the composer text
-  // and staged attachments are untouched until the user says send.
+  // «Bekreft før deling» (AiConfig.access 'confirm'): a send is staged as a
+  // thunk and a strip above the composer asks first — the FIRST time this
+  // document goes to this provider in the window (ai-sharing.ts); a follow-up
+  // sends nothing that has not already left and passes. A thunk rather than
+  // message args, so cancelling loses nothing — the composer text and staged
+  // attachments are untouched until the user says send. Every send that
+  // actually happens is recorded, in every mode.
   const [pendingSend, setPendingSend] = useState<{ run: () => void } | null>(null)
-  const needsConfirm = config?.access === 'confirm'
+  const provider = config?.provider ?? null
   const stageOrRun = useCallback(
     (run: () => void) => {
-      if (needsConfirm) setPendingSend({ run })
-      else run()
+      if (config?.access === 'confirm' && provider && !isSharedWith(docPath, provider)) {
+        setPendingSend({ run })
+        return
+      }
+      if (provider) markSharedWith(docPath, provider)
+      run()
     },
-    [needsConfirm]
+    [config?.access, provider, docPath]
   )
 
   /** Composer send: takes the staged images/annotations along and clears them.
@@ -920,6 +928,7 @@ export default function AiPanel({
                 onClick={() => {
                   const staged = pendingSend
                   setPendingSend(null)
+                  if (provider) markSharedWith(docPath, provider)
                   staged.run()
                 }}
               >

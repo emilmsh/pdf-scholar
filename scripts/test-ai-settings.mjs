@@ -8,7 +8,7 @@
 // id pickable with the server offline and hides the reasoning selector for a
 // non-reasoning id. Then KI-tilgang, the dead-man switch: 'off' must gate the
 // transport itself (a direct window.api.aiChat answers ai-disabled) and swap
-// the composer for the off notice, and 'confirm' must stage every send behind
+// the composer for the off notice, and 'confirm' must stage a send behind
 // the strip that names the receiving model.
 //
 // Run: npm run build && npm run test:ai-settings
@@ -233,6 +233,25 @@ try {
     return { msgs: document.querySelectorAll('.ai-msg').length, stripGone: !document.querySelector('.ai-confirm') }
   `, PRELUDE)
   ok(fired.stripGone && fired.msgs >= 2, `confirming sends for real (got ${fired.msgs} messages)`)
+
+  // «Bekreft før deling» asks ONCE per document and provider (ai-sharing.ts):
+  // a follow-up to the same document with the same provider is not staged —
+  // it goes straight out, strip and all skipped
+  const again = await evaluate(send, `
+    for (let i = 0; i < 60 && document.querySelector('.ai-composer textarea')?.disabled; i++) await sleep(200)
+    const ta = document.querySelector('.ai-composer textarea')
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, 'Follow-up, same document, same provider')
+    ta.dispatchEvent(new Event('input', { bubbles: true }))
+    await sleep(100)
+    const before = document.querySelectorAll('.ai-msg').length
+    document.querySelector('.ai-composer .ai-send').click()
+    await sleep(400)
+    const strip = !!document.querySelector('.ai-confirm')
+    for (let i = 0; i < 60 && document.querySelectorAll('.ai-msg').length <= before; i++) await sleep(200)
+    return { strip, before, after: document.querySelectorAll('.ai-msg').length }
+  `, PRELUDE)
+  ok(!again.strip, 'a follow-up to the same document and provider is NOT staged again')
+  ok(again.after > again.before, `…and it was sent (${again.before} -> ${again.after} messages)`)
 
   console.log(failures === 0 ? '\ntest-ai-settings: all checks passed' : `\ntest-ai-settings: ${failures} check(s) FAILED`)
   process.exitCode = failures === 0 ? 0 : 1
