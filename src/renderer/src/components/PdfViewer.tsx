@@ -651,6 +651,17 @@ export default function PdfViewer({
   const splitOpenRef = useRef(splitOpen)
   splitOpenRef.current = splitOpen
   const holdPlaceAcrossSplitRef = useRef<() => void>(() => {})
+  /** The first column's zoom from before a split took half its width. Both
+   *  open paths re-fit the column to fit-width for its new size; closing the
+   *  split hands this back (Emil, 2026-09-03: the zoom the two-page view had
+   *  must come back with it — not a pair pressed edge to edge at fit-width).
+   *  Filled and consumed through the two refs so the open/close paths above
+   *  can call what is defined next to computeCurrent below. */
+  const zoomBeforeSplitRef = useRef<{ fit: 'width' | 'page' | 'custom'; scale: number } | null>(
+    null
+  )
+  const noteZoomBeforeSplitRef = useRef<() => void>(() => {})
+  const restoreZoomAfterSplitRef = useRef<() => void>(() => {})
   /** Effective two-page layout: the choice, suspended while split (see spreadPref) */
   const spread = spreadPref && !splitOpen
   const spreadRef = useRef(spread)
@@ -923,6 +934,10 @@ export default function PdfViewer({
     setPaneBRotation(memory?.rotation ?? rotationRef.current)
     setPaneBSpreadPref(memory?.spread ?? spreadPrefRef.current)
     setPaneBCover(memory?.cover ?? coverPageRef.current)
+    // Only when the split actually OPENS: a column converted from another
+    // document is already split, and the zoom noted when that one opened is
+    // the one to come back to
+    if (!splitOpenRef.current) noteZoomBeforeSplitRef.current()
     setFitMode('width')
     lastSplitRef.current = { kind: 'same' }
     if (!splitOpenRef.current) {
@@ -977,6 +992,7 @@ export default function PdfViewer({
     if (splitOpenRef.current) {
       rememberPaneB()
       holdPlaceAcrossSplitRef.current()
+      restoreZoomAfterSplitRef.current()
       setSplitOpen(false)
       setActivePane('a')
       return
@@ -1058,14 +1074,17 @@ export default function PdfViewer({
       // Same gesture as toggling the split off, so it remembers the same way
       rememberPaneB()
       holdPlaceAcrossSplitRef.current()
+      restoreZoomAfterSplitRef.current()
       setSplitOpen(false)
       setActivePane('a')
       return
     }
     const bPage = handleForRef.current('b')?.position()?.page ?? paneBPage
     // The right column's view is about to BECOME the left one — remembering it
-    // would reopen a duplicate of what you are already looking at.
+    // would reopen a duplicate of what you are already looking at. Its zoom
+    // takes over too, so the first column's pre-split zoom is not wanted back.
     paneBMemoryRef.current = null
+    zoomBeforeSplitRef.current = null
     setRotation(paneBRotationRef.current)
     setSpreadPref(paneBSpreadPrefRef.current)
     setCoverPage(paneBCoverRef.current)
@@ -1098,6 +1117,8 @@ export default function PdfViewer({
     // chrome would point at pages that no longer mean the same thing.
     if (prevPath && prevPath !== nextPath) {
       purgeUndoDocRef.current('split')
+      onePageTextRef.current.split.clear()
+      onePageTextPendingRef.current.split.clear()
       setSelected((sel) => (sel?.doc === 'split' ? null : sel))
       setAnnotPopover((pop) => (pop?.doc === 'split' ? null : pop))
       setFreeTextDraft((draft) => (draft?.pane === 'b' ? null : draft))
@@ -1120,6 +1141,7 @@ export default function PdfViewer({
         const share = placement?.share ?? 0.5
         setPanelW((p) => (p.pane === share ? p : { ...p, pane: share }))
         window.setTimeout(persistPanelWidths, 0)
+        noteZoomBeforeSplitRef.current()
         setFitMode('width')
         holdPlaceAcrossSplitRef.current()
         setSplitOpen(true)
@@ -1155,6 +1177,7 @@ export default function PdfViewer({
       }
       if (splitOpenRef.current) {
         holdPlaceAcrossSplitRef.current()
+        restoreZoomAfterSplitRef.current()
         setSplitOpen(false)
         setActivePane('a')
       }
@@ -1931,6 +1954,43 @@ export default function PdfViewer({
     }
   }, [computeCurrent])
   holdPlaceAcrossSplitRef.current = holdPlaceAcrossSplit
+
+  /** See zoomBeforeSplitRef. Noted as the split opens, before the open path
+   *  re-fits this column to its half of the width. */
+  const noteZoomBeforeSplit = useCallback(() => {
+    zoomBeforeSplitRef.current = { fit: fitModeRef.current, scale: scaleRef.current }
+  }, [])
+  noteZoomBeforeSplitRef.current = noteZoomBeforeSplit
+  /** …and handed back as it closes. A fit mode only needs the mode restored:
+   *  the width effect re-fits for the full width in the same pre-paint pass,
+   *  reading fitModeRef — hence the ref is set here, not only the state. A
+   *  hand-set zoom is the reader's number and comes back verbatim, re-anchored
+   *  on the page point under the reading position so the relayout lands where
+   *  the reader was. */
+  const restoreZoomAfterSplit = useCallback(() => {
+    const saved = zoomBeforeSplitRef.current
+    zoomBeforeSplitRef.current = null
+    if (!saved) return
+    fitModeRef.current = saved.fit
+    setFitMode(saved.fit)
+    if (saved.fit !== 'custom' || saved.scale <= 0) return
+    // holdPlaceAcrossSplit may just have noted the place for the spread
+    // relayout; the same spot, now at the restored zoom
+    const cur = restoreRef.current ?? computeCurrent()
+    pendingAnchorRef.current = null
+    setScale(saved.scale)
+    if (cur) {
+      restoreRef.current = {
+        page: cur.page,
+        offset: cur.offset,
+        zoom: saved.scale,
+        rotation: rotationRef.current,
+        spread: spreadPrefRef.current,
+        coverPage: coverPageRef.current
+      }
+    }
+  }, [computeCurrent])
+  restoreZoomAfterSplitRef.current = restoreZoomAfterSplit
 
   const schedulePositionSave = useCallback(() => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
@@ -3775,6 +3835,7 @@ export default function PdfViewer({
             setNoteDraft({
               x: menu.x,
               y: menu.y,
+              doc: menu.foreign ? 'split' : undefined,
               pageNumber: menu.pageNumber,
               anchor: { x: menu.pagePoint.x, y: menu.pagePoint.y, w: 20, h: 20 }
             })
@@ -4231,53 +4292,6 @@ export default function PdfViewer({
     [sizes]
   )
 
-  const openMenuAt = useCallback((clientX: number, clientY: number, target: EventTarget | null) => {
-    const pageEl = (target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
-    const sel = window.getSelection()
-    const hasSelection = !!sel && !sel.isCollapsed && sel.toString().trim().length > 0
-    if (hasSelection) {
-      const anchorNode = sel.anchorNode
-      const anchorEl =
-        anchorNode instanceof Element ? anchorNode : (anchorNode?.parentElement ?? null)
-      const selPage = (anchorEl?.closest?.('.pdf-page') as HTMLElement | null) ?? pageEl
-      if (!selPage) return
-      setMenu({
-        x: clientX,
-        y: clientY,
-        pageNumber: Number(selPage.dataset.page),
-        mode: 'selection'
-      })
-    } else if (pageEl) {
-      const pageNumber = Number(pageEl.dataset.page)
-      const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
-      // An annotation under the cursor takes precedence over the point menu
-      const hit = annotsHiddenRef.current
-        ? null
-        : annotationHitTest(annotsRef.current.get(pageNumber) ?? [], px, py)
-      if (hit) {
-        setMenu(null)
-        setSelected({ pageNumber, localId: hit.id })
-        setAnnotPopover({
-          x: clientX,
-          y: clientY,
-          avoid: annotAvoidRect(pageNumber, hit),
-          pageNumber,
-          localId: hit.id
-        })
-        return
-      }
-      setMenu({
-        x: clientX,
-        y: clientY,
-        pageNumber,
-        mode: 'point',
-        pagePoint: { x: px, y: py }
-      })
-    } else {
-      setMenu(null)
-    }
-  }, [pagePointFromClient])
-
   /** The annotation records of the document a PANE shows: pane B resolves to
    *  its own session's map when it holds another file. Every DOM-driven
    *  handler below goes through this instead of annotsRef directly, so a hit
@@ -4287,25 +4301,76 @@ export default function PdfViewer({
     if (session) return session.annots.get(pageNumber) ?? []
     return annotsRef.current.get(pageNumber) ?? []
   }, [])
-  /** True when the element sits in a column showing ANOTHER document. Phase
-   *  one of the two-document split reads that document; the selection/edit
-   *  surfaces (popovers, drags, editors) stay with the main document until the
-   *  write path routes per document too. */
-  const elIsForeign = useCallback(
-    (el: Element | null | undefined): boolean => paneOfEl(el) === 'b' && !!sessionBRef.current,
-    []
+
+  /** The menu over a page: the selection menu after a text selection, the
+   *  point menu on an empty spot, the properties popover on a mark. Every
+   *  action is stamped with the document under the pointer, so the split
+   *  column's other file takes markups, notes and edits like the tab's own
+   *  (Emil, 2026-09-03: the column read as a preview because the menus stayed
+   *  home there). The AI actions are the one thing that stays home — they ask
+   *  about the tab's document — and the menu hides them for a foreign column. */
+  const openMenuAt = useCallback(
+    (clientX: number, clientY: number, target: EventTarget | null) => {
+      const pageEl = (target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+      const sel = window.getSelection()
+      const hasSelection = !!sel && !sel.isCollapsed && sel.toString().trim().length > 0
+      if (hasSelection) {
+        const anchorNode = sel.anchorNode
+        const anchorEl =
+          anchorNode instanceof Element ? anchorNode : (anchorNode?.parentElement ?? null)
+        const selPage = (anchorEl?.closest?.('.pdf-page') as HTMLElement | null) ?? pageEl
+        if (!selPage) return
+        setMenu({
+          x: clientX,
+          y: clientY,
+          pageNumber: Number(selPage.dataset.page),
+          mode: 'selection',
+          foreign: docOf(paneOfEl(selPage)) === 'split'
+        })
+      } else if (pageEl) {
+        const pane = paneOfEl(pageEl)
+        const doc = docOf(pane)
+        const pageNumber = Number(pageEl.dataset.page)
+        const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
+        // An annotation under the cursor takes precedence over the point menu
+        const hit = annotsHiddenRef.current
+          ? null
+          : annotationHitTest(annotsFor(pane, pageNumber), px, py)
+        if (hit) {
+          setMenu(null)
+          setSelected({ pageNumber, localId: hit.id, doc })
+          setAnnotPopover({
+            x: clientX,
+            y: clientY,
+            avoid: annotAvoidRect(pageNumber, hit),
+            pageNumber,
+            localId: hit.id,
+            doc
+          })
+          return
+        }
+        setMenu({
+          x: clientX,
+          y: clientY,
+          pageNumber,
+          mode: 'point',
+          pagePoint: { x: px, y: py },
+          foreign: doc === 'split'
+        })
+      } else {
+        setMenu(null)
+      }
+    },
+    [pagePointFromClient, annotsFor, docOf]
   )
 
   const onContextMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
       if (drawToolRef.current) return
-      // The context menu's actions (markup, AI, annotation edits) all address
-      // the main document — suppress it over a foreign column
-      if (elIsForeign(e.target as Element)) return
       openMenuAt(e.clientX, e.clientY, e.target)
     },
-    [openMenuAt, elIsForeign]
+    [openMenuAt]
   )
 
   // The menu pops up right after finishing a text selection;
@@ -4326,10 +4391,6 @@ export default function PdfViewer({
             applyMarkup(mt, prefsRef.current.markup[mt].color)
             return
           }
-          // The selection menu's AI actions ask about the TAB's document — over
-          // the split column's other file they would answer from the wrong one,
-          // so the menu stays home there (armed tools above still work).
-          if (elIsForeign(target as Element)) return
           openMenuAt(clientX, clientY, target)
           return
         }
@@ -4361,7 +4422,7 @@ export default function PdfViewer({
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect, annotsFor, docOf, elIsForeign]
+    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect, annotsFor, docOf]
   )
 
   // Double-click a text box to re-open it in the editor (edit text + resize the
@@ -4791,22 +4852,35 @@ export default function PdfViewer({
    *  too slow to sit inside a gesture — a 15-page paper takes over a second, and
    *  the end of a highlight has to start moving now. Cached per page; the
    *  full-document texts are preferred when they happen to exist already. */
-  const onePageTextRef = useRef(new Map<number, PageText>())
-  const onePageTextPendingRef = useRef(new Map<number, Promise<PageText>>())
+  // Per DOCUMENT: the split column's other file keeps its own cache, cleared
+  // by the splitDoc effect when the column's document changes (a reload of the
+  // same file keeps it — the text does not move when a mark is saved).
+  const onePageTextRef = useRef({
+    main: new Map<number, PageText>(),
+    split: new Map<number, PageText>()
+  })
+  const onePageTextPendingRef = useRef({
+    main: new Map<number, Promise<PageText>>(),
+    split: new Map<number, Promise<PageText>>()
+  })
   const pageTextFor = useCallback(
-    (pageNumber: number): PageText | undefined =>
-      pageTextsRef.current?.[pageNumber - 1] ?? onePageTextRef.current.get(pageNumber),
+    (pageNumber: number, doc: DocId = 'main'): PageText | undefined =>
+      doc === 'split'
+        ? onePageTextRef.current.split.get(pageNumber)
+        : (pageTextsRef.current?.[pageNumber - 1] ?? onePageTextRef.current.main.get(pageNumber)),
     []
   )
   const ensureOnePageText = useCallback(
-    (pageNumber: number): void => {
-      if (!pdf || pageTextFor(pageNumber)) return
-      if (onePageTextPendingRef.current.has(pageNumber)) return
-      const p = buildPageText(pdf, pageNumber)
-      onePageTextPendingRef.current.set(pageNumber, p)
+    (pageNumber: number, doc: DocId = 'main'): void => {
+      const proxy = doc === 'split' ? sessionBRef.current?.pdf : pdf
+      if (!proxy || pageTextFor(pageNumber, doc)) return
+      const pending = onePageTextPendingRef.current[doc]
+      if (pending.has(pageNumber)) return
+      const p = buildPageText(proxy, pageNumber)
+      pending.set(pageNumber, p)
       void p
-        .then((text) => onePageTextRef.current.set(pageNumber, text))
-        .finally(() => onePageTextPendingRef.current.delete(pageNumber))
+        .then((text) => onePageTextRef.current[doc].set(pageNumber, text))
+        .finally(() => pending.delete(pageNumber))
     },
     [pdf, pageTextFor]
   )
@@ -4836,6 +4910,8 @@ export default function PdfViewer({
     pageEl: HTMLElement
     scale: number
     pane: PaneId
+    /** The document the mark lives in — its text, its write path */
+    doc: DocId
     moved: boolean
     /** Last range resolved, so the commit does not re-measure */
     latest: { range: CharRange; rects: PageRect[] } | null
@@ -4849,20 +4925,18 @@ export default function PdfViewer({
   // text now: the drag needs it, and starting the pass on pointerdown loses a
   // race against the hand on any document of a serious size.
   useEffect(() => {
-    if (!selected || selected.doc === 'split') return
-    const record = annotsRef.current.get(selected.pageNumber)?.find((r) => r.id === selected.localId)
-    if (record && isTextMarkup(record)) ensureOnePageText(selected.pageNumber)
+    if (!selected) return
+    const doc = selected.doc ?? 'main'
+    const list = doc === 'split' ? sessionBRef.current?.annots : annotsRef.current
+    const record = list?.get(selected.pageNumber)?.find((r) => r.id === selected.localId)
+    if (record && isTextMarkup(record)) ensureOnePageText(selected.pageNumber, doc)
   }, [selected, ensureOnePageText])
 
   const onMarkupEndStart = useCallback(
     (pageNumber: number, record: PageAnnotation, end: 'start' | 'end', e: React.PointerEvent) => {
       const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
       if (!pageEl || !pdf) return
-      // Boundary: end-dragging reads the covered words back from the page's
-      // extracted TEXT, and the text pipeline (pageTextFor/buildPageText) is
-      // the main document's. A split-doc markup can be recoloured, moved,
-      // commented and deleted — re-covering different words means remaking it.
-      if (elIsForeign(pageEl)) return
+      const doc = docOf(paneOfEl(pageEl))
       // The properties popover opens right under the mark it belongs to, which is
       // exactly where the text you are extending onto lives. Get it out of the
       // way for the duration of the drag (measured: it swallowed the pointer).
@@ -4879,12 +4953,13 @@ export default function PdfViewer({
         pageEl,
         scale: scaleOfPageElRef.current(pageEl),
         pane: paneOfEl(pageEl),
+        doc,
         moved: false,
         latest: null
       }
-      ensureOnePageText(pageNumber)
+      ensureOnePageText(pageNumber, doc)
     },
-    [ensureOnePageText, elIsForeign]
+    [ensureOnePageText, docOf]
   )
 
   useEffect(() => {
@@ -4895,7 +4970,7 @@ export default function PdfViewer({
       clientX: number,
       clientY: number
     ): { range: CharRange; rects: PageRect[] } | null => {
-      const pageText = pageTextFor(edit.pageNumber)
+      const pageText = pageTextFor(edit.pageNumber, edit.doc)
       if (!pageText) return null // still extracting; the next move will find it
       // Where the mark started, read off the page the first time it is needed.
       const from = (edit.from ??= rangeOfQuads(
@@ -4944,8 +5019,8 @@ export default function PdfViewer({
       if (!edit.moved || !next) return
       if (next.range.start === edit.from?.start && next.range.end === edit.from?.end) return
       dragEndAtRef.current = performance.now()
-      setSelected({ pageNumber: edit.pageNumber, localId: edit.record.id })
-      changeAnnotation(edit.pageNumber, edit.record, { quads: next.rects })
+      setSelected({ pageNumber: edit.pageNumber, localId: edit.record.id, doc: edit.doc })
+      changeAnnotation(edit.pageNumber, edit.record, { quads: next.rects }, edit.doc)
     }
     const onCancel = (): void => {
       if (!markupEditRef.current) return
@@ -6797,9 +6872,7 @@ export default function PdfViewer({
                 onMarginJump={(p, r) => jumpSelectAnnotIn('b', p, r)}
                 onResizeStart={onResizeStart}
                 onMarkupEndStart={onMarkupEndStart}
-                markupPreview={
-                  !foreign && markupPreview?.pane === 'b' ? markupPreview.byPage : null
-                }
+                markupPreview={markupPreview?.pane === 'b' ? markupPreview.byPage : null}
                 onExternalLink={onExternalLink}
                 onInternalLink={onPaneBInternalLink}
                 onHandle={(h) => {

@@ -181,13 +181,19 @@ carries no picture of its own.)*
 - «Bytt plass» trades the columns' sides, in both modes
 - Ctrl+click on an internal link opens its target in the other column
 - Annotations can be made in either column and land in the document they are
-  made in; with one document open they appear in both — it is a single document
+  made in — the tools, the selection menu, the right-click menu and a mark's own
+  popover all work the same in the other document's column; only the AI actions
+  stay with the tab's document *(2026-09-03: with the menus staying home, the
+  column read as a preview)*. With one document open they appear in both — it
+  is a single document
 - S reopens whatever the split held last — the other document too, on the side
   and at the width it had; a closed same-file column comes back at its page,
   zoom and width
 - The two-page spread is suspended while the view is split (a pair in a
   half-width column is two thumbnails) and returns when the document is shown
-  alone; the choice itself is kept *(2026-09-03)*
+  alone; the choice itself is kept, and so is the zoom the column had before
+  the split — a hand-set zoom comes back exactly, a fit re-fits for the full
+  width *(2026-09-03)*
 
 ### 3. Annotation
 

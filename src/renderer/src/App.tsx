@@ -277,6 +277,11 @@ export default function App(): React.JSX.Element {
 
   // ---------- Tabs ----------
 
+  /** Paths of the tabs closed this session, most recent last — what
+   *  Ctrl+Shift+T walks back through. Session-scoped on purpose: after a
+   *  restart the recents list is the memory, and the command falls back to it. */
+  const closedPathsRef = useRef<string[]>([])
+
   const reallyCloseTab = useCallback((id: string) => {
     setTabs((prev) => {
       const index = prev.findIndex((t) => t.id === id)
@@ -618,15 +623,16 @@ export default function App(): React.JSX.Element {
       // The split column's document first, sequentially — two unsaved
       // documents must not stack two dialogs (same rule closeTabs follows)
       if (tab.splitDoc && !(await closeSplitDoc(id))) return false
-      if (!dirtyTabsRef.current.has(id)) {
-        reallyCloseTab(id)
-        return true
+      if (dirtyTabsRef.current.has(id)) {
+        const outcome = await confirmCloseVerdict(tab.payload.path, tab.payload.name)
+        if (outcome.verdict === 'cancel') {
+          reportCloseFailure(outcome)
+          return false
+        }
       }
-      const outcome = await confirmCloseVerdict(tab.payload.path, tab.payload.name)
-      if (outcome.verdict === 'cancel') {
-        reportCloseFailure(outcome)
-        return false
-      }
+      // Recorded here and not in reallyCloseTab: that runs inside a state
+      // updater, which React may call twice
+      closedPathsRef.current.push(tab.payload.path)
       reallyCloseTab(id)
       return true
     },
@@ -797,6 +803,25 @@ export default function App(): React.JSX.Element {
     [openPayload, confirmExternalUpdateVerdict, setTabDirty, goToTab]
   )
 
+  /** Ctrl+Shift+T: the tab closed most recently comes back. A closed path that
+   *  is on screen again already (reopened from the library, say) is skipped
+   *  rather than focused — the ask was for the one that is gone. With nothing
+   *  left to walk back through, the most recent file not on screen opens: the
+   *  same list the library shows, so the command means something right after
+   *  a restart too. */
+  const reopenClosedTab = useCallback(async () => {
+    const open = new Set(tabsRef.current.map((t) => t.payload.path))
+    let path: string | undefined
+    while ((path = closedPathsRef.current.pop()) !== undefined) {
+      if (!open.has(path)) break
+    }
+    if (path === undefined) {
+      const list = await bridge.getRecents()
+      path = list.find((r) => !open.has(r.path))?.path
+    }
+    if (path !== undefined) await openPath(path)
+  }, [openPath])
+
   const openDialog = useCallback(async () => {
     const result = await bridge.openFileDialog()
     if (!result) return
@@ -877,6 +902,10 @@ export default function App(): React.JSX.Element {
           // you are not even looking at.
           if (activeIdRef.current && !atLibraryRef.current) closeTab(activeIdRef.current)
           break
+        case 'tab.reopen':
+          e.preventDefault()
+          void reopenClosedTab()
+          break
         case 'window.new':
           e.preventDefault()
           bridge.newWindow()
@@ -919,7 +948,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, openDialog, moveTab, updateSettings, flashThemeName])
+  }, [cycleTab, closeTab, reopenClosedTab, openDialog, moveTab, updateSettings, flashThemeName])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {

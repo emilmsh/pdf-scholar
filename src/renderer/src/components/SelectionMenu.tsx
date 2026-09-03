@@ -144,6 +144,11 @@ export interface MenuState {
   mode: 'selection' | 'point'
   /** click point in page space (point mode) */
   pagePoint?: { x: number; y: number }
+  /** Opened over the split column's OTHER document. The markup, note and copy
+   *  actions work there like anywhere else; the AI actions do not appear,
+   *  because they ask about the tab's document and would answer from the
+   *  wrong file. */
+  foreign?: boolean
 }
 
 /** Word Counter Plus-style stats for the current selection. Words split on
@@ -317,7 +322,7 @@ export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.J
           <button className="menu-item" onClick={() => onAction({ kind: 'copy' })}>
             <span className="menu-icon"><IconCopy size={15} /></span> {t('menu.copy')}
           </button>
-          {aiEnabled && (
+          {aiEnabled && !menu.foreign && (
             <>
               <div className="menu-sep" />
               <div className="menu-section-label">
@@ -387,7 +392,7 @@ export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.J
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
             <span className="menu-icon"><IconNote size={15} /></span> {t('menu.newNoteHere')}
           </button>
-          {aiEnabled && (
+          {aiEnabled && !menu.foreign && (
             <button className="menu-item" title={t('menu.snipTip')} onClick={() => onAction({ kind: 'snip' })}>
               <span className="menu-icon"><IconSparkle size={15} /></span> {t('menu.snip')}
             </button>

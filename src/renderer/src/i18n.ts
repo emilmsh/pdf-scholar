@@ -818,6 +818,7 @@ const nb = {
   'keys.tabNext': 'Neste fane',
   'keys.tabPrev': 'Forrige fane',
   'keys.tabClose': 'Lukk fanen',
+  'keys.tabReopen': 'Gjenåpne sist lukkede fane',
   'keys.tabMoveLeft': 'Flytt fanen mot venstre',
   'keys.tabMoveRight': 'Flytt fanen mot høyre',
 
@@ -1652,6 +1653,7 @@ const en: Dict = {
   'keys.tabNext': 'Next tab',
   'keys.tabPrev': 'Previous tab',
   'keys.tabClose': 'Close tab',
+  'keys.tabReopen': 'Reopen last closed tab',
   'keys.tabMoveLeft': 'Move tab left',
   'keys.tabMoveRight': 'Move tab right',
 

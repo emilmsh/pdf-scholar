@@ -36,6 +36,7 @@ export type CommandId =
   | 'tab.next'
   | 'tab.prev'
   | 'tab.close'
+  | 'tab.reopen'
   | 'tab.moveLeft'
   | 'tab.moveRight'
   // Navigation
@@ -170,6 +171,10 @@ const REGISTRY: readonly Command[] = [
   { id: 'tab.next', category: 'tabs', labelKey: 'keys.tabNext', defaults: ['ctrl+tab'], whileTyping: true },
   { id: 'tab.prev', category: 'tabs', labelKey: 'keys.tabPrev', defaults: ['ctrl+shift+tab'], whileTyping: true },
   { id: 'tab.close', category: 'tabs', labelKey: 'keys.tabClose', defaults: ['mod+w'], whileTyping: true },
+  // The browser's chord, with the browser's meaning: the tab closed most
+  // recently comes back, and when nothing was closed this session, the most
+  // recent file not on screen — what the library would list first.
+  { id: 'tab.reopen', category: 'tabs', labelKey: 'keys.tabReopen', defaults: ['mod+shift+t'], whileTyping: true },
   { id: 'tab.moveLeft', category: 'tabs', labelKey: 'keys.tabMoveLeft', defaults: ['mod+shift+pageup'], whileTyping: true },
   { id: 'tab.moveRight', category: 'tabs', labelKey: 'keys.tabMoveRight', defaults: ['mod+shift+pagedown'], whileTyping: true },
 

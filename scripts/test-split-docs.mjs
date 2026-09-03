@@ -13,8 +13,11 @@
 //      second column: two different data-dockeys, the toolbar's page count
 //      following whichever column is active.
 //   4. «Bytt plass» (Shift+S) visually trades the columns' sides.
-//   5. A text markup made in the foreign column dirties THAT file's draft and
-//      not the host's — the wrong-document write is the bug class this guards.
+//   5. The foreign column takes annotations like the tab's own: a text selection
+//      raises the selection menu there (without the AI section, which asks about
+//      the tab's document), a right-click raises the point menu, and a markup
+//      made there dirties THAT file's draft and not the host's — the
+//      wrong-document write is the bug class this guards.
 //   6. The same file's own tab converges on the mark (the intra-window bus),
 //      and saving there bakes exactly one new annotation into the bytes,
 //      verified with mupdf; the host file's draft stays clean.
@@ -26,7 +29,8 @@
 //   10. The document already in a column, dropped into the other one, fills
 //      both columns — the same-file split's gesture.
 //   11. The two-page spread is suspended while the view is split and returns,
-//      still chosen, when the document is shown alone.
+//      still chosen, when the document is shown alone — at the zoom it had
+//      before the split, not the fit-width the column was re-fitted to.
 //   12. REPLACING the split's document keeps the column: the first column
 //      never changes width and the second never leaves the DOM, so the swap
 //      is one layout change and not a jump out and straight back.
@@ -314,7 +318,53 @@ try {
   )
   await evalIn(W, `ui.key('S', { shiftKey: true }); await ui.settle(400); return null`)
 
-  // ---- 5. a markup in the foreign column dirties B's draft, not A's
+  // ---- 5. the foreign column takes annotations like the tab's own
+  // The menus first (Emil, 2026-09-03: with the selection and right-click menus
+  // staying home, the column read as a preview). A selection raises the
+  // selection menu without the AI section — those actions ask about the TAB's
+  // document — and a right-click raises the point menu with the note action
+  // alone (snip-to-explain is AI too). Both close on a click in the column.
+  const menus = await evalIn(W, `
+    const pages = ui.activeView().querySelector('.pages[data-pane="b"]');
+    const box = pages.getBoundingClientRect();
+    const span = [...pages.querySelectorAll('.pdf-page .text-host .textLayer > span')].find((s) => {
+      const r = s.getBoundingClientRect();
+      return (s.textContent || '').trim().length > 12 && r.top > box.top + 40 && r.bottom < box.bottom - 40 && r.width > 60;
+    });
+    if (!span) throw new Error('no on-screen text in pane b');
+    const page = span.closest('.pdf-page');
+    const pr = page.getBoundingClientRect();
+    const dismiss = async () => {
+      pages.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: Math.round(pr.left + 4), clientY: Math.round(pr.top + 4) }));
+      await ui.settle(300);
+    };
+    const r0 = span.getBoundingClientRect();
+    const range = document.createRange(); range.selectNodeContents(span);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    await ui.settle(150);
+    pages.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: Math.round(r0.right), clientY: Math.round(r0.bottom) }));
+    await ui.settle(500);
+    const selMenu = document.querySelector('.selection-menu');
+    const selection = {
+      shown: !!selMenu,
+      items: selMenu ? selMenu.querySelectorAll('.menu-item').length : 0,
+      ai: !!selMenu?.querySelector('.menu-ai-grid')
+    };
+    sel.removeAllRanges();
+    await dismiss();
+    page.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round(pr.left + pr.width / 2), clientY: Math.round(pr.top + 10) }));
+    await ui.settle(500);
+    const pointMenu = document.querySelector('.selection-menu');
+    const point = { shown: !!pointMenu, items: pointMenu ? pointMenu.querySelectorAll('.menu-item').length : 0 };
+    await dismiss();
+    return { selection, point, gone: !document.querySelector('.selection-menu') };
+  `)
+  check('a text selection in the foreign column raises the selection menu', menus.selection.shown, JSON.stringify(menus.selection))
+  check('…with the markup actions and without the AI section', menus.selection.items > 0 && !menus.selection.ai, JSON.stringify(menus.selection))
+  check('a right-click in the foreign column raises the point menu, note alone', menus.point.shown && menus.point.items === 1, JSON.stringify(menus.point))
+  check('both menus dismiss on a click in the column', menus.gone)
+
+  // …then a markup made there lands in B's draft, not A's
   await evalIn(W, `ui.armMarkup(); return null`)
   const markedText = await evalIn(W, `return await ui.markupInPane('b')`)
   check('a highlight was made in the foreign column', typeof markedText === 'string' && markedText.length > 0, markedText)
@@ -497,20 +547,34 @@ try {
       if (!box) throw new Error('spread checkbox not found');
       return box;
     };
+    const zoom = () => (view.querySelector('.zoom-label')?.textContent || '').trim();
     (await spreadBox()).click(); await ui.settle(900);
+    if (document.querySelector('.view-menu')) { click(btn); await ui.settle(200); }
+    // A hand-set zoom on the pair: one step in from the fit. The split re-fits
+    // the column to its half; the reader's number must be back afterwards.
+    ui.key('=', { ctrlKey: true }); await ui.settle(700);
     const alone = ${rowTops};
+    const zoomAlone = zoom();
     ui.key('s'); await ui.settle(900);
     const split = ${rowTops};
+    const zoomSplit = zoom();
     const inSplit = await spreadBox();
     const whileSplit = { disabled: inSplit.disabled, checked: inSplit.checked };
+    if (document.querySelector('.view-menu')) { click(btn); await ui.settle(200); }
     ui.key('s'); await ui.settle(900);
     const back = ${rowTops};
+    const zoomBack = zoom();
     const afterwards = await spreadBox();
     const checkedBack = afterwards.checked;
     afterwards.click(); await ui.settle(300); // leave document B single-page
     if (document.querySelector('.view-menu')) click(btn);
-    return { alone, split, whileSplit, back, checkedBack, panes: ui.panes() };
+    return { alone, split, whileSplit, back, checkedBack, zoomAlone, zoomSplit, zoomBack, panes: ui.panes() };
   `)
+  check(
+    "the split re-fits the column (the zoom changes), and closing it brings the pair's zoom back",
+    spread.zoomAlone !== spread.zoomSplit && spread.zoomBack === spread.zoomAlone,
+    JSON.stringify({ alone: spread.zoomAlone, split: spread.zoomSplit, back: spread.zoomBack })
+  )
   check('two pages pair up with the spread on', spread.alone.length === 2 && spread.alone[0] === spread.alone[1], JSON.stringify(spread.alone))
   check("…'s' splits the view and the pages stand single in the column", spread.split.length === 2 && spread.split[0] !== spread.split[1], JSON.stringify(spread.split))
   check('the spread toggle is greyed and unchecked while split', spread.whileSplit.disabled && !spread.whileSplit.checked, JSON.stringify(spread.whileSplit))
