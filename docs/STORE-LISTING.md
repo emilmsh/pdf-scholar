@@ -42,7 +42,7 @@ Open a PDF and it becomes an ordinary browser tab in the PDF Scholar viewer inst
 
 READING
 • Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
-• Day, Sepia and two Night themes, with contrast adjustable per theme
+• Four reading modes — Day, Tint (a light paper tone in five colours), Night and Night+ — plus Auto; a slider sets the strength, and Night can keep pictures in their original colours
 • Page rotation, two-page spread, and a full-screen presentation mode
 • Split view: two columns of the same document, each with its own page, zoom and rotation
 • Table of contents, thumbnails and bookmarks
@@ -72,6 +72,7 @@ AI ASSISTANT (optional, bring your own key)
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
 • The assistant can open in its own tab; a citation click still goes to the passage in the tab showing the document
+• An AI access switch: "Confirm every request" shows the model and what is attached before anything is sent; "Off" blocks every AI request
 • Eight major AI services are supported, one key field each, alongside any endpoint that speaks the standard chat-completions API — including a local model server, which needs no key. The providers are listed on the project page. Requests go directly to the provider you chose; with a local model the document never leaves the machine
 
 Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
@@ -85,7 +86,7 @@ PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotat
 
 LESING
 • Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
-• Dag-, Sepia- og to Natt-temaer, med kontrast som kan justeres per tema
+• Fire lesemoduser — Dag, Farge (en lys papirtone i fem farger), Natt og Natt+ — pluss Auto; en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
 • Siderotasjon, tosiders oppslag og en fullskjerms presentasjonsmodus
 • Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
 • Innholdsfortegnelse, miniatyrer og bokmerker
@@ -115,6 +116,7 @@ AI-ASSISTENT (valgfri, egen nøkkel)
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
 • Assistenten kan åpnes i egen fane; et sitatklikk går fortsatt til avsnittet i fanen som viser dokumentet
+• AI-tilgang: «Bekreft hver forespørsel» viser modell og hva som legges ved før noe sendes; «Av» stopper alle AI-forespørsler
 • Åtte store AI-tjenester støttes, med ett nøkkelfelt hver, i tillegg til ethvert endepunkt som følger den vanlige chat-API-standarden — også en lokal modellserver, som ikke trenger nøkkel. Leverandørene er listet opp på prosjektsiden. Forespørslene går rett til leverandøren du valgte; med en lokal modell forlater dokumentet aldri maskinen
 
 Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.

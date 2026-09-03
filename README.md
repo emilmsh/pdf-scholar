@@ -128,14 +128,20 @@ the current desktop-vs-extension parity.
 
 ### Undistracted reading
 
-The frame at the top of this page is one window shown in three of the four themes — the
-same page, the same moment. Sepia sets the page on warm ivory; Night and Night+ are the
-two dark modes, the second with higher contrast.
+The frame at the top of this page is one window shown in three of the four reading modes —
+the same page, the same moment. Tint sets the page on a light paper tone (here the classic
+Sepia cream); Night and Night+ are the two dark modes, the second with higher contrast.
 
 - Smooth scrolling; zoom centres on the cursor or pinch point; one button toggles
   fit-width and whole-page (W)
-- Four themes — Day, Sepia, Night and Night+ — plus Auto, which follows the system's
-  light/dark setting. Contrast and brightness are adjustable per theme
+- Four reading modes — Day, Tint, Night and Night+ — plus Auto, which follows the
+  system's light/dark setting. Tint is a light paper tone: the classic Sepia cream, or
+  gray, green, blue or sand; Night has its own dark tones. The tinted modes take a
+  strength slider — tint strength for the light tones, brightness for Night; 100 % is
+  the standard look — and the toolbar and panels follow the chosen tone. D cycles the
+  modes
+- Night can keep pictures in their original colours: figures and photos stay true while
+  the page inverts
 - Page rotation (Shift+R) and a two-page spread for wide layouts
 - Presentation mode (P): one page at a time, full screen
 - The toolbar can be unpinned (V); the side panels go with it, and each returns on hover
@@ -157,12 +163,16 @@ two dark modes, the second with higher contrast.
 ![Split view — the same paper in two columns, each with its own page and zoom](docs/screenshots/dual-pane.png)
 
 A table or figure often sits on one page and the text that discusses it on another. S
-opens a second column of the same document.
+opens a second column of the same document. The second column can also hold another
+document — right-click a tab and choose "Open in split view", or drop a PDF on the
+column — so two papers can be read and annotated side by side. Shift+S trades the
+columns' sides.
 
 - Each column has its own page, zoom and rotation, so a landscape-printed table can sit
   upright beside portrait text
 - The toolbar's page and zoom controls drive the active column. Annotation, eraser and
-  undo work in either column, and a mark made in one appears in both
+  undo work in either column; a mark lands in the document it is made in, and with one
+  document open it appears in both columns
 - Ctrl+click on an internal link opens its target in the other column, keeping the
   current page. Search, the outline, the notes list and the assistant's citations move
   only the active column, and back/forward history is per column
@@ -247,8 +257,9 @@ the claim came from.
 - Context-menu actions on any selection: explain, simplify, critique, look up a cited
   reference, or a free-form question
 - Explain a figure: a region dragged around a chart or table lands in the chat as an
-  attachment, and nothing is sent until you add a question. Images can be pasted or
-  attached the same way
+  attachment, staged until you press send — the one-click explain action in the
+  selection menu is the exception, and sends the crop as soon as it is drawn. Images can
+  be pasted or attached the same way
 - A scanned PDF has no text layer, and the assistant reports that instead of guessing;
   a page range can be attached as images for it to read
 - The assistant can open in its own window — the document keeps the whole screen, or a
@@ -285,6 +296,13 @@ Reading, annotating and saving are entirely local; the app runs without network 
 When you do use the assistant, the request goes directly to the provider you chose, under
 your key and that provider's terms — there is no intermediary server, and with a local
 model (Ollama, LM Studio) even your questions stay on the machine.
+
+An AI action sends content from the document — normally the whole text, an excerpt for
+very long documents — and several actions fire on one click. An AI access switch in the
+assistant's settings decides how far that goes: "Confirm every request" stages each
+request and names the model and what is about to be attached before anything is sent;
+"Off" blocks every AI request in the transport layer, so a stored key cannot leak content
+by accident.
 
 You paste the key once, in the assistant's settings, and it goes into the platform's key
 store: DPAPI on Windows, Keychain on macOS, the system keyring on Linux. The browser

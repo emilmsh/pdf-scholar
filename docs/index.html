@@ -303,10 +303,11 @@
     <div class="body">
       <h2>Undistracted reading</h2>
       <p>
-        The frame above is one window shown in three of the four reading themes —
-        Day, Sepia on warm ivory, and two dark modes, the second with higher contrast —
-        plus Auto, which follows the system. Contrast and brightness are adjustable per
-        theme.
+        The frame above is one window shown in three of the four reading modes — Day,
+        Tint (a light paper tone: the classic Sepia cream, or gray, green, blue or sand)
+        and two dark modes, the second with higher contrast — plus Auto, which follows
+        the system. Night has its own dark tones and can keep pictures in their original
+        colours; a slider sets the strength, and the toolbar follows the chosen tone.
       </p>
       <ul class="points">
         <li>Table of contents, thumbnails and bookmarks in one panel, and a page field in the toolbar that jumps straight to a page number.</li>
@@ -324,12 +325,13 @@
       <h2>Two pages at once</h2>
       <p>
         A table or figure often sits on one page and the text that discusses it on
-        another. The S key opens a second column of the same document.
+        another. The S key opens a second column of the same document — or of another
+        one, so two papers can be read side by side.
       </p>
       <ul class="points">
         <li>Each column has its own page, zoom and rotation, so a landscape table can sit upright beside portrait text.</li>
         <li>Ctrl+click on an internal link opens its target in the other column, keeping the current page in view.</li>
-        <li>Annotations made in either column appear in both; it is a single document.</li>
+        <li>The second column can hold another document — right-click a tab and choose “Open in split view” — and each column annotates its own file; with one document open, a mark appears in both columns.</li>
       </ul>
     </div>
     <img class="shot" src="screenshots/dual-pane.png" alt="The same paper in two columns, each showing a different page.">
@@ -379,7 +381,7 @@
       </p>
       <ul class="points">
         <li>Structured article summaries: research question, method, data, findings, limitations.</li>
-        <li>A figure or table can be cropped into the chat and asked about; nothing is sent until you ask.</li>
+        <li>A figure or table can be cropped into the chat and asked about.</li>
         <li>Questions about your own annotations — <i>“summarize what I've highlighted”</i>.</li>
         <li>The assistant can open in its own window, so the document keeps the whole screen; a citation click still goes to the passage in the window showing the document.</li>
         <li>Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq, one key field each — or any OpenAI-compatible endpoint and local models via Ollama or LM Studio, with no key. Each answer reports the provider's token count.</li>
@@ -412,6 +414,12 @@
       system keyring on Linux.
       <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md">The
       privacy notes</a> have the per-platform detail.
+    </p>
+    <p>
+      An AI action sends document content — normally the whole text, an excerpt for very
+      long documents — and some actions fire on one click. An AI access switch in
+      settings can require a confirmation before every request, naming the model and
+      what is about to be attached, or block AI requests entirely.
     </p>
   </div>
 
