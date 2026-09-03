@@ -602,11 +602,24 @@ button {
   width: min(420px, calc(100vw - 48px));
   max-height: calc(100vh - 96px);
   overflow-y: auto;
-  padding: 16px 18px 18px;
+  /* Bottom padding lives on the sticky action bar (see .ai-settings-actions)
+     so it can stick flush with the modal's bottom edge. */
+  padding: 16px 18px 0;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow-menu);
+}
+
+/* The modal is the scroller here, so the settings pane must not be one of
+   its own (any overflow other than visible would capture the sticky bar). */
+.welcome-ai-modal .ai-settings {
+  overflow: visible;
+}
+
+.welcome-ai-modal .ai-settings-actions {
+  background: var(--bg-elevated);
+  padding-bottom: 18px;
 }
 
 .welcome-ai-modal-head {
@@ -4602,7 +4615,9 @@ html.pen-near .draw-layer {
 /* Settings */
 
 .ai-settings {
-  padding: 16px 14px;
+  /* No bottom padding here: the sticky action bar carries it, so the bar can
+     sit flush with the scroller's bottom edge. */
+  padding: 16px 14px 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -4720,10 +4735,22 @@ html.pen-near .draw-layer {
   color: var(--text-secondary);
 }
 
+/* Cancel/Save stay in view while the form scrolls: the bar sticks to the
+   bottom of whichever ancestor scrolls (the settings pane in the assistant
+   panel, the modal on the welcome screen) and paints its own background so
+   the fields slide underneath it. Negative side margins let that background
+   span the pane's padding too; a hairline above marks the edge. */
 .ai-settings-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+  margin: 0 -14px;
+  padding: 10px 14px 16px;
+  background: var(--bg-chrome);
+  border-top: 1px solid var(--border);
 }
 
 /* ---------- Detached assistant window (AssistantApp) ----------

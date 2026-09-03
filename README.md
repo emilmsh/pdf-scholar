@@ -338,8 +338,12 @@ annotations inside Zotero — editing them there, or extracting them into a note
 use Zotero's File → "Export PDF…" if you later need a copy with them re-embedded.
 
 A document that lives in a Zotero library also gets a Zotero section in the save
-button's menu: show the item in Zotero, or copy an in-text citation or full reference
-(APA). The metadata comes from Zotero's local API on your own machine — enable it once
+button's menu: show the item in Zotero, or copy an in-text citation, a full reference
+(APA) or the BibTeX entry. BibTeX comes from the exporter built into Zotero, so no
+Better BibTeX add-on is needed; the citation key is Zotero's own generated one rather
+than a Better BibTeX pinned key. Two fields are left out: `file`, which names the PDF's
+location on your own disk, and `abstract`, which belongs in the library rather than in a
+.bib file. The metadata comes from Zotero's local API on your own machine — enable it once
 in Zotero under Settings → Advanced → "Allow other applications on this computer to
 communicate with Zotero". Stored attachments are recognised by their path alone, so for
 them "Show in Zotero" works even with the API off. Linked attachments (a library kept in

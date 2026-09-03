@@ -134,6 +134,33 @@ eq(Z.parseZoteroItem(undefined).title, '', 'malformed item JSON never throws')
 eq(Z.htmlToText('a &amp;lt; b'), 'a &lt; b', '&amp; decodes last (no double-decode)')
 eq(Z.htmlToText('x&nbsp;&#160;y'), 'x y', 'nbsp in both spellings collapses to one space')
 
+// --- cleanBibtex: Zotero's export, minus this machine ---------------------------
+{
+  const out = Z.cleanBibtex(`@article{halseth_t_2026,
+	title = {T},
+	author = {Halseth, Emil},
+	abstract = {Several hundred words that belong in the library, not in a .bib.},
+	file = {Halseth (2026) - T:G\:\\Min disk\\T.pdf:application/pdf},
+}
+`)
+  eq(out.includes('file ='), false, 'bibtex: the local file path is stripped')
+  eq(out.includes('Min disk'), false, 'bibtex: no trace of the absolute path left behind')
+  eq(out.includes('abstract ='), false, 'bibtex: the abstract is stripped too')
+  eq(out.includes('belong in the library'), false, 'bibtex: no trace of the abstract left behind')
+  eq(out.includes('author = {Halseth, Emil}'), true, 'bibtex: every other field survives')
+  eq(out.startsWith('@article{halseth_t_2026,'), true, 'bibtex: the entry head is untouched')
+  eq(out.endsWith('}'), true, 'bibtex: stripping the last field leaves the entry closed')
+  // A newline inside the value would make the line-wise match cut the entry in
+  // half — leaving it whole is the safer failure.
+  const multiline = ['@book{x,', '	abstract = {a', '	b},', '	title = {T},', '}'].join('\n')
+  eq(
+    Z.cleanBibtex(multiline).includes('title = {T}'),
+    true,
+    'bibtex: a multi-line value is left alone, not half-cut'
+  )
+  eq(Z.cleanBibtex(''), '', 'bibtex: an item that exports to nothing stays empty')
+}
+
 // --- Status → named code --------------------------------------------------------
 eq(Z.zoteroCodeForStatus(null), 'zotero-off', 'no response → zotero-off')
 eq(Z.zoteroCodeForStatus(403), 'zotero-api-disabled', '403 → API toggle off')
@@ -166,16 +193,26 @@ function scriptedFetch(script) {
         status: 200,
         json: item({ title: 'T', date: '2026-05-04', creators: [{ lastName: 'Halseth' }] }, '<span>(Halseth, 2026)</span>', '<div>Halseth (2026). T.</div>')
       }
-    ]
+    ],
+    ['/items/QRST6789?format=bibtex', { status: 200, text: `@article{halseth_t_2026,
+	title = {T},
+	author = {Halseth, Emil},
+	abstract = {Several hundred words that belong in the library, not in a .bib.},
+	file = {Halseth (2026) - T:G\:\\Min disk\\T.pdf:application/pdf},
+}
+` }]
   ])
   const client = Z.createZoteroClient(f.fetchJson)
   eq(client.selectUrl(PATH), 'zotero://select/library/items/ABCD2345', 'before info(): attachment key')
   const info = await client.info(PATH)
   eq(info.parentKey, 'QRST6789', 'parent key resolved')
   eq(info.citation, '(Halseth, 2026)', 'citation flattened')
-  eq(f.calls.length, 2, 'exactly two requests')
+  eq(info.bibtex.startsWith('@article{halseth_t_2026,'), true, 'bibtex fetched alongside the citation')
+  eq(info.bibtex.includes('file ='), false, 'bibtex cleaned on the way through')
+  // Three: the attachment lookup, then the cited item in both forms at once.
+  eq(f.calls.length, 3, 'exactly three requests')
   await client.info(PATH)
-  eq(f.calls.length, 2, 'success cached — no third request')
+  eq(f.calls.length, 3, 'success cached — no further requests')
   eq(
     client.selectUrl(PATH),
     'zotero://select/library/items/QRST6789',
@@ -193,6 +230,20 @@ function scriptedFetch(script) {
   const info = await client.info(PATH)
   eq(info.parentKey, null, 'standalone: no parent')
   eq(f.calls[1].includes('/items/ABCD2345?include='), true, 'standalone: cites the attachment item')
+}
+
+// The BibTeX export is the one request allowed to fail alone: a standalone
+// attachment exports to nothing, and the other two copy rows still work.
+{
+  const f = scriptedFetch([
+    ['/items/ABCD2345', { status: 200, json: { data: { parentItem: 'QRST6789' } } }],
+    ['?include=', { status: 200, json: item({ title: 'T' }, '<span>(H, 2026)</span>', '<div>H (2026).</div>') }],
+    ['?format=bibtex', { status: 404, json: null }]
+  ])
+  const client = Z.createZoteroClient(f.fetchJson)
+  const info = await client.info(PATH)
+  eq(info.bibtex, '', 'bibtex export refused → empty, not an error')
+  eq(info.citation, '(H, 2026)', 'the citation still resolved')
 }
 
 // Failures: named, and never cached (the user may start Zotero and retry)
@@ -263,16 +314,20 @@ const listing = [
   eq(info.attachmentKey, 'WE23ALSN', 'linked: the record sharing the folder wins over the same filename elsewhere')
   eq(info.parentKey, '9JV4599V', 'linked: parent resolved')
   eq(info.citation, '(Foo, 2022)', 'linked: citation flattened')
-  eq(f.calls.length, 2, 'linked: one listing page + one item request')
+  eq(f.calls.length, 3, 'linked: one listing page + the item in both forms')
   await client.info(LINKED)
-  eq(f.calls.length, 2, 'linked: success cached — no further requests')
+  eq(f.calls.length, 3, 'linked: success cached — no further requests')
   eq(client.selectUrl(LINKED), 'zotero://select/library/items/9JV4599V', 'linked after info(): parent key')
   // A second linked file reuses the index: one item request, no new listing
   const info2 = await client.info('G:\\Min disk\\Library\\Other.pdf')
   eq(info2.attachmentKey, 'BBBB2222', 'linked: second file found in the cached index')
   eq(info2.parentKey, null, 'linked: standalone attachment cites itself')
-  eq(f.calls.length, 3, 'linked: the index is built once per session')
-  eq(f.calls[2].includes('/items/BBBB2222?include='), true, 'linked standalone: cites the attachment item')
+  eq(
+    f.calls.filter((u) => u.includes('itemType=attachment')).length,
+    1,
+    'linked: the index is built once per session'
+  )
+  eq(f.calls[3].includes('/items/BBBB2222?include='), true, 'linked standalone: cites the attachment item')
 }
 // The extension's file:// form resolves the same record
 {

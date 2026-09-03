@@ -200,6 +200,10 @@ export interface ZoteroInfo {
   citation: string
   /** Full bibliography entry in the same style */
   bib: string
+  /** Zotero's own BibTeX export of the item, its local `file` path stripped.
+   *  Empty when the item exports to nothing (a standalone attachment) or the
+   *  export request failed — the copy row disables itself on that. */
+  bibtex: string
 }
 
 export interface FileError {
