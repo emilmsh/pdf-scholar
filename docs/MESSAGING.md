@@ -46,7 +46,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | Browser extension | **Beta — and live in BOTH stores** (confirmed 2026-08-12). Edge Add-ons: `https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc`. Chrome Web Store: `https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd`. One click, self-updating — this is the install to lead with, and the Load-unpacked route is now only for running a build newer than the stores carry. **Both listings lag the current release** while their updates sit in review, so never name a version on a store surface |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). No server of ours in between |
-| Zotero | Works as Zotero's external PDF reader (Zotero 7+, its "Open PDFs using" setting). A document living in a Zotero library gets a Zotero section in the save menu — show the item in Zotero, copy an in-text citation or full reference (APA), fetched from Zotero's **local** API on the same machine (no account, no network; the user enables the API once in Zotero's Advanced settings). Annotations saved into the file are standard PDF annots, which Zotero's own «Import Annotations…» adopts — highlights and underlines; text boxes and ink are not importable on Zotero's side, and that boundary is Zotero's to claim, not ours to hide. Importing MOVES them (Zotero strips the file and keeps them in its database — verified 2026-09-02); the guide says so plainly and advises skipping the import in a PDF-Scholar-first workflow. Covers stored attachments in My Library; linked-file attachments are not detected |
+| Zotero | Works as Zotero's external PDF reader (Zotero 7+, its "Open PDFs using" setting). A document living in a Zotero library gets a Zotero section in the save menu — show the item in Zotero, copy an in-text citation or full reference (APA), fetched from Zotero's **local** API on the same machine (no account, no network; the user enables the API once in Zotero's Advanced settings). Annotations saved into the file are standard PDF annots, which Zotero's own «Import Annotations…» adopts — highlights and underlines; text boxes and ink are not importable on Zotero's side, and that boundary is Zotero's to claim, not ours to hide. Importing MOVES them (Zotero strips the file and keeps them in its database — verified 2026-09-02); the guide says so plainly and advises skipping the import in a PDF-Scholar-first workflow. Covers stored AND linked attachments: a stored file is recognised by its path alone; a linked file (ZotFile-style libraries, a base folder on a synced drive — Emil's own setup) by asking the local API for the library's attachment list and matching the filename, so it shows its Zotero section only while Zotero runs with the API on (2026-09-03; v0.44.0 showed linked libraries nothing) |
 | Author | Emil Mathias Strøm Halseth, who reads PDFs for a living — full name wherever he is credited. Where the author is named in long form (README footer, landing footer), the approved signature is verbatim: "Built by Emil Mathias Strøm Halseth, who reads PDFs for a living, with assistance from Claude Code." (Emil's wording, 2026-08-04 — no stronger Claude credit than "assistance".) The store copyright line stays author-only |
 | Logo | Elisabeth Walle — credit her wherever the logo appears, and link her name to <https://www.linkedin.com/in/elisabeth-walle-239028140/> on every surface that supports links |
 
@@ -162,9 +162,13 @@ carries no picture of its own.)*
 
 - Two columns of the same document, each with its own page, zoom and rotation —
   a table or figure can stay in view beside the text that discusses it
-- The second column can also hold ANOTHER document — right-click a tab and
-  choose «Åpne i delt visning», or drop a PDF on the column — so two papers can
-  be read and annotated side by side *(the top reader ask, 2026-09-02)*
+- The second column can also hold ANOTHER document — drag its tab into the
+  view, pick it under «Åpne i delt visning» in the view menu (the other open
+  documents by name, or «Annen fil …»), right-click its tab, or drop a PDF on
+  the column — so two papers can be read and annotated side by side *(the top
+  reader ask, 2026-09-02; the view menu and the drag arrived 2026-09-03 after
+  the tab menu alone went unfound — same words everywhere, «delt visning», and
+  never the other paper's name in a label)*
 - «Bytt plass» trades the columns' sides, in both modes
 - Ctrl+click on an internal link opens its target in the other column
 - Annotations can be made in either column and land in the document they are
@@ -326,10 +330,13 @@ app looks like.)*
   long documents), and the answer labels what rode along — say "document
   content is sent when you use an AI action", never "only when you ask a
   question": several actions fire on one click
-- An AI access switch in settings: **Confirm every request** stages each
-  request and names the model and what is about to be attached before anything
-  is sent; **Off** blocks every AI request in the transport layer, so a stored
-  key cannot leak content by accident
+- An AI access switch in settings: **Confirm before sharing** pauses the first
+  request that takes a document to a provider in a session — naming the model
+  and what is about to be attached — and lets follow-up questions about the
+  same document pass; a new document or a new provider asks again *(Emil,
+  2026-09-03: a prompt on every request trains the click-through)*; **Off**
+  blocks every AI request in the transport layer, so a stored key cannot leak
+  content by accident
 - With a local model (Ollama, LM Studio), questions also stay on the machine
 - The key is stored in the platform's own key store; the exact mode differs per
   platform and the settings panel names the one in force. See "Wording we do not

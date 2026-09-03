@@ -52,7 +52,7 @@ READING
 
 SPLIT VIEW
 • Two columns of the same document, each with its own page, zoom and rotation — a table or figure can stay in view beside the text that discusses it
-• The second column can also hold another document — right-click a tab and choose "Open in split view" — so two papers can be read and annotated side by side; the columns can swap sides
+• The second column can also hold another document — drag its tab into the view, or pick it under "Open in split view" in the view menu — so two papers can be read and annotated side by side; the columns can swap sides
 • Annotations land in the document they are made in — with one document open they appear in both columns, and two windows on one file also stay in sync
 • Ctrl+click on an internal link opens the target in the other column
 
@@ -67,7 +67,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • Password-protected documents open, can be annotated, and keep their protection when saved
 • Colour, thickness and opacity are set per tool and remembered; existing marks can be adjusted rather than redrawn
 • An optional name in settings fills the standard PDF author field on new annotations
-• A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy an in-text citation or full reference
+• A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy an in-text citation or full reference — stored and linked attachments alike
 • Edits are held in a draft until saved; what is saved is standard PDF annotations, which open correctly in Acrobat and other viewers
 
 SEARCH
@@ -82,7 +82,7 @@ AI ASSISTANT (optional — bring your own key)
 • Scanned documents are identified as such; a page range can be attached as images for the assistant to read
 • The assistant can open in its own window; a citation click still goes to the passage in the document's window
 • LaTeX in answers is rendered; optional web search, off by default
-• AI access switch: "Confirm every request" shows the model and what is attached before anything is sent; "Off" blocks every AI request
+• AI access switch: "Confirm before sharing" asks the first time a document goes to a provider and shows what is attached; "Off" blocks every AI request
 • Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq — one key field each — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio (no key needed). Requests go directly to the provider; with a local model the document never leaves the machine. PDF Scholar operates no server.
 
 Source code: https://github.com/emilmsh/pdf-scholar
@@ -106,7 +106,7 @@ LESING
 
 DELT VISNING
 • To kolonner av samme dokument, hver med egen side, zoom og rotasjon — en tabell eller figur kan stå framme ved siden av teksten som omtaler den
-• Den andre kolonnen kan også vise et annet dokument — høyreklikk en fane og velg «Åpne i delt visning» — så to artikler kan leses og annoteres side om side; kolonnene kan bytte plass
+• Den andre kolonnen kan også vise et annet dokument — dra fanen inn i visningen, eller velg det under «Åpne i delt visning» i visningsmenyen — så to artikler kan leses og annoteres side om side; kolonnene kan bytte plass
 • Merknader lander i dokumentet de settes i — med ett dokument åpent vises de i begge kolonnene, og to vinduer på samme fil holdes også synkronisert
 • Ctrl+klikk på en intern lenke åpner målet i den andre kolonnen
 
@@ -121,7 +121,7 @@ ANNOTERING
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
 • Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes; eksisterende merker kan justeres i stedet for å tegnes på nytt
 • Et valgfritt navn i innstillingene fyller PDF-ens standard forfatterfelt på nye merknader
-• Et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen: vis elementet i Zotero, eller kopier en henvisning eller full referanse
+• Et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen: vis elementet i Zotero, eller kopier en henvisning eller full referanse — både lagrede og lenkede vedlegg
 • Endringer holdes i et utkast til du lagrer; det som lagres er standard PDF-annoteringer, som åpnes riktig i Acrobat og andre lesere
 
 SØK
@@ -136,7 +136,7 @@ AI-ASSISTENT (valgfri — egen nøkkel)
 • Skannede dokumenter identifiseres som det; et sideutvalg kan legges ved som bilder som assistenten leser
 • Assistenten kan åpnes i eget vindu; et sitatklikk går fortsatt til avsnittet i dokumentvinduet
 • LaTeX i svar gjengis; valgfritt nettsøk, av som standard
-• AI-tilgang: «Bekreft hver forespørsel» viser modell og hva som legges ved før noe sendes; «Av» stopper alle AI-forespørsler
+• AI-tilgang: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved; «Av» stopper alle AI-forespørsler
 • Leverandører: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral og Groq — ett nøkkelfelt hver — pluss et hvilket som helst OpenAI-kompatibelt endepunkt og lokale modeller via Ollama eller LM Studio (uten nøkkel). Forespørslene går rett til leverandøren; med en lokal modell forlater dokumentet aldri maskinen. PDF Scholar driver ingen egen server.
 
 Kildekode: https://github.com/emilmsh/pdf-scholar
@@ -144,23 +144,23 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.44.0
+## What's new in this version (≤ 1 500 chars) — v0.44.1
 
 **EN:**
 ```
-• Two documents side by side: the second split column can now hold another file — right-click a tab and choose "Open in split view", or drop a PDF on the column. Each column annotates its own document, and Shift+S swaps their sides
+• Two documents side by side: the second split column can hold another file — drag its tab into the view, pick it under "Open in split view" in the view menu, right-click its tab, or drop a PDF on the column. Each column annotates its own document, and Shift+S swaps their sides
 • Reading modes reworked: Day, Tint, Night and Night+. Tint is a light paper tone — the classic Sepia cream, or gray, green, blue or sand — and Night has its own dark tones; a slider sets the strength, the toolbar follows the chosen tone, and D cycles the modes. Night can keep figures and photos in their original colours
-• An AI access switch in settings: "Confirm every request" shows the model and what is about to be attached before anything is sent; "Off" blocks every AI request. The assistant now says when the whole document text rides along
-• Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item in Zotero, or copy an in-text citation or full reference
+• An AI access switch in settings: "Confirm before sharing" asks the first time a document goes to a provider and shows what is about to be attached — follow-ups pass; "Off" blocks every AI request. The assistant now says when the whole document text rides along
+• Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item in Zotero, or copy an in-text citation or full reference. Linked attachments (a library kept in its own folder) are recognised too
 • Smaller: keyboard zoom follows the active column, and a right-click on the margin strip offers to hide it
 ```
 
 **NO:**
 ```
-• To dokumenter side om side: den andre kolonnen i delt visning kan nå vise en annen fil — høyreklikk en fane og velg «Åpne i delt visning», eller slipp en PDF på kolonnen. Hver kolonne annoterer sitt eget dokument, og Shift+S bytter plass på dem
+• To dokumenter side om side: den andre kolonnen i delt visning kan vise en annen fil — dra fanen inn i visningen, velg den under «Åpne i delt visning» i visningsmenyen, høyreklikk fanen, eller slipp en PDF på kolonnen. Hver kolonne annoterer sitt eget dokument, og Shift+S bytter plass på dem
 • Lesemodusene er gjort om: Dag, Farge, Natt og Natt+. Farge er en lys papirtone — den klassiske sepia-kremen, eller grå, grønn, blå eller sand — og natt har egne mørke toner; en glidebryter setter styrken, verktøylinja følger valgt tone, og D bytter modus. Natt kan beholde figurer og bilder i originalfargene
-• KI-tilgang i innstillingene: «Bekreft hver forespørsel» viser modell og hva som legges ved før noe sendes; «Av» stopper alle AI-forespørsler. Assistenten sier nå fra når hele dokumentteksten legges ved
-• Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet i Zotero, eller kopier en henvisning eller full referanse
+• KI-tilgang i innstillingene: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved — oppfølgingsspørsmål går rett gjennom; «Av» stopper alle AI-forespørsler. Assistenten sier nå fra når hele dokumentteksten legges ved
+• Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet i Zotero, eller kopier en henvisning eller full referanse. Lenkede vedlegg (et bibliotek i egen mappe) gjenkjennes også
 • Mindre: tastaturzoom følger den aktive kolonnen, og høyreklikk på margstripen tilbyr å skjule den
 ```
 
@@ -191,7 +191,7 @@ Existing marks can be adjusted rather than redrawn
 Standard PDF annotations that open correctly in Acrobat and other viewers
 Optional AI assistant that cites the passage each answer came from
 Bring your own AI key, or run a local model via Ollama/LM Studio with no key
-An AI access switch: confirm every request before it is sent, or block AI requests entirely
+An AI access switch: confirm before a document is first shared, or block AI requests entirely
 Native x64 and arm64; the Store keeps the app updated
 Free and open source (MIT) — no account, no tracking, no ads
 ```
@@ -210,7 +210,7 @@ Eksisterende merker kan justeres i stedet for å tegnes på nytt
 Standard PDF-annoteringer som åpnes riktig i Acrobat og andre lesere
 Valgfri AI-assistent som viser hvilket avsnitt hvert svar kom fra
 Bruk din egen AI-nøkkel, eller kjør en lokal modell via Ollama/LM Studio uten nøkkel
-AI-tilgang: bekreft hver forespørsel før den sendes, eller stopp alle AI-forespørsler
+AI-tilgang: bekreft før et dokument deles første gang, eller stopp alle AI-forespørsler
 Både x64 og arm64; Store holder appen oppdatert
 Gratis og åpen kildekode (MIT) — ingen konto, ingen sporing, ingen reklame
 ```

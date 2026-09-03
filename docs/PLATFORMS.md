@@ -277,17 +277,21 @@ regressions are treated as bugs, not as acceptable platform lag.
     `npm run test:assistant` (desktop session) and the URL forms by
     `npm run test:viewer-url` (CI).
 
-18. **Zotero-awareness is path-based, so each platform sees what its file
-    identity exposes.** A document whose path matches Zotero's storage layout
-    (`…/storage/<8-char KEY>/file.pdf` — detection in `shared/zotero.ts`) gets
+18. **Zotero-awareness starts from the file's path, so each platform sees what
+    its file identity exposes.** A document whose path matches Zotero's storage
+    layout (`…/storage/<8-char KEY>/file.pdf`) is Zotero's by construction;
+    any other local path is matched by filename against the library's
+    attachment list from the local API — LINKED attachments, fetched once per
+    session and indexed (both in `shared/zotero.ts`; a linked file therefore
+    shows its Zotero UI only while Zotero runs with the API on). Either gets
     a Zotero section in the save menu (reveal the item via `zotero://select`,
     copy a citation/reference fetched from Zotero's local API on
     `127.0.0.1:23119`) and a «Vis i Zotero» row in the tab context menu.
     Desktop: full support — HTTP runs in MAIN (the local API's CORS behaviour
     is undocumented), and the `zotero://` URL is built in main from a validated
     8-char key per the `shell:open-external` rule. Extension: identical for
-    PDFs opened by navigating to a `file://` URL inside a storage folder — the
-    viewer page fetches `127.0.0.1` itself (CORS-exempt via the manifest's host
+    PDFs opened by navigating to a `file://` URL — storage folder or linked
+    file alike — the viewer page fetches `127.0.0.1` itself (CORS-exempt via the manifest's host
     permissions, the same fact as §14) and hands `zotero://` to the browser's
     own external-protocol prompt (browser-dependent; if a browser refuses
     protocol navigation from extension pages, that one row hides there).

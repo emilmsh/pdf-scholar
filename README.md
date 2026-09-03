@@ -164,8 +164,9 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
 
 A table or figure often sits on one page and the text that discusses it on another. S
 opens a second column of the same document. The second column can also hold another
-document — right-click a tab and choose "Open in split view", or drop a PDF on the
-column — so two papers can be read and annotated side by side. Shift+S trades the
+document: drag its tab into the view, pick it under "Open in split view" in the view
+menu ("Another file…" for one not yet open), right-click its tab, or drop a PDF on the
+column. Two papers can then be read and annotated side by side, and Shift+S trades the
 columns' sides.
 
 - Each column has its own page, zoom and rotation, so a landscape-printed table can sit
@@ -299,10 +300,11 @@ model (Ollama, LM Studio) even your questions stay on the machine.
 
 An AI action sends content from the document — normally the whole text, an excerpt for
 very long documents — and several actions fire on one click. An AI access switch in the
-assistant's settings decides how far that goes: "Confirm every request" stages each
-request and names the model and what is about to be attached before anything is sent;
-"Off" blocks every AI request in the transport layer, so a stored key cannot leak content
-by accident.
+assistant's settings decides how far that goes: "Confirm before sharing" pauses the first
+request that takes a document to a provider in a session — naming the model and what is
+about to be attached — and lets follow-up questions about the same document pass; a new
+document or a new provider asks again. "Off" blocks every AI request in the transport
+layer, so a stored key cannot leak content by accident.
 
 You paste the key once, in the assistant's settings, and it goes into the platform's key
 store: DPAPI on Windows, Keychain on macOS, the system keyring on Linux. The browser
@@ -332,9 +334,11 @@ A document that lives in a Zotero library also gets a Zotero section in the save
 button's menu: show the item in Zotero, or copy an in-text citation or full reference
 (APA). The metadata comes from Zotero's local API on your own machine — enable it once
 in Zotero under Settings → Advanced → "Allow other applications on this computer to
-communicate with Zotero"; without it, "Show in Zotero" still works. This covers stored
-attachments in My Library; linked-file attachments (a linked base directory) carry no
-item key in their path and are not detected.
+communicate with Zotero". Stored attachments are recognised by their path alone, so for
+them "Show in Zotero" works even with the API off. Linked attachments (a library kept in
+its own folder, ZotFile-style) carry no item key in their path; they are matched by
+filename against the library's attachment list through that same local API, so their
+Zotero section appears while Zotero is running with the API enabled.
 
 ## Development
 

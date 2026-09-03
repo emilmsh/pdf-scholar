@@ -48,9 +48,12 @@ does with received content — retention, training, region — is governed by yo
 agreement with that provider, not by the app.
 
 **The AI access switch.** The AI settings hold a three-position switch: **On**
-(AI actions fire when used), **Confirm every request** (every request —
-including the one-click actions — pauses first and names the model and what is
-about to be attached), and **Off** (no request is sent at all: the app refuses
+(AI actions fire when used), **Confirm before sharing** (the first time a
+document is sent to a provider in a session — one-click actions included — the
+request pauses and names the model and what is about to be attached; follow-up
+questions about the same document to the same provider then pass, since nothing
+new leaves the machine, and a new document or a new provider asks again), and
+**Off** (no request is sent at all: the app refuses
 in the transport layer, not just in the interface, so a stored key cannot leak
 content by accident). If your licence to a document does not permit sharing it
 with an AI service, use Confirm or Off — the app cannot know what your
