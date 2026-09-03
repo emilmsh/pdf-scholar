@@ -626,5 +626,125 @@ for (const req of reqs) {
   fs.rmSync(FFILE, { force: true })
 }
 
+
+// 12. OPTIONAL CONTENT GROUPS (layers) must survive a save. PDFium exposes no
+// public OCG API at all — we neither read nor write layers — so the risk is not
+// that we get them wrong, it is that a full-rewrite save silently FLATTENS a
+// document that had them: a layered figure exported from Illustrator or a CAD
+// drawing, annotated once, comes back with every layer fused and the hidden
+// ones now visible. Nothing else in this suite would notice, because the marks
+// we wrote would all be correct. pdf.js honours /OCProperties on display, so
+// what we destroy here the reader WOULD see.
+//
+// The fixture carries the three places layer state lives: the catalog's
+// /OCProperties (which groups exist, plus the /D default config saying which
+// start off), the page's /Resources /Properties + /OC ... BDC marked content
+// (which page content belongs to which group), and an annotation's own /OC
+// (a mark that belongs to a layer).
+{
+  const N = { catalog: 1, pages: 2, page: 3, ocgOn: 4, ocgOff: 5, contents: 6, square: 7 }
+  const content =
+    '/OC /MC0 BDC\n1 0 0 RG 4 w 50 700 200 50 re S\nEMC\n' +
+    '/OC /MC1 BDC\n0 0 1 rg 50 600 100 30 re f\nEMC\n'
+
+  const objs = [
+    `<< /Type /Catalog /Pages ${N.pages} 0 R /OCProperties << ` +
+      `/OCGs [${N.ocgOn} 0 R ${N.ocgOff} 0 R] ` +
+      `/D << /BaseState /ON /ON [${N.ocgOn} 0 R] /OFF [${N.ocgOff} 0 R] ` +
+      `/Order [${N.ocgOn} 0 R ${N.ocgOff} 0 R] >> >> >>`,
+    `<< /Type /Pages /Kids [${N.page} 0 R] /Count 1 >>`,
+    `<< /Type /Page /Parent ${N.pages} 0 R /MediaBox [0 0 612 792] ` +
+      `/Contents ${N.contents} 0 R /Annots [${N.square} 0 R] ` +
+      `/Resources << /Properties << /MC0 ${N.ocgOn} 0 R /MC1 ${N.ocgOff} 0 R >> >> >>`,
+    `<< /Type /OCG /Name (Kartlag) >>`,
+    `<< /Type /OCG /Name (Tekstlag) >>`,
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    // A mark that belongs to the layer which starts OFF: hiding «Tekstlag»
+    // must keep hiding this square too.
+    `<< /Type /Annot /Subtype /Square /Rect [300 700 400 760] /C [1 0 0] ` +
+      `/OC ${N.ocgOff} 0 R /F 4 >>`
+  ]
+  let out = '%PDF-1.7\n'
+  const offsets = []
+  for (let i = 0; i < objs.length; i++) {
+    offsets.push(out.length)
+    out += `${i + 1} 0 obj\n${objs[i]}\nendobj\n`
+  }
+  const xref = out.length
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`
+  for (const off of offsets) out += `${String(off).padStart(10, '0')} 00000 n \n`
+  out += `trailer\n<< /Size ${objs.length + 1} /Root ${N.catalog} 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+
+  const OCFILE = path.join(os.tmpdir(), 'pdfx-ocg-test.pdf')
+  fs.writeFileSync(OCFILE, Buffer.from(out, 'latin1'))
+
+  // A normal annotation session: create, then edit. The edit is the one that
+  // matters — updateAnnotation runs getPageAnnotations, the call that already
+  // leaked once (see linkguard above) — and both go out through the
+  // full-rewrite save.
+  const obase = { path: OCFILE, pageIndex: 0, opacity: 0.5, color: [1, 0.84, 0.29], author: 'test' }
+  const r1 = await applyAnnotation({ ...obase, type: 'highlight', quads: q(60, 400, 200, 16) })
+  check('ocg: create highlight on a layered page', 'ok' in r1, 'error' in r1 ? r1.error : '')
+  const r2 = await updateAnnotation({ path: OCFILE, pageIndex: 0, id: r1.id, color: [0.44, 0.71, 1] })
+  check('ocg: update highlight on a layered page', 'ok' in r2, 'error' in r2 ? r2.error : '')
+  await flushAnnotations(OCFILE)
+
+  const pdf = mupdf.Document.openDocument(fs.readFileSync(OCFILE), 'application/pdf').asPDF()
+  const name = (o) => (o && !o.isNull() && !o.get('Name').isNull() ? o.get('Name').asString() : '')
+  const ocp = pdf.getTrailer().get('Root').get('OCProperties')
+  check('ocg: /OCProperties survives the save', !ocp.isNull())
+
+  const ocgs = ocp.isNull() ? null : ocp.get('OCGs')
+  const ocgNames = []
+  if (ocgs && !ocgs.isNull()) for (let i = 0; i < ocgs.length; i++) ocgNames.push(name(ocgs.get(i)))
+  check('ocg: both groups still listed, names intact',
+    ocgNames.length === 2 && ocgNames[0] === 'Kartlag' && ocgNames[1] === 'Tekstlag',
+    JSON.stringify(ocgNames))
+
+  // The default configuration is what decides what the reader SEES. Losing /D
+  // (or just its /OFF list) turns every hidden layer visible.
+  const d = ocp.isNull() ? null : ocp.get('D')
+  const off = d && !d.isNull() ? d.get('OFF') : null
+  check('ocg: the /D default config survives', !!d && !d.isNull())
+  check('ocg: the layer that started hidden is still in /OFF',
+    !!off && !off.isNull() && off.length === 1 && name(off.get(0)) === 'Tekstlag',
+    off && !off.isNull() ? `${off.length} entries, first: ${name(off.get(0)) || 'unnamed'}` : 'missing')
+  const order = d && !d.isNull() ? d.get('Order') : null
+  check('ocg: the /Order tree (what a layer panel would list) survives',
+    !!order && !order.isNull() && order.length === 2,
+    order && !order.isNull() ? `${order.length} entries` : 'missing')
+
+  // Page side: the marked-content operators plus the /Properties map that binds
+  // /MC0 to a group. Either one missing and the content becomes unconditional.
+  const page = pdf.findPage(0)
+  const props = page.get('Resources').get('Properties')
+  check('ocg: /Resources /Properties still maps MC0 + MC1 to the groups',
+    !props.isNull() && name(props.get('MC0')) === 'Kartlag' && name(props.get('MC1')) === 'Tekstlag',
+    props.isNull() ? 'missing' : `${name(props.get('MC0')) || '?'} / ${name(props.get('MC1')) || '?'}`)
+  const cs = page.get('Contents')
+  const csText = !cs.isNull() ? cs.readStream().asString() : ''
+  check('ocg: the /OC ... BDC marked content is still in the page stream',
+    csText.includes('/OC /MC0 BDC') && csText.includes('/OC /MC1 BDC') && csText.includes('EMC'),
+    csText.includes('BDC') ? 'BDC present' : 'no BDC')
+
+  // And the mark that belonged to a layer: an annotation whose /OC is dropped
+  // becomes permanently visible, which is the version of this bug a reader
+  // would actually notice.
+  const annots = page.get('Annots')
+  let layered = null
+  let ours = false
+  for (let i = 0; i < annots.length; i++) {
+    const a = annots.get(i)
+    const st = a.get('Subtype').asName()
+    if (st === 'Square') layered = a
+    else if (st === 'Highlight') ours = true
+  }
+  check('ocg: our own highlight really landed', ours)
+  check('ocg: the layered annotation kept its /OC',
+    !!layered && name(layered.get('OC')) === 'Tekstlag',
+    layered ? `OC -> ${name(layered.get('OC')) || 'gone'}` : 'square missing')
+  pdf.destroy()
+  fs.rmSync(OCFILE, { force: true })
+}
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)
