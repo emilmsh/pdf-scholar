@@ -1119,12 +1119,26 @@ const ui = {
     if (wrap && !wrap.classList.contains('tucked'))
       throw new Error('the toolbar is still on screen — it peeked, or the unpin did not take');
   },
+  /** Sepia stopped being a button on 2026-09-02: it is the default paper tone
+   *  under «Farge»/Tint (theme id 'custom'). Asking for 'sepia' therefore picks
+   *  Tint and then asserts that the Sepia tone chip is the selected one — the
+   *  throwaway profile starts at the default (sepia), but this frame is the
+   *  tricolor's middle third and must not silently turn gray or blue. */
   async setTheme(id) {
+    const tone = id === 'sepia' ? 'Sepia' : null;
+    if (tone) id = 'custom';
     await this.toggle(L.theme);
     const opt = document.querySelector('.theme-menu .theme-option.theme-' + id);
     if (!opt) throw new Error('no theme option: ' + id);
     click(opt);
     await settle(500);
+    if (tone) {
+      const chip = [...document.querySelectorAll('.theme-menu .tone-chip')]
+        .find((c) => (c.textContent || '').trim() === tone);
+      if (!chip) throw new Error('no ' + tone + ' tone chip under Tint');
+      if (!chip.classList.contains('selected')) { click(chip); await settle(400); }
+      if (!chip.classList.contains('selected')) throw new Error('the ' + tone + ' tone did not take');
+    }
     document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
     await settle(400);
   },
