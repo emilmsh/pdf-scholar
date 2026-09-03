@@ -41,8 +41,8 @@ interface Props {
   /** Re-read the file from disk and remount the viewer (external updates) */
   onReload(id: string, path: string): void
   /** Show this tab's file in the ACTIVE tab's second split column — the two-
-   *  document split's main entry point. Only offered while some other tab is
-   *  active (a document to sit beside) — the tab itself stays open. */
+   *  document split's main entry point; the tab itself stays open. On the
+   *  active tab itself it means that document in both columns. */
   onOpenInSplit(path: string): void
 }
 
@@ -269,10 +269,12 @@ export default function TabBar({
           >
             {t('tabs.openInNewWindow')}
           </button>
-          {/* Two-document split: this file beside the ACTIVE tab's document.
-              Needs another tab to sit beside — tabs are unique per path, so a
-              non-active right-clicked tab is always a different file. */}
-          {activeId !== null && menu.tab.id !== activeId && (
+          {/* Two-document split: this file beside the ACTIVE tab's document
+              (tabs are unique per path, so another tab is always another
+              file). On the active tab itself: the document in both columns —
+              the same-file split's home now that 's' reopens whatever the
+              split held last. */}
+          {activeId !== null && (
             <button
               className="menu-item"
               onClick={() => {

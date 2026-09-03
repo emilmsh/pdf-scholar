@@ -1834,14 +1834,15 @@ html.pen-near .draw-layer {
   color: var(--text-secondary);
 }
 
-/* The spread's cover sub-option: indented under its parent toggle, greyed out
-   (but still visible) while two-page view is off */
+/* The spread's cover sub-option: indented under its parent toggle. Greyed out
+   (but still visible) while two-page view is off — and the spread toggle itself
+   while the view is split, where the pairs are suspended */
 .view-row-sub {
   margin-top: 6px;
   margin-left: 18px;
 }
 
-.view-row-sub.is-disabled {
+.view-row-toggle.is-disabled {
   opacity: 0.45;
   cursor: default;
 }
@@ -1907,6 +1908,14 @@ html.pen-near .draw-layer {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
   outline: 2px dashed var(--accent);
   outline-offset: -8px;
+}
+
+/* One column open: the hint covers the half the new document will take */
+.pane-drop-hint.is-left {
+  right: 50%;
+}
+.pane-drop-hint.is-right {
+  left: 50%;
 }
 
 .pane-drop-hint > span {

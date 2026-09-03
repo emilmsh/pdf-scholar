@@ -1623,8 +1623,19 @@ export default function Toolbar({
                   </button>
                 </span>
               </div>
-              <label className="theme-menu-toggle view-row-toggle">
-                <input type="checkbox" checked={spread} onChange={onToggleSpread} />
+              {/* Suspended while split — a pair in a half-width column is two
+                  thumbnails. Greyed, not hidden, the reason on hover: the choice
+                  itself survives and returns when the column stands alone. */}
+              <label
+                className={`theme-menu-toggle view-row-toggle${splitOpen ? ' is-disabled' : ''}`}
+                title={splitOpen ? t('tb.spreadSplitTip') : undefined}
+              >
+                <input
+                  type="checkbox"
+                  checked={spread}
+                  disabled={splitOpen}
+                  onChange={onToggleSpread}
+                />
                 <IconSpread size={15} />
                 {t('tb.spread')}
               </label>

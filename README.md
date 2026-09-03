@@ -177,8 +177,15 @@ columns' sides.
 - Ctrl+click on an internal link opens its target in the other column, keeping the
   current page. Search, the outline, the notes list and the assistant's citations move
   only the active column, and back/forward history is per column
-- The divider can be dragged to rebalance; a closed column's page, zoom and width are
-  restored when the split is reopened
+- A dropped tab or file lands where you drop it: on the column it hits, or, with one
+  column open, on the half the pointer is over. Putting the document already in a column
+  into the other one (its tab dropped there, or "Open in split view" on its own tab or
+  under its name in the view menu) fills both columns with it
+- The divider can be dragged to rebalance. S reopens whatever the split held last, the
+  other document included, on the side and at the width it had; a closed same-file
+  column comes back at its page, zoom and width
+- The two-page spread pauses while the view is split and returns when the document is
+  shown alone
 - Two windows on the same file are also possible: they share one draft and stay in sync
   as you annotate
 

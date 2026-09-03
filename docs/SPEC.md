@@ -13,7 +13,7 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 ## 2. Reading & View Settings ("aA" popover)
 - **Themes: Day (default), Sepia, Night, Night+ (higher contrast), Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement). *(Shipped 2026-09-02, reworked the same day on owner feedback: Sepia folded into «Farge» — one light-tone mode with curated paper tones (sepia cream, gray, green, blue, sand) — and Night got its own dark tones (warm, gray, blue, green) via a screen blend. The tinted modes take a strength slider named for its axis («Fargestyrke» / «Lysstyrke»; 100 % = the shipped look, Day has nothing to dial and Night+ is already maximum), the chrome follows the chosen tone, a night-mode toggle keeps images in their original colours, and 'd' cycles the modes from the keyboard. The stored 'sepia' theme id remains valid — legacy settings and the auto-mode light choice still resolve to it.)*
 - **Brightness slider** (in-app overlay).
-- **Scroll**: vertical + continuous (desktop default) or horizontal + single-page (page-flip). Two-page spread with "first page alone" toggle.
+- **Scroll**: vertical + continuous (desktop default) or horizontal + single-page (page-flip). Two-page spread with "first page alone" toggle — suspended while the view is split (each column is half the width), back when the document is shown alone.
 - **Zoom**: ctrl+wheel / trackpad pinch; fit-width and fit-page snap modes.
 - **Crop-margins mode** (hide headers/footers/margins).
 - **Keep awake** toggle (powerSaveBlocker).

@@ -34,6 +34,9 @@ interface OpenTab {
    *  as its own tab: main keeps one draft per path, the local doc bus keeps
    *  the two views converged, and docRegistry keeps the bookkeeping honest. */
   splitDoc: { payload: FilePayload; initialPosition: ReadingPosition | null } | null
+  /** Bumped when «Åpne i delt visning» names this tab's OWN document — the
+   *  same-file split, which only the tab's viewer can open */
+  sameSplitNonce: number
 }
 
 
@@ -414,7 +417,8 @@ export default function App(): React.JSX.Element {
         payload,
         initialPosition,
         epoch: 0,
-        splitDoc: null
+        splitDoc: null,
+        sameSplitNonce: 0
       }
       docRegistry.acquire(payload.path)
       setTabs((prev) => [...prev, tab])
@@ -451,12 +455,12 @@ export default function App(): React.JSX.Element {
     [confirmExternalUpdateVerdict, setTabDirty, goToTab]
   )
 
-  /** Close the split column's document (a different file in pane B): the same
-   *  unsaved-changes guard a tab close runs, but only when this pane is the
-   *  LAST viewer of the path in this window — a tab still showing the same
-   *  file keeps the draft alive, so there is nothing to ask about yet.
-   *  Resolves to whether the pane actually closed. */
-  const closeSplitDoc = useCallback(
+  /** May the split column's document go? The same unsaved-changes guard a tab
+   *  close runs, but only when this pane is the LAST viewer of the path in
+   *  this window — a tab still showing the same file keeps the draft alive, so
+   *  there is nothing to ask about yet. Asking is separated from the teardown
+   *  so a REPLACEMENT can ask first and swap the documents in one commit. */
+  const guardSplitDoc = useCallback(
     async (tabId: string): Promise<boolean> => {
       const tab = tabsRef.current.find((t) => t.id === tabId)
       const split = tab?.splitDoc
@@ -469,12 +473,25 @@ export default function App(): React.JSX.Element {
           return false
         }
       }
-      docRegistry.release(path)
+      return true
+    },
+    [confirmCloseVerdict, reportCloseFailure]
+  )
+
+  /** Close the split column's document and let the column go with it.
+   *  Resolves to whether the pane actually closed. */
+  const closeSplitDoc = useCallback(
+    async (tabId: string): Promise<boolean> => {
+      const tab = tabsRef.current.find((t) => t.id === tabId)
+      const split = tab?.splitDoc
+      if (!tab || !split) return true
+      if (!(await guardSplitDoc(tabId))) return false
+      docRegistry.release(split.payload.path)
       setSplitTabDirty(tabId, false)
       setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, splitDoc: null } : t)))
       return true
     },
-    [confirmCloseVerdict, reportCloseFailure, setSplitTabDirty]
+    [guardSplitDoc, setSplitTabDirty]
   )
 
   /** «Åpne i delt visning»: show `path` in the second column of `hostTabId`.
@@ -483,35 +500,52 @@ export default function App(): React.JSX.Element {
    *  same model as two windows on one file, one draft in main, views converge
    *  over the doc buses. */
   const openInSplit = useCallback(
-    async (hostTabId: string, path: string, picked?: FilePayload) => {
+    async (hostTabId: string, path: string, picked?: FilePayload): Promise<boolean> => {
       const host = tabsRef.current.find((t) => t.id === hostTabId)
-      if (!host) return
-      // Same file as the host document: that is the plain same-file split —
-      // the viewer opens it itself (the entry points already route there)
-      if (host.payload.path === path) return
+      if (!host) return false
+      // Same file as the host document: the plain same-file split, which only
+      // the viewer can open — asked for through the tab's nonce
+      if (host.payload.path === path) {
+        setTabs((prev) =>
+          prev.map((t) => (t.id === hostTabId ? { ...t, sameSplitNonce: t.sameSplitNonce + 1 } : t))
+        )
+        goToTab(hostTabId)
+        return true
+      }
       if (host.splitDoc) {
         if (host.splitDoc.payload.path === path) {
           goToTab(hostTabId)
-          return
+          return true
         }
-        // Replacing a foreign split runs its close guard first
-        if (!(await closeSplitDoc(hostTabId))) return
+        // Replacing a foreign split ASKS first, but does not tear the column
+        // down: the outgoing document leaves in the same commit the new one
+        // arrives in (below), so the column never blinks out to full width and
+        // straight back.
+        if (!(await guardSplitDoc(hostTabId))) return false
       }
       const result = picked ?? (await bridge.readFile(path))
       if ('error' in result) {
         setError(t('app.openFailed', { error: errorText(result) }))
-        return
+        return false
       }
       const initialPosition = await bridge.getPosition(path)
+      // Re-read the tab: the guard and the read are awaits, and the split may
+      // have been closed under us in the meantime
+      const outgoing = tabsRef.current.find((t) => t.id === hostTabId)?.splitDoc
       docRegistry.acquire(path)
+      if (outgoing) {
+        docRegistry.release(outgoing.payload.path)
+        setSplitTabDirty(hostTabId, false)
+      }
       setTabs((prev) =>
         prev.map((t) =>
           t.id === hostTabId ? { ...t, splitDoc: { payload: result, initialPosition } } : t
         )
       )
       goToTab(hostTabId)
+      return true
     },
-    [closeSplitDoc, goToTab]
+    [guardSplitDoc, setSplitTabDirty, goToTab]
   )
 
   /** «Annen fil …» under «Åpne i delt visning» in the view menu: pick a PDF and
@@ -995,14 +1029,15 @@ export default function App(): React.JSX.Element {
                 onLeaveDocument={() => setAtLibrary(true)}
                 splitDoc={tab.splitDoc}
                 onSplitDirtyChange={(dirty) => setSplitTabDirty(tab.id, dirty)}
-                onRequestCloseSplitDoc={() => void closeSplitDoc(tab.id)}
+                onRequestCloseSplitDoc={() => closeSplitDoc(tab.id)}
                 onRequestPromoteSplitDoc={() => void promoteSplitDoc(tab.id)}
-                onRequestOpenInSplit={(path) => void openInSplit(tab.id, path)}
+                onRequestOpenInSplit={(path) => openInSplit(tab.id, path)}
+                sameSplitNonce={tab.sameSplitNonce}
+                // This tab's own document included: picking it puts the
+                // document in both columns (the same-file split)
                 splitCandidates={
                   isElectron
-                    ? tabs
-                        .filter((o) => o.id !== tab.id)
-                        .map((o) => ({ name: o.payload.name, path: o.payload.path }))
+                    ? tabs.map((o) => ({ name: o.payload.name, path: o.payload.path }))
                     : undefined
                 }
                 onRequestOpenOtherInSplit={isElectron ? () => void openOtherInSplit(tab.id) : undefined}

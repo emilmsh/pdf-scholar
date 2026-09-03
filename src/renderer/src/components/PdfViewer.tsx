@@ -198,6 +198,9 @@ const ERASER_DRAWN_TYPES = new Set<AnnotationType>(['ink', 'square', 'circle', '
  *  every annotation action — the id only says WHERE to draw pane-local chrome
  *  (the text-box editor, the drag ghost) and which zoom the toolbar edits. */
 export type PaneId = 'a' | 'b'
+/** A column's VISUAL side — the columns can trade sides («Bytt plass»), so a
+ *  side is not a pane */
+export type PaneSide = 'left' | 'right'
 
 /** The pane a DOM node sits in (each `.pages` column carries data-pane) */
 function paneOfEl(el: Element | null | undefined): PaneId {
@@ -388,15 +391,21 @@ interface Props {
   /** Unsaved-changes state of the split column's document */
   onSplitDirtyChange?(dirty: boolean): void
   /** Close the split document (App runs its unsaved guard, then clears
-   *  splitDoc — the viewer closes the column when the prop goes null) */
-  onRequestCloseSplitDoc?(): void
+   *  splitDoc — the viewer closes the column when the prop goes null).
+   *  Resolves to whether it actually closed, when the host can tell. */
+  onRequestCloseSplitDoc?(): Promise<boolean> | void
   /** Pane A was closed while pane B shows another file — that file takes over
    *  the tab (App swaps the payload and remounts) */
   onRequestPromoteSplitDoc?(): void
   /** A file was dropped on the second column, or a tab on either column — show
-   *  that document in the split */
-  onRequestOpenInSplit?(path: string): void
-  /** Desktop: the other open documents, listed under «Åpne i delt visning» in
+   *  that document in the split. Resolves to whether it actually opened, when
+   *  the host can tell (a cancelled unsaved-changes guard says false). */
+  onRequestOpenInSplit?(path: string): Promise<boolean> | void
+  /** Bumped by App when «Åpne i delt visning» names THIS tab's own document
+   *  (its tab's menu, or its name in the view menu): the same-file split, which
+   *  only this viewer can open */
+  sameSplitNonce?: number
+  /** Desktop: the open documents, listed under «Åpne i delt visning» in
    *  the view menu */
   splitCandidates?: { name: string; path: string }[] | undefined
   /** «Annen fil …» in that menu — App shows the picker and opens the pick in the split */
@@ -472,6 +481,7 @@ export default function PdfViewer({
   onRequestCloseSplitDoc,
   onRequestPromoteSplitDoc,
   onRequestOpenInSplit,
+  sameSplitNonce,
   splitCandidates,
   onRequestOpenOtherInSplit
 }: Props): React.JSX.Element {
@@ -486,9 +496,14 @@ export default function PdfViewer({
   const [rotation, setRotation] = useState<ViewRotation>(initialPosition?.rotation ?? 0)
   const rotationRef = useRef(rotation)
   rotationRef.current = rotation
-  const [spread, setSpread] = useState(initialPosition?.spread ?? false)
-  const spreadRef = useRef(spread)
-  spreadRef.current = spread
+  /** The reader's two-page CHOICE — what the toolbar toggles and what the
+   *  reading position persists. Whether pages actually pair up is `spread`
+   *  below: suspended while the view is split (Emil, 2026-09-03 — a pair in a
+   *  half-width column is two thumbnails), back the moment the column stands
+   *  alone again. Opening a split never unlearns the choice. */
+  const [spreadPref, setSpreadPref] = useState(initialPosition?.spread ?? false)
+  const spreadPrefRef = useRef(spreadPref)
+  spreadPrefRef.current = spreadPref
   /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … so facing pages align
    *  as printed. Persisted with the position like spread itself. */
   const [coverPage, setCoverPage] = useState(initialPosition?.coverPage ?? false)
@@ -635,11 +650,18 @@ export default function PdfViewer({
   const [splitOpen, setSplitOpen] = useState(false)
   const splitOpenRef = useRef(splitOpen)
   splitOpenRef.current = splitOpen
+  const holdPlaceAcrossSplitRef = useRef<() => void>(() => {})
+  /** Effective two-page layout: the choice, suspended while split (see spreadPref) */
+  const spread = spreadPref && !splitOpen
+  const spreadRef = useRef(spread)
+  spreadRef.current = spread
   /** «Bytt plass»: which side each column sits on — a pure VISUAL order flip
    *  (CSS order), never a move of documents or view state. One mechanism for
    *  both split modes; pane A keeps owning the persisted reading position
    *  wherever it sits. Resets when the split closes. */
   const [paneOrder, setPaneOrder] = useState<'ab' | 'ba'>('ab')
+  const paneOrderRef = useRef(paneOrder)
+  paneOrderRef.current = paneOrder
   useEffect(() => {
     if (!splitOpen) setPaneOrder('ab')
   }, [splitOpen])
@@ -737,12 +759,17 @@ export default function PdfViewer({
    *  prose that discusses it in the other. Spread is per column for the same
    *  reason — if the option exists at all it has to mean "this column". */
   const [paneBRotation, setPaneBRotation] = useState<ViewRotation>(0)
-  const [paneBSpread, setPaneBSpread] = useState(false)
+  const [paneBSpreadPref, setPaneBSpreadPref] = useState(false)
   const [paneBCover, setPaneBCover] = useState(false)
   const paneBRotationRef = useRef(paneBRotation)
   paneBRotationRef.current = paneBRotation
-  const paneBSpreadRef = useRef(paneBSpread)
-  paneBSpreadRef.current = paneBSpread
+  // Kept for the same reason as spreadPref: it is what the other file's
+  // reading position and the same-file memory carry, and what a column
+  // promoted to the left inherits. The column itself exists only while split,
+  // so its pages never actually pair up.
+  const paneBSpread = paneBSpreadPref && !splitOpen
+  const paneBSpreadPrefRef = useRef(paneBSpreadPref)
+  paneBSpreadPrefRef.current = paneBSpreadPref
   const paneBCoverRef = useRef(paneBCover)
   paneBCoverRef.current = paneBCover
   const paneBFitRef = useRef(paneBFit)
@@ -803,6 +830,39 @@ export default function PdfViewer({
   onRequestCloseSplitDocRef.current = onRequestCloseSplitDoc
   const onRequestPromoteSplitDocRef = useRef(onRequestPromoteSplitDoc)
   onRequestPromoteSplitDocRef.current = onRequestPromoteSplitDoc
+  const onRequestOpenInSplitRef = useRef(onRequestOpenInSplit)
+  onRequestOpenInSplitRef.current = onRequestOpenInSplit
+  /** What the split held when it last closed (session-scoped): the plain
+   *  same-file split, or another document by path with the side it sat on and
+   *  the divider's share. 's' reopens exactly this (Emil, 2026-09-03: the key
+   *  should give back the last split, not fall back to the same-file one). */
+  const lastSplitRef = useRef<
+    { kind: 'same' } | { kind: 'foreign'; path: string; side: PaneSide; share: number }
+  >({ kind: 'same' })
+  /** Where the NEXT document arriving in the column should sit — the half a
+   *  drop landed on, or the remembered side on an 's' reopen. Consumed by the
+   *  splitDoc effect below. */
+  const pendingSideRef = useRef<{ side: PaneSide; share?: number | undefined } | null>(null)
+  /** Ask the host for a document in the column, placed on `side`. A request
+   *  that never lands (a cancelled unsaved-changes guard, an unreadable file)
+   *  must not leave the placement armed for the next one. */
+  const requestSplitDoc = useCallback((path: string, side: PaneSide, share?: number) => {
+    pendingSideRef.current = { side, share }
+    const opening = onRequestOpenInSplitRef.current?.(path)
+    if (opening)
+      void opening.then((opened) => {
+        if (!opened) pendingSideRef.current = null
+      })
+  }, [])
+  /** A same-file split asked for while another document holds the column: the
+   *  column is converted in place once App has closed that document. */
+  const pendingSameFileRef = useRef(false)
+  /** Which visual side a column sits on right now */
+  const sideOf = useCallback(
+    (pane: PaneId): PaneSide =>
+      (pane === 'b') === (paneOrderRef.current === 'ab') ? 'right' : 'left',
+    []
+  )
 
   // Mirror the split document's dirty flag up to App (same shape as the
   // primary's onDirtyChange effect, same reason: never from a state updater)
@@ -824,7 +884,7 @@ export default function PdfViewer({
       scale: paneBScaleRef.current,
       fit: paneBFitRef.current,
       rotation: paneBRotationRef.current,
-      spread: paneBSpreadRef.current,
+      spread: paneBSpreadPrefRef.current,
       cover: paneBCoverRef.current,
       share: panelWRef.current.pane
     }
@@ -839,21 +899,11 @@ export default function PdfViewer({
   // React may call an updater more than once and does not support nested state
   // updates from inside one. Doing that dropped the symmetric-width update, so
   // the split opened lopsided (398/1199 instead of 799/799).
-  const toggleSplit = useCallback(() => {
-    // With another file in the column, the split button/'s' means "close that
-    // document" — App runs its unsaved guard and clears splitDoc; the effect
-    // below closes the column when the prop goes null. The button stays an
-    // instant same-file split whenever no foreign document is present.
-    if (foreignRef.current) {
-      onRequestCloseSplitDocRef.current?.()
-      return
-    }
-    if (splitOpenRef.current) {
-      rememberPaneB()
-      setSplitOpen(false)
-      setActivePane('a')
-      return
-    }
+  /** The plain same-file split: the second column opens where it was left, or
+   *  — the first time — on the page you are reading at a fresh fit. Also
+   *  CONVERTS a column that held another document (requestSameFileSplit): the
+   *  column is already open then and only re-seeds. */
+  const openSameFileSplit = useCallback(() => {
     const memory = paneBMemoryRef.current
     const page = memory?.page ?? currentPage
     // Reopening: back to the share the divider had. First time: an even split of
@@ -871,33 +921,119 @@ export default function PdfViewer({
     // Mirror the orientation you were already reading in, so the two columns
     // are indistinguishable at the moment a FRESH split opens
     setPaneBRotation(memory?.rotation ?? rotationRef.current)
-    setPaneBSpread(memory?.spread ?? spreadRef.current)
+    setPaneBSpreadPref(memory?.spread ?? spreadPrefRef.current)
     setPaneBCover(memory?.cover ?? coverPageRef.current)
     setFitMode('width')
-    setSplitOpen(true)
+    lastSplitRef.current = { kind: 'same' }
+    if (!splitOpenRef.current) {
+      holdPlaceAcrossSplitRef.current()
+      setSplitOpen(true)
+    }
     // Land the column once it can be scrolled — on the remembered spot within
     // the page, not just its top, so a figure comes back framed as you left it
     whenPaneReadyRef.current('b', () =>
       handleForRef.current('b')?.scrollToPage(page, memory?.offset ?? 0)
     )
-  }, [currentPage, rememberPaneB])
+  }, [currentPage])
+  const openSameFileSplitRef = useRef(openSameFileSplit)
+  openSameFileSplitRef.current = openSameFileSplit
+
+  /** This document in BOTH columns — asked for by putting the document that
+   *  already fills a column into the other one: its tab dropped there, «Åpne i
+   *  delt visning» on its own tab, or its name in the view menu. With another
+   *  document in the column, App closes that one first (its unsaved guard) and
+   *  the splitDoc effect converts the column when it sees it go. */
+  const requestSameFileSplit = useCallback(() => {
+    if (foreignRef.current) {
+      pendingSameFileRef.current = true
+      const closing = onRequestCloseSplitDocRef.current?.()
+      // A cancelled guard keeps the other document — and must not leave the
+      // conversion armed for whenever that document closes later
+      if (closing)
+        void closing.then((closed) => {
+          if (!closed) pendingSameFileRef.current = false
+        })
+      return
+    }
+    if (!splitOpenRef.current) openSameFileSplit()
+  }, [openSameFileSplit])
+  // App routes «Åpne i delt visning» for this tab's own document here by
+  // bumping the nonce — only this viewer can open its same-file split
+  const sameSplitSeenRef = useRef(sameSplitNonce ?? 0)
+  useEffect(() => {
+    if (!sameSplitNonce || sameSplitNonce === sameSplitSeenRef.current) return
+    sameSplitSeenRef.current = sameSplitNonce
+    requestSameFileSplit()
+  }, [sameSplitNonce, requestSameFileSplit])
+
+  const toggleSplit = useCallback(() => {
+    // With another file in the column, the split button/'s' means "close that
+    // document" — App runs its unsaved guard and clears splitDoc; the effect
+    // below closes the column when the prop goes null.
+    if (foreignRef.current) {
+      onRequestCloseSplitDocRef.current?.()
+      return
+    }
+    if (splitOpenRef.current) {
+      rememberPaneB()
+      holdPlaceAcrossSplitRef.current()
+      setSplitOpen(false)
+      setActivePane('a')
+      return
+    }
+    // Reopen what the split held LAST: the other document, on the side and at
+    // the share it had — or the same-file column where it was left
+    const last = lastSplitRef.current
+    if (last.kind === 'foreign' && onRequestOpenInSplitRef.current) {
+      requestSplitDoc(last.path, last.side, last.share)
+      return
+    }
+    openSameFileSplit()
+  }, [rememberPaneB, openSameFileSplit, requestSplitDoc])
   toggleSplitRef.current = toggleSplit
 
-  /** A tab dragged into either column: its document opens beside this one.
-   *  The host's own tab dropped in means the plain same-file split. */
-  const dropTabIntoSplit = useCallback(
-    (path: string) => {
+  /** A document dropped on a column — a tab from the strip or a PDF from the
+   *  OS — lands WHERE it was dropped (Emil, 2026-09-03: not always on the
+   *  right): the column it hit, or with one column the half of it. Pane A is
+   *  the architecturally permanent column, so a drop on ITS side puts the new
+   *  document in the second column and trades the sides — this document stays,
+   *  the one that held the second column leaves. The document already in a
+   *  column dropped into the OTHER column gives the same-file split (this
+   *  document's) or trades the sides (the other file's); dropped into its own
+   *  column it does nothing. */
+  const dropDocIntoSplit = useCallback(
+    (path: string, pane: PaneId, half: PaneSide | null) => {
       if (path === payload.path) {
-        if (!splitOpenRef.current) toggleSplit()
+        if (!(splitOpenRef.current && pane === 'a')) requestSameFileSplit()
         return
       }
-      onRequestOpenInSplit?.(path)
+      const other = foreignRef.current
+      if (other && path === other.payload.path) {
+        if (pane === 'a') swapPanes()
+        return
+      }
+      requestSplitDoc(path, splitOpenRef.current ? sideOf(pane) : (half ?? 'right'))
     },
-    [payload.path, toggleSplit, onRequestOpenInSplit]
+    [payload.path, requestSameFileSplit, sideOf, swapPanes, requestSplitDoc]
   )
-  // Pane A takes tabs only: a FILE dropped there still opens a tab (App's
-  // handler), the behaviour it always had
-  const paneADrop = useDropTarget(onRequestOpenInSplit ? dropTabIntoSplit : undefined, undefined)
+  /** A PDF from the OS. Desktop only: the split's other document is addressed
+   *  by path (main resolves drafts behind it). A browser drop has no real path
+   *  — false lets it bubble to App's open-a-tab handler. */
+  const dropFileIntoSplit = useCallback(
+    (file: File, pane: PaneId, half: PaneSide | null): boolean => {
+      const realPath = bridge.getPathForFile(file)
+      if (!realPath) return false
+      dropDocIntoSplit(realPath, pane, half)
+      return true
+    },
+    [dropDocIntoSplit]
+  )
+  const paneADrop = useDropTarget(
+    onRequestOpenInSplit ? (path, half) => dropDocIntoSplit(path, 'a', half) : undefined,
+    onRequestOpenInSplit ? (file, half) => dropFileIntoSplit(file, 'a', half) : undefined,
+    // With one column its two halves are the two sides the new document can take
+    { halves: !splitOpen }
+  )
 
   /**
    * Close ONE named column and keep the other's content — "lukk det panelet man
@@ -921,6 +1057,7 @@ export default function PdfViewer({
     if (pane === 'b') {
       // Same gesture as toggling the split off, so it remembers the same way
       rememberPaneB()
+      holdPlaceAcrossSplitRef.current()
       setSplitOpen(false)
       setActivePane('a')
       return
@@ -930,7 +1067,7 @@ export default function PdfViewer({
     // would reopen a duplicate of what you are already looking at.
     paneBMemoryRef.current = null
     setRotation(paneBRotationRef.current)
-    setSpread(paneBSpreadRef.current)
+    setSpreadPref(paneBSpreadPrefRef.current)
     setCoverPage(paneBCoverRef.current)
     // A fit mode is better recomputed for the full width than copied; an exact
     // hand-set zoom is the reader's number and is carried over verbatim.
@@ -950,23 +1087,50 @@ export default function PdfViewer({
   // from the OTHER file's persisted reading position at a fresh fit — and the
   // same-file memory (paneBMemoryRef) is deliberately not touched, so S after
   // a foreign split still reopens the figure you had parked there before it.
-  const wasForeignRef = useRef(false)
+  const foreignPathRef = useRef<string | null>(null)
   const purgeUndoDocRef = useRef<(doc: DocId) => void>(() => {})
   useEffect(() => {
+    const prevPath = foreignPathRef.current
+    const nextPath = foreign?.payload.path ?? null
+    foreignPathRef.current = nextPath
+    // Whatever the column held is gone — replaced or closed. Undo entries
+    // addressed to it would write into a closed session, and split-tagged
+    // chrome would point at pages that no longer mean the same thing.
+    if (prevPath && prevPath !== nextPath) {
+      purgeUndoDocRef.current('split')
+      setSelected((sel) => (sel?.doc === 'split' ? null : sel))
+      setAnnotPopover((pop) => (pop?.doc === 'split' ? null : pop))
+      setFreeTextDraft((draft) => (draft?.pane === 'b' ? null : draft))
+      setNoteDraft((draft) => (draft?.doc === 'split' ? null : draft))
+    }
     if (foreign) {
-      wasForeignRef.current = true
+      pendingSameFileRef.current = false
+      const placement = pendingSideRef.current
+      pendingSideRef.current = null
       const pos = foreign.initialPosition
       setPaneBPage(pos?.page ?? 1)
       setPaneBScale(0) // 0 = PagesPane picks a fresh fit for the column width
       setPaneBFit('width')
       setPaneBRotation(pos?.rotation ?? 0)
-      setPaneBSpread(pos?.spread ?? false)
+      setPaneBSpreadPref(pos?.spread ?? false)
       setPaneBCover(pos?.coverPage ?? false)
       if (!splitOpenRef.current) {
-        setPanelW((p) => (p.pane === 0.5 ? p : { ...p, pane: 0.5 }))
+        // An 's' reopen brings the divider back where it was; anything else
+        // starts at an even split
+        const share = placement?.share ?? 0.5
+        setPanelW((p) => (p.pane === share ? p : { ...p, pane: share }))
         window.setTimeout(persistPanelWidths, 0)
         setFitMode('width')
+        holdPlaceAcrossSplitRef.current()
         setSplitOpen(true)
+      }
+      // The side a drop or the reopen asked for; a menu pick keeps the order
+      if (placement) setPaneOrder(placement.side === 'left' ? 'ba' : 'ab')
+      lastSplitRef.current = {
+        kind: 'foreign',
+        path: foreign.payload.path,
+        side: placement?.side ?? sideOf('b'),
+        share: placement?.share ?? 0.5
       }
       setActivePane('b')
       flashPaneRef.current('b')
@@ -975,17 +1139,22 @@ export default function PdfViewer({
       )
       return
     }
-    if (wasForeignRef.current) {
-      wasForeignRef.current = false
-      // The split document is gone: undo entries addressed to it would write
-      // into a closed session, and split-tagged chrome would point at pages
-      // that no longer mean the same thing.
-      purgeUndoDocRef.current('split')
-      setSelected((sel) => (sel?.doc === 'split' ? null : sel))
-      setAnnotPopover((pop) => (pop?.doc === 'split' ? null : pop))
-      setFreeTextDraft((draft) => (draft?.pane === 'b' ? null : draft))
-      setNoteDraft((draft) => (draft?.doc === 'split' ? null : draft))
+    if (prevPath) {
+      // What 's' brings back: that document, on the side and at the share it had
+      const last = lastSplitRef.current
+      if (last.kind === 'foreign') {
+        lastSplitRef.current = { ...last, side: sideOf('b'), share: panelWRef.current.pane }
+      }
+      if (pendingSameFileRef.current) {
+        // The reader asked for THIS document in both columns: convert the
+        // column in place instead of closing it and opening it again
+        pendingSameFileRef.current = false
+        openSameFileSplitRef.current()
+        setActivePane('a')
+        return
+      }
       if (splitOpenRef.current) {
+        holdPlaceAcrossSplitRef.current()
         setSplitOpen(false)
         setActivePane('a')
       }
@@ -1744,6 +1913,25 @@ export default function PdfViewer({
   )
   handleForRef.current = (pane: PaneId) => (pane === 'b' ? paneBHandleRef.current : paneAHandle)
 
+  /** Opening or closing the split flips the effective two-page layout when the
+   *  reader's choice is on (spreadPref): the rows double or halve under the
+   *  scroll position. Note the page + offset first so the restore effect lands
+   *  the same spot in the rebuilt layout — a fit-mode refit anchors on its own,
+   *  a custom zoom would otherwise land pages away. */
+  const holdPlaceAcrossSplit = useCallback(() => {
+    if (!spreadPrefRef.current) return
+    const cur = computeCurrent()
+    if (!cur) return
+    restoreRef.current = {
+      ...cur,
+      zoom: scaleRef.current,
+      rotation: rotationRef.current,
+      spread: spreadPrefRef.current,
+      coverPage: coverPageRef.current
+    }
+  }, [computeCurrent])
+  holdPlaceAcrossSplitRef.current = holdPlaceAcrossSplit
+
   const schedulePositionSave = useCallback(() => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
     saveTimerRef.current = window.setTimeout(() => {
@@ -1753,7 +1941,7 @@ export default function PdfViewer({
           ...current,
           zoom: scaleRef.current,
           rotation: rotationRef.current,
-          spread: spreadRef.current,
+          spread: spreadPrefRef.current,
           coverPage: coverPageRef.current
         })
       }
@@ -1899,7 +2087,7 @@ export default function PdfViewer({
       offset: pos.offset,
       zoom: paneBScaleRef.current,
       rotation: paneBRotationRef.current,
-      spread: paneBSpreadRef.current,
+      spread: paneBSpreadPrefRef.current,
       coverPage: paneBCoverRef.current
     })
   }, [])
@@ -1919,7 +2107,7 @@ export default function PdfViewer({
     if (!sessionBPath) return
     const timer = window.setTimeout(savePaneBPosition, 400)
     return () => window.clearTimeout(timer)
-  }, [sessionBPath, paneBScale, paneBRotation, paneBSpread, paneBCover, savePaneBPosition])
+  }, [sessionBPath, paneBScale, paneBRotation, paneBSpreadPref, paneBCover, savePaneBPosition])
 
   const wakeHudRef = useRef<() => void>(() => {})
 
@@ -2463,17 +2651,11 @@ export default function PdfViewer({
   )
 
   const toggleSpread = useCallback(() => {
-    const pane = activePaneRef.current
-    if (pane === 'b') {
-      setPaneBSpread((s) => {
-        // Same rule as the first column: coming from a hand-set zoom, switch to
-        // fit-page so BOTH pages of the pair actually become visible.
-        if (!s) setPaneBFit((f) => (f === 'custom' ? 'page' : f))
-        return !s
-      })
-      return
-    }
-    const next = !spreadRef.current
+    // Suspended while split (see spreadPref): the toolbar greys the toggle
+    // out, this catches the keymap route. Only the first column can be active
+    // outside a split, so the choice below is always the first column's.
+    if (splitOpenRef.current) return
+    const next = !spreadPrefRef.current
     // Entering two-page view from a custom (manual) zoom: switch to fit-page so
     // BOTH pages become visible. Without this the single-page zoom is kept and
     // the spread overflows the viewport, showing only part of it. (An existing
@@ -2483,7 +2665,7 @@ export default function PdfViewer({
       setFitMode('page')
     }
     reanchorFor(rotationRef.current, next, coverPageRef.current)
-    setSpread(next)
+    setSpreadPref(next)
     schedulePositionSave()
   }, [reanchorFor, schedulePositionSave])
 
@@ -2762,7 +2944,7 @@ export default function PdfViewer({
           ...current,
           zoom: scaleRef.current,
           rotation: rotationRef.current,
-          spread: spreadRef.current,
+          spread: spreadPrefRef.current,
           coverPage: coverPageRef.current
         })
       onSavedAs(result.path)
@@ -4879,7 +5061,7 @@ export default function PdfViewer({
     setMarkupTool(null)
     reanchorFor(0, false, false)
     setRotation(0)
-    setSpread(false)
+    setSpreadPref(false)
     setCoverPage(false)
     setBubbleSizes(new Map())
     fitModeRef.current = 'page'
@@ -5969,7 +6151,7 @@ export default function PdfViewer({
         ...current,
         zoom: scaleRef.current,
         rotation: rotationRef.current,
-        spread: spreadRef.current,
+        spread: spreadPrefRef.current,
         coverPage: coverPageRef.current
       })
   }, [computeCurrent, payload.path])
@@ -6398,7 +6580,7 @@ export default function PdfViewer({
           {...paneADrop.handlers}
         >
           {paneADrop.hint && (
-            <div className="pane-drop-hint">
+            <div className={`pane-drop-hint${paneADrop.half ? ` is-${paneADrop.half}` : ''}`}>
               <span>{t('viewer.dropSplitHint')}</span>
             </div>
           )}
@@ -6542,7 +6724,7 @@ export default function PdfViewer({
             save — only page and zoom are its own. With a FOREIGN document
             (splitDoc) the column binds to its own session instead: own proxy,
             own annots, own dirty — every pane mechanic below is shared. */}
-        {splitOpen && pdf && (!foreign || sessionB?.pdf) && (
+        {splitOpen && pdf && (
           <>
             <div
               className={`panel-resizer panel-resizer-pane${resizingPanel === 'pane' ? ' active' : ''}`}
@@ -6550,75 +6732,82 @@ export default function PdfViewer({
               onPointerDown={(e) => beginPanelResize('pane', e)}
               onDoubleClick={() => resetPanelWidth('pane')}
             />
-            <PagesPane
-              pdf={sessionB?.pdf ?? pdf}
-              docKey={sessionB ? sessionB.path : payload.path}
-              sizes={sessionB ? sessionB.sizes : sizes}
-              annots={sessionB ? sessionB.annots : annots}
-              annotsHidden={annotsHidden}
-              keepImageColors={keepImageColors}
-              onTabDrop={onRequestOpenInSplit ? dropTabIntoSplit : undefined}
-              onFileDrop={
-                onRequestOpenInSplit &&
-                ((file: File) => {
-                  // Desktop only: the split's other document is addressed by
-                  // path (main resolves drafts behind it). A browser drop has
-                  // no real path — let it bubble to App's open-a-tab handler.
-                  const realPath = bridge.getPathForFile(file)
-                  if (!realPath || realPath === payload.path) return false
-                  onRequestOpenInSplit(realPath)
-                  return true
-                })
-              }
-              rotation={paneBRotation}
-              spread={paneBSpread}
-              coverPage={paneBCover}
-              scale={paneBScale}
-              fitMode={paneBFit}
-              onZoom={paneBZoom}
-              onPageChange={setPaneBPage}
-              flash={paneFlash === 'b'}
-              drawTool={drawTool}
-              fingerDraws={prefs.input.fingerDraws}
-              penPressure={prefs.input.penPressure}
-              // The frame follows the document the column shows — a selection
-              // in one file must never draw on the other's page numbers
-              selected={
-                selected && (selected.doc === 'split') === !!foreign ? selected : null
-              }
-              searchHits={foreign ? null : searchHits}
-              searchAllHits={
-                !foreign && searchAllHits?.pane === 'b' ? searchAllHits.byPage : null
-              }
-              onContextMenu={onContextMenu}
-              onMouseUp={onMouseUp}
-              onMouseDown={onMouseDown}
-              onDoubleClick={onPagesDoubleClick}
-              onMouseMove={onPagesMouseMove}
-              onMouseLeave={() => setHoverTip(null)}
-              onScroll={onPaneBScroll}
-              onStrokeComplete={onStrokeComplete}
-              onErase={onEraseAt}
-              onShapeComplete={onShapeComplete}
-              onPlaceText={onPlaceText}
-              marginView={foreign ? null : marginViewConfig}
-              onMarginCommit={onMarginCommit}
-              onMarginSelect={onMarginSelect}
-              onMarginDelete={onMarginDelete}
-              onMarginMenu={onMarginMenu}
-              onMarginJump={(p, r) => jumpSelectAnnotIn('b', p, r)}
-              onResizeStart={onResizeStart}
-              onMarkupEndStart={onMarkupEndStart}
-              markupPreview={
-                !foreign && markupPreview?.pane === 'b' ? markupPreview.byPage : null
-              }
-              onExternalLink={onExternalLink}
-              onInternalLink={onPaneBInternalLink}
-              onHandle={(h) => {
-                paneBHandleRef.current = h
-              }}
-              overlay={({ layout: lay, scale: s }) => paneOverlay('b', lay, s, paneBRotation)}
-            />
+            {foreign && !sessionB?.pdf ? (
+              // The column's document is still loading — opening, or being
+              // REPLACED by another one. It keeps its slot and its width while
+              // it does (Emil, 2026-09-03: no blink out to full width and
+              // straight back); the first column is never relaid out, because
+              // as far as the flex row is concerned nothing moved.
+              <div className="pages-host pane-b">
+                <div className="viewer-loading">
+                  <div className="spinner" />
+                  <span>{t('viewer.opening', { name: foreign.payload.name })}</span>
+                </div>
+              </div>
+            ) : (
+              <PagesPane
+                pdf={sessionB?.pdf ?? pdf}
+                docKey={sessionB ? sessionB.path : payload.path}
+                sizes={sessionB ? sessionB.sizes : sizes}
+                annots={sessionB ? sessionB.annots : annots}
+                annotsHidden={annotsHidden}
+                keepImageColors={keepImageColors}
+                onTabDrop={
+                  onRequestOpenInSplit ? (path) => dropDocIntoSplit(path, 'b', null) : undefined
+                }
+                onFileDrop={
+                  onRequestOpenInSplit ? (file) => dropFileIntoSplit(file, 'b', null) : undefined
+                }
+                rotation={paneBRotation}
+                spread={paneBSpread}
+                coverPage={paneBCover}
+                scale={paneBScale}
+                fitMode={paneBFit}
+                onZoom={paneBZoom}
+                onPageChange={setPaneBPage}
+                flash={paneFlash === 'b'}
+                drawTool={drawTool}
+                fingerDraws={prefs.input.fingerDraws}
+                penPressure={prefs.input.penPressure}
+                // The frame follows the document the column shows — a selection
+                // in one file must never draw on the other's page numbers
+                selected={
+                  selected && (selected.doc === 'split') === !!foreign ? selected : null
+                }
+                searchHits={foreign ? null : searchHits}
+                searchAllHits={
+                  !foreign && searchAllHits?.pane === 'b' ? searchAllHits.byPage : null
+                }
+                onContextMenu={onContextMenu}
+                onMouseUp={onMouseUp}
+                onMouseDown={onMouseDown}
+                onDoubleClick={onPagesDoubleClick}
+                onMouseMove={onPagesMouseMove}
+                onMouseLeave={() => setHoverTip(null)}
+                onScroll={onPaneBScroll}
+                onStrokeComplete={onStrokeComplete}
+                onErase={onEraseAt}
+                onShapeComplete={onShapeComplete}
+                onPlaceText={onPlaceText}
+                marginView={foreign ? null : marginViewConfig}
+                onMarginCommit={onMarginCommit}
+                onMarginSelect={onMarginSelect}
+                onMarginDelete={onMarginDelete}
+                onMarginMenu={onMarginMenu}
+                onMarginJump={(p, r) => jumpSelectAnnotIn('b', p, r)}
+                onResizeStart={onResizeStart}
+                onMarkupEndStart={onMarkupEndStart}
+                markupPreview={
+                  !foreign && markupPreview?.pane === 'b' ? markupPreview.byPage : null
+                }
+                onExternalLink={onExternalLink}
+                onInternalLink={onPaneBInternalLink}
+                onHandle={(h) => {
+                  paneBHandleRef.current = h
+                }}
+                overlay={({ layout: lay, scale: s }) => paneOverlay('b', lay, s, paneBRotation)}
+              />
+            )}
           </>
         )}
 

@@ -169,12 +169,25 @@ carries no picture of its own.)*
   reader ask, 2026-09-02; the view menu and the drag arrived 2026-09-03 after
   the tab menu alone went unfound — same words everywhere, «delt visning», and
   never the other paper's name in a label)*
+- A dropped tab or file lands where it is dropped: on the column it hits, or,
+  with one column open, on the half of it the pointer is over *(2026-09-03 —
+  before this every new document took the right column)*
+- The document already in a column, put into the other one — its tab dropped
+  there, «Åpne i delt visning» on its own tab, or its name in the view menu —
+  fills both columns: that is the same-file split's home
+- Swapping the column's document for another one keeps the column: it holds
+  its width while the next file loads, so the swap is one layout change and
+  never a blink out to full width and straight back *(2026-09-03)*
 - «Bytt plass» trades the columns' sides, in both modes
 - Ctrl+click on an internal link opens its target in the other column
 - Annotations can be made in either column and land in the document they are
   made in; with one document open they appear in both — it is a single document
-- A closed column's page, zoom and width are restored when the split is
-  reopened
+- S reopens whatever the split held last — the other document too, on the side
+  and at the width it had; a closed same-file column comes back at its page,
+  zoom and width
+- The two-page spread is suspended while the view is split (a pair in a
+  half-width column is two thumbnails) and returns when the document is shown
+  alone; the choice itself is kept *(2026-09-03)*
 
 ### 3. Annotation
 

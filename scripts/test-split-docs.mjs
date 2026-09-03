@@ -19,7 +19,17 @@
 //      and saving there bakes exactly one new annotation into the bytes,
 //      verified with mupdf; the host file's draft stays clean.
 //   7. 's' with a foreign document closes it (the other tab survives), and the
-//      next 's' is the instant same-file split again.
+//      next 's' brings THAT document back — the key reopens whatever the split
+//      held last, on the side and at the width it had.
+//   8-9. The view menu and a dragged tab both reach the split; a drop lands the
+//      document on the half it was dropped on, not always on the right.
+//   10. The document already in a column, dropped into the other one, fills
+//      both columns — the same-file split's gesture.
+//   11. The two-page spread is suspended while the view is split and returns,
+//      still chosen, when the document is shown alone.
+//   12. REPLACING the split's document keeps the column: the first column
+//      never changes width and the second never leaves the DOM, so the swap
+//      is one layout change and not a jump out and straight back.
 import { existsSync, copyFileSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -41,6 +51,7 @@ const ROOT = resolve(HERE, '..')
 const PORT = 9339
 const FILE_A = join(tmpdir(), 'pdfx-splitdocs-vert.pdf')
 const FILE_B = join(tmpdir(), 'pdfx-splitdocs-annen.pdf')
+const FILE_C = join(tmpdir(), 'pdfx-splitdocs-tredje.pdf')
 
 let failures = 0
 const check = (label, cond, detail = '') => {
@@ -52,13 +63,13 @@ const check = (label, cond, detail = '') => {
 
 /** A minimal one-page PDF (US letter, a little text) — visibly NOT sample.pdf,
  *  and 1 page vs sample's 6 so the toolbar's page count tells them apart. */
-function onePageFixture() {
+function onePageFixture(title = 'Vertsdokument A') {
   const objs = []
   const add = (body) => {
     objs.push(body)
     return objs.length
   }
-  const text = 'BT /F1 24 Tf 72 700 Td (Vertsdokument A) Tj ET'
+  const text = `BT /F1 24 Tf 72 700 Td (${title}) Tj ET`
   const content = add(`<< /Length ${text.length} >>\nstream\n${text}\nendstream`)
   const font = add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
   const page = add(
@@ -99,6 +110,9 @@ const ui = {
   settle,
   activeView() {
     return document.querySelector('.tab-view.active');
+  },
+  hosts() {
+    return [...this.activeView().querySelectorAll('.pages-host')].length;
   },
   panes() {
     return [...this.activeView().querySelectorAll('.pages')].map((p) => ({
@@ -202,6 +216,7 @@ writeFileSync(FILE_A, onePageFixture())
 copyFileSync(join(ROOT, 'src', 'renderer', 'public', 'sample.pdf'), FILE_B)
 
 // sample.pdf ships with annotations — the assertion is a DELTA, not a total
+writeFileSync(FILE_C, onePageFixture('Tredje dokument C'))
 const beforeA = annotsOnDisk(FILE_A)
 const beforeB = annotsOnDisk(FILE_B)
 console.log(`baseline: A=${beforeA} annotation(s), B=${beforeB}\n`)
@@ -320,7 +335,8 @@ try {
   check('saving from B’s own tab bakes exactly one new annotation', afterB === beforeB + 1, `${beforeB} -> ${afterB}`)
   check('document A’s bytes are untouched', annotsOnDisk(FILE_A) === beforeA)
 
-  // ---- 7. 's' in the host tab closes the foreign document; next 's' is same-file
+  // ---- 7. 's' in the host tab closes the foreign document; the next 's' brings it BACK
+  // (the key reopens whatever the split held last — not the same-file split)
   const tabA = tabs.find((t) => /vert/.test(t.name)) ?? tabs[0]
   await clickAt(W, tabA.x, tabA.y)
   await sleep(600)
@@ -337,17 +353,31 @@ try {
   check("'s' closes the two-document split", ok, JSON.stringify(panes))
   tabs = await evalIn(W, `return ui.tabRects()`)
   check('document B’s tab survives the close', tabs.length === 2)
-  await evalIn(W, `ui.key('s'); await ui.settle(700); return null`)
-  panes = await evalIn(W, `return ui.panes()`)
-  check(
-    "…and the next 's' is the instant same-file split again",
-    panes.length === 2 && panes[0].dockey === panes[1].dockey && panes[0].dockey === FILE_A,
-    JSON.stringify(panes)
-  )
+  await evalIn(W, `ui.key('s'); return null`)
+  ok = false
+  for (let i = 0; i < 20; i++) {
+    panes = await evalIn(W, `return ui.panes()`)
+    if (panes.length === 2 && panes.find((p) => p.pane === 'b')?.dockey === FILE_B) {
+      ok = true
+      break
+    }
+    await sleep(400)
+  }
+  check("…and the next 's' reopens the split with document B, not the same-file one", ok, JSON.stringify(panes))
 
   // ---- 8. the view menu lists document B under «Åpne i delt visning» — the
   // two-document split's visible home (the tab menu alone went unfound)
-  await evalIn(W, `ui.key('s'); await ui.settle(500); return null`) // close the same-file split
+  await evalIn(W, `ui.key('s'); return null`) // 's' closes the foreign document again
+  ok = false
+  for (let i = 0; i < 20; i++) {
+    panes = await evalIn(W, `return ui.panes()`)
+    if (panes.length === 1) {
+      ok = true
+      break
+    }
+    await sleep(400)
+  }
+  check('the foreign split is closed before the menu', ok, JSON.stringify(panes))
   const viaMenu = await evalIn(W, `
     const btn = [...document.querySelectorAll('.tb-btn')].find((b) => /^(Zoom og sidevisning|Zoom and page layout)/.test(b.title || ''));
     if (!btn) throw new Error('view menu button not found');
@@ -356,10 +386,12 @@ try {
     const row = rows.find((b) => /pdfx-splitdocs-annen/.test(b.title || ''));
     if (!row) throw new Error('no row for document B in the view menu; rows: ' + rows.map((r) => (r.textContent || '').trim()).join(' | '));
     const other = rows.some((b) => /Annen fil|Another file/.test(b.textContent || ''));
+    const own = rows.some((b) => b.title === ${JSON.stringify(FILE_A)});
     click(row); await ui.settle(900);
-    return { other, panes: ui.panes(), menuGone: !document.querySelector('.view-menu') };
+    return { other, own, panes: ui.panes(), menuGone: !document.querySelector('.view-menu') };
   `)
   check('the view menu offers «Annen fil …» too', viaMenu.other)
+  check('…and lists the tab’s own document (the same-file split’s home)', viaMenu.own)
   check(
     'choosing document B in the view menu opens it beside A',
     viaMenu.panes.length === 2 && viaMenu.panes.find((p) => p.pane === 'b')?.dockey === FILE_B,
@@ -367,7 +399,8 @@ try {
   )
   check('the menu closes on the choice', viaMenu.menuGone)
 
-  // ---- 9. dragging B's tab into the view: a hint while it hovers, B beside A on drop
+  // ---- 9. dragging B's tab into the view: a hint over the half it hovers, B on THAT
+  // side on drop (clientX 0 = the left half — the new document need not land right)
   await evalIn(W, `ui.key('s'); return null`) // 's' closes the foreign document
   ok = false
   for (let i = 0; i < 20; i++) {
@@ -388,18 +421,191 @@ try {
     pane.dispatchEvent(ev('dragenter'));
     pane.dispatchEvent(ev('dragover'));
     await ui.settle(150);
-    const hint = document.querySelector('.pane-drop-hint')?.textContent || '';
+    const hintEl = document.querySelector('.pane-drop-hint');
+    const hint = hintEl?.textContent || '';
+    const hintClass = hintEl?.className || '';
     pane.dispatchEvent(ev('drop'));
     await ui.settle(900);
-    return { hint, panes: ui.panes(), hintGone: !document.querySelector('.pane-drop-hint') };
+    return { hint, hintClass, panes: ui.panes(), hintGone: !document.querySelector('.pane-drop-hint') };
   `)
   check('a tab over the column shows the drop hint', /delt visning|split view/i.test(viaDrop.hint), viaDrop.hint)
+  check('…covering the half the pointer is over', /is-left/.test(viaDrop.hintClass), viaDrop.hintClass)
+  const bPane = viaDrop.panes.find((p) => p.pane === 'b')
+  const aPane = viaDrop.panes.find((p) => p.pane === 'a')
   check(
     'dropping the tab opens document B beside A',
-    viaDrop.panes.length === 2 && viaDrop.panes.find((p) => p.pane === 'b')?.dockey === FILE_B,
+    viaDrop.panes.length === 2 && bPane?.dockey === FILE_B,
     JSON.stringify(viaDrop.panes)
   )
+  check('…on the LEFT, where it was dropped', !!bPane && !!aPane && bPane.left < aPane.left, JSON.stringify(viaDrop.panes))
   check('the hint is gone after the drop', viaDrop.hintGone)
+
+  // ---- 10. document A's own tab dropped on the second column: A in BOTH columns
+  // (the same-file split's gesture now that 's' reopens the last split)
+  const sameViaDrop = await evalIn(W, `
+    const pane = document.querySelector('.tab-view.active .pages-host.pane-b');
+    if (!pane) throw new Error('no second column to drop on');
+    const dt = new DataTransfer();
+    dt.setData('text/plain', ${JSON.stringify(FILE_A)});
+    dt.setData('application/x-pdf-scholar-tab', ${JSON.stringify(FILE_A)});
+    const ev = (type) => new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+    pane.dispatchEvent(ev('dragenter'));
+    pane.dispatchEvent(ev('dragover'));
+    pane.dispatchEvent(ev('drop'));
+    return null;
+  `)
+  void sameViaDrop
+  ok = false
+  for (let i = 0; i < 20; i++) {
+    panes = await evalIn(W, `return ui.panes()`)
+    if (panes.length === 2 && panes.every((p) => p.dockey === FILE_A)) {
+      ok = true
+      break
+    }
+    await sleep(400)
+  }
+  check('dropping A’s own tab on B’s column puts A in both columns', ok, JSON.stringify(panes))
+  tabs = await evalIn(W, `return ui.tabRects()`)
+  check('document B’s tab still stands', tabs.length === 2)
+  await evalIn(W, `ui.key('s'); await ui.settle(500); return null`)
+  panes = await evalIn(W, `return ui.panes()`)
+  check("'s' closes the same-file split", panes.length === 1, JSON.stringify(panes))
+  await evalIn(W, `ui.key('s'); await ui.settle(700); return null`)
+  panes = await evalIn(W, `return ui.panes()`)
+  check(
+    "…and the next 's' reopens the same-file split — the last one held",
+    panes.length === 2 && panes.every((p) => p.dockey === FILE_A),
+    JSON.stringify(panes)
+  )
+
+  // ---- 11. the two-page spread pauses while the view is split and returns alone
+  // (Emil, 2026-09-03: a pair in a half-width column is two thumbnails). Document B
+  // has six pages; A has one, which cannot pair.
+  tabs = await evalIn(W, `return ui.tabRects()`)
+  const tabBAgain = tabs.find((t) => /annen/.test(t.name))
+  if (!tabBAgain) throw new Error('no tab for document B')
+  await clickAt(W, tabBAgain.x, tabBAgain.y)
+  await sleep(600)
+  const rowTops = `[...ui.activeView().querySelectorAll('.pages[data-pane="a"] .pdf-page')].slice(0, 2).map((p) => Math.round(p.getBoundingClientRect().top))`
+  const spread = await evalIn(W, `
+    const view = ui.activeView();
+    const btn = [...view.querySelectorAll('.tb-btn')].find((b) => /^(Zoom og sidevisning|Zoom and page layout)/.test(b.title || ''));
+    if (!btn) throw new Error('view menu button not found');
+    const spreadBox = async () => {
+      if (!document.querySelector('.view-menu')) { click(btn); await ui.settle(300); }
+      const box = document.querySelector('.view-menu .view-row-toggle:not(.view-row-sub) input');
+      if (!box) throw new Error('spread checkbox not found');
+      return box;
+    };
+    (await spreadBox()).click(); await ui.settle(900);
+    const alone = ${rowTops};
+    ui.key('s'); await ui.settle(900);
+    const split = ${rowTops};
+    const inSplit = await spreadBox();
+    const whileSplit = { disabled: inSplit.disabled, checked: inSplit.checked };
+    ui.key('s'); await ui.settle(900);
+    const back = ${rowTops};
+    const afterwards = await spreadBox();
+    const checkedBack = afterwards.checked;
+    afterwards.click(); await ui.settle(300); // leave document B single-page
+    if (document.querySelector('.view-menu')) click(btn);
+    return { alone, split, whileSplit, back, checkedBack, panes: ui.panes() };
+  `)
+  check('two pages pair up with the spread on', spread.alone.length === 2 && spread.alone[0] === spread.alone[1], JSON.stringify(spread.alone))
+  check("…'s' splits the view and the pages stand single in the column", spread.split.length === 2 && spread.split[0] !== spread.split[1], JSON.stringify(spread.split))
+  check('the spread toggle is greyed and unchecked while split', spread.whileSplit.disabled && !spread.whileSplit.checked, JSON.stringify(spread.whileSplit))
+  check('closing the split brings the pairs back', spread.back.length === 2 && spread.back[0] === spread.back[1], JSON.stringify(spread.back))
+  check('…and the toggle shows the kept choice', spread.checkedBack === true)
+  check('the view is single-column again', spread.panes.length === 1, JSON.stringify(spread.panes))
+
+  // ---- 12. REPLACING the split's document: the second column keeps its slot
+  // while the next file loads, so the first column is never relaid out (Emil,
+  // 2026-09-03: no jump out to full width and straight back). Pane A's width is
+  // the witness — a column that unmounts hands its space to pane A for a frame.
+  const third = spawn(electronBinary(ROOT), [mainJs, FILE_C, `--user-data-dir=${app.profile}`], {
+    cwd: ROOT,
+    stdio: 'ignore'
+  })
+  third.unref()
+  for (let i = 0; i < 40; i++) {
+    tabs = await evalIn(W, `return ui.tabRects()`)
+    if (tabs.length === 3) break
+    await sleep(500)
+  }
+  check('document C opened as a third tab', tabs.length === 3, JSON.stringify(tabs.map((t) => t.name)))
+  const tabAAgain = tabs.find((t) => /vert/.test(t.name))
+  if (!tabAAgain) throw new Error('no tab for document A')
+  await clickAt(W, tabAAgain.x, tabAAgain.y)
+  await sleep(700)
+  // Put document B in the column first (a drop on the right half)
+  await evalIn(W, `
+    const host = ui.activeView().querySelector('.pages-host');
+    const dt = new DataTransfer();
+    dt.setData('application/x-pdf-scholar-tab', ${JSON.stringify(FILE_B)});
+    const box = host.getBoundingClientRect();
+    const at = (type) => new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt,
+      clientX: Math.round(box.right - 40), clientY: Math.round(box.top + box.height / 2) });
+    host.dispatchEvent(at('dragenter')); host.dispatchEvent(at('dragover')); host.dispatchEvent(at('drop'));
+    return null;
+  `)
+  ok = false
+  for (let i = 0; i < 30; i++) {
+    panes = await evalIn(W, `return ui.panes()`)
+    if (panes.length === 2 && panes.find((p) => p.pane === 'b')?.dockey === FILE_B) {
+      ok = true
+      break
+    }
+    await sleep(400)
+  }
+  check('document B sits in the column before the replacement', ok, JSON.stringify(panes))
+
+  const replace = await evalIn(W, `
+    const view = ui.activeView();
+    const paneA = view.querySelector('.pages-host:not(.pane-b)');
+    // Every width pane A takes while the documents trade places, and the lowest
+    // column count seen — a teardown shows up as either.
+    const widths = [Math.round(paneA.getBoundingClientRect().width)];
+    let minHosts = ui.hosts();
+    const ro = new ResizeObserver(() => {
+      const w = Math.round(paneA.getBoundingClientRect().width);
+      if (widths[widths.length - 1] !== w) widths.push(w);
+    });
+    ro.observe(paneA);
+    // Every FRAME, not every mutation: an unmount and a remount inside one
+    // frame leave a MutationObserver reading the net result and nothing else.
+    let sampling = true;
+    const tick = () => {
+      minHosts = Math.min(minHosts, ui.hosts());
+      if (sampling) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    const dt = new DataTransfer();
+    dt.setData('application/x-pdf-scholar-tab', ${JSON.stringify(FILE_C)});
+    const paneB = view.querySelector('.pages-host.pane-b');
+    const ev = (type) => new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+    paneB.dispatchEvent(ev('dragenter'));
+    paneB.dispatchEvent(ev('dragover'));
+    paneB.dispatchEvent(ev('drop'));
+    await ui.settle(2500);
+    sampling = false;
+    ro.disconnect();
+    return { widths, minHosts, panes: ui.panes(), hosts: ui.hosts() };
+  `)
+  check(
+    'the replacement lands document C in the column',
+    replace.panes.length === 2 && replace.panes.find((p) => p.pane === 'b')?.dockey === FILE_C,
+    JSON.stringify(replace.panes)
+  )
+  check(
+    'the second column never went away while the documents traded places',
+    replace.minHosts === 2,
+    'lowest column count seen: ' + replace.minHosts
+  )
+  check(
+    'the first column never changed width — no jump out and back',
+    replace.widths.length === 1,
+    'widths seen: ' + JSON.stringify(replace.widths)
+  )
 } catch (err) {
   failures++
   console.error('FAIL  unexpected error:', err)
@@ -413,7 +619,7 @@ try {
     }
   }
   await app.cleanup()
-  for (const f of [FILE_A, FILE_B]) {
+  for (const f of [FILE_A, FILE_B, FILE_C]) {
     try {
       unlinkSync(f)
     } catch {
