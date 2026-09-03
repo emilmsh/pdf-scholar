@@ -518,7 +518,7 @@ export default function Toolbar({
     loading: boolean
     result: ZoteroInfo | FileError | null
   }>({ loading: false, result: null })
-  const [zoteroCopied, setZoteroCopied] = useState<'citation' | 'bib' | null>(null)
+  const [zoteroCopied, setZoteroCopied] = useState<'citation' | 'bib' | 'bibtex' | null>(null)
   const zoteroResolved = zoteroFetch.result !== null && !('error' in zoteroFetch.result)
   const zoteroHit = zoteroKey !== null || zoteroFetch.result !== null
   const askZotero = useCallback(() => {
@@ -541,7 +541,7 @@ export default function Toolbar({
     setZoteroCopied(null)
     return askZotero()
   }, [saveMenuOpen, zoteroResolved, askZotero])
-  const zoteroCopy = (kind: 'citation' | 'bib', text: string): void => {
+  const zoteroCopy = (kind: 'citation' | 'bib' | 'bibtex', text: string): void => {
     void navigator.clipboard.writeText(text).then(() => {
       setZoteroCopied(kind)
       window.setTimeout(() => setZoteroCopied((c) => (c === kind ? null : c)), 1500)
@@ -1781,6 +1781,17 @@ export default function Toolbar({
               >
                 <IconCopy size={15} />
                 {zoteroCopied === 'bib' ? t('doc.copied') : t('zotero.copyReference')}
+              </button>
+              {/* BibTeX for the .tex half of the same workflow. Disabled rather
+                  than hidden when the item exports to nothing, so the row does
+                  not appear and vanish between documents. */}
+              <button
+                className="menu-action"
+                disabled={!zInfo?.bibtex}
+                onClick={() => zInfo && zoteroCopy('bibtex', zInfo.bibtex)}
+              >
+                <IconCopy size={15} />
+                {zoteroCopied === 'bibtex' ? t('doc.copied') : t('zotero.copyBibtex')}
               </button>
             </>
           ) : null

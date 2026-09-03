@@ -203,6 +203,33 @@ const fromCodePoint = (cp: number): string => {
   }
 }
 
+/** The two fields dropped from Zotero's BibTeX export, matched a line at a
+ *  time. `file` holds the attachment's ABSOLUTE path on this machine —
+ *  meaningless in anyone else's .bib and local disk layout nobody meant to
+ *  publish. `abstract` is several hundred words of prose that belong in the
+ *  library, not in a bibliography file.
+ *
+ *  Single-line only, on purpose: a value carrying a newline (a multi-paragraph
+ *  abstract) is left in place rather than cut in half. Losing the strip is a
+ *  much better failure than corrupting the entry. */
+const STRIPPED_FIELD = /^[ \t]*(?:file|abstract)[ \t]*=[ \t]*\{.*\},?[ \t]*\r?\n/gm
+
+/** Zotero's own BibTeX export, ready to paste into a .bib.
+ *
+ *  The BibTeX translator ships with Zotero — no Better BibTeX needed. What it
+ *  writes is passed through untouched except for STRIPPED_FIELD above.
+ *
+ *  Note the citation keys are the translator's own (`smith_evolution_2025`),
+ *  generated per export and NOT the pinned keys Better BibTeX maintains — a
+ *  library curated with BBT can hand out a different key here than the one its
+ *  exported .bib file carries.
+ *
+ *  An attachment item exports to nothing at all (HTTP 200, empty body), which
+ *  is why '' has to read as «no BibTeX for this» rather than as a failure. */
+export function cleanBibtex(raw: string): string {
+  return raw.replace(STRIPPED_FIELD, '').trim()
+}
+
 /** What an HTTP outcome from the local API MEANS. null status = the request
  *  never got an answer (connection refused, timeout): Zotero isn't running.
  *  403 is Zotero deciding: the API toggle is off. Anything else non-OK reads
@@ -227,6 +254,9 @@ export interface ZoteroFetchOutcome {
   status: number | null
   /** Parsed body for a 200, else null */
   json: unknown
+  /** Raw body for a 200. The export formats (`?format=bibtex`) are not JSON,
+   *  so the one fetch serves both kinds of request. */
+  text?: string
 }
 export type ZoteroFetchJson = (url: string) => Promise<ZoteroFetchOutcome>
 
@@ -305,11 +335,27 @@ export function createZoteroClient(fetchJson: ZoteroFetchJson): ZoteroClient {
   }
 
   async function fetchInfo(attachmentKey: string, parentKey: string | null): Promise<ZoteroInfo | FileError> {
-    const item = await fetchJson(
-      `${ZOTERO_LOCAL_API}/items/${parentKey ?? attachmentKey}?include=data,bib,citation&style=${ZOTERO_CITATION_STYLE}`
-    )
+    // The cited item is the parent when there is one — the attachment itself
+    // otherwise. Both forms of it are asked for at once: the JSON the menu
+    // shows, and the BibTeX its copy row hands over. One extra request to
+    // localhost, no extra latency, and the row knows whether it has anything
+    // to give BEFORE it is clicked.
+    const key = parentKey ?? attachmentKey
+    const [item, bibtex] = await Promise.all([
+      fetchJson(
+        `${ZOTERO_LOCAL_API}/items/${key}?include=data,bib,citation&style=${ZOTERO_CITATION_STYLE}`
+      ),
+      fetchJson(`${ZOTERO_LOCAL_API}/items/${key}?format=bibtex`)
+    ])
     if (item.status !== 200) return zoteroError(item.status)
-    return { attachmentKey, parentKey, ...parseZoteroItem(item.json) }
+    return {
+      attachmentKey,
+      parentKey,
+      ...parseZoteroItem(item.json),
+      // A missing BibTeX export never fails the lookup: the citation and the
+      // reference are still there to copy, and the BibTeX row disables itself.
+      bibtex: bibtex.status === 200 ? cleanBibtex(bibtex.text ?? '') : ''
+    }
   }
 
   return {
@@ -361,7 +407,17 @@ function zoteroError(status: number | null): FileError {
 export async function httpZoteroFetch(url: string): Promise<ZoteroFetchOutcome> {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(1500) })
-    return { status: res.status, json: res.ok ? await res.json().catch(() => null) : null }
+    if (!res.ok) return { status: res.status, json: null }
+    // Read once, as text: an export format (BibTeX) is not JSON, and the JSON
+    // endpoints here are small enough that parsing them ourselves costs nothing.
+    const text = await res.text().catch(() => '')
+    let json: unknown = null
+    try {
+      json = JSON.parse(text)
+    } catch {
+      // Not JSON — a `?format=` body, which the caller reads from `text`
+    }
+    return { status: res.status, json, text }
   } catch {
     return { status: null, json: null }
   }

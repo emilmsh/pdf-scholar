@@ -67,7 +67,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • Password-protected documents open, can be annotated, and keep their protection when saved
 • Colour, thickness and opacity are set per tool and remembered; existing marks can be adjusted rather than redrawn
 • An optional name in settings fills the standard PDF author field on new annotations
-• A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy an in-text citation or full reference — stored and linked attachments alike
+• A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy an in-text citation, full reference or BibTeX entry — stored and linked attachments alike
 • Edits are held in a draft until saved; what is saved is standard PDF annotations, which open correctly in Acrobat and other viewers
 
 SEARCH
@@ -121,7 +121,7 @@ ANNOTERING
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
 • Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes; eksisterende merker kan justeres i stedet for å tegnes på nytt
 • Et valgfritt navn i innstillingene fyller PDF-ens standard forfatterfelt på nye merknader
-• Et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen: vis elementet i Zotero, eller kopier en henvisning eller full referanse — både lagrede og lenkede vedlegg
+• Et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen: vis elementet i Zotero, eller kopier en henvisning, full referanse eller BibTeX-oppføringen — både lagrede og lenkede vedlegg
 • Endringer holdes i et utkast til du lagrer; det som lagres er standard PDF-annoteringer, som åpnes riktig i Acrobat og andre lesere
 
 SØK
@@ -151,7 +151,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Two documents side by side: the second split column can hold another file — drag its tab into the view, pick it under "Open in split view" in the view menu, right-click its tab, or drop a PDF on the column. Each column annotates its own document, and Shift+S swaps their sides
 • Reading modes reworked: Day, Tint, Night and Night+. Tint is a light paper tone — the classic Sepia cream, or gray, green, blue or sand — and Night has its own dark tones; a slider sets the strength, the toolbar follows the chosen tone, and D cycles the modes. Night can keep figures and photos in their original colours
 • An AI access switch in settings: "Confirm before sharing" asks the first time a document goes to a provider and shows what is about to be attached — follow-ups pass; "Off" blocks every AI request. The assistant now says when the whole document text rides along
-• Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item in Zotero, or copy an in-text citation or full reference. Linked attachments (a library kept in its own folder) are recognised too
+• Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item in Zotero, or copy an in-text citation, full reference or BibTeX entry. Linked attachments (a library kept in its own folder) are recognised too
 • Smaller: keyboard zoom follows the active column, and a right-click on the margin strip offers to hide it
 ```
 
@@ -160,7 +160,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • To dokumenter side om side: den andre kolonnen i delt visning kan vise en annen fil — dra fanen inn i visningen, velg den under «Åpne i delt visning» i visningsmenyen, høyreklikk fanen, eller slipp en PDF på kolonnen. Hver kolonne annoterer sitt eget dokument, og Shift+S bytter plass på dem
 • Lesemodusene er gjort om: Dag, Farge, Natt og Natt+. Farge er en lys papirtone — den klassiske sepia-kremen, eller grå, grønn, blå eller sand — og natt har egne mørke toner; en glidebryter setter styrken, verktøylinja følger valgt tone, og D bytter modus. Natt kan beholde figurer og bilder i originalfargene
 • KI-tilgang i innstillingene: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved — oppfølgingsspørsmål går rett gjennom; «Av» stopper alle AI-forespørsler. Assistenten sier nå fra når hele dokumentteksten legges ved
-• Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet i Zotero, eller kopier en henvisning eller full referanse. Lenkede vedlegg (et bibliotek i egen mappe) gjenkjennes også
+• Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet i Zotero, eller kopier en henvisning, full referanse eller BibTeX-oppføringen. Lenkede vedlegg (et bibliotek i egen mappe) gjenkjennes også
 • Mindre: tastaturzoom følger den aktive kolonnen, og høyreklikk på margstripen tilbyr å skjule den
 ```
 
