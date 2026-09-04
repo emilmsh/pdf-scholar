@@ -209,7 +209,7 @@ const REGISTRY: readonly Command[] = [
   // get to spend themselves.
   { id: 'view.marginNotes', category: 'view', labelKey: 'keys.viewMarginNotes', defaults: [] },
   { id: 'view.togglePin', category: 'view', labelKey: 'keys.viewTogglePin', defaults: ['v'] },
-  // Cycles day→sepia→night→night+ (a reader-feature ask, 2026-09-02). 'd' was
+  // Cycles day→Farge→night→night+ (a reader-feature ask, 2026-09-02). 'd' was
   // free and reads as dag/dark in both languages; handled in App.tsx's shell
   // switch because the theme must flip with no document open too.
   { id: 'view.cycleTheme', category: 'view', labelKey: 'keys.viewCycleTheme', defaults: ['d'] },

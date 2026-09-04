@@ -914,21 +914,26 @@ export default function App(): React.JSX.Element {
           e.preventDefault()
           void openDialog()
           break
-        // Cycle the reading mode through the four core themes. App-level, not
-        // the viewer's switch: the theme is an app setting and the key must
-        // work with no document open. 'auto' and 'custom' are not IN the cycle
-        // (auto is a policy, custom is a menu choice) — from either, the first
-        // press lands on day, which indexOf's −1 gives for free.
+        // Cycle the reading mode through the four modes the picker offers:
+        // day → Farge → night → night+. App-level, not the viewer's switch:
+        // the theme is an app setting and the key must work with no document
+        // open. Farge is the 'custom' theme in whatever tone the user chose —
+        // the legacy 'sepia' id sits in that slot so a stored sepia cycles on
+        // to night instead of restarting at day (the first version cycled
+        // through 'sepia' itself, which ignored the chosen tone). 'auto' is
+        // not IN the cycle (a policy, not a mode) — from it the first press
+        // lands on day, which indexOf's −1 gives for free.
         case 'view.cycleTheme': {
           e.preventDefault()
-          const order = ['day', 'sepia', 'night', 'nightHc'] as const
+          const order = ['day', 'custom', 'night', 'nightHc'] as const
           const labels = {
             day: 'tb.themeDay',
-            sepia: 'tb.themeSepia',
+            custom: 'tb.themeCustom',
             night: 'tb.themeNight',
             nightHc: 'tb.themeNightHc'
           } as const
-          const at = (order as readonly string[]).indexOf(settingsRef.current.theme)
+          const current = settingsRef.current.theme
+          const at = (order as readonly string[]).indexOf(current === 'sepia' ? 'custom' : current)
           const next = order[(at + 1) % order.length]
           updateSettings({ theme: next })
           flashThemeName(t(labels[next]))
