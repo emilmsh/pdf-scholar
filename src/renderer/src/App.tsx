@@ -181,6 +181,14 @@ export default function App(): React.JSX.Element {
    *  must read the CURRENT theme when cycling, not the one at bind time. */
   const settingsRef = useRef(settings)
   settingsRef.current = settings
+  const systemDarkRef = useRef(systemDark)
+  systemDarkRef.current = systemDark
+  /** The 'd' cycle's memory of having LEFT auto: `home` is set when a press
+   *  takes the theme off 'auto', `last` is the theme that press set. The next
+   *  press compares `last` with the live setting — a mismatch means the menu
+   *  changed the theme in between, and the excursion is forgotten rather
+   *  than returning someone to a policy they have since moved away from. */
+  const themeCycleRef = useRef<{ home: 'auto'; last: ThemeName } | null>(null)
 
   const resolvedTheme: ThemeName =
     settings.theme === 'auto'
@@ -920,21 +928,49 @@ export default function App(): React.JSX.Element {
         // open. Farge is the 'custom' theme in whatever tone the user chose —
         // the legacy 'sepia' id sits in that slot so a stored sepia cycles on
         // to night instead of restarting at day (the first version cycled
-        // through 'sepia' itself, which ignored the chosen tone). 'auto' is
-        // not IN the cycle (a policy, not a mode) — from it the first press
-        // lands on day, which indexOf's −1 gives for free.
+        // through 'sepia' itself, which ignored the chosen tone).
+        //
+        // 'auto' is not a fifth stop — it is a policy that resolves to one of
+        // the same four looks, so a plain stop for it would be one press per
+        // user that changes nothing on screen while the flash claims a new
+        // mode. It takes part in two other ways instead (Emil, 2026-09-04):
+        // the cycle ENTERS from auto by stepping past the look auto is showing
+        // right now (from auto-on-day the first press is Farge, not day), and
+        // it comes HOME to auto — only if it started there — at the exact
+        // press where it would otherwise land on the look auto shows, so the
+        // return is never a dead step either. A theme picked from the menu in
+        // between ends the excursion (see themeCycleRef).
         case 'view.cycleTheme': {
           e.preventDefault()
           const order = ['day', 'custom', 'night', 'nightHc'] as const
+          type Stop = (typeof order)[number]
           const labels = {
             day: 'tb.themeDay',
             custom: 'tb.themeCustom',
             night: 'tb.themeNight',
-            nightHc: 'tb.themeNightHc'
+            nightHc: 'tb.themeNightHc',
+            auto: 'tb.themeAuto'
           } as const
-          const current = settingsRef.current.theme
-          const at = (order as readonly string[]).indexOf(current === 'sepia' ? 'custom' : current)
-          const next = order[(at + 1) % order.length]
+          const s = settingsRef.current
+          const asStop = (theme: ThemeName): Stop => (theme === 'sepia' ? 'custom' : theme)
+          const after = (stop: Stop): Stop => order[(order.indexOf(stop) + 1) % order.length]
+          const autoShows = asStop(systemDarkRef.current ? s.autoDark : s.autoLight)
+          let next: Stop | 'auto'
+          if (s.theme === 'auto') {
+            next = after(autoShows)
+            themeCycleRef.current = { home: 'auto', last: next }
+          } else {
+            const excursion = themeCycleRef.current
+            if (excursion && excursion.last !== s.theme) themeCycleRef.current = null
+            const candidate = after(asStop(s.theme))
+            if (themeCycleRef.current && candidate === autoShows) {
+              next = 'auto'
+              themeCycleRef.current = null
+            } else {
+              next = candidate
+              if (themeCycleRef.current) themeCycleRef.current.last = next
+            }
+          }
           updateSettings({ theme: next })
           flashThemeName(t(labels[next]))
           break
