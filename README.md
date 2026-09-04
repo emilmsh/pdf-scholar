@@ -95,6 +95,13 @@ From the [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest
 
 Both auto-update in place when a new release is published.
 
+The build is made in CI on every release, from the same sources as the Windows
+one, but it has never been run on a Linux machine: I develop on Windows and have
+no Linux hardware to test on. So the beta label here is literal, and reports are
+genuinely useful — if you run it, [open an
+issue](https://github.com/emilmsh/pdf-scholar/issues) with your distro and what
+worked or broke.
+
 ### Browser extension (Edge / Chrome) — beta
 
 The same viewer, but each PDF opens as an ordinary browser tab instead of in the
