@@ -144,7 +144,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.44.1
+## What's new in this version (≤ 1 500 chars) — v0.45.3
 
 **EN:**
 ```
@@ -152,7 +152,8 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Reading modes reworked: Day, Tint, Night and Night+. Tint is a light paper tone — the classic Sepia cream, or gray, green, blue or sand — and Night has its own dark tones; a slider sets the strength, the toolbar follows the chosen tone, and D cycles the modes. Night can keep figures and photos in their original colours
 • An AI access switch in settings: "Confirm before sharing" asks the first time a document goes to a provider and shows what is about to be attached — follow-ups pass; "Off" blocks every AI request. The assistant now says when the whole document text rides along
 • Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item in Zotero, or copy an in-text citation, full reference or BibTeX entry. Linked attachments (a library kept in its own folder) are recognised too
-• Smaller: keyboard zoom follows the active column, and a right-click on the margin strip offers to hide it
+• The split remembers: S reopens the last pair at the side and width it had, a dropped tab lands on the half it was dropped over, and the two-page spread returns at its own zoom. The other document's column gets the selection and right-click menus too
+• Ctrl+Shift+T reopens the last closed tab. D steps past the mode Auto is showing and returns to Auto when the cycle began there
 ```
 
 **NO:**
@@ -161,7 +162,8 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 • Lesemodusene er gjort om: Dag, Farge, Natt og Natt+. Farge er en lys papirtone — den klassiske sepia-kremen, eller grå, grønn, blå eller sand — og natt har egne mørke toner; en glidebryter setter styrken, verktøylinja følger valgt tone, og D bytter modus. Natt kan beholde figurer og bilder i originalfargene
 • KI-tilgang i innstillingene: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved — oppfølgingsspørsmål går rett gjennom; «Av» stopper alle AI-forespørsler. Assistenten sier nå fra når hele dokumentteksten legges ved
 • Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet i Zotero, eller kopier en henvisning, full referanse eller BibTeX-oppføringen. Lenkede vedlegg (et bibliotek i egen mappe) gjenkjennes også
-• Mindre: tastaturzoom følger den aktive kolonnen, og høyreklikk på margstripen tilbyr å skjule den
+• Delt visning husker: S åpner forrige par igjen på samme side og i samme bredde, en sluppet fane lander på halvdelen den ble sluppet over, og tosidevisningen kommer tilbake i sin egen zoom. Det andre dokumentets kolonne får også markerings- og høyreklikkmenyen
+• Ctrl+Shift+T åpner sist lukkede fane. D hopper forbi modusen Auto viser, og går tilbake til Auto når syklusen begynte der
 ```
 
 ---
