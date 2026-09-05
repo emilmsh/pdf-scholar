@@ -7,21 +7,37 @@ one is the first thing a visitor sees, and it ships to the Microsoft Store.
 **Two sizes of release.** A **release** — the default meaning of the word when
 nothing more is said — is GitHub only: steps 0–3. A **full release** also pushes
 the store channels: steps 4–5 (Microsoft Store, then the extension stores). The
-distinction exists because the store channels routinely have submissions still
+distinction exists because a store channel routinely has a submission still
 sitting in review, and a new push there while one is pending is at best queued
-and at worst a conflict — so the stores are only touched on an explicit "full
-release" from Emil. A monthly reminder issue
-(`.github/workflows/release-reminder.yml`, the 1st of each month) nudges that
-batch so the stores never silently fall a season behind.
+and at worst a conflict — so the stores wait for Emil to ask, and a bare
+"release" never implies them.
 
-**Small updates go everywhere, hands-free** (Emil, 2026-08-25). When a release
-carries **no new listing copy and no new screenshots**, the store channels ride
-along via the two workflows (`store-publish.yml`, `ext-publish.yml`) rather than
-waiting for a batched full release — the one thing the APIs cannot carry
-(images) is exactly what such a release does not have. The
-one-delivery-per-certification rule (2026-08-11) still governs releases that DO
-bring new images or copy: those are submitted by hand, everything in one
-submission. And never push a channel that still has a submission in review.
+**The build travels; the copy waits** (Emil, 2026-09-04: "Jeg er mest opptatt av
+at nyeste versjon av appen er oppdatert. Vi kan ta tekster og bilder litt mer
+sjeldent"). Getting the current *build* onto every channel is the thing that
+matters, so the two workflows (`store-publish.yml`, `ext-publish.yml`) run as
+soon as a channel is free — a release that also happens to carry new listing
+copy or new screenshots is **not** a reason to hold the version back. That was
+the old reading of the one-delivery-per-certification rule, and it is how the
+stores fell several versions behind through 0.44 and 0.45.
+
+Listing copy and screenshots are a **separate, slower batch**. What each channel
+can carry differs, and it decides what is left over:
+
+- `store-publish.yml` sends the Microsoft Store's description, features and
+  release notes through the API for free, so take that along whenever it is
+  ready. **Screenshots are never synced** — they go up in Partner Center by
+  hand.
+- `ext-publish.yml` carries **no listing copy at all** for Edge or Chrome. When
+  `docs/STORE-LISTING.md` has changed since the version those stores carry, the
+  new copy stays queued for a manual pass in both dashboards.
+
+So: push the build, then *tell Emil what is left over by hand* rather than
+delaying the version. The monthly reminder issue
+(`.github/workflows/release-reminder.yml`, the 1st of each month) is what keeps
+that leftover batch from being forgotten. Two rules survive unchanged — never
+push a channel that still has a submission in review, and once a submission is
+created through the API, never edit it in the Partner Center UI.
 
 ## 0. Screenshots — by hand, Emil
 
@@ -270,9 +286,11 @@ gh workflow run ext-publish.yml -f target=all -f check_only=true
 
 then for real (no `check_only`). It uploads the release's store zip and submits
 for review; it cannot touch listing copy, screenshots or permission
-justifications — those stay manual in the dashboards. Edge secrets are in and
-proven; **Chrome needs the `CWS_*` secrets set up first** (one-time, see
-`docs/STORE.md` Track C) — until then Chrome is a manual upload of
-`pdf-scholar-extension-store.zip` (manifest at the zip root) in the dev console.
-Copy lives in `docs/STORE-LISTING.md`; the permission justifications there are
-written to pre-empt the reviewer. See `docs/STORE.md`.
+justifications — those stay manual in the dashboards. Both stores' secrets are
+in and proven end to end (Edge since 2026-09-02, Chrome's `CWS_*` since
+2026-09-04, when `target=all` submitted to both in one run).
+
+Copy lives in `docs/STORE-LISTING.md` and reaches neither store through the
+API, so compare it against what the stores carry after every push and hand Emil
+the leftovers — the permission justifications there are written to pre-empt the
+reviewer. See `docs/STORE.md`.
