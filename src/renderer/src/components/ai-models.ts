@@ -71,12 +71,18 @@ export const MODELS: Record<
   { id: string; label: string; short: string; hint?: MsgKey }[]
 > = {
   anthropic: [
-    { id: 'claude-fable-5', label: 'Claude Fable 5', short: 'Fable 5', hint: 'ai.modelHintHeaviest' },
+    // Fable 5.1 replaced Fable 5 in the same slot 2026-09-05 (launched
+    // 2026-09-01; Fable 5 moved to Anthropic's "Legacy models" list, still
+    // served — a stored Fable 5 selection stays pickable)
+    { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'ai.modelHintHeaviest' },
     { id: 'claude-opus-5', label: 'Claude Opus 5', short: 'Opus 5', hint: 'ai.modelHintCapable' },
     { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'ai.modelHintRecommended' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'ai.modelHintFast' }
   ],
   openai: [
+    // GPT-6 Astra (launched 2026-09-03) sits above the 5.6 trio, which stays
+    // current — Astra is a new top tier, not a replacement
+    { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
     { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', short: 'GPT-5.6 Sol', hint: 'ai.modelHintCapable' },
     { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', short: 'GPT-5.6 Terra', hint: 'ai.modelHintRecommended' },
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
@@ -225,17 +231,22 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
 // ids get the provider floor (Azure lowest: deployments routinely cap below
 // the base model). Maintained with the curated MODELS list (docs/MODEL-UPDATE.md).
 const MODEL_CONTEXT_TOKENS: Record<string, number> = {
-  // Anthropic's own model table (platform.claude.com, verified 2026-08-13)
-  // states 1M tokens for Fable 5, Opus 5 and Sonnet 5 — matches
-  // docs/agent-notes/modeller-api.md, which had recorded the same number
-  // since July; the two were out of sync here until this pass.
+  // Anthropic's own model table (platform.claude.com, verified 2026-08-13,
+  // Fable 5.1 added 2026-09-05) states 1M tokens for Fable 5.1, Opus 5 and
+  // Sonnet 5 — matches docs/agent-notes/modeller-api.md, which had recorded
+  // the same number since July; the two were out of sync here until this pass.
+  'claude-fable-5-1': 1_000_000,
+  // claude-fable-5 kept here though no longer curated (see MODELS.anthropic) —
+  // a stored selection from before 5.1 must not regress to the 200k floor
   'claude-fable-5': 1_000_000,
   'claude-opus-5': 1_000_000,
   'claude-sonnet-5': 1_000_000,
   'claude-haiku-4-5': 200_000,
   // 922K is the documented INPUT capacity (1.05M total minus the 128K output
   // ceiling); 900K keeps the floor conservative without throwing the window
-  // away, as the old 250_000 did. Verified 2026-08-13, see modeller-api.md.
+  // away, as the old 250_000 did. Verified 2026-08-13 (Astra 2026-09-05, same
+  // numbers on its model page), see modeller-api.md.
+  'gpt-6-astra': 900_000,
   'gpt-5.6-sol': 900_000,
   'gpt-5.6-terra': 900_000,
   'gpt-5.6-luna': 900_000,

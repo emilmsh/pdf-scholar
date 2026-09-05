@@ -56,7 +56,14 @@ export interface AiProviderProfile {
  *  (console.groq.com/docs/reasoning, verified 2026-08-17); "none"/off is
  *  unverified there (same open gap as grok-4.5/4.6's off value), covered by
  *  the degrade-on-400 net. */
-export const OPENAI_REASONING_RE = /gpt-5|o[0-9]|grok-4\.[56]|gpt-oss/i
+export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[56]|gpt-oss/i
+
+/** OpenAI models whose reasoning cannot be switched off: GPT-6 Astra returns
+ *  HTTP 400 on `reasoning.effort: "none"` (developers.openai.com/api/docs/
+ *  guides/reasoning, verified 2026-09-05 — it takes low/medium/high/xhigh/max
+ *  only). «Av» maps to the lowest effort instead, the same honest mapping
+ *  the Anthropic path uses for the always-thinking Fable family. */
+export const OPENAI_ALWAYS_REASONS_RE = /gpt-6/i
 
 /** The first-class hosted OpenAI-compatible services (fase 10.3): a FINITE,
  *  curated set — one key field each, entered once, stored exactly like the

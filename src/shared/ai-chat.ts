@@ -27,7 +27,12 @@ import type {
   ThinkingLevel
 } from './types'
 import { isCatalogProvider, remoteModel } from './ai-model-catalog'
-import { COMPAT_SERVICES, isCompatService, OPENAI_REASONING_RE } from './ai-provider-profile'
+import {
+  COMPAT_SERVICES,
+  isCompatService,
+  OPENAI_ALWAYS_REASONS_RE,
+  OPENAI_REASONING_RE
+} from './ai-provider-profile'
 import { DEFAULT_AZURE_API_VERSION } from './defaults'
 import { AI_ERRORS } from './engine-errors'
 
@@ -116,9 +121,12 @@ function anthropicThinking(
   return { thinking: { type: 'adaptive' }, ...(outputConfig && { outputConfig }), maxTokens: 12000 }
 }
 
-/** OpenAI reasoning_effort value (none maps 'off') */
-function openAiEffort(level: ThinkingLevel): string {
-  return level === 'off' ? 'none' : level
+/** OpenAI reasoning_effort value. 'off' maps to `none` — except on models
+ *  that cannot stop reasoning (GPT-6 Astra 400s on `none`), where the lowest
+ *  effort is the honest mapping, as for Anthropic's Fable family. */
+function openAiEffort(level: ThinkingLevel, model: string): string {
+  if (level !== 'off') return level
+  return OPENAI_ALWAYS_REASONS_RE.test(model) ? 'low' : 'none'
 }
 
 // ---------- Web search (server-side provider tool) ----------
@@ -607,7 +615,7 @@ async function chatOpenAiResponses(
     stream: true
   }
   if (webSearchEnabled(req)) body.tools = [{ type: 'web_search' }]
-  if (OPENAI_REASONING_RE.test(model)) body.reasoning = { effort: openAiEffort(thinking) }
+  if (OPENAI_REASONING_RE.test(model)) body.reasoning = { effort: openAiEffort(thinking, model) }
 
   // Same degrade-on-400 idea as the Anthropic path: when the model rejects a
   // parameter we added on a heuristic (reasoning effort, the web-search tool),
@@ -773,8 +781,8 @@ async function chatOpenAiCompatible(
 
   const body: Record<string, unknown> = { messages, stream: true }
   if (model) body.model = model
-  // gpt-5.6 reasoning control (harmless on models that ignore it)
-  if (OPENAI_REASONING_RE.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking)
+  // gpt-5.6/gpt-6 reasoning control (harmless on models that ignore it)
+  if (OPENAI_REASONING_RE.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking, model ?? '')
 
   // Deployments name models we cannot inspect, so the reasoning heuristic can
   // misfire — a 400 blaming it gets one retry without, same net as the other paths.

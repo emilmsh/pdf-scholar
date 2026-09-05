@@ -1,4 +1,4 @@
-# API-katalog (agentverifisert juli 2026, sist oppdatert 2026-08-31) — grunnlag for modell/tenkeinnsats-implementasjon
+# API-katalog (agentverifisert juli 2026, sist oppdatert 2026-09-05) — grunnlag for modell/tenkeinnsats-implementasjon
 
 > Vedlikehold: kjør `npm run check:models` og følg `docs/MODEL-UPDATE.md` når
 > katalogen skal fornyes. Appen henter nå modell-lister og kapabiliteter live
@@ -18,7 +18,7 @@ ikke på Opus-generasjon, så ingen kodeendring der).
 
 | Modell | ID | Kontekst | Pris inn/ut per MTok |
 |---|---|---|---|
-| Claude Fable 5 | `claude-fable-5` | 1M | $10/$50 |
+| Claude Fable 5.1 | `claude-fable-5-1` | 1M | $10/$50 (cache-lesing $0.25, en fjerdedel av Fable 5) |
 | Claude Opus 5 | `claude-opus-5` | 1M | $5/$25 |
 | Claude Sonnet 5 | `claude-sonnet-5` | 1M | $2/$10 |
 | Claude Haiku 4.5 | `claude-haiku-4-5-20251001` (alias `claude-haiku-4-5`) | 200K | $1/$5 |
@@ -57,9 +57,51 @@ suspending access... apologize for this disruption», gjenåpnet 1.7.2026),
 ingen eksportkontroll-sammenheng. Ingen relevans for dagens status, men notert
 her så en fremtidig runde ikke lar seg lure av samme søketreff.
 
+**Review 2026-09-05 (platform.claude.com/docs/en/models/overview,
+anthropic.com/claude-fable-and-mythos-5-1, sjekket samme dag): Claude Fable
+5.1 (`claude-fable-5-1`) lanserte 1.9.2026 og har tatt Fable 5s plass i
+tabellen over.** Fable 5 (`claude-fable-5`) ligger nå under «Legacy models»
+— fortsatt tilgjengelig, så den beholdes i `MODEL_CONTEXT_TOKENS` for lagrede
+valg, men er ute av den kuraterte listen (samme regel som Opus 4.8 → Opus 5).
+Samme tier, samme pris per token ($10/$50), samme 1M kontekst og 128K output,
+samme tokenizer; cache-lesing er satt ned til $0.25/MTok (0,025× inn-pris,
+mot 0,1× på resten av lineupen). Kunnskaps-cutoff juni 2026, pensjonering
+tidligst 1.9.2027. Mythos 5.1 (`claude-mythos-5-1`) er samme modell for
+Project Glasswing — fortsatt ikke selvbetjent, samme status som Mythos 5.
+
+Hva 5.1 bryter i forhold til Fable 5, og hvorfor ingen av dem treffer oss
+(vurdert mot `chatAnthropic` i `src/shared/ai-chat.ts`, 2026-09-05):
+- **Tvunget `tool_choice` (`any`/`tool`) gir 400.** Vi sender aldri
+  `tool_choice` — eneste verktøy er den server-side web-søk-tool'en under
+  `auto`. Ingen endring.
+- **«Preserved thinking»: thinking-blokker er bundet til modellen som laget
+  dem OG til samtaleprefikset** — å redigere en tidligere tur invaliderer
+  alle senere blokker, og nye kontoer (opprettet fra 31.8.2026) får 400 på
+  det uten `thinking-binding-controls-2026-08-01`-headeren. Vi replayer aldri
+  thinking-blokker på tvers av forespørsler: historikken bygges av
+  `req.messages` som rolle + ren tekst, så assistent-turer går tilbake som
+  tekst og det finnes ingen blokk å invalidere. Innenfor ÉN forespørsel
+  legges `final.content` (med thinking) til kun i pause_turn-løkken, som er
+  append-only. Ingen endring, og headeren trengs ikke.
+- **`thinking: {type:"disabled"}` gir 400 på alle effort-nivåer** (Opus 5
+  tok det på `high` og lavere) — vi sender aldri `thinking`-feltet for
+  `fable|mythos` (`alwaysThinks`). Ingen endring.
+- Fallbacks (`fallbacks: 'default'` + `server-side-fallback-2026-07-01`)
+  virker som på Fable 5; tillatte mål er Opus 4.8 og Opus 5. Fallback-
+  modellen kan ikke lese 5.1s thinking-blokker, API-et dropper dem selv.
+  Refusal-kategoriene er bredere enn Opus 5s (`bio`, `reasoning_extraction`
+  i tillegg til `cyber`) — vi leser bare `stop_reason === 'refusal'`, så det
+  spiller ingen rolle.
+- Ikke støttet på Priority Tier; krever 30 dagers dataoppbevaring (ZDR-org
+  får 400 — det gjaldt Fable 5 også).
+- Regex-fallbackene (`/fable|mythos/` i `anthropicTraits`,
+  `anthropicWebSearchTool`, beta-klienten) matcher `claude-fable-5-1` uten
+  endring; verifisert i `npm run test:ai-chat` («fable 5.1»-assertions).
+  **Live spørsmål med ekte nøkkel gjenstår (Emil, MAINTENANCE.md rad 2).**
+
 Thinking-regler:
 - `budget_tokens` gir **400** på Fable/Opus 5/Sonnet 5. Bruk `thinking: {type:"adaptive"}` + `output_config: {effort: "low|medium|high|xhigh|max"}`.
-- Fable 5: thinking alltid på (disabled/budget → 400); `temperature` → 400; krever `client.beta.messages.stream` med `betas: ['server-side-fallback-2026-07-01']`, `fallbacks: 'default'` (Anthropic velger fallback per avslagskategori — ingen pinnet modell-id å vedlikeholde; den eldre array-formen bruker `-2026-06-01`-headeren); sjekk `stop_reason === 'refusal'` før content leses.
+- Fable 5 og 5.1: thinking alltid på (disabled/budget → 400); `temperature` → 400; krever `client.beta.messages.stream` med `betas: ['server-side-fallback-2026-07-01']`, `fallbacks: 'default'` (Anthropic velger fallback per avslagskategori — ingen pinnet modell-id å vedlikeholde; den eldre array-formen bruker `-2026-06-01`-headeren); sjekk `stop_reason === 'refusal'` før content leses.
 - Sonnet 5: thinking er PÅ som default når feltet utelates — «Av» krever `{type:"disabled"}`.
 - Opus 5 (og 4.8): utelatt felt = av.
 - Haiku 4.5: `effort` feiler; thinking via `budget_tokens` (min 1024) eller utelat.
@@ -68,7 +110,49 @@ Thinking-regler:
 - Å endre `thinking`-feltet invaliderer messages-cachen (dokumentblokken) → lås tenkeinnsats per samtale.
 - Citations upåvirket av thinking.
 
-## OpenAI gpt-5.6 (lansert 9.7.2026)
+## OpenAI gpt-6 Astra (lansert 3.9.2026) og gpt-5.6 (lansert 9.7.2026)
+
+**Review 2026-09-05 (developers.openai.com/api/docs/models,
+/api/docs/models/gpt-6-astra og /api/docs/guides/reasoning, sjekket samme
+dag; lanseringsdato fra techcrunch.com/2026/09/03 og cnbc.com/2026/09/03):
+GPT-6 Astra (`gpt-6-astra`) er lagt til øverst i den kuraterte listen.**
+Det er et nytt topp-tier over 5.6-trioen, ikke en erstatning — Sol/Terra/Luna
+står uendret på modellsiden, så listen har nå fire. Tekst + bilde inn, tekst
+ut (kuratert-regel #2 innfridd), Chat Completions og Responses støttet,
+streaming, web-søk og prompt caching støttet. Kunnskaps-cutoff 30.4.2026.
+Eneste snapshot-id er `gpt-6-astra` selv.
+
+- **`reasoning.effort` tar `low|medium|high|xhigh|max` — IKKE `none`.**
+  Reasoning-guiden sier ordrett: «GPT-6 Astra does not support `none`
+  reasoning effort. Setting `reasoning.effort` … to `none` returns HTTP 400.»
+  Vår «Av» sendte `none` for alle OpenAI-modeller; for Astra hadde det gitt
+  én 400 + degrade-retry uten reasoning per spørsmål. Kodet som
+  `OPENAI_ALWAYS_REASONS_RE` (`/gpt-6/`, `ai-provider-profile.ts`): «Av» →
+  `low`, samme ærlige mapping som Fable-familien på Anthropic-siden.
+  gpt-5.6 beholder `none` (dokumentert der, og billigere). Default-effort
+  for Astra er ikke oppgitt — vi setter alltid effort eksplisitt, så det
+  spiller ingen rolle.
+- **`OPENAI_REASONING_RE` utvidet fra `/gpt-5/` til `/gpt-[5-9]/`** — uten
+  det hadde Astra fått ingen tenkeinnsats-styring i stillhet (ingen 400,
+  bare default-effort). Dette er nøyaktig drift-typen MODEL-UPDATE.md rad
+  «Capability summary contradicts the heuristics» beskriver.
+- `isOpenAiChatModel` (`ai-model-catalog.ts`) og filteret i
+  `check-models.mjs` matcher `gpt-6-astra` allerede (`/^(gpt-[0-9]|o[0-9])/`);
+  `lineageOf` leser generasjon 6 → sorterer over 5.6 i live-lister.
+- Kontekst: 1,05M totalt, **922K input**, 128K output — identisk med 5.6,
+  så `MODEL_CONTEXT_TOKENS` får 900_000 som de tre andre. 272K-pristerskelen
+  gjelder Astra også (samme ordlyd: >272K input → 2× inn/cache og 1,5× ut).
+- Pris $10/$50 per MTok, cached inn $1, batch halv pris, «Fast mode» 2×.
+- Presseomtale (TechCrunch/CNBC 3.9.2026) beskriver trinnvis utrulling
+  («a limited set of organizations on day one, then … the OpenAI API and AWS
+  over the coming days»); modellsiden selv nevner ingen tilgangsbegrensning.
+  Om en konto ikke har fått den ennå, viser ⚠-markøren i menyen det (live
+  `/v1/models`-diff), og valget står. **Live spørsmål med ekte nøkkel
+  gjenstår (Emil).**
+
+| Modell | ID | Kontekst (input) | Pris inn/ut | Cached inn |
+|---|---|---|---|---|
+| Astra (GPT-6, tyngst) | `gpt-6-astra` | 922K (1,05M totalt inkl. 128K output) | $10/$50 | $1 |
 
 Kontekst-kolonnen er kontrakten mot `MODEL_CONTEXT_TOKENS` (`npm run
 check:models` sammenligner dem): den oppgir **input**-kapasiteten, ikke en
@@ -211,12 +295,14 @@ tenkeinnsats-styring. Det samme gjelder nå `gemini-3.6-flash` i
 
 ## Anbefalt mapping «Tenkeinnsats» (Av/Lav/Middels/Høy)
 
-| Valg | Opus 5 / Sonnet 5 | Fable 5 | Haiku 4.5 | OpenAI |
-|---|---|---|---|---|
-| Av | Opus: utelat; Sonnet 5: `{type:"disabled"}` | umulig (grå ut → Lav) | utelat | `none` |
-| Lav/Middels/Høy | `adaptive` + effort low/medium/high | effort low/medium/high | ikke støttet (utelat) | low/medium/high |
+| Valg | Opus 5 / Sonnet 5 | Fable 5 / 5.1 | Haiku 4.5 | OpenAI gpt-5.6 | OpenAI gpt-6 |
+|---|---|---|---|---|---|
+| Av | Opus: utelat; Sonnet 5: `{type:"disabled"}` | umulig (→ effort low) | utelat | `none` | umulig (`none` → 400; → `low`) |
+| Lav/Middels/Høy | `adaptive` + effort low/medium/high | effort low/medium/high | ikke støttet (utelat) | low/medium/high | low/medium/high |
 
 Defaults: anthropic `claude-sonnet-5` + Middels; openai `gpt-5.6-terra` + medium.
 Heuristikk: effort kun når id ikke matcher `haiku` (fallback i `anthropicTraits`
 skiller ikke videre på Opus/Sonnet/Fable-generasjon — «alwaysThinks» slår bare
-inn for `fable|mythos`); Haiku alltid uten thinking.
+inn for `fable|mythos`); Haiku alltid uten thinking. OpenAI: `reasoning_effort`
+sendes for `OPENAI_REASONING_RE` (`gpt-[5-9]|o[0-9]|grok-4.[56]|gpt-oss`), og
+«Av» blir `low` i stedet for `none` for `OPENAI_ALWAYS_REASONS_RE` (`gpt-6`).

@@ -247,6 +247,29 @@ section('anthropic: family rules (fable / haiku / caps override)')
   ok(beta.includes('server-side-fallback') || Array.isArray(fable?.body?.betas), 'fable: fallback beta requested')
   ok(fable?.body?.fallbacks === 'default', 'fable: fallbacks default')
 
+  // Fable 5.1 (curated since 2026-09-05) rides the same family rules — and
+  // never sees the two things it rejects that Fable 5 accepted: a forced
+  // tool_choice and replayed thinking blocks (history is text-only here).
+  responder = () => anthropicSse({ model: 'claude-fable-5-1', deltas: ['ok'] })
+  await run({
+    models: { anthropic: 'claude-fable-5-1', openai: '', azure: '', mock: '' },
+    thinking: 'high',
+    req: { ...baseParams({}).req, messages: [
+      { role: 'user', text: 'Første spørsmål', images: [] },
+      { role: 'assistant', text: 'Første svar', images: [] },
+      { role: 'user', text: 'Oppfølging', images: [] }
+    ] }
+  })
+  const fable51 = calls[0]
+  ok(fable51?.body?.thinking === undefined, 'fable 5.1: no thinking param')
+  ok(fable51?.body?.output_config?.effort === 'high', 'fable 5.1: effort travels')
+  ok(fable51?.body?.fallbacks === 'default', 'fable 5.1: fallbacks default')
+  ok(fable51?.body?.tool_choice === undefined, 'fable 5.1: no forced tool_choice (400 on 5.1)')
+  ok(
+    (fable51?.body?.messages ?? []).every((m) => typeof m.content === 'string' || m.content.every((b) => b.type !== 'thinking')),
+    'fable 5.1: no thinking blocks replayed in history'
+  )
+
   // Haiku ignores thinking AND effort entirely.
   responder = () => anthropicSse({ model: 'claude-haiku-4-5', deltas: ['ok'] })
   await run({ models: { anthropic: 'claude-haiku-4-5', openai: '', azure: '', mock: '' }, thinking: 'high' })
@@ -340,6 +363,23 @@ section('openai: request shaping + SSE parse')
     webTool: (body?.tools ?? []).length > 0,
     images: Array.isArray(userParts) && userParts.some((p) => p.type === 'input_image')
   }
+}
+
+section('openai: gpt-6 astra (curated 2026-09-05)')
+{
+  // The reasoning regex must cover the 6-series — /gpt-5/ alone would have
+  // left Astra without thinking-level control in silence.
+  responder = () => openAiSse({ deltas: ['ok'], response: { model: 'gpt-6-astra', output: [] } })
+  await run({ provider: 'openai', models: { anthropic: '', openai: 'gpt-6-astra', azure: '', mock: '' }, thinking: 'high' })
+  ok(calls[0]?.body?.reasoning?.effort === 'high', 'gpt-6: reasoning effort sent')
+  // Astra 400s on effort "none" (OpenAI reasoning guide, 2026-09-05): «Av»
+  // maps to the lowest effort, like Fable — and NOT through the degrade net,
+  // which would have cost a second request per question.
+  await run({ provider: 'openai', models: { anthropic: '', openai: 'gpt-6-astra', azure: '', mock: '' }, thinking: 'off' })
+  ok(calls.length === 1 && calls[0]?.body?.reasoning?.effort === 'low', `gpt-6 off → effort low in ONE request (got ${calls.length}, ${calls[0]?.body?.reasoning?.effort})`)
+  // gpt-5.6 keeps `none` — it is documented there and the cheaper answer.
+  await run({ provider: 'openai', thinking: 'off' })
+  ok(calls[0]?.body?.reasoning?.effort === 'none', 'gpt-5.6 off → none unchanged')
 }
 
 section('openai: degrade-on-400 + response.failed')
