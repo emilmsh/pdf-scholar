@@ -6153,6 +6153,36 @@ html.pen-near .draw-layer {
   overflow: hidden;
 }
 
+/* The citation-style row of the save menu's reference sections: a label and
+   a native select on one line, styled like the AI settings' fields so the two
+   menus read as one family. Native because the list is eight fixed presets —
+   a picker inside a menu inside a menu is one layer too many. */
+.menu-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.menu-select-row select {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.menu-select-row select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
 /* A document living in a Zotero library: a quiet Z on the save split, marking
    where the Zotero actions live (Emil's ask, 2026-09-02). Non-interactive —
    the chevron beneath it is the click target. */

@@ -10,8 +10,8 @@
 //   application/vnd.citationstyles.csl+json  → title / authors / year
 //   text/x-bibliography; style=apa           → the full reference
 //   application/x-bibtex                     → the BibTeX entry
-// The in-text citation is not a format the agencies serve, so APA's rule is
-// applied here from the CSL fields (one author, two, three-or-more, no date).
+// The in-text citation is not a format the agencies serve, so the style
+// family's rule is applied from the CSL fields (shared/citation-style.ts).
 //
 // The Zotero section stays the better source when the library HAS the item —
 // the user's own corrected metadata beats a publisher's deposit — so the
@@ -26,6 +26,10 @@
 // scripts/test-doi.mjs proves the flow without a network.
 
 import type { DoiErrorCode, DoiInfo, FileError } from './types'
+import type { CitationStyleId } from './citation-style'
+import { citationStyleOrDefault, inTextCitation } from './citation-style'
+
+export { CITATION_STYLES, inTextCitation } from './citation-style'
 
 /** A DOI as the handbook defines it: the `10.` prefix, a 4–9 digit registrant
  *  code, a slash, and a suffix that may hold nearly any printable character.
@@ -140,31 +144,20 @@ function yearOf(root: Record<string, unknown> | null): string {
   return ''
 }
 
-/** APA 7 in-text citation from the CSL fields: «(Pfaffman, 2007)», «(Vaswani &
- *  Shazeer, 2017)», «(Vaswani et al., 2017)». With no author the title stands
- *  in, as APA has it; with no date, «n.d.». Empty only when there is neither
- *  an author nor a title — nothing to cite by. */
+/** APA 7 in-text citation from the CSL fields — the APA case of
+ *  shared/citation-style.ts, kept under its own name for the test. */
 export function apaInText(item: ParsedCsl): string {
-  const who =
-    item.creators.length === 0
-      ? item.title
-      : item.creators.length === 1
-        ? item.creators[0]!
-        : item.creators.length === 2
-          ? `${item.creators[0]} & ${item.creators[1]}`
-          : `${item.creators[0]} et al.`
-  if (!who) return ''
-  return `(${who}, ${item.year || 'n.d.'})`
+  return inTextCitation(item, 'apa')
 }
 
 // ---------- The client ----------
 
-/** Fixed, like Zotero's: the style belongs to the destination manuscript, not
- *  the reader. A request parameter so a picker stays a UI-only change. */
-const DOI_CITATION_STYLE = 'apa'
-
 export const ACCEPT_CSL_JSON = 'application/vnd.citationstyles.csl+json'
-export const ACCEPT_BIBLIOGRAPHY = `text/x-bibliography; style=${DOI_CITATION_STYLE}`
+/** The bibliography Accept header for a style — a curated id only, so the
+ *  header can never carry anything else. */
+export const acceptBibliography = (style: CitationStyleId): string =>
+  `text/x-bibliography; style=${citationStyleOrDefault(style)}`
+export const ACCEPT_BIBLIOGRAPHY = acceptBibliography('apa')
 export const ACCEPT_BIBTEX = 'application/x-bibtex'
 
 export interface DoiFetchOutcome {
@@ -177,9 +170,10 @@ export interface DoiFetchOutcome {
 export type DoiFetch = (url: string, accept: string) => Promise<DoiFetchOutcome>
 
 export interface DoiClient {
-  /** The formatted reference for a DOI. Successes are cached for the session;
+  /** The formatted reference for a DOI in a style (APA when omitted or not
+   *  one of ours). Successes are cached for the session per DOI and style;
    *  failures never are (the next click asks again — the network may be back). */
-  cite(doi: string): Promise<DoiInfo | FileError>
+  cite(doi: string, style?: CitationStyleId): Promise<DoiInfo | FileError>
 }
 
 /** What the outcome MEANS. null = nothing answered (offline, DNS, timeout).
@@ -193,10 +187,11 @@ export function doiCodeForStatus(status: number | null): DoiErrorCode {
 export function createDoiClient(fetchDoi: DoiFetch): DoiClient {
   const cache = new Map<string, DoiInfo>()
   return {
-    async cite(doi) {
+    async cite(doi, requested) {
+      const style = citationStyleOrDefault(requested)
       const url = doiUrl(doi)
       if (!url) return { error: `not a DOI: ${doi}`, code: 'doi-unknown' }
-      const hit = cache.get(doi)
+      const hit = cache.get(`${doi}|${style}`)
       if (hit) return hit
       // All three at once: the metadata the hint line shows, and the two
       // texts the copy rows hand over. The reference and the BibTeX are
@@ -204,7 +199,7 @@ export function createDoiClient(fetchDoi: DoiFetch): DoiClient {
       // that row disabled rather than failing the lookup.
       const [csl, bib, bibtex] = await Promise.all([
         fetchDoi(url, ACCEPT_CSL_JSON),
-        fetchDoi(url, ACCEPT_BIBLIOGRAPHY),
+        fetchDoi(url, acceptBibliography(style)),
         fetchDoi(url, ACCEPT_BIBTEX)
       ])
       if (csl.status !== 200) return doiError(csl.status)
@@ -217,12 +212,13 @@ export function createDoiClient(fetchDoi: DoiFetch): DoiClient {
       const parsed = parseCslJson(json)
       const info: DoiInfo = {
         doi,
+        style,
         ...parsed,
-        citation: apaInText(parsed),
+        citation: inTextCitation(parsed, style),
         bib: bib.status === 200 ? bib.text.replace(/\s+/g, ' ').trim() : '',
         bibtex: bibtex.status === 200 ? bibtex.text.trim() : ''
       }
-      cache.set(doi, info)
+      cache.set(`${doi}|${style}`, info)
       return info
     }
   }

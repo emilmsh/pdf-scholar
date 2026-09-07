@@ -32,6 +32,7 @@ import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
+import type { CitationStyleId } from '../../shared/citation-style'
 import { subscribeAssistantJumps } from './assistant-channel'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
@@ -206,7 +207,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // client as desktop, just from the page. fsa:-picked files expose only a
     // basename and http(s) PDFs are not local files, so detection returns null
     // and no Zotero UI renders for them (docs/PLATFORMS.md).
-    zoteroInfo: (path: string) => zoteroClient.info(path),
+    zoteroInfo: (path: string, style?: CitationStyleId) => zoteroClient.info(path, style),
     zoteroSelect: async (path: string) => {
       const url = zoteroClient.selectUrl(path)
       if (!url) return { error: 'not a Zotero storage path' }
@@ -218,7 +219,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // The DOI reserve works for EVERY document here — file:// and http(s)
     // alike — since it reads the DOI from the document's own text and doi.org
     // answers CORS-open; the manifest's host permissions are not even needed.
-    doiCite: (doi: string) => doiClient.cite(doi),
+    doiCite: (doi: string, style?: CitationStyleId) => doiClient.cite(doi, style),
 
     // ---------- Tabs / windows ----------
 

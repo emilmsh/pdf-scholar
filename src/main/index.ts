@@ -63,6 +63,7 @@ import {
 import { initUpdater } from './updater'
 import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
 import { doiCite } from './doi'
+import { citationStyleOrDefault } from '../shared/citation-style'
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
 // carry the state file over so recents, positions and encrypted AI keys
@@ -1062,8 +1063,10 @@ function registerIpc(): void {
   // from a validated 8-char item key derived from the document's own path —
   // the renderer supplies a path it already holds, never a URL. Metadata comes
   // from Zotero's local API on 127.0.0.1 (src/main/zotero.ts).
-  ipcMain.handle('zotero:info', (_e, path: string) =>
-    typeof path === 'string' ? zoteroInfo(path) : null
+  // The style arrives as whatever the renderer sent; both clients accept only
+  // a curated id and read anything else as APA (shared/citation-style.ts).
+  ipcMain.handle('zotero:info', (_e, path: string, style?: unknown) =>
+    typeof path === 'string' ? zoteroInfo(path, citationStyleOrDefault(style)) : null
   )
   ipcMain.handle('zotero:select', async (_e, path: string) => {
     const url = typeof path === 'string' ? zoteroSelectUrlFor(path) : null
@@ -1080,8 +1083,10 @@ function registerIpc(): void {
   // The DOI reserve for a file outside Zotero: the renderer hands over the DOI
   // it read from the document, the shared client validates it and asks doi.org
   // (src/main/doi.ts). Never a URL from the renderer, per the rule above.
-  ipcMain.handle('doi:cite', (_e, doi: string) =>
-    typeof doi === 'string' ? doiCite(doi) : { error: 'not a DOI', code: 'doi-unknown' }
+  ipcMain.handle('doi:cite', (_e, doi: string, style?: unknown) =>
+    typeof doi === 'string'
+      ? doiCite(doi, citationStyleOrDefault(style))
+      : { error: 'not a DOI', code: 'doi-unknown' }
   )
 
   ipcMain.handle('file:save-text', async (e, defaultName: string, content: string | Uint8Array) => {

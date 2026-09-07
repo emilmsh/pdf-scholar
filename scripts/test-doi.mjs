@@ -15,7 +15,7 @@ const SRC = fileURLToPath(new URL('../src/shared/doi.ts', import.meta.url))
 
 const dir = mkdtempSync(join(tmpdir(), 'doi-'))
 const out = join(dir, 'doi.mjs')
-await build({ entryPoints: [SRC], outfile: out, format: 'esm', bundle: false, logLevel: 'silent' })
+await build({ entryPoints: [SRC], outfile: out, format: 'esm', bundle: true, logLevel: 'silent' })
 const D = await import(pathToFileURL(out).href)
 
 let failures = 0
@@ -112,6 +112,7 @@ const ok = {
   const info = await client.cite('10.1007/s11528-007-0040-x')
   eq(info, {
     doi: '10.1007/s11528-007-0040-x',
+    style: 'apa',
     title: 'It’s Time to Consider Open Source Software',
     creators: ['Pfaffman'],
     year: '2007',
@@ -160,6 +161,41 @@ const ok = {
   eq(err.code, 'doi-unknown', 'not a DOI → refused')
   eq(calls.length, 0, '… without a single request')
 }
+// --- Styles ---------------------------------------------------------------------
+eq(D.acceptBibliography('ieee'), 'text/x-bibliography; style=ieee', 'the style rides in the Accept header')
+eq(D.acceptBibliography('../../etc/passwd'), 'text/x-bibliography; style=apa', 'anything not curated reads as APA')
+{
+  calls.length = 0
+  const client = D.createDoiClient(scripted(ok))
+  const chicago = await client.cite('10.1007/s11528-007-0040-x', 'chicago-author-date')
+  eq(chicago.style, 'chicago-author-date', 'the item carries the style it is in')
+  eq(chicago.citation, '(Pfaffman 2007)', 'Chicago author-date in-text: no comma')
+  eq(calls.find((c) => c.accept.startsWith('text/x-bibliography')).accept, 'text/x-bibliography; style=chicago-author-date', 'the bibliography asked for in that style')
+  const ieee = await client.cite('10.1007/s11528-007-0040-x', 'ieee')
+  eq(ieee.citation, '', 'a numeric style has no in-text form to invent')
+  eq(ieee.bib !== '', true, '… but the reference is there')
+  calls.length = 0
+  await client.cite('10.1007/s11528-007-0040-x', 'chicago-author-date')
+  eq(calls.length, 0, 'cached per DOI and style')
+  await client.cite('10.1007/s11528-007-0040-x', 'vancouver')
+  eq(calls.length, 3, 'a style not seen before is a new lookup')
+  const apa = await client.cite('10.1007/s11528-007-0040-x')
+  eq(apa.style, 'apa', 'no style → APA')
+}
+{
+  const item = { title: 'T', creators: ['Vaswani', 'Shazeer'], year: '2017' }
+  const three = { title: 'T', creators: ['Vaswani', 'Shazeer', 'Parmar'], year: '2017' }
+  eq(D.inTextCitation(item, 'harvard-cite-them-right'), '(Vaswani & Shazeer, 2017)', 'Harvard: like APA')
+  eq(D.inTextCitation(item, 'chicago-author-date'), '(Vaswani and Shazeer 2017)', 'Chicago: «and», no comma')
+  eq(D.inTextCitation(three, 'chicago-author-date'), '(Vaswani et al. 2017)', 'Chicago: et al.')
+  eq(D.inTextCitation(item, 'modern-language-association'), '(Vaswani and Shazeer)', 'MLA: no year')
+  eq(D.inTextCitation({ title: 'T', creators: ['Solo'], year: '' }, 'chicago-author-date'), '(Solo n.d.)', 'Chicago: n.d.')
+  eq(D.inTextCitation(item, 'chicago-note-bibliography'), '', 'a note style has no in-text form')
+  eq(D.inTextCitation(item, 'nature'), '', 'Nature is numeric')
+  eq(D.CITATION_STYLES.length, 8, 'eight curated styles')
+  eq(D.CITATION_STYLES.every((s) => /^[a-z-]+$/.test(s.id)), true, 'every id is a plain CSL id')
+}
+
 eq(D.doiCodeForStatus(null), 'doi-offline', 'code for no answer')
 eq(D.doiCodeForStatus(500), 'doi-unknown', 'code for a server error')
 

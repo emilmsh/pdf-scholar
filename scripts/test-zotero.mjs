@@ -14,7 +14,7 @@ const SRC = fileURLToPath(new URL('../src/shared/zotero.ts', import.meta.url))
 
 const dir = mkdtempSync(join(tmpdir(), 'zotero-'))
 const out = join(dir, 'zotero.mjs')
-await build({ entryPoints: [SRC], outfile: out, format: 'esm', bundle: false, logLevel: 'silent' })
+await build({ entryPoints: [SRC], outfile: out, format: 'esm', bundle: true, logLevel: 'silent' })
 const Z = await import(pathToFileURL(out).href)
 
 let failures = 0
@@ -181,6 +181,36 @@ function scriptedFetch(script) {
       return { status: 404, json: null }
     }
   }
+}
+
+// Styles: the request carries the style, the cache is per style, and a style
+// Zotero lacks (400) falls back to APA with the item saying so.
+{
+  const f = scriptedFetch([
+    ['/items/ABCD2345', { status: 200, json: { data: { parentItem: 'QRST6789' } } }],
+    [
+      '/items/QRST6789?include=data,bib,citation&style=ieee',
+      { status: 200, json: item({ title: 'T', date: '2026', creators: [] }, '[1]', '[1] T.') }
+    ],
+    ['/items/QRST6789?include=data,bib,citation&style=nature', { status: 400, json: null }],
+    [
+      '/items/QRST6789?include=data,bib,citation&style=apa',
+      { status: 200, json: item({ title: 'T', date: '2026', creators: [] }, '(T, 2026)', 'T. (2026).') }
+    ],
+    ['/items/QRST6789?format=bibtex', { status: 200, text: '' }]
+  ])
+  const c = Z.createZoteroClient(f.fetchJson)
+  const ieee = await c.info('C:\\Zotero\\storage\\ABCD2345\\p.pdf', 'ieee')
+  eq([ieee.style, ieee.citation], ['ieee', '[1]'], 'the requested style is asked for and recorded')
+  eq(f.calls.filter((u) => u.includes('style=')).length, 1, 'one styled request')
+  await c.info('C:\\Zotero\\storage\\ABCD2345\\p.pdf', 'ieee')
+  eq(f.calls.filter((u) => u.includes('style=')).length, 1, 'cached per style')
+  const nature = await c.info('C:\\Zotero\\storage\\ABCD2345\\p.pdf', 'nature')
+  eq([nature.style, nature.citation], ['apa', '(T, 2026)'], 'a 400 on the style falls back to APA, and the item says so')
+  const garbage = await c.info('C:\\Zotero\\storage\\ABCD2345\\p.pdf', 'evil')
+  eq(garbage.style, 'apa', 'an unknown style id reads as APA without a request for it')
+  eq(f.calls.some((u) => u.includes('style=evil')), false, '… never sent')
+  eq(c.selectUrl('C:\\Zotero\\storage\\ABCD2345\\p.pdf'), 'zotero://select/library/items/QRST6789', 'selectUrl still prefers the parent')
 }
 
 // Happy path: attachment → parent, both citation forms, then cached

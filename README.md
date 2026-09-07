@@ -346,7 +346,9 @@ use Zotero's File → "Export PDF…" if you later need a copy with them re-embe
 
 A document that lives in a Zotero library also gets a Zotero section in the save
 button's menu: show the item in Zotero, or copy an in-text citation, a full reference
-(APA) or the BibTeX entry. BibTeX comes from the exporter built into Zotero, so no
+or the BibTeX entry. The style is a picker in that section — APA 7, Chicago (author-date
+or notes), Harvard (Cite Them Right), IEEE, MLA 9, Nature or Vancouver, all of which
+Zotero ships installed — and one choice serves every document. BibTeX comes from the exporter built into Zotero, so no
 Better BibTeX add-on is needed; the citation key is Zotero's own generated one rather
 than a Better BibTeX pinned key. Two fields are left out: `file`, which names the PDF's
 location on your own disk, and `abstract`, which belongs in the library rather than in a
@@ -363,7 +365,9 @@ prints its DOI on the first pages or carries it in its metadata — most publish
 papers do. The save menu then shows a Reference section with the DOI and one row,
 "Fetch reference from doi.org": clicking it asks doi.org for the item's metadata
 (the Crossref or DataCite record, the same data a citation manager would import) and
-turns it into an in-text citation, an APA reference and a BibTeX entry to copy. That
+turns it into an in-text citation, a reference in the chosen style and a BibTeX entry to
+copy (for numeric styles like IEEE the in-text row stays empty — a number depends on
+your bibliography's order). That
 click is the only time anything leaves your machine, and only the DOI is sent. When
 Zotero does know the document, its section takes precedence — your own corrected
 metadata beats the publisher's deposit — so you never see two versions of one citation.

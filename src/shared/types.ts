@@ -1,5 +1,6 @@
 // Types shared between the Electron main process, preload bridge and renderer.
 import type { PdfStandardFont } from '@embedpdf/models'
+import type { CitationStyleId } from './citation-style'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
  *  'custom' is the user-toned light mode (paper tone from `customTone`) */
@@ -54,6 +55,10 @@ export interface Settings {
    *  metadata other readers show as the commenter. Empty (the default, since
    *  the app has no accounts) writes no author at all. */
   annotAuthor: string
+  /** CSL style the save menu's reference sections format in — one setting
+   *  for both sources (Zotero's local API and doi.org). Curated ids only
+   *  (shared/citation-style.ts); an unknown stored value reads as APA. */
+  citationStyle: CitationStyleId
   /** Rebound keyboard shortcuts: command id → its chords, where an entry
    *  REPLACES that command's shipped bindings (an empty array means the user
    *  unbound it) and an absent one means defaults. Only commands the user
@@ -192,12 +197,17 @@ export type DoiErrorCode = 'doi-offline' | 'doi-unknown'
  *  section and the DOI reserve have in common, so one set of rows renders
  *  either. */
 export interface CitedItem {
+  /** The CSL style the citation and bib are actually in — the requested one,
+   *  or APA when the source lacked the requested style (Zotero without that
+   *  style installed). The renderer notes the difference on the hint row. */
+  style: CitationStyleId
   title: string
   /** Creator family names, in order — the renderer formats the summary, since
    *  only it knows the UI language («A mfl.» vs «A et al.») */
   creators: string[]
   year: string
-  /** In-text citation in the fixed style (APA), e.g. «(Vaswani et al., 2017)» */
+  /** In-text citation in `style`, e.g. «(Vaswani et al., 2017)». Empty for a
+   *  DOI-cited document in a numeric or note style — nothing worth inventing */
   citation: string
   /** Full bibliography entry in the same style */
   bib: string
@@ -853,7 +863,7 @@ export interface PdfxApi {
    *  null = not such a path, or this platform cannot tell — show no Zotero UI
    *  at all. A FileError with a zotero-* code = the file IS Zotero's, but the
    *  local API said no (Zotero not running / API toggle off / unknown item). */
-  zoteroInfo(path: string): Promise<ZoteroInfo | FileError | null>
+  zoteroInfo(path: string, style?: CitationStyleId): Promise<ZoteroInfo | FileError | null>
   /** Reveal the item in the Zotero client (zotero://select). The zotero:// URL
    *  is built platform-side from a validated 8-char key derived from the path —
    *  the renderer never supplies a URL (the shell:open-external rule in
@@ -866,7 +876,7 @@ export interface PdfxApi {
    *  a click, never on open, and shows the destination on the row. Every
    *  platform runs the same shared client (doi.org is CORS-open). A FileError
    *  with a doi-* code = nothing answered, or the DOI is unknown there. */
-  doiCite(doi: string): Promise<DoiInfo | FileError>
+  doiCite(doi: string, style?: CitationStyleId): Promise<DoiInfo | FileError>
   setFullscreen(on: boolean): void
   /** Notifies when the window enters/leaves OS fullscreen */
   onFullScreen(cb: (fullscreen: boolean) => void): () => void

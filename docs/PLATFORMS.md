@@ -306,8 +306,12 @@ regressions are treated as bugs, not as acceptable platform lag.
     Zotero is off) whose metadata or first two pages carry a DOI gets a
     «Referanse» section instead: the DOI shown, one row that fetches the
     reference from doi.org on click (Crossref/DataCite content negotiation —
-    APA reference, BibTeX, and the APA in-text form applied from the CSL
-    fields), then the same three copy rows as the Zotero section. Detection
+    the reference in the chosen style, BibTeX, and the in-text form applied
+    from the CSL fields per style family), then the same three copy rows as
+    the Zotero section. The style is one setting (`citationStyle`, eight
+    curated CSL ids in `shared/citation-style.ts`) shown as a picker in
+    whichever section holds the citation; both platform clients accept only a
+    curated id and read anything else as APA. Detection
     is pdf.js text in the renderer (`doi-detect.ts`) and so identical
     everywhere, including `fsa:` files and http(s) PDFs in the extension; the
     lookup runs the one shared client (`shared/doi.ts`) from main on desktop

@@ -14,6 +14,8 @@ import type {
   ZoteroInfo
 } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
+import { CITATION_STYLES } from '../../../shared/citation-style'
+import type { CitationStyleId } from '../../../shared/citation-style'
 import {
   applyPageTune,
   CUSTOM_TONE_ORDER,
@@ -134,13 +136,17 @@ export type ToolName = DrawToolType
 /** «Halseth & Wu (2026) — Title», from whatever fields the cited item actually
  *  has (a Zotero record or a DOI's metadata); falls back to the formatted
  *  citation for a bare item. */
-function citedLine(info: CitedItem): string {
+function citedLine(info: CitedItem, requestedStyle: CitationStyleId): string {
   const names =
     info.creators.length > 2
       ? `${info.creators[0]} ${t('zotero.etAl')}`
       : info.creators.join(' & ')
   const head = [names, info.year ? `(${info.year})` : ''].filter(Boolean).join(' ')
-  return [head, info.title].filter(Boolean).join(' — ') || info.citation
+  const line = [head, info.title].filter(Boolean).join(' — ') || info.citation
+  // The source answered in another style than asked (Zotero without that
+  // style installed): say so, or the copied reference silently disagrees
+  // with the picker.
+  return info.style === requestedStyle ? line : `${line} · ${t('cite.styleFallback')}`
 }
 
 const SHAPE_ICONS: Record<ShapeToolType, (p: { size?: number }) => React.JSX.Element> = {
@@ -537,16 +543,19 @@ export default function Toolbar({
   }
   const zoteroResolved = zoteroFetch.result !== null && !('error' in zoteroFetch.result)
   const zoteroHit = zoteroKey !== null || zoteroFetch.result !== null
+  // The style is one setting for both sections; a change re-asks (the
+  // platform caches per style, so switching back is instant).
+  const citationStyle = settings.citationStyle
   const askZotero = useCallback(() => {
     let stale = false
     setZoteroFetch((z) => ({ loading: true, result: z.result }))
-    void bridge.zoteroInfo(filePath).then((result) => {
+    void bridge.zoteroInfo(filePath, citationStyle).then((result) => {
       if (!stale) setZoteroFetch({ loading: false, result })
     })
     return () => {
       stale = true
     }
-  }, [filePath])
+  }, [filePath, citationStyle])
   useEffect(() => {
     setZoteroFetch({ loading: false, result: null })
     setCopiedRow(null)
@@ -566,18 +575,30 @@ export default function Toolbar({
     loading: boolean
     result: DoiInfo | FileError | null
   }>({ loading: false, result: null })
-  useEffect(() => {
-    setDoiFetch({ loading: false, result: null })
-  }, [doi])
-  const askDoi = (): void => {
+  const askDoi = useCallback((): void => {
     if (!doi) return
     setDoiFetch((d) => ({ loading: true, result: d.result }))
-    void bridge.doiCite(doi).then((result) => {
+    void bridge.doiCite(doi, citationStyle).then((result) => {
       // A stale answer (the document changed mid-flight) must not land on the
-      // new document: the effect above reset the state, so only accept when
+      // new document: the effect below reset the state, so only accept when
       // the lookup shown is still the one in flight.
       setDoiFetch((d) => (d.loading ? { loading: false, result } : d))
     })
+  }, [doi, citationStyle])
+  /** Whether the user has clicked the lookup for THIS document — a style
+   *  change then re-asks on its own (the click was the consent), while a new
+   *  document starts over behind the row again. */
+  const doiAsked = useRef(false)
+  useEffect(() => {
+    doiAsked.current = false
+    setDoiFetch({ loading: false, result: null })
+  }, [doi])
+  useEffect(() => {
+    if (doiAsked.current) askDoi()
+  }, [askDoi])
+  const askDoiClick = (): void => {
+    doiAsked.current = true
+    askDoi()
   }
   // The gear menu: the app's technical surface (language, annotation
   // visibility, AI setup, update check, reset, version/about)
@@ -1772,6 +1793,24 @@ export default function Toolbar({
               {t('tb.print')}
             </button>
           )
+          // The style, one setting shared by both sections and both sources.
+          // Rendered in whichever section holds the citation (the Zotero one
+          // once resolved, else the DOI one) — never in both at once.
+          const stylePicker = (
+            <label className="menu-select-row">
+              <span>{t('cite.style')}</span>
+              <select
+                value={citationStyle}
+                onChange={(e) => onSettingsChange({ citationStyle: e.target.value as CitationStyleId })}
+              >
+                {CITATION_STYLES.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )
           // The three copy rows both citation sections share. Disabled rather
           // than hidden while a text is missing (an item that exports no
           // BibTeX), so rows do not appear and vanish between documents.
@@ -1825,7 +1864,7 @@ export default function Toolbar({
                     : zErr
                       ? errorText(zErr)
                       : zInfo
-                        ? citedLine(zInfo)
+                        ? citedLine(zInfo, citationStyle)
                         : ''}
                 </div>
               )}
@@ -1841,6 +1880,7 @@ export default function Toolbar({
                 <IconBook size={15} />
                 {t('zotero.show')}
               </button>
+              {zInfo && stylePicker}
               {copyRows('zotero', zInfo)}
             </>
           ) : null
@@ -1864,11 +1904,12 @@ export default function Toolbar({
                     : dErr
                       ? errorText(dErr)
                       : dInfo
-                        ? citedLine(dInfo)
+                        ? citedLine(dInfo, citationStyle)
                         : `DOI ${doi}`}
                 </div>
+                {stylePicker}
                 {!dInfo && (
-                  <button className="menu-action" disabled={doiFetch.loading} onClick={askDoi}>
+                  <button className="menu-action" disabled={doiFetch.loading} onClick={askDoiClick}>
                     <IconBook size={15} />
                     {t('doi.fetch')}
                   </button>

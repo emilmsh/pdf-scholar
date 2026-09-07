@@ -22,6 +22,8 @@
 // Electron, a network, or Zotero installed.
 
 import type { FileError, ZoteroErrorCode, ZoteroInfo } from './types'
+import type { CitationStyleId } from './citation-style'
+import { citationStyleOrDefault, DEFAULT_CITATION_STYLE } from './citation-style'
 
 /** Item keys are 8 chars of uppercase A–Z / 0–9. Kept case-SENSITIVE on
  *  purpose: it is the cheapest guard against a random `/storage/whatever/`
@@ -244,11 +246,6 @@ export function zoteroCodeForStatus(status: number | null): ZoteroErrorCode {
 // ---------- The client (fetch injected; one instance per platform) ----------
 
 export const ZOTERO_LOCAL_API = 'http://127.0.0.1:23119/api/users/0'
-/** Fixed for now: style belongs to the destination manuscript, not the reader.
- *  Kept a parameter of the request (not baked into parsing) so a picker is a
- *  UI-only change later. */
-const ZOTERO_CITATION_STYLE = 'apa'
-
 export interface ZoteroFetchOutcome {
   /** HTTP status, or null when no response arrived at all */
   status: number | null
@@ -268,7 +265,7 @@ export interface ZoteroClient {
    *  file can only be recognised THROUGH the API, so with Zotero off it reads
    *  as «not Zotero's» — nothing shows, and the next call asks again.
    *  Successes are cached for the session; failures never are. */
-  info(path: string): Promise<ZoteroInfo | FileError | null>
+  info(path: string, style?: CitationStyleId): Promise<ZoteroInfo | FileError | null>
   /** zotero://select URL for the file — the parent item when a completed
    *  info() has resolved it, else the attachment key straight from the path
    *  (which is why this works with the local API off). Null off storage paths
@@ -283,9 +280,13 @@ export const ZOTERO_PAGE = 100
 const INDEX_STALE_MS = 5 * 60_000
 
 export function createZoteroClient(fetchJson: ZoteroFetchJson): ZoteroClient {
+  /** Successes by `<attachment key>|<style>` — a style is a different answer */
   const cache = new Map<string, ZoteroInfo>()
-  /** Linked files, resolved: keyed by the path as the caller gave it */
+  /** Linked files, resolved: keyed by `<path as the caller gave it>|<style>` */
   const linkedByPath = new Map<string, ZoteroInfo>()
+  /** The attachment record a linked path resolved to (style-independent), so
+   *  a style change never re-pages the library */
+  const linkedRecord = new Map<string, LinkedAttachment>()
   /** Every linked attachment in the library, by lower-cased filename */
   let index: { byName: Map<string, LinkedAttachment[]>; builtAt: number } | null = null
 
@@ -334,23 +335,34 @@ export function createZoteroClient(fetchJson: ZoteroFetchJson): ZoteroClient {
     return best
   }
 
-  async function fetchInfo(attachmentKey: string, parentKey: string | null): Promise<ZoteroInfo | FileError> {
+  async function fetchInfo(
+    attachmentKey: string,
+    parentKey: string | null,
+    style: CitationStyleId
+  ): Promise<ZoteroInfo | FileError> {
     // The cited item is the parent when there is one — the attachment itself
     // otherwise. Both forms of it are asked for at once: the JSON the menu
     // shows, and the BibTeX its copy row hands over. One extra request to
     // localhost, no extra latency, and the row knows whether it has anything
     // to give BEFORE it is clicked.
     const key = parentKey ?? attachmentKey
-    const [item, bibtex] = await Promise.all([
-      fetchJson(
-        `${ZOTERO_LOCAL_API}/items/${key}?include=data,bib,citation&style=${ZOTERO_CITATION_STYLE}`
-      ),
-      fetchJson(`${ZOTERO_LOCAL_API}/items/${key}?format=bibtex`)
-    ])
+    const styled = (s: CitationStyleId) =>
+      fetchJson(`${ZOTERO_LOCAL_API}/items/${key}?include=data,bib,citation&style=${s}`)
+    let [item, bibtex] = await Promise.all([styled(style), fetchJson(`${ZOTERO_LOCAL_API}/items/${key}?format=bibtex`)])
+    let used = style
+    // A style Zotero does not have installed is a 400 on an item that exists.
+    // Every style we offer ships with Zotero 7, so this is the user having
+    // removed one — answered in APA, with the item saying so, rather than as
+    // «not found».
+    if (item.status === 400 && style !== DEFAULT_CITATION_STYLE) {
+      item = await styled(DEFAULT_CITATION_STYLE)
+      used = DEFAULT_CITATION_STYLE
+    }
     if (item.status !== 200) return zoteroError(item.status)
     return {
       attachmentKey,
       parentKey,
+      style: used,
       ...parseZoteroItem(item.json),
       // A missing BibTeX export never fails the lookup: the citation and the
       // reference are still there to copy, and the BibTeX row disables itself.
@@ -359,33 +371,41 @@ export function createZoteroClient(fetchJson: ZoteroFetchJson): ZoteroClient {
   }
 
   return {
-    async info(path) {
+    async info(path, requested) {
+      const style = citationStyleOrDefault(requested)
       const key = zoteroKeyFromPath(path)
       if (key) {
-        const hit = cache.get(key)
+        const hit = cache.get(`${key}|${style}`)
         if (hit) return hit
         const att = await fetchJson(`${ZOTERO_LOCAL_API}/items/${key}`)
         if (att.status !== 200) return zoteroError(att.status)
         const { parentKey } = parseAttachmentItem(att.json)
-        const info = await fetchInfo(key, parentKey)
-        if (!('error' in info)) cache.set(key, info)
+        const info = await fetchInfo(key, parentKey, style)
+        if (!('error' in info)) cache.set(`${key}|${style}`, info)
         return info
       }
       // Not a storage path: maybe a linked attachment. The path says nothing,
       // so the library is asked — nothing shows unless it answers with a match.
-      const linkedHit = linkedByPath.get(path)
+      const linkedHit = linkedByPath.get(`${path}|${style}`)
       if (linkedHit) return linkedHit
-      const att = await findLinked(path)
+      const att = linkedRecord.get(path) ?? (await findLinked(path))
       if (!att) return null
-      const info = await fetchInfo(att.key, att.parentKey)
-      if (!('error' in info)) linkedByPath.set(path, info)
+      const info = await fetchInfo(att.key, att.parentKey, style)
+      if (!('error' in info)) {
+        linkedRecord.set(path, att)
+        linkedByPath.set(`${path}|${style}`, info)
+      }
       return info
     },
     selectUrl(path) {
       const key = zoteroKeyFromPath(path)
-      if (key) return zoteroSelectUrl(cache.get(key)?.parentKey ?? key)
-      const linked = linkedByPath.get(path)
-      return linked ? zoteroSelectUrl(linked.parentKey ?? linked.attachmentKey) : null
+      if (key) {
+        // Any style's cached answer knows the parent
+        for (const [k, v] of cache) if (k.startsWith(`${key}|`)) return zoteroSelectUrl(v.parentKey ?? key)
+        return zoteroSelectUrl(key)
+      }
+      const linked = linkedRecord.get(path)
+      return linked ? zoteroSelectUrl(linked.parentKey ?? linked.key) : null
     }
   }
 }

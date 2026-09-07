@@ -134,6 +134,9 @@ const nb = {
   'doi.loading': 'Henter fra doi.org …',
   'doierr.doi-offline': 'Fikk ikke svar fra doi.org — sjekk nettforbindelsen og prøv igjen.',
   'doierr.doi-unknown': 'doi.org kjenner ikke denne DOI-en.',
+  // The style picker both reference sections share
+  'cite.style': 'Stil',
+  'cite.styleFallback': 'stilen mangler i Zotero, viser APA',
 
   // «Gi tilgang til URL-adresser for fil» — the one permission a store install
   // cannot arrive with, and no extension can grant itself. The label is quoted
@@ -1028,6 +1031,8 @@ const en: Dict = {
   'doi.loading': 'Fetching from doi.org …',
   'doierr.doi-offline': 'No answer from doi.org — check the connection and try again.',
   'doierr.doi-unknown': 'doi.org does not know this DOI.',
+  'cite.style': 'Style',
+  'cite.styleFallback': 'style not installed in Zotero, showing APA',
 
   'fileaccess.title': 'Allow local PDFs',
   'fileaccess.blockedTitle': 'This PDF lives on your own machine',

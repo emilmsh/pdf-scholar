@@ -179,7 +179,7 @@ export const webApi: PdfxApi = {
   zoteroSelect: async () => ({ error: 'Zotero unavailable in the web preview' }),
   // The DOI reserve needs no filesystem: doi.org is CORS-open, so the preview
   // runs the same shared client from the page (and so does the extension).
-  doiCite: (doi) => webDoiClient.cite(doi),
+  doiCite: (doi, style) => webDoiClient.cite(doi, style),
   setFullscreen: (on) => {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
