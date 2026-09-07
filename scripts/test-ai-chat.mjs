@@ -159,7 +159,7 @@ function baseParams(overrides) {
       // The curated ids (ai-models.ts) — the harness must exercise what the
       // menu actually offers, not ids the providers retired
       openrouter: 'anthropic/claude-sonnet-5',
-      gemini: 'gemini-3.6-flash',
+      gemini: 'gemini-3.8-flash',
       xai: 'grok-4.3',
       mistral: 'mistral-large-3-25-12',
       groq: 'openai/gpt-oss-120b',
