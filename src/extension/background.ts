@@ -23,6 +23,12 @@
 // file:// interception additionally requires the user to enable "Allow access
 // to file URLs" on the extension's details page; http(s) is covered by
 // host_permissions in the manifest.
+//
+// The http(s) half can be switched OFF by the user («Åpne PDF-er fra nettet
+// her» in the gear menu; src/renderer/src/extension-takeover.ts). A browser set
+// to download PDFs rather than view them was being overridden by the redirect
+// with no say in it (issue #16). Off, rule 1 narrows to file:// and rule 2 is
+// removed; the storage listener below re-applies on every flip.
 
 const URL_RULE_ID = 1
 const CONTENT_TYPE_RULE_ID = 2
@@ -37,6 +43,22 @@ const RAW_FILE_PARAM = 'rawfile'
 // Match http(s)/file URLs ending in .pdf, tolerating a trailing query/hash.
 // \\0 in the substitution is the whole matched URL.
 const PDF_URL_FILTER = '^(https?|file)://[^#]*\\.pdf(\\?[^#]*)?(#.*)?$'
+// The same rule with the web half switched off: file:// documents only.
+const FILE_URL_FILTER = '^file://[^#]*\\.pdf(\\?[^#]*)?(#.*)?$'
+
+// chrome.storage.local key of the switch — a literal for the same reason as
+// RAW_FILE_PARAM (this worker imports nothing); test:file-access pins that it
+// matches extension-takeover.ts. Absent = on.
+const K_WEB_TAKEOVER = 'pdfx-web-takeover'
+
+async function webTakeoverEnabled(): Promise<boolean> {
+  try {
+    const got = await chrome!.storage!.local.get(K_WEB_TAKEOVER)
+    return got[K_WEB_TAKEOVER] !== false
+  } catch {
+    return true
+  }
+}
 
 // Rule 2 matches every http(s) navigation and lets the response's content-type
 // decide, so the filter is deliberately wide; \\0 folds the URL in the same way.
@@ -49,7 +71,7 @@ function redirectToViewer(viewer: string): DnrRule['action'] {
 /** Rule 1 — the URL ends in .pdf. Decided *before* the request is sent, so the
  *  document is fetched exactly once and nothing reaches the server twice. This is
  *  the rule that must never fail to register. */
-async function installUrlRule(viewer: string): Promise<void> {
+async function installUrlRule(viewer: string, web: boolean): Promise<void> {
   await chrome!.declarativeNetRequest!.updateDynamicRules({
     removeRuleIds: [URL_RULE_ID],
     addRules: [
@@ -57,7 +79,7 @@ async function installUrlRule(viewer: string): Promise<void> {
         id: URL_RULE_ID,
         priority: 1,
         action: redirectToViewer(viewer),
-        condition: { regexFilter: PDF_URL_FILTER, resourceTypes: ['main_frame'] }
+        condition: { regexFilter: web ? PDF_URL_FILTER : FILE_URL_FILTER, resourceTypes: ['main_frame'] }
       }
     ]
   })
@@ -105,7 +127,14 @@ async function installContentTypeRule(viewer: string): Promise<void> {
 async function installRedirectRules(): Promise<void> {
   if (!chrome?.declarativeNetRequest) return
   const viewer = chrome.runtime.getURL('viewer.html')
-  await installUrlRule(viewer)
+  const web = await webTakeoverEnabled()
+  await installUrlRule(viewer, web)
+  if (!web) {
+    // Rule 2 only ever matches http(s), so off means gone — the browser's own
+    // setting (view, or download) decides those navigations again.
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [CONTENT_TYPE_RULE_ID] })
+    return
+  }
   try {
     await installContentTypeRule(viewer)
   } catch {
@@ -114,6 +143,11 @@ async function installRedirectRules(): Promise<void> {
     // not a broken one.
   }
 }
+
+// The gear-menu switch lives in the viewer page's storage; re-apply on a flip.
+chrome?.storage?.onChanged.addListener((changes, area) => {
+  if (area === 'local' && K_WEB_TAKEOVER in changes) void installRedirectRules()
+})
 
 /** The install-time ask for «Gi tilgang til URL-adresser for fil».
  *

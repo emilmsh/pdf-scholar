@@ -322,6 +322,18 @@ regressions are treated as bugs, not as acceptable platform lag.
     check, which is why it is a click and never automatic. Covered keylessly
     by `npm run test:doi` (CI).
 
+19. **The extension's takeover of web PDFs has an off-switch; the desktop has
+    nothing to switch.** «Åpne PDF-er fra nettet her» in the gear menu renders
+    on the extension alone: off, http(s) navigations go wherever the browser
+    was set to send them (its own reader, or a download) and only `file://`
+    documents open here (`extension-takeover.ts`, `background.ts`; the flag
+    lives in `chrome.storage.local`, not in `Settings`, because no other
+    platform has the concept). The desktop equivalent is the OS file
+    association, which is already the user's own choice — so no row there is
+    the parity, not a gap. Asked for by a user whose browser was set to
+    download a batch of articles and got them opened instead (issue #16).
+    Covered by `npm run test:file-access` (CI).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

@@ -80,6 +80,16 @@ half the web with the browser's own reader:
 | Covers | most direct links, `file://` | arXiv `/pdf/2401.12345`, SSRN `Delivery.cfm`, DOI resolvers, Drive, `?download=1` endpoints |
 | Needs | — | Chrome/Edge 128+ (`responseHeaders` conditions) |
 
+**The http(s) half is the user's to switch off.** «Åpne PDF-er fra nettet her»
+in the gear menu (extension only; `extension-takeover.ts`, key
+`pdfx-web-takeover` in `chrome.storage.local`, absent = on). A browser set to
+*download* PDFs rather than view them was being overridden by the redirect with
+no say in it (issue #16, a reference tool opening a batch of articles). Off,
+rule 1 narrows to `file://` and rule 2 is removed, so web PDFs go wherever the
+browser was told to send them while the File Explorer story keeps working; the
+worker listens on `storage.onChanged` and re-applies without a restart.
+`test:file-access` pins that the worker and the renderer name the same key.
+
 Rule 2 is registered in its own `updateDynamicRules` call and its failure is
 swallowed: an older browser rejects the condition outright, and rule 1 must not
 go down with it. Chrome evaluates it on the headers and then abandons the body,

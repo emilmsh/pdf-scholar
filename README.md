@@ -106,7 +106,9 @@ worked or broke.
 
 The same viewer, but each PDF opens as an ordinary browser tab instead of in the
 browser's built-in reader. Make your browser the default PDF app and double-clicking a
-PDF in Explorer opens it here too. It is in both stores:
+PDF in Explorer opens it here too. If you would rather keep the browser's own handling
+of web PDFs — viewing or downloading them as you have set it up — switch off "Open PDFs
+from the web here" in the gear menu; local files still open here. It is in both stores:
 
 [![Edge Add-ons](https://img.shields.io/badge/Edge%20Add--ons-PDF%20Scholar-2f6f7b?logo=microsoftedge&logoColor=white)](https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome%20Web%20Store-PDF%20Scholar-2f6f7b?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd)

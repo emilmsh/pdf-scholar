@@ -70,6 +70,11 @@ interface ChromeApi {
   }
   storage?: {
     local: ChromeStorageArea
+    /** Fires in every context of the extension on a write to any area —
+     *  the service worker hears the viewer page flip a switch. */
+    onChanged: {
+      addListener(cb: (changes: Record<string, { oldValue?: unknown; newValue?: unknown }>, area: string) => void): void
+    }
   }
   tabs?: {
     create(props: { url: string; active?: boolean }): Promise<ChromeTab>

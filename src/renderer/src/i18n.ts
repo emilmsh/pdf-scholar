@@ -351,6 +351,10 @@ const nb = {
   'tb.keepImageColorsTip':
     'Bilder beholder originalfargene i nattmodus (gjelder rasterbilder, ikke vektorfigurer).',
   'tb.keepAwake': 'Hold skjermen våken',
+  // Extension only (the gear menu): the http(s) takeover switch, issue #16
+  'tb.webTakeover': 'Åpne PDF-er fra nettet her',
+  'tb.webTakeoverTip':
+    'Av: nettleseren behandler PDF-er fra nettet slik den selv er satt opp — viser eller laster ned. Lokale filer åpnes her uansett.',
   'tb.language': 'Språk',
   'tb.langAuto': 'Auto',
   'tb.autoLight': 'Lys',
@@ -1230,6 +1234,9 @@ const en: Dict = {
   'tb.keepImageColorsTip':
     'Pictures keep their original colors in night mode (raster images, not vector figures).',
   'tb.keepAwake': 'Keep the screen awake',
+  'tb.webTakeover': 'Open PDFs from the web here',
+  'tb.webTakeoverTip':
+    'Off: the browser handles PDFs from the web the way it is set up to — viewing or downloading. Local files still open here.',
   'tb.language': 'Language',
   'tb.langAuto': 'Auto',
   'tb.autoLight': 'Light',

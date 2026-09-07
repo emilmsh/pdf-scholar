@@ -24,7 +24,8 @@ import {
   NIGHT_TONES,
   TUNE_RANGE
 } from '../theme-tune'
-import { bridge, isElectron } from '../bridge'
+import { bridge, isElectron, isExtension } from '../bridge'
+import { setWebTakeover, webTakeoverEnabled } from '../extension-takeover'
 import {
   annotTypeLabel,
   colorLabel,
@@ -606,6 +607,14 @@ export default function Toolbar({
   const [resetAsk, setResetAsk] = useState(false)
   /** The keyboard map, opened from the gear menu */
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  /** Extension only: whether http(s) PDFs open here (extension-takeover.ts).
+   *  Read when the gear menu opens — the flag lives in the extension's own
+   *  storage, not in Settings, since no other platform has the switch. */
+  const [webTakeover, setWebTakeoverState] = useState(true)
+  useEffect(() => {
+    if (!settingsMenuOpen || !isExtension) return
+    void webTakeoverEnabled().then(setWebTakeoverState)
+  }, [settingsMenuOpen])
   const [appVersion, setAppVersion] = useState('')
   const [updChecking, setUpdChecking] = useState(false)
   const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
@@ -2234,6 +2243,25 @@ export default function Toolbar({
                 />
                 {t('tb.keepAwake')}
               </label>
+              {/* Extension only: the one thing the extension takes from the
+                  browser that a user may want back — a browser set to download
+                  PDFs was overridden by the redirect with no say in it (issue
+                  #16). Off, only file:// documents open here; the desktop app
+                  has no equivalent, since the OS file association is already
+                  the user's own choice. */}
+              {isExtension && (
+                <label className="theme-menu-toggle" title={t('tb.webTakeoverTip')}>
+                  <input
+                    type="checkbox"
+                    checked={webTakeover}
+                    onChange={(e) => {
+                      setWebTakeoverState(e.target.checked)
+                      setWebTakeover(e.target.checked)
+                    }}
+                  />
+                  {t('tb.webTakeover')}
+                </label>
+              )}
             </div>
           )}
         </div>

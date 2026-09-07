@@ -175,6 +175,17 @@ eq(
   'the onboarding tab opens on install only, never on an update'
 )
 
+// --- The web-takeover switch: three literals that must agree, and the worker's
+// off-state — rule 1 narrows to file:// and rule 2 goes (issue #16).
+const takeover = readFileSync(new URL('../src/renderer/src/extension-takeover.ts', import.meta.url), 'utf8')
+const keyOf = (src) => /const K_WEB_TAKEOVER = '([^']+)'/.exec(src)?.[1] ?? null
+eq(keyOf(takeover), 'pdfx-web-takeover', 'the renderer half names the storage key')
+eq(keyOf(bg), keyOf(takeover), 'the service worker reads the same key')
+eq(/!== false/.test(bg) && /!== false/.test(takeover), true, 'absent reads as ON on both sides')
+eq(/FILE_URL_FILTER = '\^file:\/\//.test(bg), true, 'the off-state rule 1 matches file:// only')
+eq(/removeRuleIds: \[CONTENT_TYPE_RULE_ID\] \}\)/.test(bg), true, 'the off-state removes rule 2 outright')
+eq(/storage\?\.onChanged\.addListener/.test(bg), true, 'a flip re-applies the rules without a restart')
+
 if (failures === 0) {
   console.log('\nALL FILE-ACCESS ASSERTIONS PASS ✓')
   process.exit(0)
