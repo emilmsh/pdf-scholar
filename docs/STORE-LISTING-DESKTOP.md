@@ -67,7 +67,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • Password-protected documents open, can be annotated, and keep their protection when saved
 • Colour, thickness and opacity are set per tool and remembered; existing marks can be adjusted rather than redrawn
 • An optional name in settings fills the standard PDF author field on new annotations
-• A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy an in-text citation, full reference or BibTeX entry — stored and linked attachments alike
+• A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy an in-text citation, full reference or BibTeX entry — stored and linked attachments alike. A document outside Zotero that carries a DOI gets the same three from doi.org on a click, and the citation style (APA, Chicago, Harvard, IEEE, MLA, Nature, Vancouver) is yours to pick
 • Edits are held in a draft until saved; what is saved is standard PDF annotations, which open correctly in Acrobat and other viewers
 
 SEARCH
@@ -121,7 +121,7 @@ ANNOTERING
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
 • Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes; eksisterende merker kan justeres i stedet for å tegnes på nytt
 • Et valgfritt navn i innstillingene fyller PDF-ens standard forfatterfelt på nye merknader
-• Et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen: vis elementet i Zotero, eller kopier en henvisning, full referanse eller BibTeX-oppføringen — både lagrede og lenkede vedlegg
+• Et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen: vis elementet i Zotero, eller kopier en henvisning, full referanse eller BibTeX-oppføringen — både lagrede og lenkede vedlegg. Et dokument utenfor Zotero med DOI får de samme tre fra doi.org med ett klikk, og siteringsstilen (APA, Chicago, Harvard, IEEE, MLA, Nature, Vancouver) velger du selv
 • Endringer holdes i et utkast til du lagrer; det som lagres er standard PDF-annoteringer, som åpnes riktig i Acrobat og andre lesere
 
 SØK
@@ -144,28 +144,28 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.45.4
+## What's new in this version (≤ 1 500 chars) — v0.46.0
 
 **EN:**
 ```
-• Two documents side by side: the second split column can hold another file — drag its tab into the view, pick it under "Open in split view" in the view menu, right-click its tab, or drop a PDF on the column. Each column annotates its own document, and Shift+S swaps their sides
-• Reading modes reworked: Day, Tint, Night and Night+. Tint is a light paper tone — the classic Sepia cream, or gray, green, blue or sand — and Night has its own dark tones; a slider sets the strength, the toolbar follows the chosen tone, and D cycles the modes. Night can keep figures in their original colours
-• An AI access switch in settings: "Confirm before sharing" asks the first time a document goes to a provider and shows what is about to be attached — follow-ups pass; "Off" blocks every AI request. The assistant now says when the whole document text rides along
-• Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item in Zotero, or copy an in-text citation, full reference or BibTeX entry. Linked attachments are recognised too
-• The split remembers: S reopens the last pair at the side and width it had, a dropped tab lands on the half it was dropped over, and the two-page spread returns at its own zoom. The other column gets the selection and right-click menus too
-• Ctrl+Shift+T reopens the last closed tab; D skips the mode Auto shows and returns to Auto where the cycle began
-• Claude Fable 5.1 and GPT-6 Astra join the AI model menu
+• Two documents side by side: the second split column can hold another file — drag a tab into the view, pick it under "Open in split view", or drop a PDF on the column. Each column annotates its own document; Shift+S swaps sides, S reopens the last pair as it was
+• Reading modes reworked: Day, Tint, Night and Night+. Tint is a light paper tone (sepia, gray, green, blue or sand), Night has its own dark tones, a slider sets the strength and D cycles the modes. Night can keep figures in their original colours
+• An AI access switch: "Confirm before sharing" asks the first time a document goes to a provider and shows what is attached; "Off" blocks every AI request
+• Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item, or copy an in-text citation, full reference or BibTeX entry. Linked attachments too
+• References beyond Zotero: a PDF that carries a DOI gets a Reference section — one click fetches citation, reference and BibTeX from doi.org. Nothing is sent until you click
+• Citation style: APA 7, Chicago, Harvard, IEEE, MLA 9, Nature or Vancouver — one choice for both sections
+• Ctrl+Shift+T reopens the last closed tab; Claude Fable 5.1 and GPT-6 Astra join the model menu
 ```
 
 **NO:**
 ```
-• To dokumenter side om side: den andre kolonnen i delt visning kan vise en annen fil — dra fanen inn i visningen, velg den under «Åpne i delt visning» i visningsmenyen, høyreklikk fanen, eller slipp en PDF på kolonnen. Hver kolonne annoterer sitt eget dokument, og Shift+S bytter plass på dem
-• Lesemodusene er gjort om: Dag, Farge, Natt og Natt+. Farge er en lys papirtone — den klassiske sepia-kremen, eller grå, grønn, blå eller sand — og natt har egne mørke toner; en glidebryter setter styrken, verktøylinja følger valgt tone, og D bytter modus. Natt kan beholde figurer i originalfargene
-• KI-tilgang i innstillingene: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved — oppfølginger går rett gjennom; «Av» stopper alle AI-forespørsler. Assistenten sier nå fra når hele dokumentteksten legges ved
-• Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet i Zotero, eller kopier en henvisning, full referanse eller BibTeX-oppføringen. Lenkede vedlegg gjenkjennes også
-• Delt visning husker: S åpner forrige par igjen på samme side og i samme bredde, en sluppet fane lander på halvdelen den ble sluppet over, og tosidevisningen kommer tilbake i sin egen zoom. Den andre kolonnen får også markerings- og høyreklikkmenyen
-• Ctrl+Shift+T åpner sist lukkede fane; D hopper forbi modusen Auto viser og går tilbake til Auto der syklusen begynte
-• Claude Fable 5.1 og GPT-6 Astra er med i KI-modellmenyen
+• To dokumenter side om side: den andre kolonnen i delt visning kan vise en annen fil — dra en fane inn i visningen, velg den under «Åpne i delt visning», eller slipp en PDF på kolonnen. Hver kolonne annoterer sitt eget dokument; Shift+S bytter side, S åpner forrige par som det var
+• Lesemodusene er gjort om: Dag, Farge, Natt og Natt+. Farge er en lys papirtone (sepia, grå, grønn, blå eller sand), natt har egne mørke toner, en glidebryter setter styrken og D bytter modus. Natt kan beholde figurer i originalfargene
+• KI-tilgang: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved; «Av» stopper alle AI-forespørsler
+• Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet, eller kopier henvisning, full referanse eller BibTeX-oppføringen. Lenkede vedlegg også
+• Referanser utenfor Zotero: en PDF med DOI får en Referanse-del — ett klikk henter henvisning, referanse og BibTeX fra doi.org. Ingenting sendes før du klikker
+• Siteringsstil: APA 7, Chicago, Harvard, IEEE, MLA 9, Nature eller Vancouver — ett valg for begge delene
+• Ctrl+Shift+T åpner sist lukkede fane; Claude Fable 5.1 og GPT-6 Astra er med i modellmenyen
 ```
 
 ---
