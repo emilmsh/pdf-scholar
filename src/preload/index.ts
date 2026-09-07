@@ -71,6 +71,7 @@ const api: PdfxApi = {
   showInFolder: (path: string) => ipcRenderer.send('shell:show-in-folder', path),
   zoteroInfo: (path: string) => ipcRenderer.invoke('zotero:info', path),
   zoteroSelect: (path: string) => ipcRenderer.invoke('zotero:select', path),
+  doiCite: (doi: string) => ipcRenderer.invoke('doi:cite', doi),
   setFullscreen: (on: boolean) => ipcRenderer.send('window:set-fullscreen', on),
   onFullScreen: (cb: (fullscreen: boolean) => void) => {
     const listener = (_e: unknown, fullscreen: boolean): void => cb(fullscreen)

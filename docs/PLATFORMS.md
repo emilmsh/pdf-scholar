@@ -301,6 +301,22 @@ regressions are treated as bugs, not as acceptable platform lag.
     the parity invariant, the same shape as §10. The mapping (path → key →
     citation, error codes, caching) is shared logic covered keylessly by
     `npm run test:zotero` (CI).
+    **The DOI reserve is platform-free by construction.** A document with no
+    RESOLVED Zotero record (any non-Zotero file; a Zotero storage path while
+    Zotero is off) whose metadata or first two pages carry a DOI gets a
+    «Referanse» section instead: the DOI shown, one row that fetches the
+    reference from doi.org on click (Crossref/DataCite content negotiation —
+    APA reference, BibTeX, and the APA in-text form applied from the CSL
+    fields), then the same three copy rows as the Zotero section. Detection
+    is pdf.js text in the renderer (`doi-detect.ts`) and so identical
+    everywhere, including `fsa:` files and http(s) PDFs in the extension; the
+    lookup runs the one shared client (`shared/doi.ts`) from main on desktop
+    and from the page in the extension (doi.org and both agencies answer
+    `Access-Control-Allow-Origin: *`). dev:web: detection runs, but its
+    plain-web save menu holds print alone, so no section renders there. It
+    is the app's one network call outside the AI providers and the update
+    check, which is why it is a click and never automatic. Covered keylessly
+    by `npm run test:doi` (CI).
 
 ## Maintenance rules
 

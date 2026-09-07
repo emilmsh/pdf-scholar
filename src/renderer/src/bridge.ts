@@ -18,6 +18,7 @@ import { version as appVersion } from '../../../package.json'
 import { DEFAULT_SETTINGS } from '../../shared/defaults'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 import { AI_ERRORS } from '../../shared/engine-errors'
+import { createDoiClient, httpDoiFetch } from '../../shared/doi'
 import {
   browserApplyAnnotation,
   browserDeleteAnnotation,
@@ -59,6 +60,9 @@ function loadWebState(): WebState {
 function saveWebState(state: WebState): void {
   localStorage.setItem(LS_KEY, JSON.stringify(state))
 }
+
+/** One DOI client for the page — the success cache lives as long as it does */
+const webDoiClient = createDoiClient(httpDoiFetch)
 
 export const webApi: PdfxApi = {
   openFileDialog: () =>
@@ -173,6 +177,9 @@ export const webApi: PdfxApi = {
   // Zotero UI ever renders here (docs/PLATFORMS.md).
   zoteroInfo: async () => null,
   zoteroSelect: async () => ({ error: 'Zotero unavailable in the web preview' }),
+  // The DOI reserve needs no filesystem: doi.org is CORS-open, so the preview
+  // runs the same shared client from the page (and so does the extension).
+  doiCite: (doi) => webDoiClient.cite(doi),
   setFullscreen: (on) => {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})

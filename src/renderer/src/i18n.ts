@@ -4,7 +4,13 @@
 // enough). Non-React modules (exports, prompts) call t() at use time.
 import { useSyncExternalStore } from 'react'
 
-import type { AiErrorCode, ExtensionErrorCode, FileError, ZoteroErrorCode } from '../../shared/types'
+import type {
+  AiErrorCode,
+  DoiErrorCode,
+  ExtensionErrorCode,
+  FileError,
+  ZoteroErrorCode
+} from '../../shared/types'
 
 export type Lang = 'nb' | 'en'
 /** User's choice — 'auto' follows the OS/browser language */
@@ -120,6 +126,14 @@ const nb = {
   'zoterr.zotero-api-disabled':
     'Skru på API-tilgang i Zotero: Settings → Advanced → «Allow other applications on this computer to communicate with Zotero».',
   'zoterr.zotero-item-unknown': 'Fant ikke dokumentet i Zotero-biblioteket.',
+  // The DOI reserve of the same menu, for a document outside Zotero. The row
+  // names doi.org because clicking it is the one thing in this menu that
+  // leaves the machine.
+  'doi.label': 'Referanse',
+  'doi.fetch': 'Hent referanse fra doi.org',
+  'doi.loading': 'Henter fra doi.org …',
+  'doierr.doi-offline': 'Fikk ikke svar fra doi.org — sjekk nettforbindelsen og prøv igjen.',
+  'doierr.doi-unknown': 'doi.org kjenner ikke denne DOI-en.',
 
   // «Gi tilgang til URL-adresser for fil» — the one permission a store install
   // cannot arrive with, and no extension can grant itself. The label is quoted
@@ -1009,6 +1023,11 @@ const en: Dict = {
   'zoterr.zotero-api-disabled':
     'Enable API access in Zotero: Settings → Advanced → “Allow other applications on this computer to communicate with Zotero”.',
   'zoterr.zotero-item-unknown': 'The document was not found in the Zotero library.',
+  'doi.label': 'Reference',
+  'doi.fetch': 'Fetch reference from doi.org',
+  'doi.loading': 'Fetching from doi.org …',
+  'doierr.doi-offline': 'No answer from doi.org — check the connection and try again.',
+  'doierr.doi-unknown': 'doi.org does not know this DOI.',
 
   'fileaccess.title': 'Allow local PDFs',
   'fileaccess.blockedTitle': 'This PDF lives on your own machine',
@@ -1801,18 +1820,22 @@ export function locale(): string {
  *  a translated sentence. */
 export function errorText(e: FileError): string {
   if (!e.code) return e.error
-  // Four prefixes because the families read differently: `engine.*` and
+  // Five prefixes because the families read differently: `engine.*` and
   // `exterr.*` entries are lowercase fragments spliced into a toast sentence,
-  // `aierr.*` and `zoterr.*` entries are whole sentences shown on their own
-  // (a chat bubble; the save menu's Zotero hint row).
+  // `aierr.*`, `zoterr.*` and `doierr.*` entries are whole sentences shown on
+  // their own (a chat bubble; the save menu's citation hint rows).
   if (isAiErrorCode(e.code)) return t(`aierr.${e.code}`)
   if (isExtensionErrorCode(e.code)) return t(`exterr.${e.code}`)
   if (isZoteroErrorCode(e.code)) return t(`zoterr.${e.code}`)
+  if (isDoiErrorCode(e.code)) return t(`doierr.${e.code}`)
   return t(`engine.${e.code}`)
 }
 
 const isZoteroErrorCode = (code: NonNullable<FileError['code']>): code is ZoteroErrorCode =>
   code.startsWith('zotero-')
+
+const isDoiErrorCode = (code: NonNullable<FileError['code']>): code is DoiErrorCode =>
+  code.startsWith('doi-')
 
 const isAiErrorCode = (code: NonNullable<FileError['code']>): code is AiErrorCode =>
   code.startsWith('ai-')

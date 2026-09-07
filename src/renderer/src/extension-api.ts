@@ -31,6 +31,7 @@ import type { FetchFailure } from '../../shared/insecure-retry'
 import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
+import { createDoiClient, httpDoiFetch } from '../../shared/doi'
 import { subscribeAssistantJumps } from './assistant-channel'
 import { store } from './extension-store'
 import { createExtensionAi } from './extension-ai'
@@ -61,6 +62,8 @@ const K_LAST_FALLBACK = 'pdfx-last-fallback'
 /** One Zotero client per viewer page — the success cache lives as long as the
  *  tab, which mirrors main's per-app-instance cache on desktop. */
 const zoteroClient = createZoteroClient(httpZoteroFetch)
+/** Same lifetime for the DOI reserve's cache */
+const doiClient = createDoiClient(httpDoiFetch)
 
 
 /** File System Access handles from in-app "Open" — keyed by the path we return,
@@ -212,6 +215,10 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       window.location.assign(url)
       return { ok: true }
     },
+    // The DOI reserve works for EVERY document here — file:// and http(s)
+    // alike — since it reads the DOI from the document's own text and doi.org
+    // answers CORS-open; the manifest's host permissions are not even needed.
+    doiCite: (doi: string) => doiClient.cite(doi),
 
     // ---------- Tabs / windows ----------
 

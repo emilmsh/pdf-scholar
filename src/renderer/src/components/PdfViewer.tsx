@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { detectDoi } from '../doi-detect'
 import { isPasswordException, openDocument } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { renderPagesAsImages as renderAiPageImages } from '../ai-page-images'
@@ -487,6 +488,22 @@ export default function PdfViewer({
 }: Props): React.JSX.Element {
   useLang()
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
+  // The document's own DOI, read once per loaded document from its metadata
+  // and first pages (doi-detect.ts). Feeds the save menu's reference reserve
+  // for a file no Zotero record covers; null = no DOI UI at all. Detection is
+  // local (pdf.js text), the lookup it enables is a click in the menu.
+  const [doi, setDoi] = useState<string | null>(null)
+  useEffect(() => {
+    setDoi(null)
+    if (!pdf) return undefined
+    let stale = false
+    void detectDoi(pdf).then((d) => {
+      if (!stale) setDoi(d)
+    })
+    return () => {
+      stale = true
+    }
+  }, [pdf])
   const [sizes, setSizes] = useState<PageSize[]>([])
   const sizesRef = useRef(sizes)
   sizesRef.current = sizes
@@ -6476,6 +6493,7 @@ export default function PdfViewer({
           onSettingsChange={onSettingsChange}
           onToggleSearch={() => (searchOpen ? closeSearch() : openSearch())}
           filePath={payload.path}
+          doi={doi}
           dirty={dirty}
           onSave={() => void saveDocument()}
           onSaveAs={() => void saveDocumentAs()}

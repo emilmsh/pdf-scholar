@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type {
+  CitedItem,
   CustomTone,
+  DoiInfo,
   FileError,
   NightTone,
   LanguagePreference,
@@ -129,9 +131,10 @@ import {
 
 export type ToolName = DrawToolType
 
-/** «Halseth & Wu (2026) — Title», from whatever fields the Zotero item actually
- *  has; falls back to the formatted citation for a bare item. */
-function zoteroLine(info: ZoteroInfo): string {
+/** «Halseth & Wu (2026) — Title», from whatever fields the cited item actually
+ *  has (a Zotero record or a DOI's metadata); falls back to the formatted
+ *  citation for a bare item. */
+function citedLine(info: CitedItem): string {
   const names =
     info.creators.length > 2
       ? `${info.creators[0]} ${t('zotero.etAl')}`
@@ -240,6 +243,10 @@ interface Props {
    *  section, whose existence is a pure path check (shared/zotero.ts) — no
    *  IPC or network unless the menu opens over a detected file. */
   filePath: string
+  /** The document's own DOI as read from its metadata/first pages, or null.
+   *  Feeds the save menu's reference reserve — shown only when no Zotero
+   *  record was resolved for the file (the library's own metadata wins). */
+  doi: string | null
   /** Unsaved annotation changes exist (enables the save button) */
   dirty: boolean
   onSave(): void
@@ -438,6 +445,7 @@ export default function Toolbar({
   onSettingsChange,
   onToggleSearch,
   filePath,
+  doi,
   dirty,
   onSave,
   onSaveAs,
@@ -518,7 +526,15 @@ export default function Toolbar({
     loading: boolean
     result: ZoteroInfo | FileError | null
   }>({ loading: false, result: null })
-  const [zoteroCopied, setZoteroCopied] = useState<'citation' | 'bib' | 'bibtex' | null>(null)
+  // One «Kopiert» flash for both citation sections, keyed by section + row,
+  // so a copy in the DOI reserve never lights the Zotero row of the same kind.
+  const [copiedRow, setCopiedRow] = useState<string | null>(null)
+  const copyRow = (key: string, text: string): void => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopiedRow(key)
+      window.setTimeout(() => setCopiedRow((c) => (c === key ? null : c)), 1500)
+    })
+  }
   const zoteroResolved = zoteroFetch.result !== null && !('error' in zoteroFetch.result)
   const zoteroHit = zoteroKey !== null || zoteroFetch.result !== null
   const askZotero = useCallback(() => {
@@ -533,18 +549,34 @@ export default function Toolbar({
   }, [filePath])
   useEffect(() => {
     setZoteroFetch({ loading: false, result: null })
-    setZoteroCopied(null)
+    setCopiedRow(null)
     return askZotero()
   }, [askZotero])
   useEffect(() => {
     if (!saveMenuOpen || zoteroResolved) return undefined
-    setZoteroCopied(null)
+    setCopiedRow(null)
     return askZotero()
   }, [saveMenuOpen, zoteroResolved, askZotero])
-  const zoteroCopy = (kind: 'citation' | 'bib' | 'bibtex', text: string): void => {
-    void navigator.clipboard.writeText(text).then(() => {
-      setZoteroCopied(kind)
-      window.setTimeout(() => setZoteroCopied((c) => (c === kind ? null : c)), 1500)
+  // The DOI reserve of the same menu: for a document with a DOI and no
+  // resolved Zotero record. Nothing is fetched until the row is clicked — the
+  // lookup leaves the machine (doi.org), and the row says so. Per document:
+  // a new file starts over; the platform caches successes for the session, so
+  // a second click for a document seen before is instant.
+  const [doiFetch, setDoiFetch] = useState<{
+    loading: boolean
+    result: DoiInfo | FileError | null
+  }>({ loading: false, result: null })
+  useEffect(() => {
+    setDoiFetch({ loading: false, result: null })
+  }, [doi])
+  const askDoi = (): void => {
+    if (!doi) return
+    setDoiFetch((d) => ({ loading: true, result: d.result }))
+    void bridge.doiCite(doi).then((result) => {
+      // A stale answer (the document changed mid-flight) must not land on the
+      // new document: the effect above reset the state, so only accept when
+      // the lookup shown is still the one in flight.
+      setDoiFetch((d) => (d.loading ? { loading: false, result } : d))
     })
   }
   // The gear menu: the app's technical surface (language, annotation
@@ -1740,6 +1772,38 @@ export default function Toolbar({
               {t('tb.print')}
             </button>
           )
+          // The three copy rows both citation sections share. Disabled rather
+          // than hidden while a text is missing (an item that exports no
+          // BibTeX), so rows do not appear and vanish between documents.
+          const copyRows = (section: string, item: CitedItem | null): React.JSX.Element => (
+            <>
+              <button
+                className="menu-action"
+                disabled={!item?.citation}
+                onClick={() => item && copyRow(`${section}:citation`, item.citation)}
+              >
+                <IconCopy size={15} />
+                {copiedRow === `${section}:citation` ? t('doc.copied') : t('zotero.copyCitation')}
+              </button>
+              <button
+                className="menu-action"
+                disabled={!item?.bib}
+                onClick={() => item && copyRow(`${section}:bib`, item.bib)}
+              >
+                <IconCopy size={15} />
+                {copiedRow === `${section}:bib` ? t('doc.copied') : t('zotero.copyReference')}
+              </button>
+              {/* BibTeX for the .tex half of the same workflow */}
+              <button
+                className="menu-action"
+                disabled={!item?.bibtex}
+                onClick={() => item && copyRow(`${section}:bibtex`, item.bibtex)}
+              >
+                <IconCopy size={15} />
+                {copiedRow === `${section}:bibtex` ? t('doc.copied') : t('zotero.copyBibtex')}
+              </button>
+            </>
+          )
           // Zotero rows, only for a file living in Zotero's storage layout.
           // They belong in this menu because it is the document's out-of-the-app
           // surface (save a copy, print) — a citation headed for a manuscript
@@ -1761,7 +1825,7 @@ export default function Toolbar({
                     : zErr
                       ? errorText(zErr)
                       : zInfo
-                        ? zoteroLine(zInfo)
+                        ? citedLine(zInfo)
                         : ''}
                 </div>
               )}
@@ -1777,35 +1841,41 @@ export default function Toolbar({
                 <IconBook size={15} />
                 {t('zotero.show')}
               </button>
-              <button
-                className="menu-action"
-                disabled={!zInfo?.citation}
-                onClick={() => zInfo && zoteroCopy('citation', zInfo.citation)}
-              >
-                <IconCopy size={15} />
-                {zoteroCopied === 'citation' ? t('doc.copied') : t('zotero.copyCitation')}
-              </button>
-              <button
-                className="menu-action"
-                disabled={!zInfo?.bib}
-                onClick={() => zInfo && zoteroCopy('bib', zInfo.bib)}
-              >
-                <IconCopy size={15} />
-                {zoteroCopied === 'bib' ? t('doc.copied') : t('zotero.copyReference')}
-              </button>
-              {/* BibTeX for the .tex half of the same workflow. Disabled rather
-                  than hidden when the item exports to nothing, so the row does
-                  not appear and vanish between documents. */}
-              <button
-                className="menu-action"
-                disabled={!zInfo?.bibtex}
-                onClick={() => zInfo && zoteroCopy('bibtex', zInfo.bibtex)}
-              >
-                <IconCopy size={15} />
-                {zoteroCopied === 'bibtex' ? t('doc.copied') : t('zotero.copyBibtex')}
-              </button>
+              {copyRows('zotero', zInfo)}
             </>
           ) : null
+          // The DOI reserve. Shown when the document has a DOI and no Zotero
+          // record was RESOLVED — so also for a Zotero storage path while
+          // Zotero is off: the file may well be in the library, but a
+          // reference the user can copy now beats a hint to go start Zotero.
+          // Once Zotero answers, this section yields to it: one citation per
+          // document, from the better source (the library's own corrected
+          // metadata over a publisher's deposit).
+          const dInfo = doiFetch.result && !('error' in doiFetch.result) ? doiFetch.result : null
+          const dErr = doiFetch.result && 'error' in doiFetch.result ? doiFetch.result : null
+          const doiSection =
+            doi && !zInfo ? (
+              <>
+                <div className="theme-menu-sep" />
+                <div className="theme-menu-label">{t('doi.label')}</div>
+                <div className="menu-hint">
+                  {doiFetch.loading
+                    ? t('doi.loading')
+                    : dErr
+                      ? errorText(dErr)
+                      : dInfo
+                        ? citedLine(dInfo)
+                        : `DOI ${doi}`}
+                </div>
+                {!dInfo && (
+                  <button className="menu-action" disabled={doiFetch.loading} onClick={askDoi}>
+                    <IconBook size={15} />
+                    {t('doi.fetch')}
+                  </button>
+                )}
+                {dInfo && copyRows('doi', dInfo)}
+              </>
+            ) : null
           const chevron = (
             <button
               className={`tb-chevron${saveMenuOpen ? ' is-active' : ''}`}
@@ -1854,6 +1924,7 @@ export default function Toolbar({
                   </button>
                   {printRow}
                   {zoteroSection}
+                  {doiSection}
                 </div>
               )}
             </span>

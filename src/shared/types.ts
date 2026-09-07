@@ -183,14 +183,15 @@ export type ExtensionErrorCode = 'ext-file-access'
  *  `errorText` routes on the `zotero-` stem. */
 export type ZoteroErrorCode = 'zotero-off' | 'zotero-api-disabled' | 'zotero-item-unknown'
 
-/** What the app knows about a document living in Zotero's storage layout
- *  (…/storage/<KEY>/file.pdf — the folder name IS the attachment item's key).
- *  Metadata and both citation forms come from Zotero's local API, flattened to
- *  plain text (the CSL HTML stripped). */
-export interface ZoteroInfo {
-  attachmentKey: string
-  /** The bibliographic item the attachment hangs under; null = standalone */
-  parentKey: string | null
+/** And for the DOI reserve (src/shared/doi.ts): doi.org never answered, or
+ *  answered that it does not know the DOI. Same i18n shape as the Zotero codes
+ *  (`doierr.*`, whole sentences on the hint row); `errorText` routes on `doi-`. */
+export type DoiErrorCode = 'doi-offline' | 'doi-unknown'
+
+/** A bibliographic item as the save menu cites it — the fields the Zotero
+ *  section and the DOI reserve have in common, so one set of rows renders
+ *  either. */
+export interface CitedItem {
   title: string
   /** Creator family names, in order — the renderer formats the summary, since
    *  only it knows the UI language («A mfl.» vs «A et al.») */
@@ -200,10 +201,30 @@ export interface ZoteroInfo {
   citation: string
   /** Full bibliography entry in the same style */
   bib: string
+  /** BibTeX entry. Empty when the source has none to give — the copy row
+   *  disables itself on that. */
+  bibtex: string
+}
+
+/** What the app knows about a document living in Zotero's storage layout
+ *  (…/storage/<KEY>/file.pdf — the folder name IS the attachment item's key).
+ *  Metadata and both citation forms come from Zotero's local API, flattened to
+ *  plain text (the CSL HTML stripped). */
+export interface ZoteroInfo extends CitedItem {
+  attachmentKey: string
+  /** The bibliographic item the attachment hangs under; null = standalone */
+  parentKey: string | null
   /** Zotero's own BibTeX export of the item, its local `file` path stripped.
    *  Empty when the item exports to nothing (a standalone attachment) or the
-   *  export request failed — the copy row disables itself on that. */
+   *  export request failed. */
   bibtex: string
+}
+
+/** The reserve for a document outside Zotero: what doi.org resolved the
+ *  document's printed DOI to (Crossref/DataCite metadata, APA via the
+ *  registrar's citeproc, the in-text form applied from the CSL fields here). */
+export interface DoiInfo extends CitedItem {
+  doi: string
 }
 
 export interface FileError {
@@ -211,7 +232,13 @@ export interface FileError {
   error: string
   /** Set when the failure is one of the recognised kinds above, so the renderer
    *  can show its own translation rather than this string. */
-  code?: EngineErrorCode | AiErrorCode | ExtensionErrorCode | ZoteroErrorCode | undefined
+  code?:
+    | EngineErrorCode
+    | AiErrorCode
+    | ExtensionErrorCode
+    | ZoteroErrorCode
+    | DoiErrorCode
+    | undefined
 }
 
 /** A partial update where "not changing this field" may be written as an explicit
@@ -833,6 +860,13 @@ export interface PdfxApi {
    *  src/main/index.ts). Works with the local API off; prefers the parent item
    *  when a completed zoteroInfo call has resolved it. */
   zoteroSelect(path: string): Promise<{ ok: true } | FileError>
+  /** The formatted reference for a DOI the renderer found in the document
+   *  (see DoiInfo) — resolved through https://doi.org by content negotiation.
+   *  The reserve for a file no Zotero record covers; the renderer calls it on
+   *  a click, never on open, and shows the destination on the row. Every
+   *  platform runs the same shared client (doi.org is CORS-open). A FileError
+   *  with a doi-* code = nothing answered, or the DOI is unknown there. */
+  doiCite(doi: string): Promise<DoiInfo | FileError>
   setFullscreen(on: boolean): void
   /** Notifies when the window enters/leaves OS fullscreen */
   onFullScreen(cb: (fullscreen: boolean) => void): () => void

@@ -358,6 +358,16 @@ its own folder, ZotFile-style) carry no item key in their path; they are matched
 filename against the library's attachment list through that same local API, so their
 Zotero section appears while Zotero is running with the API enabled.
 
+A document that is *not* in your Zotero library can still be cited, as long as it
+prints its DOI on the first pages or carries it in its metadata — most published
+papers do. The save menu then shows a Reference section with the DOI and one row,
+"Fetch reference from doi.org": clicking it asks doi.org for the item's metadata
+(the Crossref or DataCite record, the same data a citation manager would import) and
+turns it into an in-text citation, an APA reference and a BibTeX entry to copy. That
+click is the only time anything leaves your machine, and only the DOI is sent. When
+Zotero does know the document, its section takes precedence — your own corrected
+metadata beats the publisher's deposit — so you never see two versions of one citation.
+
 ## Development
 
 ```bash

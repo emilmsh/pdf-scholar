@@ -62,6 +62,7 @@ import {
 } from './storage'
 import { initUpdater } from './updater'
 import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
+import { doiCite } from './doi'
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
 // carry the state file over so recents, positions and encrypted AI keys
@@ -1076,6 +1077,12 @@ function registerIpc(): void {
       return { error: 'no handler registered for zotero://', code: 'zotero-off' }
     }
   })
+  // The DOI reserve for a file outside Zotero: the renderer hands over the DOI
+  // it read from the document, the shared client validates it and asks doi.org
+  // (src/main/doi.ts). Never a URL from the renderer, per the rule above.
+  ipcMain.handle('doi:cite', (_e, doi: string) =>
+    typeof doi === 'string' ? doiCite(doi) : { error: 'not a DOI', code: 'doi-unknown' }
+  )
 
   ipcMain.handle('file:save-text', async (e, defaultName: string, content: string | Uint8Array) => {
     const parent = windowFor(e)
