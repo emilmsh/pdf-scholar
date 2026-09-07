@@ -2243,25 +2243,6 @@ export default function Toolbar({
                 />
                 {t('tb.keepAwake')}
               </label>
-              {/* Extension only: the one thing the extension takes from the
-                  browser that a user may want back — a browser set to download
-                  PDFs was overridden by the redirect with no say in it (issue
-                  #16). Off, only file:// documents open here; the desktop app
-                  has no equivalent, since the OS file association is already
-                  the user's own choice. */}
-              {isExtension && (
-                <label className="theme-menu-toggle" title={t('tb.webTakeoverTip')}>
-                  <input
-                    type="checkbox"
-                    checked={webTakeover}
-                    onChange={(e) => {
-                      setWebTakeoverState(e.target.checked)
-                      setWebTakeover(e.target.checked)
-                    }}
-                  />
-                  {t('tb.webTakeover')}
-                </label>
-              )}
             </div>
           )}
         </div>
@@ -2354,6 +2335,30 @@ export default function Toolbar({
               />
 
               <div className="theme-menu-sep" />
+
+              {/* Extension only: the one thing the extension takes from the
+                  browser that a user may want back — a browser set to download
+                  PDFs was overridden by the redirect with no say in it (issue
+                  #16). Off, only file:// documents open here; the desktop app
+                  has no equivalent, since the OS file association is already
+                  the user's own choice. Lives here with the app's plumbing —
+                  v0.46.0 put it in the VIEW menu by mistake, where nobody saw it. */}
+              {isExtension && (
+                <>
+                  <label className="theme-menu-toggle" title={t('tb.webTakeoverTip')}>
+                    <input
+                      type="checkbox"
+                      checked={webTakeover}
+                      onChange={(e) => {
+                        setWebTakeoverState(e.target.checked)
+                        setWebTakeover(e.target.checked)
+                      }}
+                    />
+                    {t('tb.webTakeover')}
+                  </label>
+                  <div className="theme-menu-sep" />
+                </>
+              )}
 
               <button
                 className="menu-action"
