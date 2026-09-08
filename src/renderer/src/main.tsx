@@ -2,6 +2,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import AssistantApp from './AssistantApp'
 import { ErrorBoundary } from './ErrorBoundary'
+import { TextContextMenu } from './components/TextContextMenu'
 import { parseAssistantTarget } from '../../shared/viewer-url'
 import { initTouchUi } from './touch-ui'
 import './styles/app.css'
@@ -37,5 +38,9 @@ if (import.meta.env.DEV && !window.api) {
 const assistantFor = parseAssistantTarget(location.href)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <ErrorBoundary>{assistantFor ? <AssistantApp docPath={assistantFor} /> : <App />}</ErrorBoundary>
+  <ErrorBoundary>
+    {assistantFor ? <AssistantApp docPath={assistantFor} /> : <App />}
+    {/* Right-click on text anywhere no surface has its own menu (Electron only) */}
+    <TextContextMenu />
+  </ErrorBoundary>
 )

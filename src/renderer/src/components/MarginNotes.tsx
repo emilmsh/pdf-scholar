@@ -22,6 +22,7 @@ import type { PageAnnotation } from '../annotations'
 import { IconChevronDown } from './icons'
 import { bubblesWhileTyping } from '../keymap'
 import { t, useLang } from '../i18n'
+import { inTextField } from './TextContextMenu'
 
 /** Vertical gap between stacked cards, CSS px */
 const CARD_GAP = 8
@@ -363,14 +364,12 @@ export default function MarginNotes({
       ref={hostRef}
       // Right-click on the strip (cards included — it is all "the margin")
       // asks the viewer to offer hiding the view. Inside a comment's textarea
-      // the browser's own menu is wanted instead (paste!) — stopPropagation
-      // without preventDefault shields it from the pages container, whose
-      // handler preventDefaults everything to open the page menu.
+      // the TEXT menu is wanted instead (paste!): the event is left to bubble,
+      // the pages container yields text fields too (inTextField), and the
+      // app-wide TextContextMenu picks it up — or the browser's own menu does,
+      // on the web targets.
       onContextMenu={(e) => {
-        if (e.target instanceof HTMLTextAreaElement) {
-          e.stopPropagation()
-          return
-        }
+        if (inTextField(e.target)) return
         e.preventDefault()
         e.stopPropagation()
         onMenu(e.clientX, e.clientY)

@@ -334,6 +334,20 @@ regressions are treated as bugs, not as acceptable platform lag.
     download a batch of articles and got them opened instead (issue #16).
     Covered by `npm run test:file-access` (CI).
 
+20. **The right-click menu for text is the desktop's own; the browser targets
+    keep the browser's.** Electron ships no context menu at all, so every
+    surface without a menu of its own (the assistant's answers, settings, the
+    library, a comment's textarea) was selectable but uncopyable by mouse.
+    `TextContextMenu` (mounted in `main.tsx`, `isElectron` only) offers
+    Kopier / Klipp ut / Lim inn / Marker alt wherever no surface has already
+    preventDefaulted the click — the pages, the tab strip and the sidebar
+    header keep their menus, so one right-click never opens two — while the
+    page menu stays open when the chat is right-clicked and copied. dev:web and
+    the extension render nothing: the browser's menu is already there and
+    knows more (search, inspect, spell-check), so drawing ours over it would be
+    the divergence. Keyboard copy (Ctrl/Cmd+C) works identically everywhere.
+    Covered by `npm run test:text-menu` (desktop session).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

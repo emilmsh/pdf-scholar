@@ -6101,6 +6101,39 @@ html.pen-near .draw-layer {
   background: var(--hover);
 }
 
+/* The text fallback menu (TextContextMenu): copy / cut / paste / select all
+   wherever no surface owns the right-click. Same chrome as the tab menu. */
+.text-menu {
+  position: fixed;
+  z-index: 70;
+  min-width: 168px;
+  padding: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.1s ease;
+}
+
+.text-menu .menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  text-align: left;
+  font-size: 12.5px;
+}
+
+.text-menu .menu-item:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.text-menu .menu-item:disabled {
+  color: var(--text-secondary);
+  opacity: 0.55;
+  cursor: default;
+}
+
 /* Scholarly details, scoped to the Pergament (sepia) theme only */
 
 :root[data-theme='sepia'] .ai-header {

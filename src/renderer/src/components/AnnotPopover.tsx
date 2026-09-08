@@ -19,6 +19,7 @@ import { useDraggable } from '../useDraggable'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { MarkupColorRow } from './SelectionMenu'
+import { inTextField } from './TextContextMenu'
 
 /** Marks made by a DRAWING tool (the pen and the shapes), as opposed to marks
  *  anchored to text. They share the pen case; text markup keeps its own
@@ -118,7 +119,9 @@ export default function AnnotPopover({
       ref={ref}
       style={{ ...style, ...sizeStyle }}
       onMouseDown={(e) => e.stopPropagation()}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        if (!inTextField(e.target)) e.preventDefault()
+      }}
     >
       <div className="annot-popover-head" {...handleProps}>
         <span>{annotTypeLabel(annotation.type)}</span>

@@ -141,6 +141,7 @@ import Sidebar from './Sidebar'
 import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
+import { inTextField } from './TextContextMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
 import { errorText, locale, t, useLang } from '../i18n'
@@ -4383,6 +4384,9 @@ export default function PdfViewer({
 
   const onContextMenu = useCallback(
     (e: React.MouseEvent) => {
+      // A comment's textarea in the margin strip: the text menu's business
+      // (copy/paste), not a page menu — leave the event alone so it bubbles on
+      if (inTextField(e.target)) return
       e.preventDefault()
       if (drawToolRef.current) return
       openMenuAt(e.clientX, e.clientY, e.target)

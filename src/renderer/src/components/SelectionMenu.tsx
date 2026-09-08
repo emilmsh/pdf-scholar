@@ -28,6 +28,7 @@ import {
   IconTally,
   IconTranslate
 } from './icons'
+import { inTextField } from './TextContextMenu'
 
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/
 
@@ -258,7 +259,9 @@ export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.J
         e.preventDefault()
         e.stopPropagation()
       }}
-      onContextMenu={(e) => e.preventDefault()}
+      onContextMenu={(e) => {
+        if (!inTextField(e.target)) e.preventDefault()
+      }}
     >
       {/* Every other row of this menu is a target, so the drag needs its own
           strip rather than "anywhere on the chrome" — grabbing a colour dot to
