@@ -43,6 +43,14 @@ need your own API key (Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemin
 Grok, Mistral or Groq) — or any OpenAI-compatible endpoint, including local models
 via Ollama or LM Studio, which need no key at all — entered in the assistant settings.
 
+<sub>No install allowed on your machine? Each release also carries a **portable zip**
+(`PDF-Scholar-*-portable-x64.zip`, and an `arm64` twin): extract it anywhere and run
+the exe. Settings, recents and drafts live in a `data` folder beside it, so the folder
+moves as a whole. It registers nothing, so it will not appear under "Open with" until
+you browse to it once, and it tells you about new releases but cannot install them
+itself. AI keys are encrypted to the Windows account that saved them and do not
+follow the folder to another machine.</sub>
+
 [![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-PDF%20Scholar-2f6f7b?logo=windows&logoColor=white)](https://apps.microsoft.com/detail/9N75CPC0G9M2)
 
 **[⬇ Get PDF Scholar from the Microsoft Store](https://apps.microsoft.com/detail/9N75CPC0G9M2)** —

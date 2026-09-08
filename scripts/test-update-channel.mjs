@@ -57,6 +57,30 @@ eq(U.isNewerVersion('0.33.x', '0.33.0'), false, 'non-numeric segment')
 eq(U.isNewerVersion('0..0', '0.33.0'), false, 'empty segment is not zero')
 eq(U.isNewerVersion('', '0.33.0'), false, 'empty string')
 
+// --- portable zip vs. install ------------------------------------------------
+// The installer leaves exactly one tell beside the exe: its uninstaller. A zip
+// extract has none — and must be told apart, or electron-updater would install
+// the Setup exe over it on quit.
+console.log('isPortableExtract')
+const winJoin = (...p) => p.join('\\')
+const only = (...present) => (path) => present.includes(path)
+eq(
+  U.isPortableExtract('C:\\Users\\e\\AppData\\Local\\Programs\\PDF Scholar', only('C:\\Users\\e\\AppData\\Local\\Programs\\PDF Scholar\\Uninstall PDF Scholar.exe'), winJoin),
+  false,
+  'an NSIS install (uninstaller beside the exe) is not portable'
+)
+eq(
+  U.isPortableExtract('D:\\PDF-Scholar-portable-x64', only(), winJoin),
+  true,
+  'a zip extract (no uninstaller) is portable'
+)
+eq(
+  U.isPortableExtract('D:\\PDF-Scholar-portable-x64', only('D:\\PDF-Scholar-portable-x64\\PDF Scholar.exe', 'D:\\PDF-Scholar-portable-x64\\data'), winJoin),
+  true,
+  'other files beside the exe do not make it an install'
+)
+eq(U.NSIS_UNINSTALLER_NAME, 'Uninstall PDF Scholar.exe', 'the uninstaller name electron-builder derives from productName')
+
 // --- the constants the UI and the docs both quote ----------------------------
 console.log('constants')
 eq(

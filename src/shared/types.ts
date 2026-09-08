@@ -713,21 +713,24 @@ export interface AiCitationTarget {
   end: number
 }
 
-/** Why a build can't self-update: developer run, unsigned macOS, or a
- *  Microsoft Store/MSIX package (the Store owns the update cycle). `null`
- *  means self-update is supported. Note that 'mac' bars INSTALLING an update,
- *  not detecting one — that build still checks and reports 'manual'. */
-export type UpdateUnsupportedReason = 'dev' | 'mac' | 'store'
+/** Why a build can't self-update: developer run, unsigned macOS, a Microsoft
+ *  Store/MSIX package (the Store owns the update cycle), or the portable
+ *  Windows zip (nothing is installed, so nothing can be replaced on quit).
+ *  `null` means self-update is supported. Note that 'mac' and 'portable' bar
+ *  INSTALLING an update, not detecting one — those builds still check and
+ *  report 'manual'. */
+export type UpdateUnsupportedReason = 'dev' | 'mac' | 'store' | 'portable'
 
 /** How a build that can't self-update gets the new version: `brew` when it was
- *  installed from the Homebrew cask, `download` for a hand-installed dmg. */
+ *  installed from the Homebrew cask, `download` for a hand-installed dmg and
+ *  for the portable Windows zip. */
 export type ManualUpdateChannel = 'brew' | 'download'
 
 /** Result of a manual "check for updates".
  *  - available: newer version detected, not downloaded (offer a download)
  *  - ready: an update is already downloaded and installs on quit/restart
  *  - manual: newer version detected, but this build can't install it itself
- *    (macOS) — `channel` says how the user does it
+ *    (macOS, portable Windows) — `channel` says how the user does it
  *  - none: this is the latest version
  *  - unsupported: no check was even attempted (dev run, or Microsoft Store —
  *    the Store owns the update cycle there)

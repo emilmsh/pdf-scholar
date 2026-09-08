@@ -7,13 +7,19 @@
 // "restart now" button). Errors are logged and swallowed: an offline machine
 // or a rate-limited GitHub API must never affect the app.
 //
-// macOS takes a second path (initManualUpdates): it can detect an update but
-// not install one, so it checks the releases API directly and shows a notice
-// carrying the `brew upgrade` command. See docs/PLATFORMS.md §1 for why.
+// macOS and the portable Windows zip take a second path (initManualUpdates):
+// they can detect an update but not install one, so they check the releases
+// API directly and show a notice carrying the way out — the `brew upgrade`
+// command for a cask install, a link to the releases page otherwise. See
+// docs/PLATFORMS.md §1 (mac) and §21 (portable) for why.
 import { existsSync } from 'node:fs'
 import { app, BrowserWindow, ipcMain, net } from 'electron'
 import { autoUpdater } from 'electron-updater'
-import type { ManualUpdateChannel, UpdateCheckOutcome } from '../shared/types'
+import type {
+  ManualUpdateChannel,
+  UpdateCheckOutcome,
+  UpdateUnsupportedReason
+} from '../shared/types'
 import {
   CASKROOM_PATHS,
   RELEASES_API_URL,
@@ -21,6 +27,7 @@ import {
   versionFromTag
 } from '../shared/update-channel'
 import { flushAllAnnotations } from './annotation-engine-embedpdf'
+import { isPortableBuild } from './portable'
 
 const FIRST_CHECK_DELAY_MS = 10_000
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
@@ -41,7 +48,7 @@ function broadcast(channel: string, ...args: unknown[]): void {
 }
 
 /** Why this build can't INSTALL an update itself, or null when it can */
-function unsupportedReason(): 'dev' | 'mac' | 'store' | null {
+function unsupportedReason(): UpdateUnsupportedReason | null {
   if (!app.isPackaged) return 'dev' // no app-update.yml, nothing meaningful to update
   // macOS builds are ad-hoc signed (no Apple Developer identity) and
   // Squirrel.Mac refuses to apply an update whose signature doesn't satisfy the
@@ -51,6 +58,10 @@ function unsupportedReason(): 'dev' | 'mac' | 'store' | null {
   if (process.platform === 'darwin') return 'mac'
   // Inside a Microsoft Store/MSIX package the Store owns the update cycle
   if (process.windowsStore) return 'store'
+  // A zip extract was never installed: NsisUpdater would fetch the Setup exe
+  // and run it on quit, turning the portable copy into an install the user
+  // did not ask for. Detect, and point at the new zip instead.
+  if (isPortableBuild()) return 'portable'
   return null
 }
 
@@ -73,16 +84,19 @@ async function fetchLatestVersion(): Promise<string | null> {
 }
 
 /** Detection-only update flow for builds that can't install their own updates
- *  (macOS). Same cadence and the same "never interrupt" policy as the real
- *  updater; the notice carries a command instead of a download button. */
+ *  (macOS, portable Windows). Same cadence and the same "never interrupt"
+ *  policy as the real updater; the notice carries a command or a link to the
+ *  releases page instead of a download button. */
 function initManualUpdates(): void {
   const current = app.getVersion()
   // A cask install stages the app under Caskroom; a dmg dragged to
-  // /Applications leaves no such trace. Resolved once — it can't change while
-  // the app is running in any way that matters.
-  const channel: ManualUpdateChannel = CASKROOM_PATHS.some((p) => existsSync(p))
-    ? 'brew'
-    : 'download'
+  // /Applications leaves no such trace, and the portable zip is never a cask.
+  // Resolved once — it can't change while the app is running in any way that
+  // matters.
+  const channel: ManualUpdateChannel =
+    process.platform === 'darwin' && CASKROOM_PATHS.some((p) => existsSync(p))
+      ? 'brew'
+      : 'download'
   /** Newest version already announced, so the 4-hourly re-check doesn't
    *  re-open a notice the user dismissed */
   let announced: string | null = null
@@ -127,9 +141,10 @@ export function initUpdater(): void {
   // flavour, before the early returns below.
   ipcMain.handle('update:support', () => unsupported)
 
-  // macOS can detect but not install — it gets its own flow, including its own
-  // 'update:check' handler, so return before the electron-updater wiring.
-  if (unsupported === 'mac') {
+  // macOS and the portable zip can detect but not install — they get their own
+  // flow, including its own 'update:check' handler, so return before the
+  // electron-updater wiring.
+  if (unsupported === 'mac' || unsupported === 'portable') {
     initManualUpdates()
     return
   }

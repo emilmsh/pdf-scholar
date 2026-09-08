@@ -102,6 +102,7 @@ jobs:
           | Platform | Download |
           |---|---|
           | **Windows** 10/11 (x64 & arm64) | [PDF-Scholar-Setup-$VERSION.exe]($BASE/PDF-Scholar-Setup-$VERSION.exe) |
+          | **Windows** — portable, no install | [PDF-Scholar-$VERSION-portable-x64.zip]($BASE/PDF-Scholar-$VERSION-portable-x64.zip) · [arm64]($BASE/PDF-Scholar-$VERSION-portable-arm64.zip) (extract and run; settings live in a \`data\` folder beside the exe) |
           | **macOS** — Apple Silicon (M1 and newer) | [PDF-Scholar-$VERSION-arm64.dmg]($BASE/PDF-Scholar-$VERSION-arm64.dmg) |
           | **macOS** — Intel | [PDF-Scholar-$VERSION-x64.dmg]($BASE/PDF-Scholar-$VERSION-x64.dmg) |
           | **Linux** — any distribution | [PDF-Scholar-$VERSION.AppImage]($BASE/PDF-Scholar-$VERSION.AppImage) (make executable and run — no install needed) |

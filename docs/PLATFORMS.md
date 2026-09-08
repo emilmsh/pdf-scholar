@@ -16,6 +16,7 @@ One-time fees (Microsoft Partner Center, Chrome Web Store) are acceptable.
 | --- | --- | --- | --- |
 | Windows x64 | 1 | `PDF-Scholar-Setup-<v>.exe` (universal NSIS) | electron-updater |
 | Windows arm64 | 1 | same universal installer (arch picked at install) | electron-updater |
+| Windows portable (x64 / arm64) | 1 | `PDF-Scholar-<v>-portable-<arch>.zip` — the installer's tree, extract and run | detect-only: in-app notice linking the releases page (see divergence 21) |
 | Microsoft Store (x64 + arm64) | 1 | `PDF-Scholar-<v>-x64.appx` + `-arm64.appx` (MSIX, signed by the Store on ingestion) | the Store; electron-updater self-disables via `process.windowsStore` (`src/main/updater.ts`) |
 | Extension (Edge/Chrome) | 1 | `pdf-scholar-extension.zip` | store auto-update; sideload = in-app notice |
 | macOS 11+ (arm64 + x64) | 2 | `PDF-Scholar-<v>-arm64.dmg` / `-x64.dmg` — **unsigned** | detect-only: in-app notice with the `brew upgrade` command (see below); no self-install |
@@ -347,6 +348,31 @@ regressions are treated as bugs, not as acceptable platform lag.
     knows more (search, inspect, spell-check), so drawing ours over it would be
     the divergence. Keyboard copy (Ctrl/Cmd+C) works identically everywhere.
     Covered by `npm run test:text-menu` (desktop session).
+
+21. **The portable Windows zip is the installer without the install** (issue
+    #17, 2026-09-08). Same win-unpacked tree, zipped per arch (a zip cannot
+    pick the arch at install time the way the universal NSIS does), for
+    machines where nothing may be installed, USB sticks, and people who want
+    nothing in the registry. It is a secondary offer: the release table lists
+    it under the installer, the README and the landing page carry it in small
+    print, the stores never. What differs, all of it a consequence of nothing
+    being installed: (a) **state lives in `data/` beside the exe**
+    (`src/main/portable.ts` moves `userData` + `sessionData` there before any
+    path is read — the state file, drafts, the single-instance lock all
+    follow), so the folder moves as a whole; if that folder cannot be created
+    the default `%APPDATA%` location stands. AI keys are still DPAPI-bound to
+    the Windows account and do not travel to another machine — same rule as
+    the installer, said plainly in the README. (b) **No file association, no
+    «Åpne med» row** until the user browses to the exe once — the installer's
+    registration is the thing that was skipped. (c) **Detect-only updates**:
+    `NsisUpdater` would download the Setup exe and run it on quit, turning the
+    portable copy into an install nobody asked for, so the build takes the
+    macOS path (`initManualUpdates`, channel `download`) and the notice links
+    the releases page. Detection reads the disk, not an env var — the NSIS
+    uninstaller sits beside an installed exe and never beside an extracted one
+    (`isPortableExtract` in `src/shared/update-channel.ts`, covered by
+    `npm run test:update-channel`). Nothing else differs — the renderer does
+    not know it is portable.
 
 ## Maintenance rules
 

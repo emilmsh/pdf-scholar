@@ -6,7 +6,11 @@
 # via Windows' "Open with" / default apps UI. x64 + arm64 are combined into
 # ONE universal installer (buildUniversalInstaller default) that picks the
 # native arch at install time — keeps the version-stable download name.
-# appId stays no.emil.pdfx so NSIS recognizes existing installs and upgrades
+# appId stays no.emil.pdfx so NSIS recognizes existing installs and upgrades.
+# Alongside the installer, the same win-unpacked tree ships as a per-arch ZIP
+# — the portable build (issue #17): extract and run, nothing installed, state
+# in a data/ folder beside the exe (src/main/portable.ts). No file association,
+# no auto-install of updates (it detects one and links the new zip).
 appId: no.emil.pdfx
 productName: PDF Scholar
 directories:
@@ -35,6 +39,10 @@ win:
   target:
     - target: nsis
       arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  # The zip's name; nsis below has its own
+  artifactName: PDF-Scholar-${version}-portable-${arch}.${ext}
   icon: build/icon.png
 nsis:
   oneClick: true

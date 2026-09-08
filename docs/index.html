@@ -447,6 +447,10 @@
       <code>brew install --cask emilmsh/tap/pdf-scholar</code><br>
       Either way the build is unsigned, so the first launch takes
       <a href="https://github.com/emilmsh/pdf-scholar#desktop-app-macos">one Terminal command</a>.<br>
+      Windows without an installer: a
+      <a id="dl-win-portable" href="https://github.com/emilmsh/pdf-scholar/releases/latest">portable zip</a>
+      (<a id="dl-win-portable-arm64" href="https://github.com/emilmsh/pdf-scholar/releases/latest">arm64</a>)
+      that you extract and run, with its settings in a folder beside the exe.<br>
       Linux is the deb for Ubuntu and Debian; other distros take the
       <a id="dl-linux-appimage" href="https://github.com/emilmsh/pdf-scholar/releases/latest">AppImage</a>.
       It is built from the same sources but has never been run on a Linux machine —
@@ -500,7 +504,8 @@
 
       // Asset-name contract, kept by .github/workflows/release.yml:
       // PDF-Scholar-Setup-<version>.exe is the universal x64+arm64 installer;
-      // the dmgs are per-arch, Linux ships a deb and an AppImage.
+      // the portable zips and the dmgs are per-arch, Linux ships a deb and an
+      // AppImage.
       const asset = (re) => (rel.assets || []).find((a) => re.test(a.name));
       const point = (id, a) => {
         const el = document.getElementById(id);
@@ -510,6 +515,8 @@
       const exe = asset(/^PDF-Scholar-Setup-.*\.exe$/);
       point('dl', exe);
       point('dl2', exe);
+      point('dl-win-portable', asset(/^PDF-Scholar-.*-portable-x64\.zip$/));
+      point('dl-win-portable-arm64', asset(/^PDF-Scholar-.*-portable-arm64\.zip$/));
       point('dl-mac', asset(/^PDF-Scholar-.*-arm64\.dmg$/));
       point('dl-mac-intel', asset(/^PDF-Scholar-.*-x64\.dmg$/));
       point('dl-linux', asset(/^PDF-Scholar-.*\.deb$/));

@@ -61,9 +61,14 @@ import {
   setPosition
 } from './storage'
 import { initUpdater } from './updater'
+import { applyPortableUserData } from './portable'
 import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
 import { doiCite } from './doi'
 import { citationStyleOrDefault } from '../shared/citation-style'
+
+// The portable zip keeps its state beside the exe. Before ANY path is read —
+// the migration below, the single-instance lock, the state file, drafts.
+applyPortableUserData()
 
 // One-time migration: renaming the app PDFX → PDF Scholar moved userData;
 // carry the state file over so recents, positions and encrypted AI keys

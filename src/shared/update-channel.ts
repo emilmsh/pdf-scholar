@@ -1,10 +1,11 @@
 // Where a build that cannot install its own updates gets the next version.
 //
-// macOS is the only such desktop build (ad-hoc signed → Squirrel.Mac refuses to
-// apply an update; see docs/PLATFORMS.md "Allowed divergences" §1). DETECTING a
-// new version is just an HTTPS GET though, and nothing about that needs a code
-// signature — so the mac build still checks and then tells the user how to
-// install it by hand. This module holds everything both sides of that flow have
+// Two desktop builds are like that: macOS (ad-hoc signed → Squirrel.Mac refuses
+// to apply an update; see docs/PLATFORMS.md "Allowed divergences" §1) and the
+// portable Windows zip (electron-updater would install the Setup exe over a
+// copy that was never installed; §21). DETECTING a new version is just an HTTPS
+// GET though, and nothing about that needs a code signature or an install — so
+// both builds still check and then tell the user how to update by hand. This module holds everything both sides of that flow have
 // to agree on: the endpoints, the command, and the version comparison.
 // Electron-free on purpose, so scripts/test-update-channel.mjs can import it.
 
@@ -51,4 +52,21 @@ export function isNewerVersion(a: string, b: string): boolean {
     if (x !== y) return x > y
   }
   return false
+}
+
+/** The NSIS uninstaller electron-builder writes beside the exe on install
+ *  (`Uninstall ${productName}.exe`). A zip extract of the same tree has none. */
+export const NSIS_UNINSTALLER_NAME = 'Uninstall PDF Scholar.exe'
+
+/** Whether a packaged Windows tree at `exeDir` is a zip extract rather than an
+ *  install: the uninstaller is the one file the installer adds. `exists` and
+ *  `join` are injected so this stays testable without a disk. Only meaningful
+ *  for a packaged win32 build that is not a Store package — the caller checks
+ *  that (src/main/portable.ts). */
+export function isPortableExtract(
+  exeDir: string,
+  exists: (path: string) => boolean,
+  join: (...parts: string[]) => string
+): boolean {
+  return !exists(join(exeDir, NSIS_UNINSTALLER_NAME))
 }

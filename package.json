@@ -2,7 +2,7 @@
   "name": "pdfx",
   "productName": "PDF Scholar",
   "version": "0.46.2",
-  "description": "A PDF reader and annotator for Windows, built for research",
+  "description": "A PDF reader and annotator for Windows and macOS, built for research",
   "main": "out/main/index.js",
   "private": true,
   "scripts": {
