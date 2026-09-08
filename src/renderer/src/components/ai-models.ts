@@ -92,8 +92,9 @@ export const MODELS: Record<
   // (docs/agent-notes/modeller-api.md has the sources and open questions)
   gemini: [
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', short: 'Gemini 3.1 Pro', hint: 'ai.modelHintCapable' },
-    // Replaced gemini-3.6-flash this round (superseded 2026-08-13, same slot)
-    { id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash', short: 'Gemini 3.7 Flash', hint: 'ai.modelHintRecommended' },
+    // Replaced gemini-3.7-flash this round (superseded 2026-09-04, same slot;
+    // 3.7 itself had replaced 3.6 on 2026-08-13)
+    { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash', short: 'Gemini 3.8 Flash', hint: 'ai.modelHintRecommended' },
     // `short` drops "Flash-" — the full name is the widest label in the whole
     // catalogue and the only one the header chip still cannot fit at the
     // default panel width. The menu keeps the provider's own name.
@@ -255,10 +256,11 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // context number was documented — excerpting early is the cheap failure,
   // erroring mid-question is not
   'gemini-3.1-pro-preview': 1_000_000,
+  'gemini-3.8-flash': 1_000_000,
+  // gemini-3.7-flash and gemini-3.6-flash kept here though no longer curated
+  // (see MODELS.gemini) — a stored selection from before either swap must not
+  // regress to the 200k provider floor
   'gemini-3.7-flash': 1_000_000,
-  // gemini-3.6-flash kept here though no longer curated (see MODELS.gemini) —
-  // a stored selection from before this review must not regress to the 200k
-  // provider floor
   'gemini-3.6-flash': 1_000_000,
   'grok-4.6': 500_000,
   // grok-4.5 kept here though no longer curated (see MODELS.xai) — a stored
