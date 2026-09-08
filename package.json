@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.46.1",
+  "version": "0.46.2",
   "description": "A PDF reader and annotator for Windows, built for research",
   "main": "out/main/index.js",
   "private": true,
@@ -55,6 +55,7 @@
     "test:split-docs": "node scripts/test-split-docs.mjs",
     "test:assistant": "node scripts/test-assistant-window.mjs",
     "test:torn-read": "node scripts/test-torn-read.mjs",
+    "test:text-menu": "node scripts/test-text-menu.mjs",
     "test:listing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-store-listing.ps1",
     "test:ext-publish": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ext-publish.ps1 -CheckOnly",
     "bench:engine": "node scripts/engine-bench.mjs",
