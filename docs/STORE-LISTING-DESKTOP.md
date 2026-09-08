@@ -144,28 +144,20 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.46.1
+## What's new in this version (≤ 1 500 chars) — v0.47.0
 
 **EN:**
 ```
-• Two documents side by side: the second split column can hold another file — drag a tab into the view, pick it under "Open in split view", or drop a PDF on the column. Each column annotates its own document; Shift+S swaps sides, S reopens the last pair as it was
-• Reading modes reworked: Day, Tint, Night and Night+. Tint is a light paper tone (sepia, gray, green, blue or sand), Night has its own dark tones, a slider sets the strength and D cycles the modes. Night can keep figures in their original colours
-• An AI access switch: "Confirm before sharing" asks the first time a document goes to a provider and shows what is attached; "Off" blocks every AI request
-• Zotero: a document from a Zotero library gets a Zotero section in the save menu — show the item, or copy an in-text citation, full reference or BibTeX entry. Linked attachments too
-• References beyond Zotero: a PDF that carries a DOI gets a Reference section — one click fetches citation, reference and BibTeX from doi.org. Nothing is sent until you click
-• Citation style: APA 7, Chicago, Harvard, IEEE, MLA 9, Nature or Vancouver — one choice for both sections
-• Ctrl+Shift+T reopens the last closed tab; Claude Fable 5.1 and GPT-6 Astra join the model menu
+• Right-click to copy text anywhere: the assistant's answers, comments and settings now have a Copy / Cut / Paste / Select all menu, alongside the one the pages already had
+• Gemini 3.8 Flash replaces 3.7 Flash in the model menu
+• Smaller fixes and refinements
 ```
 
 **NO:**
 ```
-• To dokumenter side om side: den andre kolonnen i delt visning kan vise en annen fil — dra en fane inn i visningen, velg den under «Åpne i delt visning», eller slipp en PDF på kolonnen. Hver kolonne annoterer sitt eget dokument; Shift+S bytter side, S åpner forrige par som det var
-• Lesemodusene er gjort om: Dag, Farge, Natt og Natt+. Farge er en lys papirtone (sepia, grå, grønn, blå eller sand), natt har egne mørke toner, en glidebryter setter styrken og D bytter modus. Natt kan beholde figurer i originalfargene
-• KI-tilgang: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved; «Av» stopper alle AI-forespørsler
-• Zotero: et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen — vis elementet, eller kopier henvisning, full referanse eller BibTeX-oppføringen. Lenkede vedlegg også
-• Referanser utenfor Zotero: en PDF med DOI får en Referanse-del — ett klikk henter henvisning, referanse og BibTeX fra doi.org. Ingenting sendes før du klikker
-• Siteringsstil: APA 7, Chicago, Harvard, IEEE, MLA 9, Nature eller Vancouver — ett valg for begge delene
-• Ctrl+Shift+T åpner sist lukkede fane; Claude Fable 5.1 og GPT-6 Astra er med i modellmenyen
+• Høyreklikk for å kopiere tekst overalt: assistentens svar, kommentarer og innstillinger har nå en Kopier / Klipp ut / Lim inn / Marker alt-meny, i tillegg til den sidene allerede hadde
+• Gemini 3.8 Flash erstatter 3.7 Flash i modellmenyen
+• Mindre feilrettinger og finpuss
 ```
 
 ---
