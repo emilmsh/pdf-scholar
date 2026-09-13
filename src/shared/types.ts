@@ -165,6 +165,7 @@ export type AiErrorCode =
   | 'ai-endpoint-unreachable'
   | 'ai-endpoint-incompatible'
   | 'ai-context-overflow'
+  | 'ai-request-too-large'
   | 'ai-rate-limited'
   | 'ai-model-overloaded'
   | 'ai-no-credit'
@@ -698,9 +699,19 @@ export interface AiUsage {
   cacheWriteTokens: number
 }
 
+/** The account's per-request input-token ceiling for the model that was just
+ *  asked, when the provider said so: its rate-limit headers
+ *  (`x-ratelimit-limit-tokens`, Anthropic's
+ *  `anthropic-ratelimit-input-tokens-limit`) or, failing those, the «Limit N»
+ *  its rejection named. This is a per-MINUTE bucket, used as a per-request
+ *  ceiling because a single request that does not fit one minute's budget can
+ *  never succeed — waiting does not help it. Absent means the provider did not
+ *  say; the renderer remembers what it hears per provider+model and caps the
+ *  document budget by it (ai-token-limits.ts). Rides on both arms because the
+ *  informative case is the rejection. */
 export type AiChatResult =
-  | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string }
-  | FileError
+  | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string; tokenLimit?: number }
+  | (FileError & { tokenLimit?: number })
 
 /** Where a clicked citation should land in the document: a page plus a char
  *  range within that page's extracted text (start === end means "just the

@@ -252,6 +252,56 @@ const OVERLOADED_RE =
 const RATE_LIMIT_RE =
   /request too large|rate.?limit|tokens per min|quota exceeded|exceeded your current quota|resource[_ ]exhausted/i
 
+// ONE request bigger than the whole per-minute budget, matched inside the
+// rate-limit family above and split out because the advice inverts: a rejection
+// that names the request as too large cannot be waited out, while «rate limit
+// reached» can. OpenAI (and Azure, same text) is the only provider observed
+// phrasing it this way; everything else stays a plain rate limit.
+const REQUEST_TOO_LARGE_RE = /request too large/i
+
+// The account's token ceiling for this model, from the provider's own
+// rate-limit headers. Read on EVERY response, success included: the ceiling is
+// what the excerpt budget needs, and learning it from a small question is what
+// lets the first big one succeed rather than fail and teach us afterwards.
+// Header names are the providers' published ones (OpenAI/Groq/OpenRouter share
+// the x-ratelimit-* family; Anthropic prefixes its own). A rename costs us the
+// pre-emption, not correctness — the excerpt budget falls back to the model's
+// context window, exactly as before this existed.
+const TOKEN_LIMIT_HEADERS = [
+  'x-ratelimit-limit-tokens',
+  'anthropic-ratelimit-input-tokens-limit',
+  'x-ratelimit-limit-input-tokens'
+]
+
+/** Per-request token ceiling from a response's (or an SDK error's) headers.
+ *  Absurdly small values are not filtered here — one floor, in one place:
+ *  MIN_CREDIBLE_TOKENS in renderer/src/ai-token-limits.ts, which is the only
+ *  consumer and the only place the number is ever acted on. */
+function tokenLimitFromHeaders(headers: unknown): number | undefined {
+  if (!headers || typeof headers !== 'object') return undefined
+  const get = (name: string): unknown => {
+    if (typeof (headers as Headers).get === 'function') return (headers as Headers).get(name)
+    const bag = headers as Record<string, unknown>
+    return bag[name] ?? bag[name.toLowerCase()]
+  }
+  for (const name of TOKEN_LIMIT_HEADERS) {
+    const n = Number(String(get(name) ?? '').trim())
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return undefined
+}
+
+/** Last resort for the same number: the «Limit 30000» a rate-limit rejection
+ *  names in prose. Only ever consulted for a message already classified as a
+ *  rate limit, so a stray «limit» in some other error text cannot be read as
+ *  a token ceiling. */
+function tokenLimitFromMessage(message: string): number | undefined {
+  const m = /\blimit[:\s]+([\d_,. ]{2,})/i.exec(message)
+  if (!m) return undefined
+  const n = Number(m[1].replace(/[_,. ]/g, ''))
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
 // A question with a picture in it, sent to a model with no eyes. Every provider
 // says this differently and none of them says it plainly: OpenRouter answers
 // «No endpoints found that support image input» with an HTTP 404 (which reads
@@ -270,13 +320,21 @@ const IMAGE_UNSUPPORTED_RE =
  *  that detail. */
 function providerFailure(
   message: string,
-  ctx?: { model?: string | null; hadImages?: boolean }
-): FileError {
+  ctx?: { model?: string | null; hadImages?: boolean; headers?: unknown }
+): FileError & { tokenLimit?: number } {
   if (ctx?.hadImages && IMAGE_UNSUPPORTED_RE.test(message))
     return AI_ERRORS.modelNoImages(ctx.model || '')
   if (NO_CREDIT_RE.test(message)) return AI_ERRORS.noCredit(message)
   if (OVERLOADED_RE.test(message)) return AI_ERRORS.modelOverloaded(message)
-  if (RATE_LIMIT_RE.test(message)) return AI_ERRORS.rateLimited(message)
+  if (RATE_LIMIT_RE.test(message)) {
+    // The ceiling the renderer needs, so the next attempt can be cut to fit:
+    // the header first (authoritative), then the number the sentence names.
+    const tokenLimit = tokenLimitFromHeaders(ctx?.headers) ?? tokenLimitFromMessage(message)
+    const failure = REQUEST_TOO_LARGE_RE.test(message)
+      ? AI_ERRORS.requestTooLarge(message)
+      : AI_ERRORS.rateLimited(message)
+    return tokenLimit ? { ...failure, tokenLimit } : failure
+  }
   return CONTEXT_OVERFLOW_RE.test(message)
     ? AI_ERRORS.contextOverflow(message)
     : { error: message }
@@ -621,6 +679,7 @@ async function chatOpenAiResponses(
   // parameter we added on a heuristic (reasoning effort, the web-search tool),
   // strip that parameter and retry rather than failing the whole question.
   let response: Response
+  let tokenLimit: number | undefined
   for (let attempt = 0; ; attempt++) {
     response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -628,6 +687,7 @@ async function chatOpenAiResponses(
       body: JSON.stringify(body),
       signal
     })
+    tokenLimit = tokenLimitFromHeaders(response.headers) ?? tokenLimit
     if (response.ok && response.body) break
     const detail = await response.text().catch(() => '')
     if (response.status === 400 && attempt < 2) {
@@ -642,7 +702,8 @@ async function chatOpenAiResponses(
     }
     return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`, {
       model,
-      hadImages: carriesImages(req)
+      hadImages: carriesImages(req),
+      headers: response.headers
     })
   }
 
@@ -729,7 +790,8 @@ async function chatOpenAiResponses(
       cacheReadTokens: finalResp.usage?.input_tokens_details?.cached_tokens ?? 0,
       cacheWriteTokens: 0
     },
-    model: finalResp.model ?? model
+    model: finalResp.model ?? model,
+    ...(tokenLimit ? { tokenLimit } : {})
   }
 }
 
@@ -787,6 +849,7 @@ async function chatOpenAiCompatible(
   // Deployments name models we cannot inspect, so the reasoning heuristic can
   // misfire — a 400 blaming it gets one retry without, same net as the other paths.
   let response: Response
+  let tokenLimit: number | undefined
   for (let attempt = 0; ; attempt++) {
     try {
       response = await fetch(url, {
@@ -808,6 +871,7 @@ async function chatOpenAiCompatible(
       }
       return AI_ERRORS.endpointUnreachable(host, err instanceof Error ? err.message : String(err))
     }
+    tokenLimit = tokenLimitFromHeaders(response.headers) ?? tokenLimit
     if (response.ok && response.body) break
     const detail = await response.text().catch(() => '')
     if (
@@ -821,7 +885,8 @@ async function chatOpenAiCompatible(
     }
     return providerFailure(`HTTP ${response.status}: ${detail.slice(0, 300)}`, {
       model,
-      hadImages: carriesImages(req)
+      hadImages: carriesImages(req),
+      headers: response.headers
     })
   }
 
@@ -897,7 +962,13 @@ async function chatOpenAiCompatible(
       if (typeof text === 'string' && text) {
         emit(text)
         if (parsed.usage) readUsage(parsed.usage)
-        return { ok: true, parts: parseQuoteContract(text), usage, model: parsed.model ?? model ?? 'azure' }
+        return {
+          ok: true,
+          parts: parseQuoteContract(text),
+          usage,
+          model: parsed.model ?? model ?? 'azure',
+          ...(tokenLimit ? { tokenLimit } : {})
+        }
       }
       if (typeof parsed?.error?.message === 'string')
         return providerFailure(parsed.error.message, { model, hadImages: carriesImages(req) })
@@ -911,7 +982,13 @@ async function chatOpenAiCompatible(
   // ended without content (reasoning that consumed the whole budget, a cut
   // connection) — say that, never render a blank assistant turn as success.
   if (!fullText) return midStreamFailure ?? AI_ERRORS.streamAborted
-  return { ok: true, parts: parseQuoteContract(fullText), usage, model: model ?? 'azure' }
+  return {
+    ok: true,
+    parts: parseQuoteContract(fullText),
+    usage,
+    model: model ?? 'azure',
+    ...(tokenLimit ? { tokenLimit } : {})
+  }
 }
 
 async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Promise<AiChatResult> {
@@ -1075,7 +1152,11 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
     if (signal.aborted) return AI_ERRORS.aborted
     return providerFailure(err instanceof Error ? err.message : String(err), {
       model: models[provider],
-      hadImages: carriesImages(req)
+      hadImages: carriesImages(req),
+      // The Anthropic path throws (SDK) rather than returning — its APIError
+      // carries the response headers, which is where that provider's
+      // per-minute token ceiling is published.
+      headers: (err as { headers?: unknown } | null)?.headers
     })
   }
 }

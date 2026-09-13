@@ -191,12 +191,22 @@ export const AI_ERRORS = {
     code: 'ai-context-overflow',
     error: providerMessage
   }),
-  /** The provider refused over the ACCOUNT's rate limit (tokens per minute),
-   *  not the model's context window — the same question may succeed in a
-   *  minute, with a narrower question, or against a model with a higher
-   *  quota. Older models sit on the lowest quotas, so this fires exactly
-   *  where users wander off the curated list. Provider wording kept as
-   *  `error`: it names the limit and the counts. */
+  /** ONE request was bigger than the account's whole per-minute token budget
+   *  («Request too large for <model> … on tokens per min (TPM): Limit 30000,
+   *  Requested 214000»). Split from the rate limit below because the advice is
+   *  opposite: waiting cannot help — the same request fails identically in a
+   *  minute and tomorrow. The remedies are a smaller attachment (which the
+   *  renderer now does by itself once it has learned the ceiling, see
+   *  ai-token-limits.ts), a narrower question, or a higher usage tier. */
+  requestTooLarge: (providerMessage: string): FileError => ({
+    code: 'ai-request-too-large',
+    error: providerMessage
+  }),
+  /** The provider refused over the ACCOUNT's rate limit, and the request
+   *  itself would have fit — someone else's request (or the previous one) is
+   *  holding the minute's budget. Waiting IS the remedy here, which is the
+   *  whole reason this is a separate code from requestTooLarge above.
+   *  Provider wording kept as `error`: it names the limit and the counts. */
   rateLimited: (providerMessage: string): FileError => ({
     code: 'ai-rate-limited',
     error: providerMessage

@@ -147,7 +147,8 @@ is deliberately high — it must be **common**, and its remedy must **differ fro
 | Named | Because the user must do something different |
 |---|---|
 | `ai-no-credit` | top up; waiting never fixes it |
-| `ai-rate-limited` | wait, or ask something smaller |
+| `ai-request-too-large` | ask something smaller, or raise the usage tier — waiting is useless, one request does not fit a whole minute's quota |
+| `ai-rate-limited` | wait: the minute's budget is spent, the request itself would have fit |
 | `ai-model-overloaded` | wait, or switch model — the request was fine |
 | `ai-model-no-images` | pick a model that can see, or drop the image |
 | `ai-context-overflow` | start a new conversation |
@@ -165,8 +166,10 @@ somebody's billing page is a score nobody trusts.
 Worth writing down so nobody mistakes a green run for a guarantee:
 
 - **Long documents.** The excerpt path (`test:retrieval`) is tested on its own,
-  but no live test attaches a 300-page document and checks the answer is still
-  grounded. Cost, mostly.
+  and `test:ai-settings` drives the whole learn-the-quota-then-excerpt loop in
+  the real app against a local server — but no live test attaches a 300-page
+  document to a real provider and checks the answer is still grounded. Cost,
+  mostly.
 - **Multi-turn drift.** Every live case is a single question. Context handling
   across ten turns with images in earlier turns is untested.
 - **Answer quality.** We test that a citation parses, not that it is the right
@@ -174,3 +177,9 @@ Worth writing down so nobody mistakes a green run for a guarantee:
 - **Rate limits and outages.** The named codes exist (`ai-rate-limited`,
   `ai-endpoint-unreachable`) and layer 1 covers their parsing, but nothing
   provokes them live.
+- **The real quota behind a real key.** The per-request token ceiling the
+  excerpt budget now respects is read from the providers' rate-limit headers
+  (`x-ratelimit-limit-tokens` and friends). Layers 1 and 4 feed it headers we
+  wrote ourselves; that the header names are still the ones OpenAI and
+  Anthropic publish is unverified by any test — a rename costs us the
+  pre-emption, and the budget falls back to the model's context window.

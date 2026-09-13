@@ -37,7 +37,8 @@ import {
   WAIT_HINT_S
 } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
-import { errorText, t, useLang, locale } from '../i18n'
+import { rememberRequestTokenLimit } from '../ai-token-limits'
+import { errorDetail, errorText, t, useLang, locale } from '../i18n'
 import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-scale'
 import { bubblesWhileTyping } from '../keymap'
 import type { AiDocument, ResolvedCitation } from '../ai'
@@ -533,10 +534,25 @@ export default function AiPanel({
       setStreamText('')
       setThinking(false)
       setBusy(false)
+      // What the provider published about the account's token ceiling for this
+      // model, from the answer OR the rejection — the next request's excerpt
+      // budget is cut to fit it (ai-token-limits.ts)
+      if (config)
+        rememberRequestTokenLimit(
+          config.provider,
+          config.models[config.provider] ?? '',
+          result.tokenLimit
+        )
       if ('error' in result) {
         setMessages((m) => [
           ...m,
-          { role: 'assistant', parts: [], error: result.error, errorCode: result.code }
+          {
+            role: 'assistant',
+            parts: [],
+            error: result.error,
+            errorCode: result.code,
+            tokenLimit: result.tokenLimit
+          }
         ])
       } else {
         // Char citations point into the excerpt this request attached —
@@ -1261,6 +1277,23 @@ export default function AiPanel({
                     {m.error ? (
                       <div className="ai-error">
                         {errorText({ error: m.error, code: m.errorCode })}
+                        {/* The ceiling we now know, and what we do about it.
+                            Only when the provider published a number — the
+                            sentence promises the next attempt fits. */}
+                        {m.errorCode === 'ai-request-too-large' && m.tokenLimit && (
+                          <div className="ai-error-note">
+                            {t('ai.errorLimitLearned', {
+                              limit: m.tokenLimit.toLocaleString(locale())
+                            })}
+                          </div>
+                        )}
+                        {/* The provider's own sentence: it names the counts,
+                            which is the only part worth reading twice */}
+                        {errorDetail({ error: m.error, code: m.errorCode }) && (
+                          <div className="ai-error-detail">
+                            {errorDetail({ error: m.error, code: m.errorCode })}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <AssistantBody parts={m.parts} doc={docRef.current?.doc ?? null} onCitation={handleCitation} />

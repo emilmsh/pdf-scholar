@@ -16,7 +16,13 @@
 //     single height guess drifts offscreen. Once the user has dragged it, their
 //     position wins and growth only re-clamps to the viewport edges.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { AiAccessMode, AiCitation, AiContentPart, AiImage } from '../../../shared/types'
+import type {
+  AiAccessMode,
+  AiCitation,
+  AiContentPart,
+  AiImage,
+  AiProviderId
+} from '../../../shared/types'
 import { bridge } from '../bridge'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { prettyModelName, providerLabels } from './ai-models'
@@ -38,6 +44,7 @@ import {
 } from '../ai'
 import type { AiDocument, PreparedDocument } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
+import { rememberRequestTokenLimit } from '../ai-token-limits'
 import type { PageText } from '../search'
 import { errorText, t, useLang } from '../i18n'
 import { loadAiTextScale } from '../ai-text-scale'
@@ -123,6 +130,11 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const [access, setAccess] = useState<AiAccessMode | null>(null)
   const [confirmed, setConfirmed] = useState(false)
   const [provider, setProvider] = useState('')
+  /** Who to credit a reported token ceiling to (ai-token-limits.ts). Set in
+   *  the config effect below, which every request already waits for — so it is
+   *  known even for the page-local actions that attach no document, and those
+   *  are the ones most likely to teach us the ceiling cheaply. */
+  const askedOfRef = useRef<{ provider: AiProviderId; model: string } | null>(null)
   /** What the confirm step names as the receiver: the model, or the provider */
   const [receiverName, setReceiverName] = useState('')
   useEffect(() => {
@@ -133,6 +145,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         c.provider === 'azure' ? c.azure.deployment : prettyModelName(c.provider, c.models[c.provider] ?? '')
       setReceiverName(model || (providerLabels().find((p) => p.id === c.provider)?.label ?? c.provider))
       setProvider(c.provider)
+      askedOfRef.current = { provider: c.provider, model: c.models[c.provider] ?? '' }
       // Already shared with this provider in this window: no second asking
       if (c.access === 'confirm' && isSharedWith(state.docPath, c.provider)) setConfirmed(true)
       setAccess(c.access)
@@ -240,6 +253,8 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         webSearch: 'ask'
       })
       if (stale) return
+      const askedOf = askedOfRef.current
+      if (askedOf) rememberRequestTokenLimit(askedOf.provider, askedOf.model, result.tokenLimit)
       setDone(true)
       if ('error' in result) {
         setError(errorText(result))

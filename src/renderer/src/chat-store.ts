@@ -28,9 +28,14 @@ export type ChatMessage =
        *  stays the fallback for conversations saved before codes existed. */
       errorCode?: FileError['code']
       /** Set when the request attached a BM25 excerpt instead of the full
-       *  document (too large for the model's context window) — drives the
+       *  document (too large for one request to carry) — drives the
        *  transparency chip on the answer */
       excerpt?: { included: number; total: number } | undefined
+      /** The per-request token ceiling the provider named while refusing this
+       *  one (see AiChatResult.tokenLimit). Kept so the failure can say what
+       *  the ceiling IS and that the next attempt is cut to fit it — a promise
+       *  we may only make when the provider actually published a number. */
+      tokenLimit?: number | undefined
     }
 
 export interface StoredConversation {

@@ -11,12 +11,76 @@
 // the composer for the off notice, and 'confirm' must stage a send behind
 // the strip that names the receiving model.
 //
+// Last, the ACCOUNT QUOTA loop, which only exists as UI: a local server
+// refuses the first request the way OpenAI refuses one bigger than the whole
+// minute's token budget, and the panel must name it as a quota (not a context
+// overflow), say that waiting cannot fix it, keep the provider's counts
+// readable, name the ceiling it published — and cut the NEXT request's
+// attachment to fit that ceiling.
+//
 // Run: npm run build && npm run test:ai-settings
 // Desktop-session test (CDP against the built app) — same harness as
 // test:windows / shoot-screenshots; throwaway profile, never touches real state.
+import { createServer } from 'node:http'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cdp, openSocket, waitForPageTargets, launchApp, evaluate } from './lib/cdp.mjs'
+
+/** A local OpenAI-compatible endpoint with an ACCOUNT QUOTA: the first request
+ *  is refused the way OpenAI refuses one bigger than the minute's whole token
+ *  budget (429, the counts in prose, the ceiling in the rate-limit header),
+ *  and later ones answer normally. Deliberately NOT a scripts/lib scenario —
+ *  it is stateful, and the shared fake provider's table is consumed by
+ *  test:live and test:streams, which expect one answer per model id. */
+async function startQuotaServer() {
+  const prompts = []
+  let calls = 0
+  const server = createServer(async (req, res) => {
+    let raw = ''
+    for await (const c of req) raw += c
+    if (!(req.url ?? '').includes('/chat/completions')) {
+      // The model-list refresh, and anything else the client probes for
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ data: [{ id: 'self/quota' }] }))
+      return
+    }
+    // What the document block actually cost us this time
+    const body = (() => {
+      try {
+        return JSON.parse(raw)
+      } catch {
+        return {}
+      }
+    })()
+    prompts.push(
+      (body.messages ?? []).reduce(
+        (n, m) => n + (typeof m.content === 'string' ? m.content.length : 0),
+        0
+      )
+    )
+    if (++calls === 1) {
+      res.writeHead(429, {
+        'content-type': 'text/plain',
+        'x-ratelimit-limit-tokens': '1200'
+      })
+      res.end(
+        'Request too large for self/quota in organization org-x on tokens per min (TPM): Limit 1200, Requested 9000.'
+      )
+      return
+    }
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: 'Svar fra kvoteserveren.' } }] })}\n\n`)
+    res.write('data: [DONE]\n\n')
+    res.end()
+  })
+  await new Promise((r) => server.listen(0, '127.0.0.1', r))
+  const { port } = server.address()
+  return {
+    baseUrl: `http://127.0.0.1:${port}/v1`,
+    promptLengths: () => prompts,
+    close: () => new Promise((r) => server.close(r))
+  }
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
@@ -252,6 +316,102 @@ try {
   `, PRELUDE)
   ok(!again.strip, 'a follow-up to the same document and provider is NOT staged again')
   ok(again.after > again.before, `…and it was sent (${again.before} -> ${again.after} messages)`)
+
+  // ---------- the ACCOUNT's token ceiling, end to end ----------
+  //
+  // The failure this covers shipped for a while: a document well inside the
+  // model's context window, refused because ONE request was bigger than the
+  // whole per-minute quota behind the key. Waiting could never fix it, and the
+  // excerpt machinery was budgeted against the context window, so it never
+  // fired. Here, in the real app: the rejection is named as its own thing, the
+  // provider's counts stay readable, the ceiling it published is remembered,
+  // and the NEXT question attaches an excerpt cut to fit it.
+  const quota = await startQuotaServer()
+  try {
+    await evaluate(send, `
+      // Point compat at the quota server and ask again. Settings open the way
+      // a reader opens them: the model chip, then its «Åpne KI-innstillinger».
+      document.querySelector('.ai-model').click()
+      for (let i = 0; i < 30 && !document.querySelector('.ai-model-menu'); i++) await sleep(100)
+      document.querySelector('.ai-model-more').click()
+      for (let i = 0; i < 50 && !document.querySelector('.ai-settings'); i++) await sleep(100)
+      const g = compatGroup()
+      const inputs = [...g.querySelectorAll('.ai-field input:not([type="password"])')]
+      setVal(inputs[0], ${JSON.stringify(quota.baseUrl)})
+      setVal(inputs[1], 'self/quota')
+      await sleep(100)
+      document.querySelector('.ai-settings-actions .btn-primary').click()
+      for (let i = 0; i < 60 && document.querySelector('.ai-settings'); i++) await sleep(200)
+      // The chip renders the view main returned from the save, so waiting for
+      // it to name the new model is waiting for the config to be LIVE — a send
+      // fired before that races the save and goes to the old endpoint.
+      for (let i = 0; i < 60 && !/Quota/i.test(document.querySelector('.ai-model-name')?.textContent ?? ''); i++)
+        await sleep(100)
+    `, PRELUDE)
+
+    const refused = await evaluate(send, `
+      const ta = document.querySelector('.ai-composer textarea')
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, 'Hva er hovedpoenget?')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+      await sleep(100)
+      const before = document.querySelectorAll('.ai-msg').length
+      document.querySelector('.ai-composer .ai-send').click()
+      const lastErr = () => [...document.querySelectorAll('.ai-error')].at(-1)
+      for (let i = 0; i < 100 && document.querySelectorAll('.ai-msg').length <= before; i++) await sleep(200)
+      const err = lastErr()
+      return {
+        text: err?.textContent ?? '',
+        detail: err?.querySelector('.ai-error-detail')?.textContent ?? '',
+        note: err?.querySelector('.ai-error-note')?.textContent ?? '',
+        grew: document.querySelectorAll('.ai-msg').length > before
+      }
+    `, PRELUDE)
+    ok(
+      /minuttkvoten|per-minute token quota/.test(refused.text),
+      `the refusal is named as a quota, not a context overflow (got "${refused.text.slice(0, 70)}")`
+    )
+    ok(
+      /vente hjelper ikke|Waiting does not help/.test(refused.text),
+      'and it says outright that waiting cannot fix this one'
+    )
+    ok(
+      /Requested 9000/.test(refused.detail),
+      `the provider's own counts stay readable (got "${refused.detail.slice(0, 80)}")`
+    )
+    ok(
+      /1[\s,. ]?200/.test(refused.note),
+      `the ceiling the provider published is named back (got "${refused.note.slice(0, 80)}")`
+    )
+
+    // Same model, same document, asked again: the ceiling is known now, so the
+    // attachment is an excerpt that fits it — the chip says so, and the server
+    // sees a far shorter prompt than the refused one.
+    const excerpted = await evaluate(send, `
+      for (let i = 0; i < 60 && document.querySelector('.ai-composer textarea')?.disabled; i++) await sleep(200)
+      const ta = document.querySelector('.ai-composer textarea')
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(ta, 'Hva er hovedpoenget?')
+      ta.dispatchEvent(new Event('input', { bubbles: true }))
+      await sleep(100)
+      document.querySelector('.ai-composer .ai-send').click()
+      for (let i = 0; i < 100 && !document.querySelector('.ai-excerpt-chip'); i++) await sleep(200)
+      return {
+        chip: document.querySelector('.ai-excerpt-chip')?.textContent ?? '',
+        answered: [...document.querySelectorAll('.ai-msg.ai-assistant')].at(-1)?.textContent ?? ''
+      }
+    `, PRELUDE)
+    ok(
+      /Utdrag|Excerpt/.test(excerpted.chip),
+      `the retry attaches an excerpt instead (got "${excerpted.chip}")`
+    )
+    ok(/Svar fra kvoteserveren/.test(excerpted.answered), 'and the retry is actually answered')
+    const [first, second] = quota.promptLengths()
+    ok(
+      second < first,
+      `the second request carried less document than the refused one (${first} -> ${second} chars)`
+    )
+  } finally {
+    await quota.close()
+  }
 
   console.log(failures === 0 ? '\ntest-ai-settings: all checks passed' : `\ntest-ai-settings: ${failures} check(s) FAILED`)
   process.exitCode = failures === 0 ? 0 : 1

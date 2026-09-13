@@ -121,6 +121,7 @@ import {
 } from '../ai'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
+import { rememberRequestTokenLimit } from '../ai-token-limits'
 import AnnotPopover from './AnnotPopover'
 import { PasswordPrompt } from './PasswordPrompt'
 import { SignaturePad } from './SignaturePad'
@@ -5711,6 +5712,7 @@ export default function PdfViewer({
     })
     if (semanticReqRef.current !== requestId) return // superseded/aborted
     semanticReqRef.current = null
+    rememberRequestTokenLimit(config.provider, config.models[config.provider] ?? '', result.tokenLimit)
     if ('error' in result) {
       setSemantic({ status: 'error', hits: [], index: -1, note: errorText(result) })
       return

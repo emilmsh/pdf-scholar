@@ -3,15 +3,17 @@
 import type { AiCitation, AiModelCatalog, AiProviderId, AiUsage } from '../../shared/types'
 import { getLanguage } from './i18n'
 import type { PageText } from './search'
-import type { AiDocument, Bm25Index } from './ai-retrieval'
+import type { AiDocument, Bm25Index, DocBlock } from './ai-retrieval'
 import {
+  buildBlocks,
   buildBm25Index,
   buildExcerptDocument,
   documentFits,
   excerptCharBudget,
-  selectExcerptPages,
+  selectExcerptBlocks,
   slotAtOffset
 } from './ai-retrieval'
+import { requestTokenLimit } from './ai-token-limits'
 import { contextTokensFor } from './components/ai-models'
 
 // The interface lives in ai-retrieval.ts (a pure module the node test can
@@ -60,10 +62,14 @@ export interface PreparedDocument {
   excerpt: { included: number; total: number } | null
 }
 
-// The tokenized index is query-independent; keyed on the pages array itself
-// (stable via pageTextsRef) so follow-up questions on the same huge document
-// pay the tokenization cost once.
-const bm25IndexCache = new WeakMap<PageText[], Bm25Index>()
+// Blocks and their tokenized index are query-independent; keyed on the pages
+// array itself (stable via pageTextsRef) so follow-up questions on the same
+// huge document pay the chunking and tokenization cost once.
+interface RetrievalIndex {
+  blocks: DocBlock[]
+  bm25: Bm25Index
+}
+const retrievalCache = new WeakMap<PageText[], RetrievalIndex>()
 
 export function prepareDocumentForRequest(
   ensured: { pages: PageText[]; doc: AiDocument },
@@ -73,23 +79,38 @@ export function prepareDocumentForRequest(
   catalog?: AiModelCatalog
 ): PreparedDocument {
   const contextTokens = contextTokensFor(provider, modelId, catalog)
-  if (documentFits(ensured.doc.text.length, contextTokens)) {
+  // Two ceilings, and the account's quota is usually the binding one (see
+  // ai-token-limits.ts). Unknown until a request has reported it, which is
+  // the everyday case and leaves the arithmetic exactly as it was.
+  const limitTokens = requestTokenLimit(provider, modelId)
+  if (documentFits(ensured.doc.text.length, contextTokens, limitTokens)) {
     return { doc: ensured.doc, excerpt: null }
   }
   const texts = ensured.pages.map((p) => p.text)
-  let index = bm25IndexCache.get(ensured.pages)
+  let index = retrievalCache.get(ensured.pages)
   if (!index) {
-    index = buildBm25Index(texts)
-    bm25IndexCache.set(ensured.pages, index)
+    const blocks = buildBlocks(texts)
+    index = { blocks, bm25: buildBm25Index(blocks.map((b) => b.text)) }
+    retrievalCache.set(ensured.pages, index)
   }
-  const indices = selectExcerptPages(texts, queryText, excerptCharBudget(contextTokens), index)
+  const selected = selectExcerptBlocks(
+    index.blocks,
+    queryText,
+    excerptCharBudget(contextTokens, limitTokens),
+    index.bm25
+  )
+  // The chip counts PAGES, not blocks: «14 of 600 pages» is what the reader
+  // can act on, and a block count would only invite the question of what a
+  // block is. Partial pages count as attached — the gap markers inside them
+  // say the rest was left out.
+  const pages = new Set(selected.map((i) => index.blocks[i].page)).size
   const nb = getLanguage() === 'nb'
   const header = nb
-    ? `[Utdrag: ${indices.length} av ${texts.length} sider vedlagt — resten er utelatt]`
-    : `[Excerpt: ${indices.length} of ${texts.length} pages attached — the rest is omitted]`
+    ? `[Utdrag: ${pages} av ${texts.length} sider vedlagt — resten er utelatt]`
+    : `[Excerpt: ${pages} of ${texts.length} pages attached — the rest is omitted]`
   return {
-    doc: buildExcerptDocument(texts, indices, nb ? 'Side' : 'Page', header),
-    excerpt: { included: indices.length, total: texts.length }
+    doc: buildExcerptDocument(index.blocks, selected, nb ? 'Side' : 'Page', header),
+    excerpt: { included: pages, total: texts.length }
   }
 }
 
@@ -100,8 +121,9 @@ export function excerptSystemNote(): string {
   return `
 
 EXCERPT MODE
-- This document is larger than your context window, so only the most relevant pages are attached (selected by text search against the user's question), each under its original page marker. Where other instructions say the full document text is attached, read "the attached excerpt" instead.
-- The pages between the attached ones are missing. If the excerpt does not answer the question, say that the relevant part of the document may not be attached — never conclude that the document lacks something from the excerpt alone.`
+- This document is larger than what one request can carry, so only the most relevant passages are attached (selected by text search against the user's question), each under its original page marker. Where other instructions say the full document text is attached, read "the attached excerpt" instead.
+- A "[…]" line means text was left out at that point INSIDE the page. Text between attached pages is missing entirely. Never quote across a "[…]" — each quote must be verbatim from one continuous passage.
+- If the excerpt does not answer the question, say that the relevant part of the document may not be attached — never conclude that the document lacks something from the excerpt alone.`
 }
 
 /** Where a citation lands in the document. The same shape travels between

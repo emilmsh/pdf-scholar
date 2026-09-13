@@ -4343,6 +4343,26 @@ html.pen-near .draw-layer {
   padding: 8px 11px;
 }
 
+/* What we now know and will do about it — advice, so it keeps the bubble's
+   voice, only set apart by a rule above it. */
+.ai-error-note {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid rgb(var(--danger-rgb) / 0.2);
+}
+
+/* The provider's own sentence: evidence rather than advice, so it reads as a
+   quieter register — muted, monospaced-ish, selectable and wrappable (the
+   counts are the point, and long ids must not push the panel wide). */
+.ai-error-detail {
+  margin-top: 7px;
+  font-size: calc(11px * var(--ai-scale, 1));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
 .ai-thinking {
   color: var(--text-secondary);
   font-size: calc(12.5px * var(--ai-scale, 1));

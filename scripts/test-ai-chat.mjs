@@ -442,17 +442,66 @@ section('azure: config gate + shaping + quote contract + overflow')
   ok(overflow.result.code === 'ai-context-overflow', 'provider overflow rejection gets the named code')
   ok(/128000/.test(overflow.result.error ?? ''), 'provider sentence (with the counts) is kept')
 
-  // A per-minute token quota rejection is NOT a context overflow: the fix is
-  // to wait / narrow the question / pick a model with a higher quota, so it
-  // carries its own name (observed live against gpt-4.1, 2026-08-12).
+  // A per-minute token quota rejection is NOT a context overflow, and ONE
+  // request bigger than the whole minute's budget is not an ordinary rate
+  // limit either: waiting cannot fix it, so it carries its own name and its
+  // own advice (observed live against gpt-4.1, 2026-08-12).
   responder = () =>
     new Response(
       'Request too large for gpt-4.1 in organization org-x on tokens per min (TPM): Limit 30000, Requested 45047.',
       { status: 429 }
     )
   const tpm = await run({ provider: 'azure' })
-  ok(tpm.result.code === 'ai-rate-limited', `TPM rejection gets the named code (got ${tpm.result.code})`)
+  ok(
+    tpm.result.code === 'ai-request-too-large',
+    `a request-too-large rejection is not a plain rate limit (got ${tpm.result.code})`
+  )
   ok(/45047/.test(tpm.result.error ?? ''), 'provider sentence (with the counts) is kept')
+  // …and the ceiling it named is handed back, so the next request's excerpt
+  // can be cut to fit it (ai-token-limits.ts). Prose is the fallback path —
+  // this rejection carried no rate-limit headers.
+  ok(tpm.result.tokenLimit === 30000, `the ceiling is read out of the sentence (got ${tpm.result.tokenLimit})`)
+
+  // A rate limit someone ELSE's request is holding: the same question succeeds
+  // in a minute, so this one keeps the wait-and-retry advice.
+  responder = () =>
+    new Response('Rate limit reached for gpt-4.1. Please try again in 20s.', { status: 429 })
+  const busyMinute = await run({ provider: 'azure' })
+  ok(
+    busyMinute.result.code === 'ai-rate-limited',
+    `a plain rate limit stays waitable (got ${busyMinute.result.code})`
+  )
+
+  // The header is authoritative where both are present: a gateway may name a
+  // per-request limit in prose that is not the account's token ceiling.
+  responder = () =>
+    new Response('Request too large: Limit 999, Requested 45047.', {
+      status: 429,
+      headers: { 'x-ratelimit-limit-tokens': '450000' }
+    })
+  const headed = await run({ provider: 'azure' })
+  ok(headed.result.tokenLimit === 450000, `the rate-limit header wins over the prose (got ${headed.result.tokenLimit})`)
+
+  // The ceiling is learned from a SUCCESSFUL answer too — which is the point:
+  // a small question teaches it, so the first big one is cut to fit rather
+  // than failing and teaching us afterwards.
+  responder = () =>
+    new Response(chatCompletionsSse({ deltas: ['Hei.'] }).body, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream', 'x-ratelimit-limit-tokens': '30000' }
+    })
+  const good = await run({ provider: 'azure' })
+  ok(good.result.ok === true && good.result.tokenLimit === 30000, `a successful answer reports the ceiling too (got ${good.result.tokenLimit})`)
+
+  // An account with no money still wins over both: waiting and excerpting are
+  // equally useless there.
+  responder = () =>
+    new Response(
+      JSON.stringify({ error: { type: 'insufficient_quota', message: 'You exceeded your current quota' } }),
+      { status: 429, headers: { 'x-ratelimit-limit-tokens': '30000' } }
+    )
+  const dryTier = await run({ provider: 'azure' })
+  ok(dryTier.result.code === 'ai-no-credit', `billing beats the quota codes (got ${dryTier.result.code})`)
 
   // Models substitute the document filename for the literal KILDE token
   // (Gemini, observed 2026-08-12) — the parser accepts any short source name

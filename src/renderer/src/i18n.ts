@@ -93,8 +93,10 @@ const nb = {
     'Endepunktet svarte, men ikke som et OpenAI-kompatibelt API. Sjekk at base-URL-en peker på API-roten (vanligvis …/v1).',
   'aierr.ai-context-overflow':
     'Dokumentet (eller samtalen) er for stort for modellens kontekstvindu, så forespørselen ble avvist. Start en ny samtale, eller bytt til en modell med større kontekstvindu.',
+  'aierr.ai-request-too-large':
+    'Dette ene spørsmålet er større enn hele minuttkvoten for tokens kontoen har hos leverandøren. Å vente hjelper ikke — samme forespørsel blir avvist likt om ett minutt. Still et mer avgrenset spørsmål, velg en modell du har høyere kvote på, eller hev kvoten (usage tier) hos leverandøren.',
   'aierr.ai-rate-limited':
-    'Leverandøren avviste forespørselen fordi kontoens minuttkvote for tokens er for lav for dette dokumentet, eller brukt opp. Vent litt og prøv igjen, still et mer avgrenset spørsmål — eller bytt til en nyere modell, som gjerne har høyere kvote.',
+    'Leverandøren avviste forespørselen fordi kontoens minuttkvote for tokens er brukt opp akkurat nå. Vent litt og prøv igjen, still et mer avgrenset spørsmål — eller velg en modell du har høyere kvote på.',
   'aierr.ai-model-overloaded':
     'Modellen er overbelastet hos leverandøren akkurat nå — det er ikke noe galt med spørsmålet. Prøv igjen om litt, eller velg en annen modell.',
   'aierr.ai-no-credit':
@@ -643,7 +645,11 @@ const nb = {
   'ai.totalTokens': 'Samtalen har brukt {tokens}',
   'ai.excerptChip': 'Utdrag: {included} av {total} sider',
   'ai.excerptTip':
-    'Dokumentet er større enn modellens kontekstvindu, så bare de mest relevante sidene ble vedlagt. Svaret kan mangle innhold fra sider utenfor utdraget. Utvalget treffer best når spørsmålet bruker dokumentets eget språk og begreper.',
+    'Dokumentet er større enn det én forespørsel kan bære — modellens kontekstvindu, eller kvoten kontoen har hos leverandøren — så bare de mest relevante avsnittene ble vedlagt, under sine egne sidetall. Svaret kan mangle innhold utenfor utdraget. Utvalget treffer best når spørsmålet bruker dokumentets eget språk og begreper.',
+  // Rendered under a «for stor forespørsel»-failure ONLY when the provider
+  // actually named its ceiling, because only then is the promise true.
+  'ai.errorLimitLearned':
+    'Kvoten leverandøren oppgav er {limit} tokens. Neste spørsmål sender et utdrag som passer den — prøv igjen.',
   'ai.excerptLangHint':
     'Tips: still spørsmål på dokumentets eget språk — sideutvalget bygger på tekstlikhet og treffer bedre da.',
   'ai.excerptSearchNote': 'Stort dokument: søket gikk i et utdrag av sidene. Søk gjerne på dokumentets språk.',
@@ -1007,8 +1013,10 @@ const en: Dict = {
     'The endpoint answered, but not like an OpenAI-compatible API. Check that the base URL points at the API root (usually …/v1).',
   'aierr.ai-context-overflow':
     'The document (or the conversation) is too large for the model’s context window, so the request was refused. Start a new conversation, or switch to a model with a larger context window.',
+  'aierr.ai-request-too-large':
+    'This one question is bigger than the account’s entire per-minute token quota at the provider. Waiting does not help — the same request is refused identically a minute from now. Ask something narrower, pick a model you have a higher quota on, or raise the quota (usage tier) at the provider.',
   'aierr.ai-rate-limited':
-    'The provider refused the request because the account’s per-minute token quota is too low for this document, or used up. Wait a moment and try again, ask a narrower question — or switch to a newer model, which usually has a higher quota.',
+    'The provider refused the request because the account’s per-minute token quota is spent right now. Wait a moment and try again, ask a narrower question — or pick a model you have a higher quota on.',
   'aierr.ai-model-overloaded':
     'The model is overloaded at the provider right now — nothing is wrong with the question. Try again shortly, or pick another model.',
   'aierr.ai-no-credit':
@@ -1504,7 +1512,9 @@ const en: Dict = {
   'ai.totalTokens': 'This conversation has used {tokens}',
   'ai.excerptChip': 'Excerpt: {included} of {total} pages',
   'ai.excerptTip':
-    "The document is larger than the model's context window, so only the most relevant pages were attached. The answer may miss content from pages outside the excerpt. The selection lands best when the question uses the document's own language and terms.",
+    "The document is larger than one request can carry — the model's context window, or the account's quota at the provider — so only the most relevant passages were attached, under their own page numbers. The answer may miss content outside the excerpt. The selection lands best when the question uses the document's own language and terms.",
+  'ai.errorLimitLearned':
+    'The quota the provider named is {limit} tokens. The next question sends an excerpt that fits it — try again.',
   'ai.excerptLangHint':
     "Tip: ask in the document's own language — the page selection is based on text similarity and lands better that way.",
   'ai.excerptSearchNote':
@@ -1847,6 +1857,27 @@ export function errorText(e: FileError): string {
   if (isZoteroErrorCode(e.code)) return t(`zoterr.${e.code}`)
   if (isDoiErrorCode(e.code)) return t(`doierr.${e.code}`)
   return t(`engine.${e.code}`)
+}
+
+/** The codes whose `error` holds the PROVIDER's own sentence rather than one of
+ *  ours. Worth showing NEXT TO the translation: it names the token counts and
+ *  the limit, which is the difference between "something about quotas" and
+ *  knowing you were 214k over a 30k ceiling. Every other code's `error` is our
+ *  own wording, where a second copy would only read as a stutter. */
+const PROVIDER_SENTENCE_CODES = new Set<string>([
+  'ai-context-overflow',
+  'ai-request-too-large',
+  'ai-rate-limited',
+  'ai-model-overloaded',
+  'ai-no-credit'
+])
+
+/** The provider's raw sentence for a failure, when there is one worth reading
+ *  under the translated advice — otherwise null. */
+export function errorDetail(e: FileError): string | null {
+  if (!e.code || !PROVIDER_SENTENCE_CODES.has(e.code)) return null
+  const raw = e.error.trim()
+  return raw && raw !== errorText(e) ? raw : null
 }
 
 const isZoteroErrorCode = (code: NonNullable<FileError['code']>): code is ZoteroErrorCode =>
