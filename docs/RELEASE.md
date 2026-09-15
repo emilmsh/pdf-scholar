@@ -284,7 +284,22 @@ Package-only pushes go through the workflow:
 gh workflow run ext-publish.yml -f target=all -f check_only=true
 ```
 
-then for real (no `check_only`). It uploads the release's store zip and submits
+then for real — and here `check_only` must be passed **explicitly false**:
+
+```bash
+gh workflow run ext-publish.yml -f target=all -f check_only=false
+```
+
+**The two workflows disagree on that default, and the run looks identical
+either way.** `store-publish.yml` defaults `check_only` to false, so omitting
+it publishes; `ext-publish.yml` defaults it to **true**, so omitting it dry-runs
+— green, ~90 seconds, «=== Dry run (nothing submitted) ===» the only line that
+says so. That cost a silent no-op on 2026-09-15 and would have read as a
+successful push to anyone reading the checkmark. Whatever the run says it did,
+confirm it: a real one prints «=== Submitted vX.Y.Z ===» with a submission ID
+per store.
+
+It uploads the release's store zip and submits
 for review; it cannot touch listing copy, screenshots or permission
 justifications — those stay manual in the dashboards. Both stores' secrets are
 in and proven end to end (Edge since 2026-09-02, Chrome's `CWS_*` since
