@@ -144,19 +144,19 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.48.0
+## What's new in this version (≤ 1 500 chars) — v0.48.1
 
 **EN:**
 ```
-• The assistant handles big documents: a question that used to be refused for exceeding your API account's per-minute token quota now sends an excerpt sized to fit that quota, picked for what you asked and citing real page numbers
-• A refusal that waiting cannot fix now says so plainly, and shows the provider's own limit instead of advice that leads nowhere
+• Sticky notes made in other apps, such as Acrobat, keep their icon when you move them — a move used to redraw the note with a different icon, fully opaque and in a smaller box
+• Moving or recolouring an existing annotation lands at once: the repaint afterwards re-read every page of the document, and now re-reads only the page you changed
 • Smaller fixes and refinements
 ```
 
 **NO:**
 ```
-• Assistenten takler store dokumenter: et spørsmål som før ble avvist fordi det sprengte minuttkvoten for tokens på API-kontoen din, sender nå et utdrag tilpasset kvoten — valgt ut fra det du spurte om, og med ekte sidetall i kildehenvisningene
-• En avvisning det ikke hjelper å vente på sier det nå rett ut, og viser leverandørens eget tak i stedet for råd som ikke fører fram
+• Notater laget i andre programmer, som Acrobat, beholder ikonet sitt når du flytter dem — før ble notatet tegnet om med et annet ikon, helt dekkende og i en mindre boks
+• Å flytte eller farge om en eksisterende merknad lander med én gang: gjenoppfriskingen etterpå leste alle sidene i dokumentet på nytt, nå bare siden du endret
 • Mindre feilrettinger og finpuss
 ```
 
