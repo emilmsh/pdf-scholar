@@ -66,6 +66,34 @@ for (const req of reqs) {
   check('translate note', 'ok' in res2, 'error' in res2 ? res2.error : '')
 }
 
+// 3b. A note made in ANOTHER app keeps its look when moved (issue #19). The
+// engine's model path rewrites a Text annot's appearance on every update, so a
+// dragged Acrobat note came back with PDFium's icon, opaque, in a smaller box.
+// A move now shifts /Rect alone. sample.pdf carries a baked Text annot on the
+// third page with its own /AP — the before-state is read from the pristine
+// sample, the after-state in step 6 from the flushed file.
+const foreignNote = (() => {
+  const pdf = mupdf.Document.openDocument(fs.readFileSync(SAMPLE), 'application/pdf').asPDF()
+  const annot = pdf.loadPage(2).getAnnotations().find((a) => a.getType() === 'Text')
+  const o = annot.getObject()
+  const keys = []
+  o.forEach((_, k) => keys.push(String(k)))
+  const n = o.get('AP').get('N')
+  const out = {
+    id: o.asIndirect(),
+    rect: Array.from(annot.getRect()),
+    keys: keys.sort(),
+    bbox: String(n.get('BBox')),
+    ap: n.readStream().asString()
+  }
+  pdf.destroy()
+  return out
+})()
+{
+  const res = await updateAnnotation({ path: FILE, pageIndex: 2, id: foreignNote.id, translate: { dx: 40, dy: -20 } })
+  check('translate foreign note', 'ok' in res, 'error' in res ? res.error : `obj#${foreignNote.id}`)
+}
+
 // 4. edit freetext contents + rect (the new resize path)
 {
   const res = await updateAnnotation({
@@ -172,6 +200,28 @@ for (const req of reqs) {
     try { const o = a.getObject().get('AP'); if (o && !o.isNull()) ap++ } catch { /* skip */ }
   }
   check('all annots have /AP', ap === annots.length, `${ap}/${annots.length}`)
+  // 3b's foreign note: moved by its /Rect alone — same appearance bytes, same
+  // /BBox, every key still there (plus the /M stamp), box shifted by exactly
+  // the delta (mupdf reports rects y-down like our page space, so dy applies
+  // as sent).
+  {
+    const fn = pdf.loadPage(2).getAnnotations().find((a) => a.getObject().asIndirect() === foreignNote.id)
+    const o = fn?.getObject()
+    const keys = []
+    o?.forEach((_, k) => keys.push(String(k)))
+    const n = o?.get('AP').get('N')
+    check('foreign note: appearance stream untouched',
+      !!n && n.readStream().asString() === foreignNote.ap && String(n.get('BBox')) === foreignNote.bbox,
+      n ? `bbox ${String(n.get('BBox'))}, ${n.readStream().getLength()} bytes` : 'missing')
+    const lost = foreignNote.keys.filter((k) => !keys.includes(k))
+    const added = keys.filter((k) => !foreignNote.keys.includes(k))
+    check('foreign note: dictionary intact', lost.length === 0 && added.every((k) => k === 'M'),
+      `lost [${lost}] added [${added}]`)
+    const r = fn ? Array.from(fn.getRect()) : null
+    const want = [foreignNote.rect[0] + 40, foreignNote.rect[1] - 20, foreignNote.rect[2] + 40, foreignNote.rect[3] - 20]
+    check('foreign note: box moved by the delta', !!r && r.every((v, i) => Math.abs(v - want[i]) < 0.01),
+      r ? r.map((v) => v.toFixed(1)).join(',') : 'missing')
+  }
   // The stamp is only worth anything if the PICTURE went in. Check the box it
   // landed in, and that the file really carries an image XObject — an /AP that
   // draws nothing would satisfy the check above while showing blank everywhere.

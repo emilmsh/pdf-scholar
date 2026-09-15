@@ -464,10 +464,91 @@ export async function readSignaturesOn(open: OpenDoc): Promise<DocSignature[]> {
   }))
 }
 
+/** FPDF_ANNOT_TEXT — the sticky note, in PDFium's subtype enum */
+const FPDF_ANNOT_TEXT = 1
+
+/** A request that moves the annotation and changes nothing else about it. */
+function isPureMove(
+  req: ModifyAnnotationRequest
+): req is ModifyAnnotationRequest & { translate: { dx: number; dy: number } } {
+  return (
+    req.translate !== undefined &&
+    req.color === undefined &&
+    req.opacity === undefined &&
+    req.contents === undefined &&
+    req.font === undefined &&
+    req.rect === undefined &&
+    (req.quads === undefined || req.quads.length === 0) &&
+    (req.strokes === undefined || req.strokes.length === 0)
+  )
+}
+
+/** Now, as a PDF date string (/M, /CreationDate) */
+function pdfDateNow(): string {
+  const d = new Date()
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `D:${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`
+}
+
+/** Move a sticky note by shifting its /Rect and touching nothing else — the
+ *  appearance stream stays byte-for-byte what it was.
+ *
+ *  The model path below rewrites the annotation from EmbedPDF's model, and for
+ *  a Text annot that means PDFium regenerates the /AP: a note made in Acrobat
+ *  came back from a plain drag with PDFium's own icon in place of Acrobat's,
+ *  its 60 % opacity turned opaque and its 24 pt box shrunk to 20 pt (issue
+ *  #19, measured on the reporter's file). A note has no geometry besides the
+ *  box, and a form XObject is mapped from its /BBox onto /Rect, so moving the
+ *  box moves the icon exactly. It also skips getPageAnnotations, which made
+ *  the move the slowest thing on the page.
+ *
+ *  Text only: every other subtype either carries geometry a rect shift would
+ *  leave behind (/QuadPoints, /L, /InkList) or has no such history of losing
+ *  its look. Returns null when no annotation has that object number, 'other'
+ *  for a subtype that must take the model path. */
+function shiftNoteRect(
+  open: OpenDoc,
+  pageIndex: number,
+  id: number,
+  dx: number,
+  dy: number
+): 'moved' | 'failed' | 'other' | null {
+  const { engine, docId } = open
+  return withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
+    withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
+      if (raw.FPDFAnnot_GetSubtype(annotPtr) !== FPDF_ANNOT_TEXT) return 'other'
+      const ptr = raw.pdfium.wasmExports.malloc(16)
+      try {
+        if (!raw.FPDFAnnot_GetRect(annotPtr, ptr)) return 'failed'
+        // FS_RECTF is left, top, right, bottom in PDF space (y up); the delta
+        // is page space (y down), so dy changes sign.
+        const at = (off: number): number => raw.pdfium.getValue(ptr + off, 'float')
+        const [left, top, right, bottom] = [at(0), at(4), at(8), at(12)]
+        raw.pdfium.setValue(ptr, left + dx, 'float')
+        raw.pdfium.setValue(ptr + 4, top - dy, 'float')
+        raw.pdfium.setValue(ptr + 8, right + dx, 'float')
+        raw.pdfium.setValue(ptr + 12, bottom - dy, 'float')
+        if (!raw.FPDFAnnot_SetRect(annotPtr, ptr)) return 'failed'
+      } finally {
+        raw.pdfium.wasmExports.free(ptr)
+      }
+      // The model path stamps /M through the engine; do the same by hand.
+      withWideString(raw, pdfDateNow(), (s) => raw.FPDFAnnot_SetStringValue(annotPtr, 'M', s))
+      return 'moved'
+    })
+  )
+}
+
 /** Recolour / retext / move an existing annotation, addressed by object number */
 export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<AnnotateResult> {
   const { engine, doc, docId } = open
   return withLinkApGuard(engine, docId, req.pageIndex, async () => {
+    if (isPureMove(req)) {
+      const moved = shiftNoteRect(open, req.pageIndex, req.id, req.translate.dx, req.translate.dy)
+      if (moved === null) return ENGINE_ERRORS.notFound
+      if (moved === 'failed') return ENGINE_ERRORS.updateRejected
+      if (moved === 'moved') return { ok: true, id: req.id }
+    }
     const model = await findByObjectNumber(open, req.pageIndex, req.id)
     if ('error' in model) return model
     const m = model as PdfAnnotationObject & {

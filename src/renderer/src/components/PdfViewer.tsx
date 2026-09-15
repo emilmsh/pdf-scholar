@@ -72,7 +72,7 @@ import type {
   ResizeHandle,
   ShapeToolType
 } from '../annotations'
-import { collectAnnotations } from '../doc-load'
+import { collectAnnotations, reloadedAnnotations } from '../doc-load'
 import { emitLocalDocEvent, onLocalDocEvent } from '../local-doc-events'
 import { useSplitDocSession } from '../hooks/useSplitDocSession'
 import {
@@ -1748,7 +1748,7 @@ export default function PdfViewer({
    *  (old canvases stay visible until re-rendered). Desktop re-reads the draft
    *  file; the browser serializes the live in-memory document — same effect:
    *  pdf.js repaints file annotations as the engine now has them. */
-  const reloadDocument = useCallback(async () => {
+  const reloadDocument = useCallback(async (pageNumber?: number) => {
     let data: Uint8Array
     if (isElectron) {
       const result = await bridge.readFile(payload.path)
@@ -1767,11 +1767,13 @@ export default function PdfViewer({
     const resources = openDocument(data.slice(), docPasswordRef.current)
     try {
       const doc = await resources.task.promise
-      const fileAnnots = await collectAnnotations(doc)
+      // Only the page this window just wrote to is re-read when one is named
+      // — see reloadedAnnotations for why that is the whole reload's cost.
+      const applyAnnots = await reloadedAnnotations(doc, pageNumber)
       const old = docResourcesRef.current
       docResourcesRef.current = resources
       setPdf(doc)
-      setAnnots(fileAnnots)
+      setAnnots(applyAnnots)
       old?.task.destroy()
       old?.port.terminate()
     } catch {
@@ -3196,7 +3198,7 @@ export default function PdfViewer({
     async (handle: AnnotHandle) => {
       const { failed, wasFilePainted } = await deleteOneAnnotation(handle)
       if (failed) showToast(t('viewer.annotDeleteFailed', { error: errorText(failed) }))
-      else if (wasFilePainted) void docCtxFor(handle.doc)?.reload()
+      else if (wasFilePainted) void docCtxFor(handle.doc)?.reload(handle.pageNumber)
     },
     [deleteOneAnnotation, showToast, docCtxFor]
   )
@@ -3245,7 +3247,7 @@ export default function PdfViewer({
         ctx.emitChanged()
         // 'file' annots are painted by pdf.js from the file — refresh the canvas
         if (wasFilePainted && (patch.color || patch.quads || patch.strokes || patch.translate)) {
-          void ctx.reload()
+          void ctx.reload(handle.pageNumber)
         }
       }
     },

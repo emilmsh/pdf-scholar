@@ -23,7 +23,7 @@ import { bridge, isElectron } from '../bridge'
 import { browserCurrentBytes, hasBrowserDoc, registerBrowserDoc } from '../annotation-engine-browser'
 import { openDocument, isPasswordException } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
-import { collectAnnotations } from '../doc-load'
+import { collectAnnotations, reloadedAnnotations } from '../doc-load'
 import { onLocalDocEvent } from '../local-doc-events'
 import { t } from '../i18n'
 
@@ -40,8 +40,10 @@ export interface SplitDocSession {
    *  own changes (and the same file's own tab does). */
   sender: symbol
   /** Re-read the current bytes (draft included) and swap the document in
-   *  place — old canvases stay up until the new ones render. */
-  reload(): Promise<void>
+   *  place — old canvases stay up until the new ones render. Name the page
+   *  when the reload follows this window's own write to it: only that page's
+   *  annotations are read back (reloadedAnnotations). */
+  reload(pageNumber?: number): Promise<void>
   /** Mark the session dirty from a write routed on its behalf. */
   markDirty(): void
   /** Immutably patch one page's annotation list (the split-document twin of
@@ -81,7 +83,7 @@ export function useSplitDocSession(
   const onFailedRef = useRef(onFailed)
   onFailedRef.current = onFailed
 
-  const reload = useCallback(async (): Promise<void> => {
+  const reload = useCallback(async (pageNumber?: number): Promise<void> => {
     const p = pathRef.current
     if (!p) return
     const data = await currentBytes(p)
@@ -89,7 +91,7 @@ export function useSplitDocSession(
     const resources = openDocument(data.slice())
     try {
       const doc = await resources.task.promise
-      const fileAnnots = await collectAnnotations(doc)
+      const applyAnnots = await reloadedAnnotations(doc, pageNumber)
       if (pathRef.current !== p) {
         resources.task.destroy()
         resources.port.terminate()
@@ -98,7 +100,7 @@ export function useSplitDocSession(
       const old = resourcesRef.current
       resourcesRef.current = resources
       setPdf(doc)
-      setAnnots(fileAnnots)
+      setAnnots(applyAnnots)
       old?.task.destroy()
       old?.port.terminate()
     } catch {

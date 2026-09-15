@@ -58,6 +58,10 @@ jobs:
       # The refcount that lets one window show a path twice (tab + split pane)
       # while main still hears exactly one docOpened/docClosed pair
       - run: npm run test:doc-registry
+      # The one-page reload after this window's own write: the written page
+      # re-read, landed session records elsewhere flipped to file-painted so
+      # the swapped pdf.js document does not paint them a second time
+      - run: npm run test:doc-load
       # BM25 excerpt fallback for documents beyond the model's context window:
       # budget bounds, real-page markers, char→quote citation conversion
       - run: npm run test:retrieval
