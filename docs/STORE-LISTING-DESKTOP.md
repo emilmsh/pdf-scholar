@@ -144,18 +144,22 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.47.0
+## What's new in this version (≤ 1 500 chars) — v0.48.0
 
 **EN:**
 ```
-• Right-click to copy text anywhere: the assistant's answers, comments and settings now have a Copy / Cut / Paste / Select all menu, alongside the one the pages already had
+• The assistant handles big documents: a question that used to be refused for exceeding your API account's per-minute token quota now sends an excerpt sized to fit that quota, picked for what you asked and citing real page numbers
+• A refusal that waiting cannot fix now says so plainly, and shows the provider's own limit instead of advice that leads nowhere
+• Right-click to copy text anywhere: the assistant's answers, comments and settings have a Copy / Cut / Paste / Select all menu, alongside the one the pages already had
 • Gemini 3.8 Flash replaces 3.7 Flash in the model menu
 • Smaller fixes and refinements
 ```
 
 **NO:**
 ```
-• Høyreklikk for å kopiere tekst overalt: assistentens svar, kommentarer og innstillinger har nå en Kopier / Klipp ut / Lim inn / Marker alt-meny, i tillegg til den sidene allerede hadde
+• Assistenten takler store dokumenter: et spørsmål som før ble avvist fordi det sprengte minuttkvoten for tokens på API-kontoen din, sender nå et utdrag tilpasset kvoten — valgt ut fra det du spurte om, og med ekte sidetall i kildehenvisningene
+• En avvisning det ikke hjelper å vente på sier det nå rett ut, og viser leverandørens eget tak i stedet for råd som ikke fører fram
+• Høyreklikk for å kopiere tekst overalt: assistentens svar, kommentarer og innstillinger har en Kopier / Klipp ut / Lim inn / Marker alt-meny, i tillegg til den sidene allerede hadde
 • Gemini 3.8 Flash erstatter 3.7 Flash i modellmenyen
 • Mindre feilrettinger og finpuss
 ```
