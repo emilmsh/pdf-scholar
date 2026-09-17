@@ -144,10 +144,12 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.48.1
+## What's new in this version (≤ 1 500 chars) — v0.49.0
 
 **EN:**
 ```
+• A tab drags like a file: drop it into another PDF Scholar window, a browser's upload field, an e-mail or a folder — the same drag Explorer starts
+• Ctrl+drag keeps the in-app move: onto another window, or out onto the desktop for a window of its own. Both gestures are listed under the fixed keys in the shortcuts dialog
 • Sticky notes made in other apps, such as Acrobat, keep their icon when you move them — a move used to redraw the note with a different icon, fully opaque and in a smaller box
 • Moving or recolouring an existing annotation lands at once: the repaint afterwards re-read every page of the document, and now re-reads only the page you changed
 • Smaller fixes and refinements
@@ -155,6 +157,8 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 **NO:**
 ```
+• En fane dras som en fil: slipp den i et annet PDF Scholar-vindu, i et opplastingsfelt i nettleseren, i en e-post eller i en mappe — samme drag som Utforsker starter
+• Ctrl+dra flytter fanen i appen: til et annet vindu, eller ut på skrivebordet for et eget vindu. Begge bevegelsene står under faste taster i hurtigtastmenyen
 • Notater laget i andre programmer, som Acrobat, beholder ikonet sitt når du flytter dem — før ble notatet tegnet om med et annet ikon, helt dekkende og i en mindre boks
 • Å flytte eller farge om en eksisterende merknad lander med én gang: gjenoppfriskingen etterpå leste alle sidene i dokumentet på nytt, nå bare siden du endret
 • Mindre feilrettinger og finpuss
