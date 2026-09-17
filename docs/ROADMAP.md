@@ -73,6 +73,39 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 ## Fase 6.5 — Faner (Emil ønsker dette tidlig, trukket frem fra fase 7)
 - [x] Fanelinje for flere åpne dokumenter: klikk/klikk-på-✕/midtklikk lukker, + åpner, Ctrl+Tab / Ctrl+Shift+Tab veksler, Ctrl+W lukker, Ctrl+O åpner; bakgrunnsfaner beholder full tilstand (scroll, zoom, angre-stakk) og leseposisjon lagres ved fanebytte (levert 2026-07-10)
 - [x] Dra faner for å endre rekkefølge; «lukk andre faner»-meny (levert 2026-07-29) — dra bytter plass live i linja (ingen protokollendring: main svarte allerede `'same'` når slippet skjer i eget vindu), meny med «Lukk andre faner»/«Lukk faner til høyre» som spør om én fane om gangen, og «Flytt til venstre/høyre» + Ctrl+Shift+PageUp/PageDown for berøring og tastatur
+- [x] **En fane dras som en fil** (2026-09-17, Emils ønske: «dra fanen inn i
+  et annet vindu skal fungere som en filopplastning»). Fanelinja avbryter
+  HTML5-draget og ber main om `webContents.startDrag` med dokumentets sti —
+  samme OS-drag som Utforsker starter. Dermed kan fanen slippes overalt der en
+  fil kan slippes: i et annet PDF Scholar-vindu (som tar den gjennom sin
+  vanlige fildropp — samme hint og samme kolonnevalg som en PDF fra OS-et), i
+  et opplastingsfelt i nettleseren, i en e-post, i en mappe. Mottakervinduet
+  melder `file:drop-landed`; først da lukker kildevinduet fanen (utkastet
+  følger stien i main som før). Slipp på skrivebordet er nå OS-ets sak
+  (Utforsker kopierer) — tear-off til nytt vindu bor i fanemenyen («Flytt til
+  nytt vindu»), fordi ingen kan fortelle oss om noen andre tok imot slippet.
+  Omorganisering i linja virker uendret (OS-draget fyrer fortsatt dragover på
+  fanene). **Bare mus**: OS-dragløkka (DoDragDrop) slutter når knappen som
+  var nede slippes, og uten knapp returnerer den aldri — main frøs for godt
+  da en syntetisk dragstart prøvde (målt 2026-09-17, bygd app: ingen IPC,
+  ingen DevTools). Fanelinja husker derfor pointerdown-typen og starter
+  OS-draget kun for et musedrag med venstre knapp nede; berøring, penn og alt
+  syntetisk beholder HTML5-draget og den gamle markørtesten
+  (`tab:drop-at-cursor`: annet vindu → flytt, skrivebord → nytt vindu).
+  Electron har ingen API for knappetilstand, så porten i fanelinja er hele
+  vernet. Porten leser pointerdown-posten ALENE: DragEvent.buttons er 0 i
+  Chromium, og en sjekk på den sendte hvert ekte musedrag ned reservestien —
+  som limte stien inn som tekst OG åpnet nytt vindu (Emils første test,
+  2026-09-17). Reservestien setter derfor ikke lenger text/plain. **Ctrl +
+  dra** (Cmd på Mac) velger reservestien med vilje: flytt inn i et annet
+  vindu eller riv løs til nytt vindu på skrivebordet, som før — det ene
+  fil-draget ikke kan. Første forsøk var Shift, og det gjorde ingenting:
+  Chromium starter aldri et drag fra Shift+mousedown på annet enn lenker og
+  bilder (Shift+trykk betyr «utvid markeringen hit»), så hverken dragstart
+  eller dragend fyrte (Emils andre test samme dag). Alt er utelukket fordi
+  Alt+dra flytter vinduet på flere Linux-skrivebord; Ctrl+trykk er
+  kontekstmeny-klikket på Mac, derav Cmd der.
+  Ingen CDP-test av selve slippet: et ekte OS-drag krever en holdt museknapp.
 
 - [x] **Fanelinja bærer bare faner** (2026-08-09): «Bibliotek» flyttet ned i
   verktøylinja som ikon, «Innhold» mistet etiketten (panelet har fire faner,

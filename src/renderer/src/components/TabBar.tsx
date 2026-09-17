@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
-import { bridge } from '../bridge'
+import { bridge, isElectron } from '../bridge'
 import { TAB_DRAG_MIME } from '../drag-types'
 import { t, useLang } from '../i18n'
+import { isMac } from '../platform'
 import { withShortcut } from '../keymap'
 import { IconChevronDown } from './icons'
 
@@ -30,7 +31,12 @@ interface Props {
    *  SECONDARY home for the action; the save menu's Zotero section is the
    *  visible one (no feature lives only in a context menu). */
   onShowInZotero(path: string): void
-  /** A tab was dragged out and released — main decides where it lands */
+  /** A MOUSE drag of the tab began: run the native file drag of its document
+   *  (desktop). Resolves when the drop is over; the source closes the tab if
+   *  another window took it. */
+  onTabDragFile(id: string, path: string): Promise<void>
+  /** The in-window HTML5 drag ended (touch, pen, web preview) — main decides
+   *  where the tab lands from the cursor position */
   onTabDragOut(id: string, path: string): void
   /** A tab was dragged onto another position within this bar */
   onReorder(id: string, toIndex: number): void
@@ -66,6 +72,7 @@ export default function TabBar({
   onOpenInNewWindow,
   onShowInFolder,
   onShowInZotero,
+  onTabDragFile,
   onTabDragOut,
   onReorder,
   onCloseMany,
@@ -99,6 +106,24 @@ export default function TabBar({
   /** The "all tabs" list, opened from the chevron at the end of the strip */
   const [allOpen, setAllOpen] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  /** How the pointer that is about to drag a tab touched it. The native file
+   *  drag is for a MOUSE drag only (see PdfxApi.dragTabFile — the OS drag loop
+   *  waits for a mouse button's release and never returns without one), and a
+   *  DragEvent does not say what started it; the pointerdown before it does.
+   *  A drag can only begin while that button is still down, so the pointerdown
+   *  record alone proves the held button — the DragEvent's own `buttons` does
+   *  NOT: Chromium reports 0 there, and gating on it sent every real mouse drag
+   *  down the in-window path (Emil, 2026-09-17: «pastes a path and opens a new
+   *  window at the same time»). The modifier is recorded here too, since one
+   *  held at the press is the reliable form of one held at the drag. It is
+   *  Ctrl (Cmd on macOS, where Ctrl+press is the context-menu click) and NOT
+   *  Shift: Chromium never starts a drag from a Shift+mousedown on anything
+   *  but a link or image — Shift+press means «extend the selection» to it —
+   *  so a Shift-drag fired no dragstart and no dragend, and did nothing at
+   *  all (Emil, 2026-09-17). Alt is out too: Alt+drag moves the window on
+   *  several Linux desktops. */
+  const dragPointer = useRef<{ type: string; buttons: number; mod: boolean } | null>(null)
+  const modOf = (e: { ctrlKey: boolean; metaKey: boolean }): boolean => (isMac ? e.metaKey : e.ctrlKey)
   /** Where the right-clicked tab currently sits — the move/close-to-the-right
    *  items are all relative to it, and it moves while the menu is open. */
   const menuIndex = menu ? tabs.findIndex((x) => x.id === menu.tab.id) : null
@@ -151,20 +176,52 @@ export default function TabBar({
           className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}`}
           title={tab.path}
           draggable
+          onPointerDown={(e) => {
+            dragPointer.current = { type: e.pointerType, buttons: e.buttons, mod: modOf(e) }
+          }}
           onDragStart={(e) => {
-            // HTML5 drag can't cross OS windows; we only need dragend to fire so
-            // main can hit-test the cursor. Setting data keeps some platforms
-            // from cancelling the drag.
-            e.dataTransfer.effectAllowed = 'move'
-            e.dataTransfer.setData('text/plain', tab.path)
-            // …and under our own type, which a pages column reads as «open this
-            // document beside mine» — text/plain alone could be anything
-            e.dataTransfer.setData(TAB_DRAG_MIME, tab.path)
             setDraggingId(tab.id)
+            const started = dragPointer.current
+            dragPointer.current = null
+            // A real mouse drag with the left button down — the only drag the
+            // OS drag loop can end (it waits for that button's release; touch
+            // and pen have none, and a synthetic dragstart has no pointer at
+            // all — see PdfxApi.dragTabFile for the freeze that guards against)
+            const mouseDrag = started?.type === 'mouse' && (started.buttons & 1) === 1
+            // Ctrl/Cmd + drag opts OUT of the file drag: the tab moves inside
+            // the app as it used to — into another window, or torn off into a
+            // new one on the desktop — the one thing the file drag cannot do,
+            // since a drop outside our windows belongs to the OS then
+            const mod = (started?.mod ?? false) || modOf(e)
+            if (isElectron && mouseDrag && !mod) {
+              // Desktop: cancel the HTML5 drag and run a NATIVE file drag of the
+              // document instead (main's startDrag) — the drag Explorer starts,
+              // so the tab drops wherever a file can: another PDF Scholar
+              // window (its file-drop handler opens it — same hint, same column
+              // targeting as a PDF from the OS), a browser's upload field, an
+              // e-mail, a folder. Reorder keeps working: the OS drag still
+              // fires dragover on the tabs here, and draggingId is state. No
+              // dragend follows a cancelled dragstart, so the drag's end is the
+              // promise settling.
+              e.preventDefault()
+              void onTabDragFile(tab.id, tab.path).finally(() => setDraggingId(null))
+              return
+            }
+            // Ctrl-drag, touch, pen, web preview: a plain HTML5 drag inside
+            // the window — reorder and drag-to-split here, and on the desktop
+            // main places the tab from the cursor when it ends (another window,
+            // or a new one). Our own type is the drag's data (some platforms
+            // cancel a drag carrying none) and what a pages column reads as
+            // «open this document beside mine». No text/plain: this drag can
+            // end over another app, and the path pasted into a text field
+            // there was the other half of Emil's double effect.
+            e.dataTransfer.effectAllowed = 'move'
+            e.dataTransfer.setData(TAB_DRAG_MIME, tab.path)
           }}
           // Dragging ACROSS the bar reorders, live, the way browsers do. Dropping
-          // outside it still tears the tab off: main answers 'same' when the
-          // cursor is over this window, so the two gestures cannot collide.
+          // outside the bar is the file drag's business (another window, another
+          // app); a release over this window answers 'same', so the two
+          // gestures cannot collide.
           onDragOver={(e) => {
             if (!draggingId || draggingId === tab.id) return
             e.preventDefault()
@@ -173,6 +230,7 @@ export default function TabBar({
             onReorder(draggingId, index)
           }}
           onDragEnd={() => {
+            // HTML5 path only — the native drag's cancelled dragstart has no dragend
             setDraggingId(null)
             onTabDragOut(tab.id, tab.path)
           }}

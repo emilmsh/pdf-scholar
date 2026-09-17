@@ -374,6 +374,37 @@ regressions are treated as bugs, not as acceptable platform lag.
     `npm run test:update-channel`). Nothing else differs — the renderer does
     not know it is portable.
 
+22. **A tab dragged by the MOUSE drags as a FILE on the desktop; touch, pen
+    and the web preview keep an in-window drag.** For a mouse drag with the
+    left button down the strip cancels its HTML5 drag and has main run
+    `webContents.startDrag` with the document's path (`tab:drag-file`), so
+    the tab lands wherever a file can — another PDF Scholar window (through
+    its ordinary file-drop handler), a browser's upload field, an e-mail, a
+    folder. The receiving window reports `file:drop-landed`, and only that
+    report closes the source's tab (the draft travels by path in main, as
+    before). Mouse only because the OS drag loop ends on that button's
+    release and without one never returns — main froze for good under a
+    synthetic dragstart (2026-09-17) — and Electron has no API to check the
+    button, so the strip's pointerdown record is the whole guard (the
+    DragEvent's own `buttons` is 0 in Chromium — never gate on it). Touch,
+    pen and Ctrl+drag (Cmd+drag on macOS) keep the HTML5 drag and the cursor
+    hit-test (`tab:drop-at-cursor`: another window merges, the desktop tears
+    off into a new window, the source is a no-op) — the desktop gestures of
+    before; the modifier is how a mouse asks for them, and a finger has no
+    way to drag a tab out of the app. The modifier is Ctrl and not Shift
+    because Chromium starts no drag from a Shift+mousedown (it extends the
+    selection instead), not Alt because Alt+drag moves the window on several
+    Linux desktops, and Cmd on macOS because Ctrl+press is the context-menu
+    click there — the one per-platform difference in the gesture. In `dev:web` neither
+    exists: reorder and drag-to-split inside the window work and a release
+    answers `'same'`. The extension has no tab strip at all (each document
+    is a browser tab). **macOS, unverified:** Electron's native drag may
+    return before the drop there, in which case the landing report finds no
+    drag in flight and the source keeps its tab — a copy instead of a move,
+    never a lost tab. With the mouse, tear-off into a new window is the tab
+    menu's «Flytt til nytt vindu», and dropping a tab on the desktop does
+    what dropping a file does (Explorer copies it).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

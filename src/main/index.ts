@@ -4,6 +4,7 @@ import {
   dialog,
   ipcMain,
   Menu,
+  nativeImage,
   nativeTheme,
   powerSaveBlocker,
   screen,
@@ -24,7 +25,8 @@ import type {
   DocBookmark,
   ReadingPosition,
   SetFormFieldRequest,
-  Settings
+  Settings,
+  TabDropResult
 } from '../shared/types'
 import { buildAssistantHash } from '../shared/viewer-url'
 import { registerAiIpc } from './ai'
@@ -661,6 +663,10 @@ async function flushDraft(originalPath: string): Promise<void> {
 // past an EOF that an earlier incremental save left mid-file.
 //
 // Only ever asked for on a retry — a first open never waits.
+/** A 1×1 transparent PNG: the drag image of last resort (see tab:drag-file) */
+const BLANK_PIXEL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
 const SETTLE_POLL_MS = 120
 const SETTLE_TIMEOUT_MS = 2000
 /** Enough tail to hold the trailer and any junk a writer leaves after it */
@@ -761,20 +767,94 @@ function registerIpc(): void {
     return false
   })
 
-  // A tab was dragged out and released. HTML5 drag events don't cross OS
-  // window boundaries, so main hit-tests the OS cursor against every window's
-  // bounds and decides where the document goes. The document's draft (unsaved
-  // annotations) is keyed by path in main, so it travels automatically: the
-  // target opens the same path and picks up the same draft — the renderer just
-  // closes the source tab WITHOUT the discard prompt.
-  ipcMain.handle('tab:drop-at-cursor', (e, path: string) => {
+  // A tab is being dragged. The strip cancels its HTML5 drag and asks for
+  // THIS instead: a native file drag of the document — the drag Explorer
+  // starts — so the tab can be dropped wherever a file can (a browser's upload
+  // field, an e-mail, a chat, a folder) and into another PDF Scholar window,
+  // which takes it through its ordinary file-drop handler like any PDF from
+  // the OS: same hint, same «which column» targeting. Emil, 2026-09-17:
+  // dragging a tab into another window should work like a file upload.
+  //
+  // startDrag returns when the OS drop is over (a nested message loop on
+  // Windows/Linux). The receiving window's renderer then reports the landing
+  // through file:drop-landed a few ms later — that report, not the cursor
+  // position, is what tells the source its tab arrived and may close: a
+  // drop on the target's window-controls overlay never reaches its DOM, and a
+  // cursor test alone would have closed a tab nothing took. The document's
+  // draft (unsaved annotations) is keyed by path in main, so it travels with
+  // the path — the target picks it back up, the source closes without asking.
+  //
+  // Dropping outside every window is the OS's business now (Explorer copies,
+  // a browser uploads) — the tear-off into a fresh window lives in the tab
+  // menu («Flytt til nytt vindu»), since nothing tells us whether the drop was
+  // accepted by someone else. On macOS the native drag may return before the
+  // drop; the landing report then finds no drag in flight and the source keeps
+  // its tab (a copy, not a move) — see docs/PLATFORMS.md.
+  //
+  // MOUSE ONLY. The OS drag loop (DoDragDrop on Windows) ends when the button
+  // that was down at its start is released; called with no button down it
+  // never returns, and this process is wedged for good — no IPC, no DevTools,
+  // no way out but Task Manager (measured 2026-09-17: a synthetic dragstart
+  // froze the built app). The strip therefore starts this only for a drag it
+  // saw begin with a mouse button; touch, pen and anything synthetic keep the
+  // HTML5 drag and tab:drop-at-cursor below. Nothing here can check the
+  // button — Electron has no API for it — so that gate is the whole guard.
+  let tabDragInFlight: { path: string; sourceId: number; landed: boolean } | null = null
+  ipcMain.on('file:drop-landed', (e, path: string) => {
+    const flight = tabDragInFlight
+    if (flight && flight.path === path && flight.sourceId !== e.sender.id) flight.landed = true
+  })
+  ipcMain.handle('tab:drag-file', async (e, path: string): Promise<TabDropResult> => {
+    const source = BrowserWindow.fromWebContents(e.sender)
+    const flight = { path, sourceId: e.sender.id, landed: false }
+    tabDragInFlight = flight
+    try {
+      // The OS icon for the file, as Explorer would show it; startDrag refuses
+      // an empty image, so a 1×1 pixel stands in if the shell has none
+      const icon = await app.getFileIcon(path, { size: 'normal' }).catch(() => nativeImage.createEmpty())
+      e.sender.startDrag({
+        file: path,
+        icon: icon.isEmpty() ? nativeImage.createFromDataURL(BLANK_PIXEL) : icon
+      })
+      const pt = screen.getCursorScreenPoint()
+      const inBounds = (win: BrowserWindow): boolean => {
+        const b = win.getBounds()
+        return pt.x >= b.x && pt.x <= b.x + b.width && pt.y >= b.y && pt.y <= b.y + b.height
+      }
+      const overAnother = BrowserWindow.getAllWindows().some(
+        (w) => w !== source && !w.isDestroyed() && !w.isMinimized() && inBounds(w)
+      )
+      // The target's drop event, its path lookup and the report are all
+      // asynchronous relative to the drag's end — give them a moment
+      if (overAnother) {
+        const deadline = Date.now() + 800
+        while (!flight.landed && Date.now() < deadline) await new Promise((r) => setTimeout(r, 25))
+      }
+      if (flight.landed) return 'window'
+      if (source && !source.isDestroyed() && inBounds(source)) return 'same'
+      return 'outside'
+    } catch (err) {
+      console.warn('tab:drag-file failed', err)
+      return 'same'
+    } finally {
+      if (tabDragInFlight === flight) tabDragInFlight = null
+    }
+  })
+
+  // The in-window HTML5 drag ended (touch, pen — whatever the native file drag
+  // above may not take). HTML5 drag events don't cross OS window boundaries, so
+  // main hit-tests the OS cursor against every window's bounds and decides
+  // where the document goes: another window merges it (open-path), the desktop
+  // tears it off into a fresh window, the source window is a no-op (the
+  // reorder / same-file split already happened in the renderer). The draft
+  // travels by path exactly as for the native drag.
+  ipcMain.handle('tab:drop-at-cursor', (e, path: string): TabDropResult => {
     const source = BrowserWindow.fromWebContents(e.sender)
     const pt = screen.getCursorScreenPoint()
     const inBounds = (win: BrowserWindow): boolean => {
       const b = win.getBounds()
       return pt.x >= b.x && pt.x <= b.x + b.width && pt.y >= b.y && pt.y <= b.y + b.height
     }
-    // Another (non-minimized) window under the cursor → merge into it
     const target = BrowserWindow.getAllWindows().find(
       (w) => w !== source && !w.isDestroyed() && !w.isMinimized() && inBounds(w)
     )
@@ -785,9 +865,7 @@ function registerIpc(): void {
       target.focus()
       return 'window'
     }
-    // Dropped back on the source window → treat as a no-op reorder
     if (source && !source.isDestroyed() && inBounds(source)) return 'same'
-    // Dropped on empty desktop → tear off into a fresh window
     createWindow(path)
     return 'new'
   })

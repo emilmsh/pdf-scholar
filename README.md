@@ -170,8 +170,12 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
 - Reading positions and recent files are remembered; a library home screen lists them.
   Going back to it closes nothing: open documents stay in the tab strip, and returning
   to one restores the page, zoom and panels
-- Several documents open in tabs or separate windows; a tab can be dragged out into its
-  own window, or along the bar to reorder
+- Several documents open in tabs or separate windows. A tab drags like a file: into
+  another PDF Scholar window, or into anything that takes a PDF (a browser's upload field,
+  an e-mail, a chat, a folder), and along the bar to reorder. Ctrl+drag (Cmd on Mac) moves
+  it inside the app instead: onto another window, or out onto the desktop for a window of
+  its own ("Move to new window" in the tab menu does the same). With a finger or pen the
+  tab always drags the in-app way
 - The interface is in Norwegian or English; the choice also applies to the AI prompts,
   exports and date formats
 

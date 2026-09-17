@@ -30,6 +30,7 @@ import {
 import type { CommandId, KeymapOverrides } from '../keymap'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
+import { isMac } from '../platform'
 import { IconPlus, IconReset } from './icons'
 
 interface Props {
@@ -68,12 +69,26 @@ interface Takeover {
 
 /** Keys the app cannot hand over, listed so the map is complete rather than
  *  merely editable. Chip text is literal on purpose: these are not bindings, so
- *  they never go through the chord grammar. */
-const FIXED_KEYS: readonly { labelKey: MsgKey; keys: readonly string[] }[] = [
+ *  they never go through the chord grammar; a chip that is a WORD rather than a
+ *  key («Dra fanen») carries a message key instead. The two tab-drag rows are
+ *  mouse gestures, not keys — they are here because the modifier that tells the
+ *  file drag from the in-app move is the one thing about them a reader would
+ *  look up, and it is not rebindable: the strip reads it straight off the
+ *  pointer event (TabBar.tsx), and Shift can never take its place (Chromium
+ *  starts no drag from a Shift+press). */
+const FIXED_KEYS: readonly {
+  labelKey: MsgKey
+  keys: readonly (string | { labelKey: MsgKey })[]
+}[] = [
   { labelKey: 'keys.fixedEscape', keys: ['Esc'] },
   { labelKey: 'keys.fixedScroll', keys: ['↑', '↓', 'PgUp', 'PgDn', 'Space'] },
   { labelKey: 'keys.fixedPresentNav', keys: ['←', '→', 'Space'] },
-  { labelKey: 'keys.fixedPresentEnds', keys: ['Home', 'End'] }
+  { labelKey: 'keys.fixedPresentEnds', keys: ['Home', 'End'] },
+  { labelKey: 'keys.fixedTabDragFile', keys: [{ labelKey: 'keys.fixedDragTab' }] },
+  {
+    labelKey: 'keys.fixedTabDragMove',
+    keys: [isMac ? '⌘' : 'Ctrl', { labelKey: 'keys.fixedDragTab' }]
+  }
 ]
 
 export default function ShortcutsDialog({ onChange, onClose }: Props): React.JSX.Element {
@@ -393,11 +408,14 @@ export default function ShortcutsDialog({ onChange, onClose }: Props): React.JSX
                 <div className="keys-row" key={fixed.labelKey}>
                   <span className="keys-label">{t(fixed.labelKey)}</span>
                   <span className="keys-binding">
-                    {fixed.keys.map((key) => (
-                      <span className="keys-chip is-fixed" key={key}>
-                        {key}
-                      </span>
-                    ))}
+                    {fixed.keys.map((key) => {
+                      const text = typeof key === 'string' ? key : t(key.labelKey)
+                      return (
+                        <span className="keys-chip is-fixed" key={text}>
+                          {text}
+                        </span>
+                      )
+                    })}
                   </span>
                 </div>
               ))}

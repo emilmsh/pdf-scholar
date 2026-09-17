@@ -828,6 +828,9 @@ const nb = {
   'keys.fixedScroll': 'Bla i dokumentet',
   'keys.fixedPresentNav': 'Neste og forrige side i presentasjon',
   'keys.fixedPresentEnds': 'Første og siste side i presentasjon',
+  'keys.fixedTabDragFile': 'Dra en fane ut som fil – til et annet vindu, en e-post eller et opplastingsfelt',
+  'keys.fixedTabDragMove': 'Flytt fanen i appen – til et annet vindu, eller til skrivebordet for et nytt',
+  'keys.fixedDragTab': 'Dra fanen',
 
   'keys.catFile': 'Fil',
   'keys.catTabs': 'Faner',
@@ -1680,6 +1683,9 @@ const en: Dict = {
   'keys.fixedScroll': 'Scroll the document',
   'keys.fixedPresentNav': 'Next and previous page in presentation mode',
   'keys.fixedPresentEnds': 'First and last page in presentation mode',
+  'keys.fixedTabDragFile': 'Drag a tab out as a file – into another window, an e-mail or an upload field',
+  'keys.fixedTabDragMove': 'Move the tab within the app – onto another window, or to the desktop for a new one',
+  'keys.fixedDragTab': 'Drag tab',
 
   'keys.catFile': 'File',
   'keys.catTabs': 'Tabs',

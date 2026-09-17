@@ -1051,13 +1051,18 @@ export default function PdfViewer({
     },
     [payload.path, requestSameFileSplit, sideOf, swapPanes, requestSplitDoc]
   )
-  /** A PDF from the OS. Desktop only: the split's other document is addressed
-   *  by path (main resolves drafts behind it). A browser drop has no real path
-   *  — false lets it bubble to App's open-a-tab handler. */
+  /** A PDF from the OS — or a tab dragged over from another PDF Scholar
+   *  window, which arrives as exactly that (main runs a native file drag for
+   *  it). Desktop only: the split's other document is addressed by path (main
+   *  resolves drafts behind it). A browser drop has no real path — false lets
+   *  it bubble to App's open-a-tab handler. */
   const dropFileIntoSplit = useCallback(
     (file: File, pane: PaneId, half: PaneSide | null): boolean => {
       const realPath = bridge.getPathForFile(file)
       if (!realPath) return false
+      // If the file is another window's dragged tab, that window is waiting to
+      // hear it landed (main ignores the report for our own drags)
+      bridge.fileDropLanded(realPath)
       dropDocIntoSplit(realPath, pane, half)
       return true
     },

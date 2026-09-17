@@ -682,10 +682,36 @@ export default function App(): React.JSX.Element {
     })
   }, [])
 
-  // Move a tab to another window (drag) or tear it off into a new one. The
-  // source tab closes WITHOUT the discard prompt so its unsaved draft (kept on
-  // disk, keyed by path in main) travels with the document — the target window
-  // opens the same path and picks the draft back up.
+  /** The path of the tab this window is dragging right now, if any. The native
+   *  file drag delivers drops to THIS window too — released over the strip or
+   *  the toolbar after a reorder — and that drop must not read as «open this
+   *  file»: openPath would re-read a document that is already on screen. */
+  const tabDragPathRef = useRef<string | null>(null)
+
+  // A MOUSE drag of a tab: main runs a native file drag (the tab drops
+  // wherever a file can — another PDF Scholar window, a browser's upload
+  // field, an e-mail), and answers 'window' once another of our windows
+  // reports the file landed. Then the source tab closes WITHOUT the discard
+  // prompt: its unsaved draft (kept on disk, keyed by path in main) travels
+  // with the document — the target opens the same path and picks the draft
+  // back up. Anywhere else the tab simply stays.
+  const dragTabFile = useCallback(
+    async (id: string, path: string) => {
+      tabDragPathRef.current = path
+      try {
+        const verdict = await bridge.dragTabFile(path)
+        if (verdict === 'window') reallyCloseTab(id)
+      } finally {
+        tabDragPathRef.current = null
+      }
+    },
+    [reallyCloseTab]
+  )
+
+  // A touch/pen drag of a tab ended (the in-window HTML5 drag): main places
+  // it from the cursor — another window (merge) or the desktop (tear off into
+  // a new one). The same draft-by-path rule lets the source close without the
+  // discard prompt.
   const moveTabOut = useCallback(
     async (id: string, path: string) => {
       const verdict = await bridge.tabDropAtCursor(path)
@@ -998,6 +1024,12 @@ export default function App(): React.JSX.Element {
       if (!file || !file.name.toLowerCase().endsWith('.pdf')) return
       const realPath = bridge.getPathForFile(file)
       if (realPath) {
+        // Our own tab released over this window's chrome: the reorder already
+        // happened live, and there is nothing to open
+        if (realPath === tabDragPathRef.current) return
+        // Tell main first — if this is a tab dragged over from another window,
+        // that window is waiting to hear its tab arrived
+        bridge.fileDropLanded(realPath)
         await openPath(realPath)
       } else {
         await openPayload({
@@ -1060,6 +1092,7 @@ export default function App(): React.JSX.Element {
         // menu has no hint surface — the save menu's Zotero section is where
         // failures get named.
         onShowInZotero={(path) => void bridge.zoteroSelect(path)}
+        onTabDragFile={dragTabFile}
         onTabDragOut={(id, path) => void moveTabOut(id, path)}
         onReorder={moveTab}
         onCloseMany={(ids) => void closeTabs(ids)}

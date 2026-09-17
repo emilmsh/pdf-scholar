@@ -148,7 +148,17 @@ carries no picture of its own.)*
 - The toolbar can be unpinned; the page then fills the window, and the toolbar
   and panels return on hover at the window edges
 - Reading positions and recent files are remembered. Documents open in tabs or
-  separate windows, and a tab can be dragged out into its own window
+  separate windows. A tab drags like a file: into another PDF Scholar window,
+  or into anything that takes a PDF — a browser's upload field, an e-mail, a
+  chat, a folder. «Flytt til nytt vindu» in the tab menu tears it into a
+  window of its own *(2026-09-17, Emil's ask: dragging a tab into another
+  window should work like a file upload — before this a tab dropped on the
+  desktop opened a new window and could not leave the app at all. Ctrl+drag
+  (Cmd on Mac) keeps the in-app move: into another window, or torn off into
+  a new one on the desktop — Ctrl, not Shift, because Chromium refuses to
+  start a drag from a Shift+press. Mouse only: with a finger or pen the tab
+  always drags the in-app way, because the OS file drag needs a mouse button
+  to end on)*
 - Going back to the library closes nothing: open documents stay in the tab
   strip, and returning to one restores page, zoom and panels
 - Password-protected documents open, can be annotated, and are saved with their

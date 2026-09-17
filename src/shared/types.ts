@@ -263,8 +263,14 @@ export interface FileError {
  *  working around it. */
 export type Patch<T> = { [K in keyof T]?: T[K] | undefined }
 
-/** Outcome of dropping a dragged tab (see PdfxApi.tabDropAtCursor) */
-export type TabDropResult = 'window' | 'new' | 'same'
+/** Where a dragged tab came to rest (PdfxApi.dragTabFile / tabDropAtCursor).
+ *  'window' = another PDF Scholar window took it (the source closes its tab),
+ *  'new' = torn off into a fresh window (cursor hit-test path only; the source
+ *  closes its tab), 'same' = released over the source window (reorder /
+ *  same-file split — handled by the renderer's own drop events), 'outside' =
+ *  the native file drag delivered it somewhere else, or nowhere (a browser
+ *  upload, an e-mail draft, a folder, the desktop) — the tab stays. */
+export type TabDropResult = 'window' | 'new' | 'same' | 'outside'
 
 /** What the unsaved-changes prompt settled on. `error` only ever accompanies
  *  'cancel': the user chose Save, the write failed, and the document must stay
@@ -791,11 +797,28 @@ export interface PdfxApi {
   openExternal(url: string): void
   /** Open a new app window, optionally loading a document (side-by-side use) */
   newWindow(path?: string): void
-  /** A tab was dragged out and released. Main hit-tests the cursor against
-   *  every window: 'window' = handed to another window (merge), 'new' = torn
-   *  off into a fresh window, 'same' = dropped back on the source (no-op).
-   *  The source closes its tab for 'window'/'new'. */
+  /** A tab is being dragged BY THE MOUSE: run a NATIVE file drag of its
+   *  document — the same drag Explorer starts — so it can be dropped wherever
+   *  a file can: a browser's upload field, an e-mail, a chat, a folder, or
+   *  another PDF Scholar window (which takes it through its ordinary
+   *  file-drop handler). Resolves when the drag ends, with where the file
+   *  landed. ONLY for a drag with a mouse button held: the OS drag loop waits
+   *  for that button's release, and with none held it never returns — main
+   *  is wedged for good (measured 2026-09-17 with a synthetic dragstart).
+   *  The strip gates on pointer type + buttons; everything else takes
+   *  tabDropAtCursor. Desktop only; the web preview answers 'same'. */
+  dragTabFile(path: string): Promise<TabDropResult>
+  /** A tab's in-window HTML5 drag ended (touch, pen, or anything the native
+   *  drag may not take). Main hit-tests the cursor against every window:
+   *  'window' = handed to another window (merge), 'new' = torn off into a
+   *  fresh window, 'same' = dropped back on the source (no-op). The source
+   *  closes its tab for 'window'/'new'. */
   tabDropAtCursor(path: string): Promise<TabDropResult>
+  /** This window just received a dropped PDF with a real path — its own
+   *  drop handler is opening it. Main matches the path against a tab drag in
+   *  flight from another window, which is how THAT window learns its tab
+   *  arrived and may close. A drop with no drag in flight is ignored. */
+  fileDropLanded(path: string): void
   // ---------- Save model (annotation edits go to a draft, not the file) ----------
   /** Tell main a document is open in this window (unsaved-changes guard) */
   docOpened(path: string): void
