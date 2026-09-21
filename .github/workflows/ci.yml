@@ -101,6 +101,11 @@ jobs:
       # updates it cannot install, and getting this wrong either nags every four
       # hours or never speaks at all, on hardware we don't own
       - run: npm run test:update-channel
+      # XFA forms open read-only from their XML layout (pdf.js enableXfa): a
+      # dynamic form lays out and its text is readable, a static one is left
+      # alone, and sample.pdf opens IDENTICALLY with the flag on — the promise
+      # that turning XFA on changed nothing for every other document
+      - run: npm run test:xfa
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

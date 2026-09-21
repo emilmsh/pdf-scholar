@@ -39,6 +39,10 @@ const MAX_MATCHES = 500
 export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): Promise<PageText> {
   const page = await pdf.getPage(pageNumber)
   const content = await page.getTextContent()
+  // An XFA form's items are the laid-out form's text nodes (a caption, a
+  // paragraph, a label) with no positions and no hasEOL — glued together they
+  // would read «Page of Support for…». Each one ends its own line instead.
+  const xfa = pdf.isPureXfa
   let text = ''
   const runs: { start: number; length: number }[] = []
   for (const item of content.items) {
@@ -47,7 +51,7 @@ export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): 
       runs.push({ start: text.length, length: item.str.length })
       text += item.str
     }
-    if (item.hasEOL) text += '\n'
+    if (item.hasEOL || xfa) text += '\n'
   }
   return { text, runs }
 }
@@ -114,11 +118,21 @@ export function findMatches(
   return matches
 }
 
+/** An XFA page's text spans — the laid-out form's text nodes, wrapped in the
+ *  order getTextContent() lists them (xfa.ts). */
+const XFA_TEXT_SPANS = '.xfa-host .xfaLayer span.xfa-text'
+
+/** «This page's text is in the DOM»: what a search jump waits for before it
+ *  measures a match — the pdf.js text layer, or an XFA page's spans. */
+export const TEXT_SPANS_READY_SELECTOR = `.text-host .textLayer > span, ${XFA_TEXT_SPANS}`
+
 /** The spans a page's matches are measured against, or null when the text layer
  *  is not in the DOM yet or does not correspond 1:1 to the extracted runs (see
- *  the invariant in CLAUDE.md — includeMarkedContent would break it). */
+ *  the invariant in CLAUDE.md — includeMarkedContent would break it). An XFA
+ *  page has no text layer; its wrapped text nodes carry the same invariant. */
 function matchSpans(pageEl: HTMLElement, pageText: PageText): NodeListOf<HTMLElement> | null {
-  const spans = pageEl.querySelectorAll<HTMLElement>('.text-host .textLayer > span')
+  const textLayer = pageEl.querySelectorAll<HTMLElement>('.text-host .textLayer > span')
+  const spans = textLayer.length > 0 ? textLayer : pageEl.querySelectorAll<HTMLElement>(XFA_TEXT_SPANS)
   return spans.length === 0 || spans.length !== pageText.runs.length ? null : spans
 }
 

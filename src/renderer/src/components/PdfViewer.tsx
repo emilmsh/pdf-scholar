@@ -127,6 +127,8 @@ import AnnotPopover from './AnnotPopover'
 import { PasswordPrompt } from './PasswordPrompt'
 import { SignaturePad } from './SignaturePad'
 import { SignatureInfo } from './SignatureInfo'
+import { XfaInfo } from './XfaInfo'
+import { isXfaDocument } from '../xfa'
 import {
   addSignature,
   dataUrlToBytes,
@@ -154,7 +156,8 @@ import {
   findMatches,
   hasExtractableText,
   resolveAllMatchRects,
-  resolveMatchRects
+  resolveMatchRects,
+  TEXT_SPANS_READY_SELECTOR
 } from '../search'
 import { addSearchHistory, clearSearchHistory } from '../search-history'
 import { clearAiTextScale } from '../ai-text-scale'
@@ -857,6 +860,22 @@ export default function PdfViewer({
   sessionBRef.current = sessionB
   const foreignRef = useRef(foreign)
   foreignRef.current = foreign
+
+  /** An XFA form (xfa.ts) is read-only: the pages on screen are pdf.js's HTML
+   *  layout of the form, not PDF pages, so a mark could only ever land on the
+   *  file's blank placeholder page. Every path that would arm a tool or create
+   *  a mark asks here first — per pane, because the split column may hold a
+   *  form beside an ordinary paper (or the other way round). */
+  const xfaDoc = isXfaDocument(pdf)
+  const xfaDocRef = useRef(xfaDoc)
+  xfaDocRef.current = xfaDoc
+  const xfaOf = useCallback(
+    (pane: PaneId): boolean =>
+      pane === 'b' && sessionBRef.current
+        ? isXfaDocument(sessionBRef.current.pdf)
+        : xfaDocRef.current,
+    []
+  )
   const onRequestCloseSplitDocRef = useRef(onRequestCloseSplitDoc)
   onRequestCloseSplitDocRef.current = onRequestCloseSplitDoc
   const onRequestPromoteSplitDocRef = useRef(onRequestPromoteSplitDoc)
@@ -2780,18 +2799,50 @@ export default function PdfViewer({
         showToast(t('viewer.rotatedToolsOff'))
         return
       }
+      if (tool && xfaOf(activePaneRef.current)) {
+        showToast(t('viewer.xfaToolsOff'))
+        return
+      }
       setActiveTool(tool)
       if (tool) setMarkupTool(null) // freehand and text-markup tools are exclusive
     },
-    [showToast]
+    [showToast, xfaOf]
   )
 
   /** Arm/disarm a text-markup tool. Turning one on clears any freehand tool so
    *  the two modes never fight over the pointer. */
-  const selectMarkupTool = useCallback((type: MarkupToolType | null) => {
-    if (type) setActiveTool(null)
-    setMarkupTool(type)
-  }, [])
+  const selectMarkupTool = useCallback(
+    (type: MarkupToolType | null) => {
+      if (type && xfaOf(activePaneRef.current)) {
+        showToast(t('viewer.xfaToolsOff'))
+        return
+      }
+      if (type) setActiveTool(null)
+      setMarkupTool(type)
+    },
+    [showToast, xfaOf]
+  )
+
+  /** The note tool's arm/disarm, and the snip tool's — the same read-only
+   *  refusal as the other tools, said in words rather than by a dead button. */
+  const toggleNotePlacing = useCallback(() => {
+    if (xfaDocRef.current) {
+      showToast(t('viewer.xfaToolsOff'))
+      return
+    }
+    setNotePlacing((v) => !v)
+  }, [showToast])
+  const armSnip = useCallback(
+    (target: 'quick' | 'chat') => {
+      // A snip is a picture of the page canvas — blank under an XFA form
+      if (xfaDocRef.current) {
+        showToast(t('viewer.xfaToolsOff'))
+        return
+      }
+      setSnip({ target })
+    },
+    [showToast]
+  )
 
   // Hide all annotations (clean reading view) — hit-testing pauses too so
   // invisible annotations can't swallow clicks or show tooltips
@@ -4106,11 +4157,14 @@ export default function PdfViewer({
    *  something that is almost never there is clutter. */
   const [docSignatures, setDocSignatures] = useState<DocSignature[]>([])
   const [signatureInfoOpen, setSignatureInfoOpen] = useState(false)
+  /** The «XFA-skjema» badge's popover (XfaInfo) — closed again per document */
+  const [xfaInfoOpen, setXfaInfoOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     setDocSignatures([])
     setSignatureInfoOpen(false)
+    setXfaInfoOpen(false)
     if (!pdf) return
     void (async () => {
       try {
@@ -4164,6 +4218,10 @@ export default function PdfViewer({
       setArmedSignature(null)
       return
     }
+    if (xfaDocRef.current) {
+      showToast(t('viewer.xfaToolsOff'))
+      return
+    }
     const list = signaturesRef.current
     if (list.length === 0) setSignaturePadOpen(true)
     else if (list.length === 1) setArmedSignature(list[0].id)
@@ -4191,6 +4249,10 @@ export default function PdfViewer({
       for (const el of allPageElsRef.current()) {
         const r = el.getBoundingClientRect()
         if (clientX < r.left || clientX > r.right || clientY < r.top || clientY > r.bottom) continue
+        if (xfaOf(paneOfEl(el))) {
+          showToast(t('viewer.xfaToolsOff'))
+          return
+        }
         const [px, py] = pagePointFromClientRef.current?.(clientX, clientY, el) ?? [0, 0]
         const rect = stampRectAt(sig, px, py)
         persistAnnotation(
@@ -4234,6 +4296,10 @@ export default function PdfViewer({
       for (const el of pages) {
         const r = el.getBoundingClientRect()
         if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) {
+          if (xfaOf(paneOfEl(el))) {
+            showToast(t('viewer.xfaToolsOff'))
+            return
+          }
           const [px, py] = pagePointFromClientRef.current?.(clientX, clientY, el) ?? [0, 0]
           setNoteDraft({
             x: clientX,
@@ -4355,6 +4421,9 @@ export default function PdfViewer({
           anchorNode instanceof Element ? anchorNode : (anchorNode?.parentElement ?? null)
         const selPage = (anchorEl?.closest?.('.pdf-page') as HTMLElement | null) ?? pageEl
         if (!selPage) return
+        // Text selected in an XFA form is just a selection: nothing to mark
+        // there, so no menu — Ctrl+C and the right-click text menu copy it
+        if (xfaOf(paneOfEl(selPage))) return
         setMenu({
           x: clientX,
           y: clientY,
@@ -4364,6 +4433,10 @@ export default function PdfViewer({
         })
       } else if (pageEl) {
         const pane = paneOfEl(pageEl)
+        if (xfaOf(pane)) {
+          setMenu(null)
+          return
+        }
         const doc = docOf(pane)
         const pageNumber = Number(pageEl.dataset.page)
         const [px, py] = pagePointFromClient(clientX, clientY, pageEl)
@@ -4396,7 +4469,7 @@ export default function PdfViewer({
         setMenu(null)
       }
     },
-    [pagePointFromClient, annotsFor, docOf]
+    [pagePointFromClient, annotsFor, docOf, xfaOf]
   )
 
   const onContextMenu = useCallback(
@@ -4404,11 +4477,16 @@ export default function PdfViewer({
       // A comment's textarea in the margin strip: the text menu's business
       // (copy/paste), not a page menu — leave the event alone so it bubbles on
       if (inTextField(e.target)) return
+      // An XFA form has no page menu (nothing can be marked in it). The event
+      // stays unclaimed so the text menu takes it — copy, as for text outside
+      // the pages — instead of a right-click that does nothing at all.
+      const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
+      if (pageEl && xfaOf(paneOfEl(pageEl))) return
       e.preventDefault()
       if (drawToolRef.current) return
       openMenuAt(e.clientX, e.clientY, e.target)
     },
-    [openMenuAt]
+    [openMenuAt, xfaOf]
   )
 
   // The menu pops up right after finishing a text selection;
@@ -4422,6 +4500,14 @@ export default function PdfViewer({
       window.setTimeout(() => {
         const sel = window.getSelection()
         if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) {
+          // A selection in an XFA form (the tab's own, or the split column's)
+          // takes neither a markup nor a menu — it is text to copy, no more
+          const anchorEl =
+            sel.anchorNode instanceof Element
+              ? sel.anchorNode
+              : (sel.anchorNode?.parentElement ?? null)
+          const selPage = anchorEl?.closest?.('.pdf-page') as HTMLElement | null
+          if (selPage && xfaOf(paneOfEl(selPage))) return
           // An armed text-markup tool marks the selection immediately (and stays
           // armed for the next one) instead of opening the selection menu.
           const mt = markupToolRef.current
@@ -4460,7 +4546,7 @@ export default function PdfViewer({
         }
       }, 0)
     },
-    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect, annotsFor, docOf]
+    [openMenuAt, pagePointFromClient, applyMarkup, annotAvoidRect, annotsFor, docOf, xfaOf]
   )
 
   // Double-click a text box to re-open it in the editor (edit text + resize the
@@ -5503,7 +5589,7 @@ export default function PdfViewer({
           const pageEl = handleForRef.current(pane)?.el()?.querySelector<HTMLElement>(
             `.pdf-page[data-page="${pageNumber}"]`
           )
-          if (pageEl?.querySelector('.text-host .textLayer > span')) return resolve(pageEl)
+          if (pageEl?.querySelector(TEXT_SPANS_READY_SELECTOR)) return resolve(pageEl)
           if (Date.now() - t0 > timeoutMs) return resolve(pageEl ?? null)
           window.setTimeout(tick, 120)
         }
@@ -6193,7 +6279,7 @@ export default function PdfViewer({
       }
       case 'tool.note':
         e.preventDefault()
-        setNotePlacing((v) => !v)
+        toggleNotePlacing()
         break
       case 'tool.signature':
         e.preventDefault()
@@ -6207,7 +6293,8 @@ export default function PdfViewer({
         e.preventDefault()
         // Dead-man switch on: don't arm a tool whose whole purpose is a request
         if (aiAccessRef.current === 'off') break
-        setSnip((s) => (s ? null : { target: 'quick' }))
+        if (snip) setSnip(null)
+        else armSnip('quick')
         break
       default:
         // A shell command (tabs, windows, opening a file) — App owns those
@@ -6535,7 +6622,8 @@ export default function PdfViewer({
           aiOpen={aiPinned}
           onToggleAi={() => setAiPinned((o) => !o)}
           noteActive={notePlacing}
-          onToggleNote={() => setNotePlacing((v) => !v)}
+          onToggleNote={toggleNotePlacing}
+          toolsLocked={xfaDoc}
           signatureActive={armedSignature !== null}
           signatures={signatures}
           onSignaturePrimary={onSignaturePrimary}
@@ -6543,13 +6631,25 @@ export default function PdfViewer({
           onSignatureDraw={() => setSignaturePadOpen(true)}
           onSignatureDelete={onSignatureDelete}
           signatureInfo={
-            <SignatureInfo
-              signatures={docSignatures}
-              open={signatureInfoOpen}
-              onToggle={() => setSignatureInfoOpen((v) => !v)}
-              onClose={() => setSignatureInfoOpen(false)}
-              locale={locale()}
-            />
+            <>
+              <SignatureInfo
+                signatures={docSignatures}
+                open={signatureInfoOpen}
+                onToggle={() => setSignatureInfoOpen((v) => !v)}
+                onClose={() => setSignatureInfoOpen(false)}
+                locale={locale()}
+              />
+              {/* Same slot, same reason: a property of the DOCUMENT, and one
+                  the reader must be told about — the tools are gone and the
+                  fields take nothing, and silence would read as a bug */}
+              {xfaDoc && (
+                <XfaInfo
+                  open={xfaInfoOpen}
+                  onToggle={() => setXfaInfoOpen((v) => !v)}
+                  onClose={() => setXfaInfoOpen(false)}
+                />
+              )}
+            </>
           }
           onOpenAiSettings={() => {
             setAiPinned(true)
@@ -6957,7 +7057,7 @@ export default function PdfViewer({
                 }}
                 chatSnip={chatSnip}
                 onChatSnipConsumed={() => setChatSnip(null)}
-                onRequestSnip={() => setSnip({ target: 'chat' })}
+                onRequestSnip={() => armSnip('chat')}
                 onDetach={() => {
                   // The chat moves out; the docked panel closes behind it.
                   // Reopening it (A) is allowed — both write the same stored

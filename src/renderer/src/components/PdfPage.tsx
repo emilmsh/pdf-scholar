@@ -20,6 +20,8 @@ import {
 } from '../../../shared/ink-outline'
 import MarginNotes from './MarginNotes'
 import type { MarginViewConfig } from './MarginNotes'
+import { isXfaDocument, renderXfaLayer } from '../xfa'
+import type { XfaLayerHandle } from '../xfa'
 
 /** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
  *  only place that gesture is advertised. */
@@ -198,6 +200,13 @@ function PdfPage({
   // dependency (which would defeat the whole point — a full rebuild per zoom).
   const textLayerRef = useRef<InstanceType<typeof TextLayer> | null>(null)
   const pageRef = useRef<PDFPageProxy | null>(null)
+  // An XFA form (xfa.ts): the page is pdf.js's HTML layout of the form, mounted
+  // in .xfa-host where a normal page has its text layer. The canvas still
+  // paints (the file's blank placeholder page — it IS the page background),
+  // and no annotation layer ever mounts here: these pages are not PDF pages.
+  const xfa = isXfaDocument(pdf)
+  const xfaRef = useRef<HTMLDivElement>(null)
+  const xfaLayerRef = useRef<XfaLayerHandle | null>(null)
   const scaleRef = useRef(scale)
   scaleRef.current = scale
   const rotationRef = useRef(rotation)
@@ -545,7 +554,9 @@ function PdfPage({
     if (!active) {
       textHost.replaceChildren()
       linkHost.replaceChildren()
+      xfaRef.current?.replaceChildren()
       textLayerRef.current = null
+      xfaLayerRef.current = null
       pageRef.current = null
       return
     }
@@ -563,6 +574,21 @@ function PdfPage({
         scale: scaleRef.current,
         rotation: (page.rotate + rotation) % 360
       })
+
+      // XFA: the form's HTML layout stands in for text layer AND link layer —
+      // its text is real DOM text (selectable as is) and its links are its own
+      // anchors. Nothing else on this page is built.
+      if (xfa) {
+        const xfaHost = xfaRef.current
+        if (!xfaHost) return
+        const handle = await renderXfaLayer(page, xfaHost, viewport, onExternalLink)
+        if (cancelled) {
+          xfaHost.replaceChildren()
+          return
+        }
+        xfaLayerRef.current = handle
+        return
+      }
 
       const textDiv = document.createElement('div')
       textDiv.className = 'textLayer'
@@ -647,19 +673,20 @@ function PdfPage({
       cancelled = true
       textLayer?.cancel()
     }
-  }, [pdf, pageNumber, rotation, active, onInternalLink, onExternalLink])
+  }, [pdf, pageNumber, rotation, active, onInternalLink, onExternalLink, xfa])
 
   // ---- Zoom refinement for the text layer ----
   // The spans' horizontal glyph fit (--scale-x) is measured at build scale; on
   // zoom pdf.js re-lays-out the EXISTING spans in place (no DOM rebuild, no text
   // re-stream), keeping text crisp. rotation is read via ref because a rotation
-  // change already triggers a full rebuild in the effect above.
+  // change already triggers a full rebuild in the effect above. An XFA layer is
+  // laid out once at scale 1 and only re-transformed — cheaper still.
   useEffect(() => {
-    const tl = textLayerRef.current
     const page = pageRef.current
-    if (!tl || !page) return
+    if (!page) return
     const viewport = page.getViewport({ scale, rotation: (page.rotate + rotationRef.current) % 360 })
-    tl.update({ viewport })
+    textLayerRef.current?.update({ viewport })
+    xfaLayerRef.current?.update(viewport)
   }, [scale])
 
   // ---------- Freehand drawing (pen/marker/eraser) ----------
@@ -1078,9 +1105,12 @@ function PdfPage({
       )}
       <div className="text-host" ref={textRef} />
       <div className="link-host" ref={linkRef} />
+      {xfa && <div className="xfa-host" ref={xfaRef} />}
       {/* Draw tools are disabled under rotation (their pointer/preview machinery
-          assumes an un-rotated page); PdfViewer also blocks selecting one */}
-      {drawTool && rotation === 0 && (
+          assumes an un-rotated page); PdfViewer also blocks selecting one. An
+          XFA page never draws: a tool armed for the tab's own document must not
+          reach this page when it is the split column's foreign form. */}
+      {drawTool && rotation === 0 && !xfa && (
         <div
           className={`draw-layer${drawTool.type === 'eraser' ? ' erasing' : ''}${drawTool.type === 'text' ? ' text-mode' : ''}${drawTool.type === 'pen' ? ' pen-mode' : ''}${drawTool.type === 'marker' ? ' marker-mode' : ''}`}
           onPointerDown={onPointerDown}

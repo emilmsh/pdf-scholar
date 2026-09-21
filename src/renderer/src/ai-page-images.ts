@@ -23,6 +23,10 @@ export async function renderPagesAsImages(
   from: number,
   count: number
 ): Promise<{ pages: number[]; images: AiImage[] }> {
+  // An XFA form's pages are HTML pdf.js laid out; its PDF pages are a blank
+  // placeholder, so a render here would send the model white sheets. Answer
+  // «nothing» — the form's text rides along as text anyway (xfa.ts).
+  if (pdf.isPureXfa) return { pages: [], images: [] }
   const first = clamp(from, 1, pdf.numPages)
   const last = Math.min(pdf.numPages, first + Math.max(1, count) - 1)
   const pages: number[] = []

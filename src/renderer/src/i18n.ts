@@ -294,6 +294,16 @@ const nb = {
   'sigInfo.certifying': 'Låser dokumentet',
   'sigInfo.notVerified':
     'PDF Scholar leser at signaturene finnes, men kontrollerer ikke om de er gyldige. Åpne dokumentet i Adobe Acrobat hvis gyldigheten er viktig.',
+  // XFA forms: shown from their XML layout, read-only (src/renderer/src/xfa.ts)
+  'xfaInfo.badge': 'XFA-skjema',
+  'xfaInfo.tip': 'Dokumentet er et XFA-skjema — vises, men kan ikke fylles ut eller merkes',
+  'xfaInfo.title': 'Dette er et XFA-skjema',
+  'xfaInfo.body':
+    'Skjemaet er laget i Adobe LiveCycle og lagres som XML inne i PDF-en. PDF Scholar viser det slik Firefox gjør, men kan ikke fylle det ut, merke i det eller lagre endringer i det. Bruk Adobe Acrobat Reader for å fylle ut.',
+  'xfaInfo.limits':
+    'Søk og KI-assistenten leser skjemateksten. Miniatyrer, presentasjon og utskrift viser den tomme ventesiden som ligger i filen.',
+  'viewer.xfaToolsOff': 'Verktøyene er slått av i et XFA-skjema — det kan bare leses',
+  'tb.xfaToolsOffTip': 'Ikke tilgjengelig i et XFA-skjema',
   'note.hint': 'Klikk der notatet skal stå · Esc avbryter',
   'tb.viewTip': 'Zoom og sidevisning',
   'tb.readingModeTip': 'Lesemodus — dag, farge, natt, merknader',
@@ -1191,6 +1201,15 @@ const en: Dict = {
   'sigInfo.certifying': 'Locks the document',
   'sigInfo.notVerified':
     'PDF Scholar reads that the signatures are there, but does not check whether they are valid. Open the document in Adobe Acrobat if validity matters.',
+  'xfaInfo.badge': 'XFA form',
+  'xfaInfo.tip': 'This document is an XFA form — shown, but it cannot be filled in or annotated',
+  'xfaInfo.title': 'This is an XFA form',
+  'xfaInfo.body':
+    'The form was made in Adobe LiveCycle and is stored as XML inside the PDF. PDF Scholar shows it the way Firefox does, but cannot fill it in, annotate it or save changes to it. Use Adobe Acrobat Reader to fill it in.',
+  'xfaInfo.limits':
+    'Search and the AI assistant read the form text. Thumbnails, presentation and printing show the blank placeholder page stored in the file.',
+  'viewer.xfaToolsOff': 'Tools are off in an XFA form — it can only be read',
+  'tb.xfaToolsOffTip': 'Not available in an XFA form',
   'note.hint': 'Click where the note should go · Esc cancels',
   'tb.viewTip': 'Zoom and page layout',
   'tb.readingModeTip': 'Reading mode — day, tint, night, annotations',

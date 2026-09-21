@@ -420,6 +420,29 @@ regressions are treated as bugs, not as acceptable platform lag.
     menu's «Flytt til nytt vindu», and dropping a tab on the desktop does
     what dropping a file does (Explorer copies it).
 
+23. **XFA forms open read-only, identically everywhere — and that is the
+    whole feature.** A dynamic XFA form (Adobe LiveCycle: `/NeedsRendering`,
+    an `/XFA` stream, no AcroForm fields) is laid out from its XML by pdf.js
+    (`enableXfa` in `src/renderer/src/pdf-doc.ts`, the same engine Firefox
+    shows these with) and mounted as HTML where a page normally has its text
+    layer (`src/renderer/src/xfa.ts`, `.xfa-host`). Reading, search, text
+    selection and copy, and the assistant's text all work; a toolbar badge
+    («XFA-skjema») says what does not. Uniform limits, by design and not by
+    platform: **no filling, no marks, no saving** — the pages on screen are
+    not PDF pages (the file holds one blank «Please wait…» page), pdf.js is
+    the only engine that could write XFA data back and pdf.js never writes in
+    this app, and XFA itself was deprecated in PDF 2.0. Every path that would
+    arm a tool or create a mark refuses with `viewer.xfaToolsOff`, per pane
+    (a form in the split column beside a paper keeps its own refusal).
+    Thumbnails, presentation mode, the assistant's page images and printing
+    see the placeholder page, since all four are rasters of the PDF page.
+    Static XFA forms (an AcroForm twin, no `/NeedsRendering`) are untouched
+    and keep rendering from their PDF pages. Chrome and Edge do not open
+    dynamic XFA at all (Edge only behind `PDFXFAEnabled`), so this sits
+    above the interop bar rather than at it. Covered by `npm run test:xfa`
+    (CI, all three OSes), which also pins that sample.pdf opens identically
+    with the flag on.
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

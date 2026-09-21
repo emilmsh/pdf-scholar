@@ -49,6 +49,7 @@
     "test:insecure-retry": "node scripts/test-insecure-retry.mjs",
     "test:file-access": "node scripts/test-file-access.mjs",
     "test:update-channel": "node scripts/test-update-channel.mjs",
+    "test:xfa": "node scripts/test-xfa.mjs",
     "test:annot-edit": "node scripts/test-annot-edit.mjs",
     "test:pen": "node scripts/test-pen.mjs",
     "test:ai-settings": "node scripts/test-ai-settings.mjs",

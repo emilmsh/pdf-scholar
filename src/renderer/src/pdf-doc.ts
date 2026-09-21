@@ -33,7 +33,12 @@ export function openDocument(data: Uint8Array, password?: string): DocResources 
     wasmUrl: pdfjsAssetUrl('wasm'),
     cMapUrl: pdfjsAssetUrl('cmaps'),
     standardFontDataUrl: pdfjsAssetUrl('standard_fonts'),
-    iccUrl: pdfjsAssetUrl('iccs')
+    iccUrl: pdfjsAssetUrl('iccs'),
+    // XFA forms lay out from their XML instead of showing the one-page
+    // "Please wait…" placeholder (src/renderer/src/xfa.ts). pdf.js applies this
+    // only to a dynamic form (/NeedsRendering, no AcroForm fields); every other
+    // document loads exactly as before — test:xfa checks sample.pdf for that.
+    enableXfa: true
   })
   return { task, port }
 }

@@ -257,7 +257,18 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     norsk offentlig sektor) kan ikke fylles ut, og **felt-JavaScript kjører
     ikke**, så et skjema med utregnede felt tar imot verdien uten å regne om.
     Edge feiler på begge, så paritetsbaren holder — men appen må si det, ikke
-    tie. Over 150 MB: navngitt avslag (`append-no-form-fill`), fordi appenderen
+    tie. *XFA-status 2026-09-21 (etter en LinkedIn-kommentar som pekte på et
+    kanadisk LiveCycle-skjema):* dynamiske XFA-skjemaer **åpnes og leses** nå —
+    pdf.js legger ut skjemaets XML som HTML (`enableXfa`, samme motor som
+    Firefox), `src/renderer/src/xfa.ts` setter det på siden i stedet for
+    tekstlaget, søk og assistent leser teksten, og en «XFA-skjema»-badge i
+    verktøylinja sier hva som ikke virker. Verktøyene er sperret for slike
+    dokumenter: sidene på skjermen finnes ikke som PDF-sider, så et merke ville
+    landet på filens tomme ventesiden. **Utfylling og lagring er lagt bort med
+    vilje** (Emil): det ville krevd at pdf.js skriver XFA-datasettet tilbake,
+    en tredje skrivevei for et format PDF 2.0 avviklet. Miniatyrer,
+    presentasjon og utskrift viser ventesiden; `test:xfa` pinner at
+    sample.pdf åpnes identisk med flagget på. Over 150 MB: navngitt avslag (`append-no-form-fill`), fordi appenderen
     kan skrive `/V` men ikke legge ut et appearance stream i dokumentets egen
     font, og en verdi uten utseende er blank i de fleste lesere.
 - [x] ~~**Standard PDF-leser — men uten å mase**~~ **Utgår helt** (Emil,

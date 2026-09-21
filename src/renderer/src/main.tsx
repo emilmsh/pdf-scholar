@@ -6,6 +6,8 @@ import { TextContextMenu } from './components/TextContextMenu'
 import { parseAssistantTarget } from '../../shared/viewer-url'
 import { initTouchUi } from './touch-ui'
 import './styles/app.css'
+// pdf.js's own stylesheet for the XFA form layer (Apache-2.0, see the file)
+import './styles/xfa-layer.css'
 
 // Finger-sized targets follow the input in use (html.touch-ui) — see touch-ui.ts
 initTouchUi()

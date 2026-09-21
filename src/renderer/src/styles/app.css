@@ -1150,11 +1150,23 @@ button {
    twice, once in ink and once in the asymmetry of a single group sitting on a
    surface while every other group floats. Emil's read, and the right one: the
    rest of the bar looked unfinished beside it. Separators do the grouping. */
+/* A <fieldset>, so the whole group can be disabled at once (an XFA form takes
+   no marks); the browser's fieldset chrome is reset here. */
 .tool-group {
   position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: 0;
+}
+
+.tool-group:disabled .tb-btn,
+.tool-group:disabled .tb-chevron {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .tool-menu {
@@ -2654,6 +2666,35 @@ html.pen-near .draw-layer {
   inset: 0;
   z-index: 3;
   pointer-events: none;
+}
+
+/* XFA form layer (read-only) — the HTML pdf.js lays a dynamic form out as,
+   in place of a text layer (src/renderer/src/xfa.ts). The page canvas beneath
+   is the file's blank placeholder page, so the theme filter has to be applied
+   HERE too: this layer carries real black text and field tints, and without it
+   Night would show black type on an inverted page. The filter also makes this
+   a stacking context, which is fine — nothing blends out of it. */
+.xfa-host {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: clip;
+  border-radius: 2px;
+  filter: var(--page-filter);
+  user-select: text;
+}
+
+/* pdf.js's stylesheet (xfa-layer.css) sets the layout; the two rules below are
+   ours. Controls are inert: a click cannot focus, toggle or drop a caret in
+   them (xfa.ts also marks them readOnly and unfocusable) — the values they show
+   are the form's own. Links stay live, as in any other document. */
+.xfa-host :is(input, textarea, select, button) {
+  pointer-events: none;
+  cursor: default;
+}
+
+.xfa-host .xfaLayer a {
+  pointer-events: auto;
 }
 
 .pdf-link {
@@ -5906,6 +5947,14 @@ html.pen-near .draw-layer {
   color: var(--text-secondary);
   border: 1px solid var(--border);
   border-radius: 999px;
+}
+
+/* The XFA badge shares the signature badge's chrome; only its body is its own */
+.xfa-info-body {
+  margin: 8px 0 12px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 /* The caveat is the reason this panel exists — it gets a rule above it and the

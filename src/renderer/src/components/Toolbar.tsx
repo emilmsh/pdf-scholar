@@ -298,6 +298,10 @@ interface Props {
    *  Passed in rather than built here: it is about the DOCUMENT, and the
    *  toolbar has no business reading the file. */
   signatureInfo?: React.ReactNode
+  /** The document takes no marks (an XFA form, src/renderer/src/xfa.ts): the
+   *  whole annotation-tool group is disabled, with the reason as its tooltip.
+   *  Navigation, zoom, search, themes and the assistant stay live. */
+  toolsLocked?: boolean
   /** Open the assistant panel showing its key settings (gear-menu shortcut) */
   onOpenAiSettings(): void
   /** Toolbar auto-hide: pinned = always shown, unpinned = reveals on hover */
@@ -477,6 +481,7 @@ export default function Toolbar({
   onSignatureDraw,
   onSignatureDelete,
   signatureInfo,
+  toolsLocked = false,
   onOpenAiSettings,
   toolbarPinned,
   onTogglePin,
@@ -634,7 +639,7 @@ export default function Toolbar({
   const themeMenuRef = useRef<HTMLDivElement>(null)
   const viewMenuRef = useRef<HTMLDivElement>(null)
   const saveMenuRef = useRef<HTMLDivElement>(null)
-  const toolMenuRef = useRef<HTMLDivElement>(null)
+  const toolMenuRef = useRef<HTMLFieldSetElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
   /** The page field, so the Gå-til-side command can focus it. Only ever one is
    *  rendered — the single cluster drives whichever column is active. */
@@ -1009,14 +1014,16 @@ export default function Toolbar({
     // folded row calling onToolSelect('square') drew a rectangle while the
     // label still said Shapes, and circle, line and arrow became unreachable.
     // It opens the picker now, like the button does.
-    { key: 'signature', icon: <IconSignature size={15} />, label: t('tb.signature'), onClick: onSignaturePrimary, active: signatureActive, opts: 'signature' },
-    { key: 'note', icon: <IconNote size={15} />, label: t('tb.note'), onClick: onToggleNote, active: noteActive },
-    { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => setToolMenu((m) => (m === 'shape' ? null : 'shape')), active: shapeActive, opts: 'shape' },
-    { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text', opts: 'text' },
-    { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser', opts: 'eraser' },
-    { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup, opts: 'markup' },
-    { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker', opts: 'marker' },
-    { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen', opts: 'pen' },
+    // (`disabled: toolsLocked` mirrors the inline group's fieldset — folded
+    // rows must refuse exactly what the buttons refuse)
+    { key: 'signature', icon: <IconSignature size={15} />, label: t('tb.signature'), onClick: onSignaturePrimary, active: signatureActive, opts: 'signature', disabled: toolsLocked },
+    { key: 'note', icon: <IconNote size={15} />, label: t('tb.note'), onClick: onToggleNote, active: noteActive, disabled: toolsLocked },
+    { key: 'shapes', icon: <IconShapes size={15} />, label: t('tb.shapes'), onClick: () => setToolMenu((m) => (m === 'shape' ? null : 'shape')), active: shapeActive, opts: 'shape', disabled: toolsLocked },
+    { key: 'text', icon: <IconText size={15} />, label: t('tb.textTool'), onClick: () => onToolSelect(activeTool === 'text' ? null : 'text'), active: activeTool === 'text', opts: 'text', disabled: toolsLocked },
+    { key: 'eraser', icon: <IconEraser size={15} />, label: t('tb.eraser'), onClick: () => onToolSelect('eraser'), active: activeTool === 'eraser', opts: 'eraser', disabled: toolsLocked },
+    { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup, opts: 'markup', disabled: toolsLocked },
+    { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker', opts: 'marker', disabled: toolsLocked },
+    { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen', opts: 'pen', disabled: toolsLocked },
     { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
     { key: 'fullscreen', icon: <IconFullscreen size={15} />, label: t('tb.fullscreen'), onClick: onToggleFullscreen },
     { key: 'redo', icon: <IconRedo size={15} />, label: t('tb.redo'), onClick: onRedo, disabled: !canRedo },
@@ -1453,7 +1460,14 @@ export default function Toolbar({
 
         <div className="toolbar-sep" />
 
-        <div className="tool-group" ref={toolMenuRef}>
+        {/* A fieldset, so one `disabled` reaches every tool button and chevron
+            in the group at once when the document takes no marks */}
+        <fieldset
+          className="tool-group"
+          ref={toolMenuRef}
+          disabled={toolsLocked}
+          title={toolsLocked ? t('tb.xfaToolsOffTip') : undefined}
+        >
           {(['pen', 'marker'] as const)
             .filter((tool) => inline(tool))
             .map((tool) => (
@@ -1593,7 +1607,7 @@ export default function Toolbar({
           )}
 
           {toolMenu && inline(toolMenu === 'shape' ? 'shapes' : toolMenu) ? toolPopover : null}
-        </div>
+        </fieldset>
       </div>
 
       {/* Only rendered for the rare document that IS signed — see
@@ -2503,6 +2517,7 @@ export default function Toolbar({
                         className={`tb-chevron${toolMenu === a.opts ? ' is-active' : ''}`}
                         title={t('tb.toolOptionsTip')}
                         aria-label={t('tb.toolOptionsTip')}
+                        disabled={a.disabled}
                         onClick={() => setToolMenu((m) => (m === a.opts ? null : a.opts!))}
                       >
                         <IconChevronDown size={11} />
