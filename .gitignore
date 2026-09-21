@@ -14,6 +14,7 @@ docs/screenshots/_auto/
 *.local
 # Throwaway esbuild output from the engine tests
 scripts/.engine-test-bundle.mjs
+scripts/.appender-test-bundle.mjs
 scripts/.engine-cache-test-embed.mjs
 scripts/.ai-chat-test-bundle.mjs
 scripts/.ai-core-bundle.mjs
