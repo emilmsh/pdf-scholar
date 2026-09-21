@@ -203,6 +203,14 @@ touches the extension — both drive Electron — and v0.27.1 shipped a broken
 recents-open there for exactly that reason. Running it here also leaves the
 sideloaded install on the version you are about to ship.
 
+**And press Print once.** Nothing automated can reach it: the print dialog is a
+system dialog, CI has neither a window nor a printer, and the whole path lives
+inside Chromium. That is how 0.49.0 shipped with a Print button that did
+nothing at all on Windows — not our code, but the Electron patch we happened to
+be pinned to (issue #22; CLAUDE.md § Version pins has the measurements). Open
+the save menu, choose «Skriv ut», and see the dialog. It costs ten seconds and
+it is the only thing standing between a runtime bump and a dead button.
+
 ## 1b. Copy — `docs/MESSAGING.md` first
 
 If the release changes **what the app is** — a new pillar-level capability, a
