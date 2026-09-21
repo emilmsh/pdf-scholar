@@ -1,12 +1,17 @@
 // The document dragged OUT of the browser shell as a file.
 //
 // The desktop drags a tab as a file (PLATFORMS.md §22: a native OS drag with the
-// document's path, so Explorer copies it and an upload field takes it). The
+// document's path, so Explorer copies it and a web upload field takes it). The
 // extension has no tab strip — each document IS a browser tab — so the sidebar's
 // document row stands in for the tab. A web page cannot start an OS file drag,
 // but Chromium reads one non-standard drag type, `DownloadURL`, and turns the
-// drop into a file wherever a file can land: the desktop, a folder, another
-// program's upload field. The payload is `mime:filename:url`; the URL is a
+// drop into a file where the OS delivers files: the desktop, a folder, Outlook.
+// NOT a web page in the same browser — Chromium hands its own drag to its own
+// pages without the file (the drop sees only `chromium/x-drag-id`; verified in
+// Edge 2026-09-21), and a page cannot originate a real-file drag, so ChatGPT's
+// upload field is reached via Explorer first. That is the one thing the
+// desktop's real-path drag does that this cannot (PLATFORMS.md §22).
+// The payload is `mime:filename:url`; the URL is a
 // `blob:` of the bytes we hold, so the same gesture works for a PDF opened from
 // the web, from file:// and from the picker, online or not.
 //

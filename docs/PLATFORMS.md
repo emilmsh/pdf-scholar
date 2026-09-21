@@ -401,18 +401,26 @@ regressions are treated as bugs, not as acceptable platform lag.
     is a browser tab), so the SIDEBAR'S DOCUMENT ROW stands in for the tab
     there (`src/renderer/src/doc-drag.ts`, `test:doc-drag`): a web page
     cannot start an OS file drag, but Chromium's `DownloadURL` drag type
-    turns the drop into a file wherever a file can land — a folder, the
-    desktop, an upload field — from a `blob:` of the bytes we hold, so it
-    works the same for a URL-, `file://`- and picker-opened PDF, online or
-    not. What travels is the document as LAST SAVED (as loaded before any
+    turns the drop into a file where the OS delivers files — a folder, the
+    desktop, Outlook — from a `blob:` of the bytes we hold, so it works the
+    same for a URL-, `file://`- and picker-opened PDF, online or not. **Not
+    into a web page in the same browser** (ChatGPT's upload field, a webmail
+    composer): Chromium hands its own drag to its own pages as an internal
+    marker with no file in it — verified 2026-09-21, the drop sees
+    `chromium/x-drag-id` and `files.length === 0` — and a web page has no way
+    to originate a real-file drag (a File without a path is dropped from the
+    drag data). The desktop's tab drag carries a real path and so lands in
+    those fields; here the route is Explorer first, then the field. This is
+    the one thing the desktop drag does that the extension's cannot. What travels is the document as LAST SAVED (as loaded before any
     save), like the desktop's file on disk; an unsaved draft stays behind on
     both. The tab strip's private MIME rides along, so another PDF Scholar
     tab opens the dropped document (its own row over itself is a no-op), and
     there is no `text/plain` on either platform. Being an HTML5 drag it has
     no OS drag loop to wedge, so finger and pen drag it too — the one place
-    the extension is AHEAD of the desktop's mouse-only file drag. The drop
-    into another Chromium tab's upload field and very large blobs are hand
-    checks before a release (Windows/Edge, 2026-09-21: pending).
+    the extension is AHEAD of the desktop's mouse-only file drag. Hand
+    checked on Windows/Edge 2026-09-21: Explorer receives the file from the
+    `blob:` URL, also from the `<button>`; the same-browser web drop does not
+    (above). Very large blobs remain a hand check.
     **macOS, unverified:** Electron's native drag may
     return before the drop there, in which case the landing report finds no
     drag in flight and the source keeps its tab — a copy instead of a move,
