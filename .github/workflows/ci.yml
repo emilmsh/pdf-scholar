@@ -81,6 +81,9 @@ jobs:
       # The extension's redirect-rule → viewer-page URL handoff: a regression is
       # invisible until one specific kind of link (signed, tracker-tagged) breaks
       - run: npm run test:viewer-url
+      # The extension's document drag (the tab-drag stand-in): the DownloadURL
+      # payload's shape, the name kept colon- and separator-free, no text/plain
+      - run: npm run test:doc-drag
       # The Zotero mapping (path → item key → citation): pure logic with fetch
       # injected, so the two-request client and its error codes run keylessly
       - run: npm run test:zotero

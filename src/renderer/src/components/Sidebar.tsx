@@ -28,6 +28,7 @@ import {
 } from './icons'
 import { useDismissable } from '../useDismissable'
 import { MarginCard } from './MarginNotes'
+import type { DocumentDragHandlers } from './useDocumentDrag'
 
 const THUMB_WIDTH = 132
 
@@ -116,6 +117,10 @@ interface Props {
   /** Desktop passes undefined here explicitly (the file identity lives in the
    *  tab bar there), so the prop must accept it rather than requiring absence. */
   onOpenFile?: (() => void) | undefined
+  /** Browser/extension only: the document row drags as a FILE (the stand-in for
+   *  the desktop's tab drag — doc-drag.ts). Supplied together with onOpenFile;
+   *  absent, the row is not draggable. */
+  docDrag?: DocumentDragHandlers | undefined
 }
 
 type Tab = 'thumbs' | 'outline' | 'marks' | 'annots'
@@ -146,7 +151,8 @@ function Sidebar({
   onAskAi,
   docName,
   docPath,
-  onOpenFile
+  onOpenFile,
+  docDrag
 }: Props): React.JSX.Element {
   useLang()
   // Contents is the scholar's default view; fall back to thumbnails when the
@@ -243,6 +249,20 @@ function Sidebar({
               e.preventDefault()
               setDocMenuOpen(true)
             }}
+            // The row drags as the document's file (a folder, an upload field,
+            // another PDF Scholar tab) — the extension's stand-in for the
+            // desktop's tab drag; see doc-drag.ts. Finger and pen get it for
+            // free: this is an HTML5 drag, with no OS drag loop to wedge.
+            draggable={!!docDrag}
+            onDragStart={
+              docDrag
+                ? (e) => {
+                    setDocMenuOpen(false)
+                    docDrag.onDragStart(e)
+                  }
+                : undefined
+            }
+            onDragEnd={docDrag?.onDragEnd}
           >
             <IconDocument size={15} />
             <span className="sidebar-doc-name">{docName}</span>

@@ -398,7 +398,22 @@ regressions are treated as bugs, not as acceptable platform lag.
     click there — the one per-platform difference in the gesture. In `dev:web` neither
     exists: reorder and drag-to-split inside the window work and a release
     answers `'same'`. The extension has no tab strip at all (each document
-    is a browser tab). **macOS, unverified:** Electron's native drag may
+    is a browser tab), so the SIDEBAR'S DOCUMENT ROW stands in for the tab
+    there (`src/renderer/src/doc-drag.ts`, `test:doc-drag`): a web page
+    cannot start an OS file drag, but Chromium's `DownloadURL` drag type
+    turns the drop into a file wherever a file can land — a folder, the
+    desktop, an upload field — from a `blob:` of the bytes we hold, so it
+    works the same for a URL-, `file://`- and picker-opened PDF, online or
+    not. What travels is the document as LAST SAVED (as loaded before any
+    save), like the desktop's file on disk; an unsaved draft stays behind on
+    both. The tab strip's private MIME rides along, so another PDF Scholar
+    tab opens the dropped document (its own row over itself is a no-op), and
+    there is no `text/plain` on either platform. Being an HTML5 drag it has
+    no OS drag loop to wedge, so finger and pen drag it too — the one place
+    the extension is AHEAD of the desktop's mouse-only file drag. The drop
+    into another Chromium tab's upload field and very large blobs are hand
+    checks before a release (Windows/Edge, 2026-09-21: pending).
+    **macOS, unverified:** Electron's native drag may
     return before the drop there, in which case the landing report finds no
     drag in flight and the source keeps its tab — a copy instead of a move,
     never a lost tab. With the mouse, tear-off into a new window is the tab

@@ -12,9 +12,17 @@
 //    becomes the viewer page's own fragment. The rule puts this param LAST, so
 //    the fix is to not parse at all: everything after `?rawfile=` is the document
 //    URL, byte for byte.
-//  • `?file=` — links we build ourselves (a new tab, the address-bar rewrite),
-//    where encodeURIComponent is available. These also carry `fsa:` pseudo-paths
-//    and Windows `file:` paths, which only survive round-tripping when encoded.
+//  • `?file=` — links we build ourselves where the target is NOT a URL: `fsa:`
+//    pseudo-paths and Windows paths, which only survive round-tripping when
+//    encoded with encodeURIComponent.
+//
+// Our own links to a URL (a new tab, the address-bar rewrite after a document
+// opens) use the RAW form too. Not out of necessity — we could encode — but
+// because the address bar is the one place the user reads the document's
+// identity, and `?file=https%3A%2F%2Femilmsh.github.io%2Fpapers%2Fx.pdf` is
+// unreadable where `?rawfile=https://emilmsh.github.io/papers/x.pdf` is not.
+// Only `#` is unsafe in the raw form (the parser cuts there), and a URL we
+// hold never carries one: the redirect's anchor is dropped on the way in.
 //
 // Producer and consumer live in different build targets (service worker vs
 // renderer), so both the param names and the parsing belong here, together.
@@ -49,9 +57,14 @@ export function parseViewerTarget(href: string): string | null {
   return params.get(FILE_PARAM) || null
 }
 
-/** A viewer URL for a document we already hold a path/URL for. */
+/** A viewer URL for a document we already hold a path/URL for. A URL rides raw
+ *  so the address bar stays readable (see the note above); anything else — a
+ *  picked file's `fsa:` key, a Windows path, a URL that somehow carries `#` —
+ *  is encoded into `?file=`, where round-tripping is guaranteed. */
 export function buildViewerUrl(base: string, path: string): string {
-  return path ? `${base}?${FILE_PARAM}=${encodeURIComponent(path)}` : base
+  if (!path) return base
+  if (/^(https?|file):\/\//i.test(path) && !path.includes('#')) return `${base}?${RAW_FILE_PARAM}=${path}`
+  return `${base}?${FILE_PARAM}=${encodeURIComponent(path)}`
 }
 
 // ---------- The detached assistant window/tab ----------

@@ -55,14 +55,41 @@ eq(
   'anchor dropped, query kept'
 )
 
-// --- What we produce ourselves (encoded) ------------------------------------
+// --- What we produce ourselves ---------------------------------------------
 for (const path of [
   'https://example.org/a.pdf?x=1&y=2',
-  'file:///C:/Users/emil/a b.pdf',
-  'fsa:min rapport.pdf'
+  'https://cdn.example.org/a.pdf?Expires=1784&Signature=aBc%2Fd&Key-Pair-Id=K123',
+  'https://example.org/my+report.pdf',
+  'file:///C:/Users/emil/a%20b.pdf',
+  'file:///C:/Users/Str%C3%B8m/paper.pdf',
+  'https://example.org/a.pdf#page=6',
+  'fsa:min rapport.pdf',
+  'C:\\Users\\emil\\Documents\\paper.pdf'
 ]) {
-  eq(V.parseViewerTarget(V.buildViewerUrl(EXT, path)), path, `encoded round-trip: ${path}`)
+  eq(V.parseViewerTarget(V.buildViewerUrl(EXT, path)), path, `own-link round-trip: ${path}`)
 }
+// A URL is written RAW so the address bar reads as the document's address (the
+// user looks there for where a paper came from), not as an encoded blob. The
+// browser hands us file: URLs already percent-encoded, so raw is also what keeps
+// `Strøm` from showing as `%25C3%25B8`.
+eq(
+  V.buildViewerUrl(EXT, 'https://emilmsh.github.io/papers/x.pdf'),
+  `${EXT}?${V.RAW_FILE_PARAM}=https://emilmsh.github.io/papers/x.pdf`,
+  'a URL rides raw in our own links'
+)
+eq(
+  V.buildViewerUrl(EXT, 'file:///C:/Users/Str%C3%B8m/paper.pdf'),
+  `${EXT}?${V.RAW_FILE_PARAM}=file:///C:/Users/Str%C3%B8m/paper.pdf`,
+  'a file: URL rides raw, single-encoded'
+)
+// Anything the raw form cannot carry falls back to the encoded param: a `#`
+// would be cut by the raw parser, and a non-URL has no address to show.
+eq(
+  V.buildViewerUrl(EXT, 'https://example.org/a.pdf#page=6'),
+  `${EXT}?${V.FILE_PARAM}=${encodeURIComponent('https://example.org/a.pdf#page=6')}`,
+  'a URL carrying # is encoded instead'
+)
+eq(V.buildViewerUrl(EXT, 'fsa:min rapport.pdf'), `${EXT}?${V.FILE_PARAM}=fsa%3Amin%20rapport.pdf`, 'fsa: key is encoded')
 
 // --- No document ------------------------------------------------------------
 eq(V.parseViewerTarget(EXT), null, 'bare viewer → null')

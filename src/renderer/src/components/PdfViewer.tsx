@@ -22,6 +22,7 @@ import type {
 import { bridge, isElectron, isExtension } from '../bridge'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { useDropTarget } from './useDropTarget'
+import { useDocumentDrag } from './useDocumentDrag'
 import { prettyModelName } from './ai-models'
 import { bubblesWhileTyping, commandForEvent, isKeyboardCaptured, shortcutLabel } from '../keymap'
 import { READ_ALOUD } from '../flags'
@@ -2810,6 +2811,13 @@ export default function PdfViewer({
   const markDirtyRef = useRef<() => void>(() => {})
   markDirtyRef.current = () => setDirty(true)
 
+  /** Browser/extension: the bytes the last in-place save wrote, so the
+   *  sidebar's document drag hands over the document as last saved rather than
+   *  as loaded (doc-drag.ts). Null until the first save; the payload's own
+   *  bytes stand in. A remount (new path or epoch) starts over. */
+  const lastSavedBytesRef = useRef<Uint8Array | null>(null)
+  const docDrag = useDocumentDrag(payload.path, payload.name, () => lastSavedBytesRef.current ?? payload.data)
+
   /** This viewer's identity on the intra-window doc bus — its own writes must
    *  never bounce back as a reload (mirrors how main only notifies OTHER
    *  windows). See local-doc-events.ts. */
@@ -2936,6 +2944,7 @@ export default function PdfViewer({
       showToast(t('viewer.saveFailed', { error: errorText(result) }))
       return
     }
+    lastSavedBytesRef.current = bytes
     setDirty(false)
     emitLocalDocEvent(payload.path, 'draft-ended', docEventSenderRef.current)
     showToast(t('viewer.saved'))
@@ -6670,6 +6679,7 @@ export default function PdfViewer({
           docName={payload.name}
           docPath={payload.path}
           onOpenFile={onOpenFile}
+          docDrag={onOpenFile ? docDrag : undefined}
         />
         {tocPinned && (
           <div

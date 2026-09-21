@@ -111,9 +111,18 @@ the document URL lands in the page URL *verbatim*. Read back with
 `URLSearchParams` that is silently wrong — the `&` in
 `report.pdf?utm_source=chatgpt.com&utm_medium=app` (or in any signed CDN link)
 starts a new param and everything after it is lost, and `+` decodes to a space.
-The distinct param name marks the value as "verbatim, to the end of the URL";
-links the app builds itself stay on the encoded `?file=`. Both forms are parsed
-by `src/shared/viewer-url.ts`, gated by `npm run test:viewer-url`.
+The distinct param name marks the value as "verbatim, to the end of the URL".
+Links the app builds itself (the address-bar rewrite once a document opens, a
+new tab) use the same raw form for any URL — not from necessity but for the
+reader: `viewer.html?rawfile=https://emilmsh.github.io/papers/x.pdf` is the one
+address the user can read, where the encoded `?file=https%3A%2F%2F…` is not
+(and a `file:` URL, which the browser hands over already percent-encoded, would
+show `Strøm` as `%25C3%25B8`). Only what the raw form cannot carry — a picked
+file's `fsa:` key, a Windows path, a URL with `#` in it — goes into the encoded
+`?file=`. A real URL in the address bar (`https://…/x.pdf` while our page shows)
+is out of reach: Chromium allowlists `mime_types_handler` to its own PDF viewer,
+and `history.replaceState` cannot leave the extension origin. Both forms are
+parsed by `src/shared/viewer-url.ts`, gated by `npm run test:viewer-url`.
 
 ### Getting the bytes: the second fetch
 
@@ -291,6 +300,7 @@ Either way the browser reads the folder only on reload — the ⟳ on the card i
 | **Persist annotations to disk** | ✅ | ✅¹ | ¹ real EmbedPDF pdfium writes in-page (`annotation-engine-browser.ts`); files opened via the in-app picker save silently over the original, URL/`file://` PDFs prompt once for a location — see roadmap for silent-overwrite full parity |
 | AI chat / grounded citations | ✅ live | ✅ live¹ | ¹ real Anthropic/OpenAI/Azure + OpenAI-compatible endpoints, BYO key in `chrome.storage.local` (not encrypted — see roadmap); shares the provider core `src/shared/ai-chat.ts`. Compat endpoints are CORS-dependent here (docs/PLATFORMS.md pt. 14) |
 | New window / side-by-side | native window | `chrome.tabs.create` | Adapted |
+| Drag the document out as a file | tab drag (`startDrag`) | **sidebar document row** | Chromium's `DownloadURL` drag type from a `blob:` of the last-saved bytes (`doc-drag.ts`, `test:doc-drag`); another PDF Scholar tab opens the drop; finger and pen work here, mouse-only on the desktop — PLATFORMS.md pt. 22 |
 | Print | ✅ | ✅ | Browser print |
 
 ## Roadmap — the remaining gaps

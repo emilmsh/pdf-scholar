@@ -13,6 +13,7 @@ import {
   EXTENSION_DOWNLOAD_URL
 } from './extension-update'
 import { extensionContextLost, fileAccessGranted } from './extension-file-access'
+import { TAB_DRAG_MIME } from './drag-types'
 import PdfViewer from './components/PdfViewer'
 import Welcome from './components/Welcome'
 import FileAccessNotice from './components/FileAccessNotice'
@@ -117,10 +118,11 @@ export default function ExtensionApp(): React.JSX.Element {
     setFileAccessPath(null)
     document.title = `${p.name} — PDF Scholar`
     // Reflect the document in the address bar: a reopenable URL goes into the
-    // encoded ?file= param (so a reload restores the document, and the raw param
-    // the redirect rule wrote is replaced by one that round-trips); a
-    // picker-opened file has no path the browser itself can reopen, so its name
-    // rides in the hash purely for display.
+    // page URL in the form buildViewerUrl picks (raw for a URL so the address
+    // stays readable, encoded otherwise — a reload restores the document, and a
+    // redirect's anchor is gone from the identity); a picker-opened file has no
+    // path the browser itself can reopen, so its name rides in the hash purely
+    // for display.
     history.replaceState(
       null,
       '',
@@ -246,6 +248,19 @@ export default function ExtensionApp(): React.JSX.Element {
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault()
+      // The document row of ANOTHER PDF Scholar tab, dragged here (doc-drag.ts):
+      // the drag carries the document's path under the tab strip's own MIME.
+      // The extension's half of «drag a tab into another window» — and as with
+      // a file dropped here, a tab already showing a document gets a new tab
+      // beside it rather than losing what it shows. Its own row released over
+      // itself is nothing to do.
+      const dragged = e.dataTransfer.getData(TAB_DRAG_MIME)
+      if (dragged) {
+        if (dragged === payload?.path) return
+        if (payload) bridge.newWindow(dragged)
+        else await openPath(dragged)
+        return
+      }
       const file = e.dataTransfer.files[0]
       if (!file || !file.name.toLowerCase().endsWith('.pdf')) return
       const p: FilePayload = {
@@ -256,7 +271,7 @@ export default function ExtensionApp(): React.JSX.Element {
       if (payload) bridge.newWindow(p.path)
       else await openPayload(p)
     },
-    [payload, openPayload]
+    [payload, openPayload, openPath]
   )
 
   /** Leave the document for the library. Not window.close(): the tab belongs

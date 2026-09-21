@@ -43,6 +43,7 @@
     "test:streams": "node scripts/test-stream-replay.mjs",
     "test:live": "node scripts/test-live.mjs",
     "test:viewer-url": "node scripts/test-viewer-url.mjs",
+    "test:doc-drag": "node scripts/test-doc-drag.mjs",
     "test:zotero": "node scripts/test-zotero.mjs",
     "test:doi": "node scripts/test-doi.mjs",
     "test:insecure-retry": "node scripts/test-insecure-retry.mjs",
