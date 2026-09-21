@@ -159,6 +159,11 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
   modes
 - Night can keep pictures in their original colours: figures and photos stay true while
   the page inverts
+- Copy a figure out of the page: «Kopier bilde …» (right-click the page, or the save
+  menu) outlines every picture the document holds — click one to take it whole, or
+  drag a box around a vector figure, a table or an equation. The capture is shown
+  before it goes anywhere, and then copies to the clipboard or saves as PNG. A real
+  picture comes out at its own resolution, not at the size it was on screen
 - Page rotation (Shift+R) and a two-page spread for wide layouts
 - Presentation mode (P): one page at a time, full screen
 - The toolbar can be unpinned (V); the side panels go with it, and each returns on hover

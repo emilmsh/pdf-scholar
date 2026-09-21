@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -1171,6 +1172,24 @@ function registerIpc(): void {
       ? doiCite(doi, citationStyleOrDefault(style))
       : { error: 'not a DOI', code: 'doi-unknown' }
   )
+
+  // «Kopier bilde»: the renderer hands over PNG bytes, main puts them on the
+  // clipboard. Done here rather than with navigator.clipboard.write because
+  // that one wants a live user activation the async crop render has usually
+  // outlived — and because nativeImage lands a CF_DIB on the Windows
+  // clipboard, which is what makes Word and PowerPoint paste a picture rather
+  // than nothing at all.
+  ipcMain.handle('clipboard:write-image', (_e, dataBase64: unknown) => {
+    if (typeof dataBase64 !== 'string' || !dataBase64) return false
+    try {
+      const image = nativeImage.createFromBuffer(Buffer.from(dataBase64, 'base64'))
+      if (image.isEmpty()) return false
+      clipboard.writeImage(image)
+      return true
+    } catch {
+      return false
+    }
+  })
 
   ipcMain.handle('file:save-text', async (e, defaultName: string, content: string | Uint8Array) => {
     const parent = windowFor(e)

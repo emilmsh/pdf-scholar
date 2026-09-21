@@ -158,10 +158,7 @@ export const webApi: PdfxApi = {
     return { ok: true }
   },
   saveTextFile: async (defaultName, content) => {
-    const type = defaultName.endsWith('.docx')
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : 'text/plain;charset=utf-8'
-    const blob = new Blob([content as BlobPart], { type })
+    const blob = new Blob([content as BlobPart], { type: downloadType(defaultName) })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -169,6 +166,21 @@ export const webApi: PdfxApi = {
     a.click()
     URL.revokeObjectURL(url)
     return { path: defaultName }
+  },
+  // No main process out here, so the async clipboard API it is. Chromium
+  // grants clipboard-write to the focused page; a refusal (an unfocused
+  // window, a browser without ClipboardItem) is reported rather than thrown,
+  // and the caller says the copy did not happen.
+  copyImage: async (dataBase64) => {
+    try {
+      const Item = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem
+      if (!Item || !navigator.clipboard?.write) return false
+      const blob = base64ToBlob(dataBase64, 'image/png')
+      await navigator.clipboard.write([new Item({ 'image/png': blob })])
+      return true
+    } catch {
+      return false
+    }
   },
   // Browser preview: a blob download stands in for a save dialog (the browser's
   // own "ask where to save" setting decides whether the user picks a folder).
@@ -329,6 +341,38 @@ export const webApi: PdfxApi = {
   },
   assistantJumpToCitation: (path, target) => requestAssistantJump(path, target),
   onAssistantJumpRequest: (cb) => subscribeAssistantJumps(cb)
+}
+
+/** The media type a download should carry, from the name the caller chose.
+ *  The browser writes the file under that name either way, but a wrong type
+ *  makes Chromium append `.txt` to it — which is how a saved .png used to
+ *  arrive as `figure.png.txt`. */
+function downloadType(name: string): string {
+  const ext = name.slice(name.lastIndexOf('.') + 1).toLowerCase()
+  switch (ext) {
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    case 'png':
+      return 'image/png'
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg'
+    case 'html':
+      return 'text/html;charset=utf-8'
+    case 'md':
+      return 'text/markdown;charset=utf-8'
+    default:
+      return 'text/plain;charset=utf-8'
+  }
+}
+
+/** Base64 → Blob, without a data: URL round-trip (a multi-megabyte crop as a
+ *  string is the one place that shows up). */
+function base64ToBlob(dataBase64: string, type: string): Blob {
+  const bin = atob(dataBase64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return new Blob([bytes], { type })
 }
 
 /** Trigger a browser download of PDF bytes (the browser decides folder prompt). */

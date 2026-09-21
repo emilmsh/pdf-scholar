@@ -19,6 +19,7 @@ import {
   IconComment,
   IconCopy,
   IconGlobe,
+  IconImageGrab,
   IconMarkupHighlight,
   IconMarkupSquiggly,
   IconMarkupStrikeout,
@@ -218,6 +219,7 @@ export type MenuAction =
   | { kind: 'critique' }
   | { kind: 'ask' }
   | { kind: 'snip' }
+  | { kind: 'grabImage' }
 
 interface MenuProps {
   menu: MenuState
@@ -394,6 +396,15 @@ export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.J
         <>
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
             <span className="menu-icon"><IconNote size={15} /></span> {t('menu.newNoteHere')}
+          </button>
+          {/* Works in the split column's other document too — it renders from
+              the page under the pointer, not from the tab's file. */}
+          <button
+            className="menu-item"
+            title={t('menu.grabImageTip')}
+            onClick={() => onAction({ kind: 'grabImage' })}
+          >
+            <span className="menu-icon"><IconImageGrab size={15} /></span> {t('menu.grabImage')}
           </button>
           {aiEnabled && !menu.foreign && (
             <button className="menu-item" title={t('menu.snipTip')} onClick={() => onAction({ kind: 'snip' })}>

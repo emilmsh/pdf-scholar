@@ -138,6 +138,11 @@ carries no picture of its own.)*
 - Night mode can keep pictures in their original colours — figures and photos
   stay true while the page inverts *(reader ask, 2026-09-02, same batch as the
   intensity slider and the two-document split)*
+- A figure, table or equation can be taken out of the page as a picture:
+  click a figure the app has outlined, or drag a box around anything, then
+  copy it or save it as PNG. A real picture in the file comes out at its own
+  resolution rather than at the size it happened to be on screen *(reader ask,
+  [issue #21](https://github.com/emilmsh/pdf-scholar/issues/21))*
 - Page rotation, two-page spread, full-screen presentation mode
 - Table of contents, thumbnails and bookmarks in one panel; the toolbar's page
   field jumps straight to a page number
