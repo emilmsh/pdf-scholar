@@ -450,6 +450,29 @@ regressions are treated as bugs, not as acceptable platform lag.
     above the interop bar rather than at it. Covered by `npm run test:xfa`
     (CI, all three OSes), which also pins that sample.pdf opens identically
     with the flag on.
+24. **«Kopier bilde» captures identically everywhere; only the two exits
+    differ.** The marquee, the outlined image regions, the crop's render scale
+    and the preview bubble are all renderer code
+    (`src/renderer/src/image-export.ts`, `image-regions.ts`,
+    `components/SnipOverlay.tsx`, `components/ImageExportPopover.tsx`), so a
+    figure comes out byte-identical on every platform — including in the split
+    column's other document, which renders from the page under the pointer and
+    is named after ITS file. What differs is where it goes. **Clipboard:**
+    Electron writes it from main through `nativeImage` + `clipboard.writeImage`
+    (`clipboard:write-image`), which needs no user activation and lands a
+    CF_DIB on the Windows clipboard so Word and PowerPoint paste a picture; the
+    browser and the extension have no main process and run
+    `navigator.clipboard.write` with a `ClipboardItem`, returning false when
+    Chromium refuses (the bubble then stays up and says to save instead). The
+    renderer never calls the async clipboard API on the desktop: the crop is
+    rendered asynchronously, and by the time there are bytes the transient
+    activation Chromium wants is usually gone — it would fail on exactly the
+    documents that took longest to render. **Saving:** desktop gets the native
+    save dialog (`file:save-text`, which already writes bytes verbatim and
+    derives its filter from the extension); the browser and the extension get a
+    download under the same name (the extension inherits the base bridge here —
+    the File System Access picker is reserved for the PDF itself). Nothing
+    about the picture changes between them.
 
 ## Maintenance rules
 

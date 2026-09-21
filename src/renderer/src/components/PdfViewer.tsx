@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { OPS } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { detectDoi } from '../doi-detect'
 import { isPasswordException, openDocument } from '../pdf-doc'
@@ -148,6 +149,12 @@ import { NotePopover, SelectionMenu } from './SelectionMenu'
 import { inTextField } from './TextContextMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
 import { SnipOverlay } from './SnipOverlay'
+import type { SnipClientRect } from './SnipOverlay'
+import { ImageExportPopover } from './ImageExportPopover'
+import type { ImageExportState } from './ImageExportPopover'
+import { pageImageRects } from '../image-regions'
+import type { OpsTable, UserRect } from '../image-regions'
+import { exportScale, imageExportName, pickableBoxes } from '../image-export'
 import { errorText, locale, t, useLang } from '../i18n'
 import { useDismissable } from '../useDismissable'
 import {
@@ -1456,6 +1463,26 @@ export default function PdfViewer({
   /** Snip-to-explain: armed from toolbar/menu ('quick' → popover) or from
    *  the chat composer ('chat' → the region lands as a chat attachment) */
   const [snip, setSnip] = useState<null | { target: 'quick' | 'chat' }>(null)
+  /** «Kopier bilde»: the same marquee, aimed at the clipboard instead of the
+   *  assistant. Armed = the overlay is up; `imageGrabRegions` are the page's
+   *  own raster images in client coordinates, outlined as one-click targets
+   *  (they arrive a moment after the overlay — building a page's operator
+   *  list is worker work, and outlines are decoration, not layout). */
+  const [imageGrab, setImageGrab] = useState(false)
+  const [imageGrabRegions, setImageGrabRegions] = useState<readonly SnipClientRect[]>([])
+  /** Bumped on every arm/disarm, so outlines from a gesture that is over
+   *  cannot land on the next one. */
+  const imageGrabRunRef = useRef(0)
+  /** Put the marquee away. Declared up here with the state rather than with
+   *  the rest of the image-grab block far below, because `armSnip` — which
+   *  sits between them — has to call it. */
+  const disarmImageGrab = useCallback(() => {
+    imageGrabRunRef.current++
+    setImageGrab(false)
+    setImageGrabRegions([])
+  }, [])
+  /** The captured crop, waiting for the reader to copy or save it */
+  const [imageExport, setImageExport] = useState<ImageExportState | null>(null)
   /** A snipped region on its way into the chat composer (consumed by AiPanel) */
   const [chatSnip, setChatSnip] = useState<{ id: number; image: AiImage } | null>(null)
   const chatSnipSeqRef = useRef(0)
@@ -1543,6 +1570,25 @@ export default function PdfViewer({
   }
   const scaleOfPageElRef = useRef(scaleOfPageEl)
   scaleOfPageElRef.current = scaleOfPageEl
+
+  /** The pdf.js document an element's column shows — pane B holds another file
+   *  whenever the split is two-document. Anything that RENDERS from a page
+   *  element (the image marquee) has to go through this, or a crop taken in
+   *  the foreign column comes back from the host document's page. */
+  const pdfOfPageEl = (pageEl: HTMLElement): PDFDocumentProxy | null => {
+    const session = paneOfEl(pageEl) === 'b' ? sessionBRef.current : null
+    return session ? session.pdf : pdf
+  }
+  const pdfOfPageElRef = useRef(pdfOfPageEl)
+  pdfOfPageElRef.current = pdfOfPageEl
+
+  /** …and its file name, for what an exported crop is called on disk. */
+  const docNameOfPageEl = (pageEl: HTMLElement): string => {
+    const session = paneOfEl(pageEl) === 'b' ? sessionBRef.current : null
+    return session ? session.name : payload.name
+  }
+  const docNameOfPageElRef = useRef(docNameOfPageEl)
+  docNameOfPageElRef.current = docNameOfPageEl
 
   /** Every mounted page element, in BOTH panes. Handlers that hit-test a client
    *  point against the pages must see the whole viewer, not one column. */
@@ -2839,9 +2885,13 @@ export default function PdfViewer({
         showToast(t('viewer.xfaToolsOff'))
         return
       }
+      // «Kopier bilde» is the SAME full-window overlay; two of them up at once
+      // would put the second one's hint over the first and hand the drag to
+      // whichever mounted last.
+      disarmImageGrab()
       setSnip({ target })
     },
-    [showToast]
+    [showToast, disarmImageGrab]
   )
 
   // Hide all annotations (clean reading view) — hit-testing pauses too so
@@ -3833,6 +3883,209 @@ export default function PdfViewer({
   )
 
 
+  // ------------------------------------------------------------------
+  // «Kopier bilde» — a picture out of the page
+  // ------------------------------------------------------------------
+
+  /** The raster images on the pages currently on screen, as client-space
+   *  boxes for the marquee overlay to outline. Built only while the tool is
+   *  being armed: it costs one operator list per visible page, which is real
+   *  worker time, and a reader who never exports a figure must not pay it. */
+  const collectImageRegions = useCallback(async (): Promise<SnipClientRect[]> => {
+    const out: SnipClientRect[] = []
+    for (const el of allPageElsRef.current()) {
+      const box = el.getBoundingClientRect()
+      if (box.bottom < 0 || box.top > window.innerHeight || box.width < 1) continue
+      const doc = pdfOfPageElRef.current(el)
+      if (!doc) continue
+      try {
+        const page = await doc.getPage(Number(el.dataset.page))
+        const rects = await pageImageRects(page, OPS as unknown as OpsTable)
+        if (rects.length === 0) continue
+        const viewport = page.getViewport({
+          scale: scaleOfPageElRef.current(el),
+          rotation: (page.rotate + rotationOfPageElRef.current(el)) % 360
+        })
+        for (const r of rects) {
+          // All four corners through the viewport (intrinsic /Rotate + the
+          // column's own rotation + scale in one map), then the AABB — the
+          // same conversion PdfPage's colour overlay makes.
+          const pts = [
+            viewport.convertToViewportPoint(r.x0, r.y0),
+            viewport.convertToViewportPoint(r.x1, r.y0),
+            viewport.convertToViewportPoint(r.x0, r.y1),
+            viewport.convertToViewportPoint(r.x1, r.y1)
+          ]
+          const xs = pts.map((pt) => pt[0])
+          const ys = pts.map((pt) => pt[1])
+          out.push({
+            x: box.left + Math.min(...xs),
+            y: box.top + Math.min(...ys),
+            w: Math.max(...xs) - Math.min(...xs),
+            h: Math.max(...ys) - Math.min(...ys)
+          })
+        }
+      } catch {
+        /* a page whose operator list will not build simply offers no outlines */
+      }
+    }
+    return pickableBoxes(out)
+  }, [])
+
+  /** Arm the image marquee. Clears whatever the last one produced: two crops
+   *  on screen at once would be two answers to one question. */
+  const armImageGrab = useCallback(() => {
+    setMenu(null)
+    // A crop is a picture of the page canvas, and an XFA form paints none —
+    // the same refusal every other tool gives there, in words.
+    if (xfaDocRef.current) {
+      showToast(t('viewer.xfaToolsOff'))
+      return
+    }
+    setSnip(null) // one marquee at a time (see armSnip)
+    setImageExport(null)
+    setImageGrabRegions([])
+    setImageGrab(true)
+    imageGrabRunRef.current++
+    const run = imageGrabRunRef.current
+    void collectImageRegions().then((regions) => {
+      // A second arming (or a disarm) while the worker was busy — those
+      // outlines belong to a gesture that is over.
+      if (imageGrabRunRef.current === run) setImageGrabRegions(regions)
+    })
+  }, [collectImageRegions, showToast])
+
+  // A different document under the marquee means outlines measured against
+  // pages that are gone, and a crop nobody asked this file for.
+  useEffect(() => {
+    disarmImageGrab()
+    setImageExport(null)
+  }, [pdf, disarmImageGrab])
+
+  /** The marquee closed on a box (or a click took an outlined figure whole):
+   *  re-render exactly that region offscreen and put the result in front of
+   *  the reader. Rendered rather than captured from the on-screen canvas,
+   *  which is low-res at fit-width and recoloured by the reading theme — a
+   *  figure read in night mode must not come out of the app inverted. */
+  const onImageGrabDone = useCallback(
+    (grab: SnipClientRect) => {
+      disarmImageGrab()
+      // Pick the page with the largest overlap; clamp the box to it. Both
+      // columns are candidates — a figure is grabbed wherever it is on screen.
+      let best: { el: HTMLElement; area: number } | null = null
+      for (const el of allPageElsRef.current()) {
+        const r = el.getBoundingClientRect()
+        const w = Math.min(grab.x + grab.w, r.right) - Math.max(grab.x, r.left)
+        const h = Math.min(grab.y + grab.h, r.bottom) - Math.max(grab.y, r.top)
+        if (w > 0 && h > 0 && (!best || w * h > best.area)) best = { el, area: w * h }
+      }
+      if (!best) return
+      const pageEl = best.el
+      const pageNumber = Number(pageEl.dataset.page)
+      const docName = docNameOfPageElRef.current(pageEl)
+      const doc = pdfOfPageElRef.current(pageEl)
+      if (!doc) return
+      const pr = pageEl.getBoundingClientRect()
+      const cx = Math.max(grab.x, pr.left) - pr.left
+      const cy = Math.max(grab.y, pr.top) - pr.top
+      const cw = Math.min(grab.x + grab.w, pr.right) - Math.max(grab.x, pr.left)
+      const ch = Math.min(grab.y + grab.h, pr.bottom) - Math.max(grab.y, pr.top)
+      if (cw < 4 || ch < 4) return
+      void (async () => {
+        try {
+          const page = await doc.getPage(pageNumber)
+          const cur = scaleOfPageElRef.current(pageEl)
+          const rotation = (page.rotate + rotationOfPageElRef.current(pageEl)) % 360
+          // The crop back in PDF user space, which is where the image regions
+          // live and the only space the two can be compared in.
+          const at = page.getViewport({ scale: cur, rotation })
+          const corners = [
+            at.convertToPdfPoint(cx, cy),
+            at.convertToPdfPoint(cx + cw, cy),
+            at.convertToPdfPoint(cx, cy + ch),
+            at.convertToPdfPoint(cx + cw, cy + ch)
+          ]
+          const uxs = corners.map((c) => c[0])
+          const uys = corners.map((c) => c[1])
+          const userBox: UserRect = {
+            x0: Math.min(...uxs),
+            y0: Math.min(...uys),
+            x1: Math.max(...uxs),
+            y1: Math.max(...uys)
+          }
+          let regions: UserRect[] = []
+          try {
+            regions = [...(await pageImageRects(page, OPS as unknown as OpsTable))]
+          } catch {
+            /* no regions is a fine answer: the crop then gets print dpi */
+          }
+          const { scale, native } = exportScale(userBox, regions, cur)
+          const k = scale / cur
+          const viewport = page.getViewport({ scale, rotation })
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.max(1, Math.round(cw * k))
+          canvas.height = Math.max(1, Math.round(ch * k))
+          await page.render({
+            canvas,
+            viewport,
+            transform: [1, 0, 0, 1, -cx * k, -cy * k]
+          }).promise
+          setImageExport({
+            x: grab.x,
+            y: grab.y + grab.h,
+            avoid: { top: grab.y, bottom: grab.y + grab.h, left: grab.x },
+            dataUrl: canvas.toDataURL('image/png'),
+            width: canvas.width,
+            height: canvas.height,
+            native,
+            dpi: Math.round(scale * 72),
+            pageNumber,
+            docName
+          })
+        } catch {
+          showToast(t('imgExport.failed'))
+        }
+      })()
+    },
+    [disarmImageGrab, showToast]
+  )
+
+  /** The clipboard. Electron writes it from main (see PdfxApi.copyImage);
+   *  the browser and the extension run the async clipboard API themselves. */
+  const copyGrabbedImage = useCallback(async () => {
+    const shot = imageExport
+    if (!shot) return
+    const ok = await bridge.copyImage(shot.dataUrl.slice(shot.dataUrl.indexOf(',') + 1))
+    if (!ok) {
+      // Keep the crop on screen: it took a gesture to make, and «Lagre …»
+      // still works when the clipboard is the thing refusing.
+      showToast(t('imgExport.copyFailed'))
+      return
+    }
+    setImageExport(null)
+    showToast(t('imgExport.copied', { w: String(shot.width), h: String(shot.height) }))
+  }, [imageExport, showToast])
+
+  /** …or to disk, through the same save dialog every other export uses. */
+  const saveGrabbedImage = useCallback(async () => {
+    const shot = imageExport
+    if (!shot) return
+    const name = imageExportName(
+      shot.docName,
+      t('imgExport.suffix', { page: String(shot.pageNumber) })
+    )
+    const result = await bridge.saveTextFile(name, dataUrlToBytes(shot.dataUrl))
+    // A cancelled dialog (null) leaves the crop standing — the reader changed
+    // their mind about the folder, not about the picture.
+    if (!result) return
+    if ('error' in result) {
+      showToast(t('viewer.saveFailed', { error: errorText(result) }))
+      return
+    }
+    setImageExport(null)
+    showToast(t('imgExport.saved', { path: result.path }))
+  }, [imageExport, showToast])
+
   const onMenuAction = useCallback(
     (action: MenuAction) => {
       const selText = window.getSelection()?.toString().trim().slice(0, 500) ?? ''
@@ -3986,9 +4239,12 @@ export default function PdfViewer({
         }
         case 'snip': {
           setMenu(null)
-          setSnip({ target: 'quick' })
+          armSnip('quick')
           break
         }
+        case 'grabImage':
+          armImageGrab()
+          break
         case 'reference':
         case 'critique':
         case 'ask': {
@@ -4037,7 +4293,7 @@ export default function PdfViewer({
         }
       }
     },
-    [menu, pdf, payload.name, applyMarkup, collectSelectionRects]
+    [menu, pdf, payload.name, applyMarkup, collectSelectionRects, armImageGrab]
   )
 
   /** Snip-to-explain: locate the page under the dragged box, re-render that
@@ -6614,6 +6870,7 @@ export default function PdfViewer({
           onUndo={() => void performUndoRedo('undo')}
           onRedo={() => void performUndoRedo('redo')}
           onPrint={printDocument}
+          onGrabImage={armImageGrab}
           readAloudOpen={readAloud !== 'closed'}
           onToggleReadAloud={() => {
             if (readAloud === 'closed') void startReadAloud()
@@ -7170,7 +7427,26 @@ export default function PdfViewer({
       )}
 
       {menu && <SelectionMenu menu={menu} onAction={onMenuAction} aiEnabled={aiAccess !== 'off'} />}
-      {snip && <SnipOverlay onDone={onSnipDone} onCancel={() => setSnip(null)} />}
+      {snip && !imageGrab && (
+        <SnipOverlay onDone={onSnipDone} onCancel={() => setSnip(null)} />
+      )}
+      {imageGrab && (
+        <SnipOverlay
+          onDone={onImageGrabDone}
+          onCancel={disarmImageGrab}
+          hint={t('imgExport.hint')}
+          regions={imageGrabRegions}
+        />
+      )}
+      {imageExport && (
+        <ImageExportPopover
+          state={imageExport}
+          onCopy={copyGrabbedImage}
+          onSave={saveGrabbedImage}
+          onRedo={armImageGrab}
+          onClose={() => setImageExport(null)}
+        />
+      )}
       {/* Armed text tool: the same pill the note tool shows, and it says out
           loud that the box stays movable/resizable — the part of the tool
           nobody discovered on their own */}

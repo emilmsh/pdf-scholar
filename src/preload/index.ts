@@ -66,6 +66,7 @@ const api: PdfxApi = {
   printFile: (path: string) => ipcRenderer.invoke('file:print', path),
   saveTextFile: (defaultName: string, content: string | Uint8Array) =>
     ipcRenderer.invoke('file:save-text', defaultName, content),
+  copyImage: (dataBase64: string) => ipcRenderer.invoke('clipboard:write-image', dataBase64),
   saveFileAs: (defaultName: string, data: Uint8Array, path?: string) =>
     ipcRenderer.invoke('file:save-as', path ?? '', defaultName, data),
   saveDocumentBytes: (path: string, name: string, data: Uint8Array) =>

@@ -877,6 +877,17 @@ export interface PdfxApi {
     defaultName: string,
     content: string | Uint8Array
   ): Promise<{ path: string } | FileError | null>
+  /** Put a picture on the system clipboard — the crop behind «Kopier bilde».
+   *  `dataBase64` is a PNG. Not navigator.clipboard.write from the renderer:
+   *  the crop is rendered asynchronously, so by the time there are bytes the
+   *  transient user activation Chromium wants for a clipboard write is often
+   *  gone, and the write fails with NotAllowedError on exactly the documents
+   *  that took longest to render. Electron writes it from main instead, which
+   *  needs no activation and puts a real bitmap on the Windows clipboard
+   *  (CF_DIB), so Word and PowerPoint paste it as a picture. The browser and
+   *  the extension do run the async clipboard API — they have no main process
+   *  — and return false when it is refused. */
+  copyImage(dataBase64: string): Promise<boolean>
   /** Save a copy of the current PDF to a user-chosen location. `data` is the
    *  renderer's bytes (used by the web/extension download path); Electron
    *  prefers `path` so unsaved annotation edits (the draft) are included.

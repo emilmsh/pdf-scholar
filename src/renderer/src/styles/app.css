@@ -5360,6 +5360,108 @@ html.pen-near .draw-layer {
   pointer-events: none;
 }
 
+/* The page's own raster images, outlined while the image marquee is armed:
+   a quiet hairline that says "this is a real picture, one click takes it",
+   lifting to the accent under the pointer. Faint on purpose — the marquee is
+   still the primary gesture and these must not read as buttons. */
+.snip-region {
+  position: absolute;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.snip-region.is-hot {
+  border: 1.5px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* What the image marquee captured, before it goes to the clipboard or to
+   disk. Draggable from its chrome like every other bubble. */
+.image-export-pop {
+  position: fixed;
+  z-index: 61;
+  /* Wide enough that the three labels sit on one line each — at 300 px both
+     «Marker på nytt» and «Lagre …» wrapped to two. */
+  width: 344px;
+  padding: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.12s ease;
+  cursor: grab;
+  touch-action: none;
+}
+
+.image-export-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-height: 220px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-chrome);
+}
+
+/* The checkerboard sits on the PICTURE, not on the frame around it: a crop
+   narrower than the bubble would otherwise look like an image with
+   transparent margins, which is the one thing the pattern is there to say. */
+.image-export-preview img {
+  max-width: 100%;
+  max-height: 218px;
+  display: block;
+  -webkit-user-drag: none;
+  background:
+    repeating-conic-gradient(
+        color-mix(in srgb, var(--text) 7%, transparent) 0% 25%,
+        transparent 0% 50%
+      )
+      50% / 14px 14px;
+}
+
+.image-export-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.image-export-source {
+  text-align: right;
+}
+
+.image-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  cursor: auto;
+}
+
+.image-export-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* «Marker på nytt» is the way back, not a third option of equal weight:
+   quieter, and pushed away from the pair that actually finish the job. */
+.image-export-redo {
+  margin-right: auto;
+  padding: 5px 9px !important;
+  font-size: 12px !important;
+  opacity: 0.8;
+}
+
 /* Custom-color pick at the end of each markup color row: a calm "+"
    swatch that opens the native color picker */
 

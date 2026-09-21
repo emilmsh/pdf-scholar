@@ -482,6 +482,21 @@ export const IconImage = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** Grab a picture out of the page: the same scan-frame as IconSnip, with a
+ *  little photo inside it instead of the assistant's sparkle — "mark an area,
+ *  get an image". The two tools share the marquee, so they share the frame. */
+export const IconImageGrab = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" />
+    <path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" />
+    <path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" />
+    <path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" />
+    <rect x="7.5" y="8.5" width="9" height="7" rx="1.5" />
+    <circle cx="10.2" cy="11.2" r="0.9" />
+    <path d="M7.5 14.2l2.6-2.1 2 1.7 1.8-1.5 2.6 2.2" />
+  </Svg>
+)
+
 export const IconSend = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M4.5 12L3 4.5 21 12 3 19.5 4.5 12z" />

@@ -99,6 +99,7 @@ import {
   IconPinOff,
   IconPlus,
   IconPresent,
+  IconImageGrab,
   IconPrint,
   IconRedo,
   IconReload,
@@ -275,6 +276,11 @@ interface Props {
   onRedo(): void
   /** Print — reached from the Save button's chevron menu, not an icon of its own */
   onPrint(): void
+  /** «Kopier bilde …» — arm the marquee that takes a picture out of the page.
+   *  Same home as print: everything that sends content OUT of the app lives
+   *  under the Save chevron, and this is an export like the others. It also
+   *  sits in the page's right-click menu, where the gesture starts anyway. */
+  onGrabImage(): void
   readAloudOpen: boolean
   onToggleReadAloud(): void
   aiOpen: boolean
@@ -468,6 +474,7 @@ export default function Toolbar({
   onUndo,
   onRedo,
   onPrint,
+  onGrabImage,
   readAloudOpen,
   onToggleReadAloud,
   aiOpen,
@@ -1816,6 +1823,19 @@ export default function Toolbar({
               {t('tb.print')}
             </button>
           )
+          const grabImageRow = (
+            <button
+              className="menu-action"
+              onClick={() => {
+                setSaveMenuOpen(false)
+                onGrabImage()
+              }}
+              title={t('menu.grabImageTip')}
+            >
+              <IconImageGrab size={15} />
+              {t('menu.grabImage')}
+            </button>
+          )
           // The style, one setting shared by both sections and both sources.
           // Rendered in whichever section holds the citation (the Zotero one
           // once resolved, else the DOI one) — never in both at once.
@@ -1987,6 +2007,7 @@ export default function Toolbar({
                     {isElectron ? t('tb.saveAs') : t('tb.saveCopy')}
                   </button>
                   {printRow}
+                  {grabImageRow}
                   {zoteroSection}
                   {doiSection}
                 </div>
@@ -2010,7 +2031,12 @@ export default function Toolbar({
                 <IconSaveAs />
               </button>
               {chevron}
-              {saveMenuOpen && <div className="theme-menu save-menu">{printRow}</div>}
+              {saveMenuOpen && (
+                <div className="theme-menu save-menu">
+                  {printRow}
+                  {grabImageRow}
+                </div>
+              )}
             </span>
           )
         })()}

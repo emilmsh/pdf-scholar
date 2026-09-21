@@ -38,6 +38,13 @@ export function mulMatrix(m1: Matrix, m2: Matrix): Matrix {
   ]
 }
 
+/** A pixel size from two operator arguments, or undefined when either is
+ *  missing/absurd — the caller then simply has no native resolution to aim at. */
+const pixelSize = (w: unknown, h: unknown): { w: number; h: number } | undefined =>
+  typeof w === 'number' && typeof h === 'number' && w > 0 && h > 0 && Number.isFinite(w) && Number.isFinite(h)
+    ? { w, h }
+    : undefined
+
 const applyMatrix = (m: Matrix, x: number, y: number): [number, number] => [
   m[0] * x + m[2] * y + m[4],
   m[1] * x + m[3] * y + m[5]
@@ -50,6 +57,12 @@ export interface UserRect {
   y0: number
   x1: number
   y1: number
+  /** The painted image's OWN pixel dimensions, when the operator carries them
+   *  (every ordinary image XObject and inline image does; the repeat op does
+   *  not). Nothing in the night-mode overlay reads this — it is what lets
+   *  «Kopier bilde» re-render a figure at the resolution the file actually
+   *  holds instead of at whatever the screen happens to show. */
+  px?: { w: number; h: number }
 }
 
 /** The operator ids the walk needs — injected so the pure function can be
@@ -78,7 +91,7 @@ export function imageRectsFromOps(
   let ctm: Matrix = IDENTITY
   const stack: Matrix[] = []
 
-  const pushUnitSquare = (m: Matrix): void => {
+  const pushUnitSquare = (m: Matrix, px?: { w: number; h: number }): void => {
     const pts = [applyMatrix(m, 0, 0), applyMatrix(m, 1, 0), applyMatrix(m, 0, 1), applyMatrix(m, 1, 1)]
     const xs = pts.map((p) => p[0])
     const ys = pts.map((p) => p[1])
@@ -86,7 +99,8 @@ export function imageRectsFromOps(
       x0: Math.min(...xs),
       y0: Math.min(...ys),
       x1: Math.max(...xs),
-      y1: Math.max(...ys)
+      y1: Math.max(...ys),
+      ...(px && px.w > 0 && px.h > 0 ? { px } : {})
     })
   }
 
@@ -116,13 +130,22 @@ export function imageRectsFromOps(
       case ops.paintFormXObjectEnd:
         ctm = stack.pop() ?? IDENTITY
         break
+      // args = [objId, w, h] — w/h are the image's own pixel dimensions
       case ops.paintImageXObject:
-      case ops.paintInlineImageXObject:
-        pushUnitSquare(ctm)
+        pushUnitSquare(ctm, pixelSize(args?.[1], args?.[2]))
         break
+      // args = [imgData], the decoded bitmap, which carries its own size
+      case ops.paintInlineImageXObject: {
+        const img = args?.[0] as { width?: unknown; height?: unknown } | undefined
+        pushUnitSquare(ctm, pixelSize(img?.width, img?.height))
+        break
+      }
       case ops.paintImageXObjectRepeat: {
         // (objId, scaleX, scaleY, positions[x0,y0, x1,y1, …]) — one placement
-        // per position, each a scaled unit square
+        // per position, each a scaled unit square. pdf.js folds the pixel
+        // dimensions away when it collapses a run of identical images into
+        // this op, so these rects carry no `px` — a tiled ornament is not
+        // what anyone reaches for «Kopier bilde» to get.
         const scaleX = args?.[1] as number
         const scaleY = args?.[2] as number
         const positions = args?.[3] as ArrayLike<number> | undefined
