@@ -144,24 +144,20 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.52.0
+## What's new in this version (≤ 1 500 chars) — v0.53.0
 
 **EN:**
 ```
-• Copy image … outlines every picture in the document: click one to copy it or save it as PNG at the file's own resolution, or drag a box to take exactly that region — vector figures, tables and equations too — at 300 dpi. Word and PowerPoint paste it as a picture, and the reading theme never comes along
-• The Print button prints: on Windows it did nothing, because the Electron version the app shipped on could not print
-• Current AI models: Claude Opus 5.5, GPT-6 Sol, GPT-6 Luna and Grok 4.7 replace their predecessors, which stay selectable if you already use them. A new setup starts on Claude Opus 5.5 or GPT-6 Sol
-• When Claude Opus declines a question on safety grounds, Anthropic now answers it with the model it recommends instead, and the answer says which model wrote it
-• Smaller fixes and refinements
+• The assistant can run on your ChatGPT Plus or Pro plan instead of an API key: choose Sign in with ChatGPT in the AI settings, sign in on OpenAI's own page, and ask away on GPT-6 Astra, Sol or Luna with no API bill
+• Worth knowing: this is an unofficial route — the same sign-in OpenAI's Codex tool uses, which OpenAI allows today but may close — and what you send is handled under ChatGPT's terms, so your ChatGPT account's own model-training setting applies. API keys keep working as before
+• When the plan's allowance is used up for now, the assistant says so plainly, and an expired sign-in asks you to sign in again
 ```
 
 **NO:**
 ```
-• Kopier bilde … markerer alle bildene i dokumentet: klikk ett for å kopiere det eller lagre det som PNG i filens egen oppløsning, eller dra en ramme for å ta akkurat det området — også vektorfigurer, tabeller og ligninger — i 300 dpi. Word og PowerPoint limer det inn som et bilde, og lesemodusen blir aldri med
-• Skriv ut virker: på Windows gjorde knappen ingenting, fordi Electron-versjonen appen kom med ikke kunne skrive ut
-• Oppdaterte AI-modeller: Claude Opus 5.5, GPT-6 Sol, GPT-6 Luna og Grok 4.7 erstatter forgjengerne, som fortsatt kan velges om du bruker dem. Et nytt oppsett starter på Claude Opus 5.5 eller GPT-6 Sol
-• Når Claude Opus avslår et spørsmål av sikkerhetshensyn, svarer Anthropic nå med modellen de anbefaler i stedet, og svaret sier hvilken modell som skrev det
-• Mindre feilrettinger og finpuss
+• Assistenten kan bruke ChatGPT Plus- eller Pro-abonnementet ditt i stedet for en API-nøkkel: velg Logg inn med ChatGPT i KI-innstillingene, logg inn på OpenAIs egen side, og spør i vei med GPT-6 Astra, Sol eller Luna uten API-regning
+• Verdt å vite: dette er en uoffisiell vei — samme innlogging som OpenAIs Codex-verktøy bruker, som OpenAI tillater i dag men kan stenge — og det du sender behandles etter ChatGPT-vilkårene, så innstillingen for modelltrening på ChatGPT-kontoen din gjelder. API-nøkler virker som før
+• Når kvoten i abonnementet er brukt opp for nå, sier assistenten det rett ut, og en utløpt innlogging ber deg logge inn på nytt
 ```
 
 ---
