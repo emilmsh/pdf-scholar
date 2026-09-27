@@ -155,6 +155,25 @@ export const AI_ERRORS = {
     error:
       'Nøkkelen lagres bare for denne økta på denne maskinen (ingen nøkkelring tilgjengelig). Legg den inn på nytt i KI-innstillingene.'
   },
+  /** Provider 'chatgpt' with no sign-in stored (or one this OS user cannot
+   *  decrypt) — the remedy is the sign-in button, not a key field. */
+  chatgptSignedOut: {
+    code: 'ai-chatgpt-signed-out',
+    error: 'Ikke logget inn med ChatGPT. Logg inn i KI-innstillingene.'
+  },
+  /** The refresh token was refused — revoked, expired, or signed out
+   *  elsewhere. The stored bundle is dropped; signing in again fixes it. */
+  chatgptSessionExpired: {
+    code: 'ai-chatgpt-session-expired',
+    error: 'ChatGPT-innloggingen er utløpt. Logg inn på nytt i KI-innstillingene.'
+  },
+  /** The plan's usage window is spent (the Codex backend's usage_limit_reached).
+   *  Unlike an API rate limit this is the SUBSCRIPTION's allowance — waiting
+   *  until the window resets is the remedy; the provider wording rides along. */
+  subscriptionLimit: (providerMessage: string): FileError => ({
+    code: 'ai-subscription-limit',
+    error: providerMessage
+  }),
   azureUnconfigured: {
     code: 'ai-azure-unconfigured',
     error: 'Azure-endepunkt og deployment må fylles ut i KI-innstillingene.'
@@ -247,4 +266,26 @@ export const AI_ERRORS = {
   streamAborted: { code: 'ai-stream-aborted', error: 'Strømmen ble avbrutt uten fullført svar.' },
   providerUnknown: { code: 'ai-provider-unknown', error: 'Ukjent feil fra leverandøren.' },
   aborted: { code: 'ai-aborted', error: 'Avbrutt' }
+} as const satisfies Record<string, FileError | ((...a: never[]) => FileError)>
+
+/** The ChatGPT-plan sign-in (src/main/chatgpt-auth.ts). Each one has its own
+ *  remedy, which is why they are codes and not one "login failed". */
+export const CHATGPT_LOGIN_ERRORS = {
+  /** Extension and web preview: the OAuth callback needs a local port the
+   *  Codex client is registered for, and only the desktop can listen on one. */
+  unsupported: {
+    code: 'ai-chatgpt-login-unsupported',
+    error: 'Innlogging med ChatGPT finnes bare i skrivebordsappen.'
+  },
+  /** Port 1455 is taken — almost always a Codex CLI or opencode sign-in that
+   *  is waiting in another window. The redirect is registered to that one
+   *  port, so there is no other to fall back to. */
+  portBusy: {
+    code: 'ai-chatgpt-login-port-busy',
+    error: 'Port 1455 er opptatt (en annen ChatGPT-innlogging venter kanskje, f.eks. Codex eller opencode).'
+  },
+  /** Five minutes without an answer from the browser, or the user said no */
+  cancelled: { code: 'ai-chatgpt-login-cancelled', error: 'Innloggingen ble avbrutt eller tok for lang tid.' },
+  /** Anything else — the provider's detail rides in `error` for the log */
+  failed: (detail: string): FileError => ({ code: 'ai-chatgpt-login-failed', error: detail })
 } as const satisfies Record<string, FileError | ((...a: never[]) => FileError)>

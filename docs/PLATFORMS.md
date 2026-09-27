@@ -473,6 +473,24 @@ regressions are treated as bugs, not as acceptable platform lag.
     download under the same name (the extension inherits the base bridge here —
     the File System Access picker is reserved for the PDF itself). Nothing
     about the picture changes between them.
+25. **The ChatGPT-plan sign-in is desktop-only (experimental).** Provider
+    `chatgpt` runs the assistant on a Plus/Pro subscription's allowance through
+    the sign-in Codex CLI uses — its public OAuth client and the
+    `chatgpt.com/backend-api/codex/responses` backend (`src/main/chatgpt-auth.ts`,
+    `chatgptTarget` in `src/shared/ai-chat.ts`). That client's redirect is
+    registered to `http://localhost:1455/auth/callback`, and only a process
+    that can listen on a local port can receive it; an extension page cannot,
+    and `chrome.identity`'s redirect is not one the Codex client accepts. So the
+    extension and the web preview report `chatgpt.supported: false`: the
+    settings row reads «Bare i skrivebordsappen», the model menu leaves the
+    group out, and `aiChatgptLogin` answers `ai-chatgpt-login-unsupported`.
+    Every other surface — request shaping, the quote contract, citations — is
+    the OpenAI Responses path unchanged, so nothing else differs. OpenAI runs
+    no sign-in program for third-party apps; this rides a door OpenAI keeps
+    open by policy, and it can close. The API-key provider stays the supported
+    route on every platform. Covered by `npm run test:ai-chat` (address,
+    headers, `store: false`, the named 401/429 failures); a signed-in plan
+    joins `npm run test:live`.
 
 ## Maintenance rules
 

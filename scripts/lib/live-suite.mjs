@@ -37,6 +37,10 @@ import { encodePng } from './tiny-png.mjs'
 export const KEY_ENV = {
   anthropic: 'ANTHROPIC_API_KEY',
   openai: 'OPENAI_API_KEY',
+  // Not an API key: a ChatGPT sign-in's ACCESS token (about an hour's life),
+  // plus the account it belongs to in CHATGPT_ACCOUNT_ID. From the app's store
+  // this comes out of the sealed bundle — see live-in-electron.mjs.
+  chatgpt: 'CHATGPT_ACCESS_TOKEN',
   openrouter: 'OPENROUTER_API_KEY',
   gemini: 'GEMINI_API_KEY',
   xai: 'XAI_API_KEY',
@@ -54,7 +58,7 @@ export const KEY_ENV = {
  * @param {string[]} opts.args                CLI flags (--record, --provider=, …)
  * @returns {Promise<{failures:number, checks:number}>}
  */
-export async function runLiveSuite({ keys = {}, args = [] } = {}) {
+export async function runLiveSuite({ keys = {}, args = [], chatgptAccountId = '' } = {}) {
   const flag = (name) => args.includes(`--${name}`)
   const value = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split('=').slice(1).join('=')
 
@@ -108,7 +112,7 @@ export async function runLiveSuite({ keys = {}, args = [] } = {}) {
    *  no credit, an exhausted quota, a model saturated right now. The app naming
    *  them correctly IS the pass — counting them as failures would make a run's
    *  score depend on someone's billing page. */
-  const NOT_OUR_FAULT = new Set(['ai-no-credit', 'ai-rate-limited', 'ai-model-overloaded'])
+  const NOT_OUR_FAULT = new Set(['ai-no-credit', 'ai-rate-limited', 'ai-model-overloaded', 'ai-subscription-limit'])
 
   function baseParams(provider, model, req, emit, signal, compatBaseUrl) {
     return {
@@ -117,6 +121,7 @@ export async function runLiveSuite({ keys = {}, args = [] } = {}) {
       models: { [provider]: model },
       azure: { endpoint: '', deployment: '', apiVersion: '' },
       compat: { baseUrl: compatBaseUrl ?? '' },
+      chatgptAccountId,
       thinking: 'medium',
       catalog: {},
       req,

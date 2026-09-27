@@ -100,6 +100,8 @@ async function toView(config: AiConfig, keys: Keys, catalog: AiModelCatalog): Pr
   // Same rule as the desktop: compat's key is optional, so "has key" means
   // "ready to use" — endpoint + model id configured.
   hasKey.compat = config.compat.baseUrl.trim() !== '' && config.models.compat.trim() !== ''
+  // The ChatGPT sign-in is desktop-only (docs/PLATFORMS.md): never "ready" here
+  hasKey.chatgpt = false
   return {
     provider: config.provider,
     models: { ...config.models },
@@ -110,7 +112,8 @@ async function toView(config: AiConfig, keys: Keys, catalog: AiModelCatalog): Pr
     hasKey,
     keyStorage: (await sealingAvailable()) ? 'browser-nonextractable' : 'session-only',
     keysSupported: true,
-    catalog
+    catalog,
+    chatgpt: { supported: false, account: '' }
   }
 }
 
@@ -230,6 +233,7 @@ export function createExtensionAi(): Pick<
       // Dead-man switch, checked before any key is unsealed or provider named —
       // same contract as the desktop's ai:chat handler.
       if (config.access === 'off') return AI_ERRORS.disabled
+      if (config.provider === 'chatgpt') return AI_ERRORS.chatgptSignedOut
       const usable = await usableKeys(stored)
       const key = usable[config.provider]?.trim() ?? ''
       if (PROVIDER_PROFILES[config.provider].keyRequired && !key) {

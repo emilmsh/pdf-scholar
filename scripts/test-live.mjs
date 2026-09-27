@@ -47,7 +47,11 @@ if (!useEnv) {
   })
   child.on('exit', (code) => process.exit(code ?? 1))
 } else {
-  const { failures, noKeys } = await runLiveSuite({ keys: envKeys, args })
+  const { failures, noKeys } = await runLiveSuite({
+    keys: envKeys,
+    args,
+    chatgptAccountId: process.env.CHATGPT_ACCOUNT_ID ?? ''
+  })
   if (noKeys) {
     console.log('No provider keys — nothing to ask.')
     console.log(`Set any of: ${Object.values(KEY_ENV).join(', ')}`)

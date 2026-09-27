@@ -41,6 +41,8 @@ export const DEFAULT_SETTINGS: Settings = {
 export const DEFAULT_AI_MODELS: Record<AiProviderId, string> = {
   anthropic: 'claude-sonnet-5',
   openai: 'gpt-5.6-terra',
+  // Emil's call 2026-09-27, verified live on a Pro plan that day
+  chatgpt: 'gpt-6-sol',
   azure: '',
   // The compat-family providers have no defaults: their model lists are
   // live-fetched, and picking one is a product decision the USER makes from

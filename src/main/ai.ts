@@ -15,17 +15,22 @@ import type {
   AiConfig,
   AiConfigView,
   AiProviderId,
+  ChatgptLoginResult,
+  FileError,
   KeyStorageMode
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
 import { PROVIDER_PROFILES } from '../shared/ai-provider-profile'
 import { AI_ERRORS } from '../shared/engine-errors'
+import { loginChatgpt, refreshChatgpt } from './chatgpt-auth'
+import type { ChatgptTokens } from './chatgpt-auth'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
 
 const PROVIDERS: AiProviderId[] = [
   'anthropic',
   'openai',
+  'chatgpt',
   'azure',
   'openrouter',
   'gemini',
@@ -197,6 +202,65 @@ function migrateLegacyPlaintextKeys(): void {
   )
 }
 
+// ---------- ChatGPT sign-in ----------
+//
+// The token bundle is stored exactly like an API key — sealed with safeStorage
+// under keys.chatgpt, or held for the session where there is no key store —
+// so everything said above about key storage holds for it too. It is JSON,
+// never shown, and never settable from the renderer (ai:set-config skips it).
+
+function loadChatgpt(): ChatgptTokens | null {
+  const raw = keyFor('chatgpt')
+  if (!raw) return null
+  try {
+    const t = JSON.parse(raw) as ChatgptTokens
+    return t.refresh ? t : null
+  } catch {
+    return null
+  }
+}
+
+function storeChatgpt(tokens: ChatgptTokens | null): void {
+  const state = getState()
+  const plain = tokens ? JSON.stringify(tokens) : ''
+  const sealed = encryptKey(plain)
+  if (sealed === null) {
+    sessionKeys.set('chatgpt', plain)
+    state.ai = mergeAiConfig(state.ai, { keys: { chatgpt: '' } })
+  } else {
+    sessionKeys.delete('chatgpt')
+    state.ai = mergeAiConfig(state.ai, { keys: { chatgpt: sealed } })
+  }
+  saveState()
+}
+
+/** One refresh at a time: the refresh token ROTATES, so two requests racing
+ *  to renew would leave the loser holding a spent token — and a spent token
+ *  reads as "signed out", which would wipe a perfectly good sign-in. */
+let refreshing: Promise<ChatgptTokens | FileError> | null = null
+
+/** A usable access token, renewed first when it is (nearly) out of date */
+async function chatgptAccess(): Promise<ChatgptTokens | FileError> {
+  const current = loadChatgpt()
+  if (!current) return AI_ERRORS.chatgptSignedOut
+  if (current.access && current.expires > Date.now() + 60_000) return current
+  return (refreshing ??= refreshChatgpt(current)
+    .then((r) => {
+      if (r.ok) {
+        storeChatgpt(r.tokens)
+        return r.tokens
+      }
+      if (r.expired) {
+        storeChatgpt(null)
+        return AI_ERRORS.chatgptSessionExpired
+      }
+      return AI_ERRORS.endpointUnreachable('auth.openai.com', r.detail)
+    })
+    .finally(() => {
+      refreshing = null
+    }))
+}
+
 function configView(): AiConfigView {
   const ai = getState().ai
   const hasKey = {} as Record<AiProviderId, boolean>
@@ -208,6 +272,8 @@ function configView(): AiConfigView {
   // endpoint + model id configured. Drives the same UI the key flags drive
   // (model-menu enabling, the add-a-key callout, the settings auto-switch).
   hasKey.compat = ai.compat.baseUrl.trim() !== '' && ai.models.compat.trim() !== ''
+  const chatgpt = loadChatgpt()
+  hasKey.chatgpt = chatgpt !== null
   return {
     provider: ai.provider,
     models: { ...ai.models },
@@ -218,7 +284,8 @@ function configView(): AiConfigView {
     hasKey,
     keyStorage: keyStorageMode(),
     keysSupported: true,
-    catalog: getState().modelCatalog
+    catalog: getState().modelCatalog,
+    chatgpt: { supported: true, account: chatgpt ? chatgpt.email || chatgpt.accountId : '' }
   }
 }
 
@@ -243,6 +310,8 @@ export function registerAiIpc(): void {
       const encryptedKeys: Partial<Record<AiProviderId, string>> = {}
       if (patch.keys) {
         for (const p of PROVIDERS) {
+          // The ChatGPT bundle is written by the sign-in only
+          if (p === 'chatgpt') continue
           const value = patch.keys[p]
           // Empty/blank means "no change" — there is no remove-key UI, and
           // treating '' as a wipe is how stored keys get lost by accident
@@ -317,7 +386,14 @@ export function registerAiIpc(): void {
       const recorded = readFixture(req)
       if (recorded) return await replay(recorded, emit)
       const ai = getState().ai
-      const key = keyFor(ai.provider)
+      let key = keyFor(ai.provider)
+      let chatgptAccountId: string | undefined
+      if (ai.provider === 'chatgpt') {
+        const access = await chatgptAccess()
+        if (!('access' in access)) return access
+        key = access.access
+        chatgptAccountId = access.accountId
+      }
       if (PROVIDER_PROFILES[ai.provider].keyRequired && !key) {
         // Three different reasons, three different remedies: a stored blob that
         // will not decrypt (DPAPI ties encryption to the OS user, so credential
@@ -332,6 +408,7 @@ export function registerAiIpc(): void {
         models: ai.models,
         azure: ai.azure,
         compat: ai.compat,
+        chatgptAccountId,
         thinking: ai.thinking,
         catalog: getState().modelCatalog,
         req,
@@ -343,6 +420,23 @@ export function registerAiIpc(): void {
     } finally {
       activeRequests.delete(requestKey)
     }
+  })
+
+  // The browser sign-in. On success the provider switches to 'chatgpt' — the
+  // one thing a user who just signed in wants — and the view comes back.
+  ipcMain.handle('ai:chatgpt-login', async (): Promise<ChatgptLoginResult> => {
+    const result = await loginChatgpt()
+    if (!('ok' in result)) return result
+    storeChatgpt(result.tokens)
+    const state = getState()
+    state.ai = mergeAiConfig(state.ai, { provider: 'chatgpt' })
+    saveState()
+    return { ok: true, config: configView() }
+  })
+
+  ipcMain.handle('ai:chatgpt-logout', () => {
+    storeChatgpt(null)
+    return configView()
   })
 
   ipcMain.on('ai:abort', (e, requestId: number) => {

@@ -4790,6 +4790,28 @@ html.pen-near .draw-layer {
   cursor: pointer;
 }
 
+.ai-field-hint.ai-field-error {
+  color: var(--danger);
+}
+
+/* The ChatGPT sign-in row: a button where the other rows have a key field.
+   Kept to its natural width so it reads as an action, not an input. */
+.ai-field > .btn-secondary {
+  align-self: flex-start;
+  font-weight: 400;
+}
+
+.ai-chatgpt-account {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.ai-chatgpt-account a {
+  color: var(--accent);
+  cursor: pointer;
+}
+
 .ai-settings-note {
   font-size: 11.5px;
   line-height: 1.5;

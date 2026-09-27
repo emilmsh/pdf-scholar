@@ -82,6 +82,7 @@ app.whenReady().then(async () => {
     }
     const stored = JSON.parse(readFileSync(stateFile, 'utf8')).ai?.keys ?? {}
     const keys = {}
+    let chatgptAccountId = ''
     for (const provider of Object.keys(KEY_ENV)) {
       const blob = stored[provider]
       if (!blob) continue
@@ -92,6 +93,20 @@ app.whenReady().then(async () => {
         keys[provider] = blob.startsWith('plain:')
           ? Buffer.from(blob.slice(6), 'base64').toString('utf-8')
           : safeStorage.decryptString(Buffer.from(blob, 'base64'))
+        if (provider === 'chatgpt') {
+          // The sealed sign-in bundle (src/main/chatgpt-auth.ts). Only its
+          // ACCESS token is spent here, and never renewed: the refresh token
+          // rotates on use, and renewing it inside this throwaway profile copy
+          // would leave the app itself holding a spent one — signed out.
+          const bundle = JSON.parse(keys.chatgpt)
+          delete keys.chatgpt
+          if (!bundle.access || bundle.expires < Date.now() + 5 * 60_000) {
+            console.error('  ! chatgpt: the access token has (nearly) expired — ask one question in the app to renew it, then run again')
+          } else {
+            keys.chatgpt = bundle.access
+            chatgptAccountId = bundle.accountId ?? ''
+          }
+        }
       } catch {
         // A blob this machine cannot decrypt: a copied profile, or an OS
         // account change since it was written. Name it, carry on with the rest.
@@ -112,7 +127,7 @@ app.whenReady().then(async () => {
       return finish(0)
     }
     console.log('')
-    const { failures, noKeys } = await runLiveSuite({ keys, args })
+    const { failures, noKeys } = await runLiveSuite({ keys, args, chatgptAccountId })
     exitCode = noKeys || failures === 0 ? 0 : 1
   } catch (err) {
     console.error(`live run failed: ${err instanceof Error ? err.stack : String(err)}`)

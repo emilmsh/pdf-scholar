@@ -155,6 +155,7 @@ function baseParams(overrides) {
     models: {
       anthropic: 'claude-sonnet-5',
       openai: 'gpt-5.6-terra',
+      chatgpt: 'gpt-6-sol',
       azure: '',
       // The curated ids (ai-models.ts) — the harness must exercise what the
       // menu actually offers, not ids the providers retired
@@ -395,6 +396,63 @@ section('openai: degrade-on-400 + response.failed')
   responder = () => sse(`data: ${JSON.stringify({ type: 'response.failed', response: { error: { message: 'boom' } } })}\n\n`)
   const failed = await run({ provider: 'openai' })
   ok(failed.result.error === 'boom', `response.failed carries the provider sentence (got ${failed.result.error})`)
+}
+
+// ---------- ChatGPT plan (Codex backend, Responses shape) ----------
+
+section('chatgpt: plan backend — address, sign-in headers, store:false, named failures')
+{
+  responder = () =>
+    openAiSse({
+      deltas: ['Svar.'],
+      response: {
+        model: 'gpt-6-sol',
+        usage: { input_tokens: 9, output_tokens: 2 },
+        output: [{ type: 'message', content: [{ type: 'output_text', text: 'Svar [KILDE s.1: "Innledningen setter rammen"].' }] }]
+      }
+    })
+  const { result } = await run({ provider: 'chatgpt', key: 'access-tok', chatgptAccountId: 'acct-1' })
+  const call = calls[0]
+  const body = call?.body
+  ok(call?.url === 'https://chatgpt.com/backend-api/codex/responses', `plan backend endpoint (got ${call?.url})`)
+  ok(call?.headers.get('authorization') === 'Bearer access-tok', 'the ACCESS token is the bearer')
+  ok(call?.headers.get('chatgpt-account-id') === 'acct-1', 'account id header')
+  ok(call?.headers.get('originator') === 'pdf-scholar', 'we name ourselves, never Codex CLI')
+  ok(body?.store === false, 'store:false — the backend keeps nothing')
+  ok(body?.model === 'gpt-6-sol' && body?.stream === true, 'model + stream')
+  ok(!('max_output_tokens' in (body ?? {})), 'no output cap (Codex sends none)')
+  ok(result.ok === true && (result.parts ?? []).some((p) => p.citations.some((c) => c.kind === 'quote')), 'quote contract parsed as for openai')
+  const userParts = body?.input?.[2]?.content
+  observed.chatgpt = {
+    quoteContract: /CITATION RULES/.test(body?.instructions ?? ''),
+    nativeCitations: false,
+    webTool: (body?.tools ?? []).length > 0,
+    images: Array.isArray(userParts) && userParts.some((p) => p.type === 'input_image')
+  }
+
+  // The API path must be untouched by the plan's extras
+  responder = () => openAiSse({ deltas: ['ok'], response: { model: 'm', output: [] } })
+  await run({ provider: 'openai' })
+  ok(!('store' in (calls[0]?.body ?? {})), 'openai (API key) does not send store')
+
+  responder = () => new Response('{"detail":"Unauthorized"}', { status: 401 })
+  const lapsed = await run({ provider: 'chatgpt', key: 'stale', chatgptAccountId: 'acct-1' })
+  ok(lapsed.result.code === 'ai-chatgpt-session-expired', `401 → session expired (got ${lapsed.result.code})`)
+
+  responder = () =>
+    new Response(
+      JSON.stringify({ error: { type: 'usage_limit_reached', message: 'The usage limit has been reached', resets_in_seconds: 1800 } }),
+      { status: 429 }
+    )
+  const spent = await run({ provider: 'chatgpt', key: 'tok', chatgptAccountId: 'acct-1' })
+  ok(spent.result.code === 'ai-subscription-limit', `usage_limit_reached → subscription limit (got ${spent.result.code})`)
+  ok(/30 min/.test(spent.result.error ?? ''), `the reset time is named (got ${spent.result.error})`)
+  ok(calls.length === 1, 'no retry on a spent plan window')
+
+  // A plain 429 without the plan's wording stays the ordinary rate-limit family
+  responder = () => new Response('Rate limit reached for requests', { status: 429 })
+  const busy = await run({ provider: 'chatgpt', key: 'tok', chatgptAccountId: 'acct-1' })
+  ok(busy.result.code === 'ai-rate-limited', `other 429 → rate limited (got ${busy.result.code})`)
 }
 
 // ---------- Azure (Chat Completions path) ----------

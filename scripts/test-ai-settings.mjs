@@ -129,18 +129,36 @@ try {
       groupNames,
       hasCompatGroup: !!g,
       presets: g ? [...g.querySelectorAll('select option')].map((o) => o.textContent) : [],
-      keyPlaceholder: g?.querySelector('input[type="password"]')?.placeholder ?? ''
+      keyPlaceholder: g?.querySelector('input[type="password"]')?.placeholder ?? '',
+      chatgpt: (() => {
+        const row = [...document.querySelectorAll('.ai-field-group')].find((el) =>
+          /ChatGPT/.test(el.querySelector('.ai-field > span')?.textContent ?? '')
+        )
+        return {
+          button: row?.querySelector('button')?.textContent ?? '',
+          hasKeyField: !!row?.querySelector('input'),
+          hint: row?.querySelector('p.ai-field-hint')?.textContent ?? ''
+        }
+      })()
     }
   `, PRELUDE)
   ok(settings.settingsShown, 'keyless start lands in the AI settings')
-  // KI-tilgang (the access switch) sits first, then the nine provider groups
-  ok(settings.groups === 10, `access group + nine provider groups render (got ${settings.groups})`)
+  // KI-tilgang (the access switch) sits first, then the ten provider groups —
+  // the ChatGPT-plan sign-in right under the OpenAI key it is the keyless twin of
+  ok(settings.groups === 11, `access group + ten provider groups render (got ${settings.groups})`)
   ok(
     /KI-tilgang|AI access/.test(settings.groupNames[0] ?? '') &&
       settings.groupNames[1] === 'OpenAI' &&
-      /Gemini/.test(settings.groupNames[3] ?? ''),
-    `ranked order: access first, then OpenAI, Gemini third provider (got ${settings.groupNames.slice(0, 4).join(' | ')})`
+      /ChatGPT/.test(settings.groupNames[2] ?? '') &&
+      /Gemini/.test(settings.groupNames[4] ?? ''),
+    `ranked order: access, OpenAI, ChatGPT plan, Claude, Gemini (got ${settings.groupNames.slice(0, 5).join(' | ')})`
   )
+  // Signed out on the desktop: a sign-in BUTTON where the others have a key
+  // field, and the one-line disclosure under it (unofficial route, whose terms)
+  const chatgpt = settings.chatgpt
+  ok(chatgpt.button && /Logg inn med ChatGPT|Sign in with ChatGPT/.test(chatgpt.button), `ChatGPT row offers the sign-in (got ${chatgpt.button})`)
+  ok(!chatgpt.hasKeyField, 'no key field for the ChatGPT row')
+  ok(/vilkår|terms/.test(chatgpt.hint), `the row says whose terms apply (got ${chatgpt.hint})`)
   ok(
     ['OpenRouter', 'xAI (Grok)', 'Mistral', 'Groq'].every((n) => settings.groupNames.includes(n)),
     'the hosted services each have their own key row'

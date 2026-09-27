@@ -137,6 +137,8 @@ const api: PdfxApi = {
   aiSetConfig: (patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }) =>
     ipcRenderer.invoke('ai:set-config', patch),
   aiRefreshModels: (force?: boolean) => ipcRenderer.invoke('ai:refresh-models', force ?? false),
+  aiChatgptLogin: () => ipcRenderer.invoke('ai:chatgpt-login'),
+  aiChatgptLogout: () => ipcRenderer.invoke('ai:chatgpt-logout'),
   aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
   aiAbort: (requestId: number) => ipcRenderer.send('ai:abort', requestId),
   onAiDelta: (cb: (requestId: number, text: string, kind?: 'thinking') => void) => {

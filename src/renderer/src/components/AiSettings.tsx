@@ -8,9 +8,9 @@
 // on save and reads back only `hasKey` flags. Keep it that way — no key value
 // may be held in renderer state beyond the field the user is typing into.
 import { useEffect, useState } from 'react'
-import type { AiAccessMode, AiConfigView, AiProviderId } from '../../../shared/types'
+import type { AiAccessMode, AiConfigView, AiProviderId, FileError } from '../../../shared/types'
 import { bridge } from '../bridge'
-import { t, useLang } from '../i18n'
+import { errorText, t, useLang } from '../i18n'
 import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
 import {
   compatPresets,
@@ -35,6 +35,7 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
   const [keys, setKeys] = useState<Record<AiProviderId, string>>({
     anthropic: '',
     openai: '',
+    chatgpt: '',
     azure: '',
     openrouter: '',
     gemini: '',
@@ -52,6 +53,11 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
   const [access, setAccess] = useState<AiAccessMode>(config.access)
   const [saving, setSaving] = useState(false)
   const [ollamaFound, setOllamaFound] = useState(false)
+  // The ChatGPT row: the account as last known here (sign-out updates it in
+  // place), the browser round-trip in flight, and a failure to show under it
+  const [chatgptAccount, setChatgptAccount] = useState(config.chatgpt.account)
+  const [chatgptWaiting, setChatgptWaiting] = useState(false)
+  const [chatgptError, setChatgptError] = useState<FileError | null>(null)
 
   // Auto-detection: when nothing is configured yet, one quiet probe of
   // Ollama's default port. no-cors on purpose — we only need "is something
@@ -116,6 +122,28 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
     onSaved(next)
   }
 
+  // Signing in IS the save for this provider: main has already switched to it,
+  // so finish exactly like the save button (other edits in the form included)
+  // and land in the chat, ready to ask.
+  const chatgptLogin = async (): Promise<void> => {
+    setChatgptError(null)
+    setChatgptWaiting(true)
+    const result = await bridge.aiChatgptLogin()
+    setChatgptWaiting(false)
+    if (!('ok' in result)) {
+      setChatgptError(result)
+      return
+    }
+    setChatgptAccount(result.config.chatgpt.account)
+    await save()
+  }
+
+  const chatgptLogout = async (): Promise<void> => {
+    const next = await bridge.aiChatgptLogout()
+    setChatgptAccount(next.chatgpt.account)
+    window.dispatchEvent(new CustomEvent('pdfx:ai-config'))
+  }
+
   // The plain-web preview cannot store keys at all — just say so
   if (!config.keysSupported) {
     return (
@@ -166,7 +194,48 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
             </span>
           ))}
       </p>
-      {keyProviders().map(({ id, name }) => (
+      {keyProviders().map(({ id, name }) =>
+        id === 'chatgpt' ? (
+          // Not a key: a sign-in. The explanation that matters (unofficial
+          // route, ChatGPT's terms) is one short line; the rest is on hover.
+          <div className="ai-field-group" key={id}>
+            <div className="ai-field">
+              <span>{name}</span>
+              {!config.chatgpt.supported ? (
+                <span className="ai-field-hint">{t('ai.chatgptDesktopOnly')}</span>
+              ) : chatgptAccount ? (
+                <span className="ai-chatgpt-account">
+                  {t('ai.chatgptSignedIn', { account: chatgptAccount })}
+                  {' · '}
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      void chatgptLogout()
+                    }}
+                  >
+                    {t('ai.chatgptLogout')}
+                  </a>
+                </span>
+              ) : (
+                <button
+                  className="btn-secondary"
+                  disabled={chatgptWaiting || saving}
+                  title={t('ai.chatgptHintTip')}
+                  onClick={() => void chatgptLogin()}
+                >
+                  {chatgptWaiting ? t('ai.chatgptWaiting') : t('ai.chatgptLogin')}
+                </button>
+              )}
+            </div>
+            {config.chatgpt.supported && (
+              <p className="ai-field-hint" title={t('ai.chatgptHintTip')}>
+                {t('ai.chatgptHint')}
+              </p>
+            )}
+            {chatgptError && <p className="ai-field-hint ai-field-error">{errorText(chatgptError)}</p>}
+          </div>
+        ) : (
         <div className="ai-field-group" key={id}>
           <label className="ai-field">
             <span>{name}</span>
@@ -311,7 +380,8 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
             </>
           )}
         </div>
-      ))}
+        )
+      )}
       <p className="ai-settings-note">
         {t('ai.settingsNote')}
         {/* One sentence per storage mode, saying what actually protects the key

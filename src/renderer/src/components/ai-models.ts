@@ -17,10 +17,11 @@ import { isCompatService } from '../../../shared/ai-provider-profile'
 import { t } from '../i18n'
 import type { MsgKey } from '../i18n'
 
-/** The catalog id for a provider, or null for the two that have no live list
- *  (Azure is per-account, mock is fake). Everything else live-fetches. */
+/** The catalog id for a provider, or null for those that have no live list
+ *  (Azure is per-account, mock is fake, the ChatGPT plan backend has no
+ *  public listing). Everything else live-fetches. */
 const catalogId = (p: AiProviderId): CatalogProviderId | null =>
-  p === 'azure' || p === 'mock' ? null : p
+  p === 'azure' || p === 'mock' || p === 'chatgpt' ? null : p
 
 // Display order is RANKED by likelihood of preferred use (general global
 // usage patterns — Emil's call 2026-08-03), NOT alphabetical and NOT the
@@ -28,6 +29,7 @@ const catalogId = (p: AiProviderId): CatalogProviderId | null =>
 // product decision and does not move with this list.
 export const providerLabels = (): { id: AiProviderId; label: string }[] => [
   { id: 'openai', label: 'OpenAI' },
+  { id: 'chatgpt', label: t('ai.providerChatgpt') },
   { id: 'anthropic', label: 'Claude (Anthropic)' },
   { id: 'gemini', label: 'Google Gemini' },
   { id: 'azure', label: 'Azure OpenAI' },
@@ -87,6 +89,18 @@ export const MODELS: Record<
     { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', short: 'GPT-5.6 Terra', hint: 'ai.modelHintRecommended' },
     { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
   ],
+  // The ChatGPT plan's Codex backend serves a narrower set than the API.
+  // All three verified live against a signed-in Pro plan 2026-09-27
+  // (`npm run test:live -- --provider=chatgpt`, 7/7 each). gpt-5.4-mini was
+  // refused there: «The 'gpt-5.4-mini' model is not supported when using
+  // Codex with a ChatGPT account.» gpt-5.5 answers too but is last
+  // generation — out of the menu by the current-generation-only rule, and a
+  // stored 5.5 selection stays pickable (the menu keeps stored ids).
+  chatgpt: [
+    { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
+    { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
+  ],
   azure: [],
   // Hosted-service lineups verified against provider docs 2026-08-12/13
   // (docs/agent-notes/modeller-api.md has the sources and open questions)
@@ -130,7 +144,8 @@ export const MODELS: Record<
  *  heaviest model, NOT the default. */
 export const DEFAULT_MODELS: Partial<Record<AiProviderId, string>> = {
   anthropic: 'claude-sonnet-5',
-  openai: 'gpt-5.6-terra'
+  openai: 'gpt-5.6-terra',
+  chatgpt: 'gpt-6-sol'
 }
 
 /** One entry in a model dropdown: the curated list merged with the live
@@ -279,6 +294,9 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
 const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {
   anthropic: 200_000,
   openai: 200_000,
+  // opencode caps plan-backend input at 272k — a floor under it, and the ONLY
+  // number for this provider: the API's per-model windows do not hold here
+  chatgpt: 250_000,
   azure: 120_000,
   // Conservative floors for the hosted services — the live catalog's
   // per-model context_length (OpenRouter reports it) overrides these, so the
@@ -311,6 +329,8 @@ export function contextTokensFor(
     const live = remoteModel(catalog, cat, modelId)?.contextTokens
     if (live) return live
   }
+  // The plan backend caps input below the API's windows for the same ids
+  if (provider === 'chatgpt') return PROVIDER_CONTEXT_FLOOR.chatgpt
   return MODEL_CONTEXT_TOKENS[modelId] ?? PROVIDER_CONTEXT_FLOOR[provider] ?? 120_000
 }
 
@@ -381,6 +401,7 @@ export const THINKING_LEVELS: { id: ThinkingLevel; key: MsgKey }[] = [
  *  function, not a constant, because the compat label is translated. */
 export const keyProviders = (): { id: AiProviderId; name: string }[] => [
   { id: 'openai', name: 'OpenAI' },
+  { id: 'chatgpt', name: t('ai.providerChatgpt') },
   { id: 'anthropic', name: 'Claude (Anthropic)' },
   { id: 'gemini', name: 'Google Gemini' },
   { id: 'azure', name: 'Azure OpenAI' },

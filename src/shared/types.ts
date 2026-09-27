@@ -174,6 +174,13 @@ export type AiErrorCode =
   | 'ai-provider-unknown'
   | 'ai-aborted'
   | 'ai-disabled'
+  | 'ai-chatgpt-signed-out'
+  | 'ai-chatgpt-session-expired'
+  | 'ai-subscription-limit'
+  | 'ai-chatgpt-login-unsupported'
+  | 'ai-chatgpt-login-port-busy'
+  | 'ai-chatgpt-login-cancelled'
+  | 'ai-chatgpt-login-failed'
 
 /** And the same for the browser-extension target, where the sandbox refuses in
  *  ways neither the engine nor a provider can. These are fragments like the
@@ -486,6 +493,10 @@ export interface SetFormFieldRequest {
 export type AiProviderId =
   | 'anthropic'
   | 'openai'
+  // OpenAI through the user's ChatGPT PLAN instead of an API key: the Codex
+  // sign-in (OAuth) and its chatgpt.com backend. Desktop only — see
+  // src/main/chatgpt-auth.ts for why, and docs/PLATFORMS.md for the divergence.
+  | 'chatgpt'
   | 'azure'
   // First-class hosted OpenAI-compatible services (one key each; base URLs in
   // shared/ai-provider-profile.ts COMPAT_SERVICES)
@@ -644,7 +655,14 @@ export interface AiConfigView extends AiConfig {
   /** Live model lists as last fetched from the providers ({} until a key
    *  exists and a refresh has succeeded) */
   catalog: AiModelCatalog
+  /** The ChatGPT-plan sign-in. `supported` is false where the OAuth flow
+   *  cannot run (extension, web preview); `account` is the signed-in email,
+   *  '' when signed out. The tokens themselves never leave main. */
+  chatgpt: { supported: boolean; account: string }
 }
+
+/** Outcome of the ChatGPT sign-in: the new view, or a named failure */
+export type ChatgptLoginResult = { ok: true; config: AiConfigView } | FileError
 
 /** An image attached to a user message (figure snip, pasted screenshot).
  *  Raw base64 without the data: prefix; mediaType e.g. 'image/png'. */
@@ -966,6 +984,11 @@ export interface PdfxApi {
    *  the updated view either way, so callers can just re-render from it.
    *  Fetch failures keep the previous snapshot — this never makes things worse. */
   aiRefreshModels(force?: boolean): Promise<AiConfigView>
+  /** Sign in with a ChatGPT plan (opens the browser, waits for the callback).
+   *  Desktop only — elsewhere resolves with `ai-chatgpt-login-unsupported`. */
+  aiChatgptLogin(): Promise<ChatgptLoginResult>
+  /** Forget the ChatGPT tokens */
+  aiChatgptLogout(): Promise<AiConfigView>
   /** Streams deltas via onAiDelta; resolves with the final result */
   aiChat(request: AiChatRequest): Promise<AiChatResult>
   aiAbort(requestId: number): void

@@ -627,11 +627,66 @@ function partsFromAnnotatedText(text: string, annotations: OpenAiAnnotation[]): 
   return parts
 }
 
+/** The ChatGPT plan's Codex backend: the Responses API at another address,
+ *  authorised by the Codex sign-in's access token plus the account id from its
+ *  id_token. Same request body with `store: false` (the backend keeps nothing
+ *  and refuses to be asked to) and no output cap — mirroring what opencode
+ *  sends (packages/opencode/src/plugin/openai/codex.ts, read 2026-09-27). */
+export const CHATGPT_CODEX_URL = 'https://chatgpt.com/backend-api/codex/responses'
+/** Who we say we are to that backend. opencode sends its own name, so the
+ *  field is not an allowlist of Codex clients — and pretending to be Codex
+ *  CLI is a line we do not cross. */
+export const CHATGPT_ORIGINATOR = 'pdf-scholar'
+
+/** The plan's usage window is spent: HTTP 429 with type usage_limit_reached.
+ *  Matched on the type AND the prose, since the backend is undocumented. */
+const USAGE_LIMIT_RE = /usage_limit_reached|usage limit has been reached/i
+
+/** Where a Responses request goes and how it is authorised. `plan` marks the
+ *  ChatGPT backend, whose failures mean different things (a 401 is a sign-in
+ *  that lapsed, a 429 is the subscription window, not an API rate limit). */
+interface ResponsesTarget {
+  url: string
+  headers: Record<string, string>
+  plan: boolean
+}
+
+function chatgptTarget(accessToken: string, accountId: string): ResponsesTarget {
+  return {
+    url: CHATGPT_CODEX_URL,
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      ...(accountId ? { 'chatgpt-account-id': accountId } : {}),
+      'openai-beta': 'responses=experimental',
+      originator: CHATGPT_ORIGINATOR
+    },
+    plan: true
+  }
+}
+
+/** A plan-backend 429 in words someone can act on: when the window reopens,
+ *  if the body says (resets_in_seconds), else the backend's own sentence. */
+function subscriptionLimitFailure(detail: string): FileError {
+  let message = detail.slice(0, 300)
+  try {
+    const err = (JSON.parse(detail) as { error?: { message?: string; resets_in_seconds?: number } }).error
+    if (err?.message) message = err.message
+    if (typeof err?.resets_in_seconds === 'number') {
+      const minutes = Math.max(1, Math.round(err.resets_in_seconds / 60))
+      message += ` (resets in ${minutes} min)`
+    }
+  } catch {
+    /* not JSON — keep the raw text */
+  }
+  return AI_ERRORS.subscriptionLimit(message)
+}
+
 /** OpenAI Responses API (streaming SSE). The 'openai' provider lives here —
  *  Chat Completions has no server-side web_search tool; Azure deployments
- *  stay on chatOpenAiCompatible below. */
+ *  stay on chatOpenAiCompatible below. 'chatgpt' rides the same path with a
+ *  different target (chatgptTarget above). */
 async function chatOpenAiResponses(
-  apiKey: string,
+  target: ResponsesTarget,
   model: string,
   thinking: ThinkingLevel,
   req: AiChatRequest,
@@ -672,6 +727,7 @@ async function chatOpenAiResponses(
     input,
     stream: true
   }
+  if (target.plan) body.store = false
   if (webSearchEnabled(req)) body.tools = [{ type: 'web_search' }]
   if (OPENAI_REASONING_RE.test(model)) body.reasoning = { effort: openAiEffort(thinking, model) }
 
@@ -681,15 +737,19 @@ async function chatOpenAiResponses(
   let response: Response
   let tokenLimit: number | undefined
   for (let attempt = 0; ; attempt++) {
-    response = await fetch('https://api.openai.com/v1/responses', {
+    response = await fetch(target.url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      headers: { 'content-type': 'application/json', ...target.headers },
       body: JSON.stringify(body),
       signal
     })
     tokenLimit = tokenLimitFromHeaders(response.headers) ?? tokenLimit
     if (response.ok && response.body) break
     const detail = await response.text().catch(() => '')
+    if (target.plan) {
+      if (response.status === 401) return AI_ERRORS.chatgptSessionExpired
+      if (response.status === 429 && USAGE_LIMIT_RE.test(detail)) return subscriptionLimitFailure(detail)
+    }
     if (response.status === 400 && attempt < 2) {
       if ('reasoning' in body && /reasoning/i.test(detail)) {
         delete body.reasoning
@@ -709,14 +769,22 @@ async function chatOpenAiResponses(
 
   // Typed SSE events; each data payload carries its own `type`, so the
   // `event:` lines can be ignored. Text arrives as output_text.delta; the
-  // completed event carries the full response (output items, usage, model).
+  // completed event carries the full response (output items, usage, model) —
+  // except from the ChatGPT plan's Codex backend, whose response.completed
+  // carries `output: []` (recorded 2026-09-27, scripts/fixtures/streams/
+  // chatgpt-*.json): there the finished message exists only in its
+  // response.output_item.done event, so every such item is kept as it lands.
   interface OutputPiece {
     type: string
     text?: string
     annotations?: OpenAiAnnotation[]
   }
+  interface OutputItem {
+    type: string
+    content?: OutputPiece[]
+  }
   interface FinalResponse {
-    output?: { type: string; content?: OutputPiece[] }[]
+    output?: OutputItem[]
     usage?: {
       input_tokens?: number
       output_tokens?: number
@@ -730,6 +798,8 @@ async function chatOpenAiResponses(
   let buffer = ''
   let finalResp: FinalResponse | null = null
   let failure: FileError | null = null
+  const doneItems: OutputItem[] = []
+  let streamedText = ''
   for (;;) {
     const { done, value } = await reader.read()
     if (done) break
@@ -745,7 +815,13 @@ async function chatOpenAiResponses(
         const parsed = JSON.parse(payload)
         switch (parsed.type) {
           case 'response.output_text.delta':
-            if (typeof parsed.delta === 'string') emit(parsed.delta)
+            if (typeof parsed.delta === 'string') {
+              streamedText += parsed.delta
+              emit(parsed.delta)
+            }
+            break
+          case 'response.output_item.done':
+            if (parsed.item && typeof parsed.item.type === 'string') doneItems.push(parsed.item)
             break
           case 'response.completed':
           case 'response.incomplete':
@@ -757,12 +833,14 @@ async function chatOpenAiResponses(
               { model, hadImages: carriesImages(req) }
             )
             break
-          case 'error':
-            failure = providerFailure(parsed.message ?? AI_ERRORS.providerUnknown.error, {
-              model,
-              hadImages: carriesImages(req)
-            })
+          case 'error': {
+            const message = parsed.message ?? AI_ERRORS.providerUnknown.error
+            failure =
+              target.plan && USAGE_LIMIT_RE.test(`${parsed.code ?? ''} ${message}`)
+                ? AI_ERRORS.subscriptionLimit(message)
+                : providerFailure(message, { model, hadImages: carriesImages(req) })
             break
+          }
         }
       } catch {
         /* ignore malformed keep-alives */
@@ -773,13 +851,18 @@ async function chatOpenAiResponses(
   if (!finalResp) return AI_ERRORS.streamAborted
 
   const parts: AiContentPart[] = []
-  for (const item of finalResp.output ?? []) {
+  const items = finalResp.output?.length ? finalResp.output : doneItems
+  for (const item of items) {
     if (item.type !== 'message') continue
     for (const piece of item.content ?? []) {
       if (piece.type !== 'output_text' || typeof piece.text !== 'string') continue
       parts.push(...partsFromAnnotatedText(piece.text, piece.annotations ?? []))
     }
   }
+  // Last resort: text the user already watched stream in must not vanish
+  // because no event carried the finished message — the answer as streamed,
+  // quote contract parsed, without web annotations (those only ride items)
+  if (parts.length === 0 && streamedText.trim()) parts.push(...parseQuoteContract(streamedText))
   if (parts.length === 0) parts.push({ text: '', citations: [] })
   return {
     ok: true,
@@ -1062,6 +1145,9 @@ export interface ProviderChatParams {
   models: Record<AiProviderId, string>
   azure: { endpoint: string; deployment: string; apiVersion: string }
   compat: { baseUrl: string }
+  /** provider 'chatgpt' only: `key` is then the Codex ACCESS token (fresh —
+   *  refreshing is the caller's job) and this the account it belongs to */
+  chatgptAccountId?: string | undefined
   thinking: ThinkingLevel
   /** Live model catalog (capability data for request shaping); absent or empty
    *  falls back to the per-family heuristics */
@@ -1077,6 +1163,11 @@ export interface ProviderChatParams {
  *  extras (Azure endpoint/deployment). Aborts surface as AI_ERRORS.aborted. */
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
   const { provider, key, models, azure, compat, thinking, catalog, req, emit, signal } = params
+  const openAiTarget: ResponsesTarget = {
+    url: 'https://api.openai.com/v1/responses',
+    headers: { authorization: `Bearer ${key}` },
+    plan: false
+  }
   try {
     // A picture in the question, and a catalogue that already says this model
     // is text-only (OpenRouter's modalities, Ollama's capabilities): say so
@@ -1111,7 +1202,16 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
         return await chatAnthropic(key, models.anthropic, thinking, caps, req, emit, signal)
       }
       case 'openai':
-        return await chatOpenAiResponses(key, models.openai, thinking, req, emit, signal)
+        return await chatOpenAiResponses(openAiTarget, models.openai, thinking, req, emit, signal)
+      case 'chatgpt':
+        return await chatOpenAiResponses(
+          chatgptTarget(key, params.chatgptAccountId ?? ''),
+          models.chatgpt,
+          thinking,
+          req,
+          emit,
+          signal
+        )
       case 'azure': {
         const endpoint = azure.endpoint.replace(/\/+$/, '')
         if (!endpoint || !azure.deployment) {

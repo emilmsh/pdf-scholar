@@ -104,6 +104,16 @@ export const PROVIDER_PROFILES: Record<AiProviderId, AiProviderProfile> = {
     vision: true,
     keyRequired: true
   },
+  // The same Responses request as 'openai', sent to the ChatGPT plan's Codex
+  // backend. keyRequired stands for "signed in" here — hasKey.chatgpt is the
+  // token bundle, never a pasted key.
+  chatgpt: {
+    citations: 'contract',
+    webSearch: true,
+    thinking: 'effort',
+    vision: true,
+    keyRequired: true
+  },
   // Azure deployments go through Chat Completions, which has no server-side
   // web-search tool — the toggle must not exist there.
   azure: {

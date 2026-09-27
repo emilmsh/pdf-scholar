@@ -17,7 +17,7 @@ import { buildAssistantHash } from '../../shared/viewer-url'
 import { version as appVersion } from '../../../package.json'
 import { DEFAULT_SETTINGS } from '../../shared/defaults'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
-import { AI_ERRORS } from '../../shared/engine-errors'
+import { AI_ERRORS, CHATGPT_LOGIN_ERRORS } from '../../shared/engine-errors'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
 import {
   browserApplyAnnotation,
@@ -221,11 +221,12 @@ export const webApi: PdfxApi = {
   // so the chat UI (streaming, citation chips, jump+highlight) can be tested.
   aiGetConfig: async () => ({
     ...loadWebAiConfig(),
-    hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
+    hasKey: { anthropic: false, openai: false, chatgpt: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
     // Mock-only preview: no key is ever stored, so there is nothing to protect
     keyStorage: 'session-only' as const,
     keysSupported: false,
-    catalog: {}
+    catalog: {},
+    chatgpt: { supported: false, account: '' }
   }),
   aiSetConfig: async (patch) => {
     const current = loadWebAiConfig()
@@ -240,14 +241,18 @@ export const webApi: PdfxApi = {
     localStorage.setItem('pdfx-web-ai', JSON.stringify(next))
     return {
       ...next,
-      hasKey: { anthropic: false, openai: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
+      hasKey: { anthropic: false, openai: false, chatgpt: false, azure: false, openrouter: false, gemini: false, xai: false, mistral: false, groq: false, compat: false, mock: true },
       keyStorage: 'session-only' as const,
       keysSupported: false,
-      catalog: {}
+      catalog: {},
+      chatgpt: { supported: false, account: '' }
     }
   },
   // No keys in the preview → nothing to fetch; hand back the current view
   aiRefreshModels: async () => webApi.aiGetConfig(),
+  // The ChatGPT sign-in needs main's localhost listener (src/main/chatgpt-auth.ts)
+  aiChatgptLogin: async () => CHATGPT_LOGIN_ERRORS.unsupported,
+  aiChatgptLogout: async () => webApi.aiGetConfig(),
   aiChat: async (request): Promise<AiChatResult> => {
     const config = loadWebAiConfig()
     // Dead-man switch: the mock sends nothing anywhere, but honouring the mode

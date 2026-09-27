@@ -52,6 +52,8 @@ const DEFAULT_AI: StoredAiConfig = {
   keys: {
     anthropic: '',
     openai: '',
+    // Not an API key: the sealed ChatGPT token bundle (src/main/chatgpt-auth.ts)
+    chatgpt: '',
     azure: '',
     openrouter: '',
     gemini: '',

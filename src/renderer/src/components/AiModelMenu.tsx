@@ -258,7 +258,11 @@ export function ModelQuickMenu({
       // local endpoint — Ollama, LM Studio — and Azure. Those have no curated
       // list and nothing live until they are configured, so the one place you
       // would look to find them was the one place that never mentioned them).
-    }).filter((g) => config.keysSupported || g.enabled)
+    })
+      // The ChatGPT sign-in cannot exist where it cannot run (the extension) —
+      // a greyed row there would promise a setup no settings page offers
+      .filter((g) => g.id !== 'chatgpt' || config.chatgpt.supported)
+      .filter((g) => config.keysSupported || g.enabled)
     if (provider === 'mock' || !config.keysSupported)
       groups.push({
         id: 'mock' as AiProviderId,

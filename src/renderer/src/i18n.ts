@@ -110,6 +110,16 @@ const nb = {
   'aierr.ai-aborted': 'Avbrutt',
   'aierr.ai-disabled':
     'KI-funksjonene er slått av i KI-innstillingene, så ingen forespørsel ble sendt.',
+  'aierr.ai-chatgpt-signed-out': 'Du er ikke logget inn med ChatGPT. Logg inn i KI-innstillingene.',
+  'aierr.ai-chatgpt-session-expired':
+    'ChatGPT-innloggingen er utløpt eller trukket tilbake. Logg inn på nytt i KI-innstillingene.',
+  'aierr.ai-subscription-limit':
+    'Kvoten i ChatGPT-abonnementet er brukt opp for nå. Den fylles opp igjen av seg selv. Vent til den er tilbake, eller bytt til en leverandør med API-nøkkel.',
+  'aierr.ai-chatgpt-login-unsupported': 'Innlogging med ChatGPT finnes bare i skrivebordsappen.',
+  'aierr.ai-chatgpt-login-port-busy':
+    'Port 1455 er opptatt, trolig av en annen ChatGPT-innlogging som venter (Codex eller opencode). Fullfør eller lukk den, og prøv igjen.',
+  'aierr.ai-chatgpt-login-cancelled': 'Innloggingen ble avbrutt eller tok for lang tid.',
+  'aierr.ai-chatgpt-login-failed': 'Innloggingen med ChatGPT mislyktes.',
   // One per ExtensionErrorCode. Fragments like engine.* — the full instructions
   // live in the notice the shell raises alongside (fileaccess.* below).
   'exterr.ext-file-access': 'nettleseren gir ikke utvidelsen tilgang til lokale filer ennå',
@@ -707,6 +717,15 @@ const nb = {
   'ai.chipTip': 'Hopp til kilden i dokumentet',
   'ai.providerMock': 'Test uten nøkkel (mock)',
   'ai.providerCompat': 'Egendefinert / lokal (OpenAI-kompatibel)',
+  'ai.providerChatgpt': 'ChatGPT-abonnement',
+  'ai.chatgptLogin': 'Logg inn med ChatGPT',
+  'ai.chatgptWaiting': 'Venter på nettleseren …',
+  'ai.chatgptSignedIn': 'Logget inn som {account}',
+  'ai.chatgptLogout': 'Logg ut',
+  'ai.chatgptHint': 'Bruker kvoten i Plus/Pro-abonnementet, ingen API-kostnad. Uoffisiell vei, og ChatGPT-vilkårene gjelder.',
+  'ai.chatgptHintTip':
+    'Samme innlogging som Codex og opencode bruker. OpenAI tillater den i dag, men har ingen avtale om den og kan stenge den. Det du sender behandles etter ChatGPT-vilkårene (ikke API-vilkårene), så innstillingen for modelltrening på ChatGPT-kontoen din gjelder.',
+  'ai.chatgptDesktopOnly': 'Bare i skrivebordsappen.',
   'ai.localTag': 'lokal',
   'ai.keySaved': '•••••••• (lagret)',
   'ai.keyNew': 'Lim inn nøkkelen din',
@@ -1062,6 +1081,16 @@ const en: Dict = {
   'aierr.ai-provider-unknown': 'Unknown error from the provider.',
   'aierr.ai-aborted': 'Stopped',
   'aierr.ai-disabled': 'AI features are switched off in the AI settings, so no request was sent.',
+  'aierr.ai-chatgpt-signed-out': 'You are not signed in with ChatGPT. Sign in from the AI settings.',
+  'aierr.ai-chatgpt-session-expired':
+    'The ChatGPT sign-in has expired or was revoked. Sign in again from the AI settings.',
+  'aierr.ai-subscription-limit':
+    'Your ChatGPT plan’s usage allowance is spent for now. It refills on its own — wait for it, or switch to a provider with an API key.',
+  'aierr.ai-chatgpt-login-unsupported': 'Signing in with ChatGPT is only available in the desktop app.',
+  'aierr.ai-chatgpt-login-port-busy':
+    'Port 1455 is in use, probably by another ChatGPT sign-in that is waiting (Codex or opencode). Finish or close it and try again.',
+  'aierr.ai-chatgpt-login-cancelled': 'The sign-in was cancelled or took too long.',
+  'aierr.ai-chatgpt-login-failed': 'Signing in with ChatGPT failed.',
   'exterr.ext-file-access': 'the browser does not let the extension read local files yet',
 
   'zotero.show': 'Show in Zotero',
@@ -1599,6 +1628,15 @@ const en: Dict = {
   'ai.chipTip': 'Jump to the source in the document',
   'ai.providerMock': 'Test without a key (mock)',
   'ai.providerCompat': 'Custom / local (OpenAI-compatible)',
+  'ai.providerChatgpt': 'ChatGPT plan',
+  'ai.chatgptLogin': 'Sign in with ChatGPT',
+  'ai.chatgptWaiting': 'Waiting for the browser …',
+  'ai.chatgptSignedIn': 'Signed in as {account}',
+  'ai.chatgptLogout': 'Sign out',
+  'ai.chatgptHint': 'Uses your Plus/Pro plan’s allowance, no API cost. Unofficial route; ChatGPT’s terms apply.',
+  'ai.chatgptHintTip':
+    'The same sign-in Codex and opencode use. OpenAI allows it today but has no agreement covering it and can close it. What you send is handled under ChatGPT’s terms (not the API’s), so your ChatGPT account’s model-training setting applies.',
+  'ai.chatgptDesktopOnly': 'Desktop app only.',
   'ai.localTag': 'local',
   'ai.keySaved': '•••••••• (saved)',
   'ai.keyNew': 'Paste your key',
@@ -1931,7 +1969,9 @@ const PROVIDER_SENTENCE_CODES = new Set<string>([
   'ai-request-too-large',
   'ai-rate-limited',
   'ai-model-overloaded',
-  'ai-no-credit'
+  'ai-no-credit',
+  'ai-subscription-limit',
+  'ai-chatgpt-login-failed'
 ])
 
 /** The provider's raw sentence for a failure, when there is one worth reading
