@@ -144,23 +144,23 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.49.0
+## What's new in this version (≤ 1 500 chars) — v0.52.0
 
 **EN:**
 ```
-• A tab drags like a file: drop it into another PDF Scholar window, a browser's upload field, an e-mail or a folder — the same drag Explorer starts
-• Ctrl+drag keeps the in-app move: onto another window, or out onto the desktop for a window of its own. Both gestures are listed under the fixed keys in the shortcuts dialog
-• Sticky notes made in other apps, such as Acrobat, keep their icon when you move them — a move used to redraw the note with a different icon, fully opaque and in a smaller box
-• Moving or recolouring an existing annotation lands at once: the repaint afterwards re-read every page of the document, and now re-reads only the page you changed
+• Copy image … outlines every picture in the document: click one to copy it or save it as PNG at the file's own resolution, or drag a box to take exactly that region — vector figures, tables and equations too — at 300 dpi. Word and PowerPoint paste it as a picture, and the reading theme never comes along
+• The Print button prints: on Windows it did nothing, because the Electron version the app shipped on could not print
+• Current AI models: Claude Opus 5.5, GPT-6 Sol, GPT-6 Luna and Grok 4.7 replace their predecessors, which stay selectable if you already use them. A new setup starts on Claude Opus 5.5 or GPT-6 Sol
+• When Claude Opus declines a question on safety grounds, Anthropic now answers it with the model it recommends instead, and the answer says which model wrote it
 • Smaller fixes and refinements
 ```
 
 **NO:**
 ```
-• En fane dras som en fil: slipp den i et annet PDF Scholar-vindu, i et opplastingsfelt i nettleseren, i en e-post eller i en mappe — samme drag som Utforsker starter
-• Ctrl+dra flytter fanen i appen: til et annet vindu, eller ut på skrivebordet for et eget vindu. Begge bevegelsene står under faste taster i hurtigtastmenyen
-• Notater laget i andre programmer, som Acrobat, beholder ikonet sitt når du flytter dem — før ble notatet tegnet om med et annet ikon, helt dekkende og i en mindre boks
-• Å flytte eller farge om en eksisterende merknad lander med én gang: gjenoppfriskingen etterpå leste alle sidene i dokumentet på nytt, nå bare siden du endret
+• Kopier bilde … markerer alle bildene i dokumentet: klikk ett for å kopiere det eller lagre det som PNG i filens egen oppløsning, eller dra en ramme for å ta akkurat det området — også vektorfigurer, tabeller og ligninger — i 300 dpi. Word og PowerPoint limer det inn som et bilde, og lesemodusen blir aldri med
+• Skriv ut virker: på Windows gjorde knappen ingenting, fordi Electron-versjonen appen kom med ikke kunne skrive ut
+• Oppdaterte AI-modeller: Claude Opus 5.5, GPT-6 Sol, GPT-6 Luna og Grok 4.7 erstatter forgjengerne, som fortsatt kan velges om du bruker dem. Et nytt oppsett starter på Claude Opus 5.5 eller GPT-6 Sol
+• Når Claude Opus avslår et spørsmål av sikkerhetshensyn, svarer Anthropic nå med modellen de anbefaler i stedet, og svaret sier hvilken modell som skrev det
 • Mindre feilrettinger og finpuss
 ```
 
