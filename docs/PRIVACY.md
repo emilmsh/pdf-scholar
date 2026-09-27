@@ -1,6 +1,6 @@
 # PDF Scholar — Privacy Policy
 
-_Last updated: 2026-09-02_
+_Last updated: 2026-09-27_
 
 PDF Scholar (the desktop app and the browser extension) is a local-first PDF
 reader and annotator. **It collects no data about you.**
@@ -17,8 +17,9 @@ reader and annotator. **It collects no data about you.**
 
 ## AI assistant (optional, off by default)
 
-The AI features only work if you enter **your own API key** for a provider, or
-point the app at a local model server. Nothing is sent in the background:
+The AI features only work if you enter **your own API key** for a provider,
+sign in with your own **ChatGPT plan** (desktop app only), or point the app at a
+local model server. Nothing is sent in the background:
 document content leaves your machine only when you use an AI action, and each
 request goes **directly from your machine to the provider you chose** under
 your key and their privacy terms. There is no intermediary server operated by
@@ -46,6 +47,18 @@ OpenAI-compatible endpoint you point the app at. With a **local** server
 (Ollama, LM Studio) the content stays on your machine. What a hosted provider
 does with received content — retention, training, region — is governed by your
 agreement with that provider, not by the app.
+
+**Signed in with a ChatGPT plan** (desktop app only). Instead of an API key you
+can sign in with a ChatGPT Plus or Pro account. The sign-in happens on OpenAI's
+own page in your browser; the app receives the resulting tokens on a local port
+(localhost:1455) and never sees your password. Requests then go directly to
+OpenAI's ChatGPT service (chatgpt.com) and count against your plan's allowance.
+Content sent this way is handled under **ChatGPT's terms and privacy policy**,
+not OpenAI's API terms — in particular, your ChatGPT account's own setting for
+model training applies. The tokens are stored exactly like an API key (below),
+are sent only to OpenAI, and are deleted when you sign out in the AI settings.
+This uses the same sign-in as OpenAI's Codex tool; OpenAI offers no official
+program for other apps, so it may stop working if OpenAI changes that.
 
 **The AI access switch.** The AI settings hold a three-position switch: **On**
 (AI actions fire when used), **Confirm before sharing** (the first time a

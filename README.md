@@ -42,6 +42,7 @@ arm64 build rather than x64 under emulation. Everything works offline. The AI fe
 need your own API key (Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini,
 Grok, Mistral or Groq) — or any OpenAI-compatible endpoint, including local models
 via Ollama or LM Studio, which need no key at all — entered in the assistant settings.
+Or sign in with a ChatGPT Plus/Pro plan and use its allowance instead of an API key.
 
 <sub>No install allowed on your machine? Each release also carries a **portable zip**
 (`PDF-Scholar-*-portable-x64.zip`, and an `arm64` twin): extract it anywhere and run
@@ -280,7 +281,7 @@ Both modes live in one search bar, a tab apart.
 
 ![The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip](docs/screenshots/assistant.png)
 
-Optional, and it runs on your own API key. The assistant answers from the document you
+Optional, and it runs on your own API key — or on your ChatGPT plan. The assistant answers from the document you
 have open, and each claim carries a source reference; following one goes to the sentence
 the claim came from.
 
@@ -309,6 +310,11 @@ the claim came from.
   which need no key. One menu holds every provider's models — a curated, verified
   list each, strongest first, with the provider's full live listing reachable by
   search; requests go directly to the provider, with no server in between
+- **Your ChatGPT plan instead of a key** (desktop app): sign in with ChatGPT Plus or Pro
+  and the assistant runs on the plan's allowance — GPT-6 Astra, Sol and Luna, no API
+  bill. It is an unofficial route (the same sign-in Codex and opencode use, which OpenAI
+  allows today but can close), and ChatGPT's terms apply rather than the API's, so your
+  account's model-training setting decides. The API-key provider stays alongside it
 - Each answer reports the token count the provider billed, and the key settings link to
   the provider's console, where a spending cap can be set
 
