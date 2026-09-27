@@ -39,8 +39,9 @@ export const DEFAULT_SETTINGS: Settings = {
  *  CHANGING THESE CHANGES WHICH MODEL USERS GET. That is a product decision, not
  *  a refactor: do not touch them without asking. */
 export const DEFAULT_AI_MODELS: Record<AiProviderId, string> = {
-  anthropic: 'claude-sonnet-5',
-  openai: 'gpt-5.6-terra',
+  // Emil, 2026-09-27: Opus 5.5 and GPT-6 Sol (were Sonnet 5 and GPT-5.6 Terra)
+  anthropic: 'claude-opus-5-5',
+  openai: 'gpt-6-sol',
   // Emil's call 2026-09-27, verified live on a Pro plan that day
   chatgpt: 'gpt-6-sol',
   azure: '',

@@ -734,7 +734,17 @@ export interface AiUsage {
  *  document budget by it (ai-token-limits.ts). Rides on both arms because the
  *  informative case is the rejection. */
 export type AiChatResult =
-  | { ok: true; parts: AiContentPart[]; usage: AiUsage; model: string; tokenLimit?: number }
+  | {
+      ok: true
+      parts: AiContentPart[]
+      usage: AiUsage
+      model: string
+      tokenLimit?: number
+      /** Set when the provider's server-side fallback answered in place of the
+       *  chosen model (Anthropic, after a safety-classifier decline): the id of
+       *  the model that finished the answer. The panel says so on the answer. */
+      fallbackModel?: string
+    }
   | (FileError & { tokenLimit?: number })
 
 /** Where a clicked citation should land in the document: a page plus a char

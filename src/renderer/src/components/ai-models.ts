@@ -77,17 +77,22 @@ export const MODELS: Record<
     // 2026-09-01; Fable 5 moved to Anthropic's "Legacy models" list, still
     // served — a stored Fable 5 selection stays pickable)
     { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'ai.modelHintHeaviest' },
-    { id: 'claude-opus-5', label: 'Claude Opus 5', short: 'Opus 5', hint: 'ai.modelHintCapable' },
-    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'ai.modelHintRecommended' },
+    // Opus 5.5 replaced Opus 5 in the same slot 2026-09-26 (launched
+    // 2026-09-22; Opus 5 moved to "Legacy models", still served) and became
+    // the default 2026-09-27 (Emil) — the «Anbefalt» hint follows the default
+    { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', short: 'Opus 5.5', hint: 'ai.modelHintRecommended' },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'ai.modelHintValue' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'ai.modelHintFast' }
   ],
   openai: [
-    // GPT-6 Astra (launched 2026-09-03) sits above the 5.6 trio, which stays
-    // current — Astra is a new top tier, not a replacement
+    // GPT-6 Astra (launched 2026-09-03) is a new top tier. GPT-6 Sol and Luna
+    // (launched 2026-09-22) replaced their 5.6 namesakes 2026-09-26, and Sol
+    // became the default 2026-09-27 (Emil). There is no GPT-6 Terra; 5.6 Terra
+    // left the menu with the default, being both older and pricier than 6 Sol
+    // ($2/$12 against $2/$10) — a stored Terra selection stays pickable
     { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
-    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', short: 'GPT-5.6 Sol', hint: 'ai.modelHintCapable' },
-    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', short: 'GPT-5.6 Terra', hint: 'ai.modelHintRecommended' },
-    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', short: 'GPT-5.6 Luna', hint: 'ai.modelHintFast' }
+    { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
   ],
   // The ChatGPT plan's Codex backend serves a narrower set than the API.
   // All three verified live against a signed-in Pro plan 2026-09-27
@@ -115,7 +120,8 @@ export const MODELS: Record<
     { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite', short: 'Gemini 3.5 Lite', hint: 'ai.modelHintFast' }
   ],
   xai: [
-    { id: 'grok-4.6', label: 'Grok 4.6', short: 'Grok 4.6', hint: 'ai.modelHintCapable' },
+    // Grok 4.7 replaced 4.6 in the same slot 2026-09-26 (launched 2026-09-21)
+    { id: 'grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'ai.modelHintCapable' },
     { id: 'grok-4.3', label: 'Grok 4.3', short: 'Grok 4.3', hint: 'ai.modelHintRecommended' }
   ],
   // Mistral publishes dated ids only — Medium outranks Large in their current
@@ -143,8 +149,8 @@ export const MODELS: Record<
  *  storage defaults — MODELS is display-ordered by capability, so [0] is the
  *  heaviest model, NOT the default. */
 export const DEFAULT_MODELS: Partial<Record<AiProviderId, string>> = {
-  anthropic: 'claude-sonnet-5',
-  openai: 'gpt-5.6-terra',
+  anthropic: 'claude-opus-5-5',
+  openai: 'gpt-6-sol',
   chatgpt: 'gpt-6-sol'
 }
 
@@ -231,6 +237,10 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
   // Aggregator ids carry a vendor prefix (anthropic/claude-sonnet-5) — the
   // vendor belongs in the menu's group label, never in the header chip
   if (id.includes('/')) id = id.slice(id.lastIndexOf('/') + 1)
+  // Anthropic writes versions with a dash and dates some ids
+  // (claude-opus-4-8, claude-haiku-4-5-20251001): «Claude Opus 4.8», never
+  // «Claude Opus 4 8» — the fallback chip names models nobody curated
+  if (/^claude-/i.test(id)) id = id.replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, '-$1.$2')
   return id
     .replace(/^claude-/i, 'Claude ')
     .replace(/^gpt-/i, 'GPT-')
@@ -255,14 +265,20 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // claude-fable-5 kept here though no longer curated (see MODELS.anthropic) —
   // a stored selection from before 5.1 must not regress to the 200k floor
   'claude-fable-5': 1_000_000,
+  // Opus 5.5 added 2026-09-26 (same 1M window); claude-opus-5 stays for
+  // stored selections, like claude-fable-5 above
+  'claude-opus-5-5': 1_000_000,
   'claude-opus-5': 1_000_000,
   'claude-sonnet-5': 1_000_000,
   'claude-haiku-4-5': 200_000,
   // 922K is the documented INPUT capacity (1.05M total minus the 128K output
   // ceiling); 900K keeps the floor conservative without throwing the window
-  // away, as the old 250_000 did. Verified 2026-08-13 (Astra 2026-09-05, same
-  // numbers on its model page), see modeller-api.md.
+  // away, as the old 250_000 did. Verified 2026-08-13 (Astra 2026-09-05, GPT-6
+  // Sol/Luna 2026-09-26 — same numbers on their model pages), see
+  // modeller-api.md. The 5.6 Sol/Luna entries stay for stored selections.
   'gpt-6-astra': 900_000,
+  'gpt-6-sol': 900_000,
+  'gpt-6-luna': 900_000,
   'gpt-5.6-sol': 900_000,
   'gpt-5.6-terra': 900_000,
   'gpt-5.6-luna': 900_000,
@@ -277,9 +293,11 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // regress to the 200k provider floor
   'gemini-3.7-flash': 1_000_000,
   'gemini-3.6-flash': 1_000_000,
+  'grok-4.7': 500_000,
+  // grok-4.6 and grok-4.5 kept here though no longer curated (see
+  // MODELS.xai) — a stored selection from before either swap must not
+  // regress to the 128k floor
   'grok-4.6': 500_000,
-  // grok-4.5 kept here though no longer curated (see MODELS.xai) — a stored
-  // selection from before this review must not regress to the 128k floor
   'grok-4.5': 500_000,
   'grok-4.3': 1_000_000,
   'openai/gpt-oss-120b': 131_072,

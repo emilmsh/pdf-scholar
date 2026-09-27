@@ -43,27 +43,33 @@ export interface AiProviderProfile {
  *  drift apart. Providers whose profile says thinking:'per-model' (Anthropic)
  *  have their own capability logic and never consult this.
  *
- *  grok-4.5 and grok-4.6 are included because xAI documents reasoning_effort
- *  (low/medium/high, plus xhigh on 4.6) for both (docs/agent-notes/
- *  modeller-api.md, verified 2026-08-12 and 2026-08-13); grok-4.5 stays in
- *  the regex even though the curated menu now offers 4.6 instead, so a
- *  stored 4.5 selection from before that switch keeps working. The match is
+ *  grok-4.5, grok-4.6 and grok-4.7 are included because xAI documents
+ *  reasoning_effort low/medium/high/xhigh for all three (docs/agent-notes/
+ *  modeller-api.md, verified 2026-08-12, 2026-08-13 and 2026-09-26); 4.5 and
+ *  4.6 stay in the regex even though the curated menu now offers 4.7, so a
+ *  stored selection from before either switch keeps working. The match is
  *  deliberately narrow — other grok ids (4.3) stay out until someone
  *  verifies them, per the fewer-models-that-work rule.
  *
  *  gpt-oss (Groq's openai/gpt-oss-120b and openai/gpt-oss-20b) is included
  *  because Groq documents reasoning_effort low/medium/high for both
- *  (console.groq.com/docs/reasoning, verified 2026-08-17); "none"/off is
- *  unverified there (same open gap as grok-4.5/4.6's off value), covered by
- *  the degrade-on-400 net. */
-export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[56]|gpt-oss/i
+ *  (console.groq.com/docs/reasoning, verified 2026-08-17). */
+export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[5-7]|gpt-oss/i
 
-/** OpenAI models whose reasoning cannot be switched off: GPT-6 Astra returns
- *  HTTP 400 on `reasoning.effort: "none"` (developers.openai.com/api/docs/
- *  guides/reasoning, verified 2026-09-05 — it takes low/medium/high/xhigh/max
- *  only). «Av» maps to the lowest effort instead, the same honest mapping
- *  the Anthropic path uses for the always-thinking Fable family. */
-export const OPENAI_ALWAYS_REASONS_RE = /gpt-6/i
+/** Models whose reasoning cannot be switched off, so «Av» maps to the lowest
+ *  effort instead of `none` — the same honest mapping the Anthropic path uses
+ *  for its always-thinking models. Each one documents the refusal:
+ *  - GPT-6 Astra 400s on `reasoning.effort: "none"` (developers.openai.com/
+ *    api/docs/guides/reasoning, verified 2026-09-05). NOT GPT-6 Sol or Luna:
+ *    both document `none` (their model pages, verified 2026-09-26).
+ *  - grok-4.5/4.6/4.7: «Reasoning cannot be disabled» (docs.x.ai/developers/
+ *    model-capabilities/text/reasoning, verified 2026-09-26).
+ *  - gpt-oss on Groq takes low/medium/high only; `none` is reserved for the
+ *    Qwen models Groq also hosts (console.groq.com/docs/reasoning, verified
+ *    2026-08-31).
+ *  Until 2026-09-26 «Av» sent `none` to the last two — a value neither
+ *  documents — and leaned on the degrade-on-400 net when it was refused. */
+export const OPENAI_ALWAYS_REASONS_RE = /gpt-6-astra|grok-4\.[5-7]|gpt-oss/i
 
 /** The first-class hosted OpenAI-compatible services (fase 10.3): a FINITE,
  *  curated set — one key field each, entered once, stored exactly like the

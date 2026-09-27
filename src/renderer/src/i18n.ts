@@ -668,6 +668,7 @@ const nb = {
   'ai.modelHintHeaviest': 'Tyngst og dyrest — spar den til de vanskeligste oppgavene',
   'ai.modelHintCapable': 'Svært kapabel, høyere pris',
   'ai.modelHintRecommended': 'Anbefalt — best balanse mellom kvalitet, fart og pris',
+  'ai.modelHintValue': 'Raskere og rimeligere, fortsatt sterk',
   'ai.modelHintFast': 'Rask og billig — fin til enkle spørsmål',
   'ai.modelMenuTip': 'Bytt modell og tenkeinnsats',
   'ai.closeTip': 'Lukk (Esc)',
@@ -684,6 +685,8 @@ const nb = {
   'ai.stopTip': 'Stopp',
   'ai.totalTokens': 'Samtalen har brukt {tokens}',
   'ai.excerptChip': 'Utdrag: {included} av {total} sider',
+  'ai.fallbackChip': 'Besvart av {model}',
+  'ai.fallbackTip': 'Den valgte modellen avslo spørsmålet, så Anthropic lot {model} svare i stedet.',
   'ai.excerptTip':
     'Dokumentet er større enn det én forespørsel kan bære — modellens kontekstvindu, eller kvoten kontoen har hos leverandøren — så bare de mest relevante avsnittene ble vedlagt, under sine egne sidetall. Svaret kan mangle innhold utenfor utdraget. Utvalget treffer best når spørsmålet bruker dokumentets eget språk og begreper.',
   // Rendered under a «for stor forespørsel»-failure ONLY when the provider
@@ -1583,6 +1586,7 @@ const en: Dict = {
   'ai.modelHintHeaviest': 'Heaviest and most expensive — save it for the hardest tasks',
   'ai.modelHintCapable': 'Highly capable, higher cost',
   'ai.modelHintRecommended': 'Recommended — the best balance of quality, speed and cost',
+  'ai.modelHintValue': 'Faster and cheaper, still strong',
   'ai.modelHintFast': 'Fast and cheap — great for simple questions',
   'ai.modelMenuTip': 'Change model and reasoning effort',
   'ai.closeTip': 'Close (Esc)',
@@ -1599,6 +1603,8 @@ const en: Dict = {
   'ai.stopTip': 'Stop',
   'ai.totalTokens': 'This conversation has used {tokens}',
   'ai.excerptChip': 'Excerpt: {included} of {total} pages',
+  'ai.fallbackChip': 'Answered by {model}',
+  'ai.fallbackTip': 'The chosen model declined the question, so Anthropic had {model} answer instead.',
   'ai.excerptTip':
     "The document is larger than one request can carry — the model's context window, or the account's quota at the provider — so only the most relevant passages were attached, under their own page numbers. The answer may miss content outside the excerpt. The selection lands best when the question uses the document's own language and terms.",
   'ai.errorLimitLearned':

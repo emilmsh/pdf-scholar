@@ -50,6 +50,7 @@ import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { AssistantBody, renderMarkdown } from './ai-markdown'
 import { modelSupportsImages, prettyModelName, providerLabels } from './ai-models'
+import { FallbackChip } from './FallbackChip'
 import { AiSettings } from './AiSettings'
 import { ModelQuickMenu } from './AiModelMenu'
 import type { AiSeed } from './AiQuickPopover'
@@ -567,6 +568,7 @@ export default function AiPanel({
             parts,
             usage: result.usage,
             model: result.model,
+            fallbackModel: result.fallbackModel,
             excerpt: prep?.excerpt ?? undefined
           }
         ])
@@ -1298,12 +1300,15 @@ export default function AiPanel({
                     ) : (
                       <AssistantBody parts={m.parts} doc={docRef.current?.doc ?? null} onCitation={handleCitation} />
                     )}
-                    {(m.excerpt || (m.usage && m.model)) && (
+                    {(m.excerpt || m.fallbackModel || (m.usage && m.model)) && (
                       <div className="ai-meta">
                         {m.excerpt && (
                           <span className="ai-excerpt-chip" title={t('ai.excerptTip')}>
                             {t('ai.excerptChip', { included: m.excerpt.included, total: m.excerpt.total })}
                           </span>
+                        )}
+                        {m.fallbackModel && (
+                          <FallbackChip model={m.fallbackModel} />
                         )}
                         {m.usage && m.model && formatTokens(m.usage)}
                       </div>

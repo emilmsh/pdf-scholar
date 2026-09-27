@@ -55,22 +55,24 @@ interface AnthropicTraits {
   effort: string[]
   /** Accepts thinking: {type:'adaptive'} */
   adaptive: boolean
-  /** Fable family: thinking cannot be configured — never send the field */
+  /** Fable family and Opus 5.5: thinking cannot be configured — never send
+   *  the field */
   alwaysThinks: boolean
   /** 'off' needs an explicit {type:'disabled'} because omitting the field
-   *  means "thinking on" for this model (Sonnet 5 and newer generations) */
+   *  means "thinking on" for this model (Sonnet 5, Opus 5) */
   explicitOff: boolean
 }
 
 function anthropicTraits(model: string, caps?: AiModelCaps): AnthropicTraits {
   // Always-on thinking is a family behavior the capability tree does not
-  // expose, so the Fable test applies on both branches.
-  const isFable = /fable|mythos/i.test(model)
+  // expose, so this test applies on both branches: the Fable family, and Opus
+  // from 5.5 on (thinking: disabled → 400, platform.claude.com, 2026-09-26).
+  const alwaysThinks = /fable|mythos|opus-5-5/i.test(model)
   if (caps) {
     return {
       effort: caps.effort,
       adaptive: caps.adaptiveThinking,
-      alwaysThinks: isFable,
+      alwaysThinks,
       // adaptive-without-budget marks the generations where an omitted field
       // means "thinking on" and explicit disabled is accepted (Sonnet 5,
       // Opus 4.8+); budget-capable models (Haiku 4.5) treat omission as off.
@@ -81,8 +83,11 @@ function anthropicTraits(model: string, caps?: AiModelCaps): AnthropicTraits {
   return {
     effort: isHaiku ? [] : ['low', 'medium', 'high'],
     adaptive: !isHaiku,
-    alwaysThinks: isFable,
-    explicitOff: /sonnet-[5-9]/i.test(model)
+    alwaysThinks,
+    // Opus 5 thinks by default too ("thinking is on by default and
+    // {type:'disabled'} is accepted", platform.claude.com, 2026-09-26);
+    // Opus 5.5 never reaches this — alwaysThinks wins in anthropicThinking
+    explicitOff: /sonnet-[5-9]|opus-[5-9]/i.test(model)
   }
 }
 
@@ -119,6 +124,29 @@ function anthropicThinking(
   // still goes through when the model accepts it (e.g. Opus 4.5).
   if (!traits.adaptive) return { ...(outputConfig && { outputConfig }), maxTokens: 4096 }
   return { thinking: { type: 'adaptive' }, ...(outputConfig && { outputConfig }), maxTokens: 12000 }
+}
+
+/** A paused turn goes back as received — except after a server-side fallback
+ *  handoff, where what the DECLINING model left before the last `fallback`
+ *  block must go: its thinking, redacted_thinking and connector_text, a client
+ *  tool_use, and a server_tool_use with no result. The fallback block itself
+ *  stays exactly where it was — the API validates the thinking around it by
+ *  its position (refusals-and-fallback, «Continuing the conversation»,
+ *  verified 2026-09-27). Echoing it all unfiltered is a 400 on the resume. */
+function echoPausedTurn<T extends { type: string }>(content: T[]): T[] {
+  const last = content.map((b) => b.type as string).lastIndexOf('fallback')
+  if (last < 0) return content
+  const answered = new Set(
+    content.map((b) => (b as { tool_use_id?: unknown }).tool_use_id).filter(Boolean)
+  )
+  return content.filter((b, i) => {
+    if (i > last) return true
+    const type = b.type as string
+    if (type === 'thinking' || type === 'redacted_thinking' || type === 'connector_text') return false
+    if (type === 'tool_use') return false
+    if (type === 'server_tool_use') return answered.has((b as { id?: unknown }).id)
+    return true
+  })
 }
 
 /** OpenAI reasoning_effort value. 'off' maps to `none` — except on models
@@ -163,10 +191,10 @@ function webSearchHint(req: AiChatRequest): string {
 }
 
 /** Anthropic web-search tool for a model. The dynamic-filtering variant
- *  (_20260209) needs Opus 4.6+/Sonnet 4.6+/Sonnet 5/Fable; Haiku and older
- *  models only accept the basic variant. */
+ *  (_20260209) needs a Claude 4.6+ model (Opus 4.6+/Sonnet 4.6+/Sonnet 5/
+ *  Opus 5+/Fable); Haiku and older models only accept the basic variant. */
 function anthropicWebSearchTool(model: string): Record<string, unknown> {
-  const modern = /fable|mythos|opus-4-[6-9]|sonnet-4-[6-9]|sonnet-[5-9]/i.test(model)
+  const modern = /fable|mythos|opus-4-[6-9]|opus-[5-9]|sonnet-4-[6-9]|sonnet-[5-9]/i.test(model)
   return {
     type: modern ? 'web_search_20260209' : 'web_search_20250305',
     name: 'web_search',
@@ -415,7 +443,10 @@ async function chatAnthropic(
   })
 
   const tuning = anthropicThinking(model, thinking, caps)
-  const isFable = /fable|mythos/i.test(model)
+  // The models that ship safety classifiers (a decline is HTTP 200 +
+  // stop_reason 'refusal'): Fable 5/5.1 and Opus 5/5.5, per Anthropic's
+  // refusals-and-fallback page (verified 2026-09-27). Mythos is Fable's twin.
+  const hasClassifiers = /fable|mythos|opus-5/i.test(model)
   const params: Record<string, unknown> = {
     model,
     max_tokens: tuning.maxTokens,
@@ -425,10 +456,14 @@ async function chatAnthropic(
   if (tuning.thinking) params.thinking = tuning.thinking
   if (tuning.outputConfig) params.output_config = tuning.outputConfig
   if (webSearchEnabled(req)) params.tools = [anthropicWebSearchTool(model)]
-  // Fable: safety-classifier refusals are opt-in recoverable server-side. The
-  // 'default' mode routes to Anthropic's recommended fallback per refusal
-  // category, so there is no pinned fallback model id to keep current here.
-  if (isFable) {
+  // Classifier refusals are opt-in recoverable server-side. The 'default' mode
+  // routes to Anthropic's recommended fallback per refusal category, so there
+  // is no pinned fallback model id to keep current here. A category with no
+  // recommended fallback still ends in the refusal below. Opus joined Fable
+  // here 2026-09-27 (Emil's call): a declined question about a biology paper
+  // is worse than an answer from the model Anthropic routes it to — and the
+  // answer says which model that was (fallbackModel on the result).
+  if (hasClassifiers) {
     params.betas = ['server-side-fallback-2026-07-01']
     params.fallbacks = 'default'
   }
@@ -465,7 +500,7 @@ async function chatAnthropic(
     return changed
   }
 
-  const api = isFable ? client.beta.messages : client.messages
+  const api = hasClassifiers ? client.beta.messages : client.messages
   type AnthropicStream = ReturnType<typeof client.messages.stream>
   // Bind to `api`: the SDK's stream() reads this._client internally, so calling it
   // detached from client.messages throws "Cannot read properties of undefined
@@ -514,7 +549,7 @@ async function chatAnthropic(
     usage.cacheWriteTokens += final.usage.cache_creation_input_tokens ?? 0
     if (final.stop_reason !== 'pause_turn' || round >= 5) break
     round++
-    ;(params.messages as unknown[]).push({ role: 'assistant', content: final.content })
+    ;(params.messages as unknown[]).push({ role: 'assistant', content: echoPausedTurn(final.content) })
   }
 
   // Safety classifiers decline with HTTP 200 + stop_reason 'refusal' (content
@@ -537,6 +572,15 @@ async function chatAnthropic(
     url?: string
     title?: string | null
   }
+  // Server-side fallback marks each handoff with a `fallback` content block
+  // ({from:{model}, to:{model}}); the last one names who finished the answer.
+  // Read it from the block, not final.model: on a mid-stream decline the
+  // stream's message_start already named the requested model.
+  let fallbackModel: string | undefined
+  for (const block of blocks as unknown as { type: string; to?: { model?: string } }[]) {
+    if (block.type === 'fallback' && block.to?.model) fallbackModel = block.to.model
+  }
+
   const parts: AiContentPart[] = []
   for (const block of blocks) {
     if (block.type !== 'text') continue
@@ -561,7 +605,7 @@ async function chatAnthropic(
       })
     })
   }
-  return { ok: true, parts, usage, model: final.model }
+  return { ok: true, parts, usage, model: final.model, ...(fallbackModel && { fallbackModel }) }
 }
 
 /** Split text on [KILDE s.N: "quote"] markers into parts with quote citations */

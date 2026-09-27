@@ -1,4 +1,4 @@
-# API-katalog (agentverifisert juli 2026, sist oppdatert 2026-09-05) — grunnlag for modell/tenkeinnsats-implementasjon
+# API-katalog (agentverifisert juli 2026, sist oppdatert 2026-09-27) — grunnlag for modell/tenkeinnsats-implementasjon
 
 > Vedlikehold: kjør `npm run check:models` og følg `docs/MODEL-UPDATE.md` når
 > katalogen skal fornyes. Appen henter nå modell-lister og kapabiliteter live
@@ -19,7 +19,8 @@ ikke på Opus-generasjon, så ingen kodeendring der).
 | Modell | ID | Kontekst | Pris inn/ut per MTok |
 |---|---|---|---|
 | Claude Fable 5.1 | `claude-fable-5-1` | 1M | $10/$50 (cache-lesing $0.25, en fjerdedel av Fable 5) |
-| Claude Opus 5 | `claude-opus-5` | 1M | $5/$25 |
+| Claude Opus 5.5 | `claude-opus-5-5` | 1M | $4/$20 (cache-lesing $0.20, 0,05× inn-pris) |
+| Claude Opus 5 (legacy fra 22.9.2026, kun lagrede valg) | `claude-opus-5` | 1M | $5/$25 |
 | Claude Sonnet 5 | `claude-sonnet-5` | 1M | $2/$10 |
 | Claude Haiku 4.5 | `claude-haiku-4-5-20251001` (alias `claude-haiku-4-5`) | 200K | $1/$5 |
 
@@ -99,18 +100,69 @@ Hva 5.1 bryter i forhold til Fable 5, og hvorfor ingen av dem treffer oss
   endring; verifisert i `npm run test:ai-chat` («fable 5.1»-assertions).
   **Live spørsmål med ekte nøkkel gjenstår (Emil, MAINTENANCE.md rad 2).**
 
+**Review 2026-09-26 (platform.claude.com/docs/en/models/overview,
+/models/opus-5-5/overview og /models/opus-5-5/whats-new-opus-5-5, sjekket
+samme dag): Claude Opus 5.5 (`claude-opus-5-5`) lanserte 22.9.2026 og har tatt
+Opus 5s plass i tabellen over.** Opus 5 ligger nå under «Legacy models» —
+fortsatt tilgjengelig, så den beholdes i `MODEL_CONTEXT_TOKENS` for lagrede
+valg, men er ute av den kuraterte listen (samme regel som Fable 5 → 5.1).
+Oversiktssiden anbefaler nå Opus 5.5 som startpunkt «for most workloads».
+1M kontekst, 128K output, tekst + bilde inn → tekst ut (kuratert-regel #2
+innfridd), billigere enn Opus 5 ($4/$20 mot $5/$25). Kunnskaps-cutoff juni
+2026, pensjonering tidligst 22.9.2027. Default effort er `medium` (Opus 5:
+`high`) — vi setter alltid effort eksplisitt, så det endrer ingenting her.
+
+Bruddene mot Opus 5, vurdert mot `chatAnthropic` i `src/shared/ai-chat.ts`:
+- **Thinking kan ikke slås av.** Ordrett: «a request that sets `thinking:
+  {"type": "disabled"}`, or a manual budget … returns a 400». Dette traff
+  oss: `anthropicTraits` regnet bare `fable|mythos` som alltid-tenkende, og
+  med live capability-data (adaptive, ingen budget) ble Opus 5.5 lest som en
+  explicit-off-modell som Sonnet 5 — «Av» hadde sendt `disabled`, fått 400 og
+  gått via degrade-nettet. **Rettet:** `alwaysThinks` er nå
+  `/fable|mythos|opus-5-5/`, på begge grener; «Av» → effort `low` uten
+  thinking-felt, som Fable. Server-side fallback (`fallbacks: 'default'`)
+  gjelder også Opus fra 27.9.2026 — se «Standardmodeller og fallback» under.
+- **Tvunget `tool_choice` gir 400**, og **thinking-blokker er bundet til
+  modell og samtaleprefiks** — samme to brudd som Fable 5.1, og av samme
+  grunner uten betydning for oss (vi sender aldri `tool_choice`, og
+  historikken går tilbake som ren tekst). Ingen endring.
+- **`computer_20251124` avvises** — vi bruker ikke computer use.
+- **Tekst mellom verktøykall kommer som thinking-blokker** (tom tekst ved
+  default `display: "omitted"`). Treffer bare web-søk-svar med flere søk:
+  mellomnotatene («Jeg søker etter …») vises ikke lenger; selve svaret etter
+  siste søk er fortsatt tekst. Ingen endring — vi viser ikke mellomnotater
+  som fremdrift.
+- **Web-søk:** web-search-siden (platform.claude.com/docs/en/agents-and-tools/
+  tool-use/web-search-tool) sier «Dynamic filtering is available with Claude
+  4.6 and later models», og bruker `claude-opus-5-5` i eksemplene med både
+  `_20250305` og `_20260318`. `anthropicWebSearchTool` kjente bare
+  `opus-4-[6-9]`, så **Opus 5 har fått basis-varianten i det stille siden
+  13.8.2026**; regexen har nå `opus-[5-9]`, som dekker begge.
+- **Rettelse av en eldre regel:** whats-new-siden sier ordrett «On Claude Opus
+  5, thinking is on by default and `thinking: {"type": "disabled"}` is
+  accepted at effort `high` or below». Regelen under («Opus 5: utelatt felt
+  = av») var altså feil, og regex-fallbacken fulgte den — uten live
+  capability-data (førstegangskjøring/offline) lot «Av» thinking stå PÅ for
+  Opus 5. `explicitOff` i fallbacken er nå `/sonnet-[5-9]|opus-[5-9]/`
+  (Opus 5.5 når aldri dit, `alwaysThinks` slår inn først). Med live data
+  var dette allerede riktig.
+- Verifisert i `npm run test:ai-chat` («opus 5.5»- og «opus 5»-assertions,
+  både regex- og live-caps-grenen). **Live spørsmål med ekte nøkkel
+  gjenstår (Emil, MAINTENANCE.md rad 2).**
+
 Thinking-regler:
 - `budget_tokens` gir **400** på Fable/Opus 5/Sonnet 5. Bruk `thinking: {type:"adaptive"}` + `output_config: {effort: "low|medium|high|xhigh|max"}`.
 - Fable 5 og 5.1: thinking alltid på (disabled/budget → 400); `temperature` → 400; krever `client.beta.messages.stream` med `betas: ['server-side-fallback-2026-07-01']`, `fallbacks: 'default'` (Anthropic velger fallback per avslagskategori — ingen pinnet modell-id å vedlikeholde; den eldre array-formen bruker `-2026-06-01`-headeren); sjekk `stop_reason === 'refusal'` før content leses.
 - Sonnet 5: thinking er PÅ som default når feltet utelates — «Av» krever `{type:"disabled"}`.
-- Opus 5 (og 4.8): utelatt felt = av.
+- Opus 5.5: thinking alltid på (disabled/budget → 400, ingen beta-header involvert); default effort `medium`.
+- Opus 5: thinking PÅ som default når feltet utelates — «Av» krever `{type:"disabled"}` (godtatt på effort `high` og lavere). Notatet sa «utelatt felt = av» fram til 26.9.2026; det var feil (se review 2026-09-26 over). Opus 4.8 er ikke gjensjekket.
 - Haiku 4.5: `effort` feiler; thinking via `budget_tokens` (min 1024) eller utelat.
 - `effort` i `output_config`, GA. Hev `max_tokens` til 8–16K når thinking er på (dagens 4096 er for lite).
 - Nytt 2026-08-13: på Opus 5 og Sonnet 5 defaulter `effort` til `"high"` på Claude API/Claude Code når feltet utelates (Opus 4.8 defaulter til `high` på ALLE surfaces, inkl. claude.ai). Vi setter alltid `effort` explisitt fra tenkeinnsats-valget, så dette endrer ikke request-shapingen — bare verdt å vite hvis en fremtidig degrade-net-treff ser rar ut.
 - Å endre `thinking`-feltet invaliderer messages-cachen (dokumentblokken) → lås tenkeinnsats per samtale.
 - Citations upåvirket av thinking.
 
-## OpenAI gpt-6 Astra (lansert 3.9.2026) og gpt-5.6 (lansert 9.7.2026)
+## OpenAI gpt-6 Astra (lansert 3.9.2026), gpt-6 Sol/Luna (22.9.2026) og gpt-5.6 (9.7.2026)
 
 **Review 2026-09-05 (developers.openai.com/api/docs/models,
 /api/docs/models/gpt-6-astra og /api/docs/guides/reasoning, sjekket samme
@@ -154,6 +206,41 @@ Eneste snapshot-id er `gpt-6-astra` selv.
 |---|---|---|---|---|
 | Astra (GPT-6, tyngst) | `gpt-6-astra` | 922K (1,05M totalt inkl. 128K output) | $10/$50 | $1 |
 
+**Review 2026-09-26 (developers.openai.com/api/docs/models,
+/api/docs/models/all, /api/docs/models/gpt-6-sol og /gpt-6-luna, sjekket
+samme dag; lanseringsdato fra techcrunch.com/2026/09/22/openai-launches-gpt-6-sol-and-luna):
+GPT-6 Sol (`gpt-6-sol`) og GPT-6 Luna (`gpt-6-luna`) har erstattet
+`gpt-5.6-sol` og `gpt-5.6-luna` i den kuraterte listen.** Modellsiden viser
+nå Astra/Sol/Luna som de tre flaggskipene; 5.6-modellene står fortsatt i
+«all models» uten deprecated-merke, så de beholdes i `MODEL_CONTEXT_TOKENS`
+for lagrede valg. **Det finnes ingen GPT-6 Terra** — `gpt-5.6-terra` beholder
+sin plass denne runden. **Oppdatert 27.9.2026:** GPT-6 Sol er ny standard
+(Emil), og `gpt-5.6-terra` gikk ut av menyen samtidig — den er både eldre og
+dyrere enn 6 Sol ($2/$12 mot $2/$10), så den hadde ingen rolle igjen. Listen
+er Astra, 6 Sol, 6 Luna, sterkest først; et lagret Terra-valg står.
+
+- Begge: tekst + bilde inn, kun tekst ut (kuratert-regel #2 innfridd);
+  1,05M totalt / **922K input** / 128K output, som resten av familien →
+  900_000 i `MODEL_CONTEXT_TOKENS`. Samme 272K-pristerskel (2× inn/cache,
+  1,5× ut for hele forespørselen).
+- **`reasoning.effort` tar `none|low|medium|high|xhigh|max` (default medium)
+  på begge** — altså MED `none`, i motsetning til Astra.
+  `OPENAI_ALWAYS_REASONS_RE` var `/gpt-6/` og ville sendt `low` for «Av» til
+  hele 6-serien; snevret inn til `gpt-6-astra` (se også xAI-raden i
+  § Hostede kompat-tjenester, som deler regexen nå).
+- Sol-siden: «Chat Completions supports function calling only with
+  `reasoning_effort` set to `none`». Treffer ikke oss: OpenAI-stien bruker
+  Responses API med den hostede `web_search`-tool'en, ikke function calling;
+  Azure-stien (Chat Completions) sender ingen tools.
+- Pris: Sol $2/$10 (cached $0.20), Luna $0.10/$0.50 (cached $0.01) — halve
+  5.6-prisene. Kunnskaps-cutoff: Sol 20.4.2026, Luna 18.5.2026.
+- **Live spørsmål med ekte nøkkel gjenstår (Emil).**
+
+| Modell | ID | Kontekst (input) | Pris inn/ut | Cached inn |
+|---|---|---|---|---|
+| Sol (GPT-6) | `gpt-6-sol` | 922K (1,05M totalt inkl. 128K output) | $2/$10 | $0.20 |
+| Luna (GPT-6, rask) | `gpt-6-luna` | 922K (som Sol) | $0.10/$0.50 | $0.01 |
+
 Kontekst-kolonnen er kontrakten mot `MODEL_CONTEXT_TOKENS` (`npm run
 check:models` sammenligner dem): den oppgir **input**-kapasiteten, ikke en
 total som inkluderer output. Verifisert mot developers.openai.com/api/docs/models
@@ -175,9 +262,9 @@ betaler); flagget til Emil i PR-en, ikke gjort her.
 
 | Modell | ID | Kontekst (input) | Pris inn/ut | Cached inn |
 |---|---|---|---|---|
-| Sol (flaggskip) | `gpt-5.6-sol` | 922K (1,05M totalt inkl. 128K output) | $4/$20 (ned fra $5/$30, se nedenfor) | $0.40 |
-| Terra (anbefalt) | `gpt-5.6-terra` | 922K (som Sol) | $2/$12 (ned fra $2.50/$15 i juli) | $0.25 |
-| Luna (rask) | `gpt-5.6-luna` | 922K (som Sol) | $0.20/$1.20 (ned fra $1/$6 i juli) | $0.10 — SVAK på long-context (41 %), unngå som dokument-default |
+| Sol (5.6, ute av menyen 26.9.2026, kun lagrede valg) | `gpt-5.6-sol` | 922K (1,05M totalt inkl. 128K output) | $4/$20 (ned fra $5/$30, se nedenfor) | $0.40 |
+| Terra (5.6, ute av menyen 27.9.2026, kun lagrede valg) | `gpt-5.6-terra` | 922K (som Sol) | $2/$12 (ned fra $2.50/$15 i juli) | $0.25 |
+| Luna (5.6, ute av menyen 26.9.2026, kun lagrede valg) | `gpt-5.6-luna` | 922K (som Sol) | $0.20/$1.20 (ned fra $1/$6 i juli) | $0.10 — SVAK på long-context (41 %), unngå som dokument-default |
 
 - `reasoning_effort: none|low|medium|high|xhigh|max` (default medium) — gyldig toppnivåfelt på `/v1/chat/completions`, dagens SSE-kode fungerer uendret.
 - Azure: dagens `api-version=2024-12-01-preview` er for gammel for 5.6 — oppgrader ved behov.
@@ -205,12 +292,13 @@ console.groq.com/docs/models, /docs/reasoning og /docs/deprecations.
 | Gemini | `gemini-3.1-pro-preview` | 1M | Flaggskip (Preview — id-en KAN rotere ved GA, sjekk ved neste review; fortsatt Preview 31.8.2026 (ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview: 1 048 576 inn / 65 536 ut, text+image+video+audio+PDF → text), «Gemini 3.5 Pro»-lansering fortsatt forsinket ifølge presseomtale 13.8.2026) |
 | Gemini | `gemini-3.8-flash` | 1M (1 048 576 dokumentert, gulvet på 1_000_000 som ellers i katalogen) | **Byttet inn 7.9.2026, erstatter `gemini-3.7-flash`** — lansert rundt 4.9.2026, tre uker etter 3.7 Flash (ai.google.dev/gemini-api/docs/models, /gemini-3.8-flash). Modellkortet bekrefter input tekst/bilde/video/lyd/PDF, output kun tekst — kuratert-regel #2 innfridd. Samme pris som 3.7 hadde: $0.75/$3.75 per MTok inn/ut ut 2026, stiger til $1.50/$7.50 fra 1.1.2027 (ai.google.dev/gemini-api/docs/pricing, sjekket 7.9.2026). Modellsiden nevner egen `thinkingLevel: low/medium/high`, men det er den native Gemini-APIens felt, ikke `reasoning_effort` på OpenAI-kompat-laget vi faktisk bruker — svarer ikke på det åpne reasoning-mapping-spørsmålet under. `gemini-3.7-flash` fortsatt tilgjengelig som «previous-generation», ikke pensjonert |
 | Gemini | `gemini-3.5-flash-lite` | ukjent → gulv | GA, billigst ($0.30/$2.50) |
-| xAI | `grok-4.6` | 500K | **Nytt 13.8.2026** — landet, forbigår grok-4.5 som flaggskip; `reasoning_effort` low/medium/high (default)/xhigh DOKUMENTERT → med i OPENAI_REASONING_RE |
+| xAI | `grok-4.7` | 500K | **Byttet inn 26.9.2026, erstatter `grok-4.6`** — lansert 21.9.2026 (marktechpost.com/2026/09/21/spacexai-releases-grok-4-7; docs.x.ai/developers/models kaller den «the most capable model we've built»). docs.x.ai/developers/models/grok-4.7: «text, image → text», 500K kontekst, samme pris som 4.6 ($2/$6, $4/$12 over 200K prompt). `reasoning_effort` low/medium/high (default)/xhigh DOKUMENTERT → med i OPENAI_REASONING_RE. **«Reasoning cannot be disabled»** (docs.x.ai/developers/model-capabilities/text/reasoning, gjelder 4.5/4.6/4.7) → med i OPENAI_ALWAYS_REASONS_RE, «Av» sender `low` |
+| xAI | `grok-4.6` | 500K | Ute av menyen 26.9.2026 (erstattet av 4.7); beholdt i `MODEL_CONTEXT_TOKENS` og begge regexene for lagrede valg. Det åpne spørsmålet om 4.5/4.6s av-verdi er LUKKET samme dag: reasoning kan ikke slås av, så `none` var aldri en gyldig verdi |
 | xAI | `grok-4.3` | 1M | Standard-tier ($1.25/$2.50); effort-støtte UVERIFISERT → utenfor regexen (fortsatt uverifisert 17.8.2026, docs.x.ai/developers/models nevner ikke reasoning for 4.3) |
 | Mistral | `mistral-medium-3-5-26-04` | 256K (verifisert 13.8.2026, gjensjekket 31.8.2026: docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04) | Frontier (Medium > Large i dagens lineup!) |
 | Mistral | `mistral-large-3-25-12` | 256K (verifisert 13.8.2026, model-card) | Open-weight arbeidshest ($0.50/$1.50) |
 | Mistral | `mistral-small-4-0-26-03` | 256K (verifisert 13.8.2026, model-card) | Rask/billig |
-| Groq | `openai/gpt-oss-120b` | 131K | Production-tier; Llama-parene (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) deprecated **16.8.2026, bekreftet på nytt 24.8.2026** (console.groq.com/docs/deprecations — datoen fra 17.8-runden holder, forrige notat om 17.6.2026 var feil kilde/lesing; begge Llama-idene er uansett utenfor vår kuraterte liste, så ingen kodeendring). `reasoning_effort` low/medium/high **bekreftet 17.8.2026** (console.groq.com/docs/reasoning: «only supported by GPT-OSS 20B and GPT-OSS 120B») → lagt til i OPENAI_REASONING_RE; «none»/av UVERIFISERT (samme gap som grok-4.5/4.6s av-verdi), degrade-on-400-nettet dekker feilgjetningen |
+| Groq | `openai/gpt-oss-120b` | 131K | Production-tier; Llama-parene (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) deprecated **16.8.2026, bekreftet på nytt 24.8.2026** (console.groq.com/docs/deprecations — datoen fra 17.8-runden holder, forrige notat om 17.6.2026 var feil kilde/lesing; begge Llama-idene er uansett utenfor vår kuraterte liste, så ingen kodeendring). `reasoning_effort` low/medium/high **bekreftet 17.8.2026** (console.groq.com/docs/reasoning: «only supported by GPT-OSS 20B and GPT-OSS 120B») → lagt til i OPENAI_REASONING_RE. «Av»: kun low/medium/high er gyldig (lukket 31.8.2026, se åpne spørsmål) → med i OPENAI_ALWAYS_REASONS_RE fra 26.9.2026, «Av» sender `low` |
 | Groq | `openai/gpt-oss-20b` | 131K | Production-tier, rask — samme reasoning_effort-bekreftelse som 120b |
 
 Grok 4.5 (`grok-4.5`) er ikke lenger i den kuraterte listen, men står fortsatt
@@ -259,6 +347,11 @@ Flash.
   tatt når nivå=Av for gpt-oss er en heuristikk-finpuss, ikke en
   korrekthetsrettelse — flagg til Emil om ønskelig, ikke gjort i denne
   runden).
+  **Rettet 26.9.2026:** gpt-oss står nå i `OPENAI_ALWAYS_REASONS_RE`, så
+  «Av» sender `low` i stedet for `none` — samme ærlige mapping som Astra og
+  grok 4.5–4.7, og én forespørsel i stedet for 400 + retry.
+- ~~Opus 5.5 og server-side fallback?~~ **Lukket 27.9.2026** — se
+  «Standardmodeller og fallback» under.
 - Mistral: ingen `-latest`-alias funnet for medium-3-5/large-3/small-4 på
   docs.mistral.ai (sjekket 13.8.2026, gjensjekket 17.8.2026 og 24.8.2026 —
   uendret). Kontekstvinduene er nå verifisert (se tabellen), så denne delen av
@@ -336,16 +429,82 @@ console.groq.com/docs/models og /docs/deprecations, alle sjekket samme dag):
   fortsatt 430 modeller, alle tre felt (`input_modalities`/`output_modalities`/
   `created`) og `pricing.completion` intakte.
 
+Review 2026-09-26 (manuell, på Emils spørsmål; kildene er de samme som
+7.9.2026, alle sjekket samme dag). De ukentlige agentkjøringene 14.9 og 21.9
+fant ingen drift; alle tre lanseringene under kom 21.–22.9:
+
+- **Anthropic — DRIFT:** Opus 5.5 erstatter Opus 5 (se § Anthropic, review
+  2026-09-26). Fable 5.1/Sonnet 5/Haiku 4.5 uendret.
+- **OpenAI — DRIFT:** GPT-6 Sol og Luna erstatter 5.6 Sol og Luna; Astra og
+  5.6 Terra uendret (se § OpenAI, review 2026-09-26).
+- **xAI — DRIFT:** Grok 4.7 erstatter Grok 4.6; `grok-4.3` uendret. Grok
+  4.20-id-ene står fortsatt i listen, ikke gjensjekket i dybden denne
+  runden.
+- **Gemini:** `gemini-3.1-pro-preview` (fortsatt Preview), `gemini-3.8-flash`
+  og `gemini-3.5-flash-lite` uendret. Ny `gemini-3.8-live` er en
+  tale-/Live API-modell, ikke relevant.
+- **Mistral:** de tre kuraterte id-ene står fortsatt på
+  docs.mistral.ai/getting-started/models (id-ene grepet ut av siden
+  ordrett), ingen nyere generasjon.
+- **Groq:** `openai/gpt-oss-120b`/`-20b` fortsatt Production-tier.
+- `npm run check:models` (keyless): ingen statisk drift; OpenRouter-probe
+  458 modeller, alle felt intakte.
+
+## Standardmodeller og fallback (Emil, 27.9.2026)
+
+- **Standard:** `claude-opus-5-5` for Anthropic og `gpt-6-sol` for OpenAI
+  (`DEFAULT_AI_MODELS` i `src/shared/defaults.ts`, speilet i `DEFAULT_MODELS`
+  i `ai-models.ts`). Gjelder bare brukere uten lagret modell — et lagret valg
+  står. «Anbefalt»-hinten følger standarden; Sonnet 5 fikk den nye
+  `ai.modelHintValue` («Raskere og rimeligere, fortsatt sterk»), som er
+  faktisk: Anthropic oppgir Fast mot Moderate latens og $2/$10 mot $4/$20.
+- **Server-side fallback gjelder nå Opus 5 og 5.5 i tillegg til Fable**
+  (`hasClassifiers` = `/fable|mythos|opus-5/` i `chatAnthropic`; Emil
+  overlot valget til Claude). Refusals-siden
+  (platform.claude.com/docs/en/build-with-claude/refusals-and-fallback)
+  sier at Fable 5.1, Fable 5, Opus 5.5 og Opus 5 alle har
+  sikkerhetsklassifikatorer som kan avslå med `stop_reason: "refusal"`, og
+  at `fallbacks: "default"` + `server-side-fallback-2026-07-01` virker for
+  dem. Begrunnelse: Opus 5.5 kjører en biologi-klassifikator i tillegg til
+  cyber, og et avslag på et spørsmål om en biologi-artikkel gir leseren
+  ingenting, mens fallback gir svar fra modellen Anthropic anbefaler for den
+  kategorien. En kategori uten anbefalt fallback ender fortsatt i avslaget.
+  Sonnet 5 og Haiku 4.5 har ingen klassifikatorer og får ingen fallback.
+- **Svaret sier hvem som svarte.** Et svar fra fallback-modellen bærer en
+  `fallback`-innholdsblokk (`{from:{model}, to:{model}}`, «What the response
+  contains» på samme side); `chatAnthropic` leser `to.model` fra siste blokk
+  og returnerer den som `fallbackModel`. Den leses fra blokken og ikke fra
+  `final.model`, fordi `message_start` fortsatt navngir den valgte modellen
+  ved et avslag midt i strømmen. Panelet og markeringsboblen viser «Besvart
+  av {modell}» (`FallbackChip.tsx`), ellers ville menyvalget ikke holdt i
+  det stille. Ved avslag midt i strømmen fortsetter fallback-modellen fra den
+  delvise teksten («nothing you have already received is invalidated»), så
+  teksten vises sammenhengende uten opprydding.
+- **Fortsettelse etter en pause (pause_turn) etter et bytte:** den
+  avslående modellens thinking/redacted_thinking/connector_text før SISTE
+  `fallback`-blokk må ut av det vi sender tilbake, mens selve blokken skal stå
+  på samme plass («Continuing the conversation» på samme side). Løkken sendte
+  alt uendret — en 400 midt i svaret, latent for Fable siden fallback kom inn,
+  og nå også for Opus. `echoPausedTurn` i `ai-chat.ts` filtrerer etter
+  tabellen der; testet i `test:ai-chat`.
+- Verifisert i `npm run test:ai-chat` (fallback-forespørsel for Opus 5/5.5,
+  ingen for Sonnet 5, `fallbackModel` fra overleveringsblokken). **Et ekte
+  avslag er ikke fremprovosert** — det krever et innhold klassifikatoren
+  slår ut på.
+
 ## Anbefalt mapping «Tenkeinnsats» (Av/Lav/Middels/Høy)
 
-| Valg | Opus 5 / Sonnet 5 | Fable 5 / 5.1 | Haiku 4.5 | OpenAI gpt-5.6 | OpenAI gpt-6 |
+| Valg | Opus 5 / Sonnet 5 | Fable 5 / 5.1, Opus 5.5 | Haiku 4.5 | gpt-5.6, GPT-6 Sol/Luna | GPT-6 Astra, grok 4.5–4.7, gpt-oss |
 |---|---|---|---|---|---|
-| Av | Opus: utelat; Sonnet 5: `{type:"disabled"}` | umulig (→ effort low) | utelat | `none` | umulig (`none` → 400; → `low`) |
+| Av | `{type:"disabled"}` | umulig (→ effort low) | utelat | `none` | umulig (→ `low`) |
 | Lav/Middels/Høy | `adaptive` + effort low/medium/high | effort low/medium/high | ikke støttet (utelat) | low/medium/high | low/medium/high |
 
-Defaults: anthropic `claude-sonnet-5` + Middels; openai `gpt-5.6-terra` + medium.
+Defaults: anthropic `claude-opus-5-5` + Middels; openai `gpt-6-sol` + medium
+(fra 27.9.2026; var `claude-sonnet-5` og `gpt-5.6-terra`).
 Heuristikk: effort kun når id ikke matcher `haiku` (fallback i `anthropicTraits`
 skiller ikke videre på Opus/Sonnet/Fable-generasjon — «alwaysThinks» slår bare
-inn for `fable|mythos`); Haiku alltid uten thinking. OpenAI: `reasoning_effort`
-sendes for `OPENAI_REASONING_RE` (`gpt-[5-9]|o[0-9]|grok-4.[56]|gpt-oss`), og
-«Av» blir `low` i stedet for `none` for `OPENAI_ALWAYS_REASONS_RE` (`gpt-6`).
+inn for `fable|mythos|opus-5-5`, og explicit-off for `sonnet-[5-9]|opus-[5-9]`);
+Haiku alltid uten thinking. OpenAI-stil: `reasoning_effort` sendes for
+`OPENAI_REASONING_RE` (`gpt-[5-9]|o[0-9]|grok-4.[5-7]|gpt-oss`), og «Av» blir
+`low` i stedet for `none` for `OPENAI_ALWAYS_REASONS_RE`
+(`gpt-6-astra|grok-4.[5-7]|gpt-oss`).
