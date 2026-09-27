@@ -104,7 +104,7 @@ const http400 = (message) =>
 // ---------- SSE builders ----------
 
 /** Anthropic Messages SSE for one assistant turn (the SDK accumulates these) */
-function anthropicSse({ model = 'claude-sonnet-5', deltas = [], citations = [], stopReason = 'end_turn', inTok = 100, outTok = 7, cacheRead = 0, cacheWrite = 0 }) {
+function anthropicSse({ model = 'claude-sonnet-5', deltas = [], citations = [], stopReason = 'end_turn', inTok = 100, outTok = 7, cacheRead = 0, cacheWrite = 0, fallback = null }) {
   const events = [
     {
       type: 'message_start',
@@ -115,11 +115,19 @@ function anthropicSse({ model = 'claude-sonnet-5', deltas = [], citations = [], 
       }
     }
   ]
-  if (deltas.length > 0 || citations.length > 0) {
-    events.push({ type: 'content_block_start', index: 0, content_block: { type: 'text', text: '', citations: [] } })
-    for (const d of deltas) events.push({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: d } })
-    for (const c of citations) events.push({ type: 'content_block_delta', index: 0, delta: { type: 'citations_delta', citation: c } })
+  // Server-side fallback's handoff marker: a content block with no deltas
+  // (refusals-and-fallback, «Streaming»), first when the decline came before
+  // any output
+  const t0 = fallback ? 1 : 0
+  if (fallback) {
+    events.push({ type: 'content_block_start', index: 0, content_block: { type: 'fallback', from: { model: fallback.from }, to: { model: fallback.to } } })
     events.push({ type: 'content_block_stop', index: 0 })
+  }
+  if (deltas.length > 0 || citations.length > 0) {
+    events.push({ type: 'content_block_start', index: t0, content_block: { type: 'text', text: '', citations: [] } })
+    for (const d of deltas) events.push({ type: 'content_block_delta', index: t0, delta: { type: 'text_delta', text: d } })
+    for (const c of citations) events.push({ type: 'content_block_delta', index: t0, delta: { type: 'citations_delta', citation: c } })
+    events.push({ type: 'content_block_stop', index: t0 })
   }
   events.push({ type: 'message_delta', delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: outTok } })
   events.push({ type: 'message_stop' })
@@ -154,7 +162,7 @@ function baseParams(overrides) {
     key: 'sk-test',
     models: {
       anthropic: 'claude-sonnet-5',
-      openai: 'gpt-5.6-terra',
+      openai: 'gpt-6-sol',
       azure: '',
       // The curated ids (ai-models.ts) — the harness must exercise what the
       // menu actually offers, not ids the providers retired
@@ -270,6 +278,50 @@ section('anthropic: family rules (fable / haiku / caps override)')
     'fable 5.1: no thinking blocks replayed in history'
   )
 
+  // Opus 5.5 (curated since 2026-09-26) cannot turn thinking off either —
+  // thinking {type:'disabled'} is a 400 there, where Opus 5 accepted it. «Av»
+  // is the lowest effort with no thinking field, also when a live capability
+  // snapshot (adaptive, no budget) would otherwise read it as an explicit-off
+  // model like Sonnet 5. It carries classifiers like Fable, so it asks for
+  // server-side fallback too (Emil, 2026-09-27).
+  const opus55Caps = { adaptiveThinking: true, budgetThinking: false, effort: ['low', 'medium', 'high', 'xhigh', 'max'] }
+  for (const catalog of [undefined, { anthropic: { fetchedAt: 1, models: [{ id: 'claude-opus-5-5', caps: opus55Caps }] } }]) {
+    const how = catalog ? 'live caps' : 'regex'
+    responder = () => anthropicSse({ model: 'claude-opus-5-5', deltas: ['ok'] })
+    await run({ models: { anthropic: 'claude-opus-5-5', openai: '', azure: '', mock: '' }, thinking: 'off', catalog })
+    ok(calls[0]?.body?.thinking === undefined, `opus 5.5 off (${how}): no thinking field (disabled → 400)`)
+    ok(calls[0]?.body?.output_config?.effort === 'low', `opus 5.5 off (${how}) → effort low`)
+    ok(calls[0]?.body?.fallbacks === 'default', `opus 5.5 (${how}): fallbacks default`)
+    const beta55 = calls[0]?.headers.get('anthropic-beta') ?? ''
+    ok(beta55.includes('server-side-fallback') || Array.isArray(calls[0]?.body?.betas), `opus 5.5 (${how}): fallback beta requested`)
+    ok(calls[0]?.body?.tools?.[0]?.type === 'web_search_20260209', `opus 5.5 (${how}): modern web-search tool`)
+  }
+  // Opus 5 (stored selections) is a Claude 4.6+ model too — it was getting
+  // the basic search tool because the regex only knew opus-4-[6-9]
+  responder = () => anthropicSse({ model: 'claude-opus-5', deltas: ['ok'] })
+  await run({ models: { anthropic: 'claude-opus-5', openai: '', azure: '', mock: '' }, thinking: 'high' })
+  ok(calls[0]?.body?.tools?.[0]?.type === 'web_search_20260209', 'opus 5: modern web-search tool')
+  // ...and it thinks when the field is left out, so «Av» must say disabled
+  // (the regex fallback used to omit it, which left thinking ON offline)
+  await run({ models: { anthropic: 'claude-opus-5', openai: '', azure: '', mock: '' }, thinking: 'off' })
+  ok(calls[0]?.body?.thinking?.type === 'disabled', `opus 5 off (regex) → explicit disabled (got ${JSON.stringify(calls[0]?.body?.thinking)})`)
+  ok(calls[0]?.body?.fallbacks === 'default', 'opus 5: fallbacks default (it has classifiers too)')
+  // Sonnet 5 ships no classifiers — no fallback, no beta endpoint
+  responder = () => anthropicSse({ model: 'claude-sonnet-5', deltas: ['ok'] })
+  await run({})
+  ok(calls[0]?.body?.fallbacks === undefined, 'sonnet 5: no server-side fallback')
+
+  // When the fallback DID answer, the result names the model that did — read
+  // from the handoff block, since message_start can still name the chosen one
+  responder = () =>
+    anthropicSse({ model: 'claude-opus-5-5', deltas: ['Svar'], fallback: { from: 'claude-opus-5-5', to: 'claude-opus-4-8' } })
+  const served = await run({ models: { anthropic: 'claude-opus-5-5', openai: '', azure: '', mock: '' } })
+  ok(served.result.ok === true && served.result.fallbackModel === 'claude-opus-4-8', `fallback answer names its model (got ${served.result.fallbackModel})`)
+  ok(served.result.parts?.map((p) => p.text).join('') === 'Svar', 'fallback answer text survives the handoff block')
+  responder = () => anthropicSse({ model: 'claude-opus-5-5', deltas: ['ok'] })
+  const own = await run({ models: { anthropic: 'claude-opus-5-5', openai: '', azure: '', mock: '' } })
+  ok(own.result.ok === true && own.result.fallbackModel === undefined, 'no fallbackModel when the chosen model answered')
+
   // Haiku ignores thinking AND effort entirely.
   responder = () => anthropicSse({ model: 'claude-haiku-4-5', deltas: ['ok'] })
   await run({ models: { anthropic: 'claude-haiku-4-5', openai: '', azure: '', mock: '' }, thinking: 'high' })
@@ -308,6 +360,35 @@ section('anthropic: degrade-on-400, pause_turn, refusal')
   ok(calls[1]?.body?.messages?.some((m) => m.role === 'assistant'), 'resume carries the assistant turn')
   ok(paused.streamed === 'Del 1. Del 2.', `both rounds streamed (got "${paused.streamed}")`)
   ok(paused.result.usage?.inputTokens === 140 && paused.result.usage?.outputTokens === 11, 'usage summed across rounds')
+
+  // A paused turn after a fallback handoff: the declining model's thinking
+  // before the LAST fallback block is dropped from the echo, the block itself
+  // stays in place (refusals-and-fallback, «Continuing the conversation»)
+  const handoffRound = () => {
+    const ev = [
+      { type: 'message_start', message: { id: 'msg_fb', type: 'message', role: 'assistant', model: 'claude-opus-5-5', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'hmm' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 'sig' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'fallback', from: { model: 'claude-opus-5-5' }, to: { model: 'claude-opus-4-8' } } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'content_block_start', index: 2, content_block: { type: 'text', text: '', citations: [] } },
+      { type: 'content_block_delta', index: 2, delta: { type: 'text_delta', text: 'Del 1. ' } },
+      { type: 'content_block_stop', index: 2 },
+      { type: 'message_delta', delta: { stop_reason: 'pause_turn', stop_sequence: null }, usage: { output_tokens: 5 } },
+      { type: 'message_stop' }
+    ]
+    return sse(ev.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join(''))
+  }
+  responder = () => (calls.length === 1 ? handoffRound() : anthropicSse({ model: 'claude-opus-4-8', deltas: ['Del 2.'] }))
+  const resumed = await run({ models: { anthropic: 'claude-opus-5-5', openai: '', azure: '', mock: '' } })
+  const echoed = (calls[1]?.body?.messages ?? []).filter((m) => m.role === 'assistant').at(-1)?.content ?? []
+  ok(
+    echoed.map((b) => b.type).join(',') === 'fallback,text',
+    `resume after a handoff drops the declined model's thinking, keeps the block (got ${echoed.map((b) => b.type).join(',')})`
+  )
+  ok(resumed.result.fallbackModel === 'claude-opus-4-8' && resumed.result.parts?.map((p) => p.text).join('') === 'Del 1. Del 2.', `handoff + pause_turn still answers whole (got ${resumed.result.fallbackModel}, "${resumed.result.parts?.map((p) => p.text).join('')}")`)
 
   // Safety refusal with no text at all: a named code, never a blank answer.
   responder = () => anthropicSse({ deltas: [], stopReason: 'refusal' })
@@ -365,7 +446,7 @@ section('openai: request shaping + SSE parse')
   }
 }
 
-section('openai: gpt-6 astra (curated 2026-09-05)')
+section('openai: gpt-6 (Astra curated 2026-09-05, Sol/Luna 2026-09-26)')
 {
   // The reasoning regex must cover the 6-series — /gpt-5/ alone would have
   // left Astra without thinking-level control in silence.
@@ -377,9 +458,16 @@ section('openai: gpt-6 astra (curated 2026-09-05)')
   // which would have cost a second request per question.
   await run({ provider: 'openai', models: { anthropic: '', openai: 'gpt-6-astra', azure: '', mock: '' }, thinking: 'off' })
   ok(calls.length === 1 && calls[0]?.body?.reasoning?.effort === 'low', `gpt-6 off → effort low in ONE request (got ${calls.length}, ${calls[0]?.body?.reasoning?.effort})`)
-  // gpt-5.6 keeps `none` — it is documented there and the cheaper answer.
-  await run({ provider: 'openai', thinking: 'off' })
+  // gpt-5.6 (stored selections) keeps `none` — documented there, and cheaper
+  await run({ provider: 'openai', models: { anthropic: '', openai: 'gpt-5.6-terra', azure: '', mock: '' }, thinking: 'off' })
   ok(calls[0]?.body?.reasoning?.effort === 'none', 'gpt-5.6 off → none unchanged')
+  // GPT-6 Sol and Luna DO document `none` (their model pages, 2026-09-26) —
+  // the always-reasons list names Astra, not the whole 6-series
+  for (const id of ['gpt-6-sol', 'gpt-6-luna']) {
+    responder = () => openAiSse({ deltas: ['ok'], response: { model: id, output: [] } })
+    await run({ provider: 'openai', models: { anthropic: '', openai: id, azure: '', mock: '' }, thinking: 'off' })
+    ok(calls[0]?.body?.reasoning?.effort === 'none', `${id} off → none (got ${calls[0]?.body?.reasoning?.effort})`)
+  }
 }
 
 section('openai: degrade-on-400 + response.failed')
@@ -837,16 +925,23 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
   })
   ok(calls[0]?.body?.reasoning_effort === 'medium', 'vendor-prefixed reasoning id gets reasoning_effort')
 
-  // grok-4.6 (curated) and grok-4.5 (retired from the menu, kept in the
-  // regex for stored selections) both document reasoning_effort (low/medium/
-  // high, plus xhigh on 4.6) — grok-4.3 stays out until someone verifies it
-  // (fewer models that work beats more that might, 2026-08-12/13)
+  // grok-4.7 (curated), grok-4.6 and grok-4.5 (retired from the menu, kept in
+  // the regex for stored selections) all document reasoning_effort (low/
+  // medium/high/xhigh) — grok-4.3 stays out until someone verifies it (fewer
+  // models that work beats more that might, 2026-08-12/13)
+  const xaiModel = (id) => ({ anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: id, mistral: '', groq: '', compat: '', mock: '' })
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
-  await run({
-    provider: 'xai',
-    models: { anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: 'grok-4.6', mistral: '', groq: '', compat: '', mock: '' }
-  })
-  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.6 gets reasoning_effort')
+  await run({ provider: 'xai', models: xaiModel('grok-4.7') })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.7 gets reasoning_effort')
+  // «Reasoning cannot be disabled» on 4.5–4.7 (xAI reasoning docs, 2026-09-26),
+  // and gpt-oss on Groq takes low/medium/high only: «Av» is the lowest effort,
+  // never a `none` neither documents
+  await run({ provider: 'xai', models: xaiModel('grok-4.7'), thinking: 'off' })
+  ok(calls[0]?.body?.reasoning_effort === 'low', `grok-4.7 off → low (got ${calls[0]?.body?.reasoning_effort})`)
+  await run({ provider: 'groq', thinking: 'off' })
+  ok(calls[0]?.body?.reasoning_effort === 'low', `gpt-oss off → low (got ${calls[0]?.body?.reasoning_effort})`)
+  await run({ provider: 'xai', models: xaiModel('grok-4.6') })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.6 (retired, still stored) gets reasoning_effort')
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
   await run({
     provider: 'xai',

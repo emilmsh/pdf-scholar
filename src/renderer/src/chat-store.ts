@@ -21,6 +21,9 @@ export type ChatMessage =
       parts: AiContentPart[]
       usage?: AiUsage | undefined
       model?: string | undefined
+      /** AiChatResult.fallbackModel: another model answered because the chosen
+       *  one declined — drives the «Besvart av …» chip on the answer */
+      fallbackModel?: string | undefined
       error?: string | undefined
       /** Set when the failure was one we can name. Stored ALONGSIDE `error`
        *  rather than instead of it: the code is what gets translated at render

@@ -4355,7 +4355,8 @@ html.pen-near .draw-layer {
 
 /* Excerpt-mode disclosure on an answer: the document was too large for the
    model's context window, so the request attached selected pages only */
-.ai-excerpt-chip {
+.ai-excerpt-chip,
+.ai-fallback-chip {
   display: inline-block;
   padding: 1px 7px;
   margin-right: 8px;

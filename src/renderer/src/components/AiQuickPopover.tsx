@@ -26,6 +26,7 @@ import type {
 import { bridge } from '../bridge'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { prettyModelName, providerLabels } from './ai-models'
+import { FallbackChip } from './FallbackChip'
 import {
   askSystem,
   askUserMessage,
@@ -110,6 +111,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [meta, setMeta] = useState<string | null>(null)
+  const [fallbackModel, setFallbackModel] = useState<string | null>(null)
   const [excerptInfo, setExcerptInfo] = useState<{ included: number; total: number } | null>(null)
   const [parts, setParts] = useState<AiContentPart[] | null>(null)
   const requestIdRef = useRef<number | null>(null)
@@ -269,6 +271,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         setText(full)
         setParts(parts)
         setMeta(formatTokens(result.usage))
+        if (result.fallbackModel) setFallbackModel(result.fallbackModel)
       }
     })()
     return () => {
@@ -466,6 +469,7 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             {t('ai.wholeDocChip')}
           </span>
         )}
+        {fallbackModel && <FallbackChip model={fallbackModel} className="ai-meta" />}
         {meta && <span className="ai-meta">{meta}</span>}
         <button
           className="btn-secondary"
