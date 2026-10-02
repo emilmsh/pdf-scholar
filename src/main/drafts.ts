@@ -17,6 +17,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { join } from 'node:path'
+import { toLongPath } from './long-path'
 
 function draftDir(): string {
   return join(app.getPath('userData'), 'drafts')
@@ -83,9 +84,14 @@ export function wasModifiedExternally(originalPath: string): boolean {
 export function saveDraft(originalPath: string): void {
   const draft = draftPathFor(originalPath)
   if (!existsSync(draft)) return
-  const tmp = `${originalPath}.pdfx-tmp`
+  // The draft is keyed by the path as given, but the file is replaced under its
+  // real name: renaming onto a Windows 8.3 alias ("EFFECT~1.pdf") would leave
+  // the document literally named that (issue #24). loadPdf already hands the
+  // renderer the long path; this covers a path that reached us any other way.
+  const target = toLongPath(originalPath)
+  const tmp = `${target}.pdfx-tmp`
   copyFileSync(draft, tmp)
-  renameSync(tmp, originalPath)
+  renameSync(tmp, target)
   rmSync(draft, { force: true })
   rmSync(baselinePathFor(originalPath), { force: true })
 }

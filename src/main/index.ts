@@ -64,6 +64,7 @@ import {
   setPosition
 } from './storage'
 import { initUpdater } from './updater'
+import { toLongPath } from './long-path'
 import { applyPortableUserData } from './portable'
 import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
 import { doiCite } from './doi'
@@ -178,7 +179,7 @@ async function askExternalUpdateVerdict(
 
 function pathFromArgv(argv: string[]): string | null {
   const arg = argv.slice(1).find((a) => !a.startsWith('-') && a.toLowerCase().endsWith('.pdf'))
-  return arg ? resolve(arg) : null
+  return arg ? toLongPath(resolve(arg)) : null
 }
 
 /** The window an IPC event came from, or the currently focused one */
@@ -705,7 +706,12 @@ async function waitUntilWhole(path: string): Promise<void> {
   // file than waited on while the window sits empty.
 }
 
-async function loadPdf(path: string, awaitSettled = false): Promise<FilePayload | FileError> {
+async function loadPdf(given: string, awaitSettled = false): Promise<FilePayload | FileError> {
+  // The path returned below becomes the document's identity in the renderer and
+  // is what every later save, draft and close is keyed by — so a Windows 8.3
+  // alias handed to us by a launcher ("EFFECT~1.pdf") is replaced by the real
+  // name here, once, for every way a file can be opened (issue #24).
+  const path = toLongPath(given)
   try {
     // Recent annotation writes may still sit in the engine's cached doc —
     // flush so the bytes we hand the renderer include them

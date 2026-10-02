@@ -101,6 +101,11 @@ jobs:
       # updates it cannot install, and getting this wrong either nags every four
       # hours or never speaks at all, on hardware we don't own
       - run: npm run test:update-channel
+      # Windows 8.3 aliases ("EFFECT~1.pdf") never become a document's identity:
+      # Save renamed a temp file onto the alias and the long-named paper came
+      # back with an eight-character name (issue #24). Logic everywhere; the
+      # real rename on the Windows runner, proving the old behaviour first
+      - run: npm run test:long-path
       # XFA forms open read-only from their XML layout (pdf.js enableXfa): a
       # dynamic form lays out and its text is readable, a static one is left
       # alone, and sample.pdf opens IDENTICALLY with the flag on — the promise
