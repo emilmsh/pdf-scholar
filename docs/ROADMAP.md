@@ -343,6 +343,36 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
   - Dekket av `test:engine` (/DA navngir ansiktet, ordene ligger i /Contents,
     ingen /FontFile) og `test:annot-edit` (menyen, editoren og merket viser
     samme skrift).
+- [x] **Vedlegg i PDF-en vises, åpnes og lagres** (Emils bestilling
+  2026-10-02, etter et prosesskriv der ni Excel-bilag lå som vedlegg —
+  dokumentnivå `/EmbeddedFiles`, med et innlimt binders-*bilde* på hver
+  bilagsside som eneste spor). Før dette var vedleggene **usynlige** i appen:
+  ikke dårligere vist, men borte, og ingenting sa fra. Nå:
+  - «N vedlegg»-brikke i verktøylinja (samme form som «Signert» og
+    «XFA-skjema», bare når dokumentet har vedlegg) åpner en vedleggsseksjon
+    **øverst i «Innhold»** — ikke en femte fane: fire etiketter fyller
+    standardbredden nøyaktig, og en femte ville kuttet «Bokmerker» og
+    «Merknader» på hvert dokument med vedlegg.
+  - FileAttachment-binderser på sidene er klikkbare (boble med åpne/lagre); en
+    uten eget utseende tegnes av appen. `/PageMode /UseAttachments` åpner
+    panelet ved åpning, som Acrobats «Vedlegg-panel og side».
+  - **Åpne bare fra en tillatt-liste** (dokumenter, data, media), aldri
+    kjørbare filer, skript, arkiver, nettsider, SVG eller makro-Office —
+    sjekket på navnet slik det blir liggende på disk, og sjekket på nytt i
+    main. Acrobat har sperreliste + «kan inneholde virus»-spørsmål; vi tok den
+    strengere halvdelen og dropper spørsmålet. PDF-vedlegg åpnes som ny fane
+    her (som Acrobat). Temp-kopien **arver dokumentets Mark of the Web**, så
+    Office åpner et vedlegg fra en e-post i beskyttet visning.
+  - «Lagre …», «Lagre alle …» (én mappe, aldri overskriving); nettleser og
+    utvidelse laster ned (PLATFORMS.md avvik 26).
+  - Bevisst utenfor: legge til / slette / redigere vedlegg, egen
+    porteføljevisning (`/Collection` — filene dukker opp i lista uansett),
+    navigering inn i innebygde PDF-er (GoToE) og JavaScript-drevne
+    «last ned»-knapper. Et innlimt binders-*bilde* bærer ingen fil og kan ikke
+    kobles til et vedlegg — det gjettes ikke.
+  - Dekket av `test:attachments` (regler + pdf.js-lesing),
+    `test:attachments-desktop` (mains håndterere) og `test:engine` seksjon 13
+    (vedleggene overlever lagring byte for byte, bindersens utseende urørt).
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

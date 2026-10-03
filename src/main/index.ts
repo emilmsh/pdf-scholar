@@ -44,7 +44,14 @@ import {
   setFormField,
   updateAnnotation
 } from './annotation-engine-embedpdf'
-import { ENGINE_ERRORS } from '../shared/engine-errors'
+import { ATTACHMENT_ERRORS, ENGINE_ERRORS } from '../shared/engine-errors'
+import {
+  attachmentExtension,
+  canOpenAttachment,
+  cleanAttachmentName,
+  isPdfAttachment
+} from '../shared/attachments'
+import { stageAttachment, writeAttachmentsInto, writeSavedAttachment } from './attachments'
 import {
   discardDraft,
   draftPathFor,
@@ -1210,6 +1217,72 @@ function registerIpc(): void {
       // A string writes as UTF-8; bytes (e.g. .docx) write verbatim
       await writeFile(result.filePath, typeof content === 'string' ? content : Buffer.from(content))
       return { path: result.filePath }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // ---------- Files embedded in a document ----------
+  // The name and the bytes come from the PDF by way of the renderer: the name
+  // is cleaned here again and the type re-checked here (src/shared/
+  // attachments.ts), never taken on trust from the UI that offered the button.
+  const isBytes = (data: unknown): data is Uint8Array => data instanceof Uint8Array && data.length > 0
+
+  ipcMain.handle('attachment:save', async (e, name: unknown, data: unknown, docPath: unknown) => {
+    const parent = windowFor(e)
+    if (!parent || typeof name !== 'string' || !isBytes(data)) return null
+    const clean = cleanAttachmentName(name)
+    const ext = attachmentExtension(clean)
+    const result = await dialog.showSaveDialog(parent, {
+      defaultPath: clean,
+      filters: ext ? [{ name: ext.toUpperCase(), extensions: [ext] }] : []
+    })
+    if (result.canceled || !result.filePath) return null
+    try {
+      await writeSavedAttachment(result.filePath, data, String(docPath ?? ''))
+      return { path: result.filePath }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('attachment:save-all', async (e, files: unknown, docPath: unknown) => {
+    const parent = windowFor(e)
+    if (!parent || !Array.isArray(files)) return null
+    const valid = files.filter(
+      (f): f is { name: string; data: Uint8Array } =>
+        !!f && typeof f.name === 'string' && isBytes(f.data)
+    )
+    if (valid.length === 0) return null
+    const result = await dialog.showOpenDialog(parent, {
+      properties: ['openDirectory', 'createDirectory']
+    })
+    const folder = result.filePaths[0]
+    if (result.canceled || !folder) return null
+    try {
+      const count = await writeAttachmentsInto(folder, valid, String(docPath ?? ''))
+      return { folder, count }
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  ipcMain.handle('attachment:open', async (e, name: unknown, data: unknown, docPath: unknown) => {
+    if (typeof name !== 'string' || !isBytes(data)) return ATTACHMENT_ERRORS.unreadable
+    if (!canOpenAttachment(name)) return ATTACHMENT_ERRORS.blocked
+    try {
+      const target = await stageAttachment(name, data, String(docPath ?? ''))
+      // A PDF is read HERE, as a new tab in the window that asked — the same
+      // way Acrobat keeps PDF attachments to itself instead of handing them to
+      // whatever the system's PDF program happens to be.
+      if (isPdfAttachment(name)) {
+        const win = windowFor(e)
+        if (!win || win.isDestroyed()) return { error: 'no window' }
+        win.webContents.send('open-path', target)
+        return { ok: true }
+      }
+      const failure = await shell.openPath(target)
+      return failure ? { ...ATTACHMENT_ERRORS.noApp, error: failure } : { ok: true }
     } catch (err) {
       return { error: err instanceof Error ? err.message : String(err) }
     }

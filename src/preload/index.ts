@@ -71,6 +71,12 @@ const api: PdfxApi = {
     ipcRenderer.invoke('file:save-as', path ?? '', defaultName, data),
   saveDocumentBytes: (path: string, name: string, data: Uint8Array) =>
     ipcRenderer.invoke('file:save-bytes', path, name, data),
+  saveAttachment: (name: string, data: Uint8Array, docPath: string) =>
+    ipcRenderer.invoke('attachment:save', name, data, docPath),
+  saveAttachments: (files: { name: string; data: Uint8Array }[], docPath: string) =>
+    ipcRenderer.invoke('attachment:save-all', files, docPath),
+  openAttachment: (name: string, data: Uint8Array, docPath: string) =>
+    ipcRenderer.invoke('attachment:open', name, data, docPath),
   showInFolder: (path: string) => ipcRenderer.send('shell:show-in-folder', path),
   zoteroInfo: (path: string, style?: string) => ipcRenderer.invoke('zotero:info', path, style),
   zoteroSelect: (path: string) => ipcRenderer.invoke('zotero:select', path),

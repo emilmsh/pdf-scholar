@@ -796,5 +796,78 @@ const foreignNote = (() => {
   pdf.destroy()
   fs.rmSync(OCFILE, { force: true })
 }
+
+// 13. EMBEDDED FILES must survive a save. A court filing can carry its exhibits
+// as attachments — the document's own /EmbeddedFiles name tree, or a
+// FileAttachment annotation's /FS on a page — and the app lists, opens and
+// saves them (src/renderer/src/attachments.ts). Annotating such a filing goes
+// out through the same full-rewrite save as everything else; a save that
+// dropped the name tree, or an annotation pass that rewrote the paperclip,
+// would delete the exhibits while every mark we wrote checked out fine. Both
+// kinds, byte for byte, plus the paperclip's appearance (present before, so
+// present after — PDFium must not repaint it with its own).
+{
+  const ATTFILE = path.join(os.tmpdir(), 'pdfx-attachments-test.pdf')
+  const sheet = new TextEncoder().encode('PK\u0003\u0004 not really a spreadsheet, but bytes that must survive')
+  const pinned = new TextEncoder().encode('%PDF-1.7 an exhibit pinned to page 1')
+  {
+    const doc = new mupdf.PDFDocument()
+    const font = doc.addSimpleFont(new mupdf.Font('Helvetica'))
+    doc.insertPage(-1, doc.addPage([0, 0, 595, 842], 0, doc.addObject({ Font: { F1: font } }),
+      'BT /F1 24 Tf 72 760 Td (Prosesskriv med bilag) Tj ET'))
+    const when = new Date('2026-10-01T12:00:00Z')
+    doc.insertEmbeddedFile('Bilag 1.xlsx', doc.addEmbeddedFile('Bilag 1.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sheet, when, when))
+    const page = doc.loadPage(0)
+    const clip = page.createAnnotation('FileAttachment')
+    clip.setRect([500, 700, 520, 724])
+    clip.setFileSpec(doc.addEmbeddedFile('Bilag 2.pdf', 'application/pdf', pinned, when, when))
+    clip.update()
+    fs.writeFileSync(ATTFILE, doc.saveToBuffer('').asUint8Array())
+    doc.destroy()
+  }
+  /** The paperclip's normal appearance stream, as text ('' = none) */
+  const apOf = (annot) => {
+    const n = annot ? annot.getObject().get('AP').get('N') : null
+    return n && !n.isNull() && n.isStream() ? n.readStream().asString() : ''
+  }
+  const apBefore = (() => {
+    const d = mupdf.Document.openDocument(fs.readFileSync(ATTFILE), 'application/pdf').asPDF()
+    const ap = apOf(d.loadPage(0).getAnnotations().find((x) => x.getType() === 'FileAttachment'))
+    d.destroy()
+    return ap
+  })()
+
+  const abase = { path: ATTFILE, pageIndex: 0, opacity: 0.5, color: [1, 0.84, 0.29], author: 'test' }
+  const r1 = await applyAnnotation({ ...abase, type: 'highlight', quads: q(70, 70, 200, 20) })
+  check('attachments: create highlight in a document with attachments', 'ok' in r1, 'error' in r1 ? r1.error : '')
+  // The edit runs getPageAnnotations — the call that synthesised appearances
+  // for link boxes once (linkguard) — over a page carrying the paperclip
+  const r2 = await updateAnnotation({ path: ATTFILE, pageIndex: 0, id: r1.id, color: [0.44, 0.71, 1] })
+  check('attachments: update it (getPageAnnotations over the paperclip)', 'ok' in r2, 'error' in r2 ? r2.error : '')
+  await flushAnnotations(ATTFILE)
+
+  const pdf = mupdf.Document.openDocument(fs.readFileSync(ATTFILE), 'application/pdf').asPDF()
+  const files = pdf.getEmbeddedFiles()
+  const names = Object.keys(files)
+  check('attachments: the /EmbeddedFiles entry survives the save', names.length === 1 && names[0] === 'Bilag 1.xlsx',
+    names.join(', ') || 'none')
+  const gotSheet = names.length ? pdf.getEmbeddedFileContents(files[names[0]])?.asUint8Array() : null
+  check('attachments: …byte for byte', !!gotSheet && Buffer.compare(Buffer.from(gotSheet), Buffer.from(sheet)) === 0,
+    gotSheet ? `${gotSheet.length} bytes` : 'no bytes')
+  const annots = pdf.loadPage(0).getAnnotations()
+  const clip = annots.find((a) => a.getType() === 'FileAttachment')
+  check('attachments: the paperclip annotation survives', !!clip)
+  const gotPinned = clip ? pdf.getEmbeddedFileContents(clip.getFileSpec())?.asUint8Array() : null
+  check('attachments: …with its file, byte for byte',
+    !!gotPinned && Buffer.compare(Buffer.from(gotPinned), Buffer.from(pinned)) === 0,
+    gotPinned ? `${gotPinned.length} bytes` : 'no bytes')
+  check('attachments: …and its own appearance, not one PDFium drew',
+    apBefore !== '' && apOf(clip) === apBefore,
+    apBefore === '' ? 'fixture had no AP' : apOf(clip) === apBefore ? 'same AP' : apOf(clip) === '' ? 'AP gone' : 'AP changed')
+  check('attachments: our highlight really landed', annots.some((a) => a.getType() === 'Highlight'))
+  pdf.destroy()
+  fs.rmSync(ATTFILE, { force: true })
+}
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)

@@ -491,6 +491,24 @@ regressions are treated as bugs, not as acceptable platform lag.
     route on every platform. Covered by `npm run test:ai-chat` (address,
     headers, `store: false`, the named 401/429 failures); a signed-in plan
     joins `npm run test:live`.
+26. **A document's attachments open on the desktop; the browser targets
+    download them.** Files embedded in a PDF — the catalog's `/EmbeddedFiles`
+    and FileAttachment paperclips — are listed identically everywhere (the top
+    of «Innhold», the «N vedlegg» toolbar chip, a bubble on the paperclip), from
+    the same pdf.js reading (`src/renderer/src/attachments.ts`). What differs is
+    the exit, because a web page cannot start a program: the desktop's «Åpne»
+    opens a PDF attachment as a new tab here and an allow-listed type in the
+    system's own program, from a temp copy that inherits the document's Mark of
+    the Web (Windows; macOS's quarantine attribute and Linux have no equivalent
+    we write — pure-JS rule, no native module); «Lagre …» is the native save
+    dialog. The extension and the web preview offer «Last ned» instead — the
+    browser marks the download as from the web itself, and its own download UI
+    opens it — and that includes a PDF attachment: a blob-URL tab would be a
+    document with no name and no file to save back to, where a download is a
+    real file the extension then opens with both. «Lagre alle» picks a real
+    folder on the desktop and in the extension (the directory picker); the web
+    preview downloads the files one by one. Covered by `npm run test:attachments`
+    (rules + reading) and `npm run test:attachments-desktop` (main's handlers).
 
 ## Maintenance rules
 

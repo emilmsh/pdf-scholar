@@ -6093,6 +6093,257 @@ html.pen-near .draw-layer {
   color: var(--text-secondary);
 }
 
+/* ---------- Files embedded in the document ---------- */
+
+/* A heading inside a sidebar list — «Vedlegg» and the «Innholdsfortegnelse»
+   under it. The annotation tab's section-head grammar, so the two tabs read
+   as one system. */
+.sidebar-section-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 4px;
+}
+
+.sidebar-section-head > span {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.attach-section {
+  padding-bottom: 6px;
+}
+
+.attach-head {
+  padding-left: 0;
+}
+
+.attach-count {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.attach-save-all {
+  margin-left: auto;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  color: var(--accent);
+}
+
+.attach-save-all:hover {
+  background: var(--hover);
+}
+
+.attach-row {
+  padding: 3px 0 3px 2px;
+  border-radius: 7px;
+}
+
+.attach-row:hover {
+  background: var(--hover);
+}
+
+.attach-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* The file type, as the reader would say it: XLSX, PDF, DOCX */
+.attach-ext {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: var(--active);
+  color: var(--text-secondary);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* A type that is only ever saved, never opened from here */
+.attach-ext.is-blocked {
+  background: rgb(var(--danger-rgb) / 0.12);
+  color: rgb(var(--danger-rgb));
+}
+
+.attach-name {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 4px;
+  border-radius: 6px;
+  text-align: left;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+}
+
+.attach-btn:hover {
+  background: var(--active);
+  color: var(--text);
+}
+
+.attach-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  /* under the name, past the type chip */
+  padding: 0 4px 2px 42px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.attach-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-page {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  color: var(--accent);
+}
+
+.attach-page:hover {
+  background: var(--active);
+}
+
+/* The paperclip on a page: the same hit area a link gets. The icon itself is
+   pdf.js's painting of the file's appearance stream, under this button. */
+.pdf-attachment {
+  position: absolute;
+  min-width: 14px;
+  min-height: 14px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.pdf-attachment:hover,
+.pdf-attachment:focus-visible {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* …unless the file brought no appearance: then this is the only paperclip
+   there is, and it draws one */
+.pdf-attachment.no-ap {
+  color: var(--accent);
+}
+
+.pdf-attachment.no-ap svg {
+  width: 100%;
+  height: 100%;
+  min-width: 14px;
+  min-height: 14px;
+}
+
+.pages.drawing .pdf-attachment {
+  pointer-events: none;
+}
+
+.link-host.annots-off .pdf-attachment {
+  display: none;
+}
+
+.attach-pop {
+  position: fixed;
+  z-index: 61;
+  width: 300px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  animation: menu-in 0.12s ease;
+  cursor: grab;
+  touch-action: none;
+}
+
+.attach-pop-head {
+  margin-bottom: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.attach-pop-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.attach-pop-name > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-pop-desc,
+.attach-pop-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.attach-pop-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  cursor: auto;
+}
+
+.attach-pop-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 /* A placed stamp, while it is still a session mark (once saved, pdf.js paints
    it from the file's appearance stream instead). */
 .annot-stamp {

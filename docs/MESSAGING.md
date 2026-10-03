@@ -168,6 +168,13 @@ carries no picture of its own.)*
   strip, and returning to one restores page, zoom and panels
 - Password-protected documents open, can be annotated, and are saved with their
   protection intact. *Supporting, not a headline: a browser opens these too.*
+- Files attached to a document — a court filing's exhibits, a portfolio's
+  files — are listed with it, and open or save from the side panel; a
+  paperclip on a page opens its file. Only document, data and media types
+  open from here; anything that could run is saved, never launched. In the
+  browser extension attachments download instead of opening. *Supporting, not a
+  headline (Emil's ask, 2026-10-02, after a filing whose nine spreadsheet
+  exhibits the app did not show at all).*
 - Interface in Norwegian and English; the choice also applies to the AI
   prompts, exports and date formats
 

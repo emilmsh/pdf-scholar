@@ -201,6 +201,15 @@ export type ZoteroErrorCode = 'zotero-off' | 'zotero-api-disabled' | 'zotero-ite
  *  (`doierr.*`, whole sentences on the hint row); `errorText` routes on `doi-`. */
 export type DoiErrorCode = 'doi-offline' | 'doi-unknown'
 
+/** And for files embedded in a document (src/shared/attachments.ts). Fragments
+ *  like the `engine.*` family — they ride inside «Kunne ikke åpne vedlegget: …»
+ *  — under the `atterr.*` prefix; `errorText` routes on the `attach-` stem.
+ *  `attach-blocked` is main refusing a type the allow list leaves out (the UI
+ *  never offers to open one, so seeing it means the check held); `attach-no-app`
+ *  is a type nothing on this machine opens; `attach-unreadable` is pdf.js
+ *  finding no file behind the entry. */
+export type AttachmentErrorCode = 'attach-blocked' | 'attach-no-app' | 'attach-unreadable'
+
 /** A bibliographic item as the save menu cites it — the fields the Zotero
  *  section and the DOI reserve have in common, so one set of rows renders
  *  either. */
@@ -256,6 +265,7 @@ export interface FileError {
     | ExtensionErrorCode
     | ZoteroErrorCode
     | DoiErrorCode
+    | AttachmentErrorCode
     | undefined
 }
 
@@ -933,6 +943,34 @@ export interface PdfxApi {
     name: string,
     data: Uint8Array
   ): Promise<{ path: string } | FileError | null>
+  // ---------- Files embedded in the document (src/shared/attachments.ts) ----------
+  /** Save one embedded file through a save dialog. `name` is the attachment's
+   *  own name, so it is untrusted: every platform cleans it before it touches a
+   *  file system. Desktop marks the saved file with the Mark of the Web of
+   *  `docPath`, the same as `openAttachment`. null = the user cancelled. The
+   *  browser targets download it under that name (the browser marks downloads
+   *  itself; the File System Access picker is kept for the PDF). */
+  saveAttachment(
+    name: string,
+    data: Uint8Array,
+    docPath: string
+  ): Promise<{ path: string } | FileError | null>
+  /** «Lagre alle»: every embedded file into one folder the user picks. A name
+   *  already taken in that folder gets « (2)» rather than overwriting anything.
+   *  null = cancelled. Desktop and the extension pick a real folder; the plain
+   *  browser preview downloads them one by one (`folder` is then ''). */
+  saveAttachments(
+    files: { name: string; data: Uint8Array }[],
+    docPath: string
+  ): Promise<{ folder: string; count: number } | FileError | null>
+  /** Open an embedded file. Desktop: a PDF opens as a new tab in the asking
+   *  window; a type on the allow list opens in the system's program, from a
+   *  temp copy carrying the Mark of the Web of `docPath` (the document it came
+   *  in); anything else is refused with `attach-blocked` — main checks the
+   *  type itself rather than trusting that the UI never offered it. A browser
+   *  page cannot start a program, so the browser targets download the file and
+   *  the browser's own download UI opens it (docs/PLATFORMS.md). */
+  openAttachment(name: string, data: Uint8Array, docPath: string): Promise<{ ok: true } | FileError>
   /** Reveal the file in Windows File Explorer */
   showInFolder(path: string): void
   /** Zotero metadata for a file in Zotero's storage layout (see ZoteroInfo).

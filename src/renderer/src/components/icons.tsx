@@ -557,6 +557,14 @@ export const IconExternal = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** A file carried by the document (attachments) — a plain paperclip, tilted
+ *  the way the object is usually drawn */
+export const IconPaperclip = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M16 7.5v8a4 4 0 0 1-8 0V6.5a2.5 2.5 0 0 1 5 0v8.5a1 1 0 0 1-2 0V8" transform="rotate(30 12 12)" />
+  </Svg>
+)
+
 export const IconRotateCw = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v5h-5" />

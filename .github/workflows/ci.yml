@@ -111,6 +111,11 @@ jobs:
       # alone, and sample.pdf opens IDENTICALLY with the flag on — the promise
       # that turning XFA on changed nothing for every other document
       - run: npm run test:xfa
+      # Files embedded in a PDF: the allow list that keeps «Åpne» from launching
+      # an executable (a bidi override, trailing dot or stream suffix cannot
+      # disguise one), the inherited Mark of the Web, and that pdf.js lists both
+      # kinds and reads their bytes back — also from a re-opened document
+      - run: npm run test:attachments
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

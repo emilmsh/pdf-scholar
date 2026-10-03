@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react'
 
 import type {
   AiErrorCode,
+  AttachmentErrorCode,
   DoiErrorCode,
   ExtensionErrorCode,
   FileError,
@@ -312,6 +313,36 @@ const nb = {
     'Skjemaet er laget i Adobe LiveCycle og lagres som XML inne i PDF-en. PDF Scholar viser det slik Firefox gjør, men kan ikke fylle det ut, merke i det eller lagre endringer i det. Bruk Adobe Acrobat Reader for å fylle ut.',
   'xfaInfo.limits':
     'Søk og KI-assistenten leser skjemateksten. Miniatyrer, presentasjon og utskrift viser den tomme ventesiden som ligger i filen.',
+  // Files embedded in the document (src/renderer/src/attachments.ts)
+  'attach.fallbackName': 'vedlegg',
+  'attach.badge': '{count} vedlegg',
+  'attach.badgeOne': '1 vedlegg',
+  'attach.badgeTip': 'Dokumentet har filer lagt ved — vis dem i sidepanelet',
+  'attach.head': 'Vedlegg',
+  'attach.outlineHead': 'Innholdsfortegnelse',
+  'attach.open': 'Åpne',
+  'attach.openTip':
+    'Åpner en kopi i programmet som er satt opp for filtypen. Endringer der havner i kopien — bruk «Lagre …» for å beholde filen.',
+  'attach.openPdfTip': 'Åpner vedlegget i en ny fane',
+  'attach.save': 'Lagre …',
+  'attach.saveTip': 'Lagre vedlegget som en egen fil',
+  'attach.download': 'Last ned',
+  'attach.downloadTip': 'Lastes ned som en vanlig nedlasting — åpne den derfra',
+  'attach.saveAll': 'Lagre alle …',
+  'attach.saveAllTip': 'Lagre alle vedleggene i én mappe',
+  'attach.blockedTip':
+    '.{ext}-filer kan inneholde programmer, så de åpnes ikke herfra. Lagre filen og åpne den selv hvis du stoler på avsenderen.',
+  'attach.pageTip': 'Gå til siden vedlegget er festet på',
+  'attach.popHead': 'Vedlegg på side {page}',
+  'attach.pinTip': '{name} — klikk for å åpne eller lagre',
+  'attach.saved': 'Lagret: {path}',
+  'attach.savedAll': '{count} av {total} vedlegg lagret i {folder}',
+  'attach.downloadedAll': '{count} vedlegg lastet ned',
+  'attach.openFailed': 'Kunne ikke åpne vedlegget: {error}',
+  'attach.saveFailed': 'Kunne ikke lagre vedlegget: {error}',
+  'atterr.attach-blocked': 'filtypen kan inneholde programmer og åpnes ikke herfra',
+  'atterr.attach-no-app': 'ingen app på maskinen åpner denne filtypen',
+  'atterr.attach-unreadable': 'vedlegget kunne ikke leses ut av dokumentet',
   'viewer.xfaToolsOff': 'Verktøyene er slått av i et XFA-skjema — det kan bare leses',
   'tb.xfaToolsOffTip': 'Ikke tilgjengelig i et XFA-skjema',
   'note.hint': 'Klikk der notatet skal stå · Esc avbryter',
@@ -1260,6 +1291,35 @@ const en: Dict = {
     'The form was made in Adobe LiveCycle and is stored as XML inside the PDF. PDF Scholar shows it the way Firefox does, but cannot fill it in, annotate it or save changes to it. Use Adobe Acrobat Reader to fill it in.',
   'xfaInfo.limits':
     'Search and the AI assistant read the form text. Thumbnails, presentation and printing show the blank placeholder page stored in the file.',
+  'attach.fallbackName': 'attachment',
+  'attach.badge': '{count} attachments',
+  'attach.badgeOne': '1 attachment',
+  'attach.badgeTip': 'This document carries attached files — show them in the side panel',
+  'attach.head': 'Attachments',
+  'attach.outlineHead': 'Table of contents',
+  'attach.open': 'Open',
+  'attach.openTip':
+    'Opens a copy in the program set up for the file type. Changes made there stay in the copy — use «Save …» to keep the file.',
+  'attach.openPdfTip': 'Opens the attachment in a new tab',
+  'attach.save': 'Save …',
+  'attach.saveTip': 'Save the attachment as a file of its own',
+  'attach.download': 'Download',
+  'attach.downloadTip': 'Downloads like any other file — open it from there',
+  'attach.saveAll': 'Save all …',
+  'attach.saveAllTip': 'Save every attachment into one folder',
+  'attach.blockedTip':
+    '.{ext} files can contain programs, so they are not opened from here. Save the file and open it yourself if you trust the sender.',
+  'attach.pageTip': 'Go to the page the attachment is pinned to',
+  'attach.popHead': 'Attachment on page {page}',
+  'attach.pinTip': '{name} — click to open or save',
+  'attach.saved': 'Saved: {path}',
+  'attach.savedAll': '{count} of {total} attachments saved to {folder}',
+  'attach.downloadedAll': '{count} attachments downloaded',
+  'attach.openFailed': 'Could not open the attachment: {error}',
+  'attach.saveFailed': 'Could not save the attachment: {error}',
+  'atterr.attach-blocked': 'this file type can contain programs and is not opened from here',
+  'atterr.attach-no-app': 'no app on this computer opens this file type',
+  'atterr.attach-unreadable': 'the attachment could not be read out of the document',
   'viewer.xfaToolsOff': 'Tools are off in an XFA form — it can only be read',
   'tb.xfaToolsOffTip': 'Not available in an XFA form',
   'note.hint': 'Click where the note should go · Esc cancels',
@@ -1954,14 +2014,16 @@ export function locale(): string {
  *  a translated sentence. */
 export function errorText(e: FileError): string {
   if (!e.code) return e.error
-  // Five prefixes because the families read differently: `engine.*` and
-  // `exterr.*` entries are lowercase fragments spliced into a toast sentence,
-  // `aierr.*`, `zoterr.*` and `doierr.*` entries are whole sentences shown on
-  // their own (a chat bubble; the save menu's citation hint rows).
+  // Six prefixes because the families read differently: `engine.*`,
+  // `exterr.*` and `atterr.*` entries are lowercase fragments spliced into a
+  // toast sentence, `aierr.*`, `zoterr.*` and `doierr.*` entries are whole
+  // sentences shown on their own (a chat bubble; the save menu's citation
+  // hint rows).
   if (isAiErrorCode(e.code)) return t(`aierr.${e.code}`)
   if (isExtensionErrorCode(e.code)) return t(`exterr.${e.code}`)
   if (isZoteroErrorCode(e.code)) return t(`zoterr.${e.code}`)
   if (isDoiErrorCode(e.code)) return t(`doierr.${e.code}`)
+  if (isAttachmentErrorCode(e.code)) return t(`atterr.${e.code}`)
   return t(`engine.${e.code}`)
 }
 
@@ -1993,6 +2055,10 @@ const isZoteroErrorCode = (code: NonNullable<FileError['code']>): code is Zotero
 
 const isDoiErrorCode = (code: NonNullable<FileError['code']>): code is DoiErrorCode =>
   code.startsWith('doi-')
+
+const isAttachmentErrorCode = (
+  code: NonNullable<FileError['code']>
+): code is AttachmentErrorCode => code.startsWith('attach-')
 
 const isAiErrorCode = (code: NonNullable<FileError['code']>): code is AiErrorCode =>
   code.startsWith('ai-')

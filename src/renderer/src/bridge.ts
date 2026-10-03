@@ -19,6 +19,7 @@ import { DEFAULT_SETTINGS } from '../../shared/defaults'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 import { AI_ERRORS, CHATGPT_LOGIN_ERRORS } from '../../shared/engine-errors'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
+import { attachmentMime, cleanAttachmentName } from '../../shared/attachments'
 import {
   browserApplyAnnotation,
   browserDeleteAnnotation,
@@ -186,6 +187,23 @@ export const webApi: PdfxApi = {
   // own "ask where to save" setting decides whether the user picks a folder).
   saveFileAs: async (defaultName, data) => downloadBlob(defaultName, data),
   saveDocumentBytes: async (_path, name, data) => downloadBlob(name, data),
+  // Embedded files: a page cannot start a program, so «open» and «save» are
+  // the same download here — the browser's own download UI opens it, and the
+  // browser marks the download as coming from the web by itself.
+  saveAttachment: async (name, data) => downloadAttachment(name, data),
+  saveAttachments: async (files) => {
+    for (const [i, file] of files.entries()) {
+      // A beat between them: Chromium coalesces a burst of anchor-click
+      // downloads, and the later ones can silently go missing.
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 250))
+      downloadAttachment(file.name, file.data)
+    }
+    return { folder: '', count: files.length }
+  },
+  openAttachment: async (name, data) => {
+    downloadAttachment(name, data)
+    return { ok: true }
+  },
   showInFolder: () => {},
   // Zotero lives on the desktop's filesystem; the preview's paths are
   // basenames/URLs, so the shared path detection can never match and no
@@ -389,6 +407,22 @@ function downloadBlob(name: string, data: Uint8Array): { path: string } {
   a.download = name
   a.click()
   URL.revokeObjectURL(url)
+  return { path: name }
+}
+
+/** Download an embedded file under its cleaned name and the type that name
+ *  implies (attachmentMime — a wrong type makes Chromium rename the file). */
+export function downloadAttachment(rawName: string, data: Uint8Array): { path: string } {
+  const name = cleanAttachmentName(rawName, t('attach.fallbackName'))
+  const blob = new Blob([data as BlobPart], { type: attachmentMime(name) })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = name
+  a.click()
+  // Revoked later rather than at once: a large blob is still being read by the
+  // download when click() returns, and revoking under it cancels the download.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
   return { path: name }
 }
 

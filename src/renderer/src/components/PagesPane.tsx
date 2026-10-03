@@ -27,6 +27,7 @@ import { useDropTarget } from './useDropTarget'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
+import type { DocAttachment } from '../attachments'
 import type { RowLayout } from '../rotation'
 import {
   buildRows,
@@ -140,6 +141,8 @@ interface Props {
   /** Margin jump arrow clicked in THIS column: select + scroll it here */
   onMarginJump(pageNumber: number, record: PageAnnotation): void
   onExternalLink(url: string): void
+  /** A paperclip on one of this column's pages (see PdfPage) */
+  onFileAttachment: (att: DocAttachment, docKey: string, at: DOMRect) => void
   /** Internal link followed inside THIS column. The viewer decides where it
    *  lands — by default the other column, so following a cross-reference never
    *  costs you your place here. */
@@ -196,6 +199,7 @@ export default function PagesPane({
   onMarginMenu,
   onMarginJump,
   onExternalLink,
+  onFileAttachment,
   onInternalLink,
   onHandle,
   overlay
@@ -719,6 +723,7 @@ export default function PagesPane({
                   penPressure={penPressure}
                   onInternalLink={handleInternalLink}
                   onExternalLink={onExternalLink}
+                  onFileAttachment={onFileAttachment}
                   onStrokeComplete={onStrokeComplete}
                   onErase={onErase}
                   onShapeComplete={onShapeComplete}

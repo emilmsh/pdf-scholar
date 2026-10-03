@@ -302,6 +302,7 @@ Either way the browser reads the folder only on reload — the ⟳ on the card i
 | New window / side-by-side | native window | `chrome.tabs.create` | Adapted |
 | Drag the document out as a file | tab drag (`startDrag`) | **sidebar document row** | Chromium's `DownloadURL` drag type from a `blob:` of the last-saved bytes (`doc-drag.ts`, `test:doc-drag`); another PDF Scholar tab opens the drop; finger and pen work here, mouse-only on the desktop — PLATFORMS.md pt. 22 |
 | Print | ✅ | ✅ | Browser print |
+| Files attached to the document | listed; **«Åpne»** (PDF → new tab, allow-listed types → system program) + «Lagre …» | listed; **«Last ned»** | Same list, chip and paperclip bubble from the shared pdf.js reading (`attachments.ts`); a page cannot start a program, so the extension downloads and the browser's download UI opens the file. «Lagre alle» uses the directory picker — PLATFORMS.md pt. 26 |
 
 ## Roadmap — the remaining gaps
 

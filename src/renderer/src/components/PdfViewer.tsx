@@ -129,6 +129,11 @@ import { PasswordPrompt } from './PasswordPrompt'
 import { SignaturePad } from './SignaturePad'
 import { SignatureInfo } from './SignatureInfo'
 import { XfaInfo } from './XfaInfo'
+import { AttachmentPopover, AttachmentsBadge } from './Attachments'
+import type { AttachmentPopState } from './Attachments'
+import { collectAttachments, opensOnAttachments, readAttachment } from '../attachments'
+import type { DocAttachment } from '../attachments'
+import { ATTACHMENT_ERRORS } from '../../../shared/engine-errors'
 import { isXfaDocument } from '../xfa'
 import {
   addSignature,
@@ -172,7 +177,7 @@ import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { offsetAtPoint, rangeOfQuads, snapToWords } from '../text-range'
 import type { CharRange } from '../text-range'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
-import type { ExportFormat } from './Sidebar'
+import type { ExportFormat, SidebarTab } from './Sidebar'
 import { clamp } from '../clamp'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { PANEL_DEFAULTS, PANEL_LS_KEY, usePanelWidths } from '../hooks/usePanelWidths'
@@ -501,6 +506,19 @@ export default function PdfViewer({
 }: Props): React.JSX.Element {
   useLang()
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null)
+  /** The pdf.js document showing NOW, for actions that finish after a reload
+   *  may have swapped it (reading an attachment's bytes, say) */
+  const pdfNowRef = useRef(pdf)
+  pdfNowRef.current = pdf
+  /** Files the document carries — read once per open, never on a reload: a
+   *  write does not change them, and the walk is the cost a reload must not
+   *  pay (issue #19) */
+  const [attachments, setAttachments] = useState<DocAttachment[]>([])
+  /** Bumped to make the sidebar show them (see Sidebar.attachmentsFocus) */
+  const [attachmentsFocus, setAttachmentsFocus] = useState(0)
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('outline')
+  /** The bubble a paperclip on a page opens */
+  const [attachPop, setAttachPop] = useState<AttachmentPopState | null>(null)
   // The document's own DOI, read once per loaded document from its metadata
   // and first pages (doi-detect.ts). Feeds the save menu's reference reserve
   // for a file no Zotero record covers; null = no DOI UI at all. Detection is
@@ -1728,6 +1746,8 @@ export default function PdfViewer({
     /** Ask the user, once, for this document's password. */
     const askPassword = (retry: boolean): Promise<string | null> =>
       new Promise<string | null>((resolve) => setPasswordAsk({ retry, resolve }))
+    setAttachments([])
+    setAttachPop(null)
     ;(async () => {
       const initial = loadAttempt === 0 ? payload.data : ((await rereadSettled()) ?? payload.data)
       if (destroyed) return
@@ -1795,6 +1815,18 @@ export default function PdfViewer({
       setSizes(collected)
       const fileAnnots = await collectAnnotations(doc)
       if (!destroyed) setAnnots(fileAnnots)
+      // After the annotation walk, which leaves every page's annotations parsed
+      // in the worker — the paperclip half of this read then costs nothing.
+      const files = await collectAttachments(doc, t('attach.fallbackName'))
+      if (destroyed) return
+      setAttachments(files)
+      // A document that asks to open on its attachments (Acrobat's initial
+      // view «Vedlegg-panel og side») gets them: the panel pinned, the list in
+      // view. One layout change, at open, before anything is read.
+      if (files.length > 0 && (await opensOnAttachments(doc)) && !destroyed) {
+        setTocPinned(true)
+        setAttachmentsFocus((n) => n + 1)
+      }
     })().catch((err) => {
       if (!destroyed) setError(err instanceof Error ? err.message : String(err))
     })
@@ -4454,6 +4486,115 @@ export default function PdfViewer({
     }
   }, [payload.path, pdf])
 
+  // ---------- Files embedded in the document ----------
+
+  /** The pdf.js document a paperclip's `docKey` names: the split's other
+   *  document when it is that one, else this tab's — whichever is current. */
+  const pdfForDoc = useCallback(
+    (docKey: string): PDFDocumentProxy | null =>
+      sessionBRef.current && docKey === sessionBRef.current.path
+        ? sessionBRef.current.pdf
+        : pdfNowRef.current,
+    []
+  )
+
+  /** The bytes, or null after saying why — in the words of what was asked */
+  const attachmentBytes = useCallback(
+    async (
+      att: DocAttachment,
+      docKey: string,
+      failKey: 'attach.openFailed' | 'attach.saveFailed'
+    ): Promise<Uint8Array | null> => {
+      const doc = pdfForDoc(docKey)
+      const data = doc ? await readAttachment(doc, att) : null
+      if (!data) showToast(t(failKey, { error: errorText(ATTACHMENT_ERRORS.unreadable) }))
+      return data
+    },
+    [pdfForDoc, showToast]
+  )
+
+  /** «Åpne»: true when it opened, so the bubble knows to close */
+  const openAttachment = useCallback(
+    async (att: DocAttachment, docKey: string): Promise<boolean> => {
+      const data = await attachmentBytes(att, docKey, 'attach.openFailed')
+      if (!data) return false
+      const res = await bridge.openAttachment(att.name, data, docKey)
+      if ('error' in res) {
+        showToast(t('attach.openFailed', { error: errorText(res) }))
+        return false
+      }
+      return true
+    },
+    [attachmentBytes, showToast]
+  )
+
+  /** «Lagre …» (desktop) / «Last ned» (browser): false on a cancelled dialog,
+   *  which leaves the bubble standing — the folder changed, not the intent */
+  const saveAttachment = useCallback(
+    async (att: DocAttachment, docKey: string): Promise<boolean> => {
+      const data = await attachmentBytes(att, docKey, 'attach.saveFailed')
+      if (!data) return false
+      const res = await bridge.saveAttachment(att.name, data, docKey)
+      if (!res) return false
+      if ('error' in res) {
+        showToast(t('attach.saveFailed', { error: errorText(res) }))
+        return false
+      }
+      // A download announces itself in the browser's own UI
+      if (isElectron) showToast(t('attach.saved', { path: res.path }))
+      return true
+    },
+    [attachmentBytes, showToast]
+  )
+
+  const saveAllAttachments = useCallback(async () => {
+    const doc = pdfNowRef.current
+    if (!doc) return
+    const files: { name: string; data: Uint8Array }[] = []
+    for (const att of attachments) {
+      const data = await readAttachment(doc, att)
+      if (data) files.push({ name: att.name, data })
+    }
+    if (files.length === 0) {
+      showToast(t('attach.saveFailed', { error: errorText(ATTACHMENT_ERRORS.unreadable) }))
+      return
+    }
+    const res = await bridge.saveAttachments(files, payload.path)
+    if (!res) return
+    if ('error' in res) {
+      showToast(t('attach.saveFailed', { error: errorText(res) }))
+      return
+    }
+    // The count against the list's total, so a file that could not be read
+    // out is not silently missing from the folder
+    showToast(
+      res.folder
+        ? t('attach.savedAll', {
+            count: String(res.count),
+            total: String(attachments.length),
+            folder: res.folder
+          })
+        : t('attach.downloadedAll', { count: String(res.count) })
+    )
+  }, [attachments, payload.path, showToast])
+
+  /** The chip: show the list, or — when it is already what the panel shows —
+   *  put the panel away again, like every other toolbar toggle */
+  const toggleAttachments = useCallback(() => {
+    if (tocPinned && sidebarTab === 'outline') {
+      setTocPinned(false)
+      return
+    }
+    setTocPeek(false)
+    setTocPinned(true)
+    setAttachmentsFocus((n) => n + 1)
+  }, [tocPinned, sidebarTab])
+
+  // Stable for PdfPage (memoised on shallow props)
+  const onFileAttachment = useCallback((att: DocAttachment, docKey: string, at: DOMRect) => {
+    setAttachPop({ att, docKey, box: { top: at.top, bottom: at.bottom, left: at.left } })
+  }, [])
+
   // ---------- Signature stamps ----------
 
   const [signatures, setSignatures] = useState<SavedSignature[]>(() => loadSignatures())
@@ -6906,6 +7047,14 @@ export default function PdfViewer({
                   onClose={() => setXfaInfoOpen(false)}
                 />
               )}
+              {/* And the files it carries: invisible otherwise, and a filing
+                  whose exhibits ride along as attachments reads as complete
+                  without them */}
+              <AttachmentsBadge
+                count={attachments.length}
+                active={tocPinned && sidebarTab === 'outline'}
+                onClick={toggleAttachments}
+              />
             </>
           }
           onOpenAiSettings={() => {
@@ -7037,6 +7186,15 @@ export default function PdfViewer({
           docPath={payload.path}
           onOpenFile={onOpenFile}
           docDrag={onOpenFile ? docDrag : undefined}
+          attachments={attachments}
+          onOpenAttachment={(att) => void openAttachment(att, payload.path)}
+          onSaveAttachment={(att) => void saveAttachment(att, payload.path)}
+          onSaveAllAttachments={() => void saveAllAttachments()}
+          onShowAttachment={(att, box) =>
+            setAttachPop({ att, docKey: payload.path, box: { top: box.top, bottom: box.bottom, left: box.left } })
+          }
+          attachmentsFocus={attachmentsFocus}
+          onTabChange={setSidebarTab}
         />
         {tocPinned && (
           <div
@@ -7122,6 +7280,7 @@ export default function PdfViewer({
                     penPressure={prefs.input.penPressure}
                     onInternalLink={onInternalLink}
                     onExternalLink={onExternalLink}
+                    onFileAttachment={onFileAttachment}
                     onStrokeComplete={onStrokeComplete}
                     onErase={onEraseAt}
                     onShapeComplete={onShapeComplete}
@@ -7272,6 +7431,7 @@ export default function PdfViewer({
                 onMarkupEndStart={onMarkupEndStart}
                 markupPreview={markupPreview?.pane === 'b' ? markupPreview.byPage : null}
                 onExternalLink={onExternalLink}
+                onFileAttachment={onFileAttachment}
                 onInternalLink={onPaneBInternalLink}
                 onHandle={(h) => {
                   paneBHandleRef.current = h
@@ -7436,6 +7596,14 @@ export default function PdfViewer({
           onCancel={disarmImageGrab}
           hint={t('imgExport.hint')}
           regions={imageGrabRegions}
+        />
+      )}
+      {attachPop && (
+        <AttachmentPopover
+          state={attachPop}
+          onOpen={() => openAttachment(attachPop.att, attachPop.docKey)}
+          onSave={() => saveAttachment(attachPop.att, attachPop.docKey)}
+          onClose={() => setAttachPop(null)}
         />
       )}
       {imageExport && (

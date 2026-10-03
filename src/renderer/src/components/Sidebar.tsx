@@ -10,18 +10,23 @@ import {
 } from '../annotations'
 import type { PageAnnotation } from '../annotations'
 import type { DocBookmark } from '../../../shared/types'
+import type { DocAttachment } from '../attachments'
+import { attachmentExtension, canOpenAttachment, isPdfAttachment } from '../../../shared/attachments'
 import { t, useLang } from '../i18n'
 import { shortcutLabel } from '../keymap'
-import { bridge } from '../bridge'
+import { bridge, isElectron } from '../bridge'
 import {
   IconBookmark,
   IconChevronDown,
   IconCopy,
   IconDocument,
+  IconExternal,
   IconFolderOpen,
   IconMarginNotes,
   IconNote,
+  IconPaperclip,
   IconPen,
+  IconSaveAs,
   IconShapes,
   IconText,
   IconTextMarkup
@@ -121,9 +126,29 @@ interface Props {
    *  the desktop's tab drag — doc-drag.ts). Supplied together with onOpenFile;
    *  absent, the row is not draggable. */
   docDrag?: DocumentDragHandlers | undefined
+  /** Files the document carries (attachments.ts). Listed at the top of
+   *  «Innhold» — the document's contents are its outline AND what is attached
+   *  to it — and nowhere at all when there are none. Not a fifth tab: four
+   *  labels already fill the default panel width exactly (see .sidebar-tabs),
+   *  and a fifth would cut «Bokmerker» and «Merknader» short on every document
+   *  that has attachments. */
+  attachments: readonly DocAttachment[]
+  onOpenAttachment(att: DocAttachment): void
+  onSaveAttachment(att: DocAttachment): void
+  onSaveAllAttachments(): void
+  /** Show the attachment's bubble beside its row (`box` = the row on screen):
+   *  what a type that is only ever saved gets for its name, so the reason is
+   *  said in words — a tooltip never reaches a finger */
+  onShowAttachment(att: DocAttachment, box: DOMRect): void
+  /** Bumped by the toolbar's «N vedlegg» chip: show «Innhold» with the
+   *  attachments expanded and in view. 0 = never asked. */
+  attachmentsFocus: number
+  /** The tab on show, so the chip can tell «already showing» from «show» */
+  onTabChange(tab: SidebarTab): void
 }
 
-type Tab = 'thumbs' | 'outline' | 'marks' | 'annots'
+export type SidebarTab = 'thumbs' | 'outline' | 'marks' | 'annots'
+type Tab = SidebarTab
 
 function Sidebar({
   open,
@@ -152,7 +177,14 @@ function Sidebar({
   docName,
   docPath,
   onOpenFile,
-  docDrag
+  docDrag,
+  attachments,
+  onOpenAttachment,
+  onSaveAttachment,
+  onSaveAllAttachments,
+  onShowAttachment,
+  attachmentsFocus,
+  onTabChange
 }: Props): React.JSX.Element {
   useLang()
   // Contents is the scholar's default view; fall back to thumbnails when the
@@ -166,6 +198,35 @@ function Sidebar({
   const [outline, setOutline] = useState<OutlineNode[] | null>(null)
   const [visibleThumbs, setVisibleThumbs] = useState<ReadonlySet<number>>(new Set())
   const listRef = useRef<HTMLDivElement>(null)
+  const outlineListRef = useRef<HTMLDivElement>(null)
+  /** The attachments section's own collapse — open unless the reader shut it */
+  const [filesOpen, setFilesOpen] = useState(true)
+  const hasFilesRef = useRef(false)
+  hasFilesRef.current = attachments.length > 0
+
+  useEffect(() => {
+    onTabChange(tab)
+  }, [tab, onTabChange])
+
+  // The chip asked: «Innhold», section open, scrolled to the top where the
+  // section is. Counts as the reader's own pick — the no-outline fallback must
+  // not take the tab away again.
+  useEffect(() => {
+    if (!attachmentsFocus) return
+    userPickedRef.current = true
+    setTab('outline')
+    setFilesOpen(true)
+    if (outlineListRef.current) outlineListRef.current.scrollTop = 0
+  }, [attachmentsFocus])
+
+  // Attachments are read after the outline (they wait for the annotation
+  // walk), so a document with no outline may already have fallen back to
+  // «Sider». Its attachments make «Innhold» worth showing after all — the
+  // panel is closed at that point in all but the rarest case, so this is not
+  // a visible jump.
+  useEffect(() => {
+    if (attachments.length > 0 && !userPickedRef.current) setTab('outline')
+  }, [attachments.length])
 
   // Document-identity header (browser/extension): filename + path menu
   const [docMenuOpen, setDocMenuOpen] = useState(false)
@@ -196,11 +257,11 @@ function Sidebar({
         if (cancelled) return
         const nodes = (items as OutlineNode[] | null) ?? []
         setOutline(nodes)
-        if (nodes.length === 0 && !userPickedRef.current) setTab('thumbs')
+        if (nodes.length === 0 && !userPickedRef.current && !hasFilesRef.current) setTab('thumbs')
       })
       .catch(() => {
         setOutline([])
-        if (!userPickedRef.current) setTab('thumbs')
+        if (!userPickedRef.current && !hasFilesRef.current) setTab('thumbs')
       })
     return () => {
       cancelled = true
@@ -345,7 +406,24 @@ function Sidebar({
       )}
 
       {tab === 'outline' && (
-        <div className="outline-list">
+        <div className="outline-list" ref={outlineListRef}>
+          {attachments.length > 0 && (
+            <>
+              <AttachmentSection
+                attachments={attachments}
+                open={filesOpen}
+                onToggle={() => setFilesOpen((o) => !o)}
+                onOpen={onOpenAttachment}
+                onSave={onSaveAttachment}
+                onSaveAll={onSaveAllAttachments}
+                onShow={onShowAttachment}
+                onJumpToPage={onJumpToPage}
+              />
+              <div className="sidebar-section-head">
+                <span>{t('attach.outlineHead')}</span>
+              </div>
+            </>
+          )}
           {outline === null && <p className="sidebar-empty">{t('side.loading')}</p>}
           {outline?.length === 0 && <p className="sidebar-empty">{t('side.noOutline')}</p>}
           {outline && outline.length > 0 && (
@@ -814,6 +892,151 @@ function AnnotationList({
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** The «Vedlegg» section: one row per file, the document's own first.
+ *
+ *  Every action is a visible button — no hover-only controls, so a finger
+ *  gets the same row a mouse does. On the desktop the name opens the file
+ *  when its type may be opened and saves it otherwise; the browser targets
+ *  cannot start a program, so there the one action is a download (see
+ *  PdfxApi.openAttachment). */
+function AttachmentSection({
+  attachments,
+  open,
+  onToggle,
+  onOpen,
+  onSave,
+  onSaveAll,
+  onShow,
+  onJumpToPage
+}: {
+  attachments: readonly DocAttachment[]
+  open: boolean
+  onToggle(): void
+  onOpen(att: DocAttachment): void
+  onSave(att: DocAttachment): void
+  onSaveAll(): void
+  onShow(att: DocAttachment, box: DOMRect): void
+  onJumpToPage(page: number): void
+}): React.JSX.Element {
+  return (
+    <div className="attach-section">
+      <div className="sidebar-section-head attach-head">
+        <button
+          className={`outline-chevron${open ? ' expanded' : ''}`}
+          onClick={onToggle}
+          aria-label={open ? t('side.collapse') : t('side.expand')}
+        >
+          ›
+        </button>
+        <span>{t('attach.head')}</span>
+        <span className="attach-count">{attachments.length}</span>
+        {attachments.length > 1 && (
+          <button className="attach-save-all" onClick={onSaveAll} title={t('attach.saveAllTip')}>
+            {t('attach.saveAll')}
+          </button>
+        )}
+      </div>
+      {open &&
+        attachments.map((a) => (
+          <AttachmentRow
+            key={a.id}
+            att={a}
+            onOpen={onOpen}
+            onSave={onSave}
+            onShow={onShow}
+            onJumpToPage={onJumpToPage}
+          />
+        ))}
+    </div>
+  )
+}
+
+function AttachmentRow({
+  att,
+  onOpen,
+  onSave,
+  onShow,
+  onJumpToPage
+}: {
+  att: DocAttachment
+  onOpen(att: DocAttachment): void
+  onSave(att: DocAttachment): void
+  onShow(att: DocAttachment, box: DOMRect): void
+  onJumpToPage(page: number): void
+}): React.JSX.Element {
+  const ext = attachmentExtension(att.name)
+  const openable = isElectron && canOpenAttachment(att.name)
+  const blocked = isElectron && !openable
+  const openTip = isPdfAttachment(att.name) ? t('attach.openPdfTip') : t('attach.openTip')
+  // The name is the big target: the row's main action, whatever this
+  // platform and this type allow. A type that is only ever saved opens its
+  // bubble instead, which says why — a save dialog for an .exe straight from
+  // a click would be the one place the app hands one over without a word.
+  const rowRef = useRef<HTMLDivElement>(null)
+  const primary = (): void => {
+    if (openable) onOpen(att)
+    else if (blocked && rowRef.current) onShow(att, rowRef.current.getBoundingClientRect())
+    else onSave(att)
+  }
+  const primaryTip = openable
+    ? openTip
+    : isElectron
+      ? t('attach.blockedTip', { ext })
+      : t('attach.downloadTip')
+  const page = att.page
+  return (
+    <div className="attach-row" ref={rowRef}>
+      <div className="attach-line">
+        <span
+          className={`attach-ext${blocked ? ' is-blocked' : ''}`}
+          title={blocked ? t('attach.blockedTip', { ext }) : undefined}
+        >
+          {ext ? ext.toUpperCase() : <IconPaperclip size={12} />}
+        </span>
+        <button className="attach-name" onClick={primary} title={`${att.name}\n${primaryTip}`}>
+          {att.name}
+        </button>
+        {openable && (
+          <button
+            className="attach-btn"
+            onClick={() => onOpen(att)}
+            title={openTip}
+            aria-label={t('attach.open')}
+          >
+            <IconExternal size={14} />
+          </button>
+        )}
+        <button
+          className="attach-btn"
+          onClick={() => onSave(att)}
+          title={isElectron ? t('attach.saveTip') : t('attach.downloadTip')}
+          aria-label={isElectron ? t('attach.save') : t('attach.download')}
+        >
+          <IconSaveAs size={14} />
+        </button>
+      </div>
+      {(att.description || page !== null) && (
+        <div className="attach-meta">
+          {att.description && (
+            <span className="attach-desc" title={att.description}>
+              {att.description}
+            </span>
+          )}
+          {page !== null && (
+            <button
+              className="attach-page"
+              onClick={() => onJumpToPage(page)}
+              title={t('attach.pageTip')}
+            >
+              {t('side.page', { page })}
+            </button>
+          )}
         </div>
       )}
     </div>

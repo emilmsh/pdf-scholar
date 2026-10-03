@@ -289,3 +289,18 @@ export const CHATGPT_LOGIN_ERRORS = {
   /** Anything else — the provider's detail rides in `error` for the log */
   failed: (detail: string): FileError => ({ code: 'ai-chatgpt-login-failed', error: detail })
 } as const satisfies Record<string, FileError | ((...a: never[]) => FileError)>
+
+/** Files embedded in a document (src/shared/attachments.ts). Fragments under
+ *  `atterr.*`, spliced into «Kunne ikke åpne vedlegget: …». */
+export const ATTACHMENT_ERRORS = {
+  /** Main's own check on the allow list. The UI offers only «Lagre» for these,
+   *  so this firing means a caller tried anyway — and the check held. */
+  blocked: {
+    code: 'attach-blocked',
+    error: 'filtypen kan inneholde programmer og åpnes ikke herfra'
+  },
+  /** The system has no program for the type (shell.openPath said so) */
+  noApp: { code: 'attach-no-app', error: 'ingen app på maskinen åpner denne filtypen' },
+  /** pdf.js found no embedded stream behind the entry */
+  unreadable: { code: 'attach-unreadable', error: 'vedlegget kunne ikke leses ut av dokumentet' }
+} as const satisfies Record<string, FileError>

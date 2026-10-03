@@ -11,6 +11,8 @@ import { beginRender, chooseRenderDpr, endRender } from '../render-quality'
 import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
 import { penNear } from '../pen-input'
+import { cleanAttachmentName } from '../../../shared/attachments'
+import type { DocAttachment } from '../attachments'
 import {
   outlineSvgPath,
   PRESSURE_EMA_ALPHA,
@@ -109,6 +111,12 @@ interface Props {
    *  (and opens the split if it is not open yet). */
   onInternalLink(dest: unknown, toOtherPane: boolean): void
   onExternalLink(url: string): void
+  /** A file-attachment annotation (the paperclip on a page) was clicked.
+   *  `docKey` says which document it belongs to — the split's other column
+   *  can hold a different one — and `at` is the icon's box on screen, for the
+   *  bubble to open beside. Optional: surfaces without file actions (none yet)
+   *  leave it out and the icon is not clickable. */
+  onFileAttachment?: ((att: DocAttachment, docKey: string, at: DOMRect) => void) | undefined
   /** pressures: EMA-smoothed pen pressures parallel to points — present only
    *  for a pressure-sensitive pen stroke */
   onStrokeComplete(pageNumber: number, points: [number, number][], pressures?: number[]): void
@@ -149,6 +157,11 @@ interface Cancellable {
   cancel(): void
 }
 
+/** The paperclip drawn for a file attachment that brought no appearance of
+ *  its own — the same glyph as IconPaperclip, as markup for a DOM-built layer */
+const PAPERCLIP_SVG =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 7.5v8a4 4 0 0 1-8 0V6.5a2.5 2.5 0 0 1 5 0v8.5a1 1 0 0 1-2 0V8" transform="rotate(30 12 12)"/></svg>'
+
 function PdfPage({
   pdf,
   docKey,
@@ -175,6 +188,7 @@ function PdfPage({
   penPressure,
   onInternalLink,
   onExternalLink,
+  onFileAttachment,
   onStrokeComplete,
   onErase,
   onShapeComplete,
@@ -632,10 +646,51 @@ function PdfPage({
         rect: number[]
         url?: string
         dest?: unknown
+        annotationFlags?: number
+        hasAppearance?: boolean
+        fileId?: string
+        file?: { filename?: string; description?: string }
+        contentsObj?: { str?: string }
       }[]
       if (cancelled) return
       const links = annots.filter((a) => a.subtype === 'Link' && (a.url || a.dest))
       const frag = document.createDocumentFragment()
+      // Paperclips: a FileAttachment annotation with a file inside it. pdf.js
+      // paints its icon on the canvas when the file has an appearance stream;
+      // one without (some writers skip it) would be invisible, so the button
+      // draws a paperclip of its own then. Hidden / no-view annotations stay
+      // unclickable — nothing on the page says they are there.
+      const pins = onFileAttachment
+        ? annots.filter(
+            (a) => a.subtype === 'FileAttachment' && a.fileId && ((a.annotationFlags ?? 0) & 0x22) === 0
+          )
+        : []
+      for (const a of pins) {
+        const [px1, py1] = viewport.convertToViewportPoint(a.rect[0], a.rect[1])
+        const [px2, py2] = viewport.convertToViewportPoint(a.rect[2], a.rect[3])
+        const att: DocAttachment = {
+          id: a.fileId!,
+          name: cleanAttachmentName(a.file?.filename ?? '', t('attach.fallbackName')),
+          description: (a.file?.description || a.contentsObj?.str || '').trim(),
+          page: pageNumber
+        }
+        const pin = document.createElement('button')
+        pin.type = 'button'
+        pin.className = `pdf-attachment${a.hasAppearance ? '' : ' no-ap'}`
+        pin.style.left = `${(100 * Math.min(px1, px2)) / viewport.width}%`
+        pin.style.top = `${(100 * Math.min(py1, py2)) / viewport.height}%`
+        pin.style.width = `${(100 * Math.abs(px2 - px1)) / viewport.width}%`
+        pin.style.height = `${(100 * Math.abs(py2 - py1)) / viewport.height}%`
+        pin.title = t('attach.pinTip', { name: att.name })
+        pin.setAttribute('aria-label', att.name)
+        if (!a.hasAppearance) pin.innerHTML = PAPERCLIP_SVG
+        pin.addEventListener('click', (e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          onFileAttachment?.(att, docKey, pin.getBoundingClientRect())
+        })
+        frag.append(pin)
+      }
       for (const link of links) {
         const [px1, py1] = viewport.convertToViewportPoint(link.rect[0], link.rect[1])
         const [px2, py2] = viewport.convertToViewportPoint(link.rect[2], link.rect[3])
@@ -673,7 +728,7 @@ function PdfPage({
       cancelled = true
       textLayer?.cancel()
     }
-  }, [pdf, pageNumber, rotation, active, onInternalLink, onExternalLink, xfa])
+  }, [pdf, docKey, pageNumber, rotation, active, onInternalLink, onExternalLink, onFileAttachment, xfa])
 
   // ---- Zoom refinement for the text layer ----
   // The spans' horizontal glyph fit (--scale-x) is measured at build scale; on
@@ -1104,7 +1159,9 @@ function PdfPage({
         </div>
       )}
       <div className="text-host" ref={textRef} />
-      <div className="link-host" ref={linkRef} />
+      {/* annots-off: «Skjul merknader» repaints the canvas without the file's
+          annotations, paperclips included — their buttons go with them */}
+      <div className={`link-host${hideAnnots ? ' annots-off' : ''}`} ref={linkRef} />
       {xfa && <div className="xfa-host" ref={xfaRef} />}
       {/* Draw tools are disabled under rotation (their pointer/preview machinery
           assumes an un-rotated page); PdfViewer also blocks selecting one. An

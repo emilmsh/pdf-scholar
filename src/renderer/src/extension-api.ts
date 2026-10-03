@@ -32,6 +32,7 @@ import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
+import { cleanAttachmentName, numberedName } from '../../shared/attachments'
 import type { CitationStyleId } from '../../shared/citation-style'
 import { subscribeAssistantJumps } from './assistant-channel'
 import { store } from './extension-store'
@@ -318,6 +319,40 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // when it is unavailable.
     saveFileAs: (defaultName, data) => saveViaPicker(defaultName, data, base),
 
+    // «Lagre alle» vedlegg: a real folder, like the desktop's, through the
+    // directory picker — nine exhibits as nine separate downloads is what this
+    // replaces. One saved attachment stays a download (inherited from base).
+    saveAttachments: async (files, docPath) => {
+      const picker = (window as unknown as {
+        showDirectoryPicker?: (opts: unknown) => Promise<FileSystemDirectoryHandle>
+      }).showDirectoryPicker
+      if (!picker) return base.saveAttachments(files, docPath)
+      let dir: FileSystemDirectoryHandle
+      try {
+        dir = await picker({ mode: 'readwrite' })
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return null
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
+      try {
+        let count = 0
+        for (const file of files) {
+          const clean = cleanAttachmentName(file.name, t('attach.fallbackName'))
+          // Never over a file already in the folder: the first free « (n)»
+          let name = clean
+          for (let n = 2; n < 1000 && (await fileExists(dir, name)); n++) name = numberedName(clean, n)
+          const handle = await dir.getFileHandle(name, { create: true })
+          const writable = await handle.createWritable()
+          await writable.write(file.data as unknown as BufferSource)
+          await writable.close()
+          count++
+        }
+        return { folder: dir.name, count }
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+
     // In-place "save over the current file". When the document was opened via
     // the app's picker we already hold a writable handle and overwrite it
     // silently — same feel as the desktop app. A URL/file://-opened PDF was
@@ -526,6 +561,15 @@ async function readViaHandle(path: string): Promise<FilePayload | FileError> {
     handles.delete(path)
     forgetFileHandle(path)
     return { error: t('doc.pickedUnavailable') }
+  }
+}
+
+async function fileExists(dir: FileSystemDirectoryHandle, name: string): Promise<boolean> {
+  try {
+    await dir.getFileHandle(name)
+    return true
+  } catch {
+    return false
   }
 }
 
