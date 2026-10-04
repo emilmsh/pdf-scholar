@@ -755,7 +755,12 @@ const ui = {
     // The text index is built page by page on demand, so a fixed wait is a
     // coin toss on a fifteen-page paper — this failed on 2026-08-20 while the
     // AI tab, which polls, passed on the same document. Poll here too.
+    // The results list opens FOLDED since 2026-10-04 (a reader's ask — it
+    // covered the hit); the frame shows the excerpts, so unfold it the way a
+    // reader would, from the chevron that appears once there are hits.
     for (let i = 0; i < 40; i++) {
+      const fold = document.querySelector('.search-list-toggle:not(.is-open)');
+      if (fold) { click(fold); await settle(150); }
       if (document.querySelector('.search-results .search-result-snippet')) break;
       await settle(250);
     }
@@ -792,6 +797,9 @@ const ui = {
     await settle(200);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     for (let i = 0; i < 120; i++) {
+      // Same folded-by-default list as the text tab — unfold once hits land
+      const fold = document.querySelector('.search-list-toggle:not(.is-open)');
+      if (fold) { click(fold); await settle(150); }
       if (document.querySelector('.search-results .search-result')) break;
       await settle(500);
     }
