@@ -65,6 +65,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold and italic — so the text stays searchable in every reader
 • A signature can be drawn once — or added as an image — and stamped where needed. It is stored locally (placing a signature is not the same as digitally signing a document)
 • Password-protected documents open, can be annotated, and keep their protection when saved
+• Files attached to a document — a court filing's exhibits, a portfolio's files — are listed in the side panel and open or save from there; a paperclip on a page opens its file. Only document, data and media types open; anything that could run is saved, never launched
 • Colour, thickness and opacity are set per tool and remembered; existing marks can be adjusted rather than redrawn
 • An optional name in settings fills the standard PDF author field on new annotations
 • A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy an in-text citation, full reference or BibTeX entry — stored and linked attachments alike. A document outside Zotero that carries a DOI gets the same three from doi.org on a click, and the citation style (APA, Chicago, Harvard, IEEE, MLA, Nature, Vancouver) is yours to pick
@@ -119,6 +120,7 @@ ANNOTERING
 • Tekstverktøyet bruker PDF-ens standardskrifter — Helvetica, Times eller Courier, fet og kursiv — så teksten forblir søkbar i enhver leser
 • Signaturen tegnes én gang — eller legges til som bilde — og stemples inn der den trengs. Den lagres lokalt (å plassere en signatur er ikke det samme som å signere digitalt)
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
+• Filer som er lagt ved et dokument — bilagene til et prosesskriv, filene i en portefølje — listes i sidepanelet og åpnes eller lagres derfra; en binders på siden åpner filen sin. Bare dokument-, data- og medietyper åpnes; alt som kan kjøre, lagres og startes aldri
 • Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes; eksisterende merker kan justeres i stedet for å tegnes på nytt
 • Et valgfritt navn i innstillingene fyller PDF-ens standard forfatterfelt på nye merknader
 • Et dokument fra et Zotero-bibliotek får en Zotero-del i lagre-menyen: vis elementet i Zotero, eller kopier en henvisning, full referanse eller BibTeX-oppføringen — både lagrede og lenkede vedlegg. Et dokument utenfor Zotero med DOI får de samme tre fra doi.org med ett klikk, og siteringsstilen (APA, Chicago, Harvard, IEEE, MLA, Nature, Vancouver) velger du selv
@@ -144,20 +146,20 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.53.0
+## What's new in this version (≤ 1 500 chars) — v0.54.0
 
 **EN:**
 ```
-• The assistant can run on your ChatGPT Plus or Pro plan instead of an API key: choose Sign in with ChatGPT in the AI settings, sign in on OpenAI's own page, and ask away on GPT-6 Astra, Sol or Luna with no API bill
-• Worth knowing: this is an unofficial route — the same sign-in OpenAI's Codex tool uses, which OpenAI allows today but may close — and what you send is handled under ChatGPT's terms, so your ChatGPT account's own model-training setting applies. API keys keep working as before
-• When the plan's allowance is used up for now, the assistant says so plainly, and an expired sign-in asks you to sign in again
+• Files attached to a PDF are no longer invisible: a document that carries them shows a count in the toolbar, and the side panel lists each one — open it, or save it as a file of its own. A paperclip on a page opens its file too
+• Only document, data and media types open from here; anything that could run a program is saved, never launched. A PDF attachment opens in a new tab
+• Saving a PDF with a long file name keeps that name — some launchers hand the app a short Windows alias (like EFFECT~1.pdf), and a save could rename the file to it
 ```
 
 **NO:**
 ```
-• Assistenten kan bruke ChatGPT Plus- eller Pro-abonnementet ditt i stedet for en API-nøkkel: velg Logg inn med ChatGPT i KI-innstillingene, logg inn på OpenAIs egen side, og spør i vei med GPT-6 Astra, Sol eller Luna uten API-regning
-• Verdt å vite: dette er en uoffisiell vei — samme innlogging som OpenAIs Codex-verktøy bruker, som OpenAI tillater i dag men kan stenge — og det du sender behandles etter ChatGPT-vilkårene, så innstillingen for modelltrening på ChatGPT-kontoen din gjelder. API-nøkler virker som før
-• Når kvoten i abonnementet er brukt opp for nå, sier assistenten det rett ut, og en utløpt innlogging ber deg logge inn på nytt
+• Filer som er lagt ved en PDF, er ikke lenger usynlige: et dokument med vedlegg viser antallet i verktøylinja, og sidepanelet lister hvert av dem — åpne det, eller lagre det som en egen fil. En binders på siden åpner også filen sin
+• Bare dokument-, data- og medietyper åpnes herfra; alt som kan starte et program, lagres og startes aldri. Et PDF-vedlegg åpnes i en ny fane
+• Lagring av en PDF med langt filnavn beholder navnet — noen programmer gir appen et kort Windows-alias (som EFFECT~1.pdf), og en lagring kunne gi filen det navnet
 ```
 
 ---

@@ -63,6 +63,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold and italic
 • A signature can be drawn once and stamped where needed; it is stored locally (placing a signature is not the same as digitally signing a document)
 • Password-protected documents open, can be annotated, and keep their protection when saved
+• Files attached to a document are listed in the side panel and download from there; a paperclip on a page downloads its file
 • Colour, thickness and opacity are set per tool and remembered between sessions
 • Existing marks can be adjusted rather than redrawn: the ends of a highlight, the corner of a shape
 • Marks are saved into the PDF as standard annotations, so they open correctly in other PDF readers
@@ -107,6 +108,7 @@ ANNOTERING
 • Tekstverktøyet bruker PDF-ens standardskrifter — Helvetica, Times eller Courier, fet og kursiv
 • Signaturen tegnes én gang og stemples inn der den trengs; den lagres lokalt (å plassere en signatur er ikke det samme som å signere digitalt)
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
+• Filer som er lagt ved et dokument, listes i sidepanelet og lastes ned derfra; en binders på siden laster ned filen sin
 • Farge, tykkelse og gjennomsiktighet settes per verktøy og huskes mellom økter
 • Eksisterende merker kan justeres i stedet for å tegnes på nytt: enden av en utheving, hjørnet av en form
 • Merkene lagres i PDF-en som standard annoteringer, så de åpnes riktig i andre PDF-lesere
