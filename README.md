@@ -254,6 +254,10 @@ panel beside the document.
   to verify them
 - Password-protected documents open, can be annotated, and are saved with their
   protection intact
+- Files attached to a document — a court filing's exhibits, a portfolio's files — are
+  listed in the side panel and open or save from there; a paperclip on a page opens its
+  file. Only document, data and media types open; anything that could run is saved,
+  never launched. In the browser extension, attachments download instead
 - Colour, thickness and opacity are set per tool and remembered between sessions
 - An optional name in settings fills the standard PDF author field on new annotations;
   left empty, they stay unsigned
