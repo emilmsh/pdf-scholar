@@ -114,6 +114,11 @@ export default function SearchBar({
   const barRef = useRef<HTMLDivElement>(null)
   const [offset, setOffset] = useState(barOffset)
   const dragRef = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null)
+  /** Time of the previous grip press — two presses within a beat put the bar
+   *  back home. Detected on pointerdown rather than dblclick because the
+   *  press calls preventDefault, which suppresses the compat mouse events
+   *  (and dblclick with them); this way a double-tap works too. */
+  const lastGripDownRef = useRef(0)
   const clampOffset = (dx: number, dy: number): { dx: number; dy: number } => {
     const el = barRef.current
     const host = el?.parentElement
@@ -145,6 +150,17 @@ export default function SearchBar({
   }, [])
   const gripProps = {
     onPointerDown: (e: React.PointerEvent): void => {
+      const now = performance.now()
+      if (now - lastGripDownRef.current < 350) {
+        // Double-click/-tap on the grip: back to the top-right home (Emil,
+        // 2026-10-04 — a way back without one more control on the bar)
+        lastGripDownRef.current = 0
+        barOffset = { dx: 0, dy: 0 }
+        setOffset(barOffset)
+        e.preventDefault()
+        return
+      }
+      lastGripDownRef.current = now
       dragRef.current = { x: e.clientX, y: e.clientY, dx: offset.dx, dy: offset.dy }
       try {
         ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
