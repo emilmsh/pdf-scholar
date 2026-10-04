@@ -24,6 +24,7 @@ import {
   IconMarkupSquiggly,
   IconMarkupStrikeout,
   IconMarkupUnderline,
+  IconMore,
   IconNote,
   IconSparkle,
   IconTally,
@@ -205,9 +206,11 @@ function SelectionCount({ text }: { text: string }): React.JSX.Element | null {
 
 export type MenuAction =
   | { kind: 'highlight'; color: HighlightColor }
-  | { kind: 'underline'; color: HighlightColor }
-  | { kind: 'strikeout'; color: HighlightColor }
-  | { kind: 'squiggly'; color: HighlightColor }
+  // No colour = the tool's default (the compact row has no colour pickers for
+  // these; the viewer's handler already fell back to UNDERLINE_COLOR etc.)
+  | { kind: 'underline'; color?: HighlightColor }
+  | { kind: 'strikeout'; color?: HighlightColor }
+  | { kind: 'squiggly'; color?: HighlightColor }
   | { kind: 'note' }
   | { kind: 'comment' }
   | { kind: 'copy' }
@@ -227,11 +230,23 @@ interface MenuProps {
   /** false while the dead-man switch is off — hides every AI entry (the chip
    *  grid, snip-to-explain) rather than offering actions that cannot fire */
   aiEnabled: boolean
+  /** One-row form for a text selection (Settings.selectionMenuCompact); the
+   *  point menu is short already and ignores it */
+  compact?: boolean
 }
 
-export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.JSX.Element {
+export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: MenuProps): React.JSX.Element {
   useLang()
   const isSelection = menu.mode === 'selection'
+  // Compact row → full panel («⋯») and the assistant chips (✦) under the row.
+  // Both unfold IN PLACE: the bubble grows, nothing moves first (one layout
+  // change per gesture). A new menu starts folded again.
+  const [expanded, setExpanded] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
+  useEffect(() => {
+    setExpanded(false)
+    setAiOpen(false)
+  }, [menu])
   // Draggable, like the note and comment bubbles: this menu is the tallest
   // popup in the app, and a reader who wants to see what is under it should be
   // able to pull it aside rather than close it and lose the selection.
@@ -240,7 +255,10 @@ export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.J
   // the placement this menu has always had — 10px below the pointer, flipped
   // above it when that would overflow the bottom, then edge-clamped — so
   // nothing about how it opens changes; only the drag is new.
-  const { ref, style, handleProps } = useDraggable<HTMLDivElement>(menu.x, menu.y, [], {
+  // Growing in place (compact → ✦ chips → full panel) re-clamps to the
+  // viewport: the taller bubble must not run off the bottom edge where the
+  // one-row form fitted.
+  const { ref, style, handleProps } = useDraggable<HTMLDivElement>(menu.x, menu.y, [expanded, aiOpen], {
     top: menu.y,
     bottom: menu.y,
     left: menu.x
@@ -251,16 +269,128 @@ export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.J
   /** Word count expands on demand instead of tailing every menu */
   const [showCount, setShowCount] = useState(false)
 
+  const showAi = aiEnabled && !menu.foreign
+  /* All assistant actions are siblings of one gesture ("ask the assistant
+     about this selection") — one uniform chip grid, where «Spør …» opens the
+     popover with a free-form question box. Shared by the full panel and the
+     compact row's ✦. */
+  const aiGrid = (
+    <div className="menu-ai-grid">
+      <button
+        className="menu-ai-chip"
+        title={t('menu.aiExplainTip')}
+        onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
+      >
+        {t('menu.aiExplain')}
+      </button>
+      <button
+        className="menu-ai-chip"
+        title={t('menu.aiSimplifyTip')}
+        onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
+      >
+        {t('menu.aiSimplify')}
+      </button>
+      <button
+        className="menu-ai-chip"
+        title={t('menu.aiCritiqueTip')}
+        onClick={() => onAction({ kind: 'critique' })}
+      >
+        {t('menu.aiCritique')}
+      </button>
+      <button
+        className="menu-ai-chip"
+        title={t('menu.aiReferenceTip')}
+        onClick={() => onAction({ kind: 'reference' })}
+      >
+        {t('menu.aiReference')}
+      </button>
+      <button
+        className="menu-ai-chip menu-ai-chip-wide"
+        title={t('menu.aiAskTip')}
+        onClick={() => onAction({ kind: 'ask' })}
+      >
+        {t('menu.aiAsk')}
+      </button>
+    </div>
+  )
+
+  const keepSelection = (e: React.MouseEvent): void => {
+    // Keep the text selection alive while interacting with the menu
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  if (compact && isSelection && !expanded) {
+    return (
+      <div
+        className="selection-menu is-compact"
+        ref={ref}
+        style={style}
+        onMouseDown={keepSelection}
+        onContextMenu={(e) => {
+          if (!inTextField(e.target)) e.preventDefault()
+        }}
+      >
+        <div className="compact-row">
+          <span className="menu-grip menu-grip-side" title={t('menu.dragTip')} {...handleProps} />
+          {/* The highlight colours inline — the one action that is most of all
+              marking — so the common case stays a single click */}
+          <div className="compact-colors">
+            {HIGHLIGHT_COLORS.map((c) => (
+              <button
+                key={c.hex}
+                className="color-dot"
+                style={{ background: c.hex }}
+                title={`${t('menu.marker')} · ${colorLabel(c)}`}
+                onClick={() => onAction({ kind: 'highlight', color: c })}
+              />
+            ))}
+          </div>
+          <span className="compact-sep" />
+          <button className="compact-btn" title={t('menu.underline')} onClick={() => onAction({ kind: 'underline' })}>
+            <IconMarkupUnderline size={17} />
+          </button>
+          <button className="compact-btn" title={t('menu.strikeout')} onClick={() => onAction({ kind: 'strikeout' })}>
+            <IconMarkupStrikeout size={17} />
+          </button>
+          <span className="compact-sep" />
+          <button className="compact-btn" title={t('menu.comment')} onClick={() => onAction({ kind: 'comment' })}>
+            <IconComment size={16} />
+          </button>
+          <button className="compact-btn" title={t('menu.copy')} onClick={() => onAction({ kind: 'copy' })}>
+            <IconCopy size={16} />
+          </button>
+          {/* ✦ sends nothing itself: it unfolds the labelled chips, which is
+              where the AI is named and triggered (the transparency rule) */}
+          {showAi && (
+            <>
+              <span className="compact-sep" />
+              <button
+                className={`compact-btn${aiOpen ? ' is-active' : ''}`}
+                title={t('menu.aiSection')}
+                aria-expanded={aiOpen}
+                onClick={() => setAiOpen((v) => !v)}
+              >
+                <IconSparkle size={16} />
+              </button>
+            </>
+          )}
+          <span className="compact-sep" />
+          <button className="compact-btn" title={t('menu.more')} onClick={() => setExpanded(true)}>
+            <IconMore size={16} />
+          </button>
+        </div>
+        {aiOpen && showAi && <div className="compact-ai">{aiGrid}</div>}
+      </div>
+    )
+  }
+
   return (
     <div
       className="selection-menu"
       ref={ref}
       style={style}
-      onMouseDown={(e) => {
-        // Keep the text selection alive while interacting with the menu
-        e.preventDefault()
-        e.stopPropagation()
-      }}
+      onMouseDown={keepSelection}
       onContextMenu={(e) => {
         if (!inTextField(e.target)) e.preventDefault()
       }}
@@ -327,53 +457,14 @@ export function SelectionMenu({ menu, onAction, aiEnabled }: MenuProps): React.J
           <button className="menu-item" onClick={() => onAction({ kind: 'copy' })}>
             <span className="menu-icon"><IconCopy size={15} /></span> {t('menu.copy')}
           </button>
-          {aiEnabled && !menu.foreign && (
+          {showAi && (
             <>
               <div className="menu-sep" />
               <div className="menu-section-label">
                 <IconSparkle size={11} />
                 {t('menu.aiSection')}
               </div>
-              {/* All assistant actions are siblings of one gesture ("ask the
-                  assistant about this selection") — one uniform chip grid, where
-                  «Spør …» opens the popover with a free-form question box */}
-              <div className="menu-ai-grid">
-                <button
-                  className="menu-ai-chip"
-                  title={t('menu.aiExplainTip')}
-                  onClick={() => onAction({ kind: 'ai', mode: 'explain' })}
-                >
-                  {t('menu.aiExplain')}
-                </button>
-                <button
-                  className="menu-ai-chip"
-                  title={t('menu.aiSimplifyTip')}
-                  onClick={() => onAction({ kind: 'ai', mode: 'simplify' })}
-                >
-                  {t('menu.aiSimplify')}
-                </button>
-                <button
-                  className="menu-ai-chip"
-                  title={t('menu.aiCritiqueTip')}
-                  onClick={() => onAction({ kind: 'critique' })}
-                >
-                  {t('menu.aiCritique')}
-                </button>
-                <button
-                  className="menu-ai-chip"
-                  title={t('menu.aiReferenceTip')}
-                  onClick={() => onAction({ kind: 'reference' })}
-                >
-                  {t('menu.aiReference')}
-                </button>
-                <button
-                  className="menu-ai-chip menu-ai-chip-wide"
-                  title={t('menu.aiAskTip')}
-                  onClick={() => onAction({ kind: 'ask' })}
-                >
-                  {t('menu.aiAsk')}
-                </button>
-              </div>
+              {aiGrid}
             </>
           )}
           <div className="menu-sep" />

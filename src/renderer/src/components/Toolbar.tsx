@@ -2406,6 +2406,15 @@ export default function Toolbar({
                   </button>
                 ))}
               </div>
+              {/* How MUCH the menu covers, independent of when it opens */}
+              <label className="theme-menu-toggle" title={t('settings.selectionMenuCompactTip')}>
+                <input
+                  type="checkbox"
+                  checked={settings.selectionMenuCompact}
+                  onChange={(e) => onSettingsChange({ selectionMenuCompact: e.target.checked })}
+                />
+                {t('settings.selectionMenuCompact')}
+              </label>
 
               <div className="theme-menu-sep" />
 

@@ -3051,6 +3051,81 @@ html.pen-near .draw-layer {
   cursor: grabbing;
 }
 
+/* The COMPACT selection menu: one row at the selection — highlight dots,
+   underline, strikeout, comment, copy, ✦ for the assistant's chips and ⋯ for
+   the full panel. Same chrome as the panel, a tighter radius for a bar. The
+   grip turns vertical and sits at the left end. */
+.selection-menu.is-compact {
+  min-width: 0;
+  padding: 4px 5px 4px 3px;
+  border-radius: 11px;
+}
+
+.compact-row {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.menu-grip-side {
+  width: 12px;
+  height: 26px;
+  margin: 0 1px 0 0;
+}
+
+.menu-grip-side::after {
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+}
+
+.compact-colors {
+  display: flex;
+  gap: 5px;
+  padding: 0 5px;
+}
+
+.compact-colors .color-dot {
+  width: 21px;
+  height: 21px;
+}
+
+.compact-sep {
+  flex-shrink: 0;
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--border);
+}
+
+.compact-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+}
+
+.compact-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.compact-btn.is-active {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+/* The assistant chips unfolded under the row (✦) */
+.compact-ai {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
 .color-row {
   display: flex;
   gap: 9px;

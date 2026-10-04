@@ -7605,7 +7605,14 @@ export default function PdfViewer({
         />
       )}
 
-      {menu && <SelectionMenu menu={menu} onAction={onMenuAction} aiEnabled={aiAccess !== 'off'} />}
+      {menu && (
+        <SelectionMenu
+          menu={menu}
+          onAction={onMenuAction}
+          aiEnabled={aiAccess !== 'off'}
+          compact={settings.selectionMenuCompact}
+        />
+      )}
       {snip && !imageGrab && (
         <SnipOverlay onDone={onSnipDone} onCancel={() => setSnip(null)} />
       )}

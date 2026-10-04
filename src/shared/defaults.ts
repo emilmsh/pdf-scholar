@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   nightTone: 'warm',
   nightKeepImages: false,
   selectionMenuTrigger: 'auto',
+  selectionMenuCompact: false,
   keepAwake: false,
   language: 'auto',
   annotAuthor: '',
