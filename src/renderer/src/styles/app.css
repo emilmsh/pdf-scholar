@@ -3051,45 +3051,59 @@ html.pen-near .draw-layer {
   cursor: grabbing;
 }
 
-/* The COMPACT selection menu: one row at the selection — highlight dots,
-   underline, strikeout, comment, copy, ✦ for the assistant's chips and ⋯ for
-   the full panel. Same chrome as the panel, a tighter radius for a bar. The
-   grip turns vertical and sits at the left end. */
+/* The COMPACT selection menu: the same menu at a smaller scale. Tighter
+   colour rows with smaller swatches, every action as an icon (its name on
+   hover), the assistant's chips folded behind ✦. Nothing is left out: which
+   action matters is the reader's call (Emil, 2026-10-04). */
 .selection-menu.is-compact {
   min-width: 0;
-  padding: 4px 5px 4px 3px;
-  border-radius: 11px;
+  padding: 6px;
 }
 
-.compact-row {
+.is-compact .menu-color-group {
+  gap: 4px;
+  padding: 1px 2px;
+}
+
+.is-compact .menu-row-label {
+  width: 20px;
+}
+
+.is-compact .color-row {
+  gap: 5px;
+  padding: 3px 4px;
+}
+
+.is-compact .color-dot,
+.is-compact .color-plus {
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+}
+
+.is-compact .color-bar {
+  width: 18px;
+  height: 18px;
+}
+
+.is-compact .color-bar span {
+  width: 14px;
+  height: 4px;
+}
+
+.is-compact .menu-sep {
+  margin: 4px 2px;
+}
+
+.is-compact .selection-stats {
+  padding: 4px 6px 2px;
+}
+
+.compact-actions {
   display: flex;
   align-items: center;
   gap: 1px;
-}
-
-.menu-grip-side {
-  width: 12px;
-  height: 26px;
-  margin: 0 1px 0 0;
-}
-
-.menu-grip-side::after {
-  left: 50%;
-  top: 50%;
-  width: 3px;
-  height: 16px;
-  transform: translate(-50%, -50%);
-}
-
-.compact-colors {
-  display: flex;
-  gap: 5px;
-  padding: 0 5px;
-}
-
-.compact-colors .color-dot {
-  width: 21px;
-  height: 21px;
+  padding: 0 1px;
 }
 
 .compact-sep {
@@ -3103,8 +3117,8 @@ html.pen-near .draw-layer {
 .compact-btn {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 7px;
   color: var(--text-secondary);
 }
@@ -3119,7 +3133,7 @@ html.pen-near .draw-layer {
   color: var(--accent);
 }
 
-/* The assistant chips unfolded under the row (✦) */
+/* The assistant chips unfolded under the actions (✦) */
 .compact-ai {
   margin-top: 4px;
   padding-top: 4px;

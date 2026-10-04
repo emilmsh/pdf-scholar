@@ -24,7 +24,6 @@ import {
   IconMarkupSquiggly,
   IconMarkupStrikeout,
   IconMarkupUnderline,
-  IconMore,
   IconNote,
   IconSparkle,
   IconTally,
@@ -206,11 +205,9 @@ function SelectionCount({ text }: { text: string }): React.JSX.Element | null {
 
 export type MenuAction =
   | { kind: 'highlight'; color: HighlightColor }
-  // No colour = the tool's default (the compact row has no colour pickers for
-  // these; the viewer's handler already fell back to UNDERLINE_COLOR etc.)
-  | { kind: 'underline'; color?: HighlightColor }
-  | { kind: 'strikeout'; color?: HighlightColor }
-  | { kind: 'squiggly'; color?: HighlightColor }
+  | { kind: 'underline'; color: HighlightColor }
+  | { kind: 'strikeout'; color: HighlightColor }
+  | { kind: 'squiggly'; color: HighlightColor }
   | { kind: 'note' }
   | { kind: 'comment' }
   | { kind: 'copy' }
@@ -230,23 +227,22 @@ interface MenuProps {
   /** false while the dead-man switch is off — hides every AI entry (the chip
    *  grid, snip-to-explain) rather than offering actions that cannot fire */
   aiEnabled: boolean
-  /** One-row form for a text selection (Settings.selectionMenuCompact); the
-   *  point menu is short already and ignores it */
+  /** The SAME menu at a smaller scale (Settings.selectionMenuCompact): tighter
+   *  colour rows, every action as an icon with its name on hover, the
+   *  assistant's labelled chips behind ✦. Nothing is left out — which action
+   *  matters is the reader's call, not ours (Emil, 2026-10-04). The point menu
+   *  is three rows already and ignores it. */
   compact?: boolean
 }
 
 export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: MenuProps): React.JSX.Element {
   useLang()
   const isSelection = menu.mode === 'selection'
-  // Compact row → full panel («⋯») and the assistant chips (✦) under the row.
-  // Both unfold IN PLACE: the bubble grows, nothing moves first (one layout
-  // change per gesture). A new menu starts folded again.
-  const [expanded, setExpanded] = useState(false)
+  // Compact: the assistant chips unfold under the ✦ IN PLACE — the bubble
+  // grows, nothing moves first (one layout change per gesture). A new menu
+  // starts folded again.
   const [aiOpen, setAiOpen] = useState(false)
-  useEffect(() => {
-    setExpanded(false)
-    setAiOpen(false)
-  }, [menu])
+  useEffect(() => setAiOpen(false), [menu])
   // Draggable, like the note and comment bubbles: this menu is the tallest
   // popup in the app, and a reader who wants to see what is under it should be
   // able to pull it aside rather than close it and lose the selection.
@@ -255,10 +251,9 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
   // the placement this menu has always had — 10px below the pointer, flipped
   // above it when that would overflow the bottom, then edge-clamped — so
   // nothing about how it opens changes; only the drag is new.
-  // Growing in place (compact → ✦ chips → full panel) re-clamps to the
-  // viewport: the taller bubble must not run off the bottom edge where the
-  // one-row form fitted.
-  const { ref, style, handleProps } = useDraggable<HTMLDivElement>(menu.x, menu.y, [expanded, aiOpen], {
+  // Growing in place (the ✦ chips, the word count) re-clamps to the viewport:
+  // the taller bubble must not run off the bottom edge where it fitted before.
+  const { ref, style, handleProps } = useDraggable<HTMLDivElement>(menu.x, menu.y, [aiOpen], {
     top: menu.y,
     bottom: menu.y,
     left: menu.x
@@ -320,7 +315,58 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
     e.stopPropagation()
   }
 
-  if (compact && isSelection && !expanded) {
+  /** The four markup rows, shared by both forms — only the row icon's size
+   *  differs; the swatches themselves scale through CSS. */
+  const markupRows = (iconSize: number): React.JSX.Element => (
+    <>
+      <div className="menu-color-group">
+        <span className="menu-row-label" title={t('menu.marker')}>
+          <IconMarkupHighlight size={iconSize} />
+        </span>
+        <MarkupColorRow
+          palette={HIGHLIGHT_COLORS}
+          swatch="dot"
+          tipKey="menu.markerTip"
+          onPick={(color) => onAction({ kind: 'highlight', color })}
+        />
+      </div>
+      <div className="menu-color-group">
+        <span className="menu-row-label" title={t('menu.underline')}>
+          <IconMarkupUnderline size={iconSize} />
+        </span>
+        <MarkupColorRow
+          palette={UNDERLINE_COLORS}
+          swatch="bar"
+          tipKey="menu.underlineTip"
+          onPick={(color) => onAction({ kind: 'underline', color })}
+        />
+      </div>
+      <div className="menu-color-group">
+        <span className="menu-row-label" title={t('menu.strikeout')}>
+          <IconMarkupStrikeout size={iconSize} />
+        </span>
+        <MarkupColorRow
+          palette={UNDERLINE_COLORS}
+          swatch="bar"
+          tipKey="menu.strikeoutTip"
+          onPick={(color) => onAction({ kind: 'strikeout', color })}
+        />
+      </div>
+      <div className="menu-color-group">
+        <span className="menu-row-label" title={t('menu.squiggly')}>
+          <IconMarkupSquiggly size={iconSize} />
+        </span>
+        <MarkupColorRow
+          palette={UNDERLINE_COLORS}
+          swatch="bar"
+          tipKey="menu.squigglyTip"
+          onPick={(color) => onAction({ kind: 'squiggly', color })}
+        />
+      </div>
+    </>
+  )
+
+  if (compact && isSelection) {
     return (
       <div
         className="selection-menu is-compact"
@@ -331,34 +377,38 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
           if (!inTextField(e.target)) e.preventDefault()
         }}
       >
-        <div className="compact-row">
-          <span className="menu-grip menu-grip-side" title={t('menu.dragTip')} {...handleProps} />
-          {/* The highlight colours inline — the one action that is most of all
-              marking — so the common case stays a single click */}
-          <div className="compact-colors">
-            {HIGHLIGHT_COLORS.map((c) => (
-              <button
-                key={c.hex}
-                className="color-dot"
-                style={{ background: c.hex }}
-                title={`${t('menu.marker')} · ${colorLabel(c)}`}
-                onClick={() => onAction({ kind: 'highlight', color: c })}
-              />
-            ))}
-          </div>
-          <span className="compact-sep" />
-          <button className="compact-btn" title={t('menu.underline')} onClick={() => onAction({ kind: 'underline' })}>
-            <IconMarkupUnderline size={17} />
-          </button>
-          <button className="compact-btn" title={t('menu.strikeout')} onClick={() => onAction({ kind: 'strikeout' })}>
-            <IconMarkupStrikeout size={17} />
-          </button>
-          <span className="compact-sep" />
+        <span className="menu-grip" title={t('menu.dragTip')} {...handleProps} />
+        {markupRows(16)}
+        <div className="menu-sep" />
+        {/* Every action of the full panel, as an icon with its name on hover —
+            the same order, the same groups, no text */}
+        <div className="compact-actions">
           <button className="compact-btn" title={t('menu.comment')} onClick={() => onAction({ kind: 'comment' })}>
             <IconComment size={16} />
           </button>
+          <button className="compact-btn" title={t('menu.note')} onClick={() => onAction({ kind: 'note' })}>
+            <IconNote size={16} />
+          </button>
           <button className="compact-btn" title={t('menu.copy')} onClick={() => onAction({ kind: 'copy' })}>
             <IconCopy size={16} />
+          </button>
+          <span className="compact-sep" />
+          <button className="compact-btn" title={t('menu.webSearch')} onClick={() => onAction({ kind: 'search' })}>
+            <IconGlobe size={16} />
+          </button>
+          <button className="compact-btn" title={t('menu.dictionary')} onClick={() => onAction({ kind: 'dictionary' })}>
+            <IconBook size={16} />
+          </button>
+          <button className="compact-btn" title={t('menu.translate')} onClick={() => onAction({ kind: 'translate' })}>
+            <IconTranslate size={16} />
+          </button>
+          <button
+            className={`compact-btn${showCount ? ' is-active' : ''}`}
+            title={t('menu.count')}
+            aria-expanded={showCount}
+            onClick={() => setShowCount((v) => !v)}
+          >
+            <IconTally size={16} />
           </button>
           {/* ✦ sends nothing itself: it unfolds the labelled chips, which is
               where the AI is named and triggered (the transparency rule) */}
@@ -375,11 +425,8 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
               </button>
             </>
           )}
-          <span className="compact-sep" />
-          <button className="compact-btn" title={t('menu.more')} onClick={() => setExpanded(true)}>
-            <IconMore size={16} />
-          </button>
         </div>
+        {showCount && <SelectionCount text={selText} />}
         {aiOpen && showAi && <div className="compact-ai">{aiGrid}</div>}
       </div>
     )
@@ -401,50 +448,7 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
       <span className="menu-grip" title={t('menu.dragTip')} {...handleProps} />
       {isSelection && (
         <>
-          <div className="menu-color-group">
-            <span className="menu-row-label" title={t('menu.marker')}>
-              <IconMarkupHighlight size={19} />
-            </span>
-            <MarkupColorRow
-              palette={HIGHLIGHT_COLORS}
-              swatch="dot"
-              tipKey="menu.markerTip"
-              onPick={(color) => onAction({ kind: 'highlight', color })}
-            />
-          </div>
-          <div className="menu-color-group">
-            <span className="menu-row-label" title={t('menu.underline')}>
-              <IconMarkupUnderline size={19} />
-            </span>
-            <MarkupColorRow
-              palette={UNDERLINE_COLORS}
-              swatch="bar"
-              tipKey="menu.underlineTip"
-              onPick={(color) => onAction({ kind: 'underline', color })}
-            />
-          </div>
-          <div className="menu-color-group">
-            <span className="menu-row-label" title={t('menu.strikeout')}>
-              <IconMarkupStrikeout size={19} />
-            </span>
-            <MarkupColorRow
-              palette={UNDERLINE_COLORS}
-              swatch="bar"
-              tipKey="menu.strikeoutTip"
-              onPick={(color) => onAction({ kind: 'strikeout', color })}
-            />
-          </div>
-          <div className="menu-color-group">
-            <span className="menu-row-label" title={t('menu.squiggly')}>
-              <IconMarkupSquiggly size={19} />
-            </span>
-            <MarkupColorRow
-              palette={UNDERLINE_COLORS}
-              swatch="bar"
-              tipKey="menu.squigglyTip"
-              onPick={(color) => onAction({ kind: 'squiggly', color })}
-            />
-          </div>
+          {markupRows(19)}
           <div className="menu-sep" />
           {/* Comment = highlight bound to the text with the note prompt up
               front; Notat stays the free-floating sticky */}

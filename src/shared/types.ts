@@ -57,11 +57,11 @@ export interface Settings {
    *  text to read along, not to mark it, asked for the quiet (2026-10-04);
    *  the right-click has always opened the same menu, so nothing is lost. */
   selectionMenuTrigger: 'auto' | 'contextMenu'
-  /** The selection menu as ONE ROW — highlight colours, underline, strikeout,
-   *  comment, copy, the assistant behind a ✦ and the full menu behind «⋯» —
-   *  instead of the full panel. Independent of the trigger above: it is about
-   *  how much the menu covers, not when it opens. PROTOTYPE (2026-10-04): if
-   *  the row proves enough, the full panel may become the «⋯» view only. */
+  /** The selection menu at a smaller scale: tighter colour rows, every action
+   *  as an icon with its name on hover, the assistant's chips behind ✦. The
+   *  SAME functions — compact means less space, never fewer choices (Emil,
+   *  2026-10-04). Independent of the trigger above: it is about how much the
+   *  menu covers, not when it opens. */
   selectionMenuCompact: boolean
   keepAwake: boolean
   language: LanguagePreference

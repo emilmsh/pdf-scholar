@@ -369,7 +369,7 @@ const nb = {
   'settings.selectionMenuContextHint': 'Merk teksten, høyreklikk (eller hold inne) for menyen',
   'settings.selectionMenuCompact': 'Kompakt meny',
   'settings.selectionMenuCompactTip':
-    'Én linje: uthevingsfarger, understrek, gjennomstrek, kommentar og kopier. Assistenten bak ✦, hele menyen bak ⋯.',
+    'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
   'settings.annotAuthor': 'Navn på merknader',
   'settings.annotAuthorPlaceholder': 'F.eks. navnet ditt',
   'settings.annotAuthorHint':
@@ -530,7 +530,6 @@ const nb = {
   'menu.snip': 'Forklar område …',
   'menu.snipTip': 'Dra en firkant rundt en figur eller tabell – assistenten forklarer den',
   'menu.dragTip': 'Dra menyen dit den ikke er i veien',
-  'menu.more': 'Hele menyen',
   'snip.hint': 'Dra en firkant rundt området som skal forklares · Esc avbryter',
   // «Kopier bilde»: den samme markeringsrammen som snip, men rettet mot
   // utklippstavla og disken i stedet for assistenten.
@@ -1357,7 +1356,7 @@ const en: Dict = {
   'settings.selectionMenuContextHint': 'Select the text, then right-click (or long-press) for the menu',
   'settings.selectionMenuCompact': 'Compact menu',
   'settings.selectionMenuCompactTip':
-    'One row: highlight colours, underline, strikeout, comment and copy. The assistant behind ✦, the full menu behind ⋯.',
+    'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',
   'settings.annotAuthor': 'Name on annotations',
   'settings.annotAuthorPlaceholder': 'E.g. your name',
   'settings.annotAuthorHint':
@@ -1512,7 +1511,6 @@ const en: Dict = {
   'menu.snip': 'Explain area …',
   'menu.snipTip': 'Drag a box around a figure or table — the assistant explains it',
   'menu.dragTip': 'Drag the menu out of the way',
-  'menu.more': 'Full menu',
   'snip.hint': 'Drag a box around the area to explain · Esc cancels',
   'menu.grabImage': 'Copy image …',
   'menu.grabImageTip':
