@@ -146,20 +146,20 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.54.0
+## What's new in this version (≤ 1 500 chars) — v0.55.0
 
 **EN:**
 ```
-• Files attached to a PDF are no longer invisible: a document that carries them shows a count in the toolbar, and the side panel lists each one — open it, or save it as a file of its own. A paperclip on a page opens its file too
-• Only document, data and media types open from here; anything that could run a program is saved, never launched. A PDF attachment opens in a new tab
-• Saving a PDF with a long file name keeps that name — some launchers hand the app a short Windows alias (like EFFECT~1.pdf), and a save could rename the file to it
+• Night has a new paper tone, «White»: the document as printed — white page, dark toolbar and panels — for readers who keep every app dark but want the document itself untouched
+• The search bar's results list opens folded, so the bar never covers the hit it points at; unfold it and the choice is remembered. The bar can be dragged aside (double-click its grip to put it back), and a hit always lands clear of it
+• The selection menu has two new switches in the settings menu: let it wait for a right-click instead of opening on its own, and a compact form — the same choices at a third of the height, icons with their names on hover, «⋯» for the full menu when you want it
 ```
 
 **NO:**
 ```
-• Filer som er lagt ved en PDF, er ikke lenger usynlige: et dokument med vedlegg viser antallet i verktøylinja, og sidepanelet lister hvert av dem — åpne det, eller lagre det som en egen fil. En binders på siden åpner også filen sin
-• Bare dokument-, data- og medietyper åpnes herfra; alt som kan starte et program, lagres og startes aldri. Et PDF-vedlegg åpnes i en ny fane
-• Lagring av en PDF med langt filnavn beholder navnet — noen programmer gir appen et kort Windows-alias (som EFFECT~1.pdf), og en lagring kunne gi filen det navnet
+• Natt har fått en ny papirtone, «Hvitt»: dokumentet som trykt — hvit side, mørk verktøylinje og mørke paneler — for den som holder alle apper mørke, men vil ha selve dokumentet urørt
+• Søkefeltets treffliste åpner sammenlagt, så feltet aldri dekker treffet det peker på; folder du den ut, huskes valget. Feltet kan dras til side (dobbeltklikk på grepet setter det tilbake), og et treff lander alltid klar av det
+• Markeringsmenyen har fått to nye brytere i innstillingene: la den vente på høyreklikk i stedet for å åpne selv, og en kompakt form — de samme valgene på en tredjedel av høyden, ikoner med navn når du holder over, «⋯» for hele menyen når du vil ha den
 ```
 
 ---
