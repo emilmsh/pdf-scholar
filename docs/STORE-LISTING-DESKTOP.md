@@ -146,19 +146,19 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.55.0
+## What's new in this version (≤ 1 500 chars) — v0.55.1
 
 **EN:**
 ```
 • Night has a new paper tone, «White»: the document as printed — white page, dark toolbar and panels — for readers who keep every app dark but want the document itself untouched
-• The search bar's results list opens folded, so the bar never covers the hit it points at; unfold it and the choice is remembered. The bar can be dragged aside (double-click its grip to put it back), and a hit always lands clear of it
+• The search bar's results list opens folded, so the bar never covers the hit it points at; a list button beside the field unfolds it, and the choice is remembered. The bar can be dragged aside (double-click its grip to put it back), and a hit always lands clear of it. The AI search steps through its passages with the same arrows
 • The selection menu has two new switches in the settings menu: let it wait for a right-click instead of opening on its own, and a compact form — the same choices at a third of the height, icons with their names on hover, «⋯» for the full menu when you want it
 ```
 
 **NO:**
 ```
 • Natt har fått en ny papirtone, «Hvitt»: dokumentet som trykt — hvit side, mørk verktøylinje og mørke paneler — for den som holder alle apper mørke, men vil ha selve dokumentet urørt
-• Søkefeltets treffliste åpner sammenlagt, så feltet aldri dekker treffet det peker på; folder du den ut, huskes valget. Feltet kan dras til side (dobbeltklikk på grepet setter det tilbake), og et treff lander alltid klar av det
+• Søkefeltets treffliste åpner sammenlagt, så feltet aldri dekker treffet det peker på; en listeknapp ved feltet folder den ut, og valget huskes. Feltet kan dras til side (dobbeltklikk på grepet setter det tilbake), og et treff lander alltid klar av det. KI-søket blar gjennom passasjene sine med de samme pilene
 • Markeringsmenyen har fått to nye brytere i innstillingene: la den vente på høyreklikk i stedet for å åpne selv, og en kompakt form — de samme valgene på en tredjedel av høyden, ikoner med navn når du holder over, «⋯» for hele menyen når du vil ha den
 ```
 
