@@ -9,6 +9,10 @@
 //   4) Every curated custom tone stays readable: WCAG contrast ≥ 7:1 against
 //      the custom theme's ink (#1d1d1f) even at maximum intensity, enforced by
 //      the luminance floor.
+//   5) The night tone «Hvitt» ('paper') is NO inversion at all — filter none,
+//      white paper, shipped dark chrome — whatever the brightness slider says,
+//      and it is the one night tone the page is NOT inverted under (which is
+//      what hides «Behold bildefarger» and the slider for it).
 // Run: node scripts/test-theme-tune.mjs
 import { build } from 'esbuild'
 import { mkdtempSync } from 'node:fs'
@@ -147,7 +151,7 @@ eq(T.customChromeCss('sepia')['--text'], '#3d3929', 'sepia tone ink verbatim')
 console.log('8) night tones: warm stays blend-free, tints screen and stay readable')
 eq(T.nightTuneCss(1, 'warm').blend, undefined, 'warm never sets a blend')
 for (const tone of T.NIGHT_TONE_ORDER) {
-  if (tone === 'warm') continue
+  if (tone === 'warm' || tone === 'paper') continue // paper: section 9
   const css = T.nightTuneCss(1, tone)
   eq(css.blend, 'screen', `night ${tone} tints through screen`)
   const chrome = T.nightChromeCss(tone)
@@ -173,6 +177,34 @@ ok(
   T.pageTuneCss('night', TUNE({}), 'gray', 'blue')?.blend === 'screen',
   'tinted night overrides at default strength'
 )
+
+console.log('9) «Hvitt» (paper): the document as printed inside the dark chrome')
+for (const t of [0.5, 0.75, 1, 1.25, 1.5]) {
+  const css = T.nightTuneCss(t, 'paper')
+  eq(css.filter, 'none', `paper @${t}: no filter`)
+  eq(css.bg, '#ffffff', `paper @${t}: white paper`)
+  eq(css.blend, undefined, `paper @${t}: no blend`)
+  // …and through the resolver: it overrides even at the default strength,
+  // because the shipped night block WOULD invert
+  const resolved = T.pageTuneCss('night', TUNE({ night: t }), 'gray', 'paper')
+  eq(resolved?.filter, 'none', `paper resolves to no filter @${t}`)
+  eq(resolved?.bg, '#ffffff', `paper resolves to white @${t}`)
+}
+eq(T.nightChromeCss('paper'), null, 'paper keeps the shipped night chrome (a white page, not a white UI)')
+eq(T.tuneTitleBar('night', 'sepia', 'paper'), null, 'paper leaves the title bar on the night map')
+eq(T.nightPaper('paper').join(), '255,255,255', 'the visible paper is white')
+ok(T.NIGHT_TONE_ORDER.includes('paper'), 'paper is offered in the picker')
+eq(T.NIGHT_TONE_ORDER[T.NIGHT_TONE_ORDER.length - 1], 'paper', 'paper is the last chip — the odd one out sits at the end')
+// What inverts: Night+ always, night for every tone but paper, nothing light
+eq(T.isPageInverted('nightHc', 'paper'), true, 'Night+ always inverts')
+eq(T.isPageInverted('night', 'warm'), true, 'night/warm inverts')
+eq(T.isPageInverted('night', 'blue'), true, 'night/blue inverts')
+eq(T.isPageInverted('night', 'paper'), false, 'night/paper does NOT invert')
+eq(T.isPageInverted('night', 'tartan'), true, 'an unknown tone reads as warm, which inverts')
+for (const theme of ['day', 'sepia', 'custom']) eq(T.isPageInverted(theme, 'warm'), false, `${theme} never inverts`)
+// The other four tones are untouched by the addition
+eq(T.pageTuneCss('night', TUNE({}), 'gray', 'warm'), null, 'warm @1 still → null')
+eq(T.nightTuneCss(1, 'blue').blend, 'screen', 'blue still screens')
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   customTone: 'sepia',
   nightTone: 'warm',
   nightKeepImages: false,
+  selectionMenuTrigger: 'auto',
   keepAwake: false,
   language: 'auto',
   annotAuthor: '',

@@ -172,6 +172,8 @@ import {
   TEXT_SPANS_READY_SELECTOR
 } from '../search'
 import { addSearchHistory, clearSearchHistory } from '../search-history'
+import { saveSearchListOpen } from '../search-list-pref'
+import { isPageInverted } from '../theme-tune'
 import { clearAiTextScale } from '../ai-text-scale'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { offsetAtPoint, rangeOfQuads, snapToWords } from '../text-range'
@@ -2935,8 +2937,7 @@ export default function PdfViewer({
   // «Behold bildefarger» resolved against the theme actually showing: the
   // setting is night-only by meaning, so day/sepia render nothing extra even
   // while the preference stays saved for the next night session
-  const keepImageColors =
-    settings.nightKeepImages && (resolvedTheme === 'night' || resolvedTheme === 'nightHc')
+  const keepImageColors = settings.nightKeepImages && isPageInverted(resolvedTheme, settings.nightTone)
 
   // ---------- Save model (dirty = unsaved draft exists) ----------
 
@@ -4886,8 +4887,9 @@ export default function PdfViewer({
     [openMenuAt, xfaOf]
   )
 
-  // The menu pops up right after finishing a text selection;
-  // a plain click hit-tests annotations and opens the properties popover
+  // The menu pops up right after finishing a text selection (unless the
+  // reader set it to wait for a right-click); a plain click hit-tests
+  // annotations and opens the properties popover
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0 || drawToolRef.current) return
@@ -4912,6 +4914,9 @@ export default function PdfViewer({
             applyMarkup(mt, prefsRef.current.markup[mt].color)
             return
           }
+          // «Bare ved høyreklikk»: the selection stays a selection, and the
+          // menu waits for the right-click (onContextMenu → the same openMenuAt)
+          if (settingsRef.current.selectionMenuTrigger === 'contextMenu') return
           openMenuAt(clientX, clientY, target)
           return
         }
@@ -5639,6 +5644,7 @@ export default function PdfViewer({
     setPrefs(structuredClone(DEFAULT_TOOL_PREFS))
     clearCustomColors()
     clearSearchHistory()
+    saveSearchListOpen(false)
     // The assistant re-reads this when the panel next opens
     clearAiTextScale()
     setPanelW({ ...PANEL_DEFAULTS })
@@ -6020,7 +6026,20 @@ export default function PdfViewer({
         return
       }
       setSearchHits({ pageNumber: match.pageNumber, rects })
-      handle.scrollToPageY(match.pageNumber, rects[0].y, el.clientHeight * 0.35)
+      // Land the hit BELOW the search bar, never behind it. The bar floats over
+      // the top-right of the viewer, and with its results list unfolded it
+      // reaches well past the 35 % anchor — a reader's screenshot (2026-10-04)
+      // had the active hit sitting under the list in the right-hand column.
+      // Measured live from the bar that is actually there: a folded bar costs
+      // nothing, an unfolded one pushes the hit just clear of its lower edge,
+      // and a column the bar does not overlap horizontally keeps the plain
+      // anchor. Capped so a tiny window still lands the hit on screen.
+      const bar = document.querySelector('.search-bar')?.getBoundingClientRect()
+      const paneRect = el.getBoundingClientRect()
+      const overlapsPane = !!bar && bar.left < paneRect.right && bar.right > paneRect.left
+      const clearance = overlapsPane ? bar.bottom - paneRect.top + 24 : 0
+      const anchor = Math.min(el.clientHeight * 0.7, Math.max(el.clientHeight * 0.35, clearance))
+      handle.scrollToPageY(match.pageNumber, rects[0].y, anchor)
       if (pane === 'a') schedulePositionSave()
     },
     [pushBack, waitForTextLayer, schedulePositionSave]

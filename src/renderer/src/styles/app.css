@@ -2893,6 +2893,16 @@ html.pen-near .draw-layer {
   cursor: default;
 }
 
+/* Fold/unfold the results list: the chevron points down at a folded list
+   (there is more below) and turns up once it is open */
+.search-list-toggle svg {
+  transition: transform 0.14s ease;
+}
+
+.search-list-toggle.is-open svg {
+  transform: rotate(180deg);
+}
+
 .search-results {
   margin-top: 8px;
   max-height: 300px;

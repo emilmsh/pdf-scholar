@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
 import { clearSearchHistory, loadSearchHistory } from '../search-history'
+import { loadSearchListOpen, saveSearchListOpen } from '../search-list-pref'
+import { IconChevronDown } from './icons'
 import { t, useLang } from '../i18n'
 import { bubblesWhileTyping, withShortcut } from '../keymap'
 
@@ -84,6 +86,18 @@ export default function SearchBar({
   /** Only while there is nothing typed — once you are typing, the results ARE
    *  the useful list, and a dropdown over them would be in the way. */
   const historyVisible = !isAi && historyOpen && query.trim() === '' && history.length > 0
+
+  // The results list folds away to one row (the default — the open list
+  // covered the hit it pointed at); unfolding is remembered across sessions.
+  // One toggle for both modes: what the text search presents, the AI search
+  // presents (the parity rule the whole bar follows).
+  const [listOpen, setListOpen] = useState(loadSearchListOpen)
+  const toggleList = (): void =>
+    setListOpen((open) => {
+      saveSearchListOpen(!open)
+      return !open
+    })
+  const hasList = isAi ? aiHits.length > 0 : matches.length > 0
 
   const pickHistory = (q: string): void => {
     setHistoryOpen(false)
@@ -230,6 +244,16 @@ export default function SearchBar({
           </span>
         )}
         <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
+        {hasList && (
+          <button
+            className={`tb-btn search-list-toggle${listOpen ? ' is-open' : ''}`}
+            onClick={toggleList}
+            title={t(listOpen ? 'search.listHide' : 'search.listShow')}
+            aria-expanded={listOpen}
+          >
+            <IconChevronDown size={14} />
+          </button>
+        )}
         {!isAi && (
           <>
             <button className="tb-btn" onClick={onPrev} disabled={count === 0} title={withShortcut(t('search.prevTip'), 'search.prev')}>
@@ -278,7 +302,7 @@ export default function SearchBar({
         </div>
       )}
 
-      {!isAi && count > 0 && (
+      {!isAi && count > 0 && listOpen && (
         <div className="search-results" ref={listRef}>
           {matches.map((m, i) => (
             <button
@@ -331,7 +355,7 @@ export default function SearchBar({
       {/* With hits the note is the excerpt disclaimer (huge documents are
           searched via a page excerpt); with none it is the model's answer */}
       {isAi && aiStatus === 'done' && aiNote && <div className="search-ai-note">{aiNote}</div>}
-      {isAi && aiHits.length > 0 && (
+      {isAi && aiHits.length > 0 && listOpen && (
         <div className="search-results" ref={listRef}>
           {aiHits.map((h, i) => (
             <button

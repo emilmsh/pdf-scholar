@@ -42,7 +42,7 @@ Open a PDF and it becomes an ordinary browser tab in the PDF Scholar viewer inst
 
 READING
 • Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
-• Four reading modes — Day, Tint (a light paper tone in five colours), Night and Night+ — plus Auto; a slider sets the strength, and Night can keep pictures in their original colours
+• Four reading modes — Day, Tint (a light paper tone in five colours), Night and Night+ — plus Auto; Night can also show the document as printed inside the dark chrome, a slider sets the strength, and Night can keep pictures in their original colours
 • Page rotation, two-page spread, and a full-screen presentation mode
 • Split view: two columns of the same document, each with its own page, zoom and rotation
 • Table of contents, thumbnails and bookmarks
@@ -51,7 +51,7 @@ READING
 
 SEARCH
 Both modes live in one search bar, a tab apart.
-• By words: match case, whole word, a results list with excerpts, and every match marked on the page
+• By words: match case, whole word, a results list with excerpts that folds away so it never covers the hit, and every match marked on the page
 • By meaning: describe a topic in your own words and get the passages that discuss it, ranked (uses the assistant's key)
 
 ANNOTATION
@@ -86,7 +86,7 @@ PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotat
 
 LESING
 • Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
-• Fire lesemoduser — Dag, Farge (en lys papirtone i fem farger), Natt og Natt+ — pluss Auto; en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
+• Fire lesemoduser — Dag, Farge (en lys papirtone i fem farger), Natt og Natt+ — pluss Auto; natt kan også vise dokumentet som trykt i den mørke rammen, en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
 • Siderotasjon, tosiders oppslag og en fullskjerms presentasjonsmodus
 • Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
 • Innholdsfortegnelse, miniatyrer og bokmerker
@@ -95,7 +95,7 @@ LESING
 
 SØK
 Begge modusene bor i én søkelinje, en fane fra hverandre.
-• Etter ord: skill store/små, helord, en treffliste med utdrag, og hvert treff markert på siden
+• Etter ord: skill store/små, helord, en treffliste med utdrag som kan slås sammen så den aldri dekker treffet, og hvert treff markert på siden
 • Etter mening: beskriv et tema med egne ord og få avsnittene som omtaler det, rangert (bruker assistentens nøkkel)
 
 ANNOTERING

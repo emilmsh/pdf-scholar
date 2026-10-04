@@ -131,7 +131,10 @@ carries no picture of its own.)*
 - Four reading modes — Day, «Farge» (a light paper tone: the classic Sepia
   cream plus gray, green, blue and sand), Night and Night+ (higher contrast) —
   plus Auto, which follows the system setting. Night has its own dark tones
-  (the standard near-black, gray, blue, green). The tinted modes take a strength slider — tint
+  (the standard near-black, gray, blue, green) — and «Hvitt», which leaves the
+  document as printed: a white page inside the dark chrome, the way Edge's
+  dark mode shows a PDF *(reader ask, 2026-10-04 — a PhD student who keeps
+  every app dark and every document white)*. The tinted modes take a strength slider — tint
   strength for the light tones, brightness for night; 100 % is the standard
   look — and the UI chrome follows the chosen tone, the way Sepia's cream
   chrome always did. A keyboard shortcut cycles the modes
@@ -245,6 +248,10 @@ margen som synlig tekst ved siden av siden, og en eksport lager en kopi med
 kommentarene satt i en utvidet marg.
 
 - The toolbar carries the same tools, and can be unpinned entirely
+- The menu at the selection can be set to wait for a right-click instead of
+  opening on its own — for a reader who selects text to follow along, not to
+  mark it *(reader ask, 2026-10-04)*. The right-click (a long-press on touch)
+  has always opened the same menu
 - Highlight, underline, strikeout and squiggly; pen and marker with
   hold-to-straighten; shapes, sticky notes, free text, and text-anchored
   comments
@@ -303,7 +310,10 @@ bar, a tab apart, and the frame that ships with the section shows exactly
 that.)*
 
 - By words: match case, whole word, a results list with excerpts, and every
-  match marked on the page
+  match marked on the page. The list opens folded, so the bar never covers the
+  hit it points at; unfold it and the choice is remembered. A hit is scrolled
+  clear of the bar whatever its height *(reader ask, 2026-10-04 — the open
+  list sat over the active hit in a split view)*
 - By meaning: describe a topic in your own words and get the passages that
   discuss it, ranked. This mode uses the assistant's key
 

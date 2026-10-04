@@ -362,6 +362,11 @@ const nb = {
   'margin.sideRight': 'Høyre',
   'margin.prevComment': 'Forrige kommentar',
   'margin.nextComment': 'Neste kommentar',
+  'settings.selectionMenu': 'Meny ved tekstmarkering',
+  'settings.selectionMenuAuto': 'Vises automatisk',
+  'settings.selectionMenuAutoHint': 'Rett etter at teksten er merket',
+  'settings.selectionMenuContext': 'Bare ved høyreklikk',
+  'settings.selectionMenuContextHint': 'Merk teksten, høyreklikk (eller hold inne) for menyen',
   'settings.annotAuthor': 'Navn på merknader',
   'settings.annotAuthorPlaceholder': 'F.eks. navnet ditt',
   'settings.annotAuthorHint':
@@ -400,6 +405,8 @@ const nb = {
   'tb.toneGreen': 'Grønn',
   'tb.toneBlue': 'Blå',
   'tb.toneSand': 'Sand',
+  'tb.tonePaper': 'Hvitt',
+  'tb.tonePaperTip': 'Dokumentet vises som trykt — hvit side, mørk ramme.',
   'tb.keepImageColors': 'Behold bildefarger',
   'tb.keepImageColorsTip':
     'Bilder beholder originalfargene i nattmodus (gjelder rasterbilder, ikke vektorfigurer).',
@@ -625,6 +632,8 @@ const nb = {
   'search.aiOpenSettings': 'Åpne KI-innstillinger',
   'search.searchError': 'KI-søket feilet',
   'search.historyClear': 'Tøm søkehistorikk',
+  'search.listShow': 'Vis treffliste',
+  'search.listHide': 'Skjul treffliste',
   'search.aiNoText': 'Dokumentet har ingen tekst å søke i (skannet)',
 
   // Viewer
@@ -1337,6 +1346,11 @@ const en: Dict = {
   'margin.sideRight': 'Right',
   'margin.prevComment': 'Previous comment',
   'margin.nextComment': 'Next comment',
+  'settings.selectionMenu': 'Menu on text selection',
+  'settings.selectionMenuAuto': 'Opens automatically',
+  'settings.selectionMenuAutoHint': 'Right after the text is selected',
+  'settings.selectionMenuContext': 'Right-click only',
+  'settings.selectionMenuContextHint': 'Select the text, then right-click (or long-press) for the menu',
   'settings.annotAuthor': 'Name on annotations',
   'settings.annotAuthorPlaceholder': 'E.g. your name',
   'settings.annotAuthorHint':
@@ -1375,6 +1389,8 @@ const en: Dict = {
   'tb.toneGreen': 'Green',
   'tb.toneBlue': 'Blue',
   'tb.toneSand': 'Sand',
+  'tb.tonePaper': 'White',
+  'tb.tonePaperTip': 'The document as printed — white page, dark chrome.',
   'tb.keepImageColors': 'Keep image colors',
   'tb.keepImageColorsTip':
     'Pictures keep their original colors in night mode (raster images, not vector figures).',
@@ -1583,6 +1599,8 @@ const en: Dict = {
   'search.aiOpenSettings': 'Open AI settings',
   'search.searchError': 'AI search failed',
   'search.historyClear': 'Clear search history',
+  'search.listShow': 'Show results list',
+  'search.listHide': 'Hide results list',
   'search.aiNoText': 'This document has no text to search (scanned)',
 
   'viewer.errorTitle': 'Could not display the document.',

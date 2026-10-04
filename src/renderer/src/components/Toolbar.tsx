@@ -20,6 +20,7 @@ import {
   applyPageTune,
   CUSTOM_TONE_ORDER,
   customToneCss,
+  isPageInverted,
   NIGHT_TONE_ORDER,
   NIGHT_TONES,
   TUNE_RANGE
@@ -373,7 +374,8 @@ const NIGHT_TONE_LABELS: Record<NightTone, MsgKey> = {
   warm: 'tb.toneWarm',
   gray: 'tb.toneGray',
   blue: 'tb.toneBlue',
-  green: 'tb.toneGreen'
+  green: 'tb.toneGreen',
+  paper: 'tb.tonePaper'
 }
 
 const LANGUAGES: { id: LanguagePreference; label: string }[] = [
@@ -2229,10 +2231,14 @@ export default function Toolbar({
                           <div className="theme-auto-choices">
                             {NIGHT_TONE_ORDER.map((tone) => {
                               const [r, g, b] = NIGHT_TONES[tone].bg
+                              // «Hvitt» is a white swatch in a dark row — it
+                              // needs the light tones' ink, not the dark ones'
+                              const inkClass = tone === 'paper' ? '' : ' tone-chip-dark'
                               return (
                                 <button
                                   key={tone}
-                                  className={`tone-chip tone-chip-dark${settings.nightTone === tone ? ' selected' : ''}`}
+                                  className={`tone-chip${inkClass}${settings.nightTone === tone ? ' selected' : ''}`}
+                                  title={tone === 'paper' ? t('tb.tonePaperTip') : undefined}
                                   style={{ background: `rgb(${r}, ${g}, ${b})` }}
                                   onClick={() => onSettingsChange({ nightTone: tone })}
                                 >
@@ -2244,7 +2250,9 @@ export default function Toolbar({
                         </div>
                       </div>
                     )}
-                    {showNightTones && slider('night')}
+                    {/* No brightness slider for «Hvitt»: nothing is inverted,
+                        so the axis has nothing to move */}
+                    {showNightTones && settings.nightTone !== 'paper' && slider('night')}
                   </>
                 )
               })()}
@@ -2265,7 +2273,7 @@ export default function Toolbar({
                   picture regions in their original colours. Only offered while
                   a night theme is what the reader sees: in day/sepia nothing
                   is inverted, so the toggle would be a no-op checkbox. */}
-              {(resolvedTheme === 'night' || resolvedTheme === 'nightHc') && (
+              {isPageInverted(resolvedTheme, settings.nightTone) && (
                 <label className="theme-menu-toggle" title={t('tb.keepImageColorsTip')}>
                   <input
                     type="checkbox"
@@ -2373,6 +2381,31 @@ export default function Toolbar({
                   if (name !== settings.annotAuthor) onSettingsChange({ annotAuthor: name })
                 }}
               />
+
+              <div className="theme-menu-sep" />
+
+              {/* When the menu at a text selection opens. Default: right after
+                  the selection, as it always has. «Bare ved høyreklikk» is for
+                  a reader who selects to read along and found the menu in the
+                  way (2026-10-04); the right-click — long-press on touch — has
+                  always opened the same menu, so nothing is lost, only moved. */}
+              <div className="theme-menu-label">{t('settings.selectionMenu')}</div>
+              <div className="scope-options">
+                {(['auto', 'contextMenu'] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    className={`scope-option${settings.selectionMenuTrigger === mode ? ' selected' : ''}`}
+                    onClick={() => onSettingsChange({ selectionMenuTrigger: mode })}
+                  >
+                    <strong>
+                      {t(mode === 'auto' ? 'settings.selectionMenuAuto' : 'settings.selectionMenuContext')}
+                    </strong>
+                    <span>
+                      {t(mode === 'auto' ? 'settings.selectionMenuAutoHint' : 'settings.selectionMenuContextHint')}
+                    </span>
+                  </button>
+                ))}
+              </div>
 
               <div className="theme-menu-sep" />
 

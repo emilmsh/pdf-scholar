@@ -42,7 +42,7 @@ Free and open source (MIT). No account, no sign-in, no tracking, no ads. Everyth
 
 READING
 • Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
-• Four reading modes — Day, Tint (a light paper tone: sepia, gray, green, blue or sand), Night and Night+ — plus Auto; Night has its own dark tones, a slider sets the strength, and Night can keep pictures in their original colours
+• Four reading modes — Day, Tint (a light paper tone: sepia, gray, green, blue or sand), Night and Night+ — plus Auto; Night has its own dark tones or shows the document as printed inside the dark chrome, a slider sets the strength, and Night can keep pictures in their original colours
 • Page rotation, two-page spread, and a full-screen presentation mode
 • Table of contents, thumbnails and bookmarks
 • Reading positions and recent files are remembered; back/forward navigation after following internal links
@@ -72,7 +72,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 
 SEARCH
 Both modes live in one search bar, a tab apart.
-• By words: match case, whole word, a results list with excerpts, and every match marked on the page
+• By words: match case, whole word, a results list with excerpts that folds away so it never covers the hit, and every match marked on the page
 • By meaning: describe a topic in your own words and get the passages that discuss it, ranked (uses the assistant's key)
 
 AI ASSISTANT (optional — bring your own key)
@@ -96,7 +96,7 @@ Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, i
 
 LESING
 • Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
-• Fire lesemoduser — Dag, Farge (en lys papirtone: sepia, grå, grønn, blå eller sand), Natt og Natt+ — pluss Auto; natt har egne mørke toner, en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
+• Fire lesemoduser — Dag, Farge (en lys papirtone: sepia, grå, grønn, blå eller sand), Natt og Natt+ — pluss Auto; natt har egne mørke toner eller viser dokumentet som trykt i den mørke rammen, en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
 • Siderotasjon, tosiders oppslag og fullskjerms presentasjonsmodus
 • Innholdsfortegnelse, miniatyrer og bokmerker
 • Leseposisjon og nylige filer huskes; fram/tilbake-navigasjon etter fulgte interne lenker
@@ -126,7 +126,7 @@ ANNOTERING
 
 SØK
 Begge modusene bor i én søkelinje, en fane fra hverandre.
-• Etter ord: skill store/små, helord, en treffliste med utdrag, og hvert treff markert på siden
+• Etter ord: skill store/små, helord, en treffliste med utdrag som kan slås sammen så den aldri dekker treffet, og hvert treff markert på siden
 • Etter mening: beskriv et tema med egne ord og få avsnittene som omtaler det, rangert (bruker assistentens nøkkel)
 
 AI-ASSISTENT (valgfri — egen nøkkel)

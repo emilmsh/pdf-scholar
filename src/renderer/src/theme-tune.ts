@@ -49,7 +49,11 @@ export const NIGHT_TONES: Record<NightTone, { bg: readonly [number, number, numb
   warm: { bg: [33, 33, 31] }, // #21211f — the shipped night paper
   gray: { bg: [30, 33, 39] }, // #1e2127 — cool neutral, the counterpart of warm
   blue: { bg: [24, 40, 70] }, // #182846
-  green: { bg: [24, 46, 32] } // #182e20
+  green: { bg: [24, 46, 32] }, // #182e20
+  // «Hvitt»: no inversion, no tint — the document as printed inside the dark
+  // chrome (a reader who keeps apps dark but documents white, 2026-10-04).
+  // The swatch IS the paper here; nothing is derived from this value.
+  paper: { bg: [255, 255, 255] }
 }
 
 /** What the page's inverted white paper (~#1c1c1c, see the night block's
@@ -57,13 +61,23 @@ export const NIGHT_TONES: Record<NightTone, { bg: readonly [number, number, numb
  *  the reader actually sees as paper. The chrome derives from THIS, not from
  *  the tone itself, so UI and page land in the same family by construction. */
 export function nightPaper(tone: NightTone): [number, number, number] {
+  if (safeNightTone(tone) === 'paper') return [255, 255, 255]
   const [r, g, b] = NIGHT_TONES[safeNightTone(tone)].bg
   const base = 28 / 255
   const screen = (c: number): number => channel(255 * (1 - (1 - base) * (1 - c / 255)))
   return [screen(r), screen(g), screen(b)]
 }
 
-export const NIGHT_TONE_ORDER: readonly NightTone[] = ['warm', 'gray', 'blue', 'green']
+export const NIGHT_TONE_ORDER: readonly NightTone[] = ['warm', 'gray', 'blue', 'green', 'paper']
+
+/** Whether the page raster is being inverted for the theme on screen — what
+ *  «Behold bildefarger» and the brightness slider act on. Night+ always
+ *  inverts; night inverts for every tone but 'paper', which leaves the
+ *  document as printed. Day and the light tones never invert. */
+export function isPageInverted(theme: ThemeName, nightTone: NightTone): boolean {
+  if (theme === 'nightHc') return true
+  return theme === 'night' && safeNightTone(nightTone) !== 'paper'
+}
 
 /** Non-finite or out-of-range input (a stale settings file, NaN from a broken
  *  merge) degrades to the shipped look, never to a broken filter string. */
@@ -122,6 +136,10 @@ export function sepiaTuneCss(t: number): PageTuneCss {
  *  is. Only that pair moves, and the canvas tone under the pages moves with
  *  the brightness so the paper never floats on a mismatched ground. */
 export function nightTuneCss(t: number, tone: NightTone = 'warm'): PageTuneCss {
+  // 'paper' ignores the strength entirely: there is no inversion to dial. No
+  // blend either — the night block sets none, so the root's 'normal' applies
+  // and the canvas paints its own white.
+  if (safeNightTone(tone) === 'paper') return { filter: 'none', bg: '#ffffff' }
   const brightness = 1.08 + 0.3 * (t - 1)
   const contrast = 1.02 + 0.1 * (t - 1)
   const k = brightness / 1.08
@@ -229,7 +247,9 @@ export function customChromeCss(tone: CustomTone): ChromeCss {
  *  titlebar = the paper, text pulled almost to white through the tone (the
  *  warm block's #eeece2 is exactly that shape). */
 export function nightChromeCss(tone: NightTone): ChromeCss | null {
-  if (safeNightTone(tone) === 'warm') return null
+  // 'paper' keeps the shipped dark chrome too: the point of the tone is a
+  // white page in the night UI, not a white UI
+  if (safeNightTone(tone) === 'warm' || safeNightTone(tone) === 'paper') return null
   // From the paper the reader SEES (the screen result), not the raw tone —
   // otherwise the UI ends up a deeper colour than the page it frames
   const [r, g, b] = nightPaper(tone)

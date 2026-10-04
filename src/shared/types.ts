@@ -18,8 +18,10 @@ export type CustomTone = 'sepia' | 'gray' | 'green' | 'blue' | 'sand'
 
 /** Dark paper tone of the night theme — 'warm' is the shipped near-black,
  *  the others tint the inverted page (curated in theme-tune.ts, same
- *  no-free-colour-input rule as CustomTone). */
-export type NightTone = 'warm' | 'gray' | 'blue' | 'green'
+ *  no-free-colour-input rule as CustomTone). 'paper' is the odd one out: the
+ *  page is NOT inverted at all — white paper as printed under the dark chrome,
+ *  the way Edge's dark mode shows a PDF (reader ask, 2026-10-04). */
+export type NightTone = 'warm' | 'gray' | 'blue' | 'green' | 'paper'
 
 /** Per-theme intensity relative to the shipped look, 1 = exactly as shipped.
  *  Only the themes with an axis worth dialling are here: sepia (paper warmth),
@@ -49,6 +51,12 @@ export interface Settings {
   /** Night/Night+: keep raster images in their original colours (an unfiltered
    *  overlay over the picture regions) instead of inverting them with the page */
   nightKeepImages: boolean
+  /** When the menu at a text selection opens: 'auto' right after the
+   *  selection is made (the shipped behaviour), 'contextMenu' only on a
+   *  right-click — or a long-press — on the selection. A reader who selects
+   *  text to read along, not to mark it, asked for the quiet (2026-10-04);
+   *  the right-click has always opened the same menu, so nothing is lost. */
+  selectionMenuTrigger: 'auto' | 'contextMenu'
   keepAwake: boolean
   language: LanguagePreference
   /** Name written into new annotations' author field (/T) — the standard PDF

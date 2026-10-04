@@ -154,7 +154,8 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
   fit-width and whole-page (W)
 - Four reading modes — Day, Tint, Night and Night+ — plus Auto, which follows the
   system's light/dark setting. Tint is a light paper tone: the classic Sepia cream, or
-  gray, green, blue or sand; Night has its own dark tones. The tinted modes take a
+  gray, green, blue or sand; Night has its own dark tones, or «White» — the document as
+  printed, a white page inside the dark chrome. The tinted modes take a
   strength slider — tint strength for the light tones, brightness for Night; 100 % is
   the standard look — and the toolbar and panels follow the chosen tone. D cycles the
   modes
@@ -272,10 +273,13 @@ panel beside the document.
 Both modes live in one search bar, a tab apart.
 
 - By words (Ctrl+F): match case, whole word, a results list with excerpts, and F3 /
-  Shift+F3 between hits. Every match on the page is marked while you search
+  Shift+F3 between hits. Every match on the page is marked while you search. The list
+  opens folded, so the bar never covers the hit it points at; unfold it and the choice
+  is remembered
 - By meaning: describe a topic in your own words and get the passages that discuss it,
   ranked (uses the assistant's key)
-- The selection menu also offers copy, web search, dictionary and translation
+- The selection menu also offers copy, web search, dictionary and translation. It can be
+  set to wait for a right-click instead of opening on its own
 
 ### An assistant that cites its sources
 
