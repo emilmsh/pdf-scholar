@@ -363,10 +363,9 @@ const nb = {
   'margin.prevComment': 'Forrige kommentar',
   'margin.nextComment': 'Neste kommentar',
   'settings.selectionMenu': 'Meny ved tekstmarkering',
-  'settings.selectionMenuAuto': 'Vises automatisk',
-  'settings.selectionMenuAutoHint': 'Rett etter at teksten er merket',
-  'settings.selectionMenuContext': 'Bare ved høyreklikk',
-  'settings.selectionMenuContextHint': 'Merk teksten, høyreklikk (eller hold inne) for menyen',
+  'settings.selectionMenuAuto': 'Vis automatisk',
+  'settings.selectionMenuAutoTip':
+    'På: menyen åpner rett etter at teksten er merket. Av: merk teksten, så høyreklikk (eller hold inne) for menyen.',
   'settings.selectionMenuCompact': 'Kompakt meny',
   'settings.selectionMenuCompactTip':
     'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
@@ -1350,10 +1349,9 @@ const en: Dict = {
   'margin.prevComment': 'Previous comment',
   'margin.nextComment': 'Next comment',
   'settings.selectionMenu': 'Menu on text selection',
-  'settings.selectionMenuAuto': 'Opens automatically',
-  'settings.selectionMenuAutoHint': 'Right after the text is selected',
-  'settings.selectionMenuContext': 'Right-click only',
-  'settings.selectionMenuContextHint': 'Select the text, then right-click (or long-press) for the menu',
+  'settings.selectionMenuAuto': 'Show automatically',
+  'settings.selectionMenuAutoTip':
+    'On: the menu opens right after the text is selected. Off: select the text, then right-click (or long-press) for the menu.',
   'settings.selectionMenuCompact': 'Compact menu',
   'settings.selectionMenuCompactTip':
     'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',

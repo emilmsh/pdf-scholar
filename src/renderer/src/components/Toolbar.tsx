@@ -2384,29 +2384,22 @@ export default function Toolbar({
 
               <div className="theme-menu-sep" />
 
-              {/* When the menu at a text selection opens. Default: right after
-                  the selection, as it always has. «Bare ved høyreklikk» is for
-                  a reader who selects to read along and found the menu in the
-                  way (2026-10-04); the right-click — long-press on touch — has
-                  always opened the same menu, so nothing is lost, only moved. */}
+              {/* The menu at a text selection — two independent toggles, the
+                  same shape (Emil, 2026-10-04): WHEN it opens and HOW MUCH it
+                  covers. Off, the menu waits for a right-click (long-press on
+                  touch), which has always opened the same menu — for a reader
+                  who selects text to follow along, not to mark it. */}
               <div className="theme-menu-label">{t('settings.selectionMenu')}</div>
-              <div className="scope-options">
-                {(['auto', 'contextMenu'] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    className={`scope-option${settings.selectionMenuTrigger === mode ? ' selected' : ''}`}
-                    onClick={() => onSettingsChange({ selectionMenuTrigger: mode })}
-                  >
-                    <strong>
-                      {t(mode === 'auto' ? 'settings.selectionMenuAuto' : 'settings.selectionMenuContext')}
-                    </strong>
-                    <span>
-                      {t(mode === 'auto' ? 'settings.selectionMenuAutoHint' : 'settings.selectionMenuContextHint')}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {/* How MUCH the menu covers, independent of when it opens */}
+              <label className="theme-menu-toggle" title={t('settings.selectionMenuAutoTip')}>
+                <input
+                  type="checkbox"
+                  checked={settings.selectionMenuTrigger === 'auto'}
+                  onChange={(e) =>
+                    onSettingsChange({ selectionMenuTrigger: e.target.checked ? 'auto' : 'contextMenu' })
+                  }
+                />
+                {t('settings.selectionMenuAuto')}
+              </label>
               <label className="theme-menu-toggle" title={t('settings.selectionMenuCompactTip')}>
                 <input
                   type="checkbox"

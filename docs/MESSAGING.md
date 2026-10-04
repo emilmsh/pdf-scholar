@@ -248,10 +248,13 @@ margen som synlig tekst ved siden av siden, og en eksport lager en kopi med
 kommentarene satt i en utvidet marg.
 
 - The toolbar carries the same tools, and can be unpinned entirely
-- The menu at the selection can be set to wait for a right-click instead of
-  opening on its own — for a reader who selects text to follow along, not to
-  mark it *(reader ask, 2026-10-04)*. The right-click (a long-press on touch)
-  has always opened the same menu
+- The menu at the selection has two switches: it can wait for a right-click
+  instead of opening on its own — for a reader who selects text to follow
+  along, not to mark it *(reader ask, 2026-10-04)*; the right-click (a
+  long-press on touch) has always opened the same menu. And it has a compact
+  form: the same choices at a smaller scale, icons with their names on hover,
+  about a third of the height. Never fewer choices — which action matters is
+  the reader's call, not ours (Emil, 2026-10-04)
 - Highlight, underline, strikeout and squiggly; pen and marker with
   hold-to-straighten; shapes, sticky notes, free text, and text-anchored
   comments

@@ -279,7 +279,8 @@ Both modes live in one search bar, a tab apart.
 - By meaning: describe a topic in your own words and get the passages that discuss it,
   ranked (uses the assistant's key)
 - The selection menu also offers copy, web search, dictionary and translation. It can be
-  set to wait for a right-click instead of opening on its own
+  set to wait for a right-click instead of opening on its own, and has a compact form with
+  the same choices at a third of the height
 
 ### An assistant that cites its sources
 
