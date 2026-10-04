@@ -88,6 +88,16 @@ appImage:
 # where the legacy FUSE2 runtime no longer works out of the box)
 toolsets:
   appimage: '1.0.3'
+# The FILE icon is not the app icon (issue #26: the logo on every .pdf in a
+# folder read as branding, not as a file type). electron-builder picks
+# build/pdf.ico (NSIS: installed to resources\pdf.ico and written as the
+# ProgId's DefaultIcon) and build/pdf.icns (macOS document type) up BY NAME —
+# `<ext>.ico` / `<ext>.icns` — so no `icon:` field is needed here. Both come
+# from scripts/pdf-document.svg via `npm run icons:app`. The MSIX manifest has
+# no per-file-type logo through electron-builder (its FileTypeAssociation
+# block carries none), so the Store build keeps the app icon on files —
+# listed in docs/PLATFORMS.md. The ProgId is `name` below: a custom icon from
+# inside the app rewrites HKCU\Software\Classes\PDF-dokument\DefaultIcon.
 fileAssociations:
   - ext: pdf
     name: PDF-dokument

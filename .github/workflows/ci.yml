@@ -116,6 +116,12 @@ jobs:
       # disguise one), the inherited Mark of the Web, and that pdf.js lists both
       # kinds and reads their bytes back — also from a re-opened document
       - run: npm run test:attachments
+      # The .pdf file icon (issue #26): the ProgId the app rewrites is the one
+      # the installer registers, the DefaultIcon value per choice, and that
+      # build/pdf.ico + pdf.icns are real containers at Explorer's sizes —
+      # electron-builder picks them up BY NAME, so a misnamed file silently
+      # falls back to the app logo
+      - run: npm run test:file-icon
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml
