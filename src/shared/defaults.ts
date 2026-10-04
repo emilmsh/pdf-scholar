@@ -25,6 +25,8 @@ export const DEFAULT_SETTINGS: Settings = {
   nightKeepImages: false,
   selectionMenuTrigger: 'auto',
   selectionMenuCompact: false,
+  fileIcon: 'document',
+  fileIconPath: '',
   keepAwake: false,
   language: 'auto',
   annotAuthor: '',

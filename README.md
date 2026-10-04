@@ -152,6 +152,8 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
 
 - Smooth scrolling; zoom centres on the cursor or pinch point; one button toggles
   fit-width and whole-page (W)
+- On Windows, PDF files get a document icon of their own in Explorer rather than the
+  app logo; the settings menu can swap it for the logo or for any .ico of yours
 - Four reading modes — Day, Tint, Night and Night+ — plus Auto, which follows the
   system's light/dark setting. Tint is a light paper tone: the classic Sepia cream, or
   gray, green, blue or sand; Night has its own dark tones, or «White» — the document as

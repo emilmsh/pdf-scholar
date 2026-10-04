@@ -510,6 +510,25 @@ regressions are treated as bugs, not as acceptable platform lag.
     preview downloads the files one by one. Covered by `npm run test:attachments`
     (rules + reading) and `npm run test:attachments-desktop` (main's handlers).
 
+27. **The .pdf FILE icon is the desktop's, and changeable on Windows installs
+    only.** Issue #26: with PDF Scholar as the default reader, every PDF in a
+    folder wore the app logo, which read as branding rather than a file type.
+    The installers now register a document icon of their own
+    (`scripts/pdf-document.svg` → `build/pdf.ico` for NSIS, `build/pdf.icns`
+    for the macOS document type; electron-builder picks both up by name). The
+    gear menu's «Filikon i Utforsker» — document / app logo / an .ico of your
+    own — rewrites the ProgId's `DefaultIcon` under `HKCU\Software\Classes`
+    (`src/main/file-icon.ts`, via `reg.exe`, refreshed with `ie4uinit -show`)
+    and is re-applied at startup because every upgrade rewrites it. The row is
+    absent where the key is not ours to write: the **portable zip** registers
+    no association; the **Store/MSIX** build's associations are virtualized
+    and, since electron-builder's manifest carries no per-file-type logo, that
+    build keeps the app icon on files until a custom manifest extension is
+    verified; **macOS** document icons live inside the bundle (the shipped
+    `.icns` applies, nothing to change at runtime); **Linux** gets the
+    desktop's generic document icon (electron-builder: not supported); the
+    **extension** has no files. Covered by `npm run test:file-icon` (CI).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

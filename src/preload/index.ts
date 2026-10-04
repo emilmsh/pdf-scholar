@@ -139,6 +139,8 @@ const api: PdfxApi = {
   updateCheck: () => ipcRenderer.invoke('update:check'),
   updateDownload: () => ipcRenderer.send('update:download'),
   updateRestart: () => ipcRenderer.send('update:restart'),
+  fileIconSupported: () => ipcRenderer.invoke('file-icon:supported'),
+  setFileIcon: (choice) => ipcRenderer.invoke('file-icon:set', choice),
   aiGetConfig: () => ipcRenderer.invoke('ai:get-config'),
   aiSetConfig: (patch: Partial<AiConfig> & { keys?: Partial<Record<AiProviderId, string>> }) =>
     ipcRenderer.invoke('ai:set-config', patch),

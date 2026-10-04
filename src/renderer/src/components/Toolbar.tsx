@@ -14,6 +14,7 @@ import type {
   ZoteroInfo
 } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
+import { FILE_ICON_CHOICES, type FileIconChoice } from '../../../shared/file-icon'
 import { CITATION_STYLES } from '../../../shared/citation-style'
 import type { CitationStyleId } from '../../../shared/citation-style'
 import {
@@ -634,6 +635,19 @@ export default function Toolbar({
   const [updOutcome, setUpdOutcome] = useState<UpdateCheckOutcome | null>(null)
   // undefined until probed; 'store' hides the check (Store owns updates there)
   const [updSupport, setUpdSupport] = useState<UpdateUnsupportedReason | null | undefined>(undefined)
+  // The Explorer file icon: offered only where main says it can be changed
+  // (an installed Windows build); the note under it reports the outcome
+  const [fileIconOk, setFileIconOk] = useState<boolean | undefined>(undefined)
+  const [fileIconNote, setFileIconNote] = useState<string | null>(null)
+  const chooseFileIcon = async (choice: FileIconChoice): Promise<void> => {
+    const r = await bridge.setFileIcon(choice)
+    if (r.ok) {
+      onSettingsChange({ fileIcon: r.fileIcon, fileIconPath: r.fileIconPath })
+      setFileIconNote(t('settings.fileIconApplied'))
+    } else if (!r.cancelled) {
+      setFileIconNote(errorText({ error: r.error, code: r.code }))
+    }
+  }
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
@@ -774,7 +788,9 @@ export default function Toolbar({
   useEffect(() => {
     if (settingsMenuOpen && !appVersion) void bridge.getVersion().then(setAppVersion)
     if (settingsMenuOpen && updSupport === undefined) void bridge.updateSupport().then(setUpdSupport)
-  }, [settingsMenuOpen, appVersion, updSupport])
+    if (settingsMenuOpen && fileIconOk === undefined) void bridge.fileIconSupported().then(setFileIconOk)
+    if (!settingsMenuOpen) setFileIconNote(null)
+  }, [settingsMenuOpen, appVersion, updSupport, fileIconOk])
 
   const checkForUpdates = (): void => {
     if (updChecking) return
@@ -2408,6 +2424,52 @@ export default function Toolbar({
                 />
                 {t('settings.selectionMenuCompact')}
               </label>
+
+              {/* The icon Explorer puts on .pdf files (issue #26): the
+                  installer's document icon by default, the app logo, or the
+                  reader's own .ico. Only where main can actually write it —
+                  an installed Windows build — so the row is simply absent on
+                  macOS, Linux, the portable zip and the Store build. */}
+              {fileIconOk && (
+                <>
+                  <div className="theme-menu-sep" />
+                  <div className="theme-menu-label" title={t('settings.fileIconTip')}>
+                    {t('settings.fileIcon')}
+                  </div>
+                  <div className="scope-options">
+                    {FILE_ICON_CHOICES.map((choice) => {
+                      const label =
+                        choice === 'document'
+                          ? 'settings.fileIconDocument'
+                          : choice === 'app'
+                            ? 'settings.fileIconApp'
+                            : 'settings.fileIconCustom'
+                      const hint =
+                        choice === 'document'
+                          ? 'settings.fileIconDocumentHint'
+                          : choice === 'app'
+                            ? 'settings.fileIconAppHint'
+                            : 'settings.fileIconCustomHint'
+                      // The custom row names the kept file once there is one
+                      const ownName =
+                        choice === 'custom' && settings.fileIconPath
+                          ? settings.fileIconPath.split(/[\\/]/).pop()
+                          : null
+                      return (
+                        <button
+                          key={choice}
+                          className={`scope-option${settings.fileIcon === choice ? ' selected' : ''}`}
+                          onClick={() => void chooseFileIcon(choice)}
+                        >
+                          <strong>{t(label)}</strong>
+                          <span>{ownName ?? t(hint)}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {fileIconNote && <div className="menu-hint">{fileIconNote}</div>}
+                </>
+              )}
 
               <div className="theme-menu-sep" />
 

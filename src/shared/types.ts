@@ -1,6 +1,7 @@
 // Types shared between the Electron main process, preload bridge and renderer.
 import type { PdfStandardFont } from '@embedpdf/models'
 import type { CitationStyleId } from './citation-style'
+import type { FileIconChoice, FileIconErrorCode, FileIconResult } from './file-icon'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
  *  'custom' is the user-toned light mode (paper tone from `customTone`) */
@@ -63,6 +64,11 @@ export interface Settings {
    *  2026-10-04). Independent of the trigger above: it is about how much the
    *  menu covers, not when it opens. */
   selectionMenuCompact: boolean
+  /** The icon Explorer shows on .pdf files (Windows installs only — see
+   *  shared/file-icon.ts): the installer's document icon, the app logo, or
+   *  the reader's own .ico, whose kept copy is `fileIconPath`. */
+  fileIcon: FileIconChoice
+  fileIconPath: string
   keepAwake: boolean
   language: LanguagePreference
   /** Name written into new annotations' author field (/T) — the standard PDF
@@ -280,6 +286,7 @@ export interface FileError {
     | ZoteroErrorCode
     | DoiErrorCode
     | AttachmentErrorCode
+    | FileIconErrorCode
     | undefined
 }
 
@@ -1037,6 +1044,13 @@ export interface PdfxApi {
   updateDownload(): void
   /** Quit and install the downloaded update now (no-op when none is ready) */
   updateRestart(): void
+  // ---------- The .pdf file icon in Explorer (Windows installs) ----------
+  /** False everywhere but a packaged, installed Windows build — the only place
+   *  the ProgId the app would rewrite is the one Explorer reads */
+  fileIconSupported(): Promise<boolean>
+  /** Apply a choice; 'custom' opens the .ico picker in main. The result
+   *  carries the settings fields to adopt, or a named failure. */
+  setFileIcon(choice: FileIconChoice): Promise<FileIconResult>
   // ---------- AI ----------
   aiGetConfig(): Promise<AiConfigView>
   /** Patch config; `keys` entries are plaintext and encrypted at rest in main */

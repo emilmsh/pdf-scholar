@@ -73,6 +73,7 @@ import {
 import { initUpdater } from './updater'
 import { toLongPath } from './long-path'
 import { applyPortableUserData } from './portable'
+import { reapplyFileIconAtStartup, registerFileIconIpc } from './file-icon'
 import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
 import { doiCite } from './doi'
 import { citationStyleOrDefault } from '../shared/citation-style'
@@ -296,6 +297,9 @@ if (!gotLock) {
     registerIpc()
     initUpdater()
     applyKeepAwake(getState().settings.keepAwake)
+    // The installer rewrites the .pdf DefaultIcon on every upgrade — put a
+    // non-default choice back (compares first, so a quiet start stays quiet)
+    reapplyFileIconAtStartup()
     createWindow(firstPending)
     firstPending = null
 
@@ -891,6 +895,8 @@ function registerIpc(): void {
   ipcMain.handle('recents:get', () => getState().recents)
 
   ipcMain.handle('settings:get', () => getState().settings)
+
+  registerFileIconIpc(windowFor)
 
   ipcMain.handle('app:version', () => app.getVersion())
 

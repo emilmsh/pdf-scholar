@@ -12,6 +12,7 @@ import type {
   FileError,
   ZoteroErrorCode
 } from '../../shared/types'
+import type { FileIconErrorCode } from '../../shared/file-icon'
 
 export type Lang = 'nb' | 'en'
 /** User's choice — 'auto' follows the OS/browser language */
@@ -366,6 +367,19 @@ const nb = {
   'settings.selectionMenuAuto': 'Vis automatisk',
   'settings.selectionMenuAutoTip':
     'På: menyen åpner rett etter at teksten er merket. Av: merk teksten, så høyreklikk (eller hold inne) for menyen.',
+  'settings.fileIcon': 'Filikon i Utforsker',
+  'settings.fileIconTip':
+    'Ikonet Windows viser på PDF-filer når PDF Scholar åpner dem. Gjelder bare den installerte Windows-utgaven.',
+  'settings.fileIconDocument': 'Dokument',
+  'settings.fileIconDocumentHint': 'Et nøytralt ark med appens merke',
+  'settings.fileIconApp': 'App-logoen',
+  'settings.fileIconAppHint': 'Samme ikon som appen selv',
+  'settings.fileIconCustom': 'Eget ikon …',
+  'settings.fileIconCustomHint': 'Velg en .ico-fil; en kopi beholdes',
+  'settings.fileIconApplied': 'Utforsker kan trenge et øyeblikk — eller en ny innlogging — før ikonet skifter.',
+  'iconerr.file-icon-unavailable': 'Filikonet kan bare endres i den installerte Windows-utgaven.',
+  'iconerr.file-icon-not-ico': 'Bare .ico-filer kan brukes som filikon.',
+  'iconerr.file-icon-registry': 'Windows avviste endringen av filikonet.',
   'settings.selectionMenuCompact': 'Kompakt meny',
   'settings.selectionMenuCompactTip':
     'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
@@ -1355,6 +1369,19 @@ const en: Dict = {
   'settings.selectionMenuAuto': 'Show automatically',
   'settings.selectionMenuAutoTip':
     'On: the menu opens right after the text is selected. Off: select the text, then right-click (or long-press) for the menu.',
+  'settings.fileIcon': 'File icon in Explorer',
+  'settings.fileIconTip':
+    'The icon Windows shows on PDF files when PDF Scholar opens them. Installed Windows build only.',
+  'settings.fileIconDocument': 'Document',
+  'settings.fileIconDocumentHint': 'A neutral sheet with the app’s mark',
+  'settings.fileIconApp': 'App logo',
+  'settings.fileIconAppHint': 'The same icon as the app itself',
+  'settings.fileIconCustom': 'Your own icon …',
+  'settings.fileIconCustomHint': 'Pick an .ico file; a copy is kept',
+  'settings.fileIconApplied': 'Explorer may need a moment — or a new sign-in — before the icon changes.',
+  'iconerr.file-icon-unavailable': 'The file icon can only be changed in the installed Windows build.',
+  'iconerr.file-icon-not-ico': 'Only .ico files can be used as the file icon.',
+  'iconerr.file-icon-registry': 'Windows refused the file icon change.',
   'settings.selectionMenuCompact': 'Compact menu',
   'settings.selectionMenuCompactTip':
     'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',
@@ -2052,6 +2079,7 @@ export function errorText(e: FileError): string {
   if (isZoteroErrorCode(e.code)) return t(`zoterr.${e.code}`)
   if (isDoiErrorCode(e.code)) return t(`doierr.${e.code}`)
   if (isAttachmentErrorCode(e.code)) return t(`atterr.${e.code}`)
+  if (isFileIconErrorCode(e.code)) return t(`iconerr.${e.code}`)
   return t(`engine.${e.code}`)
 }
 
@@ -2090,6 +2118,10 @@ const isAttachmentErrorCode = (
 
 const isAiErrorCode = (code: NonNullable<FileError['code']>): code is AiErrorCode =>
   code.startsWith('ai-')
+
+const isFileIconErrorCode = (
+  code: NonNullable<FileError['code']>
+): code is FileIconErrorCode => code.startsWith('file-icon-')
 
 const isExtensionErrorCode = (
   code: NonNullable<FileError['code']>

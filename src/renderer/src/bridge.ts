@@ -235,6 +235,13 @@ export const webApi: PdfxApi = {
   updateCheck: async () => ({ status: 'unsupported' as const, current: '', reason: 'dev' as const }),
   updateDownload: () => {},
   updateRestart: () => {},
+  // The Explorer file icon is a Windows-install concern; the browser has no files
+  fileIconSupported: async () => false,
+  setFileIcon: async () => ({
+    ok: false as const,
+    code: 'file-icon-unavailable' as const,
+    error: 'no file association in the browser'
+  }),
   // AI in the browser preview: only the offline mock provider is available,
   // so the chat UI (streaming, citation chips, jump+highlight) can be tested.
   aiGetConfig: async () => ({
