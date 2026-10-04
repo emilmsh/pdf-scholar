@@ -2928,14 +2928,16 @@ html.pen-near .draw-layer {
   cursor: default;
 }
 
-/* Fold/unfold the results list: the chevron points down at a folded list
-   (there is more below) and turns up once it is open */
-.search-list-toggle svg {
-  transition: transform 0.14s ease;
+/* Fold/unfold the results list — a list glyph (never a chevron: beside ↑ ↓
+   it read as a step arrow), tinted like the field's own Aa / |ab| toggles
+   while the list is open */
+.search-list-toggle {
+  color: var(--text-secondary);
 }
 
-.search-list-toggle.is-open svg {
-  transform: rotate(180deg);
+.search-list-toggle.is-open {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
 }
 
 .search-results {

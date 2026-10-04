@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
 import { clearSearchHistory, loadSearchHistory } from '../search-history'
 import { loadSearchListOpen, saveSearchListOpen } from '../search-list-pref'
-import { IconChevronDown } from './icons'
+import { IconList } from './icons'
 import { t, useLang } from '../i18n'
 import { bubblesWhileTyping, withShortcut } from '../keymap'
 
@@ -93,17 +93,17 @@ export default function SearchBar({
    *  the useful list, and a dropdown over them would be in the way. */
   const historyVisible = !isAi && historyOpen && query.trim() === '' && history.length > 0
 
-  // The results list folds away to one row (the default — the open list
+  // The TEXT results list folds away to one row (the default — the open list
   // covered the hit it pointed at); unfolding is remembered across sessions.
-  // One toggle for both modes: what the text search presents, the AI search
-  // presents (the parity rule the whole bar follows).
+  // The AI list never folds: it has no ↑ ↓ to step with, so the rows ARE the
+  // only way to reach a hit (Emil, 2026-10-04).
   const [listOpen, setListOpen] = useState(loadSearchListOpen)
   const toggleList = (): void =>
     setListOpen((open) => {
       saveSearchListOpen(!open)
       return !open
     })
-  const hasList = isAi ? aiHits.length > 0 : matches.length > 0
+  const hasList = !isAi && matches.length > 0
 
   // Draggable by the grip at its left end (Emil, 2026-10-04: folded or not,
   // the bar can still sit over the one thing you need to see). The bar keeps
@@ -333,7 +333,9 @@ export default function SearchBar({
             {aiModelName}
           </span>
         )}
-        <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
+        {/* The fold toggle sits right after the field, away from ↑ ↓: a
+            chevron next to the step arrows read as a third arrow (Emil,
+            2026-10-04), so it is a list glyph, lit while the list is open */}
         {hasList && (
           <button
             className={`tb-btn search-list-toggle${listOpen ? ' is-open' : ''}`}
@@ -341,9 +343,10 @@ export default function SearchBar({
             title={t(listOpen ? 'search.listHide' : 'search.listShow')}
             aria-expanded={listOpen}
           >
-            <IconChevronDown size={14} />
+            <IconList size={15} />
           </button>
         )}
+        <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
         {!isAi && (
           <>
             <button className="tb-btn" onClick={onPrev} disabled={count === 0} title={withShortcut(t('search.prevTip'), 'search.prev')}>
@@ -445,7 +448,7 @@ export default function SearchBar({
       {/* With hits the note is the excerpt disclaimer (huge documents are
           searched via a page excerpt); with none it is the model's answer */}
       {isAi && aiStatus === 'done' && aiNote && <div className="search-ai-note">{aiNote}</div>}
-      {isAi && aiHits.length > 0 && listOpen && (
+      {isAi && aiHits.length > 0 && (
         <div className="search-results" ref={listRef}>
           {aiHits.map((h, i) => (
             <button

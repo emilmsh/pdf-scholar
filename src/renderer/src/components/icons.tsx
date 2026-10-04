@@ -155,6 +155,16 @@ export const IconPanelRight = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** A results list: three rows with a short bullet each — read as "the list",
+ *  never as a direction, which is why the find bar's fold toggle uses it and
+ *  not a chevron (a chevron beside ↑ ↓ read as a third step arrow). */
+export const IconList = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <path d="M9 6.5h11M9 12h11M9 17.5h11" />
+    <path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01" strokeWidth="2.6" />
+  </Svg>
+)
+
 export const IconSidebar = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="3" y="4" width="18" height="16" rx="2" />

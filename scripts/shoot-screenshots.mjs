@@ -797,9 +797,7 @@ const ui = {
     await settle(200);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     for (let i = 0; i < 120; i++) {
-      // Same folded-by-default list as the text tab — unfold once hits land
-      const fold = document.querySelector('.search-list-toggle:not(.is-open)');
-      if (fold) { click(fold); await settle(150); }
+      // The AI list never folds (no ↑ ↓ to step with) — nothing to unfold here
       if (document.querySelector('.search-results .search-result')) break;
       await settle(500);
     }
