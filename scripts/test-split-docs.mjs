@@ -322,8 +322,9 @@ try {
   // The menus first (Emil, 2026-09-03: with the selection and right-click menus
   // staying home, the column read as a preview). A selection raises the
   // selection menu without the AI section — those actions ask about the TAB's
-  // document — and a right-click raises the point menu with the note action
-  // alone (snip-to-explain is AI too). Both close on a click in the column.
+  // document — and a right-click raises the point menu with the note and the
+  // image grab, which renders from the page under the pointer (snip-to-explain
+  // is AI too, so it stays home). Both close on a click in the column.
   const menus = await evalIn(W, `
     const pages = ui.activeView().querySelector('.pages[data-pane="b"]');
     const box = pages.getBoundingClientRect();
@@ -355,13 +356,20 @@ try {
     page.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2, clientX: Math.round(pr.left + pr.width / 2), clientY: Math.round(pr.top + 10) }));
     await ui.settle(500);
     const pointMenu = document.querySelector('.selection-menu');
-    const point = { shown: !!pointMenu, items: pointMenu ? pointMenu.querySelectorAll('.menu-item').length : 0 };
+    const point = {
+      shown: !!pointMenu,
+      items: pointMenu ? [...pointMenu.querySelectorAll('.menu-item')].map((b) => (b.textContent || '').trim()) : []
+    };
     await dismiss();
     return { selection, point, gone: !document.querySelector('.selection-menu') };
   `)
   check('a text selection in the foreign column raises the selection menu', menus.selection.shown, JSON.stringify(menus.selection))
   check('…with the markup actions and without the AI section', menus.selection.items > 0 && !menus.selection.ai, JSON.stringify(menus.selection))
-  check('a right-click in the foreign column raises the point menu, note alone', menus.point.shown && menus.point.items === 1, JSON.stringify(menus.point))
+  check(
+    'a right-click in the foreign column raises the point menu: note and image grab, no AI item',
+    menus.point.shown && JSON.stringify(menus.point.items) === JSON.stringify(['Nytt notat her', 'Kopier bilde …']),
+    JSON.stringify(menus.point)
+  )
   check('both menus dismiss on a click in the column', menus.gone)
 
   // …then a markup made there lands in B's draft, not A's
