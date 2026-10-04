@@ -24,6 +24,7 @@ import {
   IconMarkupSquiggly,
   IconMarkupStrikeout,
   IconMarkupUnderline,
+  IconMore,
   IconNote,
   IconSparkle,
   IconTally,
@@ -238,11 +239,17 @@ interface MenuProps {
 export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: MenuProps): React.JSX.Element {
   useLang()
   const isSelection = menu.mode === 'selection'
-  // Compact: the assistant chips unfold under the ✦ IN PLACE — the bubble
+  // Compact: the assistant chips unfold under the ✦, and «⋯» swaps in the
+  // full panel for THIS menu only (Emil, 2026-10-04 — the setting is the
+  // habit, the dots are the exception). Both happen IN PLACE: the bubble
   // grows, nothing moves first (one layout change per gesture). A new menu
-  // starts folded again.
+  // starts compact and folded again.
   const [aiOpen, setAiOpen] = useState(false)
-  useEffect(() => setAiOpen(false), [menu])
+  const [expanded, setExpanded] = useState(false)
+  useEffect(() => {
+    setAiOpen(false)
+    setExpanded(false)
+  }, [menu])
   // Draggable, like the note and comment bubbles: this menu is the tallest
   // popup in the app, and a reader who wants to see what is under it should be
   // able to pull it aside rather than close it and lose the selection.
@@ -253,7 +260,7 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
   // nothing about how it opens changes; only the drag is new.
   // Growing in place (the ✦ chips, the word count) re-clamps to the viewport:
   // the taller bubble must not run off the bottom edge where it fitted before.
-  const { ref, style, handleProps } = useDraggable<HTMLDivElement>(menu.x, menu.y, [aiOpen], {
+  const { ref, style, handleProps } = useDraggable<HTMLDivElement>(menu.x, menu.y, [aiOpen, expanded], {
     top: menu.y,
     bottom: menu.y,
     left: menu.x
@@ -366,7 +373,7 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
     </>
   )
 
-  if (compact && isSelection) {
+  if (compact && isSelection && !expanded) {
     return (
       <div
         className="selection-menu is-compact"
@@ -425,6 +432,10 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
               </button>
             </>
           )}
+          <span className="compact-sep" />
+          <button className="compact-btn" title={t('menu.more')} onClick={() => setExpanded(true)}>
+            <IconMore size={16} />
+          </button>
         </div>
         {showCount && <SelectionCount text={selText} />}
         {aiOpen && showAi && <div className="compact-ai">{aiGrid}</div>}

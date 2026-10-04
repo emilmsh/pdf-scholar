@@ -315,8 +315,9 @@ that.)*
 - By words: match case, whole word, a results list with excerpts, and every
   match marked on the page. The list opens folded, so the bar never covers the
   hit it points at; unfold it and the choice is remembered. A hit is scrolled
-  clear of the bar whatever its height *(reader ask, 2026-10-04 — the open
-  list sat over the active hit in a split view)*
+  clear of the bar whatever its height, and the bar itself can be dragged
+  aside *(reader ask, 2026-10-04 — the open list sat over the active hit in a
+  split view)*
 - By meaning: describe a topic in your own words and get the passages that
   discuss it, ranked. This mode uses the assistant's key
 

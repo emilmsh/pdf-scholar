@@ -2783,6 +2783,41 @@ html.pen-near .draw-layer {
   gap: 4px;
 }
 
+/* Drag handle at the bar's left end — the same quiet pill as .menu-grip,
+   turned vertical to fit the row; the strip is wide enough for a finger */
+.search-grip {
+  position: relative;
+  flex-shrink: 0;
+  width: 12px;
+  height: 28px;
+  margin-right: 1px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.search-grip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.16;
+  transition: opacity 0.12s ease;
+}
+
+.search-bar:hover .search-grip::after,
+.search-grip:hover::after {
+  opacity: 0.45;
+}
+
+.search-grip:active {
+  cursor: grabbing;
+}
+
 /* Text | AI mode toggle */
 .search-mode {
   display: inline-flex;

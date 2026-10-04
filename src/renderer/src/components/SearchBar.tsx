@@ -1,10 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { SearchMatch, SearchOptions } from '../search'
 import { clearSearchHistory, loadSearchHistory } from '../search-history'
 import { loadSearchListOpen, saveSearchListOpen } from '../search-list-pref'
 import { IconChevronDown } from './icons'
 import { t, useLang } from '../i18n'
 import { bubblesWhileTyping, withShortcut } from '../keymap'
+
+/** Where the reader last dragged the bar, as an offset from its home in the
+ *  top-right corner — kept for the SESSION (a module variable, not storage):
+ *  a position measured against one window size is wrong in the next one, but
+ *  within a sitting the bar should stay where it was put when it reopens. */
+let barOffset = { dx: 0, dy: 0 }
 
 export interface SemanticHitView {
   label: string
@@ -99,6 +105,66 @@ export default function SearchBar({
     })
   const hasList = isAi ? aiHits.length > 0 : matches.length > 0
 
+  // Draggable by the grip at its left end (Emil, 2026-10-04: folded or not,
+  // the bar can still sit over the one thing you need to see). The bar keeps
+  // its CSS home (absolute, top-right of the viewer) and moves by a translate,
+  // clamped so it never leaves the viewer — not the window: the assistant
+  // panel beside the pages is not somewhere to park a search bar. gotoMatch
+  // measures the bar live, so hits land clear of it wherever it is.
+  const barRef = useRef<HTMLDivElement>(null)
+  const [offset, setOffset] = useState(barOffset)
+  const dragRef = useRef<{ x: number; y: number; dx: number; dy: number } | null>(null)
+  const clampOffset = (dx: number, dy: number): { dx: number; dy: number } => {
+    const el = barRef.current
+    const host = el?.parentElement
+    if (!el || !host) return { dx, dy }
+    const h = host.getBoundingClientRect()
+    // The bar's HOME rect from its offset geometry, which ignores the
+    // translate it carries (reading the client rect and subtracting the
+    // offset would trust the translate to have been applied already)
+    const home = {
+      left: h.left + el.offsetLeft,
+      top: h.top + el.offsetTop,
+      right: h.left + el.offsetLeft + el.offsetWidth,
+      bottom: h.top + el.offsetTop + el.offsetHeight
+    }
+    const m = 8
+    return {
+      dx: Math.max(h.left + m - home.left, Math.min(dx, h.right - m - home.right)),
+      dy: Math.max(h.top + m - home.top, Math.min(dy, h.bottom - m - home.bottom))
+    }
+  }
+  // A remembered offset from a wider window is pulled back inside this one
+  useLayoutEffect(() => {
+    const c = clampOffset(offset.dx, offset.dy)
+    if (c.dx !== offset.dx || c.dy !== offset.dy) {
+      barOffset = c
+      setOffset(c)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const gripProps = {
+    onPointerDown: (e: React.PointerEvent): void => {
+      dragRef.current = { x: e.clientX, y: e.clientY, dx: offset.dx, dy: offset.dy }
+      try {
+        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      } catch {
+        /* synthetic events have no active pointer to capture */
+      }
+      e.preventDefault()
+    },
+    onPointerMove: (e: React.PointerEvent): void => {
+      const d = dragRef.current
+      if (!d) return
+      const next = clampOffset(d.dx + e.clientX - d.x, d.dy + e.clientY - d.y)
+      barOffset = next
+      setOffset(next)
+    },
+    onPointerUp: (): void => {
+      dragRef.current = null
+    }
+  }
+
   const pickHistory = (q: string): void => {
     setHistoryOpen(false)
     setHistoryIndex(-1)
@@ -142,8 +208,16 @@ export default function SearchBar({
             : ''
 
   return (
-    <div className="search-bar" onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="search-bar"
+      ref={barRef}
+      // The `translate` property, not `transform`: the bar's entrance
+      // animation owns transform, and the two compose instead of competing
+      style={offset.dx || offset.dy ? { translate: `${offset.dx}px ${offset.dy}px` } : undefined}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <div className="search-row">
+        <span className="search-grip" title={t('search.dragTip')} {...gripProps} />
         <div className="search-mode" role="tablist">
           <button
             className={`search-mode-btn${!isAi ? ' is-active' : ''}`}

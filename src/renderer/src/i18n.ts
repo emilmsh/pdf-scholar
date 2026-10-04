@@ -529,6 +529,7 @@ const nb = {
   'menu.snip': 'Forklar område …',
   'menu.snipTip': 'Dra en firkant rundt en figur eller tabell – assistenten forklarer den',
   'menu.dragTip': 'Dra menyen dit den ikke er i veien',
+  'menu.more': 'Hele menyen (bare nå)',
   'snip.hint': 'Dra en firkant rundt området som skal forklares · Esc avbryter',
   // «Kopier bilde»: den samme markeringsrammen som snip, men rettet mot
   // utklippstavla og disken i stedet for assistenten.
@@ -634,6 +635,7 @@ const nb = {
   'search.aiOpenSettings': 'Åpne KI-innstillinger',
   'search.searchError': 'KI-søket feilet',
   'search.historyClear': 'Tøm søkehistorikk',
+  'search.dragTip': 'Dra søkefeltet dit det ikke er i veien',
   'search.listShow': 'Vis treffliste',
   'search.listHide': 'Skjul treffliste',
   'search.aiNoText': 'Dokumentet har ingen tekst å søke i (skannet)',
@@ -1509,6 +1511,7 @@ const en: Dict = {
   'menu.snip': 'Explain area …',
   'menu.snipTip': 'Drag a box around a figure or table — the assistant explains it',
   'menu.dragTip': 'Drag the menu out of the way',
+  'menu.more': 'Full menu (this time)',
   'snip.hint': 'Drag a box around the area to explain · Esc cancels',
   'menu.grabImage': 'Copy image …',
   'menu.grabImageTip':
@@ -1603,6 +1606,7 @@ const en: Dict = {
   'search.aiOpenSettings': 'Open AI settings',
   'search.searchError': 'AI search failed',
   'search.historyClear': 'Clear search history',
+  'search.dragTip': 'Drag the search bar out of the way',
   'search.listShow': 'Show results list',
   'search.listHide': 'Hide results list',
   'search.aiNoText': 'This document has no text to search (scanned)',
