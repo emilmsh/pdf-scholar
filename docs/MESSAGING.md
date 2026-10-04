@@ -319,7 +319,9 @@ that.)*
   aside *(reader ask, 2026-10-04 — the open list sat over the active hit in a
   split view)*
 - By meaning: describe a topic in your own words and get the passages that
-  discuss it, ranked. This mode uses the assistant's key
+  discuss it, ranked — stepped through with the same arrows as word hits,
+  with the list kept open, since these are passages rather than exact
+  matches. This mode uses the assistant's key
 
 ### 5. The assistant
 

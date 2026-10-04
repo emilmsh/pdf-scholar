@@ -6278,13 +6278,22 @@ export default function PdfViewer({
     [semantic.hits]
   )
 
+  // ↑ ↓ / F3 step whichever list the bar is showing: the exact matches, or
+  // the AI search's ranked passages (Emil, 2026-10-04 — the list stays open
+  // there because the hits are not word matches, but stepping is good anyway)
   const searchStep = useCallback(
     (delta: number) => {
+      if (searchMode === 'ai') {
+        const n = semantic.hits.length
+        if (n === 0) return
+        pickSemanticHit((semantic.index + delta + n) % n)
+        return
+      }
       if (searchMatches.length === 0) return
       const next = (searchIndex + delta + searchMatches.length) % searchMatches.length
       void gotoMatch(searchMatches, next, false)
     },
-    [searchMatches, searchIndex, gotoMatch]
+    [searchMode, semantic.hits.length, semantic.index, pickSemanticHit, searchMatches, searchIndex, gotoMatch]
   )
 
   // ---------- Read aloud ----------

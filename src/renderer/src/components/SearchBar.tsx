@@ -215,7 +215,9 @@ export default function SearchBar({
       ? t('search.aiSearching')
       : aiStatus === 'done'
         ? aiHits.length > 0
-          ? t('search.aiHits', { count: aiHits.length })
+          ? aiIndex >= 0
+            ? t('search.count', { index: aiIndex + 1, count: aiHits.length })
+            : t('search.aiHits', { count: aiHits.length })
           : t('search.aiNoHits')
         : aiStatus === 'error'
           ? t('search.searchError')
@@ -347,16 +349,23 @@ export default function SearchBar({
           </button>
         )}
         <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
-        {!isAi && (
-          <>
-            <button className="tb-btn" onClick={onPrev} disabled={count === 0} title={withShortcut(t('search.prevTip'), 'search.prev')}>
-              ↑
-            </button>
-            <button className="tb-btn" onClick={onNext} disabled={count === 0} title={t('search.nextTip')}>
-              ↓
-            </button>
-          </>
-        )}
+        {/* ↑ ↓ step whichever list is showing — the AI passages too */}
+        <button
+          className="tb-btn"
+          onClick={onPrev}
+          disabled={isAi ? aiHits.length === 0 : count === 0}
+          title={withShortcut(t('search.prevTip'), 'search.prev')}
+        >
+          ↑
+        </button>
+        <button
+          className="tb-btn"
+          onClick={onNext}
+          disabled={isAi ? aiHits.length === 0 : count === 0}
+          title={isAi ? withShortcut(t('search.nextTipAi'), 'search.next') : t('search.nextTip')}
+        >
+          ↓
+        </button>
         {isAi && aiStatus !== 'running' && (
           <button className="tb-btn" onClick={() => onAiSearch()} disabled={query.trim() === ''} title={t('search.modeAiTip')}>
             ✦
