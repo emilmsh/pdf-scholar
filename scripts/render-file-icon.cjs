@@ -32,15 +32,21 @@ const BUILD = path.join(__dirname, '..', 'build')
 const VARIANT_DIR = path.join(BUILD, 'file-icons')
 const PREVIEW_DIR = path.join(__dirname, '..', 'src', 'renderer', 'src', 'assets', 'file-icons')
 
-/** The three variants — ids are the FileIconChoice values in
- *  src/shared/file-icon.ts (test:file-icon pins the two lists together). The
- *  colours are the SVG's three variables. */
+/** The six variants — ids are the FileIconChoice values in
+ *  src/shared/file-icon.ts (test:file-icon pins the two lists together). Three
+ *  colourings, each with the S badge and without (`-plain`, where the third
+ *  text line runs full length instead). The values are the SVG's variables. */
 const RED = '#d9463e'
-const VARIANTS = [
+const GREY = { foldEdge: '#b9bec6', fold: '#dfe7ea' }
+const COLOURINGS = [
   { id: 'document', foldEdge: RED, fold: RED, line: RED }, // the default: red fold + red lines
-  { id: 'document-lines', foldEdge: '#b9bec6', fold: '#dfe7ea', line: RED }, // grey fold, red lines
-  { id: 'document-quiet', foldEdge: '#b9bec6', fold: '#dfe7ea', line: '#c3c8cf' } // all grey
+  { id: 'document-lines', ...GREY, line: RED }, // grey fold, red lines
+  { id: 'document-quiet', ...GREY, line: '#c3c8cf' } // all grey
 ]
+const VARIANTS = COLOURINGS.flatMap((c) => [
+  { ...c, badge: true },
+  { ...c, id: `${c.id}-plain`, badge: false }
+])
 
 /** Every size either container wants. 16/32/48 are what Explorer actually
  *  draws in list and tile views; 256 is its large-icon view; the ICNS set
@@ -67,8 +73,15 @@ async function openPage() {
 }
 
 async function setVariant(v) {
+  const vars = {
+    '--fold-edge': v.foldEdge,
+    '--fold': v.fold,
+    '--line': v.line,
+    '--badge': v.badge ? 'visible' : 'hidden',
+    '--line3': v.badge ? '56px' : '232px'
+  }
   await win.webContents.executeJavaScript(
-    `(() => { const s = document.querySelector('svg'); s.style.setProperty('--fold-edge', ${JSON.stringify(v.foldEdge)}); s.style.setProperty('--fold', ${JSON.stringify(v.fold)}); s.style.setProperty('--line', ${JSON.stringify(v.line)}); return true })()`
+    `(() => { const s = document.querySelector('svg'); for (const [k, val] of Object.entries(${JSON.stringify(vars)})) s.style.setProperty(k, val); return true })()`
   )
 }
 

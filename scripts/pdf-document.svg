@@ -5,24 +5,29 @@
        icon.svg as a mark in the lower right. Issue #26: the app logo on every
        file in a folder read as branding, not as a file type (Emil, 2026-10-04:
        the files get a document icon of their own).
-       Three VARIANTS share this one drawing and differ only in the three
-       colour variables below (scripts/render-file-icon.cjs sets them):
+       Six VARIANTS share this one drawing and differ only in the variables
+       below (scripts/render-file-icon.cjs sets them): three colourings —
          document        red fold + red lines   (the shipped default, Emil 2026-10-05)
          document-lines  grey fold + red lines
          document-quiet  grey fold + grey lines
-       Red is the colour of the FILE TYPE (Acrobat, Edge, the desktop icon
-       themes all use it); the teal badge is the app's. Nothing depends on
-       lettering, so it reads at 16 px: a light sheet, a red smear, a dark dot.
+       — each with the S badge or without it (`-plain`: the badge hidden and
+       the third text line full length, Emil 2026-10-05: a file icon need not
+       carry the app's mark at all). Red is the colour of the FILE TYPE
+       (Acrobat, Edge, the desktop icon themes all use it); the teal badge is
+       the app's. Nothing depends on lettering, so it reads at 16 px: a light
+       sheet, a red smear, a dark dot — or just the sheet and the smear.
        Source of truth for build/pdf.ico, build/pdf.icns, build/file-icons/*.ico
        and the picker's previews in src/renderer/src/assets/file-icons/. -->
   <defs>
     <style>
-      svg { --fold-edge: #d9463e; --fold: #d9463e; --line: #d9463e; }
+      svg { --fold-edge: #d9463e; --fold: #d9463e; --line: #d9463e; --badge: visible; --line3: 56px; }
       .sheet { fill: #ffffff; }
       .edge { fill: #b9bec6; }
       .fold-edge { fill: var(--fold-edge); }
       .fold { fill: var(--fold); }
       .line { fill: var(--line); }
+      .line3 { width: var(--line3); }
+      .badge { visibility: var(--badge); }
       .disc { fill: #1b3844; }
       .s { fill: #f7f1e3; }
     </style>
@@ -38,10 +43,10 @@
   <!-- text lines -->
   <rect class="line" x="140" y="196" width="150" height="22" rx="11"/>
   <rect class="line" x="140" y="248" width="232" height="22" rx="11"/>
-  <rect class="line" x="140" y="300" width="56" height="22" rx="11"/>
+  <rect class="line line3" x="140" y="300" width="56" height="22" rx="11"/>
   <!-- the S badge, from icon.svg (53.51 units → 184 px), bottom right, inside
-       the sheet with a margin on both edges -->
-  <g transform="translate(212 286) scale(3.4386)">
+       the sheet with a margin on both edges; hidden in the -plain variants -->
+  <g class="badge" transform="translate(212 286) scale(3.4386)">
     <path class="disc" d="M53.49,25.53c-.19-4.08-1.29-7.91-3.09-11.29-.01-.02-.02-.03-.03-.04C45.66,5.37,36.17-.46,25.52.03,17.15.42,9.84,4.64,5.21,10.92,1.71,15.69-.26,21.63.03,28c.68,14.73,13.22,26.18,27.96,25.5,1.72-.08,3.38-.32,4.99-.7,8.83-2.11,15.9-8.58,18.93-16.92,1.17-3.22,1.74-6.71,1.58-10.35Z"/>
     <path class="s" d="M45.82,42.54c.92-2.23,3.29-8.39-1.35-15.03-4.92-7.04-20.52-9.63-23.46-13.44-4.78-6.19,1.37-11.76,6.48-11.45,7.14.43,8.55,6.65,3.22,7.37-3.98.55-1.86,7.09,3.55,5.66,3.71-.98,4.41-4.34,4.51-5.16.21-1.8.18-4.08-2.28-6.48.01,0,.02.01.02.01,8.43,3.63,14.53,11.84,14.98,21.61.29,6.38-1.87,12.34-5.67,16.91Z"/>
     <path class="s" d="M36.24,40.15c-3.58,15.65-28.52,8.6-24.51-5.74,1.62-5.79,4.9,4.62,9.69,3.47,4.91-1.17,5.41-6.52,1.62-10.43-4.73-4.88-20.41-2.03-14.34,16.22l-.03-.03-.18-.18c-3.77-4.12-6.18-9.55-6.46-15.56v-.21c-.03-.66-.03-1.32,0-1.97h0C2.48,15.44,9.27,6.6,18.7,3.35c-8.47,6.99-4.45,15.8,3.44,20.01,6.53,3.49,16.44,6.59,14.1,16.79Z"/>

@@ -146,11 +146,11 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.56.0
+## What's new in this version (≤ 1 500 chars) — v0.56.1
 
 **EN:**
 ```
-• PDF files get a document icon of their own in Explorer — a sheet with a red corner and red lines and the app's small mark — instead of the app logo. The settings menu offers two quieter variants, the app logo, or an icon of your own: an .ico, or a square .png the app turns into one
+• PDF files get a document icon of their own in Explorer — a sheet with a red corner and red lines and the app's small mark — instead of the app logo. The settings menu offers quieter variants, each with or without the mark, the app logo, or an icon of your own: an .ico, or a square .png the app turns into one
 • Night has a new paper tone, «White»: the document as printed — white page, dark toolbar and panels
 • The search bar's results list opens folded so it never covers the hit it points at; a list button unfolds it, the bar can be dragged aside, and the AI search steps through its passages with the same arrows
 • The selection menu has two switches: wait for a right-click instead of opening on its own, and a compact form with the same choices at a third of the height
@@ -158,7 +158,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 **NO:**
 ```
-• PDF-filer får et eget dokumentikon i Utforsker — et ark med rødt hjørne, røde linjer og appens lille merke — i stedet for app-logoen. Innstillingene tilbyr to roligere varianter, app-logoen eller et eget ikon: en .ico, eller en kvadratisk .png som appen gjør om
+• PDF-filer får et eget dokumentikon i Utforsker – et ark med rødt hjørne, røde linjer og appens lille merke – i stedet for app-logoen. Innstillingene tilbyr roligere varianter, med eller uten merket, app-logoen eller et eget ikon: en .ico, eller en kvadratisk .png som appen gjør om
 • Natt har fått en ny papirtone, «Hvitt»: dokumentet som trykt — hvit side, mørk verktøylinje og mørke paneler
 • Søkefeltets treffliste åpner sammenlagt så feltet aldri dekker treffet det peker på; en listeknapp folder den ut, feltet kan dras til side, og KI-søket blar gjennom passasjene med de samme pilene
 • Markeringsmenyen har fått to brytere: vent på høyreklikk i stedet for å åpne selv, og en kompakt form med de samme valgene på en tredjedel av høyden

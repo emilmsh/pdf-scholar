@@ -517,8 +517,9 @@ regressions are treated as bugs, not as acceptable platform lag.
     (`scripts/pdf-document.svg` → `build/pdf.ico` for NSIS, `build/pdf.icns`
     for the macOS document type; electron-builder picks both up by name —
     red fold and red lines, red being the file type's colour everywhere). The
-    gear menu's «Filikon i Utforsker» — three document variants (the two
-    others ship via `extraResources` to `resources\file-icons\`), the app
+    gear menu's «Filikon i Utforsker» — three document colourings, each with
+    or without the app's mark (the five non-default variants ship via
+    `extraResources` to `resources\file-icons\`), the app
     logo, or an icon of your own (an .ico, or a square .png that main packs
     into one at 16/32/48/256 — only the sizes the source fills without
     upscaling) — rewrites the ProgId's `DefaultIcon` under

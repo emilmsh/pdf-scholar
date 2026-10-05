@@ -14,10 +14,20 @@ import type {
   ZoteroInfo
 } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
-import { FILE_ICON_CHOICES, type FileIconChoice } from '../../../shared/file-icon'
+import {
+  FILE_ICON_CHOICES,
+  isFileIconVariant,
+  splitVariant,
+  variantFor,
+  type FileIconChoice,
+  type FileIconColouring
+} from '../../../shared/file-icon'
 import previewDocument from '../assets/file-icons/document.png'
+import previewDocumentPlain from '../assets/file-icons/document-plain.png'
 import previewDocumentLines from '../assets/file-icons/document-lines.png'
+import previewDocumentLinesPlain from '../assets/file-icons/document-lines-plain.png'
 import previewDocumentQuiet from '../assets/file-icons/document-quiet.png'
+import previewDocumentQuietPlain from '../assets/file-icons/document-quiet-plain.png'
 import previewApp from '../assets/file-icons/app.png'
 import { CITATION_STYLES } from '../../../shared/citation-style'
 import type { CitationStyleId } from '../../../shared/citation-style'
@@ -380,19 +390,22 @@ const TONE_LABELS: Record<CustomTone, MsgKey> = {
  *  so the row shows exactly what Explorer will. */
 const FILE_ICON_PREVIEWS: Record<FileIconChoice, string | null> = {
   document: previewDocument,
+  'document-plain': previewDocumentPlain,
   'document-lines': previewDocumentLines,
+  'document-lines-plain': previewDocumentLinesPlain,
   'document-quiet': previewDocumentQuiet,
+  'document-quiet-plain': previewDocumentQuietPlain,
   app: previewApp,
   custom: null
 }
-const FILE_ICON_LABELS: Record<FileIconChoice, MsgKey> = {
+const FILE_ICON_LABELS: Record<FileIconColouring | 'app' | 'custom', MsgKey> = {
   document: 'settings.fileIconDocument',
   'document-lines': 'settings.fileIconLines',
   'document-quiet': 'settings.fileIconQuiet',
   app: 'settings.fileIconApp',
   custom: 'settings.fileIconCustom'
 }
-const FILE_ICON_TIPS: Record<FileIconChoice, MsgKey> = {
+const FILE_ICON_TIPS: Record<FileIconColouring | 'app' | 'custom', MsgKey> = {
   document: 'settings.fileIconDocumentTip',
   'document-lines': 'settings.fileIconLinesTip',
   'document-quiet': 'settings.fileIconQuietTip',
@@ -668,6 +681,11 @@ export default function Toolbar({
   // (an installed Windows build); the note under it reports the outcome
   const [fileIconOk, setFileIconOk] = useState<boolean | undefined>(undefined)
   const [fileIconNote, setFileIconNote] = useState<string | null>(null)
+  // «Med S-merke»: follows the selected variant while one is selected, and
+  // remembers the last position otherwise, so the row's three chips show the
+  // badged or the plain set accordingly
+  const [badgePref, setBadgePref] = useState(true)
+  const fileIconBadge = isFileIconVariant(settings.fileIcon) ? splitVariant(settings.fileIcon).badge : badgePref
   const chooseFileIcon = async (choice: FileIconChoice): Promise<void> => {
     const r = await bridge.setFileIcon(choice)
     if (r.ok) {
@@ -2466,20 +2484,37 @@ export default function Toolbar({
                     {t('settings.fileIcon')}
                   </div>
                   {/* The choices as the icons themselves — a file icon is
-                      judged by eye, not by name. The three document variants,
-                      the app logo, and «Eget …» for the reader's own .ico. Five
-                      chips leave no room for a name under each, so one caption
-                      under the row names the current choice; every chip carries
-                      its own name on hover. */}
+                      judged by eye, not by name. Three colourings, the app
+                      logo, and «Eget …» for the reader's own; the switch above
+                      the row flips the three between the badged and the plain
+                      set (and re-applies the selected one, if a variant is what
+                      is selected). Five chips leave no room for a name under
+                      each, so one caption under the row names the current
+                      choice; every chip carries its own name on hover. */}
+                  <label className="theme-menu-toggle" title={t('settings.fileIconBadgeTip')}>
+                    <input
+                      type="checkbox"
+                      checked={fileIconBadge}
+                      onChange={(e) => {
+                        setBadgePref(e.target.checked)
+                        if (isFileIconVariant(settings.fileIcon)) {
+                          void chooseFileIcon(variantFor(splitVariant(settings.fileIcon).colouring, e.target.checked))
+                        }
+                      }}
+                    />
+                    {t('settings.fileIconBadge')}
+                  </label>
                   <div className="file-icon-chips">
-                    {FILE_ICON_CHOICES.map((choice) => {
+                    {FILE_ICON_CHOICES.map((chip) => {
+                      const choice: FileIconChoice =
+                        chip === 'app' || chip === 'custom' ? chip : variantFor(chip, fileIconBadge)
                       const preview = FILE_ICON_PREVIEWS[choice]
                       return (
                         <button
-                          key={choice}
+                          key={chip}
                           className={`file-icon-chip${settings.fileIcon === choice ? ' selected' : ''}`}
-                          title={`${t(FILE_ICON_LABELS[choice])} — ${t(FILE_ICON_TIPS[choice])}`}
-                          aria-label={t(FILE_ICON_LABELS[choice])}
+                          title={`${t(FILE_ICON_LABELS[chip])} — ${t(FILE_ICON_TIPS[chip])}`}
+                          aria-label={t(FILE_ICON_LABELS[chip])}
                           aria-pressed={settings.fileIcon === choice}
                           onClick={() => void chooseFileIcon(choice)}
                         >
@@ -2495,7 +2530,11 @@ export default function Toolbar({
                   <div className="file-icon-caption">
                     {settings.fileIcon === 'custom' && settings.fileIconPath
                       ? settings.fileIconPath.split(/[\\/]/).pop()
-                      : t(FILE_ICON_LABELS[settings.fileIcon] ?? 'settings.fileIconDocument')}
+                      : isFileIconVariant(settings.fileIcon)
+                        ? `${t(FILE_ICON_LABELS[splitVariant(settings.fileIcon).colouring])}${
+                            splitVariant(settings.fileIcon).badge ? '' : ` · ${t('settings.fileIconNoBadge')}`
+                          }`
+                        : t(FILE_ICON_LABELS[settings.fileIcon === 'app' ? 'app' : 'custom'])}
                   </div>
                   {fileIconNote && <div className="menu-hint">{fileIconNote}</div>}
                 </>
