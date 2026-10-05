@@ -312,6 +312,23 @@ section('anthropic: family rules (fable / haiku / caps override)')
   await run({})
   ok(calls[0]?.body?.fallbacks === undefined, 'sonnet 5: no server-side fallback')
 
+  // Sonnet 5.5 (curated since 2026-10-05): adaptive thinking, NOT always-on
+  // like Opus 5.5 — but {type:'disabled'} is itself a 400 there, so «Av» must
+  // say {type:'between_tools'} instead (platform.claude.com/docs/en/models/
+  // sonnet-5-5/whats-new-sonnet-5-5, verified 2026-10-05). Unlike Sonnet 5, it
+  // ships classifiers, so fallback joins it too.
+  responder = () => anthropicSse({ model: 'claude-sonnet-5-5', deltas: ['ok'] })
+  await run({ models: { anthropic: 'claude-sonnet-5-5', openai: '', azure: '', mock: '' }, thinking: 'off' })
+  ok(
+    calls[0]?.body?.thinking?.type === 'between_tools',
+    `sonnet 5.5 off → between_tools (got ${JSON.stringify(calls[0]?.body?.thinking)})`
+  )
+  ok(calls[0]?.body?.fallbacks === 'default', 'sonnet 5.5: fallbacks default (has classifiers, unlike sonnet 5)')
+  responder = () => anthropicSse({ model: 'claude-sonnet-5-5', deltas: ['ok'] })
+  await run({ models: { anthropic: 'claude-sonnet-5-5', openai: '', azure: '', mock: '' }, thinking: 'medium' })
+  ok(calls[0]?.body?.thinking?.type === 'adaptive', 'sonnet 5.5 medium → adaptive thinking (not always-on)')
+  ok(calls[0]?.body?.tools?.[0]?.type === 'web_search_20260209', 'sonnet 5.5: modern web-search tool')
+
   // When the fallback DID answer, the result names the model that did — read
   // from the handoff block, since message_start can still name the chosen one
   responder = () =>
@@ -469,6 +486,16 @@ section('openai: gpt-6 (Astra curated 2026-09-05, Sol/Luna 2026-09-26)')
     await run({ provider: 'openai', models: { anthropic: '', openai: id, azure: '', mock: '' }, thinking: 'off' })
     ok(calls[0]?.body?.reasoning?.effort === 'none', `${id} off → none (got ${calls[0]?.body?.reasoning?.effort})`)
   }
+  // GPT-6.1 Sol (curated 2026-10-05, DevDay launch 2026-09-29): near-Astra
+  // quality, and like Astra it 400s on `reasoning.effort: "none"`
+  // (developers.openai.com/api/docs/models/gpt-6.1-sol, verified 2026-10-05)
+  // — «Av» maps to the lowest effort, in one request.
+  responder = () => openAiSse({ deltas: ['ok'], response: { model: 'gpt-6.1-sol', output: [] } })
+  await run({ provider: 'openai', models: { anthropic: '', openai: 'gpt-6.1-sol', azure: '', mock: '' }, thinking: 'off' })
+  ok(
+    calls.length === 1 && calls[0]?.body?.reasoning?.effort === 'low',
+    `gpt-6.1-sol off → effort low in ONE request (got ${calls.length}, ${calls[0]?.body?.reasoning?.effort})`
+  )
 }
 
 section('openai: degrade-on-400 + response.failed')

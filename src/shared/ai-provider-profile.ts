@@ -59,9 +59,11 @@ export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[5-7]|gpt-oss/i
 /** Models whose reasoning cannot be switched off, so «Av» maps to the lowest
  *  effort instead of `none` — the same honest mapping the Anthropic path uses
  *  for its always-thinking models. Each one documents the refusal:
- *  - GPT-6 Astra 400s on `reasoning.effort: "none"` (developers.openai.com/
- *    api/docs/guides/reasoning, verified 2026-09-05). NOT GPT-6 Sol or Luna:
- *    both document `none` (their model pages, verified 2026-09-26).
+ *  - GPT-6 Astra and GPT-6.1 Sol 400 on `reasoning.effort: "none"` (and on
+ *    `"minimal"` for 6.1 Sol) — developers.openai.com/api/docs/models/
+ *    gpt-6-astra (verified 2026-09-05) and /gpt-6.1-sol (verified 2026-10-05).
+ *    NOT GPT-6 Sol or Luna: both document `none` (their model pages, verified
+ *    2026-09-26).
  *  - grok-4.5/4.6/4.7: «Reasoning cannot be disabled» (docs.x.ai/developers/
  *    model-capabilities/text/reasoning, verified 2026-09-26).
  *  - gpt-oss on Groq takes low/medium/high only; `none` is reserved for the
@@ -69,7 +71,7 @@ export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[5-7]|gpt-oss/i
  *    2026-08-31).
  *  Until 2026-09-26 «Av» sent `none` to the last two — a value neither
  *  documents — and leaned on the degrade-on-400 net when it was refused. */
-export const OPENAI_ALWAYS_REASONS_RE = /gpt-6-astra|grok-4\.[5-7]|gpt-oss/i
+export const OPENAI_ALWAYS_REASONS_RE = /gpt-6-astra|gpt-6\.1-sol|grok-4\.[5-7]|gpt-oss/i
 
 /** Mistral's reasoning switch is `reasoning_effort` too, but with a two-value
  *  domain: `"high"` (thinking on) or `"none"` (off — «the model thinks
