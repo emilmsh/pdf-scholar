@@ -47,9 +47,10 @@ interface Props {
   aiHits: SemanticHitView[]
   aiIndex: number
   aiNote: string | null
-  /** Display name of the model that will answer — the search must say which
-   *  model it is about to spend the user's key on (same transparency rule as
-   *  every other AI surface). Empty when no model is configured yet. */
+  /** Display name of the model that will answer — named in the search
+   *  button's tooltip and in the «Bekreft før deling» strip, which is where
+   *  the transparency rule asks for it before anything is sent. Empty when
+   *  no model is configured yet. */
   aiModelName: string
   /** confirmed=true only from the staged note's own Send button */
   onAiSearch(confirmed?: boolean): void
@@ -104,7 +105,7 @@ export default function SearchBar({
   // needs. Never sideways: the bar is anchored top-right, so a wider bar
   // would slide the whole query left on every keystroke. Kept per mode — the
   // room beside the controls differs (Aa |ab| inside the field, or the
-  // model's ✦ button beside it).
+  // «Søk med KI» button there instead).
   const [tallFor, setTallFor] = useState<'text' | 'ai' | null>(null)
   const tall = tallFor === mode
   /** The field's text room in the one-row layout when the bar went tall —
@@ -397,7 +398,22 @@ export default function SearchBar({
               </span>
             )}
           </div>
-          {!isAi && (
+          {isAi ? (
+            // The AI tab's send, where the text tab keeps Aa |ab|: it rides
+            // with the field when the field takes a row of its own. Says
+            // what it does in words, at a fixed width — the model's name used
+            // to stand here, but it cannot be changed from the bar and its
+            // length crowded the field (Emil, 2026-10-05); the tooltip and
+            // the «Bekreft før deling» strip still name it.
+            <button
+              className="search-ai-go"
+              onClick={() => onAiSearch()}
+              disabled={query.trim() === '' || aiStatus === 'running'}
+              title={aiModelName ? t('search.aiGoTip', { name: aiModelName }) : t('search.modeAiTip')}
+            >
+              {t('search.aiGo')}
+            </button>
+          ) : (
             <>
               <button
                 className={`search-field-opt${options.matchCase ? ' is-active' : ''}`}
@@ -416,22 +432,6 @@ export default function SearchBar({
             </>
           )}
         </div>
-        {/* The AI search's own button, labelled with the model that answers:
-            always visible in AI mode, and an AI button says in words what it
-            spends the key on rather than a bare ✦. One control where the
-            model name and a ✦ sat side by side; the model is switched in the
-            assistant's model menu, the tooltip says so. Not dimmed while the
-            search runs — the name stays readable, the count says «Søker …». */}
-        {isAi && (
-          <button
-            className="tb-btn search-ai-go"
-            onClick={() => (query.trim() === '' ? inputRef.current?.focus() : onAiSearch())}
-            disabled={aiStatus === 'running'}
-            title={aiModelName ? t('search.aiGoTip', { name: aiModelName }) : t('search.modeAiTip')}
-          >
-            ✦{aiModelName && <span className="search-ai-go-name">{aiModelName}</span>}
-          </button>
-        )}
         {/* Only while tall: holds the count and the buttons at the right end
             once the field has left the row */}
         <span className="search-row-fill" />

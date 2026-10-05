@@ -3031,37 +3031,35 @@ html.pen-near .draw-layer {
   font-variant-numeric: tabular-nums;
 }
 
-/* The AI search button: ✦ plus the model the search will spend the user's
-   key on, the name in the status's muted tone — capped so a long deployment
-   name cannot squeeze the field */
+/* «Søk med KI», inside the field where the text tab has Aa |ab| and sized
+   like them. Tinted rather than filled: the active ✦ KI tab beside it is
+   already the bar's one solid accent. Faded while there is nothing to send
+   or a search is running, like the assistant's send. */
 .search-ai-go {
-  min-width: 0;
-  max-width: 150px;
-  color: var(--text-secondary);
-}
-
-.search-ai-go:hover {
-  color: var(--text);
-}
-
-.search-ai-go-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 5px;
   font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.search-ai-go:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.search-ai-go:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .search-row .tb-btn:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-/* Busy, not unavailable: the model's name stays readable while it answers */
-.search-row .search-ai-go:disabled {
-  opacity: 1;
-  background: none;
-  color: var(--text-secondary);
 }
 
 /* Fold/unfold the results list — a list glyph (never a chevron: beside ↑ ↓
