@@ -519,7 +519,9 @@ regressions are treated as bugs, not as acceptable platform lag.
     red fold and red lines, red being the file type's colour everywhere). The
     gear menu's «Filikon i Utforsker» — three document variants (the two
     others ship via `extraResources` to `resources\file-icons\`), the app
-    logo, or an .ico of your own — rewrites the ProgId's `DefaultIcon` under
+    logo, or an icon of your own (an .ico, or a square .png that main packs
+    into one at 16/32/48/256 — only the sizes the source fills without
+    upscaling) — rewrites the ProgId's `DefaultIcon` under
     `HKCU\Software\Classes`
     (`src/main/file-icon.ts`, via `reg.exe`, refreshed with `ie4uinit -show`)
     and is re-applied at startup because every upgrade rewrites it. The row is

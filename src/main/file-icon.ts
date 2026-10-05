@@ -19,15 +19,19 @@
 // No native module: reg.exe does the registry, ie4uinit.exe -show the refresh
 // (the documented way to rebuild the icon cache on Windows 10/11 without a
 // sign-out). Both ship with Windows.
-import { app, dialog, ipcMain, type BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, nativeImage, type BrowserWindow } from 'electron'
 import { execFile } from 'node:child_process'
-import { copyFileSync, mkdirSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { copyFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { basename, extname, join } from 'node:path'
 import {
   fileIconRegistryValue,
-  isIcoName,
+  iconSourceKind,
+  ICO_SIZES,
+  MIN_ICON_SOURCE_PX,
+  packIco,
   PDF_PROGID,
   type FileIconChoice,
+  type FileIconErrorCode,
   type FileIconResult
 } from '../shared/file-icon'
 import { isPortableBuild } from './portable'
@@ -70,7 +74,7 @@ async function writeChoice(choice: FileIconChoice, customPath: string): Promise<
     execPath: process.execPath,
     customPath
   })
-  if (!value) return { ok: false, code: 'file-icon-not-ico', error: 'no file chosen' }
+  if (!value) return { ok: false, code: 'file-icon-bad-file', error: 'no file chosen' }
   if ((await readCurrent()) !== value) {
     try {
       await run('reg.exe', ['add', REG_KEY, '/ve', '/t', 'REG_SZ', '/d', value, '/f'])
@@ -93,15 +97,34 @@ export function reapplyFileIconAtStartup(): void {
   void writeChoice(fileIcon, fileIconPath)
 }
 
-/** The reader's .ico, copied into userData under its own name — the original
- *  may live on a USB stick or in Downloads, and a DefaultIcon that points at a
- *  file that is gone shows a blank sheet on every PDF. */
-function keepCopy(source: string): string {
+/** The reader's icon, kept in userData under its own name — the original may
+ *  live on a USB stick or in Downloads, and a DefaultIcon that points at a
+ *  file that is gone shows a blank sheet on every PDF. An .ico is copied; a
+ *  .png is rendered into an .ico at Explorer's sizes (only the sizes the
+ *  source can fill without upscaling, so a 64 px PNG gives 16/32/48 and the
+ *  shell scales the 48 for its large views rather than us blurring a 256). */
+function keepIcon(source: string): { path: string } | { code: FileIconErrorCode; error: string } {
+  const kind = iconSourceKind(source)
+  if (!kind) return { code: 'file-icon-bad-file', error: basename(source) }
   const dir = join(app.getPath('userData'), 'file-icons')
   mkdirSync(dir, { recursive: true })
-  const target = join(dir, basename(source))
-  copyFileSync(source, target)
-  return target
+  if (kind === 'ico') {
+    const target = join(dir, basename(source))
+    copyFileSync(source, target)
+    return { path: target }
+  }
+  const image = nativeImage.createFromPath(source)
+  if (image.isEmpty()) return { code: 'file-icon-bad-file', error: basename(source) }
+  const { width, height } = image.getSize()
+  if (width !== height) return { code: 'file-icon-not-square', error: `${width}×${height}` }
+  if (width < MIN_ICON_SOURCE_PX) return { code: 'file-icon-too-small', error: `${width} px` }
+  const entries = ICO_SIZES.filter((s) => s <= width).map((size) => ({
+    size,
+    png: new Uint8Array(image.resize({ width: size, height: size, quality: 'best' }).toPNG())
+  }))
+  const target = join(dir, `${basename(source, extname(source))}.ico`)
+  writeFileSync(target, packIco(entries))
+  return { path: target }
 }
 
 export function registerFileIconIpc(windowFor: (e: Electron.IpcMainInvokeEvent) => BrowserWindow | null): void {
@@ -117,15 +140,16 @@ export function registerFileIconIpc(windowFor: (e: Electron.IpcMainInvokeEvent) 
       const parent = windowFor(e)
       if (!parent) return { ok: false, cancelled: true }
       const picked = await dialog.showOpenDialog(parent, {
-        filters: [{ name: 'Ikon', extensions: ['ico'] }],
+        filters: [{ name: 'Ikon (.ico, .png)', extensions: ['ico', 'png'] }],
         properties: ['openFile']
       })
       if (picked.canceled || picked.filePaths.length === 0) return { ok: false, cancelled: true }
-      const source = picked.filePaths[0]
-      // The dialog filters on .ico, but "All files" is one click away in it
-      if (!isIcoName(source)) return { ok: false, code: 'file-icon-not-ico', error: basename(source) }
+      // The dialog filters on .ico/.png, but "All files" is one click away in
+      // it — keepIcon judges the name and the bytes itself
       try {
-        customPath = keepCopy(source)
+        const kept = keepIcon(picked.filePaths[0])
+        if ('code' in kept) return { ok: false, code: kept.code, error: kept.error }
+        customPath = kept.path
       } catch (err) {
         return { ok: false, code: 'file-icon-registry', error: err instanceof Error ? err.message : String(err) }
       }

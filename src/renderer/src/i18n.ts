@@ -379,10 +379,13 @@ const nb = {
   'settings.fileIconApp': 'App-logo',
   'settings.fileIconAppTip': 'Samme ikon som appen selv',
   'settings.fileIconCustom': 'Eget …',
-  'settings.fileIconCustomTip': 'Velg en .ico-fil; en kopi beholdes i appens mappe',
+  'settings.fileIconCustomTip':
+    'Velg en .ico-fil, eller en kvadratisk .png (helst 256 × 256 px med gjennomsiktig bakgrunn) som gjøres om til ikon. En kopi beholdes i appens mappe.',
   'settings.fileIconApplied': 'Utforsker kan trenge et øyeblikk — eller en ny innlogging — før ikonet skifter.',
   'iconerr.file-icon-unavailable': 'Filikonet kan bare endres i den installerte Windows-utgaven.',
-  'iconerr.file-icon-not-ico': 'Bare .ico-filer kan brukes som filikon.',
+  'iconerr.file-icon-bad-file': 'Bare .ico- og .png-filer kan brukes som filikon.',
+  'iconerr.file-icon-not-square': 'Bildet må være kvadratisk — like bredt som høyt.',
+  'iconerr.file-icon-too-small': 'Bildet må være minst 48 × 48 px; 256 × 256 anbefales.',
   'iconerr.file-icon-registry': 'Windows avviste endringen av filikonet.',
   'settings.selectionMenuCompact': 'Kompakt meny',
   'settings.selectionMenuCompactTip':
@@ -1385,10 +1388,13 @@ const en: Dict = {
   'settings.fileIconApp': 'App logo',
   'settings.fileIconAppTip': 'The same icon as the app itself',
   'settings.fileIconCustom': 'Your own …',
-  'settings.fileIconCustomTip': 'Pick an .ico file; a copy is kept in the app’s folder',
+  'settings.fileIconCustomTip':
+    'Pick an .ico file, or a square .png (ideally 256 × 256 px with a transparent background) to be turned into one. A copy is kept in the app’s folder.',
   'settings.fileIconApplied': 'Explorer may need a moment — or a new sign-in — before the icon changes.',
   'iconerr.file-icon-unavailable': 'The file icon can only be changed in the installed Windows build.',
-  'iconerr.file-icon-not-ico': 'Only .ico files can be used as the file icon.',
+  'iconerr.file-icon-bad-file': 'Only .ico and .png files can be used as the file icon.',
+  'iconerr.file-icon-not-square': 'The image must be square — as wide as it is tall.',
+  'iconerr.file-icon-too-small': 'The image must be at least 48 × 48 px; 256 × 256 is recommended.',
   'iconerr.file-icon-registry': 'Windows refused the file icon change.',
   'settings.selectionMenuCompact': 'Compact menu',
   'settings.selectionMenuCompactTip':

@@ -53,11 +53,62 @@ export function fileIconRegistryValue(
   }
 }
 
-/** Only .ico files are offered: Explorer reads icon resources from .exe/.dll
- *  too, but a picker that accepts programs is a picker that launches nothing
- *  and still looks like it might. Judged on the name's extension alone. */
+/** What the picker accepts: a ready .ico, or a square .png that main turns
+ *  into one (few people have an .ico lying around; everyone has a PNG).
+ *  Explorer reads icon resources from .exe/.dll too, but a picker that
+ *  accepts programs is a picker that launches nothing and still looks like it
+ *  might. Judged on the name's extension alone. */
+export function iconSourceKind(name: string): 'ico' | 'png' | null {
+  const n = name.trim()
+  if (/\.ico$/i.test(n)) return 'ico'
+  if (/\.png$/i.test(n)) return 'png'
+  return null
+}
+
 export function isIcoName(name: string): boolean {
-  return /\.ico$/i.test(name.trim())
+  return iconSourceKind(name) === 'ico'
+}
+
+/** The sizes a PNG is rendered into when it becomes an .ico — what Explorer
+ *  draws in list, tile and large-icon views. A source smaller than the top
+ *  size gets only the entries it can fill without upscaling. */
+export const ICO_SIZES: readonly number[] = [16, 32, 48, 256]
+
+/** Below this a PNG cannot even fill the 48 px tile view, and upscaling an
+ *  icon is how blur gets onto every file in a folder. The tooltip recommends
+ *  256 px. */
+export const MIN_ICON_SOURCE_PX = 48
+
+/** Pack PNG images into an ICO container: ICONDIR (6 bytes) + one
+ *  ICONDIRENTRY (16 bytes) per image, then the PNG payloads back to back.
+ *  Width/height bytes are 0 for 256 (the format's way of saying 256); larger
+ *  entries are not legal ICO and are dropped. Pure bytes, so main can pack the
+ *  reader's PNG and the test can check the header. (scripts/render-file-icon.cjs
+ *  carries the same logic in CommonJS for the build-time icons.) */
+export function packIco(entries: ReadonlyArray<{ size: number; png: Uint8Array }>): Uint8Array {
+  const kept = entries.filter((e) => e.size <= 256)
+  const dirLen = 16 * kept.length
+  const total = 6 + dirLen + kept.reduce((n, e) => n + e.png.length, 0)
+  const out = new Uint8Array(total)
+  const view = new DataView(out.buffer)
+  view.setUint16(0, 0, true) // reserved
+  view.setUint16(2, 1, true) // type: icon
+  view.setUint16(4, kept.length, true)
+  let offset = 6 + dirLen
+  kept.forEach((e, i) => {
+    const o = 6 + i * 16
+    out[o] = e.size === 256 ? 0 : e.size
+    out[o + 1] = e.size === 256 ? 0 : e.size
+    out[o + 2] = 0 // palette
+    out[o + 3] = 0 // reserved
+    view.setUint16(o + 4, 1, true) // planes
+    view.setUint16(o + 6, 32, true) // bpp
+    view.setUint32(o + 8, e.png.length, true)
+    view.setUint32(o + 12, offset, true)
+    out.set(e.png, offset)
+    offset += e.png.length
+  })
+  return out
 }
 
 export type FileIconErrorCode =
@@ -65,14 +116,20 @@ export type FileIconErrorCode =
    *  registers nothing), the Store build (MSIX associations are virtualized),
    *  or a dev run */
   | 'file-icon-unavailable'
-  /** The chosen file is not an .ico */
-  | 'file-icon-not-ico'
+  /** The chosen file is neither an .ico nor a readable .png */
+  | 'file-icon-bad-file'
+  /** A PNG that is not square — an icon is, and stretching one is not ours to do */
+  | 'file-icon-not-square'
+  /** A PNG under MIN_ICON_SOURCE_PX */
+  | 'file-icon-too-small'
   /** reg.exe refused the write — the detail travels as prose */
   | 'file-icon-registry'
 
 const FILE_ICON_ERROR_CODES: ReadonlySet<string> = new Set<FileIconErrorCode>([
   'file-icon-unavailable',
-  'file-icon-not-ico',
+  'file-icon-bad-file',
+  'file-icon-not-square',
+  'file-icon-too-small',
   'file-icon-registry'
 ])
 
