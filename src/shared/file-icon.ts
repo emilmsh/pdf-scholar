@@ -17,10 +17,32 @@
  *  icon, the app logo; 'custom' = an .ico of the reader's own. Offering the
  *  variants is the same spirit as offering custom: the file icon is the
  *  reader's call, not ours. */
-export type FileIconChoice = 'document' | 'document-lines' | 'document-quiet' | 'app' | 'custom'
+export type FileIconColouring = 'document' | 'document-lines' | 'document-quiet'
+/** Each colouring comes with the S badge (the bare id) or without it (`-plain`
+ *  — Emil, 2026-10-05: a file icon need not carry the app's mark at all). */
+export type FileIconVariant = FileIconColouring | `${FileIconColouring}-plain`
+export type FileIconChoice = FileIconVariant | 'app' | 'custom'
 
-export const FILE_ICON_VARIANTS = ['document', 'document-lines', 'document-quiet'] as const
-export const FILE_ICON_CHOICES: readonly FileIconChoice[] = [...FILE_ICON_VARIANTS, 'app', 'custom']
+export const FILE_ICON_COLOURINGS: readonly FileIconColouring[] = ['document', 'document-lines', 'document-quiet']
+/** Every shipped variant, in the order render-file-icon.cjs renders them */
+export const FILE_ICON_VARIANTS: readonly FileIconVariant[] = FILE_ICON_COLOURINGS.flatMap((c) => [c, `${c}-plain` as const])
+/** What the picker's row shows: the three colourings (badge or plain is a
+ *  switch above the row), then the app logo and the reader's own */
+export const FILE_ICON_CHOICES: readonly (FileIconColouring | 'app' | 'custom')[] = [...FILE_ICON_COLOURINGS, 'app', 'custom']
+
+export function isFileIconVariant(choice: FileIconChoice): choice is FileIconVariant {
+  return (FILE_ICON_VARIANTS as readonly string[]).includes(choice)
+}
+
+/** The colouring a variant is, and whether it carries the badge */
+export function splitVariant(v: FileIconVariant): { colouring: FileIconColouring; badge: boolean } {
+  const plain = v.endsWith('-plain')
+  return { colouring: (plain ? v.slice(0, -'-plain'.length) : v) as FileIconColouring, badge: !plain }
+}
+
+export function variantFor(colouring: FileIconColouring, badge: boolean): FileIconVariant {
+  return badge ? colouring : `${colouring}-plain`
+}
 
 /** The ProgId electron-builder's NSIS script registers for .pdf — it is the
  *  `name` of the fileAssociations entry in config/electron-builder.yml, and
@@ -41,8 +63,11 @@ export function fileIconRegistryValue(
     case 'document':
       return `${paths.resourcesPath}\\pdf.ico`
     // The other variants travel through extraResources to resources\file-icons\
+    case 'document-plain':
     case 'document-lines':
+    case 'document-lines-plain':
     case 'document-quiet':
+    case 'document-quiet-plain':
       return `${paths.resourcesPath}\\file-icons\\${choice}.ico`
     case 'app':
       return `${paths.execPath},0`
