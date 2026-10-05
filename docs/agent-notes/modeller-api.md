@@ -298,7 +298,7 @@ console.groq.com/docs/models, /docs/reasoning og /docs/deprecations.
 | Mistral | `mistral-medium-2604` | 256K (model-card docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04, verifisert 13.8.2026; **id-en rettet 5.10.2026**, se review) | Frontier ($1.5/$7.5). `reasoning_effort` high/none dokumentert (docs.mistral.ai/capabilities/reasoning) → `MISTRAL_REASONING_RE`. Alias `mistral-medium-latest` |
 | Mistral | `ministral-14b-2512` | 256K (model-card docs.mistral.ai/models/model-cards/ministral-3-14b-25-12, lest 5.10.2026) | **Inn 5.10.2026** som rask modell: test:live 7/7 (svar 1,1 s, sitat, bildet lest «Rød.»), ingen reasoning_effort (ikke dokumentert, ikke sendt). $0.2/$0.2. Alias `ministral-14b-latest`. Apache 2.0 |
 | Mistral | ~~`mistral-small-2603`~~ | — (utenfor koden; vinduet står i model-card) | **IKKE kuratert** fra 5.10.2026 (var inne noen timer samme dag): blind for bilder under `reasoning_effort: "high"`, og under `none` kalte den et rødt kvadrat «et blankt dokument» med assistentens systemprompt — test:live 6/7 to ganger. `MISTRAL_REASONING_RE`/`MISTRAL_BLIND_WHEN_REASONING_RE` dekker den fortsatt for et lagret/skrevet valg. $0.15/$0.6 |
-| Mistral | ~~`mistral-large-2512`~~ | — (utenfor koden; vinduet står i model-card) | **IKKE kuratert** fra 5.10.2026: finnes (changelog 12.2025), men API-et svarer 403 `tier_not_allowed` («not available in your subscription tier») på eierens konto og lister den ikke i /v1/models for det nivået — kan ikke verifiseres hos oss. Ingen reasoning_effort dokumentert |
+| Mistral | ~~`mistral-large-2512`~~ | — (utenfor koden; vinduet står i model-card) | **IKKE kuratert** fra 5.10.2026: finnes (changelog 12.2025). Først 403 `tier_not_allowed` på eierens gratisnivå; etter at pay-as-you-go ble aktivert samme dag svarer den, men **blind for bilder**: test:live 6/7, og direkte sonder kalte et rødt kvadrat «Hvitt» i fem av seks forsøk (også uten tenkeparametre; assistentens prompt ga i tillegg «ingen farge, dokumentet har ingen visuelle elementer»). Sitat og dokumentbruk fungerer (1,5 s). Avviser `reasoning_effort` med 400 «not enabled for this model» (kode 3051) — riktig at vi ikke sender den. $0.5/$1.5, 256k. Domineres av Medium 3.5 på bildelesing, så den er ute etter Emils regel om state of the art (5.10.2026) |
 | Groq | `openai/gpt-oss-120b` | 131K | Production-tier; Llama-parene (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) deprecated **16.8.2026, bekreftet på nytt 24.8.2026** (console.groq.com/docs/deprecations — datoen fra 17.8-runden holder, forrige notat om 17.6.2026 var feil kilde/lesing; begge Llama-idene er uansett utenfor vår kuraterte liste, så ingen kodeendring). `reasoning_effort` low/medium/high **bekreftet 17.8.2026** (console.groq.com/docs/reasoning: «only supported by GPT-OSS 20B and GPT-OSS 120B») → lagt til i OPENAI_REASONING_RE. «Av»: kun low/medium/high er gyldig (lukket 31.8.2026, se åpne spørsmål) → med i OPENAI_ALWAYS_REASONS_RE fra 26.9.2026, «Av» sender `low` |
 | Groq | `openai/gpt-oss-20b` | 131K | Production-tier, rask — samme reasoning_effort-bekreftelse som 120b |
 
@@ -481,6 +481,17 @@ docs.mistral.ai/getting-started/models, /resources/changelogs,
   Large 2.1-brukere til Medium 3.5 som etterfølger. Medium 3.5 får
   «Anbefalt»-hinten (ingen standardmodell for Mistral, `DEFAULT_AI_MODELS`
   urørt).
+- **Large 3 testet på nytt etter pay-as-you-go, fortsatt UT.** Tilgangen var
+  problemet i første runde (kontoens nivå), ikke modellen: etter aktivering
+  svarte den på dokumentspørsmål med sitat. Men bildesjekken feilet: den
+  kaller et ensfarget rødt 64×64-kvadrat «Hvitt» (5 av 6 direkte kall, to
+  forskjellige prompter, uten `reasoning_effort` som den avviser med 400
+  kode 3051). Medium 3.5 og Ministral 3 14B svarer «Rød» hver gang. Siden
+  bilder er førsteklasses input i assistenten og Medium 3.5 slår den på
+  akkurat det, er Large 3 dominert og kommer ikke inn; Mistrals chatbot
+  sier alle modeller er åpne på pay-as-you-go, men det er en påstand, ikke
+  en verifisering. Sjekk bildelesing på nytt hvis Mistral ruller ut en ny
+  Large-versjon.
 - **Reasoning:** docs.mistral.ai/capabilities/reasoning dokumenterer
   `reasoning_effort` med NØYAKTIG to verdier for Mistral-modellene, `high` og
   `none` (low/medium/max finnes bare for GLM 5.3), og at reasoning er AV som
