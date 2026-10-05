@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "provider": "mistral",
+    "model": "ministral-14b-2512",
+    "source": "recorded",
+    "recordedAt": "2026-10-05",
+    "note": ""
+  },
+  "http": {
+    "status": 200
+  },
+  "chunks": [
+    "data: {\"id\":\"f6b39413a9984409983ff57ac111aaad\",\"object\":\"chat.completion.chunk\",\"created\":1791188154,\"model\":\"ministral-14b-2512\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"\"},\"finish_reason\":null}]}\n\ndata: {\"id\":\"f6b39413a9984409983ff57ac111aaad\",\"object\":\"chat.completion.chunk\",\"created\":1791188154,\"model\":\"ministral-14b-2512\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"R\"},\"f",
+    "inish_reason\":null}],\"p\":\"abcdefghijklmnopq\"}\n\n",
+    "data: {\"id\":\"f6b39413a9984409983ff57ac111aaad\",\"object\":\"chat.completion.chunk\",\"created\":1791188154,\"model\":\"ministral-14b-2512\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"ød\"},\"finish_reason\":null}],\"p\":\"abcdefgh\"}\n\n",
+    "data: {\"id\":\"f6b39413a9984409983ff57ac111aaad\",\"object\":\"chat.completion.chunk\",\"created\":1791188154,\"model\":\"ministral-14b-2512\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\".\"},\"finish_reason\":null}],\"p\":\"abcdefghi\"}\n\n",
+    "data: {\"id\":\"f6b39413a9984409983ff57ac111aaad\",\"object\":\"chat.completion.chunk\",\"created\":1791188154,\"model\":\"ministral-14b-2512\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"\"},\"finish_reason\":\"stop\"}],\"usage\":{\"prompt_tokens\":69,\"total_tokens\":73,\"completion_tokens\":4,\"prompt_tokens_details\":{\"cached_tokens\":0},\"service_tier\":\"standard\"},\"p\":\"abcdefghijklmnopqrst\"}\n\n",
+    "data: [DONE]\n\n"
+  ],
+  "expect": {
+    "ok": true,
+    "text": "Rød.",
+    "citations": 0,
+    "thinking": false
+  }
+}

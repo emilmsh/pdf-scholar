@@ -295,9 +295,10 @@ console.groq.com/docs/models, /docs/reasoning og /docs/deprecations.
 | xAI | `grok-4.7` | 500K | **Byttet inn 26.9.2026, erstatter `grok-4.6`** — lansert 21.9.2026 (marktechpost.com/2026/09/21/spacexai-releases-grok-4-7; docs.x.ai/developers/models kaller den «the most capable model we've built»). docs.x.ai/developers/models/grok-4.7: «text, image → text», 500K kontekst, samme pris som 4.6 ($2/$6, $4/$12 over 200K prompt). `reasoning_effort` low/medium/high (default)/xhigh DOKUMENTERT → med i OPENAI_REASONING_RE. **«Reasoning cannot be disabled»** (docs.x.ai/developers/model-capabilities/text/reasoning, gjelder 4.5/4.6/4.7) → med i OPENAI_ALWAYS_REASONS_RE, «Av» sender `low` |
 | xAI | `grok-4.6` | 500K | Ute av menyen 26.9.2026 (erstattet av 4.7); beholdt i `MODEL_CONTEXT_TOKENS` og begge regexene for lagrede valg. Det åpne spørsmålet om 4.5/4.6s av-verdi er LUKKET samme dag: reasoning kan ikke slås av, så `none` var aldri en gyldig verdi |
 | xAI | `grok-4.3` | 1M | Standard-tier ($1.25/$2.50); effort-støtte UVERIFISERT → utenfor regexen (fortsatt uverifisert 17.8.2026, docs.x.ai/developers/models nevner ikke reasoning for 4.3) |
-| Mistral | `mistral-medium-3-5-26-04` | 256K (verifisert 13.8.2026, gjensjekket 31.8.2026: docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04) | Frontier (Medium > Large i dagens lineup!) |
-| Mistral | `mistral-large-3-25-12` | 256K (verifisert 13.8.2026, model-card) | Open-weight arbeidshest ($0.50/$1.50) |
-| Mistral | `mistral-small-4-0-26-03` | 256K (verifisert 13.8.2026, model-card) | Rask/billig |
+| Mistral | `mistral-medium-2604` | 256K (model-card docs.mistral.ai/models/model-cards/mistral-medium-3-5-26-04, verifisert 13.8.2026; **id-en rettet 5.10.2026**, se review) | Frontier ($1.5/$7.5). `reasoning_effort` high/none dokumentert (docs.mistral.ai/capabilities/reasoning) → `MISTRAL_REASONING_RE`. Alias `mistral-medium-latest` |
+| Mistral | `ministral-14b-2512` | 256K (model-card docs.mistral.ai/models/model-cards/ministral-3-14b-25-12, lest 5.10.2026) | **Inn 5.10.2026** som rask modell: test:live 7/7 (svar 1,1 s, sitat, bildet lest «Rød.»), ingen reasoning_effort (ikke dokumentert, ikke sendt). $0.2/$0.2. Alias `ministral-14b-latest`. Apache 2.0 |
+| Mistral | ~~`mistral-small-2603`~~ | — (utenfor koden; vinduet står i model-card) | **IKKE kuratert** fra 5.10.2026 (var inne noen timer samme dag): blind for bilder under `reasoning_effort: "high"`, og under `none` kalte den et rødt kvadrat «et blankt dokument» med assistentens systemprompt — test:live 6/7 to ganger. `MISTRAL_REASONING_RE`/`MISTRAL_BLIND_WHEN_REASONING_RE` dekker den fortsatt for et lagret/skrevet valg. $0.15/$0.6 |
+| Mistral | ~~`mistral-large-2512`~~ | — (utenfor koden; vinduet står i model-card) | **IKKE kuratert** fra 5.10.2026: finnes (changelog 12.2025), men API-et svarer 403 `tier_not_allowed` («not available in your subscription tier») på eierens konto og lister den ikke i /v1/models for det nivået — kan ikke verifiseres hos oss. Ingen reasoning_effort dokumentert |
 | Groq | `openai/gpt-oss-120b` | 131K | Production-tier; Llama-parene (`llama-3.1-8b-instant`, `llama-3.3-70b-versatile`) deprecated **16.8.2026, bekreftet på nytt 24.8.2026** (console.groq.com/docs/deprecations — datoen fra 17.8-runden holder, forrige notat om 17.6.2026 var feil kilde/lesing; begge Llama-idene er uansett utenfor vår kuraterte liste, så ingen kodeendring). `reasoning_effort` low/medium/high **bekreftet 17.8.2026** (console.groq.com/docs/reasoning: «only supported by GPT-OSS 20B and GPT-OSS 120B») → lagt til i OPENAI_REASONING_RE. «Av»: kun low/medium/high er gyldig (lukket 31.8.2026, se åpne spørsmål) → med i OPENAI_ALWAYS_REASONS_RE fra 26.9.2026, «Av» sender `low` |
 | Groq | `openai/gpt-oss-20b` | 131K | Production-tier, rask — samme reasoning_effort-bekreftelse som 120b |
 
@@ -352,9 +353,11 @@ Flash.
   grok 4.5–4.7, og én forespørsel i stedet for 400 + retry.
 - ~~Opus 5.5 og server-side fallback?~~ **Lukket 27.9.2026** — se
   «Standardmodeller og fallback» under.
-- Mistral: ingen `-latest`-alias funnet for medium-3-5/large-3/small-4 på
-  docs.mistral.ai (sjekket 13.8.2026, gjensjekket 17.8.2026 og 24.8.2026 —
-  uendret). Kontekstvinduene er nå verifisert (se tabellen), så denne delen av
+- ~~Mistral: ingen `-latest`-alias funnet for medium-3-5/large-3/small-4~~
+  **Lukket 5.10.2026** — aliasene finnes (`mistral-medium-latest`,
+  `mistral-small-latest` i /v1/models), og det vi hadde lest som id-er var
+  dokumentasjonens URL-slugs; se review 2026-10-05. Historikk: sjekket
+  13.8.2026, gjensjekket 17.8.2026 og 24.8.2026 — uendret. Kontekstvinduene er nå verifisert (se tabellen), så denne delen av
   spørsmålet er lukket; alias-delen forblir åpen i den forstand at et
   fremtidig alias ikke er utelukket, bare ikke observert. Sett på samme side
   24.8.2026, men IKKE relevant for vår liste: en Ministral 3-serie (14B/8B/3B)
@@ -450,6 +453,75 @@ fant ingen drift; alle tre lanseringene under kom 21.–22.9:
 - `npm run check:models` (keyless): ingen statisk drift; OpenRouter-probe
   458 modeller, alle felt intakte.
 
+Review 2026-10-05 (manuell, på Emils melding om at Mistral-modellene måtte
+oppdateres; kilder: appens egen cache av Mistrals /v1/models hentet med hans
+nøkkel samme morgen (`modelCatalog.mistral` i pdfx-state.json, 46 id-er),
+docs.mistral.ai/getting-started/models, /resources/changelogs,
+/capabilities/reasoning og model-cards, pluss `npm run test:live --
+--provider=mistral --model=…` mot tre kandidat-id-er):
+
+- **Mistral — FEIL ID-FORMAT siden 12.8.2026, rettet.** De tre kuraterte
+  id-ene (`mistral-medium-3-5-26-04`, `mistral-large-3-25-12`,
+  `mistral-small-4-0-26-03`) var model-card-sidenes URL-slugs, ikke API-id-er.
+  Mistrals API bruker navn + ÅÅMM: /v1/models lister `mistral-medium-2604`
+  (+ `mistral-medium-latest`, `mistral-medium-3-5`, `mistral-medium-3.5`),
+  `mistral-small-2603` (+ `mistral-small-latest`), `ministral-{3b,8b,14b}-2512`
+  (+ `-latest`), `magistral-{small,medium}-latest` osv. Changelogen bekrefter
+  formatet («We released Mistral Large 3 (mistral-large-2512) and Ministral 3
+  (ministral-3b-2512, …)»). Alle tidligere reviews «grep'et id-ene ordrett
+  ut av siden» — og fikk slugs; menyen hadde dermed aldri en Mistral-modell
+  som svarte. Lærdom for neste review: en id er verifisert når den står i
+  leverandørens /v1/models eller i en changelog/kodesnutt, ikke når den står
+  i en URL.
+- **Large 3 ut av menyen.** `mistral-large-2512` finnes, men live-testen
+  svarte 403 `tier_not_allowed` («This model is not available in your
+  subscription tier»), og den mangler i eierens /v1/models — listen er altså
+  filtrert per abonnementsnivå, og ⚠-markøren vår («trolig pensjonert») ville
+  vært misvisende for den. Mistrals egen deprecation-tabell peker dessuten
+  Large 2.1-brukere til Medium 3.5 som etterfølger. Medium 3.5 får
+  «Anbefalt»-hinten (ingen standardmodell for Mistral, `DEFAULT_AI_MODELS`
+  urørt).
+- **Reasoning:** docs.mistral.ai/capabilities/reasoning dokumenterer
+  `reasoning_effort` med NØYAKTIG to verdier for Mistral-modellene, `high` og
+  `none` (low/medium/max finnes bare for GLM 5.3), og at reasoning er AV som
+  standard. Ny `MISTRAL_REASONING_RE` i ai-provider-profile.ts: Lav/Middels/
+  Høy → `high`, Av → `none`; Large 3 og alt annet uten parameter som før.
+  Med reasoning på kommer `delta.content` som en LISTE av chunks
+  (`{type:"thinking", thinking:[{type:"text",text}]}` → `{type:"text",text}`
+  → vanlige strenger); parseren i `chatOpenAiCompatible` skilte ikke på det
+  og ville ha vist «[object Object]». Rettet (tekst-chunks → svar,
+  thinking-chunks → liveness), testet i `test:ai-chat`.
+- **Live-verifisert samme dag** (`npm run test:live -- --provider=mistral
+  --record`, etter at nøkkelen ble «Live» i Mistrals konsoll — de to første
+  forsøkene fikk 429 «Rate limit exceeded» på en nøkkel som ennå ikke var
+  aktivert, og appen navnga det riktig som `ai-rate-limited`): Medium 3.5
+  7/7 (svar på 2,6 s, sitat, dokument brukt, én forespørsel, thinking som
+  liveness, bildet lest: «Rød. (Bildet er ensfarget rødt.)»). Small 4 6/7 —
+  alt likt, men bildet IKKE sett under `high`. En direkte sonde (to
+  forespørsler, nøytral systemprompt) viste at Small 4 svarer «Rød.» med
+  `reasoning_effort: "none"` og «Jeg kan ikke se bildet» med `"high"`:
+  reasoning-modus gjør den blind. Kodet inn som
+  `MISTRAL_BLIND_WHEN_REASONING_RE` (ai-provider-profile.ts): en forespørsel
+  med bilde går til Small 4 med `none` uansett tenkenivå; Medium 3.5 er
+  upåvirket. Udokumentert hos Mistral — sondér på nytt ved neste review.
+- **Small 4 likevel UT, Ministral 3 14B INN.** Med `none` tvunget på
+  bildeforespørsler svarte Small 4 fortsatt feil i test:live («Dokumentet er
+  blankt, så det er umulig å avgjøre fargen») — sonden med samme systemprompt
+  gir det samme, så det er modellen som leser et rødt kvadrat som «blankt
+  dokument» når prompten handler om et vedlagt dokument. En kuratert modell
+  som feiler release-porten hver kjøring er støy vi ikke vil ha; ut etter
+  kuratert-kun-regelen. Rask-setet gikk til `ministral-14b-2512` (Ministral 3
+  14B, Apache 2.0, «text & vision» på docs-oversikten): test:live 7/7, svar på
+  1,1 s, bildet lest «Rød.», ingen reasoning-parameter sendt (ikke
+  dokumentert for Ministral). Kortet oppgir 256k kontekst og $0.2/$0.2 per
+  MTok (lest 5.10.2026) → `MODEL_CONTEXT_TOKENS`. Seks opptak ligger nå i
+  `scripts/fixtures/streams/mistral-*` og replayes av `test:streams`.
+- Funn utenfor denne runden: 403 `tier_not_allowed` kommer i dag som en
+  unavngitt feil (rå HTTP-tekst); en egen kode à la `ai-no-credit` ville vært
+  mer i tråd med named-failures-regelen. Ikke gjort her.
+- Anthropic, OpenAI, Gemini, xAI og Groq: ikke gjennomgått denne runden
+  (utenfor spørsmålet).
+
 ## Standardmodeller og fallback (Emil, 27.9.2026)
 
 - **Standard:** `claude-opus-5-5` for Anthropic og `gpt-6-sol` for OpenAI
@@ -494,10 +566,10 @@ fant ingen drift; alle tre lanseringene under kom 21.–22.9:
 
 ## Anbefalt mapping «Tenkeinnsats» (Av/Lav/Middels/Høy)
 
-| Valg | Opus 5 / Sonnet 5 | Fable 5 / 5.1, Opus 5.5 | Haiku 4.5 | gpt-5.6, GPT-6 Sol/Luna | GPT-6 Astra, grok 4.5–4.7, gpt-oss |
-|---|---|---|---|---|---|
-| Av | `{type:"disabled"}` | umulig (→ effort low) | utelat | `none` | umulig (→ `low`) |
-| Lav/Middels/Høy | `adaptive` + effort low/medium/high | effort low/medium/high | ikke støttet (utelat) | low/medium/high | low/medium/high |
+| Valg | Opus 5 / Sonnet 5 | Fable 5 / 5.1, Opus 5.5 | Haiku 4.5 | gpt-5.6, GPT-6 Sol/Luna | GPT-6 Astra, grok 4.5–4.7, gpt-oss | Mistral Medium 3.5 / Small 4 |
+|---|---|---|---|---|---|---|
+| Av | `{type:"disabled"}` | umulig (→ effort low) | utelat | `none` | umulig (→ `low`) | `none` |
+| Lav/Middels/Høy | `adaptive` + effort low/medium/high | effort low/medium/high | ikke støttet (utelat) | low/medium/high | low/medium/high | `high` (eneste på-verdi) |
 
 Defaults: anthropic `claude-opus-5-5` + Middels; openai `gpt-6-sol` + medium
 (fra 27.9.2026; var `claude-sonnet-5` og `gpt-5.6-terra`).
@@ -507,4 +579,7 @@ inn for `fable|mythos|opus-5-5`, og explicit-off for `sonnet-[5-9]|opus-[5-9]`);
 Haiku alltid uten thinking. OpenAI-stil: `reasoning_effort` sendes for
 `OPENAI_REASONING_RE` (`gpt-[5-9]|o[0-9]|grok-4.[5-7]|gpt-oss`), og «Av» blir
 `low` i stedet for `none` for `OPENAI_ALWAYS_REASONS_RE`
-(`gpt-6-astra|grok-4.[5-7]|gpt-oss`).
+(`gpt-6-astra|grok-4.[5-7]|gpt-oss`). Mistral: `MISTRAL_REASONING_RE`
+(`mistral-medium-2604`/`-3.5`/`-latest`, `mistral-small-2603`/`-latest`)
+sender `high` for alle på-nivåer og `none` for «Av» — Mistral dokumenterer
+bare de to verdiene (5.10.2026).

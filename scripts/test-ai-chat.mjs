@@ -170,7 +170,7 @@ function baseParams(overrides) {
       openrouter: 'anthropic/claude-sonnet-5',
       gemini: 'gemini-3.8-flash',
       xai: 'grok-4.3',
-      mistral: 'mistral-large-3-25-12',
+      mistral: 'mistral-medium-2604',
       groq: 'openai/gpt-oss-120b',
       compat: 'llama3.1',
       mock: 'mock-1'
@@ -1009,6 +1009,64 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
   await run({ provider: 'xai' })
   ok(calls[0]?.body?.reasoning_effort === undefined, 'grok-4.3 sends no reasoning_effort (unverified)')
+
+  // Mistral documents exactly two reasoning_effort values, high and none
+  // (docs.mistral.ai/capabilities/reasoning, 2026-10-05): every «on» level is
+  // high, «Av» is none, and Mistral Large 3 — which documents neither — is
+  // asked without the parameter
+  const mistralModel = (id) => ({ anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: '', mistral: id, groq: '', compat: '', mock: '' })
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'mistral', models: mistralModel('mistral-medium-2604') })
+  ok(calls[0]?.body?.reasoning_effort === 'high', `Mistral Medium 3.5 medium → high (got ${calls[0]?.body?.reasoning_effort})`)
+  const noImage = { requestId: 3, system: 'S', messages: [{ role: 'user', text: 'Hva sier dokumentet?' }], document: DOC, webSearch: 'off' }
+  await run({ provider: 'mistral', models: mistralModel('mistral-small-2603'), thinking: 'low', req: noImage })
+  ok(calls[0]?.body?.reasoning_effort === 'high', `Mistral Small 4 low → high, the only «on» value (got ${calls[0]?.body?.reasoning_effort})`)
+  await run({ provider: 'mistral', models: mistralModel('mistral-medium-latest'), thinking: 'off' })
+  ok(calls[0]?.body?.reasoning_effort === 'none', `Mistral off → none (got ${calls[0]?.body?.reasoning_effort})`)
+  await run({ provider: 'mistral', models: mistralModel('mistral-large-2512') })
+  ok(calls[0]?.body?.reasoning_effort === undefined, 'Mistral Large 3 sends no reasoning_effort (undocumented)')
+  // Small 4 goes blind under `high` (probed 2026-10-05: «Rød.» at none, «Jeg
+  // kan ikke se bildet» at high) — an image in the request forces none on
+  // THAT model only; Medium 3.5 reads images while reasoning. Small 4 is no
+  // longer in the menu, but a stored or typed id keeps the rule
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'mistral', models: mistralModel('mistral-small-2603') })
+  ok(calls[0]?.body?.reasoning_effort === 'none', `Small 4 with an image → none (got ${calls[0]?.body?.reasoning_effort})`)
+  await run({ provider: 'mistral', models: mistralModel('mistral-small-2603'), req: noImage })
+  ok(calls[0]?.body?.reasoning_effort === 'high', `Small 4 without an image → high (got ${calls[0]?.body?.reasoning_effort})`)
+  await run({ provider: 'mistral', models: mistralModel('mistral-medium-2604') })
+  ok(calls[0]?.body?.reasoning_effort === 'high', `Medium 3.5 with an image → still high (got ${calls[0]?.body?.reasoning_effort})`)
+
+  // With reasoning on, Mistral streams `delta.content` as CHUNKS — a
+  // ThinkChunk while it reasons, then a TextChunk — before dropping back to
+  // plain strings. Thinking is liveness, never answer text; before 2026-10-05
+  // the parser concatenated the array and would have shown «[object Object]».
+  responder = () =>
+    sse(
+      [
+        { choices: [{ delta: { content: [{ type: 'thinking', thinking: [{ type: 'text', text: 'Leser side 2 … ' }] }] } }] },
+        { choices: [{ delta: { content: [{ type: 'thinking', thinking: [{ type: 'text', text: 'ferdig.' }] }, { type: 'text', text: 'Metoden ' }] } }] },
+        { choices: [{ delta: { content: 'er enkel [KILDE s.2: "Metoden er enkel"].' } }] },
+        { usage: { prompt_tokens: 9, completion_tokens: 4 } }
+      ]
+        .map((e) => `data: ${JSON.stringify(e)}\n\n`)
+        .join('') + 'data: [DONE]\n\n'
+    )
+  let mistralAnswer = ''
+  let mistralThinking = ''
+  const chunked = await run({
+    provider: 'mistral',
+    models: mistralModel('mistral-medium-2604'),
+    emit: (t, kind) => {
+      if (kind === 'thinking') mistralThinking += t
+      else mistralAnswer += t
+    }
+  })
+  ok(chunked.result.ok === true, 'chunked Mistral stream answers')
+  ok(mistralAnswer === 'Metoden er enkel [KILDE s.2: "Metoden er enkel"].', `text chunks and plain strings join into the answer (got "${mistralAnswer}")`)
+  ok(mistralThinking === 'Leser side 2 … ferdig.', `thinking chunks reach the panel as liveness only (got "${mistralThinking}")`)
+  ok(!/object Object/.test(mistralAnswer + JSON.stringify(chunked.result.parts ?? [])), 'no «[object Object]» anywhere in the answer')
+  ok((chunked.result.parts ?? []).flatMap((p) => p.citations).some((c) => c.kind === 'quote' && c.pageNumber === 2), 'quote-contract citation survives the chunked stream')
 }
 
 // ---------- compat catalog fetcher (fase 10.2: Ollama enrichment) ----------
