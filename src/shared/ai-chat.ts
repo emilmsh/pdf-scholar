@@ -30,6 +30,8 @@ import { isCatalogProvider, remoteModel } from './ai-model-catalog'
 import {
   COMPAT_SERVICES,
   isCompatService,
+  MISTRAL_BLIND_WHEN_REASONING_RE,
+  MISTRAL_REASONING_RE,
   OPENAI_ALWAYS_REASONS_RE,
   OPENAI_REASONING_RE
 } from './ai-provider-profile'
@@ -922,6 +924,21 @@ async function chatOpenAiResponses(
   }
 }
 
+/** One element of a Chat Completions `content` list (Mistral's shape when
+ *  reasoning is on; everyone else sends a string) */
+type ContentChunk = { type?: unknown; text?: unknown; thinking?: unknown }
+
+/** The text of a Chat Completions `content` value: the string itself, or the
+ *  text chunks of a chunk list joined (a ThinkChunk's own `thinking` is such
+ *  a list too). Anything else is "no text". */
+function chunkText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return (content as ContentChunk[])
+    .map((c) => (c?.type === 'text' && typeof c.text === 'string' ? c.text : ''))
+    .join('')
+}
+
 /** Chat Completions path — Azure deployments and the compat provider (any
  *  OpenAI-compatible server: OpenRouter, Mistral, Groq, local Ollama/LM
  *  Studio); OpenAI proper goes through chatOpenAiResponses. No server-side
@@ -972,6 +989,14 @@ async function chatOpenAiCompatible(
   if (model) body.model = model
   // gpt-5.6/gpt-6 reasoning control (harmless on models that ignore it)
   if (OPENAI_REASONING_RE.test(model ?? '')) body.reasoning_effort = openAiEffort(thinking, model ?? '')
+  // Mistral's two-value domain: high or none (see MISTRAL_REASONING_RE) —
+  // and none, whatever the level, for the model that cannot see an image
+  // while it reasons (MISTRAL_BLIND_WHEN_REASONING_RE)
+  else if (MISTRAL_REASONING_RE.test(model ?? ''))
+    body.reasoning_effort =
+      thinking === 'off' || (carriesImages(req) && MISTRAL_BLIND_WHEN_REASONING_RE.test(model ?? ''))
+        ? 'none'
+        : 'high'
 
   // Deployments name models we cannot inspect, so the reasoning heuristic can
   // misfire — a 400 blaming it gets one retry without, same net as the other paths.
@@ -1052,10 +1077,27 @@ async function chatOpenAiCompatible(
       if (payload === '[DONE]') continue
       try {
         const parsed = JSON.parse(payload)
-        const delta: string | undefined = parsed.choices?.[0]?.delta?.content
-        if (delta) {
+        const delta: unknown = parsed.choices?.[0]?.delta?.content
+        if (typeof delta === 'string' && delta) {
           fullText += delta
           emit(delta)
+        } else if (Array.isArray(delta)) {
+          // Mistral with reasoning on streams `content` as chunks — a
+          // ThinkChunk ({type:'thinking', thinking:[{type:'text', text}]}) while
+          // it reasons, then a TextChunk ({type:'text', text}) — and drops back
+          // to plain strings for the rest of the answer (docs.mistral.ai/
+          // capabilities/reasoning, 2026-10-05). Thinking is liveness, never
+          // answer text; concatenating the array (what this did before) would
+          // have printed «[object Object]» into the panel.
+          for (const chunk of delta as ContentChunk[]) {
+            if (chunk?.type === 'text' && typeof chunk.text === 'string' && chunk.text) {
+              fullText += chunk.text
+              emit(chunk.text)
+            } else if (chunk?.type === 'thinking') {
+              const thought = chunkText(chunk.thinking)
+              if (thought) emit(thought, 'thinking')
+            }
+          }
         }
         // Reasoning models stream their thinking in a separate field —
         // OpenRouter normalizes it to `reasoning`, Moonshot/DeepSeek natively
@@ -1085,8 +1127,10 @@ async function chatOpenAiCompatible(
     // else (a web page, an unrecognisable body) gets the named code.
     try {
       const parsed = JSON.parse(raw)
-      const text: unknown = parsed.choices?.[0]?.message?.content
-      if (typeof text === 'string' && text) {
+      // A string, or Mistral's chunk list when reasoning was on (text chunks
+      // only — the thinking is not the answer)
+      const text = chunkText(parsed.choices?.[0]?.message?.content)
+      if (text) {
         emit(text)
         if (parsed.usage) readUsage(parsed.usage)
         return {

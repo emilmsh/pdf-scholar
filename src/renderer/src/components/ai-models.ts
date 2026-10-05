@@ -124,12 +124,23 @@ export const MODELS: Record<
     { id: 'grok-4.7', label: 'Grok 4.7', short: 'Grok 4.7', hint: 'ai.modelHintCapable' },
     { id: 'grok-4.3', label: 'Grok 4.3', short: 'Grok 4.3', hint: 'ai.modelHintRecommended' }
   ],
-  // Mistral publishes dated ids only — Medium outranks Large in their current
-  // lineup (Medium 3.5 is the frontier model, Large 3 the value workhorse)
+  // Mistral's API ids are the model name plus a YYMM date (`mistral-medium-2604`),
+  // with a `-latest` alias beside each. Until 2026-10-05 this list carried the
+  // documentation's URL slugs (`mistral-medium-3-5-26-04`) instead — ids the
+  // API never served, so every Mistral question failed with «model not found».
+  // Verified against the live /v1/models listing fetched with Emil's key the
+  // same day (docs/agent-notes/modeller-api.md, review 2026-10-05), then one
+  // real question each through `test:live`. Medium 3.5 is Mistral's frontier
+  // model (7/7). Ministral 3 14B is the fast seat (7/7, image read, no
+  // reasoning parameter). Two of Mistral's own were tried and left out:
+  // Mistral Large 3 (`mistral-large-2512`) is paid-tier only on the API (HTTP
+  // 403 «not available in your subscription tier» on the owner's account, and
+  // absent from that tier's listing), and Mistral Small 4 (`mistral-small-2603`)
+  // goes blind to images while it reasons and called a red square «a blank
+  // document» under the assistant's prompt even with reasoning off — 6/7 twice.
   mistral: [
-    { id: 'mistral-medium-3-5-26-04', label: 'Mistral Medium 3.5', short: 'Mistral Medium', hint: 'ai.modelHintCapable' },
-    { id: 'mistral-large-3-25-12', label: 'Mistral Large 3', short: 'Mistral Large', hint: 'ai.modelHintRecommended' },
-    { id: 'mistral-small-4-0-26-03', label: 'Mistral Small 4', short: 'Mistral Small', hint: 'ai.modelHintFast' }
+    { id: 'mistral-medium-2604', label: 'Mistral Medium 3.5', short: 'Mistral Medium', hint: 'ai.modelHintRecommended' },
+    { id: 'ministral-14b-2512', label: 'Ministral 3 14B', short: 'Ministral 14B', hint: 'ai.modelHintFast' }
   ],
   // Groq's PRODUCTION tier only (their own designation) — the Llama pair was
   // deprecated 2026-06-17 with gpt-oss as the named replacement
@@ -302,11 +313,12 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   'grok-4.3': 1_000_000,
   'openai/gpt-oss-120b': 131_072,
   'openai/gpt-oss-20b': 131_072,
-  // Mistral model cards (docs.mistral.ai, verified 2026-08-13): all three of
-  // the "26" generation share a 256k window
-  'mistral-medium-3-5-26-04': 256_000,
-  'mistral-large-3-25-12': 256_000,
-  'mistral-small-4-0-26-03': 256_000
+  // Mistral model cards (docs.mistral.ai; Medium verified 2026-08-13, id
+  // corrected 2026-10-05; Ministral 3 14B read 2026-10-05): 256k each. The old
+  // slug ids are NOT kept here — they never reached the API, so no stored
+  // selection ever worked under them.
+  'mistral-medium-2604': 256_000,
+  'ministral-14b-2512': 256_000
 }
 
 const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {

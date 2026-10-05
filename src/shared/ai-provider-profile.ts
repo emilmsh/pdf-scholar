@@ -71,6 +71,32 @@ export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[5-7]|gpt-oss/i
  *  documents — and leaned on the degrade-on-400 net when it was refused. */
 export const OPENAI_ALWAYS_REASONS_RE = /gpt-6-astra|grok-4\.[5-7]|gpt-oss/i
 
+/** Mistral's reasoning switch is `reasoning_effort` too, but with a two-value
+ *  domain: `"high"` (thinking on) or `"none"` (off — «the model thinks
+ *  minimally and the thinking chunk is omitted»), documented for Mistral
+ *  Medium 3.5 (`mistral-medium-2604`) and Mistral Small 4 (`mistral-small-2603`,
+ *  which the docs name through its alias `mistral-small-latest`) at
+ *  docs.mistral.ai/capabilities/reasoning, verified 2026-10-05 against the
+ *  docs — the live run that day was 429'd by the owner's account quota, so
+ *  the first real question is still owed (docs/agent-notes/modeller-api.md).
+ *  Low/Medium/High in the UI therefore all send `high` — there is no smaller
+ *  step to send — and Off sends `none`. Reasoning is off by default at
+ *  Mistral, so a model outside this match is simply asked without the
+ *  parameter, as before; the match is narrow on purpose (Mistral Large 3 and
+ *  Ministral 3 document no reasoning_effort at all). Small 4 left the curated
+ *  menu the same day (see MODELS.mistral), but a stored or typed id still
+ *  gets the documented mapping. */
+export const MISTRAL_REASONING_RE = /^mistral-(medium-(2604|3[-.]5|latest)|small-(2603|latest))$/i
+
+/** Mistral Small 4 answers BLIND when reasoning is on: the same red square it
+ *  names «Rød.» under `reasoning_effort: "none"` becomes «Jeg kan ikke se
+ *  bildet» under `"high"` (two direct requests, 2026-10-05; the live suite
+ *  saw the same). Medium 3.5 reads the image under `high`. So a request that
+ *  carries an image is sent to Small 4 with `none` whatever the UI level —
+ *  a sighted answer without reasoning beats a reasoned answer about a picture
+ *  the model never saw. Undocumented on Mistral's side; re-probe each review. */
+export const MISTRAL_BLIND_WHEN_REASONING_RE = /^mistral-small-(2603|latest)$/i
+
 /** The first-class hosted OpenAI-compatible services (fase 10.3): a FINITE,
  *  curated set — one key field each, entered once, stored exactly like the
  *  Anthropic/OpenAI keys — instead of a free-form endpoint manager. The set

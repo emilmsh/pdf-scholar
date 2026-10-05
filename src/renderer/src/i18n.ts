@@ -803,7 +803,7 @@ const nb = {
   'ai.compatPresetPick': 'Velg tjeneste eller skriv inn selv …',
   'ai.baseUrl': 'Base-URL',
   'ai.compatModelId': 'Modell-id',
-  'ai.compatModelHint': 'f.eks. llama3.1 eller mistral-large-latest',
+  'ai.compatModelHint': 'f.eks. llama3.1 eller mistral-medium-latest',
   'ai.compatHint':
     'For lokale modeller (Ollama og LM Studio kjører uten nøkkel — velg dem i listen) og alle andre OpenAI-kompatible endepunkter. Modellisten hentes fra endepunktet når du lagrer.',
   'ai.modelFilter': 'Filtrer modeller …',
@@ -1780,7 +1780,7 @@ const en: Dict = {
   'ai.compatPresetPick': 'Pick a service or type your own …',
   'ai.baseUrl': 'Base URL',
   'ai.compatModelId': 'Model id',
-  'ai.compatModelHint': 'e.g. llama3.1 or mistral-large-latest',
+  'ai.compatModelHint': 'e.g. llama3.1 or mistral-medium-latest',
   'ai.compatHint':
     'For local models (Ollama and LM Studio run without a key — pick them in the list) and any other OpenAI-compatible endpoint. The model list is fetched from the endpoint when you save.',
   'ai.modelFilter': 'Filter models …',
