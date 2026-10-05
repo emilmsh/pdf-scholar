@@ -29,6 +29,13 @@ files:
 asarUnpack:
   # loaded via dynamic import() — keep it on real disk
   - node_modules/@anthropic-ai/sdk/**
+# The two OTHER document-icon variants for the gear menu's picker (issue #26);
+# the default variant travels as the association icon itself, resources\pdf.ico.
+# src/shared/file-icon.ts points DefaultIcon at resources\file-icons\<id>.ico.
+extraResources:
+  - from: build/file-icons
+    to: file-icons
+    filter: ['*.ico']
 # Updater/release metadata (latest*.yml) for electron-updater. CI builds with
 # --publish never and uploads assets itself; nothing publishes from dev machines.
 publish:

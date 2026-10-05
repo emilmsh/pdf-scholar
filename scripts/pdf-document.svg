@@ -2,19 +2,27 @@
   <!-- The .pdf FILE icon — what Explorer and Finder show next to a document
        when PDF Scholar is its reader. A document, not the app: a white sheet
        with a folded corner and three lines of "text", with the S badge from
-       icon.svg as a small mark in the corner. Issue #26: the app logo on every
+       icon.svg as a mark in the lower right. Issue #26: the app logo on every
        file in a folder read as branding, not as a file type (Emil, 2026-10-04:
-       the files get a neutral document icon of their own).
-       Reads at 16 px because the shapes carry it: a light sheet with a dark
-       edge, a fold, a dark-teal dot. Nothing depends on lettering.
-       Source of truth for build/pdf.ico, build/pdf.icns and
-       build/pdf-document.png — rendered by scripts/render-file-icon.cjs. -->
+       the files get a document icon of their own).
+       Three VARIANTS share this one drawing and differ only in the three
+       colour variables below (scripts/render-file-icon.cjs sets them):
+         document        red fold + red lines   (the shipped default, Emil 2026-10-05)
+         document-lines  grey fold + red lines
+         document-quiet  grey fold + grey lines
+       Red is the colour of the FILE TYPE (Acrobat, Edge, the desktop icon
+       themes all use it); the teal badge is the app's. Nothing depends on
+       lettering, so it reads at 16 px: a light sheet, a red smear, a dark dot.
+       Source of truth for build/pdf.ico, build/pdf.icns, build/file-icons/*.ico
+       and the picker's previews in src/renderer/src/assets/file-icons/. -->
   <defs>
     <style>
+      svg { --fold-edge: #d9463e; --fold: #d9463e; --line: #d9463e; }
       .sheet { fill: #ffffff; }
       .edge { fill: #b9bec6; }
-      .fold { fill: #dfe7ea; }
-      .line { fill: #c3c8cf; }
+      .fold-edge { fill: var(--fold-edge); }
+      .fold { fill: var(--fold); }
+      .line { fill: var(--line); }
       .disc { fill: #1b3844; }
       .s { fill: #f7f1e3; }
     </style>
@@ -23,8 +31,9 @@
        every size without a stroke that would thin out when scaled -->
   <path class="edge" d="M110 26h198l118 118v316a26 26 0 0 1-26 26H110a26 26 0 0 1-26-26V52a26 26 0 0 1 26-26z"/>
   <path class="sheet" d="M110 32h194l116 116v312a20 20 0 0 1-20 20H110a20 20 0 0 1-20-20V52a20 20 0 0 1 20-20z"/>
-  <!-- folded corner -->
-  <path class="edge" d="M304 32v96a20 20 0 0 0 20 20h96z"/>
+  <!-- folded corner: an outer triangle in the edge colour and an inner one in
+       the fold colour (identical for the red variant, grey/pale for the others) -->
+  <path class="fold-edge" d="M304 32v96a20 20 0 0 0 20 20h96z"/>
   <path class="fold" d="M310 44v78a14 14 0 0 0 14 14h78z"/>
   <!-- text lines -->
   <rect class="line" x="140" y="196" width="150" height="22" rx="11"/>

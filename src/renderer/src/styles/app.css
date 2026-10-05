@@ -1757,6 +1757,62 @@ html.pen-near .draw-layer {
 /* The paper-tone pickers («Farge»'s light tones, night's dark ones): one
    colored chip per curated tone. Tone colours arrive inline from
    theme-tune.ts — the single source. */
+/* The Explorer file-icon picker (gear menu): five chips, each the icon itself
+   at 32 px — a file icon is chosen by eye; the caption under the row names
+   the current choice (or the chosen .ico), every chip its own on hover. The
+   custom chip is a dashed «…». */
+.file-icon-chips {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.file-icon-chip {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  padding: 6px 2px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+}
+
+.file-icon-chip img {
+  width: 32px;
+  height: 32px;
+}
+
+.file-icon-caption {
+  margin-top: 5px;
+  padding: 0 2px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-icon-chip:hover {
+  background: var(--hover);
+}
+
+.file-icon-chip.selected {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.file-icon-chip-plus {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed color-mix(in srgb, var(--text-secondary) 55%, transparent);
+  border-radius: 7px;
+  font-size: 15px;
+  line-height: 1;
+}
+
 .tone-chip {
   flex: 1;
   padding: 6px 4px;

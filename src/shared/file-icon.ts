@@ -9,11 +9,18 @@
 // Windows-only by nature (docs/PLATFORMS.md, divergence 27): macOS document
 // icons live inside the app bundle, and the browser has no files.
 
-/** 'document' = the installer's own icon (the shipped default); 'app' = the
- *  executable's icon, the app logo; 'custom' = an .ico of the reader's own. */
-export type FileIconChoice = 'document' | 'app' | 'custom'
+/** The three document variants share one drawing (scripts/pdf-document.svg)
+ *  and differ in colour: 'document' = red fold + red lines (the shipped
+ *  default — red is the file type's colour, the way Acrobat, Edge and the
+ *  desktop icon themes all use it; Emil, 2026-10-05), 'document-lines' = grey
+ *  fold + red lines, 'document-quiet' = all grey. Then 'app' = the executable's
+ *  icon, the app logo; 'custom' = an .ico of the reader's own. Offering the
+ *  variants is the same spirit as offering custom: the file icon is the
+ *  reader's call, not ours. */
+export type FileIconChoice = 'document' | 'document-lines' | 'document-quiet' | 'app' | 'custom'
 
-export const FILE_ICON_CHOICES: readonly FileIconChoice[] = ['document', 'app', 'custom']
+export const FILE_ICON_VARIANTS = ['document', 'document-lines', 'document-quiet'] as const
+export const FILE_ICON_CHOICES: readonly FileIconChoice[] = [...FILE_ICON_VARIANTS, 'app', 'custom']
 
 /** The ProgId electron-builder's NSIS script registers for .pdf — it is the
  *  `name` of the fileAssociations entry in config/electron-builder.yml, and
@@ -33,6 +40,10 @@ export function fileIconRegistryValue(
   switch (choice) {
     case 'document':
       return `${paths.resourcesPath}\\pdf.ico`
+    // The other variants travel through extraResources to resources\file-icons\
+    case 'document-lines':
+    case 'document-quiet':
+      return `${paths.resourcesPath}\\file-icons\\${choice}.ico`
     case 'app':
       return `${paths.execPath},0`
     case 'custom':

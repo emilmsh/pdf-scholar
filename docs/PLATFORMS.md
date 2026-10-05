@@ -515,9 +515,12 @@ regressions are treated as bugs, not as acceptable platform lag.
     folder wore the app logo, which read as branding rather than a file type.
     The installers now register a document icon of their own
     (`scripts/pdf-document.svg` → `build/pdf.ico` for NSIS, `build/pdf.icns`
-    for the macOS document type; electron-builder picks both up by name). The
-    gear menu's «Filikon i Utforsker» — document / app logo / an .ico of your
-    own — rewrites the ProgId's `DefaultIcon` under `HKCU\Software\Classes`
+    for the macOS document type; electron-builder picks both up by name —
+    red fold and red lines, red being the file type's colour everywhere). The
+    gear menu's «Filikon i Utforsker» — three document variants (the two
+    others ship via `extraResources` to `resources\file-icons\`), the app
+    logo, or an .ico of your own — rewrites the ProgId's `DefaultIcon` under
+    `HKCU\Software\Classes`
     (`src/main/file-icon.ts`, via `reg.exe`, refreshed with `ie4uinit -show`)
     and is re-applied at startup because every upgrade rewrites it. The row is
     absent where the key is not ours to write: the **portable zip** registers

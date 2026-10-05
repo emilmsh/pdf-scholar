@@ -15,6 +15,10 @@ import type {
 } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
 import { FILE_ICON_CHOICES, type FileIconChoice } from '../../../shared/file-icon'
+import previewDocument from '../assets/file-icons/document.png'
+import previewDocumentLines from '../assets/file-icons/document-lines.png'
+import previewDocumentQuiet from '../assets/file-icons/document-quiet.png'
+import previewApp from '../assets/file-icons/app.png'
 import { CITATION_STYLES } from '../../../shared/citation-style'
 import type { CitationStyleId } from '../../../shared/citation-style'
 import {
@@ -369,6 +373,31 @@ const TONE_LABELS: Record<CustomTone, MsgKey> = {
   green: 'tb.toneGreen',
   blue: 'tb.toneBlue',
   sand: 'tb.toneSand'
+}
+
+/** The Explorer file-icon picker (issue #26): what each chip shows and says.
+ *  The previews are the real 48 px renders (scripts/render-file-icon.cjs),
+ *  so the row shows exactly what Explorer will. */
+const FILE_ICON_PREVIEWS: Record<FileIconChoice, string | null> = {
+  document: previewDocument,
+  'document-lines': previewDocumentLines,
+  'document-quiet': previewDocumentQuiet,
+  app: previewApp,
+  custom: null
+}
+const FILE_ICON_LABELS: Record<FileIconChoice, MsgKey> = {
+  document: 'settings.fileIconDocument',
+  'document-lines': 'settings.fileIconLines',
+  'document-quiet': 'settings.fileIconQuiet',
+  app: 'settings.fileIconApp',
+  custom: 'settings.fileIconCustom'
+}
+const FILE_ICON_TIPS: Record<FileIconChoice, MsgKey> = {
+  document: 'settings.fileIconDocumentTip',
+  'document-lines': 'settings.fileIconLinesTip',
+  'document-quiet': 'settings.fileIconQuietTip',
+  app: 'settings.fileIconAppTip',
+  custom: 'settings.fileIconCustomTip'
 }
 
 const NIGHT_TONE_LABELS: Record<NightTone, MsgKey> = {
@@ -2436,36 +2465,37 @@ export default function Toolbar({
                   <div className="theme-menu-label" title={t('settings.fileIconTip')}>
                     {t('settings.fileIcon')}
                   </div>
-                  <div className="scope-options">
+                  {/* The choices as the icons themselves — a file icon is
+                      judged by eye, not by name. The three document variants,
+                      the app logo, and «Eget …» for the reader's own .ico. Five
+                      chips leave no room for a name under each, so one caption
+                      under the row names the current choice; every chip carries
+                      its own name on hover. */}
+                  <div className="file-icon-chips">
                     {FILE_ICON_CHOICES.map((choice) => {
-                      const label =
-                        choice === 'document'
-                          ? 'settings.fileIconDocument'
-                          : choice === 'app'
-                            ? 'settings.fileIconApp'
-                            : 'settings.fileIconCustom'
-                      const hint =
-                        choice === 'document'
-                          ? 'settings.fileIconDocumentHint'
-                          : choice === 'app'
-                            ? 'settings.fileIconAppHint'
-                            : 'settings.fileIconCustomHint'
-                      // The custom row names the kept file once there is one
-                      const ownName =
-                        choice === 'custom' && settings.fileIconPath
-                          ? settings.fileIconPath.split(/[\\/]/).pop()
-                          : null
+                      const preview = FILE_ICON_PREVIEWS[choice]
                       return (
                         <button
                           key={choice}
-                          className={`scope-option${settings.fileIcon === choice ? ' selected' : ''}`}
+                          className={`file-icon-chip${settings.fileIcon === choice ? ' selected' : ''}`}
+                          title={`${t(FILE_ICON_LABELS[choice])} — ${t(FILE_ICON_TIPS[choice])}`}
+                          aria-label={t(FILE_ICON_LABELS[choice])}
+                          aria-pressed={settings.fileIcon === choice}
                           onClick={() => void chooseFileIcon(choice)}
                         >
-                          <strong>{t(label)}</strong>
-                          <span>{ownName ?? t(hint)}</span>
+                          {preview ? (
+                            <img src={preview} alt="" width={32} height={32} />
+                          ) : (
+                            <span className="file-icon-chip-plus">…</span>
+                          )}
                         </button>
                       )
                     })}
+                  </div>
+                  <div className="file-icon-caption">
+                    {settings.fileIcon === 'custom' && settings.fileIconPath
+                      ? settings.fileIconPath.split(/[\\/]/).pop()
+                      : t(FILE_ICON_LABELS[settings.fileIcon] ?? 'settings.fileIconDocument')}
                   </div>
                   {fileIconNote && <div className="menu-hint">{fileIconNote}</div>}
                 </>

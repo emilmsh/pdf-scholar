@@ -45,11 +45,21 @@ console.log('2) the DefaultIcon value per choice')
 const paths = { resourcesPath: 'C:\\App\\resources', execPath: 'C:\\App\\PDF Scholar.exe', customPath: 'C:\\Users\\me\\AppData\\Roaming\\pdfx\\file-icons\\mine.ico' }
 eq(M.fileIconRegistryValue('document', paths), 'C:\\App\\resources\\pdf.ico', 'document → the installed pdf.ico')
 eq(M.fileIconRegistryValue('app', paths), 'C:\\App\\PDF Scholar.exe,0', 'app → exe,0')
+eq(M.fileIconRegistryValue('document-lines', paths), 'C:\\App\\resources\\file-icons\\document-lines.ico', 'document-lines → the extraResources copy')
+eq(M.fileIconRegistryValue('document-quiet', paths), 'C:\\App\\resources\\file-icons\\document-quiet.ico', 'document-quiet → the extraResources copy')
 eq(M.fileIconRegistryValue('custom', paths), paths.customPath, 'custom → the kept copy')
 eq(M.fileIconRegistryValue('custom', { ...paths, customPath: '' }), null, 'custom without a file → null')
 eq(M.fileIconRegistryValue('custom', { ...paths, customPath: '   ' }), null, 'custom with a blank path → null')
 eq(M.fileIconRegistryValue('plaid', paths), 'C:\\App\\resources\\pdf.ico', 'an unknown stored choice → the document icon')
-eq(M.FILE_ICON_CHOICES.join(), 'document,app,custom', 'the three choices, document first')
+eq(M.FILE_ICON_CHOICES.join(), 'document,document-lines,document-quiet,app,custom', 'the five choices, the default first')
+// The renderer script's variant ids are the shared list, in order — a variant
+// added on one side only would ship an .ico nothing can choose, or a choice
+// pointing at an .ico that was never rendered
+const renderSrc = readFileSync(join(root, 'scripts', 'render-file-icon.cjs'), 'utf-8')
+const renderedIds = [...renderSrc.matchAll(/\{ id: '([a-z-]+)'/g)].map((m) => m[1])
+eq(renderedIds.join(), M.FILE_ICON_VARIANTS.join(), 'render-file-icon.cjs renders exactly the shared variants')
+// extraResources must carry the non-default variants
+ok(/extraResources:\s*\n\s*- from: build\/file-icons\s*\n\s*to: file-icons/.test(yml), 'electron-builder.yml ships build/file-icons as resources/file-icons')
 
 console.log('3) only .ico passes the picker guard')
 for (const good of ['mine.ico', 'C:\\x\\y\\Z.ICO', ' a.ico ']) ok(M.isIcoName(good), `${JSON.stringify(good)} is an .ico`)
@@ -62,6 +72,11 @@ const ico = join(root, 'build', 'pdf.ico')
 const icns = join(root, 'build', 'pdf.icns')
 ok(existsSync(ico), 'build/pdf.ico exists (electron-builder picks it up by name)')
 ok(existsSync(icns), 'build/pdf.icns exists (same rule, macOS)')
+for (const v of M.FILE_ICON_VARIANTS) {
+  if (v !== 'document') ok(existsSync(join(root, 'build', 'file-icons', `${v}.ico`)), `build/file-icons/${v}.ico exists`)
+  ok(existsSync(join(root, 'src', 'renderer', 'src', 'assets', 'file-icons', `${v}.png`)), `picker preview for ${v} exists`)
+}
+ok(existsSync(join(root, 'src', 'renderer', 'src', 'assets', 'file-icons', 'app.png')), 'picker preview for the app logo exists')
 if (existsSync(ico)) {
   const b = readFileSync(ico)
   eq(b.readUInt16LE(2), 1, 'ICO type is 1 (icon)')

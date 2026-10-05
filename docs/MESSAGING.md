@@ -129,9 +129,9 @@ carries no picture of its own.)*
 - Smooth scrolling; zoom centres on the cursor or pinch point; fit width or
   whole page
 - On Windows, PDF files carry a document icon of their own in Explorer — a
-  sheet with the app's mark, not the app logo — and the settings menu can swap
-  it for the logo or for any .ico of yours *(reader ask, issue #26,
-  2026-10-04)*
+  sheet with red text lines and the app's mark, not the app logo — and the
+  settings menu offers two quieter variants, the logo, or any .ico of yours
+  *(reader ask, issue #26, 2026-10-04)*
 - Four reading modes — Day, «Farge» (a light paper tone: the classic Sepia
   cream plus gray, green, blue and sand), Night and Night+ (higher contrast) —
   plus Auto, which follows the system setting. Night has its own dark tones
