@@ -12,6 +12,18 @@ import { bubblesWhileTyping, withShortcut } from '../keymap'
  *  within a sitting the bar should stay where it was put when it reopens. */
 let barOffset = { dx: 0, dy: 0 }
 
+/** One canvas for the whole session, only ever asked for text widths */
+let measureCtx: CanvasRenderingContext2D | null | undefined
+
+/** How wide `text` sets in the field's own font, on one line */
+function textWidth(text: string, cs: CSSStyleDeclaration): number {
+  if (!text) return 0
+  if (measureCtx === undefined) measureCtx = document.createElement('canvas').getContext('2d')
+  if (!measureCtx) return 0
+  measureCtx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`
+  return measureCtx.measureText(text).width
+}
+
 export interface SemanticHitView {
   label: string
   pageNumber: number | null
@@ -79,9 +91,27 @@ export default function SearchBar({
   onClose
 }: Props): React.JSX.Element {
   useLang()
-  const inputRef = useRef<HTMLInputElement>(null)
+  /** The query field — a textarea in both modes, so the ONE element can sit
+   *  in the control row while the query is short and wrap on a row of its
+   *  own once it is not, without a remount (focus and caret stay put) */
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const isAi = mode === 'ai'
+
+  // The bar fits its query (Emil, 2026-10-05), in both modes: one row at
+  // rest and while the text fits the field beside the controls; past that
+  // the field takes a row of its own and wraps, as many lines as the query
+  // needs. Never sideways: the bar is anchored top-right, so a wider bar
+  // would slide the whole query left on every keystroke. Kept per mode — the
+  // room beside the controls differs (Aa |ab| inside the field, or the
+  // model's ✦ button beside it).
+  const [tallFor, setTallFor] = useState<'text' | 'ai' | null>(null)
+  const tall = tallFor === mode
+  /** The field's text room in the one-row layout when the bar went tall —
+   *  the query must fall clearly under it again before the bar folds back,
+   *  so a query near the edge cannot make it hop between the two */
+  const roomRef = useRef(0)
+  const placeholder = isAi ? t('search.aiPlaceholder') : t('search.placeholder')
 
   // Recent queries, offered while the field is focused and empty. Read straight
   // from the MRU module rather than threaded down as props: nothing outside this
@@ -196,6 +226,46 @@ export default function SearchBar({
     setHistoryIndex(-1)
   }, [focusToken])
 
+  // The click on a mode tab took the focus — hand it back, caret after the
+  // query, so the next keystroke goes where the reader is about to type
+  const modeRef = useRef(mode)
+  useEffect(() => {
+    if (modeRef.current === mode) return
+    modeRef.current = mode
+    const el = inputRef.current
+    if (!el) return
+    el.focus()
+    el.setSelectionRange(el.value.length, el.value.length)
+  }, [mode])
+
+  // Every render, before paint: one row or two, then the field's height.
+  // Anything in the row can change the room (the count, the list toggle, a
+  // mode switch), so this has no deps; a flip re-renders before the frame is
+  // drawn, so neither layout is ever shown for the wrong text.
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    const cs = getComputedStyle(el)
+    // The query alone decides; the placeholder ellipsizes instead (see
+    // .search-placeholder), so an empty bar always rests on one row
+    const need = textWidth(query, cs)
+    if (!tall) {
+      const room = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      if (need + 2 > room || el.scrollWidth > el.clientWidth) {
+        roomRef.current = room
+        setTallFor(mode)
+        return
+      }
+    } else if (query === '' || need < roomRef.current - 16) {
+      setTallFor(null)
+      return
+    }
+    // Grown to its text, one line at rest; the CSS max-height caps it and
+    // hands over to scrolling (the assistant composer's idiom)
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  })
+
   useEffect(() => {
     listRef.current
       ?.querySelector('.search-result.active')
@@ -210,20 +280,22 @@ export default function SearchBar({
       : count === 0
         ? t('search.noMatches')
         : t('search.count', { index: index + 1, count })
+  // Short words only, the same ones as the text tab's where they mean the
+  // same: the status sits beside the field and must not take its room —
+  // «KI leter i dokumentet …» left the query ~25 px while the search ran
+  // (Emil, 2026-10-05). What needs a sentence says it on the note line.
   const aiStatusText =
     aiStatus === 'running'
-      ? t('search.aiSearching')
+      ? t('search.searching')
       : aiStatus === 'done'
         ? aiHits.length > 0
           ? aiIndex >= 0
             ? t('search.count', { index: aiIndex + 1, count: aiHits.length })
             : t('search.aiHits', { count: aiHits.length })
-          : t('search.aiNoHits')
+          : t('search.noMatches')
         : aiStatus === 'error'
           ? t('search.searchError')
-          : aiStatus === 'noText'
-            ? t('search.aiNoText')
-            : ''
+          : ''
 
   return (
     <div
@@ -234,7 +306,7 @@ export default function SearchBar({
       style={offset.dx || offset.dy ? { translate: `${offset.dx}px ${offset.dy}px` } : undefined}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="search-row">
+      <div className={`search-row${tall ? ' is-tall' : ''}`}>
         <span className="search-grip" title={t('search.dragTip')} {...gripProps} />
         <div className="search-mode" role="tablist">
           <button
@@ -253,62 +325,78 @@ export default function SearchBar({
           </button>
         </div>
         {/* The option toggles live INSIDE the field (VS Code-style) so they
-            don't shrink the visible query text by taking their own row slots */}
+            don't shrink the visible query text by taking their own row slots.
+            When the bar is tall the CSS orders the field last, onto a row of
+            its own — the same element, so typing carries on uninterrupted. */}
         <div className="search-field">
-          <input
-            ref={inputRef}
-            value={query}
-            placeholder={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
-            onChange={(e) => {
-              onQueryChange(e.target.value)
-              // Emptying the field is how you ask for the list again after
-              // picking from it — the same move as clearing any combobox.
-              if (e.target.value.trim() === '') {
+          <div className="search-input">
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={query}
+              onChange={(e) => {
+                // A query is one line however it arrives: a pasted passage
+                // keeps its words, not its line breaks
+                const q = e.target.value.replace(/\s*[\r\n]+\s*/g, ' ')
+                onQueryChange(q)
+                // Emptying the field is how you ask for the list again after
+                // picking from it — the same move as clearing any combobox.
+                if (q.trim() === '') {
+                  setHistory(loadSearchHistory())
+                  setHistoryOpen(true)
+                  setHistoryIndex(-1)
+                }
+              }}
+              onFocus={() => {
                 setHistory(loadSearchHistory())
                 setHistoryOpen(true)
                 setHistoryIndex(-1)
-              }
-            }}
-            onFocus={() => {
-              setHistory(loadSearchHistory())
-              setHistoryOpen(true)
-              setHistoryIndex(-1)
-            }}
-            onKeyDown={(e) => {
-              if (bubblesWhileTyping(e)) return // an app shortcut (find reselects, F3 steps)
-              e.stopPropagation()
-              if (isAi) {
-                if (e.key === 'Enter') onAiSearch()
+              }}
+              onKeyDown={(e) => {
+                if (bubblesWhileTyping(e)) return // an app shortcut (find reselects, F3 steps)
+                e.stopPropagation()
+                if (e.key === 'Enter') e.preventDefault() // a search, never a newline
+                if (isAi) {
+                  if (e.key === 'Enter') onAiSearch()
+                  else if (e.key === 'Escape') onClose()
+                  return
+                }
+                // While the history list is showing, the arrows and Enter belong to
+                // it, and Escape dismisses it before the bar itself — the same
+                // priority every other transient surface in the app follows.
+                if (historyVisible && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                  e.preventDefault()
+                  const step = e.key === 'ArrowDown' ? 1 : -1
+                  setHistoryIndex((i) => {
+                    const next = i + step
+                    if (next < 0) return -1
+                    return next >= history.length ? history.length - 1 : next
+                  })
+                  return
+                }
+                if (historyVisible && e.key === 'Escape') {
+                  setHistoryOpen(false)
+                  return
+                }
+                if (e.key === 'Enter' && historyVisible && historyIndex >= 0) {
+                  pickHistory(history[historyIndex])
+                  return
+                }
+                if (e.key === 'Enter' && e.shiftKey) onPrev()
+                else if (e.key === 'Enter') onNext()
                 else if (e.key === 'Escape') onClose()
-                return
-              }
-              // While the history list is showing, the arrows and Enter belong to
-              // it, and Escape dismisses it before the bar itself — the same
-              // priority every other transient surface in the app follows.
-              if (historyVisible && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-                e.preventDefault()
-                const step = e.key === 'ArrowDown' ? 1 : -1
-                setHistoryIndex((i) => {
-                  const next = i + step
-                  if (next < 0) return -1
-                  return next >= history.length ? history.length - 1 : next
-                })
-                return
-              }
-              if (historyVisible && e.key === 'Escape') {
-                setHistoryOpen(false)
-                return
-              }
-              if (e.key === 'Enter' && historyVisible && historyIndex >= 0) {
-                pickHistory(history[historyIndex])
-                return
-              }
-              if (e.key === 'Enter' && e.shiftKey) onPrev()
-              else if (e.key === 'Enter') onNext()
-              else if (e.key === 'Escape') onClose()
-            }}
-            aria-label={isAi ? t('search.aiPlaceholder') : t('search.placeholder')}
-          />
+              }}
+              aria-label={placeholder}
+            />
+            {/* Our own placeholder, laid over the empty field: a textarea's
+                native one cannot ellipsize, so beside the model name the AI
+                prompt was cut off mid-word */}
+            {query === '' && (
+              <span className="search-placeholder" aria-hidden="true">
+                {placeholder}
+              </span>
+            )}
+          </div>
           {!isAi && (
             <>
               <button
@@ -328,13 +416,25 @@ export default function SearchBar({
             </>
           )}
         </div>
-        {/* Which model answers, always visible in AI mode — switching it
-            happens in the assistant's model menu, the tooltip says so */}
-        {isAi && aiModelName && (
-          <span className="search-ai-model" title={t('search.aiModelTip')}>
-            {aiModelName}
-          </span>
+        {/* The AI search's own button, labelled with the model that answers:
+            always visible in AI mode, and an AI button says in words what it
+            spends the key on rather than a bare ✦. One control where the
+            model name and a ✦ sat side by side; the model is switched in the
+            assistant's model menu, the tooltip says so. Not dimmed while the
+            search runs — the name stays readable, the count says «Søker …». */}
+        {isAi && (
+          <button
+            className="tb-btn search-ai-go"
+            onClick={() => (query.trim() === '' ? inputRef.current?.focus() : onAiSearch())}
+            disabled={aiStatus === 'running'}
+            title={aiModelName ? t('search.aiGoTip', { name: aiModelName }) : t('search.modeAiTip')}
+          >
+            ✦{aiModelName && <span className="search-ai-go-name">{aiModelName}</span>}
+          </button>
         )}
+        {/* Only while tall: holds the count and the buttons at the right end
+            once the field has left the row */}
+        <span className="search-row-fill" />
         {/* The fold toggle sits right after the field, away from ↑ ↓: a
             chevron next to the step arrows read as a third arrow (Emil,
             2026-10-04), so it is a list glyph, lit while the list is open */}
@@ -348,7 +448,11 @@ export default function SearchBar({
             <IconList size={15} />
           </button>
         )}
-        <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
+        {/* Not even its padding while there is nothing to count — those
+            12 px are the difference between the AI prompt fitting or not */}
+        {(isAi ? aiStatusText : textStatus) && (
+          <span className="search-status">{isAi ? aiStatusText : textStatus}</span>
+        )}
         {/* ↑ ↓ step whichever list is showing — the AI passages too */}
         <button
           className="tb-btn"
@@ -366,11 +470,6 @@ export default function SearchBar({
         >
           ↓
         </button>
-        {isAi && aiStatus !== 'running' && (
-          <button className="tb-btn" onClick={() => onAiSearch()} disabled={query.trim() === ''} title={t('search.modeAiTip')}>
-            ✦
-          </button>
-        )}
         <button className="tb-btn" onClick={onClose} title={t('search.closeTip')}>
           ✕
         </button>
@@ -454,6 +553,7 @@ export default function SearchBar({
         </div>
       )}
       {isAi && aiStatus === 'error' && aiNote && <div className="search-ai-note">{aiNote}</div>}
+      {isAi && aiStatus === 'noText' && <div className="search-ai-note">{t('search.aiNoText')}</div>}
       {/* With hits the note is the excerpt disclaimer (huge documents are
           searched via a page excerpt); with none it is the model's answer */}
       {isAi && aiStatus === 'done' && aiNote && <div className="search-ai-note">{aiNote}</div>}

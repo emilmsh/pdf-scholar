@@ -745,11 +745,12 @@ const ui = {
     const b = btn(L.search);
     if (!b) throw new Error('no search button on the toolbar');
     if (!document.querySelector('.search-bar')) { click(b); await settle(450); }
-    const input = document.querySelector('.search-bar input');
+    // A textarea, not an input: it wraps a long query on a row of its own
+    const input = document.querySelector('.search-bar textarea');
     if (!input) throw new Error('the search bar did not open');
     input.focus();
     await settle(80);
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
     setter.call(input, query);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     // The text index is built page by page on demand, so a fixed wait is a
@@ -787,11 +788,13 @@ const ui = {
     if (!tab) throw new Error('no AI tab in the search bar');
     click(tab);
     await settle(300);
-    const input = document.querySelector('.search-bar input');
+    // The same textarea as the text tab's, so its value setter is the
+    // textarea's own
+    const input = document.querySelector('.search-bar textarea');
     if (!input) throw new Error('the search bar lost its input after the tab switch');
     input.focus();
     await settle(80);
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
     setter.call(input, query);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await settle(200);

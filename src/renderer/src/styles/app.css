@@ -2822,7 +2822,8 @@ html.pen-near .draw-layer {
   right: 14px;
   z-index: 55;
   /* Wide enough that the query input isn't squeezed to a few characters by
-     the mode toggle + counter + nav buttons sharing its row */
+     the mode toggle + counter + nav buttons sharing its row — a longer query
+     makes the bar taller, never wider (SearchBar, the tall layout) */
   width: 500px;
   max-width: calc(100vw - 28px);
   background: var(--bg-elevated);
@@ -2836,7 +2837,13 @@ html.pen-near .draw-layer {
 .search-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px 4px;
+}
+
+/* Tall: the query has outgrown the field beside the controls, so the field
+   (the same element — focus and caret survive) moves to a row of its own */
+.search-row.is-tall {
+  flex-wrap: wrap;
 }
 
 /* Drag handle at the bar's left end — the same quiet pill as .menu-grip,
@@ -2909,39 +2916,94 @@ html.pen-near .draw-layer {
   text-decoration: underline;
 }
 
-/* The query field: a bordered wrapper holding the input plus the Aa / |ab|
-   toggles, so the toggles ride inside the field instead of eating row width */
+/* Only while tall: holds the count and the buttons at the row's right end
+   once the field has left the row */
+.search-row-fill {
+  display: none;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.search-row.is-tall .search-row-fill {
+  display: block;
+}
+
+/* The query field: a bordered wrapper holding the textarea plus the Aa /
+   |ab| toggles, so the toggles ride inside the field instead of eating row
+   width. A step above the chrome's 13px: the query is what the bar is for. */
 .search-field {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 2px;
-  height: 30px;
   padding-right: 3px;
   background: var(--bg-chrome);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
 
+.search-row.is-tall .search-field {
+  order: 1;
+  flex: 1 0 100%;
+}
+
 .search-field:focus-within {
   border-color: var(--accent);
 }
 
-.search-field input {
+/* The textarea with its placeholder laid over it */
+.search-input {
+  position: relative;
   flex: 1;
   min-width: 0;
-  height: 100%;
-  padding: 0 4px 0 10px;
+}
+
+/* One line, unwrapped, while the bar is one row (SearchBar folds it out to
+   the tall layout before the text could scroll out of sight); wrapping in
+   the tall layout, grown to its text — as many lines as it needs, capped
+   only so a pasted page cannot push the hit list off the screen */
+.search-field textarea,
+.search-placeholder {
+  padding: 5px 4px 5px 10px;
   font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.search-field textarea {
+  display: block;
+  width: 100%;
   color: var(--text);
   background: none;
   border: none;
   outline: none;
+  resize: none;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.search-row.is-tall .search-field textarea {
+  white-space: pre-wrap;
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
+/* Ellipsizes where a textarea's native placeholder would be cut mid-word */
+.search-placeholder {
+  position: absolute;
+  inset: 0;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
 
 .search-field-opt {
   flex-shrink: 0;
+  /* Centred on the first line, which is the whole field until it wraps */
+  margin-top: 4px;
   height: 22px;
   padding: 0 5px;
   border-radius: 5px;
@@ -2959,6 +3021,8 @@ html.pen-near .draw-layer {
   color: var(--accent);
 }
 
+/* Short words only (SearchBar keeps sentences on the note line), so the
+   count never takes the field's room */
 .search-status {
   color: var(--text-secondary);
   font-size: 11.5px;
@@ -2967,21 +3031,37 @@ html.pen-near .draw-layer {
   font-variant-numeric: tabular-nums;
 }
 
-/* Which model the AI search will spend the user's key on — same muted tone
-   as the status, capped so a long deployment name cannot squeeze the field */
-.search-ai-model {
+/* The AI search button: ✦ plus the model the search will spend the user's
+   key on, the name in the status's muted tone — capped so a long deployment
+   name cannot squeeze the field */
+.search-ai-go {
+  min-width: 0;
+  max-width: 150px;
   color: var(--text-secondary);
-  font-size: 11.5px;
-  white-space: nowrap;
+}
+
+.search-ai-go:hover {
+  color: var(--text);
+}
+
+.search-ai-go-name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 130px;
-  padding: 0 4px;
+  white-space: nowrap;
+  font-size: 11.5px;
 }
 
 .search-row .tb-btn:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* Busy, not unavailable: the model's name stays readable while it answers */
+.search-row .search-ai-go:disabled {
+  opacity: 1;
+  background: none;
+  color: var(--text-secondary);
 }
 
 /* Fold/unfold the results list — a list glyph (never a chevron: beside ↑ ↓
