@@ -146,20 +146,22 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.55.1
+## What's new in this version (≤ 1 500 chars) — v0.56.0
 
 **EN:**
 ```
-• Night has a new paper tone, «White»: the document as printed — white page, dark toolbar and panels — for readers who keep every app dark but want the document itself untouched
-• The search bar's results list opens folded, so the bar never covers the hit it points at; a list button beside the field unfolds it, and the choice is remembered. The bar can be dragged aside (double-click its grip to put it back), and a hit always lands clear of it. The AI search steps through its passages with the same arrows
-• The selection menu has two new switches in the settings menu: let it wait for a right-click instead of opening on its own, and a compact form — the same choices at a third of the height, icons with their names on hover, «⋯» for the full menu when you want it
+• PDF files get a document icon of their own in Explorer — a sheet with a red corner and red lines and the app's small mark — instead of the app logo. The settings menu offers two quieter variants, the app logo, or an icon of your own: an .ico, or a square .png the app turns into one
+• Night has a new paper tone, «White»: the document as printed — white page, dark toolbar and panels
+• The search bar's results list opens folded so it never covers the hit it points at; a list button unfolds it, the bar can be dragged aside, and the AI search steps through its passages with the same arrows
+• The selection menu has two switches: wait for a right-click instead of opening on its own, and a compact form with the same choices at a third of the height
 ```
 
 **NO:**
 ```
-• Natt har fått en ny papirtone, «Hvitt»: dokumentet som trykt — hvit side, mørk verktøylinje og mørke paneler — for den som holder alle apper mørke, men vil ha selve dokumentet urørt
-• Søkefeltets treffliste åpner sammenlagt, så feltet aldri dekker treffet det peker på; en listeknapp ved feltet folder den ut, og valget huskes. Feltet kan dras til side (dobbeltklikk på grepet setter det tilbake), og et treff lander alltid klar av det. KI-søket blar gjennom passasjene sine med de samme pilene
-• Markeringsmenyen har fått to nye brytere i innstillingene: la den vente på høyreklikk i stedet for å åpne selv, og en kompakt form — de samme valgene på en tredjedel av høyden, ikoner med navn når du holder over, «⋯» for hele menyen når du vil ha den
+• PDF-filer får et eget dokumentikon i Utforsker — et ark med rødt hjørne, røde linjer og appens lille merke — i stedet for app-logoen. Innstillingene tilbyr to roligere varianter, app-logoen eller et eget ikon: en .ico, eller en kvadratisk .png som appen gjør om
+• Natt har fått en ny papirtone, «Hvitt»: dokumentet som trykt — hvit side, mørk verktøylinje og mørke paneler
+• Søkefeltets treffliste åpner sammenlagt så feltet aldri dekker treffet det peker på; en listeknapp folder den ut, feltet kan dras til side, og KI-søket blar gjennom passasjene med de samme pilene
+• Markeringsmenyen har fått to brytere: vent på høyreklikk i stedet for å åpne selv, og en kompakt form med de samme valgene på en tredjedel av høyden
 ```
 
 ---
