@@ -761,14 +761,47 @@ button {
   min-height: 0;
 }
 
+.recents-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 0 4px 0 12px;
+}
+
 .recents h2 {
   font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-secondary);
-  margin-bottom: 10px;
-  padding-left: 12px;
+}
+
+/* List / first-pages switch — two quiet icon buttons, the chosen one sunk */
+.recents-view {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.recents-view button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--text-secondary);
+}
+
+.recents-view button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.recents-view button.is-active {
+  background: var(--active);
+  color: var(--text);
 }
 
 .recents ul {
@@ -920,6 +953,104 @@ button {
   color: var(--text-secondary);
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* ---------- «Nylig lest» as first pages (issue #28) ----------
+   Same box as the list, so switching changes what is inside it and nothing
+   else. Every cover sits in a fixed sheet-shaped frame: a picture drawn late
+   lands in place instead of pushing the grid, and a landscape slide or an A4
+   page letterboxes onto the same paper, where the bars read as margin. Five
+   across in the library's column. */
+.recents ul.recents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  align-content: start;
+  gap: 10px 8px;
+  padding: 12px;
+}
+
+.recents-grid li + li {
+  border-top: none;
+}
+
+.recent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  border-radius: 10px;
+  text-align: left;
+}
+
+.recent-card:hover {
+  background: var(--hover);
+}
+
+.recent-cover {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--page-bg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  color: var(--text-secondary);
+}
+
+/* White paper with the picture on it, recoloured as ONE layer the way a page
+   canvas is (and like the sidebar's thumbnails): the stored picture is the
+   unthemed page, so one picture serves every theme, and margin and page take
+   the same tone. No z-index here or on the frame — the blend needs the page
+   colour behind it. */
+.recent-sheet {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  filter: var(--page-filter);
+  mix-blend-mode: var(--page-blend);
+}
+
+.recent-sheet img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* The placeholder icon, above the sheet */
+.recent-cover > svg {
+  position: relative;
+  opacity: 0.55;
+}
+
+/* Where the reader is — a hairline along the foot of the page */
+.recent-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--wc-teal);
+}
+
+.recent-card-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.recent-card-meta {
+  margin-top: -3px;
+  font-size: 11px;
+  color: var(--text-secondary);
 }
 
 /* ---------- Viewer ---------- */

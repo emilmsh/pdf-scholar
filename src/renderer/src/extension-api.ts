@@ -25,9 +25,17 @@ import type {
   PdfxApi,
   ReadingPosition,
   RecentFile,
+  RecentThumbView,
   Settings
 } from '../../shared/types'
 import type { FetchFailure } from '../../shared/insecure-retry'
+import {
+  RECENT_THUMB_READ_MAX_BYTES,
+  sanitizeRecentThumb,
+  staleThumbPaths,
+  thumbReadableInExtension
+} from '../../shared/recent-thumbs'
+import { forgetRecentThumbs, loadRecentThumbs, saveRecentThumb } from './extension-recent-thumbs'
 import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
@@ -292,6 +300,47 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         r.name.startsWith(FSA) ? { ...r, name: fileNameOf(r.name) } : r
       ),
 
+    // The library's grid pictures (issue #28) — IndexedDB, see
+    // extension-recent-thumbs.ts. Same contract as desktop's main process:
+    // pruned against the recents on every read, refused for a path not in them.
+    getRecentThumbs: async () => {
+      const [recents, positions, stored] = await Promise.all([
+        store.get<RecentFile[]>(K_RECENTS, []),
+        store.get<Record<string, ReadingPosition>>(K_POSITIONS, {}),
+        loadRecentThumbs()
+      ])
+      const paths = recents.map((r) => r.path)
+      void forgetRecentThumbs(staleThumbPaths(Object.keys(stored), paths))
+      const out: Record<string, RecentThumbView> = {}
+      for (const path of paths) {
+        const thumb = stored[path]
+        if (!thumb) continue
+        const page = positions[path]?.page
+        out[path] = page === undefined ? thumb : { ...thumb, page }
+      }
+      return out
+    },
+    setRecentThumb: (path, thumb) => {
+      const clean = sanitizeRecentThumb(thumb)
+      if (!clean) return
+      void store.get<RecentFile[]>(K_RECENTS, []).then((recents) => {
+        if (recents.some((r) => r.path === path)) void saveRecentThumb(path, clean)
+      })
+    },
+    // Only a local file (thumbReadableInExtension), and through fetch rather
+    // than readFile so nothing is retried with cookies or recorded as opened.
+    readRecentForThumb: async (path) => {
+      if (!thumbReadableInExtension(path)) return null
+      const recents = await store.get<RecentFile[]>(K_RECENTS, [])
+      if (!recents.some((r) => r.path === path)) return null
+      try {
+        const res = await fetch(path)
+        return res.ok ? await readCapped(res, RECENT_THUMB_READ_MAX_BYTES) : null
+      } catch {
+        return null // moved, renamed, or local files not allowed
+      }
+    },
+
     docOpened: (path: string) => {
       // The name is derived from the path tail; the shell also records recents
       // via openFileDialog. Keep this cheap and best-effort.
@@ -459,6 +508,37 @@ async function fetchDocument(
     // gave up (DNS, TLS, a reset). Everything the server said is handled above.
     return { error: err instanceof Error ? err.message : String(err), failure: 'transport' }
   }
+}
+
+/** A response body, or null once it passes `max` bytes — read as a stream and
+ *  abandoned there, so an oversized file is never held whole just to be
+ *  measured (a file:// response need not declare its length). */
+async function readCapped(res: Response, max: number): Promise<Uint8Array | null> {
+  const declared = Number(res.headers.get('content-length'))
+  if (declared > max || !res.body) {
+    void res.body?.cancel()
+    return null
+  }
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > max) {
+      void reader.cancel()
+      return null
+    }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const chunk of chunks) {
+    out.set(chunk, at)
+    at += chunk.byteLength
+  }
+  return out
 }
 
 /** `%PDF` somewhere in the first KB — the same tolerance pdf.js allows for files

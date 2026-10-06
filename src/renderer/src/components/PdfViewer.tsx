@@ -5,6 +5,7 @@ import { detectDoi } from '../doi-detect'
 import { isPasswordException, openDocument } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { renderPagesAsImages as renderAiPageImages } from '../ai-page-images'
+import { recordRecentThumb } from '../recent-thumbs'
 import type {
   AiAccessMode,
   AiCitation,
@@ -1726,6 +1727,7 @@ export default function PdfViewer({
 
   useEffect(() => {
     let destroyed = false
+    let stopRecentThumb: (() => void) | undefined
     /** Register the bytes with the engines that need them, then hand pdf.js its
      *  own copy. In the browser the annotation engine edits an in-memory twin of
      *  the document (desktop edits a draft file instead), so the registration
@@ -1829,11 +1831,18 @@ export default function PdfViewer({
         setTocPinned(true)
         setAttachmentsFocus((n) => n + 1)
       }
+      // The library's grid picture (issue #28), from the document already in
+      // hand — but only for a reader who chose the grid, and only once the
+      // pages they came for are on screen.
+      if (!destroyed && settingsRef.current.recentsView === 'grid') {
+        stopRecentThumb = recordRecentThumb(payload.path, doc, docPasswordRef.current !== undefined)
+      }
     })().catch((err) => {
       if (!destroyed) setError(err instanceof Error ? err.message : String(err))
     })
     return () => {
       destroyed = true
+      stopRecentThumb?.()
       // Unmounting with the prompt up (tab closed mid-unlock) must settle the
       // promise, or the load loop above never returns and the effect leaks.
       setPasswordAsk((ask) => {

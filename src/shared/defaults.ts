@@ -34,7 +34,8 @@ export const DEFAULT_SETTINGS: Settings = {
   // Empty = every command sits on the bindings keymap.ts ships. The defaults
   // themselves live there, next to the commands they belong to, so this stays
   // "nothing rebound" rather than a second copy of the map.
-  keymap: {}
+  keymap: {},
+  recentsView: 'list'
 }
 
 /** Model per provider when nothing is stored yet. Azure has no default — its

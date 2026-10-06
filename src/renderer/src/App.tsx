@@ -1151,7 +1151,13 @@ export default function App(): React.JSX.Element {
         {/* With nothing open the library is not a choice, it is all there is */}
         {(atLibrary || tabs.length === 0) && (
           <div className="tab-view active">
-            <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+            <Welcome
+              recents={recents}
+              onOpenDialog={openDialog}
+              onOpenRecent={openPath}
+              recentsView={settings.recentsView}
+              onRecentsViewChange={(recentsView) => updateSettings({ recentsView })}
+            />
           </div>
         )}
       </div>

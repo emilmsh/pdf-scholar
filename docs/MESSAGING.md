@@ -160,8 +160,14 @@ carries no picture of its own.)*
   him as much as the split view, and it was buried in a subclause)*
 - The toolbar can be unpinned; the page then fills the window, and the toolbar
   and panels return on hover at the window edges
-- Reading positions and recent files are remembered. Documents open in tabs or
-  separate windows. A tab drags like a file: into another PDF Scholar window,
+- Reading positions and recent files are remembered. The library shows the
+  recent files as a list, or as a grid of their first pages with how far each
+  was read — a document is often recognised faster by its look than by its
+  file name. The pictures are taken only while the grid is chosen, stay on the
+  machine, and a password-protected document shows a lock instead of its first
+  page *(reader ask, [issue #28](https://github.com/emilmsh/pdf-scholar/issues/28),
+  2026-10-06 — a SumatraPDF habit; supporting, not a headline)*. Documents open
+  in tabs or separate windows. A tab drags like a file: into another PDF Scholar window,
   or into anything that takes a PDF — a browser's upload field, an e-mail, a
   chat, a folder. «Flytt til nytt vindu» in the tab menu tears it into a
   window of its own *(2026-09-17, Emil's ask: dragging a tab into another

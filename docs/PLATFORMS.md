@@ -535,6 +535,25 @@ regressions are treated as bugs, not as acceptable platform lag.
     desktop's generic document icon (electron-builder: not supported); the
     **extension** has no files. Covered by `npm run test:file-icon` (CI).
 
+28. **The library's grid of first pages draws a missing picture from a LOCAL
+    file only.** Issue #28: «Nylig lest» as a grid of first pages, identical
+    everywhere — the viewer pictures page 1 of the document it has open
+    (`src/renderer/src/recent-thumbs.ts`, only while the grid is chosen), and
+    the grid draws, once, the entries opened before that. The drawing reads
+    the file again, and that is where the platforms part: desktop recents are
+    all files on disk (`recent-thumbs:read` in main, ≤ 50 MB, never through
+    `loadPdf`, which would file the document as just opened); the extension
+    reads back only a `file://` recent (`thumbReadableInExtension`) — a URL
+    would be downloaded again, possibly from behind a login, and a picked
+    (`fsa:`) file needs a permission only a click can grant. Those keep a
+    placeholder until they are next opened, which takes the picture the
+    ordinary way. Storage differs by backend only: files beside the state
+    file on the desktop (`src/main/recent-thumbs.ts`), IndexedDB in the
+    extension (`src/renderer/src/extension-recent-thumbs.ts`;
+    `chrome.storage.local` is JSON and shares its 10 MB with the keys), none
+    in the web preview, which has no recents. Covered by
+    `npm run test:recent-thumbs` (CI) and `npm run test:recents-grid` (desktop).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

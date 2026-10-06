@@ -25,6 +25,8 @@ import type {
   ModifyAnnotationRequest,
   DocBookmark,
   ReadingPosition,
+  RecentThumb,
+  RecentThumbView,
   SetFormFieldRequest,
   Settings,
   TabDropResult
@@ -77,6 +79,8 @@ import { reapplyFileIconAtStartup, registerFileIconIpc } from './file-icon'
 import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
 import { doiCite } from './doi'
 import { citationStyleOrDefault } from '../shared/citation-style'
+import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
+import { createRecentThumbStore } from './recent-thumbs'
 
 // The portable zip keeps its state beside the exe. Before ANY path is read —
 // the migration below, the single-instance lock, the state file, drafts.
@@ -893,6 +897,46 @@ function registerIpc(): void {
   )
 
   ipcMain.handle('recents:get', () => getState().recents)
+
+  // The library's grid pictures (issue #28). Every handler checks the path
+  // against the recents: that list is the only thing a picture belongs to, and
+  // it keeps the byte read below from being a general «read any file» channel.
+  const recentThumbs = createRecentThumbStore(join(app.getPath('userData'), 'recent-thumbs'))
+  const isRecent = (path: unknown): path is string =>
+    typeof path === 'string' && getState().recents.some((r) => r.path === path)
+
+  ipcMain.handle('recent-thumbs:get', async (): Promise<Record<string, RecentThumbView>> => {
+    const { recents, positions } = getState()
+    const paths = recents.map((r) => r.path)
+    await recentThumbs.prune(paths)
+    const stored = await recentThumbs.get(paths)
+    const out: Record<string, RecentThumbView> = {}
+    for (const [path, thumb] of Object.entries(stored)) {
+      const page = positions[path]?.page
+      out[path] = page === undefined ? thumb : { ...thumb, page }
+    }
+    return out
+  })
+
+  ipcMain.on('recent-thumbs:set', (_e, path: unknown, thumb: RecentThumb) => {
+    if (!isRecent(path)) return
+    recentThumbs.set(path, thumb).catch((err) => console.error('pdfx: recent thumb not stored', err))
+  })
+
+  // Not loadPdf: that files the document as just opened (recents order, the
+  // OS jump list), and the grid reading a picture is not the reader opening it.
+  // The draft is read when there is one — it is what opening the file shows.
+  ipcMain.handle('recent-thumbs:read', async (_e, path: unknown): Promise<Uint8Array | null> => {
+    if (!isRecent(path)) return null
+    try {
+      const file = readPathFor(path)
+      const info = await stat(file)
+      if (!info.isFile() || info.size > RECENT_THUMB_READ_MAX_BYTES) return null
+      return new Uint8Array(await readFile(file))
+    } catch {
+      return null
+    }
+  })
 
   ipcMain.handle('settings:get', () => getState().settings)
 

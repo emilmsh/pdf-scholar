@@ -182,6 +182,10 @@ const nb = {
   'welcome.aiGuide':
     'Lim inn nøkkelen for leverandørene du har – resten lar du stå tomt. Nøkler lages i leverandørens konsoll; sett et utgiftstak med det samme, og følg med på forbruket på samme sted. Nøkkelen blir liggende på din egen maskin og sendes aldri til andre enn leverandøren; innstillingene forteller nøyaktig hva som beskytter den her.',
   'welcome.recents': 'Nylig lest',
+  'welcome.recentsView': 'Visning av nylig leste',
+  'welcome.recentsList': 'Vis som liste',
+  'welcome.recentsGrid': 'Vis forsidene',
+  'welcome.recentsProgress': 's. {page} av {pages}',
   'welcome.logoCredit': 'Logo av Elisabeth Walle',
 
   // Tabs
@@ -1206,6 +1210,10 @@ const en: Dict = {
   'welcome.aiGuide':
     'Paste the key for the providers you have — leave the rest empty. Keys are created in the provider console; set a spending cap while you are there, and watch your usage in the same place. The key stays on your own machine and is only ever sent to the provider; the settings state exactly what protects it here.',
   'welcome.recents': 'Recently read',
+  'welcome.recentsView': 'Recently read view',
+  'welcome.recentsList': 'Show as list',
+  'welcome.recentsGrid': 'Show first pages',
+  'welcome.recentsProgress': 'p. {page} of {pages}',
   'welcome.logoCredit': 'Logo by Elisabeth Walle',
 
   'tabs.close': 'Close tab',

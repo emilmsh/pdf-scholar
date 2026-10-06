@@ -122,6 +122,11 @@ jobs:
       # electron-builder picks them up BY NAME, so a misnamed file silently
       # falls back to the app logo
       - run: npm run test:file-icon
+      # The library's grid of first pages (issue #28): a LOCKED document never
+      # keeps a picture on disk (nor the cover it had before it was encrypted),
+      # main writes only small JPEGs, pictures go when their file leaves the
+      # recents, and the extension never re-downloads a URL to draw one
+      - run: npm run test:recent-thumbs
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

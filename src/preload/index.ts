@@ -11,6 +11,7 @@ import type {
   PdfxApi,
   DocBookmark,
   ReadingPosition,
+  RecentThumb,
   SetFormFieldRequest,
   Settings
 } from '../shared/types'
@@ -20,6 +21,10 @@ const api: PdfxApi = {
   readFile: (path: string, opts?: { awaitSettled?: boolean }) =>
     ipcRenderer.invoke('file:read', path, opts),
   getRecents: () => ipcRenderer.invoke('recents:get'),
+  getRecentThumbs: () => ipcRenderer.invoke('recent-thumbs:get'),
+  setRecentThumb: (path: string, thumb: RecentThumb) =>
+    ipcRenderer.send('recent-thumbs:set', path, thumb),
+  readRecentForThumb: (path: string) => ipcRenderer.invoke('recent-thumbs:read', path),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   getPosition: (path: string) => ipcRenderer.invoke('position:get', path),
   getBookmarks: (path: string) => ipcRenderer.invoke('bookmarks:get', path),

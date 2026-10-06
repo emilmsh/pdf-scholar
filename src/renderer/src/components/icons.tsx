@@ -165,6 +165,17 @@ export const IconList = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** The library's grid of first pages (issue #28): four sheets, IconList's twin
+ *  in the «Nylig lest» view switch */
+export const IconGrid = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+    <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+    <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+  </Svg>
+)
+
 export const IconSidebar = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>
     <rect x="3" y="4" width="18" height="16" rx="2" />

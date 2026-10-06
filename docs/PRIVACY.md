@@ -1,6 +1,6 @@
 # PDF Scholar — Privacy Policy
 
-_Last updated: 2026-09-27_
+_Last updated: 2026-10-06_
 
 PDF Scholar (the desktop app and the browser extension) is a local-first PDF
 reader and annotator. **It collects no data about you.**
@@ -14,6 +14,13 @@ reader and annotator. **It collects no data about you.**
   contains no advertising or analytics SDKs.
 - **Settings and reading positions** (recent files, per-file positions, theme,
   window size) are stored locally on your device and never transmitted.
+- **First-page pictures of your recent files** — only if you switch the
+  library's «Recently read» list to show first pages. A small picture of page 1
+  of each recent file is then kept locally next to the settings (in the browser
+  extension, in the extension's own browser storage), deleted when the file
+  leaves the recent-files list, and never transmitted. A password-protected
+  document gets no picture at all. While the plain list is chosen, no picture
+  is taken.
 
 ## AI assistant (optional, off by default)
 

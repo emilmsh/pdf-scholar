@@ -406,6 +406,8 @@ export default function ExtensionApp(): React.JSX.Element {
                 recents={recents}
                 onOpenDialog={openDialog}
                 onOpenRecent={openPath}
+                recentsView={settings.recentsView}
+                onRecentsViewChange={(recentsView) => updateSettings({ recentsView })}
                 resume={{ name: payload.name, onResume: () => setAtLibrary(false) }}
               />
             </div>
@@ -421,7 +423,13 @@ export default function ExtensionApp(): React.JSX.Element {
       ) : accessNotice ? (
         <div className="fileaccess-screen">{accessNotice}</div>
       ) : (
-        <Welcome recents={recents} onOpenDialog={openDialog} onOpenRecent={openPath} />
+        <Welcome
+          recents={recents}
+          onOpenDialog={openDialog}
+          onOpenRecent={openPath}
+          recentsView={settings.recentsView}
+          onRecentsViewChange={(recentsView) => updateSettings({ recentsView })}
+        />
       )}
       {extUpdate && (
         <div className="update-toast" role="status">

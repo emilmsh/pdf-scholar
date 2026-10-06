@@ -89,12 +89,40 @@ export interface Settings {
    *  the object, and a stored id that no longer exists is dropped on load
    *  rather than failing a build in main. */
   keymap: Record<string, string[]>
+  /** How the library shows «Nylig lest»: the compact list, or a grid of
+   *  first-page pictures (issue #28). The pictures are only ever taken while
+   *  'grid' is chosen, so a reader who keeps the list pays nothing for them and
+   *  has no page content stored outside the files themselves. */
+  recentsView: 'list' | 'grid'
 }
 
 export interface RecentFile {
   path: string
   name: string
   lastOpened: number
+}
+
+/** What one recents entry shows in the library's grid view (issue #28). Taken
+ *  from the open document while the grid is the chosen view, or — for an entry
+ *  that never was open since — drawn once by the grid itself from the file. */
+export interface RecentThumb {
+  /** Page 1 as a JPEG, unthemed (the grid recolours it the way it recolours a
+   *  page). Absent for a locked document, and for one with nothing to draw. */
+  image?: Uint8Array
+  /** Pages in the document when the picture was taken; 0 = not known (a locked
+   *  file the grid could not open). The denominator of the progress line. */
+  pages: number
+  /** The document needed a password. No picture is kept: it would be page 1 in
+   *  the clear on disk, for a file its owner chose to encrypt. */
+  locked?: boolean
+  /** When it was taken (ms) — the version the library caches its image URL by */
+  taken: number
+}
+
+/** A RecentThumb as the library reads it: with where the reader is */
+export interface RecentThumbView extends RecentThumb {
+  /** 1-based page of the saved reading position, when there is one */
+  page?: number
 }
 
 /** User-applied view rotation in clockwise degrees (added on top of the
@@ -831,6 +859,21 @@ export interface PdfxApi {
    *  that serve URLs rather than files ignore the flag and simply read again. */
   readFile(path: string, opts?: { awaitSettled?: boolean }): Promise<FilePayload | FileError>
   getRecents(): Promise<RecentFile[]>
+  // ---------- The library's grid view (issue #28, shared/recent-thumbs.ts) ----------
+  /** The stored first-page pictures of the recents, keyed by path, each with
+   *  the page its reading position is at. Pictures of files that have left the
+   *  recents list are deleted on the way, so the store never outgrows it. */
+  getRecentThumbs(): Promise<Record<string, RecentThumbView>>
+  /** Keep the picture for a recents entry, replacing any earlier one. Fire and
+   *  forget, like setPosition; refused for a path not in the recents. */
+  setRecentThumb(path: string, thumb: RecentThumb): void
+  /** A recents entry's bytes, for the grid to draw a picture the file never got
+   *  while open. Read WITHOUT readFile's side effects — that call files the
+   *  document as just opened, which would reshuffle the very list being drawn
+   *  (and the OS's recent documents with it). null = not to be read here: not
+   *  in the recents, gone, larger than RECENT_THUMB_READ_MAX_BYTES, or a
+   *  platform that would have to download it again (a URL in the extension). */
+  readRecentForThumb(path: string): Promise<Uint8Array | null>
   getSettings(): Promise<Settings>
   getPosition(path: string): Promise<ReadingPosition | null>
   getPendingPath(): Promise<string | null>

@@ -89,6 +89,10 @@ export const webApi: PdfxApi = {
     }
   },
   getRecents: async () => [],
+  // No recents here, so nothing for the grid to picture
+  getRecentThumbs: async () => ({}),
+  setRecentThumb: () => {},
+  readRecentForThumb: async () => null,
   getSettings: async () => loadWebState().settings,
   getPosition: async (path) => loadWebState().positions[path] ?? null,
   getBookmarks: async (path) => loadWebState().bookmarks?.[path] ?? [],

@@ -177,7 +177,8 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
   field jumps straight to a page number
 - Internal links and cross-references can be followed and returned from: back/forward
   navigation (Alt+← / Alt+→, or the mouse side-buttons) holds the history
-- Reading positions and recent files are remembered; a library home screen lists them.
+- Reading positions and recent files are remembered; a library home screen lists them —
+  as a list, or as a grid of their first pages with how far you read each one.
   Going back to it closes nothing: open documents stay in the tab strip, and returning
   to one restores the page, zoom and panels
 - Several documents open in tabs or separate windows. A tab drags like a file: into

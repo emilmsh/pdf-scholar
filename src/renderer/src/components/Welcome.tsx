@@ -2,21 +2,39 @@ import { useEffect, useState } from 'react'
 import type {
   AiConfigView,
   RecentFile,
+  Settings,
   UpdateCheckOutcome,
   UpdateUnsupportedReason
 } from '../../../shared/types'
 import { BREW_UPGRADE_COMMAND } from '../../../shared/update-channel'
+import { readingProgress } from '../../../shared/recent-thumbs'
 import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
-import { AppMark, IconArrowLeft, IconDocument, IconFolderOpen, IconHeart, IconSparkle } from './icons'
+import {
+  AppMark,
+  IconArrowLeft,
+  IconDocument,
+  IconFolderOpen,
+  IconGrid,
+  IconHeart,
+  IconList,
+  IconLock,
+  IconSparkle
+} from './icons'
 import { AiSettings } from './AiPanel'
 import FileAccessNotice from './FileAccessNotice'
 import { dismissFileAccessNotice, fileAccessGranted, fileAccessNoticeDismissed } from '../extension-file-access'
+import { useRecentThumbs } from '../hooks/useRecentThumbs'
+
+type RecentsView = Settings['recentsView']
 
 interface Props {
   recents: RecentFile[]
   onOpenDialog(): void
   onOpenRecent(path: string): void
+  /** «Nylig lest» as the compact list or as a grid of first pages (issue #28) */
+  recentsView: RecentsView
+  onRecentsViewChange(view: RecentsView): void
   /** A document still open behind this screen, and the way back to it.
    *
    *  The extension only. There, this screen IS the library and there is no tab
@@ -56,8 +74,22 @@ export function updateOutcomeText(outcome: UpdateCheckOutcome): string {
   }
 }
 
-export default function Welcome({ recents, onOpenDialog, onOpenRecent, resume }: Props): React.JSX.Element {
+/** A picked file has no folder path — the `fsa:` pseudo-path is an internal
+ *  key, so show the same hint the sidebar uses. */
+function recentLocation(path: string): string {
+  return path.startsWith('fsa:') ? t('doc.pickedHint') : path
+}
+
+export default function Welcome({
+  recents,
+  onOpenDialog,
+  onOpenRecent,
+  recentsView,
+  onRecentsViewChange,
+  resume
+}: Props): React.JSX.Element {
   useLang()
+  const thumbs = useRecentThumbs(recents, recentsView === 'grid')
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showAiSetup, setShowAiSetup] = useState(false)
   const [updateChecking, setUpdateChecking] = useState(false)
@@ -171,27 +203,89 @@ export default function Welcome({ recents, onOpenDialog, onOpenRecent, resume }:
 
         {recents.length > 0 && (
           <div className="recents">
-            <h2>{t('welcome.recents')}</h2>
-            <ul>
-              {recents.map((r) => (
-                <li key={r.path}>
-                  {/* A picked file has no folder path — the `fsa:` pseudo-path is
-                      an internal key, so show the same hint the sidebar uses. */}
-                  <button
-                    className="recent-row"
-                    onClick={() => onOpenRecent(r.path)}
-                    title={r.path.startsWith('fsa:') ? undefined : r.path}
-                  >
-                    <IconDocument />
-                    <span className="recent-name">{r.name}</span>
-                    <span className="recent-path">
-                      {r.path.startsWith('fsa:') ? t('doc.pickedHint') : r.path}
-                    </span>
-                    <span className="recent-date">{formatDate(r.lastOpened)}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div className="recents-head">
+              <h2>{t('welcome.recents')}</h2>
+              <div className="recents-view" role="group" aria-label={t('welcome.recentsView')}>
+                <button
+                  className={recentsView === 'list' ? 'is-active' : ''}
+                  aria-pressed={recentsView === 'list'}
+                  title={t('welcome.recentsList')}
+                  aria-label={t('welcome.recentsList')}
+                  onClick={() => onRecentsViewChange('list')}
+                >
+                  <IconList size={16} />
+                </button>
+                <button
+                  className={recentsView === 'grid' ? 'is-active' : ''}
+                  aria-pressed={recentsView === 'grid'}
+                  title={t('welcome.recentsGrid')}
+                  aria-label={t('welcome.recentsGrid')}
+                  onClick={() => onRecentsViewChange('grid')}
+                >
+                  <IconGrid size={16} />
+                </button>
+              </div>
+            </div>
+            {recentsView === 'grid' ? (
+              <ul className="recents-grid">
+                {recents.map((r) => {
+                  const thumb = thumbs[r.path]
+                  const progress = readingProgress(thumb?.page, thumb?.pages)
+                  const at = progress
+                    ? t('welcome.recentsProgress', {
+                        page: String(progress.page),
+                        pages: String(progress.pages)
+                      })
+                    : null
+                  return (
+                    <li key={r.path}>
+                      <button
+                        className="recent-card"
+                        onClick={() => onOpenRecent(r.path)}
+                        title={[recentLocation(r.path), formatDate(r.lastOpened)].join('\n')}
+                      >
+                        {/* A fixed frame whatever arrives in it, so a picture
+                            drawn late never moves the grid. The sheet is white
+                            paper recoloured as a whole, picture and margin
+                            alike, so a letterboxed page has no visible seam. */}
+                        <span className="recent-cover">
+                          <span className="recent-sheet">
+                            {thumb?.url && <img src={thumb.url} alt="" draggable={false} />}
+                          </span>
+                          {!thumb?.url &&
+                            (thumb?.locked ? <IconLock size={22} /> : <IconDocument size={22} />)}
+                          {progress && (
+                            <span
+                              className="recent-progress"
+                              style={{ width: `${progress.fraction * 100}%` }}
+                            />
+                          )}
+                        </span>
+                        <span className="recent-card-name">{r.name}</span>
+                        {at && <span className="recent-card-meta">{at}</span>}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <ul>
+                {recents.map((r) => (
+                  <li key={r.path}>
+                    <button
+                      className="recent-row"
+                      onClick={() => onOpenRecent(r.path)}
+                      title={r.path.startsWith('fsa:') ? undefined : r.path}
+                    >
+                      <IconDocument />
+                      <span className="recent-name">{r.name}</span>
+                      <span className="recent-path">{recentLocation(r.path)}</span>
+                      <span className="recent-date">{formatDate(r.lastOpened)}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
