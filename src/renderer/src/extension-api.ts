@@ -54,7 +54,7 @@ import {
   saveFileHandle
 } from './extension-fs-grants'
 import { t } from './i18n'
-import { DEFAULT_SETTINGS } from '../../shared/defaults'
+import { DEFAULT_SETTINGS, RECENTS_MAX } from '../../shared/defaults'
 
 /** True when running inside a WebExtension page (has a runtime id). */
 export function isExtensionContext(): boolean {
@@ -116,7 +116,7 @@ function recordRecent(payload: { path: string; name: string }): void {
     const next = [
       { path: payload.path, name: payload.name, lastOpened: Date.now() },
       ...list.filter((r) => r.path !== payload.path)
-    ].slice(0, 30)
+    ].slice(0, RECENTS_MAX)
     store.set(K_RECENTS, next)
   })
 }
@@ -294,11 +294,13 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       })
     },
     // Heal names written before fileNameOf existed (picked files were stored as
-    // "fsa:<name>" because the name was derived from the pseudo-path).
+    // "fsa:<name>" because the name was derived from the pseudo-path). The cap
+    // applies on read too: a list stored when the extension kept 30 shows the
+    // same 20 the desktop does until the next open trims it.
     getRecents: async () =>
-      (await store.get<RecentFile[]>(K_RECENTS, [])).map((r) =>
-        r.name.startsWith(FSA) ? { ...r, name: fileNameOf(r.name) } : r
-      ),
+      (await store.get<RecentFile[]>(K_RECENTS, []))
+        .slice(0, RECENTS_MAX)
+        .map((r) => (r.name.startsWith(FSA) ? { ...r, name: fileNameOf(r.name) } : r)),
 
     // The library's grid pictures (issue #28) — IndexedDB, see
     // extension-recent-thumbs.ts. Same contract as desktop's main process:

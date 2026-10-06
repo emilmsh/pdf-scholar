@@ -11,7 +11,7 @@ import type {
   RecentFile,
   Settings
 } from '../shared/types'
-import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
+import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS, RECENTS_MAX } from '../shared/defaults'
 export type { Settings }
 
 export interface StoredAiConfig extends AiConfig {
@@ -146,7 +146,7 @@ export function addRecent(path: string, name: string): void {
   state.recents = [
     { path, name, lastOpened: Date.now() },
     ...state.recents.filter((r) => r.path !== path)
-  ].slice(0, 20)
+  ].slice(0, RECENTS_MAX)
   saveState()
 }
 

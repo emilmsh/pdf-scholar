@@ -38,6 +38,12 @@ export const DEFAULT_SETTINGS: Settings = {
   recentsView: 'list'
 }
 
+/** How many files «Nylig lest» remembers, on every platform (docs/SPEC.md §8).
+ *  The extension kept 30 against the desktop's 20 until 2026-10-06 — a
+ *  divergence nothing called for — and the library's grid stores one picture
+ *  per entry, so the number is also what bounds that store. */
+export const RECENTS_MAX = 20
+
 /** Model per provider when nothing is stored yet. Azure has no default — its
  *  deployment name is per-account — and mock is a fixed stand-in.
  *
