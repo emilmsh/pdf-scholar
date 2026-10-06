@@ -63,18 +63,28 @@ interface AnthropicTraits {
   /** 'off' needs an explicit {type:'disabled'} because omitting the field
    *  means "thinking on" for this model (Sonnet 5, Opus 5) */
   explicitOff: boolean
+  /** Sonnet 5.5 only: {type:'disabled'} is itself a 400 there — the lowest
+   *  off-setting is {type:'between_tools'} instead (platform.claude.com/docs/
+   *  en/models/sonnet-5-5/whats-new-sonnet-5-5, verified 2026-10-05). A
+   *  per-model quirk the capability tree does not expose, so it is read off
+   *  the model id on both branches, same as alwaysThinks. */
+  betweenToolsOff: boolean
 }
 
 function anthropicTraits(model: string, caps?: AiModelCaps): AnthropicTraits {
   // Always-on thinking is a family behavior the capability tree does not
   // expose, so this test applies on both branches: the Fable family, and Opus
   // from 5.5 on (thinking: disabled → 400, platform.claude.com, 2026-09-26).
+  // Sonnet 5.5 is NOT in this set — its thinking is adaptive, not always-on
+  // (platform.claude.com/docs/en/models/sonnet-5-5/overview, 2026-10-05).
   const alwaysThinks = /fable|mythos|opus-5-5/i.test(model)
+  const betweenToolsOff = /sonnet-5-5/i.test(model)
   if (caps) {
     return {
       effort: caps.effort,
       adaptive: caps.adaptiveThinking,
       alwaysThinks,
+      betweenToolsOff,
       // adaptive-without-budget marks the generations where an omitted field
       // means "thinking on" and explicit disabled is accepted (Sonnet 5,
       // Opus 4.8+); budget-capable models (Haiku 4.5) treat omission as off.
@@ -86,6 +96,7 @@ function anthropicTraits(model: string, caps?: AiModelCaps): AnthropicTraits {
     effort: isHaiku ? [] : ['low', 'medium', 'high'],
     adaptive: !isHaiku,
     alwaysThinks,
+    betweenToolsOff,
     // Opus 5 thinks by default too ("thinking is on by default and
     // {type:'disabled'} is accepted", platform.claude.com, 2026-09-26);
     // Opus 5.5 never reaches this — alwaysThinks wins in anthropicThinking
@@ -104,7 +115,7 @@ function anthropicThinking(
   level: ThinkingLevel,
   caps?: AiModelCaps
 ): {
-  thinking?: { type: 'adaptive' } | { type: 'disabled' }
+  thinking?: { type: 'adaptive' } | { type: 'disabled' } | { type: 'between_tools' }
   outputConfig?: { effort: Effort }
   maxTokens: number
 } {
@@ -116,7 +127,12 @@ function anthropicThinking(
         ? { outputConfig: { effort: 'low' }, maxTokens: 12000 }
         : { maxTokens: 12000 }
     }
-    if (traits.explicitOff) return { thinking: { type: 'disabled' }, maxTokens: 4096 }
+    if (traits.explicitOff) {
+      return {
+        thinking: { type: traits.betweenToolsOff ? 'between_tools' : 'disabled' },
+        maxTokens: 4096
+      }
+    }
     return { maxTokens: 4096 }
   }
   const effort = EFFORT[level]
@@ -446,9 +462,14 @@ async function chatAnthropic(
 
   const tuning = anthropicThinking(model, thinking, caps)
   // The models that ship safety classifiers (a decline is HTTP 200 +
-  // stop_reason 'refusal'): Fable 5/5.1 and Opus 5/5.5, per Anthropic's
-  // refusals-and-fallback page (verified 2026-09-27). Mythos is Fable's twin.
-  const hasClassifiers = /fable|mythos|opus-5/i.test(model)
+  // stop_reason 'refusal'): Fable 5/5.1, Opus 5/5.5 and Sonnet 5.5 (not
+  // Sonnet 5), per Anthropic's refusals-and-fallback page (Opus verified
+  // 2026-09-27; Sonnet 5.5 ships five stop_details categories — cyber, bio,
+  // frontier_llm, reasoning_extraction, general_harms — and fallback retries
+  // cyber/frontier_llm declines onto Sonnet 5, platform.claude.com/docs/en/
+  // models/sonnet-5-5/whats-new-sonnet-5-5, verified 2026-10-05). Mythos is
+  // Fable's twin.
+  const hasClassifiers = /fable|mythos|opus-5|sonnet-5-5/i.test(model)
   const params: Record<string, unknown> = {
     model,
     max_tokens: tuning.maxTokens,

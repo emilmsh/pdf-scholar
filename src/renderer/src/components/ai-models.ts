@@ -81,7 +81,10 @@ export const MODELS: Record<
     // 2026-09-22; Opus 5 moved to "Legacy models", still served) and became
     // the default 2026-09-27 (Emil) — the «Anbefalt» hint follows the default
     { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', short: 'Opus 5.5', hint: 'ai.modelHintRecommended' },
-    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', short: 'Sonnet 5', hint: 'ai.modelHintValue' },
+    // Sonnet 5.5 replaced Sonnet 5 in the same slot 2026-10-05 (launched
+    // 2026-09-28; Sonnet 5 moved to "Legacy models", still served — a stored
+    // Sonnet 5 selection stays pickable). Same price and context as Sonnet 5.
+    { id: 'claude-sonnet-5-5', label: 'Claude Sonnet 5.5', short: 'Sonnet 5.5', hint: 'ai.modelHintValue' },
     { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', short: 'Haiku 4.5', hint: 'ai.modelHintFast' }
   ],
   openai: [
@@ -91,6 +94,13 @@ export const MODELS: Record<
     // left the menu with the default, being both older and pricier than 6 Sol
     // ($2/$12 against $2/$10) — a stored Terra selection stays pickable
     { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
+    // GPT-6.1 Sol is a NEW mid tier added 2026-09-29 (DevDay), not a
+    // replacement — developers.openai.com/api/docs/models/all still lists
+    // gpt-6-sol as current, undeprecated, alongside it. Near-Astra quality at
+    // a fifth of Astra's price, same price as GPT-6 Sol ($2/$10). The default
+    // stays gpt-6-sol (Emil's call, untouched here), so the «Anbefalt» hint
+    // stays there too.
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', short: 'GPT-6.1 Sol', hint: 'ai.modelHintCapable' },
     { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
     { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
   ],
@@ -280,14 +290,19 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // stored selections, like claude-fable-5 above
   'claude-opus-5-5': 1_000_000,
   'claude-opus-5': 1_000_000,
+  // Sonnet 5.5 added 2026-10-05 (same 1M window, platform.claude.com/docs/en/
+  // models/sonnet-5-5/overview); claude-sonnet-5 stays for stored selections
+  'claude-sonnet-5-5': 1_000_000,
   'claude-sonnet-5': 1_000_000,
   'claude-haiku-4-5': 200_000,
   // 922K is the documented INPUT capacity (1.05M total minus the 128K output
   // ceiling); 900K keeps the floor conservative without throwing the window
   // away, as the old 250_000 did. Verified 2026-08-13 (Astra 2026-09-05, GPT-6
-  // Sol/Luna 2026-09-26 — same numbers on their model pages), see
-  // modeller-api.md. The 5.6 Sol/Luna entries stay for stored selections.
+  // Sol/Luna 2026-09-26, GPT-6.1 Sol 2026-10-05 — same numbers on their model
+  // pages), see modeller-api.md. The 5.6 Sol/Luna entries stay for stored
+  // selections.
   'gpt-6-astra': 900_000,
+  'gpt-6.1-sol': 900_000,
   'gpt-6-sol': 900_000,
   'gpt-6-luna': 900_000,
   'gpt-5.6-sol': 900_000,
