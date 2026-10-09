@@ -12,6 +12,9 @@
 //      is a well-formed ICNS. electron-builder picks both up BY NAME
 //      (`<ext>.ico` / `<ext>.icns`), so a missing or misnamed file silently
 //      falls back to the app logo — which is the regression this guards.
+//   5) The extension's counterpart, the browser TAB icon: every variant has a
+//      16 and a 32 px render, and a picture of the reader's own must be square
+//      and at least 16 px.
 // Run: node scripts/test-file-icon.mjs
 import { build } from 'esbuild'
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs'
@@ -127,6 +130,31 @@ if (existsSync(icns)) {
   }
   for (const want of ['icp4', 'icp5', 'ic08', 'ic09']) ok(types.includes(want), `ICNS carries ${want} (has ${types.join(', ')})`)
 }
+
+console.log('5) the browser TAB icon (the extension): same renders, its own size rule')
+// Every variant the picker can choose has a 16 and a 32 px render — the tab
+// strip's 1x and 2x — that is a real PNG of that size. A missing one would
+// leave renderer/tab-icon.ts falling back to the app logo without a word.
+const pngSize = (buf) => ({ sig: buf.slice(0, 8).toString('hex'), w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) })
+for (const v of M.FILE_ICON_VARIANTS) {
+  for (const size of [16, 32]) {
+    const f = join(root, 'src', 'renderer', 'src', 'assets', 'tab-icons', `${v}-${size}.png`)
+    if (!existsSync(f)) {
+      ok(false, `tab-icons/${v}-${size}.png exists`)
+      continue
+    }
+    const p = pngSize(readFileSync(f))
+    eq(p.sig, '89504e470d0a1a0a', `tab-icons/${v}-${size}.png is a PNG`)
+    ok(p.w === size && p.h === size, `tab-icons/${v}-${size}.png is ${size}×${size} (is ${p.w}×${p.h})`)
+  }
+}
+for (const size of [16, 32]) ok(existsSync(join(root, 'src', 'extension', 'icons', `icon-${size}.png`)), `the app-logo tab icon icon-${size}.png exists`)
+eq(M.MIN_TAB_ICON_SOURCE_PX, 16, 'a tab icon must at least fill a 16 px tab')
+eq(M.tabIconSizeProblem(256, 256), null, 'a square 256 px picture is accepted')
+eq(M.tabIconSizeProblem(16, 16), null, 'a square 16 px picture is accepted')
+eq(M.tabIconSizeProblem(15, 15), 'tab-icon-too-small', 'under 16 px is refused')
+eq(M.tabIconSizeProblem(300, 200), 'tab-icon-not-square', 'a wide picture is refused')
+eq(M.tabIconSizeProblem(0, 0), null, 'an SVG without intrinsic size scales to anything')
 
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)

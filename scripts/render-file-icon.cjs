@@ -14,6 +14,12 @@
 //   src/renderer/src/assets/file-icons/<variant>.png   48 px previews for the
 //                                      picker, plus app.png (the app icon) so
 //                                      the row shows what each choice looks like
+//   src/renderer/src/assets/tab-icons/<variant>-16.png, -32.png   the same
+//                                      icon as the extension's TAB icon
+//                                      (src/renderer/src/tab-icon.ts): the two
+//                                      sizes a tab strip draws, at 1x and 2x,
+//                                      rendered here rather than left to the
+//                                      browser to scale down from 48 px
 // (The MSIX manifest gets no per-file-type logo through electron-builder, so
 // the Store build keeps the app icon on files — docs/PLATFORMS.md § 27.)
 // Same offscreen-Electron approach as render-icon.cjs, no dependencies: ICO
@@ -31,6 +37,7 @@ const SVG = path.join(__dirname, 'pdf-document.svg')
 const BUILD = path.join(__dirname, '..', 'build')
 const VARIANT_DIR = path.join(BUILD, 'file-icons')
 const PREVIEW_DIR = path.join(__dirname, '..', 'src', 'renderer', 'src', 'assets', 'file-icons')
+const TAB_DIR = path.join(__dirname, '..', 'src', 'renderer', 'src', 'assets', 'tab-icons')
 
 /** The six variants — ids are the FileIconChoice values in
  *  src/shared/file-icon.ts (test:file-icon pins the two lists together). Three
@@ -168,6 +175,7 @@ app.whenReady().then(async () => {
   step = 'page open'
   fs.mkdirSync(VARIANT_DIR, { recursive: true })
   fs.mkdirSync(PREVIEW_DIR, { recursive: true })
+  fs.mkdirSync(TAB_DIR, { recursive: true })
   for (const v of VARIANTS) {
     step = `variant ${v.id}: set colours`
     await setVariant(v)
@@ -194,6 +202,11 @@ app.whenReady().then(async () => {
     const preview = path.join(PREVIEW_DIR, `${v.id}.png`)
     fs.writeFileSync(preview, pngs.find((p) => p.size === 48).png)
     wrote(preview)
+    for (const size of [16, 32]) {
+      const tab = path.join(TAB_DIR, `${v.id}-${size}.png`)
+      fs.writeFileSync(tab, pngs.find((p) => p.size === size).png)
+      wrote(tab)
+    }
   }
   // The app icon at the same size, so the «App-logo» chip shows the real thing
   const appPreview = path.join(PREVIEW_DIR, 'app.png')

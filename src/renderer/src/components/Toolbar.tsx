@@ -29,6 +29,7 @@ import previewDocumentLinesPlain from '../assets/file-icons/document-lines-plain
 import previewDocumentQuiet from '../assets/file-icons/document-quiet.png'
 import previewDocumentQuietPlain from '../assets/file-icons/document-quiet-plain.png'
 import previewApp from '../assets/file-icons/app.png'
+import { pickTabIconFile, readTabIconFile } from '../tab-icon'
 import { CITATION_STYLES } from '../../../shared/citation-style'
 import type { CitationStyleId } from '../../../shared/citation-style'
 import {
@@ -685,7 +686,12 @@ export default function Toolbar({
   // remembers the last position otherwise, so the row's three chips show the
   // badged or the plain set accordingly
   const [badgePref, setBadgePref] = useState(true)
-  const fileIconBadge = isFileIconVariant(settings.fileIcon) ? splitVariant(settings.fileIcon).badge : badgePref
+  // Which icon the row picks: Explorer's where main can write it, the browser
+  // tab's in the extension (and the web preview, which is a tab too), and
+  // none in a desktop build that cannot change the file icon
+  const iconTarget: 'file' | 'tab' | null = fileIconOk ? 'file' : !isElectron ? 'tab' : null
+  const iconChoice = iconTarget === 'tab' ? settings.tabIcon : settings.fileIcon
+  const fileIconBadge = isFileIconVariant(iconChoice) ? splitVariant(iconChoice).badge : badgePref
   const chooseFileIcon = async (choice: FileIconChoice): Promise<void> => {
     const r = await bridge.setFileIcon(choice)
     if (r.ok) {
@@ -695,6 +701,25 @@ export default function Toolbar({
       setFileIconNote(errorText({ error: r.error, code: r.code }))
     }
   }
+  // The tab icon changes the moment the setting does (ExtensionApp applies
+  // it), so there is no «may take a moment» note — only a refusal gets one
+  const chooseTabIcon = async (choice: FileIconChoice): Promise<void> => {
+    if (choice !== 'custom') {
+      onSettingsChange({ tabIcon: choice })
+      setFileIconNote(null)
+      return
+    }
+    const file = await pickTabIconFile()
+    if (!file) return
+    const r = await readTabIconFile(file)
+    if (r.ok) {
+      onSettingsChange({ tabIcon: 'custom', tabIconImage: r.image })
+      setFileIconNote(null)
+    } else {
+      setFileIconNote(t(`iconerr.${r.code}`))
+    }
+  }
+  const chooseIcon = iconTarget === 'tab' ? chooseTabIcon : chooseFileIcon
   // Outside-click closers listen for pointerdown in the capture phase:
   // pointerdown always fires (page overlays may suppress the compat
   // mousedown via preventDefault) and capture beats stopPropagation.
@@ -2476,12 +2501,17 @@ export default function Toolbar({
                   installer's document icon by default, the app logo, or the
                   reader's own .ico. Only where main can actually write it —
                   an installed Windows build — so the row is simply absent on
-                  macOS, Linux, the portable zip and the Store build. */}
-              {fileIconOk && (
+                  macOS, Linux, the portable zip and the Store build. In the
+                  browser the same row picks the TAB's icon instead
+                  (tab-icon.ts): there the tab is where a document shows one. */}
+              {iconTarget && (
                 <>
                   <div className="theme-menu-sep" />
-                  <div className="theme-menu-label" title={t('settings.fileIconTip')}>
-                    {t('settings.fileIcon')}
+                  <div
+                    className="theme-menu-label"
+                    title={t(iconTarget === 'tab' ? 'settings.tabIconTip' : 'settings.fileIconTip')}
+                  >
+                    {t(iconTarget === 'tab' ? 'settings.tabIcon' : 'settings.fileIcon')}
                   </div>
                   {/* The choices as the icons themselves — a file icon is
                       judged by eye, not by name. Three colourings, the app
@@ -2497,8 +2527,8 @@ export default function Toolbar({
                       checked={fileIconBadge}
                       onChange={(e) => {
                         setBadgePref(e.target.checked)
-                        if (isFileIconVariant(settings.fileIcon)) {
-                          void chooseFileIcon(variantFor(splitVariant(settings.fileIcon).colouring, e.target.checked))
+                        if (isFileIconVariant(iconChoice)) {
+                          void chooseIcon(variantFor(splitVariant(iconChoice).colouring, e.target.checked))
                         }
                       }}
                     />
@@ -2508,15 +2538,21 @@ export default function Toolbar({
                     {FILE_ICON_CHOICES.map((chip) => {
                       const choice: FileIconChoice =
                         chip === 'app' || chip === 'custom' ? chip : variantFor(chip, fileIconBadge)
-                      const preview = FILE_ICON_PREVIEWS[choice]
+                      // The tab's own picture, once there is one, shows on its
+                      // chip — it is stored inline, so there is something to show
+                      const preview =
+                        choice === 'custom' && iconTarget === 'tab'
+                          ? settings.tabIconImage || null
+                          : FILE_ICON_PREVIEWS[choice]
+                      const tip = chip === 'custom' && iconTarget === 'tab' ? 'settings.tabIconCustomTip' : FILE_ICON_TIPS[chip]
                       return (
                         <button
                           key={chip}
-                          className={`file-icon-chip${settings.fileIcon === choice ? ' selected' : ''}`}
-                          title={`${t(FILE_ICON_LABELS[chip])} — ${t(FILE_ICON_TIPS[chip])}`}
+                          className={`file-icon-chip${iconChoice === choice ? ' selected' : ''}`}
+                          title={`${t(FILE_ICON_LABELS[chip])} — ${t(tip)}`}
                           aria-label={t(FILE_ICON_LABELS[chip])}
-                          aria-pressed={settings.fileIcon === choice}
-                          onClick={() => void chooseFileIcon(choice)}
+                          aria-pressed={iconChoice === choice}
+                          onClick={() => void chooseIcon(choice)}
                         >
                           {preview ? (
                             <img src={preview} alt="" width={32} height={32} />
@@ -2528,13 +2564,15 @@ export default function Toolbar({
                     })}
                   </div>
                   <div className="file-icon-caption">
-                    {settings.fileIcon === 'custom' && settings.fileIconPath
-                      ? settings.fileIconPath.split(/[\\/]/).pop()
-                      : isFileIconVariant(settings.fileIcon)
-                        ? `${t(FILE_ICON_LABELS[splitVariant(settings.fileIcon).colouring])}${
-                            splitVariant(settings.fileIcon).badge ? '' : ` · ${t('settings.fileIconNoBadge')}`
-                          }`
-                        : t(FILE_ICON_LABELS[settings.fileIcon === 'app' ? 'app' : 'custom'])}
+                    {iconChoice === 'custom' && iconTarget === 'tab' && settings.tabIconImage
+                      ? t('settings.tabIconCustomName')
+                      : iconChoice === 'custom' && iconTarget === 'file' && settings.fileIconPath
+                        ? settings.fileIconPath.split(/[\\/]/).pop()
+                        : isFileIconVariant(iconChoice)
+                          ? `${t(FILE_ICON_LABELS[splitVariant(iconChoice).colouring])}${
+                              splitVariant(iconChoice).badge ? '' : ` · ${t('settings.fileIconNoBadge')}`
+                            }`
+                          : t(FILE_ICON_LABELS[iconChoice === 'app' ? 'app' : 'custom'])}
                   </div>
                   {fileIconNote && <div className="menu-hint">{fileIconNote}</div>}
                 </>

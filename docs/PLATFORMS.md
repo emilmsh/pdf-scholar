@@ -533,7 +533,14 @@ regressions are treated as bugs, not as acceptable platform lag.
     verified; **macOS** document icons live inside the bundle (the shipped
     `.icns` applies, nothing to change at runtime); **Linux** gets the
     desktop's generic document icon (electron-builder: not supported); the
-    **extension** has no files. Covered by `npm run test:file-icon` (CI).
+    **extension** has no files — there the same row is «Ikon på fanen», the
+    icon on the BROWSER TAB (`src/renderer/src/tab-icon.ts`, Emil
+    2026-10-09): the six variants from the same renders (16/32 px copies in
+    `src/renderer/src/assets/tab-icons/`), the app logo (the default — the
+    extension icon the tab always wore), or a square picture of 16 px or more,
+    kept inline in settings as a 64 px PNG since there is no file to point
+    at. The desktop has no browser tab and keeps the Explorer row. Covered by
+    `npm run test:file-icon` (CI).
 
 28. **The library's grid of first pages draws a missing picture from a LOCAL
     file only.** Issue #28: «Nylig lest» as a grid of first pages, identical

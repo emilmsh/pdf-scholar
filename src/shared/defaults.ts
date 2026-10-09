@@ -27,6 +27,8 @@ export const DEFAULT_SETTINGS: Settings = {
   selectionMenuCompact: false,
   fileIcon: 'document',
   fileIconPath: '',
+  tabIcon: 'app',
+  tabIconImage: '',
   keepAwake: false,
   language: 'auto',
   annotAuthor: '',

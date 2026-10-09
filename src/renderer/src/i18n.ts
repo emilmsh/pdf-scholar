@@ -394,6 +394,14 @@ const nb = {
   'iconerr.file-icon-not-square': 'Bildet må være kvadratisk – like bredt som høyt.',
   'iconerr.file-icon-too-small': 'Bildet må være minst 48 × 48 px; 256 × 256 anbefales.',
   'iconerr.file-icon-registry': 'Windows avviste endringen av filikonet.',
+  'settings.tabIcon': 'Ikon på fanen',
+  'settings.tabIconTip': 'Ikonet nettleseren viser på fanen et dokument er åpent i.',
+  'settings.tabIconCustomTip':
+    'Velg et kvadratisk bilde – .png, .svg, .ico, .webp eller .jpg, minst 16 × 16 px. Det lagres i utvidelsen, ikke som en fil.',
+  'settings.tabIconCustomName': 'Eget bilde',
+  'iconerr.tab-icon-bad-file': 'Nettleseren kunne ikke lese bildet. Prøv en .png, .svg, .ico, .webp eller .jpg.',
+  'iconerr.tab-icon-not-square': 'Bildet må være kvadratisk – like bredt som høyt.',
+  'iconerr.tab-icon-too-small': 'Bildet må være minst 16 × 16 px.',
   'settings.selectionMenuCompact': 'Kompakt meny',
   'settings.selectionMenuCompactTip':
     'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
@@ -1409,6 +1417,14 @@ const en: Dict = {
   'iconerr.file-icon-not-square': 'The image must be square — as wide as it is tall.',
   'iconerr.file-icon-too-small': 'The image must be at least 48 × 48 px; 256 × 256 is recommended.',
   'iconerr.file-icon-registry': 'Windows refused the file icon change.',
+  'settings.tabIcon': 'Tab icon',
+  'settings.tabIconTip': 'The icon the browser shows on the tab a document is open in.',
+  'settings.tabIconCustomTip':
+    'Choose a square picture — .png, .svg, .ico, .webp or .jpg, at least 16 × 16 px. It is kept in the extension, not as a file.',
+  'settings.tabIconCustomName': 'Your own picture',
+  'iconerr.tab-icon-bad-file': 'The browser could not read the picture. Try a .png, .svg, .ico, .webp or .jpg.',
+  'iconerr.tab-icon-not-square': 'The picture must be square — as wide as it is tall.',
+  'iconerr.tab-icon-too-small': 'The picture must be at least 16 × 16 px.',
   'settings.selectionMenuCompact': 'Compact menu',
   'settings.selectionMenuCompactTip':
     'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',

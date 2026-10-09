@@ -13,6 +13,7 @@ import { bridge, isElectron } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
 import { applyPageTune, tuneTitleBar } from './theme-tune'
+import { applyTabIcon } from './tab-icon'
 import { createDocRegistry } from './doc-registry'
 import { emitLocalDocEvent } from './local-doc-events'
 import { browserCurrentBytes } from './annotation-engine-browser'
@@ -266,6 +267,12 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     setLanguage(settings.language)
   }, [settings.language])
+
+  // In a plain browser (the web preview) the page is a tab too, and wears the
+  // icon the extension's gear menu picks; Electron has no tab to put it on
+  useEffect(() => {
+    if (!isElectron) applyTabIcon(settings.tabIcon, settings.tabIconImage)
+  }, [settings.tabIcon, settings.tabIconImage])
 
   // Same for the keyboard map: the key handlers are not components, so the
   // rebound shortcuts are mirrored into keymap.ts's own store where they can be

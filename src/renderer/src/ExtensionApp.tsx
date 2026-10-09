@@ -6,6 +6,7 @@ import { openInBrowserViewer } from './extension-api'
 import { insecureRetryUrl } from '../../shared/insecure-retry'
 import { errorText, setLanguage, t } from './i18n'
 import { applyPageTune, tuneTitleBar } from './theme-tune'
+import { applyTabIcon } from './tab-icon'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import {
   checkForExtensionUpdate,
@@ -98,6 +99,11 @@ export default function ExtensionApp(): React.JSX.Element {
   useEffect(() => {
     setLanguage(settings.language)
   }, [settings.language])
+
+  // The browser tab's icon — the reader's choice in the gear menu (tab-icon.ts)
+  useEffect(() => {
+    applyTabIcon(settings.tabIcon, settings.tabIconImage)
+  }, [settings.tabIcon, settings.tabIconImage])
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
     setSettingsState((prev) => ({ ...prev, ...patch }))

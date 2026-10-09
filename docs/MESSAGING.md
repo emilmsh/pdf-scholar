@@ -132,7 +132,10 @@ carries no picture of its own.)*
   sheet with red text lines and the app's mark, not the app logo — and the
   settings menu offers quieter variants, each with or without the mark, the
   logo, or an icon of yours (an .ico, or a square .png) *(reader ask, issue
-  #26, 2026-10-04)*
+  #26, 2026-10-04)*. In the browser extension the same choices set the icon
+  on the browser tab a document is read in — the app logo by default, as
+  before; an own picture is any square image of 16 px or more *(Emil,
+  2026-10-09)*
 - Four reading modes — Day, «Farge» (a light paper tone: the classic Sepia
   cream plus gray, green, blue and sand), Night and Night+ (higher contrast) —
   plus Auto, which follows the system setting. Night has its own dark tones

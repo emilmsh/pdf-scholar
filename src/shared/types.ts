@@ -69,6 +69,13 @@ export interface Settings {
    *  the reader's own .ico, whose kept copy is `fileIconPath`. */
   fileIcon: FileIconChoice
   fileIconPath: string
+  /** The extension's counterpart: the icon on the BROWSER TAB a document is
+   *  read in (renderer's tab-icon.ts) — the same choices, drawn from the same
+   *  renders. 'app' (the default) is the extension icon the tab always wore.
+   *  A custom picture is kept inline as a small PNG data URL in
+   *  `tabIconImage`, since the browser has no file to point at. */
+  tabIcon: FileIconChoice
+  tabIconImage: string
   keepAwake: boolean
   language: LanguagePreference
   /** Name written into new annotations' author field (/T) — the standard PDF

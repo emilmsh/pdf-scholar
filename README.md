@@ -154,7 +154,8 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
   fit-width and whole-page (W)
 - On Windows, PDF files get a document icon of their own in Explorer rather than the
   app logo; the settings menu offers quieter variants, with or without the app's mark, the
-  logo, or an icon of yours (an .ico, or a square .png)
+  logo, or an icon of yours (an .ico, or a square .png). In the browser extension the same
+  menu picks the icon on the browser tab instead
 - Four reading modes — Day, Tint, Night and Night+ — plus Auto, which follows the
   system's light/dark setting. Tint is a light paper tone: the classic Sepia cream, or
   gray, green, blue or sand; Night has its own dark tones, or «White» — the document as

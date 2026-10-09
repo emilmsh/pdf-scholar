@@ -136,6 +136,28 @@ export function packIco(entries: ReadonlyArray<{ size: number; png: Uint8Array }
   return out
 }
 
+/** The browser TAB's icon (the extension's counterpart, renderer's
+ *  tab-icon.ts) takes a picture of the reader's own too, kept inline. A
+ *  favicon is a 16 px thing: anything smaller can only be blown up. */
+export const MIN_TAB_ICON_SOURCE_PX = 16
+
+export type TabIconErrorCode =
+  /** Not a picture the browser can decode (or not a picture at all) */
+  | 'tab-icon-bad-file'
+  /** Not square — the Explorer picker's rule too */
+  | 'tab-icon-not-square'
+  /** Under MIN_TAB_ICON_SOURCE_PX */
+  | 'tab-icon-too-small'
+
+/** Whether a decoded picture of this size may become the tab icon. An SVG
+ *  with no intrinsic size reports 0×0 and scales to anything — it passes. */
+export function tabIconSizeProblem(width: number, height: number): TabIconErrorCode | null {
+  if (width === 0 && height === 0) return null
+  if (width !== height) return 'tab-icon-not-square'
+  if (width < MIN_TAB_ICON_SOURCE_PX) return 'tab-icon-too-small'
+  return null
+}
+
 export type FileIconErrorCode =
   /** Not a Windows install we registered: macOS/Linux, the portable zip (it
    *  registers nothing), the Store build (MSIX associations are virtualized),
