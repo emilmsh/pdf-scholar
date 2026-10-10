@@ -150,11 +150,11 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.60.1
+## What's new in this version (≤ 1 500 chars) — v0.60.2
 
 **EN:**
 ```
-• Rest the pointer on a citation, a figure or an equation to preview it beside the text. On a citation, one click fetches the cited paper's abstract from free scholarly databases — no key, no account
+• Rest the pointer on a citation, a figure or an equation to preview it beside the text. On a citation, one click fetches the cited paper's abstract from free scholarly databases — no key, no account. In the reference list, select an entry and choose «Abstract»
 • Recent files can be shown as a grid of their first pages with how far you read; pin the ones you return to, remove the rest
 • Page by page: one page or one spread at a time, turned by the wheel, a swipe or the arrow keys
 • Tabs can be pinned, and each window gets its tabs back at the next launch
@@ -165,7 +165,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 **NO:**
 ```
-• Hold pekeren over en henvisning, en figur eller en ligning for å forhåndsvise den ved siden av teksten. På en henvisning henter ett klikk sammendraget til den siterte artikkelen fra åpne fagdatabaser – uten nøkkel og konto
+• Hold pekeren over en henvisning, en figur eller en ligning for å forhåndsvise den ved siden av teksten. På en henvisning henter ett klikk sammendraget til den siterte artikkelen fra åpne fagdatabaser – uten nøkkel og konto. I referanselista: merk en oppføring og velg «Sammendrag»
 • Nylige filer kan vises som et rutenett av forsider med hvor langt du har lest; fest de du kommer tilbake til, fjern resten
 • Side for side: én side eller ett oppslag om gangen, bladd med hjulet, et sveip eller piltastene
 • Faner kan festes, og hvert vindu får fanene sine tilbake ved neste oppstart
