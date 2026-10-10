@@ -38,17 +38,19 @@ PDF Scholar
 ```
 PDF Scholar is a PDF reader and annotator for Windows, for the documents you work through rather than skim: research articles, reports, books. The window is nearly all page — one slim toolbar carries the tools, the panels stay out of the way until called, and the toolbar itself can be unpinned. Annotation happens at the text you select, every mark is listed in a panel beside the document, and the optional AI assistant answers from the document and cites the passage it used.
 
-Free and open source (MIT). No account, no sign-in, no tracking, no ads. Everything works offline except the optional AI, which uses your own key. Native x64 and arm64, so Windows-on-ARM machines run the app without emulation. The Store keeps it updated.
+Free and open source (MIT). No account, no sign-in, no tracking, no ads. Nothing goes online unless you ask: the optional AI uses your own key, and a reference or a cited paper's abstract is fetched on a click. Native x64 and arm64, so Windows-on-ARM machines run the app without emulation. The Store keeps it updated.
 
 READING
 • Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
 • Four reading modes — Day, Tint (a light paper tone: sepia, gray, green, blue or sand), Night and Night+ — plus Auto; Night has its own dark tones or shows the document as printed inside the dark chrome, a slider sets the strength, and Night can keep pictures in their original colours
-• Page rotation, two-page spread, and a full-screen presentation mode
+• Page rotation, two-page spread, page by page (one page or spread at a time, turned instead of scrolled), and a full-screen presentation mode
 • Table of contents, thumbnails and bookmarks
-• Reading positions and recent files are remembered; back/forward navigation after following internal links
-• Going back to the library closes nothing: documents stay open, and returning to one restores your place
+• Rest the pointer on a citation, a figure or an equation to preview it beside the text; on a citation, one click fetches the cited paper's abstract from free scholarly databases (arXiv, Europe PMC, Crossref, OpenAlex)
+• Back/forward navigation after following internal links
+• Reading positions are remembered; the library lists recent files or shows their first pages with how far you read, and the ones you return to can be pinned
+• Tabs can be pinned, and each window gets its tabs back at the next launch; going back to the library closes nothing
 • Keyboard shortcuts are listed in one map and can be rebound or reset
-• Opens PDFs from File Explorer, with a Recent list on the taskbar
+• Opens PDFs from File Explorer, with a Recent list on the taskbar; PDF files get a document icon of their own, or one you choose
 
 SPLIT VIEW
 • Two columns of the same document, each with its own page, zoom and rotation — a table or figure can stay in view beside the text that discusses it
@@ -93,17 +95,19 @@ Source code: https://github.com/emilmsh/pdf-scholar
 ```
 PDF Scholar er en PDF-leser og -annotator for Windows, for dokumentene du jobber deg gjennom og ikke bare skummer: forskningsartikler, rapporter, bøker. Vinduet er nesten bare side — én slank verktøylinje bærer verktøyene, panelene holder seg unna til de hentes fram, og verktøylinja kan løsnes helt. Annotering skjer ved teksten du merker, hvert merke listes i et panel ved siden av dokumentet, og den valgfrie AI-assistenten svarer ut fra dokumentet og viser hvilket avsnitt den brukte.
 
-Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel. Både x64 og arm64, så Windows-på-ARM-maskiner kjører appen uten emulering. Store holder appen oppdatert.
+Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, ingen reklame. Ingenting går på nett med mindre du ber om det: den valgfrie AI-en bruker din egen nøkkel, og en referanse eller sammendraget til en sitert artikkel hentes med et klikk. Både x64 og arm64, så Windows-på-ARM-maskiner kjører appen uten emulering. Store holder appen oppdatert.
 
 LESING
 • Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
 • Fire lesemoduser — Dag, Farge (en lys papirtone: sepia, grå, grønn, blå eller sand), Natt og Natt+ — pluss Auto; natt har egne mørke toner eller viser dokumentet som trykt i den mørke rammen, en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
-• Siderotasjon, tosiders oppslag og fullskjerms presentasjonsmodus
+• Siderotasjon, tosiders oppslag, side for side (én side eller ett oppslag om gangen, bladd i stedet for rullet) og fullskjerms presentasjonsmodus
 • Innholdsfortegnelse, miniatyrer og bokmerker
-• Leseposisjon og nylige filer huskes; fram/tilbake-navigasjon etter fulgte interne lenker
-• Å gå til biblioteket lukker ingenting: dokumentene forblir åpne, og du kommer tilbake dit du var
+• Hold pekeren over en henvisning, en figur eller en ligning for å forhåndsvise den ved siden av teksten; på en henvisning henter ett klikk sammendraget til den siterte artikkelen fra åpne fagdatabaser (arXiv, Europe PMC, Crossref, OpenAlex)
+• Fram/tilbake-navigasjon etter fulgte interne lenker
+• Leseposisjonen huskes; biblioteket viser nylige filer som liste eller som forsider med hvor langt du har lest, og de du kommer tilbake til kan festes
+• Faner kan festes, og hvert vindu får fanene sine tilbake ved neste oppstart; å gå til biblioteket lukker ingenting
 • Hurtigtastene står i ett kart og kan bindes om eller tilbakestilles
-• Åpner PDF-er fra Utforsker, med en «Nylig»-liste på oppgavelinjen
+• Åpner PDF-er fra Utforsker, med en «Nylig»-liste på oppgavelinjen; PDF-filer får et eget dokumentikon, eller et du velger selv
 
 DELT VISNING
 • To kolonner av samme dokument, hver med egen side, zoom og rotasjon — en tabell eller figur kan stå framme ved siden av teksten som omtaler den
@@ -146,22 +150,28 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.56.1
+## What's new in this version (≤ 1 500 chars) — v0.60.1
 
 **EN:**
 ```
-• PDF files get a document icon of their own in Explorer — a sheet with a red corner and red lines and the app's small mark — instead of the app logo. The settings menu offers quieter variants, each with or without the mark, the app logo, or an icon of your own: an .ico, or a square .png the app turns into one
-• Night has a new paper tone, «White»: the document as printed — white page, dark toolbar and panels
-• The search bar's results list opens folded so it never covers the hit it points at; a list button unfolds it, the bar can be dragged aside, and the AI search steps through its passages with the same arrows
-• The selection menu has two switches: wait for a right-click instead of opening on its own, and a compact form with the same choices at a third of the height
+• Rest the pointer on a citation, a figure or an equation to preview it beside the text. On a citation, one click fetches the cited paper's abstract from free scholarly databases — no key, no account
+• Recent files can be shown as a grid of their first pages with how far you read; pin the ones you return to, remove the rest
+• Page by page: one page or one spread at a time, turned by the wheel, a swipe or the arrow keys
+• Tabs can be pinned, and each window gets its tabs back at the next launch
+• PDF files get a document icon of their own in Explorer, or one you choose
+• Night has a new paper tone, «White»: the document as printed inside the dark toolbar and panels
+• The selection menu can wait for a right-click instead of opening on its own, and has a compact form
 ```
 
 **NO:**
 ```
-• PDF-filer får et eget dokumentikon i Utforsker – et ark med rødt hjørne, røde linjer og appens lille merke – i stedet for app-logoen. Innstillingene tilbyr roligere varianter, med eller uten merket, app-logoen eller et eget ikon: en .ico, eller en kvadratisk .png som appen gjør om
-• Natt har fått en ny papirtone, «Hvitt»: dokumentet som trykt — hvit side, mørk verktøylinje og mørke paneler
-• Søkefeltets treffliste åpner sammenlagt så feltet aldri dekker treffet det peker på; en listeknapp folder den ut, feltet kan dras til side, og KI-søket blar gjennom passasjene med de samme pilene
-• Markeringsmenyen har fått to brytere: vent på høyreklikk i stedet for å åpne selv, og en kompakt form med de samme valgene på en tredjedel av høyden
+• Hold pekeren over en henvisning, en figur eller en ligning for å forhåndsvise den ved siden av teksten. På en henvisning henter ett klikk sammendraget til den siterte artikkelen fra åpne fagdatabaser – uten nøkkel og konto
+• Nylige filer kan vises som et rutenett av forsider med hvor langt du har lest; fest de du kommer tilbake til, fjern resten
+• Side for side: én side eller ett oppslag om gangen, bladd med hjulet, et sveip eller piltastene
+• Faner kan festes, og hvert vindu får fanene sine tilbake ved neste oppstart
+• PDF-filer får et eget dokumentikon i Utforsker, eller et du velger selv
+• Natt har fått en ny papirtone, «Hvitt»: dokumentet som trykt inne i mørk verktøylinje og mørke paneler
+• Markeringsmenyen kan vente på høyreklikk i stedet for å åpne selv, og har en kompakt form
 ```
 
 ---
@@ -186,6 +196,8 @@ Selecting text opens the annotation menu at the selection
 A notes panel lists every mark, with search, filters and export to Word, Markdown or HTML
 Comments in the margin, and a print-ready export with the comments set in a widened margin
 Highlight, underline, strikeout, squiggly, pen, marker, shapes, notes and free text
+Rest the pointer on a citation, figure or equation to preview it; fetch a cited paper's abstract with one click
+Recent files as a grid of first pages; pinned tabs, and your tabs back at the next launch
 Pressure-sensitive pen (beta); the pen draws while a finger scrolls
 Existing marks can be adjusted rather than redrawn
 Standard PDF annotations that open correctly in Acrobat and other viewers
@@ -205,6 +217,8 @@ Delt visning: to kolonner — samme dokument eller to ulike — hver med egen si
 Et notatpanel lister hvert merke, med søk, filtre og eksport til Word, Markdown eller HTML
 Kommentarer i margen, og en utskriftsklar eksport med kommentarene satt i en utvidet marg
 Utheving, understreking, gjennomstreking, bølget strek, penn, tusj, former, notater og fritekst
+Hold pekeren over en henvisning, figur eller ligning for å forhåndsvise den; hent sammendraget til en sitert artikkel med ett klikk
+Nylige filer som et rutenett av forsider; festede faner, og fanene tilbake ved neste oppstart
 Trykkfølsom penn (beta); pennen tegner mens fingeren blar
 Eksisterende merker kan justeres i stedet for å tegnes på nytt
 Standard PDF-annoteringer som åpnes riktig i Acrobat og andre lesere

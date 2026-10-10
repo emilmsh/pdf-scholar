@@ -43,10 +43,12 @@ Open a PDF and it becomes an ordinary browser tab in the PDF Scholar viewer inst
 READING
 • Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
 • Four reading modes — Day, Tint (a light paper tone in five colours), Night and Night+ — plus Auto; Night can also show the document as printed inside the dark chrome, a slider sets the strength, and Night can keep pictures in their original colours
-• Page rotation, two-page spread, and a full-screen presentation mode
+• Page rotation, two-page spread, page by page (one page or spread at a time, turned instead of scrolled), and a full-screen presentation mode
 • Split view: two columns of the same document, each with its own page, zoom and rotation
 • Table of contents, thumbnails and bookmarks
-• Reading positions and recent files are remembered
+• Rest the pointer on a citation, a figure or an equation to preview it beside the text; on a citation, one click fetches the cited paper's abstract from free scholarly databases
+• Reading positions are remembered; the library lists recent files or shows their first pages with how far you read, and the ones you return to can be pinned
+• The icon on the browser tab can be one of several document icons, or a picture of your own
 • Keyboard shortcuts are listed in one map and can be rebound or reset
 
 SEARCH
@@ -76,7 +78,7 @@ AI ASSISTANT (optional, bring your own key)
 • An AI access switch: "Confirm before sharing" asks the first time a document goes to a provider and shows what is attached; "Off" blocks every AI request
 • Eight major AI services are supported, one key field each, alongside any endpoint that speaks the standard chat-completions API — including a local model server, which needs no key. The providers are listed on the project page. Requests go directly to the provider you chose; with a local model the document never leaves the machine
 
-Free and open source (MIT). No account, no tracking, no ads. Everything works offline except the optional AI, which uses your own key.
+Free and open source (MIT). No account, no tracking, no ads. Nothing goes online unless you ask: the optional AI uses your own key, and a reference or a cited paper's abstract is fetched on a click.
 ```
 
 **NO:**
@@ -88,10 +90,12 @@ PDF Scholar erstatter nettleserens innebygde PDF-visning med en leser og annotat
 LESING
 • Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
 • Fire lesemoduser — Dag, Farge (en lys papirtone i fem farger), Natt og Natt+ — pluss Auto; natt kan også vise dokumentet som trykt i den mørke rammen, en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
-• Siderotasjon, tosiders oppslag og en fullskjerms presentasjonsmodus
+• Siderotasjon, tosiders oppslag, side for side (én side eller ett oppslag om gangen, bladd i stedet for rullet) og en fullskjerms presentasjonsmodus
 • Delt visning: to kolonner av samme dokument, hver med egen side, zoom og rotasjon
 • Innholdsfortegnelse, miniatyrer og bokmerker
-• Leseposisjon og nylige filer huskes
+• Hold pekeren over en henvisning, en figur eller en ligning for å forhåndsvise den ved siden av teksten; på en henvisning henter ett klikk sammendraget til den siterte artikkelen fra åpne fagdatabaser
+• Leseposisjonen huskes; biblioteket viser nylige filer som liste eller som forsider med hvor langt du har lest, og de du kommer tilbake til kan festes
+• Ikonet på nettleserfanen kan være et av flere dokumentikoner, eller et eget bilde
 • Hurtigtastene står i ett kart og kan bindes om eller tilbakestilles
 
 SØK
@@ -121,7 +125,7 @@ AI-ASSISTENT (valgfri, egen nøkkel)
 • AI-tilgang: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved; «Av» stopper alle AI-forespørsler
 • Åtte store AI-tjenester støttes, med ett nøkkelfelt hver, i tillegg til ethvert endepunkt som følger den vanlige chat-API-standarden — også en lokal modellserver, som ikke trenger nøkkel. Leverandørene er listet opp på prosjektsiden. Forespørslene går rett til leverandøren du valgte; med en lokal modell forlater dokumentet aldri maskinen
 
-Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Alt virker offline bortsett fra den valgfrie AI-en, som bruker din egen nøkkel.
+Gratis og åpen kildekode (MIT). Ingen konto, ingen sporing, ingen reklame. Ingenting går på nett med mindre du ber om det: den valgfrie AI-en bruker din egen nøkkel, og en referanse eller sammendraget til en sitert artikkel hentes med et klikk.
 ```
 
 > **No third-party brand name belongs in the two description blocks above.**
@@ -170,7 +174,8 @@ Answer the stores' data questions as follows (all true — see `docs/PRIVACY.md`
 - **Does this extension collect or use user data?** The extension itself collects and transmits **nothing** — no analytics, no telemetry, no accounts.
 - **Website content:** the extension processes PDF content **locally, on the device**, only to render and annotate it. It is not sent anywhere by the reader.
 - **The optional AI assistant** only runs when the user has configured **their own** AI provider and uses an AI action — asking a question, or a one-click action such as summarize or explain. It then sends document text (normally the whole document's extractable text; an excerpt for very long documents) **directly from the user's browser to the AI provider the user chose** — including a local model server, in which case nothing leaves the device — under the user's key and that provider's terms. An access setting can require a confirmation before every request, or switch the AI features off entirely (enforced in the transport, not just the UI). PDF Scholar operates **no server** and receives none of this data.
-- **Not sold or transferred** to third parties, except the user-directed AI call above.
+- **Reference lookups, on a click only:** a document that prints a DOI can fetch its own reference — the DOI is sent to `doi.org`. The link preview can fetch a cited paper's abstract — the text of that one reference-list entry (or the DOI/arXiv id in it) is sent to the public scholarly databases Crossref, Europe PMC, OpenAlex and arXiv. No key, no account, nothing else from the document and nothing about the user.
+- **Not sold or transferred** to third parties, except the user-directed requests above.
 - **No remote code:** all executable code ships inside the package; nothing is fetched and run at runtime. (The AI calls are data requests to the user's provider, not code.)
 - **Privacy policy URL:** `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md`
 

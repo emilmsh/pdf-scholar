@@ -116,22 +116,31 @@ remembers a credential without asking you for a master password every time, so
 set a spending cap in the provider's console as well — the app's key settings link
 straight to it.
 
-## Abstracts of cited papers (optional, on request)
+## References and abstracts (optional, on request)
 
-Resting the pointer on a citation shows the reference-list entry it points to,
-read from the document on your machine. That preview sends nothing. Below it, a
-**«Sammendrag» / «Abstract»** button fetches the cited paper's abstract — only
-when you click it. The click sends **the text of that one reference-list
-entry** (or just the DOI or arXiv number printed in it) to these free public
-scholarly databases, with no key and no account:
+Two lookups go online, each only when you click it. Neither needs a key or an
+account, and nothing else from the document, and nothing about you, goes with
+either request.
+
+**A document's own reference.** A document that prints a DOI (and is not in
+your Zotero library) gets a reference section in the save menu. Clicking it
+sends **that DOI** to `doi.org`, which returns the reference and BibTeX entry
+from the registration agency (Crossref or DataCite).
+
+**The abstract behind a citation.** Resting the pointer on a citation shows the
+reference-list entry it points to, read from the document on your machine. That
+preview sends nothing. Below it, a **«Sammendrag» / «Abstract»** button fetches
+the cited paper's abstract — only when you click it. The click sends **the text
+of that one reference-list entry** (or just the DOI or arXiv number printed in
+it) to these free public scholarly databases:
 
 - Crossref (`api.crossref.org`) — to find which paper the entry names, and for
   the abstract where the publisher deposited one;
 - Europe PMC (`www.ebi.ac.uk`), OpenAlex (`api.openalex.org`) and arXiv
   (`export.arxiv.org`) — for the abstract itself.
 
-Nothing else from the document, and nothing about you, goes with the request.
-The answer is kept in memory for the session and forgotten when the app closes.
+Both answers are kept in memory for the session and forgotten when the app
+closes.
 
 ## Automatic updates (desktop app)
 

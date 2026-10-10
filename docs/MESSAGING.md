@@ -431,6 +431,13 @@ app looks like.)*
 
 - Reading, annotating and saving are entirely local; the app runs without
   network access
+- Two lookups go online, each on a click and only where it is offered: a
+  document's own reference from doi.org (the save menu), and a cited paper's
+  abstract from free scholarly databases — arXiv, Europe PMC, Crossref,
+  OpenAlex (the link preview). Only the DOI, or the one reference entry, is
+  sent *(2026-10-10: the doi.org lookup had shipped on 2026-09-07 without a
+  line here or in PRIVACY.md. The extension listing says «free scholarly
+  databases» and names none — its no-brand-names rule)*
 - Assistant requests go directly to the chosen provider, under your key and
   that provider's terms — there is no intermediary server. Signed in with a
   ChatGPT plan, the request goes to OpenAI's ChatGPT service under the ChatGPT

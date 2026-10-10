@@ -15,7 +15,7 @@ There are four reading themes, and every file reopens where you stopped. Annotat
 happens from a menu that opens at the selected text; every mark is listed in a panel
 beside the document, and comments can be laid out in the margin — or exported into one.
 A split view places a figure or table beside the passage that discusses it, and
-cross-references can be followed and returned from. The optional AI assistant answers
+cross-references can be previewed where they are cited, or followed and returned from. The optional AI assistant answers
 from the open document and cites the passage each claim came from. Free, MIT-licensed,
 and offline unless you ask a question.
 
@@ -357,7 +357,9 @@ the keys named in this README are the defaults.
 ### Local by default
 
 Reading, annotating and saving are entirely local; the app runs without network access.
-When you do use the assistant, the request goes directly to the provider you chose, under
+Two lookups go online, each on a click: a document's reference from doi.org, and a cited
+paper's abstract from free scholarly databases (arXiv, Europe PMC, Crossref, OpenAlex) —
+only the DOI, or the one reference entry, is sent. When you do use the assistant, the request goes directly to the provider you chose, under
 your key and that provider's terms — there is no intermediary server, and with a local
 model (Ollama, LM Studio) even your questions stay on the machine.
 
