@@ -70,6 +70,9 @@ interface ChromeApi {
   }
   storage?: {
     local: ChromeStorageArea
+    /** In memory, gone with the browser session; extension pages and the
+     *  service worker share it. */
+    session?: ChromeStorageArea
     /** Fires in every context of the extension on a write to any area —
      *  the service worker hears the viewer page flip a switch. */
     onChanged: {

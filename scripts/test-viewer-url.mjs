@@ -151,6 +151,30 @@ eq(
   'background.ts folds the matched URL in through RAW_FILE_PARAM'
 )
 
+// --- The toolbar icon taking a PDF back from the browser's reader ------------
+// background.ts addresses the viewer itself (takeBackIntoViewer) in the rule's
+// own form, and hands extension-api.ts two storage keys it declares as literals.
+eq(
+  bg.includes('`${chrome.runtime.getURL(\'viewer.html\')}?${RAW_FILE_PARAM}=${url}`'),
+  true,
+  'background.ts takes a tab back in the redirect rule\'s raw form'
+)
+const api = readFileSync(new URL('../src/renderer/src/extension-api.ts', import.meta.url), 'utf8')
+for (const name of ['K_LAST_FALLBACK', 'K_TAKEN_BACK']) {
+  const key = (src) => new RegExp(`const ${name} = '([^']+)'`).exec(src)?.[1] ?? null
+  eq(key(bg) !== null && key(bg) === key(api), true, `${name} agrees between background.ts and extension-api.ts`)
+}
+// Elsevier's signed links (the case behind the icon, 2026-10-10): the path ends
+// in main.pdf and a long signed query follows. The .pdf rule must call it a PDF,
+// and the URL must come back from the viewer address byte for byte.
+const elsevier =
+  'https://pdf.sciencedirectassets.com/312218/1-s2.0-S2352550923X00025/1-s2.0-S2352550923000428/main.pdf' +
+  '?X-Amz-Security-Token=IQoJb3%2F%2B%3D&X-Amz-Date=20261010T063131Z&X-Amz-Expires=300' +
+  '&X-Amz-Signature=95f6edc3&pii=S2352550923000428&tsoh=d3d3LnNjaWVuY2VkaXJlY3QuY29t&cc=no'
+const pdfFilter = /const PDF_URL_FILTER = '([^']+)'/.exec(bg)?.[1]?.replace(/\\\\/g, '\\')
+eq(new RegExp(pdfFilter).test(elsevier), true, 'the .pdf rule recognises an Elsevier signed link')
+eq(V.parseViewerTarget(`${EXT}?${V.RAW_FILE_PARAM}=${elsevier}`), elsevier, 'Elsevier signed link round-trips')
+
 // --- Display names ----------------------------------------------------------
 eq(V.fileNameFromUrl('https://example.org/p/attention.pdf'), 'attention.pdf', 'plain name')
 eq(

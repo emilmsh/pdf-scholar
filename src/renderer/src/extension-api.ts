@@ -76,6 +76,9 @@ const K_RECENTS = 'pdfx-recents'
 /** Why the last document was handed to the browser's own reader — the only trace
  *  of a hand-off that is deliberately invisible (see openInBrowserViewer). */
 const K_LAST_FALLBACK = 'pdfx-last-fallback'
+/** chrome.storage.session: the document the toolbar icon just took back from the
+ *  browser's reader into this tab (background.ts, takeBackIntoViewer). */
+const K_TAKEN_BACK = 'pdfx-taken-back'
 
 /** One Zotero client per viewer page — the success cache lives as long as the
  *  tab, which mirrors main's per-app-instance cache on desktop. */
@@ -638,6 +641,26 @@ export async function openInBrowserViewer(url: string, reason?: string): Promise
     })
     await tabs.update?.(tabId, { url })
     return true
+  } catch {
+    return false
+  }
+}
+
+/** True — once — when the toolbar icon put `path` in this tab by hand, taking
+ *  it back from the browser's reader. Such a document must not be handed back
+ *  on failure: that is exactly where the click came from, and a silent bounce
+ *  would read as the icon doing nothing. The banner says why instead. */
+export async function consumeTakenBack(path: string): Promise<boolean> {
+  const session = chrome?.storage?.session
+  if (!session || !chrome?.tabs?.getCurrent) return false
+  try {
+    const got = (await session.get(K_TAKEN_BACK))[K_TAKEN_BACK] as { tabId?: unknown; url?: unknown } | undefined
+    if (!got) return false
+    const tabId = (await chrome.tabs.getCurrent())?.id
+    if (got.tabId !== tabId) return false
+    await session.remove(K_TAKEN_BACK)
+    const bare = (u: string): string => u.split('#')[0]
+    return typeof got.url === 'string' && bare(got.url) === bare(path)
   } catch {
     return false
   }

@@ -183,11 +183,87 @@ chrome?.runtime.onInstalled.addListener((details) => {
 // startup is cheap insurance against a partially-applied install.
 void installRedirectRules()
 
-// Clicking the toolbar icon opens an empty viewer tab (welcome screen).
+// The toolbar icon. On a tab where the browser's own reader is showing a PDF it
+// takes that document back into our viewer, in place; anywhere else it opens an
+// empty viewer tab (welcome screen).
+//
+// The case this exists for is the hand-off (openInBrowserViewer in
+// extension-api.ts): a host that answers the viewer's fetch with a bot check
+// gets the tab handed to the browser, the user solves the check THERE, and the
+// PDF that follows lands in the browser's reader, because the hand-off's allow
+// rule keeps this tab away from our redirects for the rest of the session
+// (Elsevier's pdf.sciencedirectassets.com, 2026-10-10). The check's clearance
+// cookie is now in the jar, so the viewer's credentialed retry can usually
+// fetch what it could not a minute ago. The same click serves a PDF that
+// reached the browser's reader any other way (web takeover off, opened before
+// install).
+//
+// Which tabs count: a URL our .pdf rule would have taken, or the very URL the
+// last hand-off gave away (arXiv's /pdf/2401.12345 says nothing in its path).
+// Anything else is an ordinary page and gets the welcome tab — fetching a web
+// page to find out it is not a PDF would only end in an error banner.
+//
+// tab.url is ours to read without the "tabs" permission: host_permissions cover
+// every http(s) and file:// page (see the NB below).
+//
 // NB: chrome.tabs.create needs NO "tabs" permission — that permission only gates
-// the sensitive tab fields (url/pendingUrl/title/favIconUrl), which we never
-// read. Chrome Web Store review rejected the extension for declaring it
-// ("Purple Potassium", 2026-07-24); do not add it back.
-chrome?.action?.onClicked.addListener(() => {
-  if (chrome?.tabs) void chrome.tabs.create({ url: chrome.runtime.getURL('viewer.html'), active: true })
+// the sensitive tab fields (url/pendingUrl/title/favIconUrl) on tabs we hold no
+// host permission for. Chrome Web Store review rejected the extension for
+// declaring it ("Purple Potassium", 2026-07-24); do not add it back.
+
+// Literals for the same reason as RAW_FILE_PARAM; test:viewer-url pins both
+// against extension-api.ts.
+const K_LAST_FALLBACK = 'pdfx-last-fallback'
+const K_TAKEN_BACK = 'pdfx-taken-back'
+
+function withoutHash(url: string): string {
+  const at = url.indexOf('#')
+  return at < 0 ? url : url.slice(0, at)
+}
+
+async function isPdfInBrowserReader(url: string): Promise<boolean> {
+  if (new RegExp(PDF_URL_FILTER).test(url)) return true
+  if (!/^https?:/i.test(url)) return false
+  try {
+    const got = await chrome!.storage!.local.get(K_LAST_FALLBACK)
+    const last = got[K_LAST_FALLBACK] as { url?: unknown } | undefined
+    return typeof last?.url === 'string' && withoutHash(last.url) === withoutHash(url)
+  } catch {
+    return false
+  }
+}
+
+async function takeBackIntoViewer(tab: ChromeTab): Promise<boolean> {
+  const url = tab.url
+  const dnr = chrome?.declarativeNetRequest
+  if (tab.id == null || !url || !chrome?.tabs?.update || !(await isPdfInBrowserReader(url))) return false
+  const tabId = tab.id
+  // The tab's hand-off rule goes: the user just asked for our viewer here.
+  try {
+    const stale = ((await dnr?.getSessionRules?.()) ?? []).filter((r) => r.condition.tabIds?.includes(tabId))
+    if (stale.length) await dnr?.updateSessionRules?.({ removeRuleIds: stale.map((r) => r.id) })
+  } catch {
+    // A rule left behind only means the NEXT navigation in this tab goes to the
+    // browser's reader again; this one is addressed to the viewer directly.
+  }
+  // Tells the viewer this document was asked for by hand: if it still cannot be
+  // fetched, show the banner (with its own «open in the browser's reader»)
+  // instead of silently handing the tab straight back where the click came from.
+  try {
+    await chrome?.storage?.session?.set({ [K_TAKEN_BACK]: { tabId, url } })
+  } catch {
+    // Without the marker a failure hands back silently — the old behaviour.
+  }
+  // Straight to the viewer, in the same form the redirect rules produce: going
+  // through the original URL would ask the server once more for nothing, and
+  // would not reach us at all with the web takeover switched off.
+  await chrome.tabs.update(tabId, { url: `${chrome.runtime.getURL('viewer.html')}?${RAW_FILE_PARAM}=${url}` })
+  return true
+}
+
+chrome?.action?.onClicked.addListener((tab) => {
+  void (async () => {
+    if (await takeBackIntoViewer(tab).catch(() => false)) return
+    if (chrome?.tabs) await chrome.tabs.create({ url: chrome.runtime.getURL('viewer.html'), active: true })
+  })()
 })
