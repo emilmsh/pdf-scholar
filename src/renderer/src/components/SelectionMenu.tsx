@@ -27,10 +27,12 @@ import {
   IconMore,
   IconNote,
   IconSparkle,
+  IconSummary,
   IconTally,
   IconTranslate
 } from './icons'
 import { inTextField } from './TextContextMenu'
+import { looksLikeReference } from '../../../shared/abstract'
 
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/
 
@@ -221,6 +223,8 @@ export type MenuAction =
   | { kind: 'ask' }
   | { kind: 'snip' }
   | { kind: 'grabImage' }
+  /** The abstract of the paper a selected reference-list entry names */
+  | { kind: 'abstract' }
 
 interface MenuProps {
   menu: MenuState
@@ -270,6 +274,10 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
   const [selText] = useState(() => window.getSelection()?.toString() ?? '')
   /** Word count expands on demand instead of tailing every menu */
   const [showCount, setShowCount] = useState(false)
+  /** «Sammendrag» only where it can work: a selection that reads like a
+   *  reference-list entry (shared/abstract.ts looksLikeReference) — prose
+   *  never grows a network action it has no use for */
+  const isReference = isSelection && looksLikeReference(selText)
 
   const showAi = aiEnabled && !menu.foreign
   /* All assistant actions are siblings of one gesture ("ask the assistant
@@ -399,6 +407,11 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
           <button className="compact-btn" title={t('menu.copy')} onClick={() => onAction({ kind: 'copy' })}>
             <IconCopy size={16} />
           </button>
+          {isReference && (
+            <button className="compact-btn" title={t('menu.abstractTip')} onClick={() => onAction({ kind: 'abstract' })}>
+              <IconSummary size={16} />
+            </button>
+          )}
           <span className="compact-sep" />
           <button className="compact-btn" title={t('menu.webSearch')} onClick={() => onAction({ kind: 'search' })}>
             <IconGlobe size={16} />
@@ -472,6 +485,11 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
           <button className="menu-item" onClick={() => onAction({ kind: 'copy' })}>
             <span className="menu-icon"><IconCopy size={15} /></span> {t('menu.copy')}
           </button>
+          {isReference && (
+            <button className="menu-item" title={t('menu.abstractTip')} onClick={() => onAction({ kind: 'abstract' })}>
+              <span className="menu-icon"><IconSummary size={15} /></span> {t('menu.abstract')}
+            </button>
+          )}
           {showAi && (
             <>
               <div className="menu-sep" />

@@ -128,6 +128,7 @@ import { charCitationsToQuotes } from '../ai-retrieval'
 import { rememberRequestTokenLimit } from '../ai-token-limits'
 import AnnotPopover from './AnnotPopover'
 import LinkPreview from './LinkPreview'
+import AbstractBubble from './AbstractBubble'
 import { linkPreviewDelayMs } from '../link-preview'
 import { PasswordPrompt } from './PasswordPrompt'
 import { SignaturePad } from './SignaturePad'
@@ -658,6 +659,12 @@ export default function PdfViewer({
   const [fullscreen, setFullscreen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
+  /** «Sammendrag» chosen in the selection menu: the selected reference's text
+   *  and where it sits on screen (AbstractBubble) */
+  const [abstractAsk, setAbstractAsk] = useState<{
+    text: string
+    avoid: { top: number; bottom: number; left: number }
+  } | null>(null)
   const [noteDraft, setNoteDraft] = useState<NoteDraft | null>(null)
   /** All annotations per page: 'file' records (painted by pdf.js) + 'session'
    *  records created now (painted by our overlay) */
@@ -4323,6 +4330,20 @@ export default function PdfViewer({
           }
           setMenu(null)
           break
+        case 'abstract': {
+          // The whole selection with its line breaks (selText is trimmed to
+          // 500 for the web actions) — the lookup rejoins a DOI broken at a
+          // line end. The bubble opens clear of the selection, which stays
+          // marked: it shows what was looked up.
+          const domSel = window.getSelection()
+          const full = domSel?.toString() ?? ''
+          const r = domSel && domSel.rangeCount ? domSel.getRangeAt(0).getBoundingClientRect() : null
+          setMenu(null)
+          if (full.trim() && r) {
+            setAbstractAsk({ text: full.slice(0, 4000), avoid: { top: r.top, bottom: r.bottom, left: r.left } })
+          }
+          break
+        }
         case 'search':
           if (selText) {
             bridge.openExternal(`https://www.google.com/search?q=${encodeURIComponent(selText)}`)
@@ -7815,6 +7836,14 @@ export default function PdfViewer({
             }
           }}
           onClose={() => setAiQuick(null)}
+        />
+      )}
+      {abstractAsk && (
+        <AbstractBubble
+          key={abstractAsk.text}
+          text={abstractAsk.text}
+          avoid={abstractAsk.avoid}
+          onClose={() => setAbstractAsk(null)}
         />
       )}
       {/* Hover previews of in-document links (issue #31) — listens on the

@@ -127,6 +127,20 @@ const check = (label, cond, detail = '') => {
   check('kept inside the window at its right edge', right.left + box.w <= win.w - 12, JSON.stringify(right))
 }
 {
+  // Once an abstract is in, the window is placed by what it needs
+  const win = { h: 800 }
+  const fitsBelow = M.placeExpanded({ top: 100, bottom: 116 }, 500, win)
+  check('expanded: below the link when all of it fits there', fitsBelow.top === 124 && fitsBelow.height === 500 && !fitsBelow.covers, JSON.stringify(fitsBelow))
+  const fitsAbove = M.placeExpanded({ top: 600, bottom: 616 }, 500, win)
+  check('expanded: above when it fits there instead', fitsAbove.top + fitsAbove.height === 592 && fitsAbove.height === 500 && !fitsAbove.covers, JSON.stringify(fitsAbove))
+  const bigger = M.placeExpanded({ top: 500, bottom: 516 }, 700, win)
+  check('expanded: neither side holds it all → the roomier side, the rest scrolls', bigger.top === 12 && bigger.height === 480 && !bigger.covers, JSON.stringify(bigger))
+  const cramped = M.placeExpanded({ top: 300, bottom: 316 }, 520, { h: 620 })
+  check('expanded: no side worth reading in → covers the link, all of it in view', cramped.covers && cramped.height === 520 && cramped.top >= 12 && cramped.top + cramped.height <= 608, JSON.stringify(cramped))
+  const huge = M.placeExpanded({ top: 300, bottom: 316 }, 5000, { h: 620 })
+  check('expanded: never taller than the window', huge.height === 620 - 24, JSON.stringify(huge))
+}
+{
   check('caption: «Figure 3:»', M.isFigureCaption('Figure 3: The Transformer'))
   check('caption: «Fig. 2.»', M.isFigureCaption('Fig. 2. Results'))
   check('caption: «FIGURE 1»', M.isFigureCaption('FIGURE 1'))

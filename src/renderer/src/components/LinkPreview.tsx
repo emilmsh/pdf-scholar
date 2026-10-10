@@ -20,17 +20,19 @@
 // still goes to the reference list. Once asked, the window stays put when the
 // pointer leaves — it is being read — and grows away from the link.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { useDismissable } from '../useDismissable'
-import { errorText, t } from '../i18n'
+import { t } from '../i18n'
 import { bridge } from '../bridge'
-import { doiUrl } from '../../../shared/doi'
 import type { CitationAbstract, FileError } from '../../../shared/types'
+import { AbstractBody, AbstractSource } from './AbstractView'
+import type { AbstractState } from './AbstractView'
 import {
   citationEntryText,
   destOnFigureCaption,
   LINK_RECORDS,
+  placeExpanded,
   placePreview,
   previewScroll,
   previewSize,
@@ -63,23 +65,11 @@ interface Open {
   at: { left: number; top: number; below: boolean }
 }
 
-type AbstractState =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'done'; result: CitationAbstract }
-  | { state: 'error'; error: FileError }
-
 /** What «Sammendrag» found, per document and destination — a second hover on
  *  the same citation shows it again without asking anyone */
 const abstractCache = new WeakMap<PDFDocumentProxy, Map<string, CitationAbstract>>()
 const destKey = (dest: unknown): string => (typeof dest === 'string' ? dest : JSON.stringify(dest))
 
-const SOURCE_NAMES: Record<Exclude<CitationAbstract['source'], ''>, string> = {
-  arxiv: 'arXiv',
-  europepmc: 'Europe PMC',
-  crossref: 'Crossref',
-  openalex: 'OpenAlex'
-}
 
 /** How long the pointer may be between the link and the window (or off both)
  *  before the window goes: long enough to cross the gap, short enough that
@@ -88,6 +78,10 @@ const CLOSE_GRACE_MS = 220
 const LONG_PRESS_MS = 450
 /** The footer line under the page window, borders included (app.css) */
 const FOOT_PX = 27
+/** The page window's height once an abstract is in: the entry's first lines
+ *  — enough to see what was matched — and the rest of the height goes to the
+ *  abstract */
+const COMPACT_PAGE_PX = 84
 /** Rendered pages kept per document. A paper's citations land on its one to
  *  three reference pages, so a handful makes every hover after the first one
  *  on a page instant. */
@@ -148,6 +142,13 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   const [abs, setAbs] = useState<AbstractState>({ state: 'idle' })
   /** Asked for the abstract: the window no longer closes on pointer leave */
   const pinnedRef = useRef(false)
+  /** Where the window stands once it has been placed for an abstract or
+   *  dragged; null = the hover placement from `open.at` */
+  const [placed, setPlaced] = useState<{ left: number; top: number; height: number | null } | null>(null)
+  /** Dragged by the reader: their position wins from then on */
+  const draggedRef = useRef(false)
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   const clearArm = (): void => {
     if (armTimer.current !== null) window.clearTimeout(armTimer.current)
@@ -211,6 +212,8 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     const at = placePreview(r, pointerX, { w: box.w, h: box.h + FOOT_PX }, { w: window.innerWidth, h: window.innerHeight })
     const known = abstractCache.get(rec.pdf)?.get(destKey(rec.dest))
     pinnedRef.current = false
+    draggedRef.current = false
+    setPlaced(null)
     setAbs(known ? { state: 'done', result: known } : { state: 'idle' })
     setOpen({
       anchor,
@@ -357,6 +360,57 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
 
   useDismissable(boxRef, !!open, close)
 
+  // The abstract is in: place the whole window ONCE by what it now needs —
+  // before paint, so it never shows at the old size first. Loading changes
+  // nothing; this is the single move.
+  const hasPanel = abs.state === 'done' || abs.state === 'error'
+  useLayoutEffect(() => {
+    const panel = panelRef.current
+    const box = boxRef.current
+    if (!open || !hasPanel || !panel || !box) return
+    const need = COMPACT_PAGE_PX + panel.scrollHeight + FOOT_PX
+    const winH = window.innerHeight
+    const left = box.getBoundingClientRect().left
+    if (draggedRef.current) {
+      const top = box.getBoundingClientRect().top
+      setPlaced({ left, top, height: Math.min(need, winH - top - 12) })
+      return
+    }
+    const at = placeExpanded(open.anchor.getBoundingClientRect(), need, { h: winH })
+    setPlaced({ left, top: at.top, height: at.height })
+  }, [open, abs, hasPanel])
+
+  /** The footer is the handle: drag the window aside to read what is under
+   *  it. A dragged window stays — leaving it no longer closes it. */
+  const footHandle = {
+    onPointerDown: (e: React.PointerEvent): void => {
+      if ((e.target as Element).closest('button, a')) return
+      const r = boxRef.current?.getBoundingClientRect()
+      if (!r) return
+      dragRef.current = { dx: e.clientX - r.left, dy: e.clientY - r.top }
+      try {
+        ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      } catch {
+        /* a synthetic event has no pointer to capture */
+      }
+      e.preventDefault()
+    },
+    onPointerMove: (e: React.PointerEvent): void => {
+      const d = dragRef.current
+      const r = boxRef.current?.getBoundingClientRect()
+      if (!d || !r) return
+      draggedRef.current = true
+      pinnedRef.current = true
+      clearClose()
+      const left = Math.max(8, Math.min(e.clientX - d.dx, window.innerWidth - r.width - 8))
+      const top = Math.max(8, Math.min(e.clientY - d.dy, window.innerHeight - r.height - 8))
+      setPlaced((p) => ({ left, top, height: p?.height ?? null }))
+    },
+    onPointerUp: (): void => {
+      dragRef.current = null
+    }
+  }
+
   /** «Sammendrag»: read the entry off the page, hand its text over */
   const askAbstract = async (o: Open): Promise<void> => {
     pinnedRef.current = true
@@ -391,18 +445,18 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   }
 
   const markTop = open.vy !== null && open.kind !== 'figure' && open.kind !== 'table' ? open.vy : null
-  // The window grows AWAY from its link: down from its top when it opened
-  // below, up from its bottom when above — an abstract never covers the
-  // citation that asked for it
+  // Before it is placed for an abstract (or dragged), the hover placement.
+  // Opened above its link, the window is held by its BOTTOM, so the footer's
+  // «Henter …» never moves it toward the citation.
   const winH = window.innerHeight
-  const bottom = winH - (open.at.top + open.box.h + FOOT_PX)
-  const room = open.at.below ? winH - open.at.top - 12 : open.at.top + open.box.h + FOOT_PX - 12
-  const place: React.CSSProperties = open.at.below
-    ? { left: open.at.left, top: open.at.top, width: open.box.w }
-    : { left: open.at.left, bottom, width: open.box.w }
+  const place: React.CSSProperties = placed
+    ? { left: placed.left, top: placed.top, width: open.box.w }
+    : open.at.below
+      ? { left: open.at.left, top: open.at.top, width: open.box.w }
+      : { left: open.at.left, bottom: winH - (open.at.top + open.box.h + FOOT_PX), width: open.box.w }
+  const pageH = hasPanel ? Math.min(COMPACT_PAGE_PX, open.box.h) : open.box.h
+  const panelMax = placed?.height != null ? Math.max(80, placed.height - pageH - FOOT_PX) : undefined
   const canAsk = open.kind === 'citation' && open.target.y !== null
-  const result = abs.state === 'done' ? abs.result : null
-  const resultDoi = result?.doi ? doiUrl(result.doi) : null
   return (
     <div
       ref={boxRef}
@@ -418,7 +472,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       <div
         ref={scrollerRef}
         className="link-preview-scroll"
-        style={{ height: open.box.h }}
+        style={{ height: pageH }}
         onClick={follow}
         title={t('linkPreview.tip')}
       >
@@ -435,44 +489,8 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
           )}
         </div>
       </div>
-      {(abs.state === 'done' || abs.state === 'error') && (
-        <div
-          className="link-preview-abstract"
-          aria-live="polite"
-          style={{ maxHeight: Math.max(120, room - open.box.h - FOOT_PX) }}
-        >
-          {result ? (
-            <>
-              {result.title && <div className="lpa-title">{result.title}</div>}
-              {(result.year || result.venue) && (
-                <div className="lpa-meta">{[result.venue, result.year].filter(Boolean).join(' · ')}</div>
-              )}
-              {result.abstract ? (
-                result.abstract.split(/\n{2,}/).map((p, i) => (
-                  <p key={i} className="lpa-text">
-                    {p}
-                  </p>
-                ))
-              ) : (
-                <p className="lpa-none">{t('linkPreview.abstractNone')}</p>
-              )}
-              {result.via === 'match' && <p className="lpa-note">{t('linkPreview.abstractMatched')}</p>}
-            </>
-          ) : (
-            abs.state === 'error' && (
-              <p className="lpa-none">
-                {errorText(abs.error)}
-                {abs.error.code === 'abstract-offline' && (
-                  <button type="button" className="lpa-retry" onClick={() => void askAbstract(open)}>
-                    {t('linkPreview.retry')}
-                  </button>
-                )}
-              </p>
-            )
-          )}
-        </div>
-      )}
-      <div className="link-preview-foot">
+      <AbstractBody ref={panelRef} abs={abs} onRetry={() => void askAbstract(open)} maxHeight={panelMax} />
+      <div className="link-preview-foot" {...footHandle}>
         <span>{t('linkPreview.page', { page: open.pageIndex + 1 })}</span>
         {canAsk && abs.state === 'idle' && (
           <button
@@ -485,25 +503,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
           </button>
         )}
         {abs.state === 'loading' && <span className="lpa-loading">{t('linkPreview.abstractLoading')}</span>}
-        {result?.source && (
-          <span className="lpa-source">
-            {t('linkPreview.abstractFrom', { source: SOURCE_NAMES[result.source] })}
-            {resultDoi && (
-              <>
-                {' · '}
-                <a
-                  href={resultDoi}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    bridge.openExternal(resultDoi)
-                  }}
-                >
-                  DOI
-                </a>
-              </>
-            )}
-          </span>
-        )}
+        <AbstractSource abs={abs} />
       </div>
     </div>
   )

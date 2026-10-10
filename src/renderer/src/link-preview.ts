@@ -222,6 +222,37 @@ export function placePreview(
   return { left, top: Math.max(margin, top), below }
 }
 
+/** Where the window goes once it holds an abstract (Emil, 2026-10-10: «nesten
+ *  ingen del av abstractet var synlig uten scrolling»). It is placed ONCE, as
+ *  a whole, by what it now needs: below the link when it fits there, above
+ *  when it fits there. When neither side holds all of it, a side with room
+ *  worth reading in (`minSide`) takes it and the abstract scrolls the rest;
+ *  when not even that, the abstract wins over the citation and the window
+ *  covers the link — it is pinned by then, and it can be dragged aside. */
+export function placeExpanded(
+  anchor: { top: number; bottom: number },
+  need: number,
+  win: { h: number },
+  gap = 8,
+  margin = 12,
+  minSide = 360
+): { top: number; height: number; covers: boolean } {
+  const below = win.h - anchor.bottom - gap - margin
+  const above = anchor.top - gap - margin
+  const h = Math.min(need, win.h - 2 * margin)
+  if (h <= below) return { top: anchor.bottom + gap, height: h, covers: false }
+  if (h <= above) return { top: anchor.top - gap - h, height: h, covers: false }
+  if (Math.max(below, above) >= minSide) {
+    return below >= above
+      ? { top: anchor.bottom + gap, height: below, covers: false }
+      : { top: margin, height: above, covers: false }
+  }
+  // Over the link, but starting a little above it, so the line read just
+  // before the citation is the part that stays in view longest
+  const top = clamp(anchor.top - h / 3, margin, win.h - margin - h)
+  return { top, height: h, covers: true }
+}
+
 /** Hover delay presets (Settings.linkPreviewDelay) — fixed choices rather
  *  than a slider. 'short' is for the reader who sweeps a paragraph's
  *  citations; 'long' for one who rests the pointer on text while reading. */

@@ -3160,6 +3160,14 @@ html.pen-near .draw-layer {
   border-top: 1px solid var(--border);
   font-size: 11px;
   color: var(--text-secondary);
+  /* The handle: drag the window aside to read what is under it */
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.link-preview-foot:active {
+  cursor: grabbing;
 }
 
 /* «Sammendrag» on a citation: a quiet text button in the footer, and the
@@ -3240,6 +3248,43 @@ html.pen-near .draw-layer {
 
 .lpa-note {
   font-style: italic;
+}
+
+/* «Sammendrag» from the selection menu: the same reading as the link
+   preview's panel, in a bubble of its own that grows in place and drags by
+   its grip like the selection menu it came from */
+.abstract-bubble {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(460px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  padding-top: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-menu);
+  overflow: hidden;
+}
+
+.abstract-bubble .link-preview-abstract {
+  flex: 1 1 auto;
+  min-height: 0;
+  border-top: none;
+  padding-top: 2px;
+}
+
+.abstract-bubble-wait {
+  margin: 0;
+  padding: 4px 14px 12px;
+  font-size: 12px;
+}
+
+.abstract-bubble-foot {
+  padding: 4px 14px 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
 }
 
 .link-preview-delays .lang-option:disabled {

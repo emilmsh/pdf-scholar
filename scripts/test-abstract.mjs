@@ -47,6 +47,16 @@ eq(A.findArxivId('arXiv:hep-th/9901001'), 'hep-th/9901001', 'old scheme')
 eq(A.findArxivId('Econometrica 56, 931–954.'), null, 'none')
 eq(A.yearsIn('Neural computation, 9(8):1735–1780, 1997. doi:10.1162/neco.1997.9.8.1735'), [1997], 'years, not DOI fragments or pages')
 
+// --- Does a selection read like a reference? (the selection menu's «Sammendrag») ----
+ok(A.looksLikeReference('[13] Sepp Hochreiter and Jürgen Schmidhuber. Long short-term memory. Neural computation, 9(8):1735–1780, 1997.'), 'a numbered reference entry')
+ok(A.looksLikeReference('Robinson, P. M. (1988). Root-N-consistent semiparametric regression. Econometrica 56, 931–954.'), 'an author–year entry')
+ok(A.looksLikeReference('Gai W, Ji L, et al. Liver-and colon-specific DNA methylation markers. Clin Chem. 2018; 64(8):1239–1249.'), 'a Vancouver entry')
+ok(A.looksLikeReference('see https://doi.org/10.1093/ije/dyr238 for the details'), 'a printed DOI is enough')
+ok(A.looksLikeReference('Kuchaiev and Ginsburg. Factorization tricks. arXiv:1703.10722'), 'an arXiv id is enough')
+ok(!A.looksLikeReference('In 2019 the economy grew faster than the central bank had expected.'), 'prose with a year is not a reference')
+ok(!A.looksLikeReference('Long short-term memory'), 'a title alone is too short to offer')
+ok(!A.looksLikeReference('The model architecture is described in detail in the following section of this paper.'), 'prose without a year')
+
 // --- Is the hit the cited work? ------------------------------------------------------
 const LSTM = 'Sepp Hochreiter and Jürgen Schmidhuber. Long short-term memory. Neural computation, 9(8):1735–1780, 1997.'
 ok(A.acceptMatch(LSTM, 'Long Short-Term Memory', 1997), 'whole title in the entry, same year')

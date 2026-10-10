@@ -88,6 +88,28 @@ export function yearsIn(text: string): number[] {
   return [...text.matchAll(/(?<![\d/.])(1[89]\d{2}|20\d{2})(?![\d/])/g)].map((m) => Number(m[1]))
 }
 
+/** Does a selection read like a reference-list entry — worth offering
+ *  «Sammendrag» for in the selection menu? A printed DOI or arXiv id always
+ *  does. Otherwise it needs a year AND something only references carry:
+ *  initials («Smith, J.», «P. M.»), «et al.», a year in brackets, a
+ *  volume(issue), «pp.» or a page range. Running prose that merely names a
+ *  year («in 2019 the economy grew») does not get the item. */
+export function looksLikeReference(text: string): boolean {
+  if (typeof text !== 'string') return false
+  const s = text.replace(/\s+/g, ' ').trim()
+  if (s.length < 25 || s.length > 4000) return false
+  if (findDoi(s) || findArxivId(s)) return true
+  if (yearsIn(s).length === 0) return false
+  return (
+    /(^|[\s,(])\p{Lu}\.(\s?\p{Lu}\.)*(?=[\s,;)]|$)/u.test(s) ||
+    /\bet al\b/i.test(s) ||
+    /\((1[89]|20)\d{2}[a-z]?\)/.test(s) ||
+    /\b\d+\s*\(\d+\)/.test(s) ||
+    /\bpp?\.\s*\d/.test(s) ||
+    /\b\d+\s*[–-]\s*\d+\b/.test(s)
+  )
+}
+
 // ---------- Is this hit the cited work? ----------
 
 const norm = (s: string): string =>
