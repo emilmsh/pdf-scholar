@@ -5,6 +5,7 @@ import type {
   ManualUpdateChannel,
   ReadingPosition,
   RecentFile,
+  SessionWindow,
   Settings,
   ThemeName
 } from '../../shared/types'
@@ -38,6 +39,21 @@ interface OpenTab {
   /** Bumped when «Åpne i delt visning» names this tab's OWN document — the
    *  same-file split, which only the tab's viewer can open */
   sameSplitNonce: number
+  /** Pinned (issue #29): kept at the strip's start, no close cross, and back
+   *  at every launch whatever restoreSession says */
+  pinned: boolean
+  /** Restored from the last session and not shown yet (issue #29): `payload`
+   *  holds the path and name but no bytes, no viewer is mounted, and main has
+   *  not been told the document is open. The first time the tab is shown its
+   *  file is read — so a long session costs a row of names at launch, not a
+   *  row of parsed documents. See takeLazy for how it stops being lazy. */
+  lazy: boolean
+}
+
+/** The file name a restored tab shows before its file is read — what
+ *  readFile will name it too */
+function baseName(path: string): string {
+  return path.split(/[\\/]/).pop() || path
 }
 
 
@@ -297,12 +313,23 @@ export default function App(): React.JSX.Element {
    *  restart the recents list is the memory, and the command falls back to it. */
   const closedPathsRef = useRef<string[]>([])
 
+  /** Ids of the tabs still lazy (see OpenTab.lazy). Kept beside the state
+   *  because two paths can race to give a restored tab its document — the
+   *  tab being shown, and the same file opened from Explorer or the library —
+   *  and only one may register it with main: takeLazy answers true exactly
+   *  once, synchronously, to whichever gets there first. */
+  const lazyIdsRef = useRef(new Set<string>())
+  const takeLazy = (id: string): boolean => lazyIdsRef.current.delete(id)
+
   const reallyCloseTab = useCallback((id: string) => {
+    // A lazy tab never told main its document was open, so it has nothing to
+    // release — and a load still in flight for it must find it gone
+    lazyIdsRef.current.delete(id)
     setTabs((prev) => {
       const index = prev.findIndex((t) => t.id === id)
       const closing = prev[index]
       if (closing) {
-        docRegistry.release(closing.payload.path)
+        if (!closing.lazy) docRegistry.release(closing.payload.path)
         // The split column's document is a viewer of its own path too
         if (closing.splitDoc) docRegistry.release(closing.splitDoc.payload.path)
       }
@@ -424,9 +451,14 @@ export default function App(): React.JSX.Element {
         }
         goToTab(existing.id)
         const initialPosition = await bridge.getPosition(payload.path)
+        // A restored tab opened from outside before it was ever shown: this
+        // read is its first, so this is where main hears of it
+        if (takeLazy(existing.id)) docRegistry.acquire(payload.path)
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === existing.id ? { ...t, payload, initialPosition, epoch: t.epoch + 1 } : t
+            t.id === existing.id
+              ? { ...t, payload, initialPosition, epoch: t.epoch + 1, lazy: false }
+              : t
           )
         )
         return
@@ -438,7 +470,9 @@ export default function App(): React.JSX.Element {
         initialPosition,
         epoch: 0,
         splitDoc: null,
-        sameSplitNonce: 0
+        sameSplitNonce: 0,
+        pinned: false,
+        lazy: false
       }
       docRegistry.acquire(payload.path)
       setTabs((prev) => [...prev, tab])
@@ -676,16 +710,34 @@ export default function App(): React.JSX.Element {
     [closeTabAwait]
   )
 
-  /** Drag a tab to a new position (also Ctrl+Shift+PageUp/PageDown) */
+  /** Drag a tab to a new position (also Ctrl+Shift+PageUp/PageDown). Pinned
+   *  tabs move among themselves and the rest among themselves: the pinned
+   *  group is always the strip's start, so a drag across the border stops at
+   *  it rather than mixing the two. */
   const moveTab = useCallback((id: string, toIndex: number) => {
     setTabs((prev) => {
       const from = prev.findIndex((t) => t.id === id)
-      const to = Math.max(0, Math.min(prev.length - 1, toIndex))
-      if (from === -1 || from === to) return prev
+      if (from === -1) return prev
+      const pinnedCount = prev.filter((t) => t.pinned).length
+      const [lo, hi] = prev[from].pinned ? [0, pinnedCount - 1] : [pinnedCount, prev.length - 1]
+      const to = Math.max(lo, Math.min(hi, toIndex))
+      if (from === to) return prev
       const next = [...prev]
       const [moved] = next.splice(from, 1)
       next.splice(to, 0, moved)
       return next
+    })
+  }, [])
+
+  /** Pin a tab (it joins the end of the pinned group) or let it go (it heads
+   *  the rest) — browsers' rule, so the tab moves as little as it can */
+  const pinTab = useCallback((id: string, pinned: boolean) => {
+    setTabs((prev) => {
+      const tab = prev.find((t) => t.id === id)
+      if (!tab || tab.pinned === pinned) return prev
+      const rest = prev.filter((t) => t.id !== id)
+      const at = rest.filter((t) => t.pinned).length
+      return [...rest.slice(0, at), { ...tab, pinned }, ...rest.slice(at)]
     })
   }, [])
 
@@ -755,8 +807,11 @@ export default function App(): React.JSX.Element {
         return
       }
       const initialPosition = await bridge.getPosition(path)
+      if (takeLazy(id)) docRegistry.acquire(result.path)
       setTabs((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t))
+        prev.map((t) =>
+          t.id === id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1, lazy: false } : t
+        )
       )
       goToTab(id)
     },
@@ -873,14 +928,102 @@ export default function App(): React.JSX.Element {
     await openPayload(result)
   }, [openPayload])
 
+  /** The last session's tabs (issue #29, desktop), all lazy: names in the
+   *  strip, nothing read until each is shown. The tab that was showing is
+   *  shown again — unless a file named at launch is about to take the front,
+   *  in which case nothing is: the launch reads one document either way, as a
+   *  launch without a session would. */
+  const restoreTabs = useCallback(
+    (session: SessionWindow, show: boolean) => {
+      const restored: OpenTab[] = session.tabs.map((s) => {
+        const id = `tab-${++tabCounter}`
+        lazyIdsRef.current.add(id)
+        return {
+          id,
+          payload: { path: s.path, name: baseName(s.path), data: new Uint8Array() },
+          initialPosition: null,
+          epoch: 0,
+          splitDoc: null,
+          sameSplitNonce: 0,
+          pinned: s.pinned === true,
+          lazy: true
+        }
+      })
+      if (restored.length === 0) return
+      // Mirrored into the ref at once: a file named on the command line is
+      // opened right after this, and openPayload must see these tabs to reuse
+      // one rather than open the same document twice
+      tabsRef.current = [...restored, ...tabsRef.current]
+      setTabs((prev) => [...restored, ...prev])
+      if (show) goToTab((restored[session.active] ?? restored[0]).id)
+    },
+    [goToTab]
+  )
+
+  /** Whether this window has taken its pending session yet. Until then its
+   *  strip is not reported to main: the empty strip of a window still booting
+   *  would overwrite the very session it is about to restore. */
+  const [sessionTaken, setSessionTaken] = useState(false)
+
   useEffect(() => {
     bridge.getSettings().then(setSettingsState)
     refreshRecents()
-    bridge.getPendingPath().then((path) => {
-      if (path) openPath(path)
-    })
+    void (async () => {
+      const session = await bridge.getPendingSession().catch(() => null)
+      const path = await bridge.getPendingPath()
+      if (session) restoreTabs(session, path === null)
+      setSessionTaken(true)
+      if (path) await openPath(path)
+    })()
     return bridge.onOpenPath((path) => openPath(path))
-  }, [refreshRecents, openPath])
+  }, [refreshRecents, openPath, restoreTabs])
+
+  // A restored tab being shown for the first time: read its file now. A file
+  // that is gone closes its tab and says so; a tab closed (or opened from
+  // elsewhere) while the read was out simply keeps what it has.
+  const lazyLoadingRef = useRef(new Set<string>())
+  useEffect(() => {
+    if (atLibrary) return
+    const tab = tabs.find((x) => x.id === activeId)
+    if (!tab?.lazy || lazyLoadingRef.current.has(tab.id)) return
+    const { id } = tab
+    lazyLoadingRef.current.add(id)
+    void (async () => {
+      const result = await bridge.readFile(tab.payload.path)
+      if ('error' in result) {
+        lazyLoadingRef.current.delete(id)
+        if (!lazyIdsRef.current.has(id)) return
+        reallyCloseTab(id)
+        setError(t('app.openFailed', { error: errorText(result) }))
+        return
+      }
+      const initialPosition = await bridge.getPosition(result.path)
+      lazyLoadingRef.current.delete(id)
+      if (!takeLazy(id)) return
+      docRegistry.acquire(result.path)
+      setTabs((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, payload: result, initialPosition, lazy: false } : x))
+      )
+    })()
+  }, [tabs, activeId, atLibrary, reallyCloseTab])
+
+  // Report the strip to main for the next launch (desktop; the bridge drops it
+  // elsewhere). Debounced while the strip changes, and sent at once when the
+  // window goes, so the last tab closed before closing the window counts.
+  useEffect(() => {
+    if (!isElectron || !sessionTaken) return
+    const snapshot = (): SessionWindow => ({
+      tabs: tabs.map((x) => (x.pinned ? { path: x.payload.path, pinned: true } : { path: x.payload.path })),
+      active: Math.max(0, tabs.findIndex((x) => x.id === activeId))
+    })
+    const timer = window.setTimeout(() => bridge.setSessionTabs(snapshot()), 300)
+    const flush = (): void => bridge.setSessionTabs(snapshot())
+    window.addEventListener('beforeunload', flush)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('beforeunload', flush)
+    }
+  }, [tabs, activeId, sessionTaken])
 
   // A detached assistant asked for a citation in one of our documents: bring
   // that document's tab forward (and leave the library). The mounted viewer's
@@ -1015,6 +1158,14 @@ export default function App(): React.JSX.Element {
         case 'tab.moveRight':
           moveActiveTab(1)
           break
+        case 'tab.pin': {
+          const id = activeIdRef.current
+          const tab = tabsRef.current.find((x) => x.id === id)
+          if (!tab || atLibraryRef.current) break
+          e.preventDefault()
+          pinTab(tab.id, !tab.pinned)
+          break
+        }
         default:
           // Every other command belongs to the viewer, which has its own listener
           break
@@ -1022,7 +1173,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, reopenClosedTab, openDialog, moveTab, updateSettings, flashThemeName])
+  }, [cycleTab, closeTab, reopenClosedTab, openDialog, moveTab, pinTab, updateSettings, flashThemeName])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -1074,7 +1225,8 @@ export default function App(): React.JSX.Element {
           path: t.payload.path,
           // Either document in the tab (its own, or the split column's other
           // file) having unsaved changes lights the dot
-          dirty: dirtyTabs.has(t.id) || splitDirtyTabs.has(t.id)
+          dirty: dirtyTabs.has(t.id) || splitDirtyTabs.has(t.id),
+          pinned: t.pinned
         }))}
         // No tab is the current one while the library is showing — the strip
         // stays, so the open documents are visible and one click away from
@@ -1102,6 +1254,7 @@ export default function App(): React.JSX.Element {
         onTabDragFile={dragTabFile}
         onTabDragOut={(id, path) => void moveTabOut(id, path)}
         onReorder={moveTab}
+        onTogglePin={pinTab}
         onCloseMany={(ids) => void closeTabs(ids)}
         onMoveToNewWindow={moveToNewWindow}
         onReload={(id, path) => void reloadTab(id, path)}
@@ -1121,6 +1274,16 @@ export default function App(): React.JSX.Element {
       <div className="tab-views">
         {tabs.map((tab) => {
           const showing = tab.id === activeId && !atLibrary
+          // A restored tab not shown yet has no document to mount; shown, it
+          // is the empty page ground for the moment its file takes to read
+          if (tab.lazy) {
+            return (
+              <div
+                key={`${tab.id}:${tab.epoch}`}
+                className={`tab-view tab-pending${showing ? ' active' : ''}`}
+              />
+            )
+          }
           return (
             <div key={`${tab.id}:${tab.epoch}`} className={`tab-view${showing ? ' active' : ''}`}>
               <PdfViewer

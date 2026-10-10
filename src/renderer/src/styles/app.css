@@ -291,6 +291,12 @@ button {
   color: var(--text);
 }
 
+/* A restored tab shown before its file has been read: the viewer's ground
+   for the moment the read takes, rather than a flash of the window colour */
+.tab-view.tab-pending {
+  background: var(--bg-canvas);
+}
+
 /* While being torn off / dragged to another window */
 .tab.dragging {
   opacity: 0.5;
@@ -306,6 +312,23 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: left;
+}
+
+/* A pinned tab (issue #29): narrower, a tack before the name, no close
+   cross — it stays at the strip's start until it is let go */
+.tab.pinned {
+  max-width: 150px;
+}
+
+.tab.pinned .tab-label {
+  padding-right: 12px;
+}
+
+/* Inline with the name, so the name still ellipsizes as one line */
+.tab-pin {
+  margin-right: 5px;
+  vertical-align: -2px;
+  color: var(--accent);
 }
 
 .tab-close {
@@ -7069,6 +7092,45 @@ html.pen-near .draw-layer {
   color: var(--accent);
 }
 
+/* A row of the list: the tab, and its pin at the end (issue #29) */
+.tab-all-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tab-all-row .menu-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.tab-all-pin {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  opacity: 0;
+}
+
+.tab-all-row:hover .tab-all-pin,
+.tab-all-pin:focus-visible,
+.tab-all-pin.is-on {
+  opacity: 1;
+}
+
+.tab-all-pin:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.tab-all-pin.is-on {
+  color: var(--accent);
+}
+
 .tab-new-window {
   flex-shrink: 0;
   width: 26px;
@@ -7836,7 +7898,8 @@ html.touch-ui .panel-resizer::before {
 /* Hover-revealed icons must be visible before you can aim at them */
 html.touch-ui .tab-close,
 html.touch-ui .annot-delete,
-html.touch-ui .ai-history-delete {
+html.touch-ui .ai-history-delete,
+html.touch-ui .tab-all-pin {
   opacity: 0.6;
 }
 

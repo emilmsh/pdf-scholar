@@ -125,8 +125,13 @@ jobs:
       # The library's grid of first pages (issue #28): a LOCKED document never
       # keeps a picture on disk (nor the cover it had before it was encrypted),
       # main writes only small JPEGs, pictures go when their file leaves the
-      # recents, and the extension never re-downloads a URL to draw one
+      # recents, and the extension never re-downloads a URL to draw one. Also
+      # the recents LIST (issue #29): a pin outlives the cap, a removal's undo
+      # puts the entry back where it was
       - run: npm run test:recent-thumbs
+      # The desktop session (issue #29): a stored session is untrusted input,
+      # pinned tabs come back even with restore off, a missing file is left out
+      - run: npm run test:session
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

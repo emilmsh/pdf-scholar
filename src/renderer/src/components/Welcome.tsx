@@ -23,7 +23,6 @@ import {
   IconLock,
   IconMinus,
   IconPin,
-  IconPinOff,
   IconPlus,
   IconSparkle
 } from './icons'
@@ -154,7 +153,8 @@ export default function Welcome({
           aria-pressed={isPinned}
           onClick={() => togglePin(r)}
         >
-          {isPinned ? <IconPinOff size={14} /> : <IconPin size={14} />}
+          {/* The upright tack, lit when pinned (the toolbar's convention) */}
+          <IconPin size={14} />
         </button>
         <button
           className="recent-action"

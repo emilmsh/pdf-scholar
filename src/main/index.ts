@@ -13,7 +13,7 @@ import {
 } from 'electron'
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { open, readFile, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, extname, join, resolve } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type {
   AiCitationTarget,
@@ -28,6 +28,8 @@ import type {
   RecentFile,
   RecentThumb,
   RecentThumbView,
+  SessionTab,
+  SessionWindow,
   SetFormFieldRequest,
   Settings,
   TabDropResult
@@ -54,7 +56,13 @@ import {
   cleanAttachmentName,
   isPdfAttachment
 } from '../shared/attachments'
-import { stageAttachment, writeAttachmentsInto, writeSavedAttachment } from './attachments'
+import { stageAttachment, tempRoot as attachmentTempRoot, writeAttachmentsInto, writeSavedAttachment } from './attachments'
+import {
+  restorePlan,
+  sanitizeSessionWindow,
+  type SessionBounds,
+  type StoredSessionWindow
+} from '../shared/session'
 import {
   discardDraft,
   draftPathFor,
@@ -119,6 +127,89 @@ const pendingPaths = new Map<number, string>()
 const openDocs = new Map<number, Set<string>>()
 /** Windows allowed to close without re-running the unsaved-changes guard */
 const forceClose = new Set<number>()
+
+// ---------- The session: which tabs each window had (issue #29) ----------
+// Main does not know what a tab is; the renderers say. Each document window
+// reports its strip on every change (session:set), and the record is written
+// to pdfx-state.json at the three moments that decide what the next launch
+// sees: the app quitting with windows open (all of them come back), the LAST
+// window closing (its tabs come back), and one of several windows closing
+// (it leaves the session — the reader closed it on purpose). The rules for
+// reading the record back are in shared/session.ts.
+
+/** webContents.id → the tabs that window should reopen once its renderer asks */
+const pendingSessions = new Map<number, SessionWindow>()
+/** webContents.id → that window's strip as its renderer last reported it */
+const sessionWindows = new Map<
+  number,
+  { win: BrowserWindow; tabs: SessionTab[]; active: number; bounds?: SessionBounds }
+>()
+/** Set when the app quits with windows still open: the session was written
+ *  whole at that moment, and the windows closing after it must not shrink it.
+ *  Reset when a close is called off (an unsaved-changes prompt cancelled). */
+let sessionQuitting = false
+let sessionWriteTimer: NodeJS.Timeout | null = null
+
+function boundsOf(win: BrowserWindow): SessionBounds | undefined {
+  if (win.isDestroyed()) return undefined
+  return { ...win.getNormalBounds(), ...(win.isMaximized() ? { maximized: true } : {}) }
+}
+
+function writeSession(): void {
+  if (sessionWriteTimer) clearTimeout(sessionWriteTimer)
+  sessionWriteTimer = null
+  const windows: StoredSessionWindow[] = []
+  for (const w of sessionWindows.values()) {
+    if (w.tabs.length === 0) continue
+    const bounds = boundsOf(w.win) ?? w.bounds
+    windows.push(bounds ? { tabs: w.tabs, active: w.active, bounds } : { tabs: w.tabs, active: w.active })
+  }
+  getState().session = { windows }
+  saveState()
+}
+
+/** The state file is written whole, so a strip changing tab by tab is
+ *  gathered into one write */
+function scheduleSessionWrite(): void {
+  if (sessionWriteTimer) clearTimeout(sessionWriteTimer)
+  sessionWriteTimer = setTimeout(writeSession, 1000)
+}
+
+/** A path worth reopening: absolute, and not one of our own temp copies (an
+ *  attachment opened from a filing — that copy is the filing's to make) */
+function sessionPathPlausible(path: string): boolean {
+  return isAbsolute(path) && !path.startsWith(attachmentTempRoot())
+}
+
+/** Which of these files still exist. A path that does not answer in time —
+ *  an offline network drive — counts as there: the tab says so if it fails
+ *  when shown, which beats holding the launch for a drive's timeout. */
+async function existingFiles(paths: string[], timeoutMs = 800): Promise<Set<string>> {
+  const found = await Promise.all(
+    paths.map((p) =>
+      Promise.race([
+        stat(p).then(
+          (info) => info.isFile(),
+          () => false
+        ),
+        new Promise<boolean>((done) => setTimeout(() => done(true), timeoutMs))
+      ]).then((ok) => (ok ? p : null))
+    )
+  )
+  return new Set(found.filter((p): p is string => p !== null))
+}
+
+/** The windows to open at launch, from the stored session */
+async function sessionRestorePlan(): Promise<StoredSessionWindow[]> {
+  const state = getState()
+  const stored = state.session ?? { windows: [] }
+  const paths = [...new Set(stored.windows.flatMap((w) => w.tabs.map((t) => t.path)))].filter(
+    sessionPathPlausible
+  )
+  if (paths.length === 0) return []
+  const exists = await existingFiles(paths)
+  return restorePlan(stored, state.settings.restoreSession !== false, (p) => exists.has(p))
+}
 
 /** Whether native dialogs should speak Norwegian. The renderer's i18n cannot be
  *  reached from main, so the handful of native strings below resolve the same
@@ -272,7 +363,7 @@ if (!gotLock) {
     console.error('[pdfx] uncaught exception in main:', err)
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     app.setAppUserModelId('no.emil.pdfx')
     console.log('[pdfx] annotation engine: embedpdf (MIT)')
     // Show the "Recent" category (fed by app.addRecentDocument) in the
@@ -308,7 +399,14 @@ if (!gotLock) {
     // The installer rewrites the .pdf DefaultIcon on every upgrade — put a
     // non-default choice back (compares first, so a quiet start stays quiet)
     reapplyFileIconAtStartup()
-    createWindow(firstPending)
+    // The last session's windows (issue #29). The extra windows open first so
+    // the one holding a file from the command line ends up in front.
+    const plan = await sessionRestorePlan().catch((err) => {
+      console.error('[pdfx] session not restored:', err)
+      return [] as StoredSessionWindow[]
+    })
+    for (const extra of plan.slice(1)) createWindow(null, extra)
+    createWindow(firstPending, plan[0])
     firstPending = null
 
     app.on('activate', () => {
@@ -325,6 +423,13 @@ if (!gotLock) {
   // hold the quit once, flush everything to disk, then resume quitting.
   let quitFlushed = false
   app.on('before-quit', (event) => {
+    // Quitting with windows open (Cmd+Q, an update restart): every window's
+    // strip is the session. After the last window closed there is nothing
+    // left here, and that window already wrote its own.
+    if (!sessionQuitting && sessionWindows.size > 0) {
+      sessionQuitting = true
+      writeSession()
+    }
     if (quitFlushed) return
     quitFlushed = true
     event.preventDefault()
@@ -384,24 +489,28 @@ function onLiveDisplay(saved: { x: number; y: number; width: number; height: num
   }
 }
 
-function createWindow(openPath?: string | null): BrowserWindow {
+function createWindow(openPath?: string | null, restore?: StoredSessionWindow): BrowserWindow {
   const state = getState()
-  const cascade = cascadeBounds(
-    BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
-  )
+  // A window coming back from the session stands where it stood (clamped onto
+  // a display that still exists); every other window cascades as before
+  const restored = restore?.bounds
+  const cascade = restored
+    ? null
+    : cascadeBounds(BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null)
   // The only fix here that is a code change rather than a type one: Electron's
   // option type declares `x?: number` without `| undefined`, and "no saved
   // position" genuinely has to be expressed by LEAVING THE KEYS OUT — that is
   // what makes Electron centre a first window on the primary display. Passing
   // `x: undefined` did the same thing in practice, but the type is right to
   // insist, so the absence is now explicit.
+  const source = restored ?? state.window
   const remembered =
-    state.window?.x !== undefined && state.window?.y !== undefined
+    source?.x !== undefined && source?.y !== undefined
       ? onLiveDisplay({
-          x: state.window.x,
-          y: state.window.y,
-          width: state.window.width,
-          height: state.window.height
+          x: source.x,
+          y: source.y,
+          width: source.width,
+          height: source.height
         })
       : null
   const position = cascade
@@ -411,8 +520,8 @@ function createWindow(openPath?: string | null): BrowserWindow {
       : {}
 
   const win = new BrowserWindow({
-    width: cascade?.width ?? remembered?.width ?? state.window?.width ?? 1280,
-    height: cascade?.height ?? remembered?.height ?? state.window?.height ?? 860,
+    width: cascade?.width ?? remembered?.width ?? source?.width ?? 1280,
+    height: cascade?.height ?? remembered?.height ?? source?.height ?? 860,
     ...position,
     minWidth: 640,
     minHeight: 480,
@@ -434,12 +543,14 @@ function createWindow(openPath?: string | null): BrowserWindow {
     }
   })
 
-  // Only the first window restores the maximized state
-  if (state.window?.maximized && !cascade) win.maximize()
+  // Only the first window restores the maximized state — and a window coming
+  // back from the session, which restores its own
+  if (source?.maximized && !cascade) win.maximize()
   // Capture the id now: win.webContents throws "Object has been destroyed"
   // when read inside the 'closed' handler
   const wcId = win.webContents.id
   if (openPath) pendingPaths.set(wcId, openPath)
+  if (restore) pendingSessions.set(wcId, { tabs: restore.tabs, active: restore.active })
 
   // Guard: the window can be closed before ready-to-show ever fires
   win.once('ready-to-show', () => {
@@ -461,6 +572,10 @@ function createWindow(openPath?: string | null): BrowserWindow {
     const bounds = win.getNormalBounds()
     getState().window = { ...bounds, maximized: win.isMaximized() }
     saveState()
+    // The session's copy of where this window stood — 'closed' is too late
+    const entry = sessionWindows.get(wcId)
+    const stood = boundsOf(win)
+    if (entry && stood) entry.bounds = stood
 
     if (forceClose.has(wcId)) return
     const dirty = [...(openDocs.get(wcId) ?? [])].filter(hasDraft)
@@ -479,7 +594,10 @@ function createWindow(openPath?: string | null): BrowserWindow {
         detail: s.detail
       })
       .then(async ({ response }) => {
-        if (response === 2) return // Avbryt
+        if (response === 2) {
+          sessionQuitting = false // a quit this close was part of is off too
+          return // Avbryt
+        }
         // One unwritable document must not abandon the rest, and must not let
         // the window close over marks that never reached disk. Collect the
         // failures, save what can be saved, then report and stay open.
@@ -494,14 +612,20 @@ function createWindow(openPath?: string | null): BrowserWindow {
               // common case (nothing changed) shows no extra dialogs.
               if (wasModifiedExternally(path)) {
                 const nested = await askExternalUpdateVerdict(win, path)
-                if (nested === 'cancel') return // abort the whole close, keep every draft
+                if (nested === 'cancel') {
+                  sessionQuitting = false
+                  return // abort the whole close, keep every draft
+                }
                 if (nested === 'save') {
                   await flushAnnotations(draftPathFor(path))
                   const result = await dialog.showSaveDialog(win, {
                     defaultPath: basename(path),
                     filters: [{ name: 'PDF', extensions: ['pdf'] }]
                   })
-                  if (result.canceled || !result.filePath) return // cancelled picker aborts too
+                  if (result.canceled || !result.filePath) {
+                    sessionQuitting = false
+                    return // cancelled picker aborts too
+                  }
                   copyFileSync(readPathFor(path), result.filePath)
                 }
                 // 'save' (copy written elsewhere) or 'discard': the draft is
@@ -528,6 +652,7 @@ function createWindow(openPath?: string | null): BrowserWindow {
         }
         if (failed.length > 0) {
           // preventDefault still stands — say why, rather than looking frozen.
+          sessionQuitting = false
           dialog.showErrorBox(s.saveFailedTitle, s.saveFailedDetail(failed.join(', ')))
           return
         }
@@ -547,8 +672,18 @@ function createWindow(openPath?: string | null): BrowserWindow {
 
   win.on('closed', () => {
     pendingPaths.delete(wcId)
+    pendingSessions.delete(wcId)
     openDocs.delete(wcId)
     forceClose.delete(wcId)
+    // The session (see sessionWindows): a quit already wrote every window; the
+    // last window closing writes its own strip as the one to come back; one of
+    // several closing drops out of it
+    if (sessionWindows.has(wcId)) {
+      const last = sessionWindows.size === 1
+      if (!sessionQuitting && last) writeSession()
+      sessionWindows.delete(wcId)
+      if (!sessionQuitting && !last) writeSession()
+    }
   })
 
   // The renderer hides its titlebar strip while in OS fullscreen
@@ -973,6 +1108,28 @@ function registerIpc(): void {
     const path = pendingPaths.get(id) ?? null
     pendingPaths.delete(id)
     return path
+  })
+
+  // Pulled, like the pending path: a push before the renderer listens is lost
+  ipcMain.handle('pending-session:get', (e): SessionWindow | null => {
+    const id = e.sender.id
+    const session = pendingSessions.get(id) ?? null
+    pendingSessions.delete(id)
+    return session
+  })
+
+  ipcMain.on('session:set', (e, raw: unknown) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win || win.isDestroyed()) return
+    const clean = sanitizeSessionWindow(raw)
+    const prev = sessionWindows.get(e.sender.id)
+    sessionWindows.set(e.sender.id, {
+      win,
+      tabs: clean?.tabs ?? [],
+      active: clean?.active ?? 0,
+      ...(prev?.bounds ? { bounds: prev.bounds } : {})
+    })
+    if (!sessionQuitting) scheduleSessionWrite()
   })
 
   ipcMain.on('position:set', (_e, path: string, pos: ReadingPosition) => setPosition(path, pos))

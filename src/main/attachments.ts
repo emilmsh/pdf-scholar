@@ -12,7 +12,7 @@ import { cleanAttachmentName, numberedName, propagatedZoneIdentifier } from '../
 /** Where opened attachments are written. Left for the OS to clean, like every
  *  program's temp copies: the user may well have edited one in Excel and saved
  *  it there, and an app that deletes those behind their back loses work. */
-const tempRoot = (): string => join(app.getPath('temp'), 'PDF Scholar', 'attachments')
+export const tempRoot = (): string => join(app.getPath('temp'), 'PDF Scholar', 'attachments')
 
 /** Give `target` the Mark of the Web of the document it came in (see
  *  propagatedZoneIdentifier for why). Windows only — the mark is an NTFS

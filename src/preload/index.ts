@@ -13,6 +13,7 @@ import type {
   ReadingPosition,
   RecentFile,
   RecentThumb,
+  SessionWindow,
   SetFormFieldRequest,
   Settings
 } from '../shared/types'
@@ -34,6 +35,8 @@ const api: PdfxApi = {
   getPosition: (path: string) => ipcRenderer.invoke('position:get', path),
   getBookmarks: (path: string) => ipcRenderer.invoke('bookmarks:get', path),
   getPendingPath: () => ipcRenderer.invoke('pending-path:get'),
+  getPendingSession: () => ipcRenderer.invoke('pending-session:get'),
+  setSessionTabs: (session: SessionWindow) => ipcRenderer.send('session:set', session),
   setPosition: (path: string, pos: ReadingPosition) => ipcRenderer.send('position:set', path, pos),
   setBookmarks: (path: string, bookmarks: DocBookmark[]) =>
     ipcRenderer.send('bookmarks:set', path, bookmarks),

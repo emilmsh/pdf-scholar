@@ -2497,6 +2497,22 @@ export default function Toolbar({
                 {t('settings.selectionMenuCompact')}
               </label>
 
+              {/* Startup (issue #29). Desktop only: the extension has no tab
+                  strip of its own — the browser brings its tabs back itself. */}
+              {isElectron && (
+                <>
+                  <div className="theme-menu-sep" />
+                  <label className="theme-menu-toggle" title={t('settings.restoreSessionTip')}>
+                    <input
+                      type="checkbox"
+                      checked={settings.restoreSession}
+                      onChange={(e) => onSettingsChange({ restoreSession: e.target.checked })}
+                    />
+                    {t('settings.restoreSession')}
+                  </label>
+                </>
+              )}
+
               {/* The icon Explorer puts on .pdf files (issue #26): the
                   installer's document icon by default, the app logo, or the
                   reader's own .ico. Only where main can actually write it —

@@ -39,6 +39,7 @@ export type CommandId =
   | 'tab.reopen'
   | 'tab.moveLeft'
   | 'tab.moveRight'
+  | 'tab.pin'
   // Navigation
   | 'nav.back'
   | 'nav.forward'
@@ -177,6 +178,9 @@ const REGISTRY: readonly Command[] = [
   { id: 'tab.reopen', category: 'tabs', labelKey: 'keys.tabReopen', defaults: ['mod+shift+t'], whileTyping: true },
   { id: 'tab.moveLeft', category: 'tabs', labelKey: 'keys.tabMoveLeft', defaults: ['mod+shift+pageup'], whileTyping: true },
   { id: 'tab.moveRight', category: 'tabs', labelKey: 'keys.tabMoveRight', defaults: ['mod+shift+pagedown'], whileTyping: true },
+  // Unbound, like the browsers: pinning is rare enough that a key would only
+  // be one more to press by accident — the map lets a reader give it one
+  { id: 'tab.pin', category: 'tabs', labelKey: 'keys.tabPin', defaults: [], whileTyping: true },
 
   // ---------- Navigation ----------
   { id: 'nav.back', category: 'nav', labelKey: 'keys.navBack', defaults: ['alt+arrowleft'] },

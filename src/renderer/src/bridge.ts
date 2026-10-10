@@ -99,6 +99,9 @@ export const webApi: PdfxApi = {
   getSettings: async () => loadWebState().settings,
   getPosition: async (path) => loadWebState().positions[path] ?? null,
   getBookmarks: async (path) => loadWebState().bookmarks?.[path] ?? [],
+  // No tab strip of its own outside Electron: the browser keeps its tabs
+  getPendingSession: async () => null,
+  setSessionTabs: () => {},
   getPendingPath: async () => {
     // A new browser tab opened via newWindow() carries #open=<path>
     const m = /#open=([^&]+)/.exec(location.hash)

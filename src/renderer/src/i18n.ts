@@ -200,6 +200,8 @@ const nb = {
   // Tabs
   'tabs.close': 'Lukk fane',
   'tabs.closeTab': 'Lukk fane',
+  'tabs.pin': 'Fest fanen',
+  'tabs.unpin': 'Løsne fanen',
   'tabs.closeOthers': 'Lukk andre faner',
   'tabs.closeToRight': 'Lukk faner til høyre',
   'tabs.moveLeft': 'Flytt til venstre',
@@ -414,6 +416,8 @@ const nb = {
   'settings.selectionMenuCompact': 'Kompakt meny',
   'settings.selectionMenuCompactTip':
     'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
+  'settings.restoreSession': 'Åpne fanene fra forrige gang',
+  'settings.restoreSessionTip': 'Ved oppstart får hvert vindu tilbake fanene det hadde. Et dokument leses først når du viser fanen. Festede faner kommer alltid tilbake.',
   'settings.annotAuthor': 'Navn på merknader',
   'settings.annotAuthorPlaceholder': 'F.eks. navnet ditt',
   'settings.annotAuthorHint':
@@ -995,6 +999,7 @@ const nb = {
   'keys.tabReopen': 'Gjenåpne sist lukkede fane',
   'keys.tabMoveLeft': 'Flytt fanen mot venstre',
   'keys.tabMoveRight': 'Flytt fanen mot høyre',
+  'keys.tabPin': 'Fest eller løsne fanen',
 
   'keys.navBack': 'Tilbake (etter et lenkehopp)',
   'keys.navForward': 'Fram igjen',
@@ -1244,6 +1249,8 @@ const en: Dict = {
 
   'tabs.close': 'Close tab',
   'tabs.closeTab': 'Close tab',
+  'tabs.pin': 'Pin tab',
+  'tabs.unpin': 'Unpin tab',
   'tabs.closeOthers': 'Close other tabs',
   'tabs.closeToRight': 'Close tabs to the right',
   'tabs.moveLeft': 'Move left',
@@ -1446,6 +1453,8 @@ const en: Dict = {
   'settings.selectionMenuCompact': 'Compact menu',
   'settings.selectionMenuCompactTip':
     'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',
+  'settings.restoreSession': 'Reopen last session’s tabs',
+  'settings.restoreSessionTip': 'At startup, every window gets back the tabs it had. Each document is read only when you show its tab. Pinned tabs always come back.',
   'settings.annotAuthor': 'Name on annotations',
   'settings.annotAuthorPlaceholder': 'E.g. your name',
   'settings.annotAuthorHint':
@@ -1984,6 +1993,7 @@ const en: Dict = {
   'keys.tabReopen': 'Reopen last closed tab',
   'keys.tabMoveLeft': 'Move tab left',
   'keys.tabMoveRight': 'Move tab right',
+  'keys.tabPin': 'Pin or unpin tab',
 
   'keys.navBack': 'Back (after a link jump)',
   'keys.navForward': 'Forward again',

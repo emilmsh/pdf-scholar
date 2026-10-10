@@ -5,7 +5,7 @@ import { TAB_DRAG_MIME } from '../drag-types'
 import { t, useLang } from '../i18n'
 import { isMac } from '../platform'
 import { withShortcut } from '../keymap'
-import { IconChevronDown } from './icons'
+import { IconChevronDown, IconPin } from './icons'
 
 export interface TabInfo {
   id: string
@@ -13,6 +13,8 @@ export interface TabInfo {
   path: string
   /** Unsaved annotation changes (save model) */
   dirty?: boolean
+  /** Pinned (issue #29): first in the strip, no close cross */
+  pinned?: boolean
 }
 
 interface Props {
@@ -40,6 +42,9 @@ interface Props {
   onTabDragOut(id: string, path: string): void
   /** A tab was dragged onto another position within this bar */
   onReorder(id: string, toIndex: number): void
+  /** Pin the tab, or let it go. Lives in the tab menu, the «Alle åpne faner»
+   *  list and the shortcut map — never in the right-click menu alone. */
+  onTogglePin(id: string, pinned: boolean): void
   /** Close every tab in this list, one at a time (see closeTabs in App) */
   onCloseMany(ids: string[]): void
   /** Context-menu fallback: tear the tab off into a new window */
@@ -75,6 +80,7 @@ export default function TabBar({
   onTabDragFile,
   onTabDragOut,
   onReorder,
+  onTogglePin,
   onCloseMany,
   onMoveToNewWindow,
   onReload,
@@ -127,6 +133,11 @@ export default function TabBar({
   /** Where the right-clicked tab currently sits — the move/close-to-the-right
    *  items are all relative to it, and it moves while the menu is open. */
   const menuIndex = menu ? tabs.findIndex((x) => x.id === menu.tab.id) : null
+  /** The pinned group is the strip's start; moves stay inside a tab's own group */
+  const pinnedCount = tabs.filter((x) => x.pinned).length
+  const menuPinned = menu ? tabs.find((x) => x.id === menu.tab.id)?.pinned === true : false
+  const groupStart = menuPinned ? 0 : pinnedCount
+  const groupEnd = menuPinned ? pinnedCount - 1 : tabs.length - 1
 
   useEffect(() => {
     if (!menu) return
@@ -173,7 +184,7 @@ export default function TabBar({
       {tabs.map((tab, index) => (
         <div
           key={tab.id}
-          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}`}
+          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}`}
           title={tab.path}
           draggable
           onPointerDown={(e) => {
@@ -235,7 +246,10 @@ export default function TabBar({
             onTabDragOut(tab.id, tab.path)
           }}
           onAuxClick={(e) => {
-            if (e.button === 1) onClose(tab.id)
+            // A pinned tab is one you asked to keep — a stray middle-click on
+            // it is more likely a miss than a wish to close it (the menu and
+            // Ctrl+W still do)
+            if (e.button === 1 && !tab.pinned) onClose(tab.id)
           }}
           onContextMenu={(e) => {
             e.preventDefault()
@@ -243,12 +257,15 @@ export default function TabBar({
           }}
         >
           <button className="tab-label" onClick={() => onSelect(tab.id)}>
+            {tab.pinned && <IconPin size={12} className="tab-pin" />}
             {tab.dirty && <span className="tab-dirty-dot">•</span>}
             {tab.name}
           </button>
-          <button className="tab-close" aria-label={t('tabs.close')} onClick={() => onClose(tab.id)}>
-            ✕
-          </button>
+          {!tab.pinned && (
+            <button className="tab-close" aria-label={t('tabs.close')} onClick={() => onClose(tab.id)}>
+              ✕
+            </button>
+          )}
         </div>
       ))}
       <button className="tab-new" onClick={onNewTab} title={withShortcut(t('tabs.new'), 'file.open')}>
@@ -278,18 +295,32 @@ export default function TabBar({
         <div className="tab-all-menu" onMouseDown={(e) => e.stopPropagation()}>
           <div className="theme-menu-label">{t('tabs.allLabel')}</div>
           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`menu-item${tab.id === activeId ? ' is-active' : ''}`}
-              title={tab.path}
-              onClick={() => {
-                onSelect(tab.id)
-                setAllOpen(false)
-              }}
-            >
-              {tab.dirty && <span className="tab-dirty-dot">•</span>}
-              {tab.name}
-            </button>
+            <div key={tab.id} className="tab-all-row">
+              <button
+                className={`menu-item${tab.id === activeId ? ' is-active' : ''}`}
+                title={tab.path}
+                onClick={() => {
+                  onSelect(tab.id)
+                  setAllOpen(false)
+                }}
+              >
+                {tab.dirty && <span className="tab-dirty-dot">•</span>}
+                {tab.name}
+              </button>
+              {/* The pin's visible home besides the tab menu — this list is
+                  where a strip too full to read gets sorted out */}
+              <button
+                className={`tab-all-pin${tab.pinned ? ' is-on' : ''}`}
+                title={t(tab.pinned ? 'tabs.unpin' : 'tabs.pin')}
+                aria-label={t(tab.pinned ? 'tabs.unpin' : 'tabs.pin')}
+                aria-pressed={tab.pinned === true}
+                onClick={() => onTogglePin(tab.id, !tab.pinned)}
+              >
+                {/* The upright tack, lit when pinned — the toolbar's own
+                    convention, where the tack on its side means NOT pinned */}
+                <IconPin size={13} />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -300,6 +331,15 @@ export default function TabBar({
           style={{ left: Math.min(menu.x, window.innerWidth - 220), top: menu.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >
+          <button
+            className="menu-item"
+            onClick={() => {
+              onTogglePin(menu.tab.id, !menuPinned)
+              setMenu(null)
+            }}
+          >
+            {t(menuPinned ? 'tabs.unpin' : 'tabs.pin')}
+          </button>
           <button
             className="menu-item"
             onClick={() => {
@@ -366,11 +406,11 @@ export default function TabBar({
           {/* Touch has no HTML5 drag, and a keyboard has no cursor: the same
               reorder lives here (long-press opens this menu) and on
               Ctrl+Shift+PageUp/PageDown. */}
-          {tabs.length > 1 && (
+          {groupEnd > groupStart && (
             <>
               <button
                 className="menu-item"
-                disabled={menuIndex <= 0}
+                disabled={menuIndex <= groupStart}
                 onClick={() => {
                   onReorder(menu.tab.id, menuIndex - 1)
                   setMenu(null)
@@ -380,7 +420,7 @@ export default function TabBar({
               </button>
               <button
                 className="menu-item"
-                disabled={menuIndex === -1 || menuIndex >= tabs.length - 1}
+                disabled={menuIndex === -1 || menuIndex >= groupEnd}
                 onClick={() => {
                   onReorder(menu.tab.id, menuIndex + 1)
                   setMenu(null)
@@ -399,22 +439,24 @@ export default function TabBar({
           >
             {t('tabs.closeTab')}
           </button>
-          {tabs.length > 1 && (
+          {/* The bulk closes leave pinned tabs standing — the browsers' rule,
+              and the point of pinning one */}
+          {tabs.some((x) => x.id !== menu.tab.id && !x.pinned) && (
             <button
               className="menu-item"
               onClick={() => {
-                onCloseMany(tabs.filter((x) => x.id !== menu.tab.id).map((x) => x.id))
+                onCloseMany(tabs.filter((x) => x.id !== menu.tab.id && !x.pinned).map((x) => x.id))
                 setMenu(null)
               }}
             >
               {t('tabs.closeOthers')}
             </button>
           )}
-          {menuIndex !== -1 && menuIndex < tabs.length - 1 && (
+          {menuIndex !== -1 && tabs.slice(menuIndex + 1).some((x) => !x.pinned) && (
             <button
               className="menu-item"
               onClick={() => {
-                onCloseMany(tabs.slice(menuIndex + 1).map((x) => x.id))
+                onCloseMany(tabs.slice(menuIndex + 1).filter((x) => !x.pinned).map((x) => x.id))
                 setMenu(null)
               }}
             >

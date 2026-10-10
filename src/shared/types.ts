@@ -121,6 +121,23 @@ export interface Settings {
 
 export type RecentsGridSize = 'small' | 'medium' | 'large'
 
+/** One tab of a window's session (issue #29, desktop): what reopens at the
+ *  next launch. The path only — the document itself is read when the tab is
+ *  first shown, and its reading position is kept per path anyway. */
+export interface SessionTab {
+  path: string
+  /** Pinned tabs stay at the strip's start, lose their close button, and
+   *  come back at every launch even with restoreSession off */
+  pinned?: boolean
+}
+
+/** A window's tabs in strip order (pinned first) and which one was showing */
+export interface SessionWindow {
+  tabs: SessionTab[]
+  /** Index into `tabs` of the tab that was showing */
+  active: number
+}
+
 export interface RecentFile {
   path: string
   name: string
@@ -919,6 +936,13 @@ export interface PdfxApi {
   getSettings(): Promise<Settings>
   getPosition(path: string): Promise<ReadingPosition | null>
   getPendingPath(): Promise<string | null>
+  /** Desktop: the tabs this window should reopen — the last session's, or only
+   *  its pinned tabs with restoreSession off. Handed out once, like the
+   *  pending path; null when there is nothing (and on the web/extension). */
+  getPendingSession(): Promise<SessionWindow | null>
+  /** Desktop: this window's tabs as they stand now, for the next launch.
+   *  Fire and forget, sent on every change to the strip (debounced). */
+  setSessionTabs(session: SessionWindow): void
   setPosition(path: string, pos: ReadingPosition): void
   /** Bookmarks for one file, page order. Same fire-and-forget shape as
    *  setPosition: the list is small, the write is not worth awaiting, and losing

@@ -13,6 +13,7 @@ import type {
 } from '../shared/types'
 import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
 import { normalizeRecents, pinRecent, recordRecent, removeRecent, restoreRecent } from '../shared/recents'
+import { sanitizeSession, type StoredSession } from '../shared/session'
 export type { Settings }
 
 export interface StoredAiConfig extends AiConfig {
@@ -41,6 +42,10 @@ export interface AppState {
   /** The detached ASSISTANT window's remembered bounds — its own key, so a
    *  small chat window closing can never clobber the main window's bounds */
   assistantWindow?: WindowState
+  /** Each window's tabs when the app last quit (issue #29; shared/session.ts).
+   *  Written by main as the renderers report their strips; read once at
+   *  launch. Shape-checked on load like the recents. */
+  session?: StoredSession
 }
 
 const DEFAULT_AI: StoredAiConfig = {
@@ -108,6 +113,7 @@ export function getState(): AppState {
       ...DEFAULTS,
       ...parsed,
       recents: normalizeRecents(parsed.recents),
+      session: sanitizeSession(parsed.session),
       settings: mergeSettings(DEFAULTS.settings, parsed.settings ?? {}),
       ai: mergeAiConfig(DEFAULT_AI, parsed.ai ?? {})
     }
