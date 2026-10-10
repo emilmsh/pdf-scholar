@@ -869,5 +869,98 @@ const foreignNote = (() => {
   pdf.destroy()
   fs.rmSync(ATTFILE, { force: true })
 }
+// 14. A sticky note keeps its FACE through a save (issue #30). The overlay
+// draws the app's bubble while the note is fresh; once saved and reopened,
+// pdf.js paints whatever appearance the file carries — and that used to be
+// PDFium's own Text icon, so the note visibly changed on reopen. The file now
+// carries the same drawing (src/shared/note-icon.ts). Pixels are the proof:
+// fill inside the body and the tail, the text lines darker, paper around it.
+// Plus the edits: a new text keeps the appearance (ours, and another app's —
+// the engine would otherwise swap PDFium's icon in), a recolour redraws ours.
+{
+  const NFILE = path.join(os.tmpdir(), 'pdfx-note-icon-test.pdf')
+  fs.copyFileSync(SAMPLE, NFILE)
+  const AMBER = [0.933, 0.796, 0.4] // NOTE_COLOR in annotations.ts
+  const nbase = { path: NFILE, pageIndex: 1, author: 'test', color: AMBER }
+  const n1 = await applyAnnotation({ ...nbase, type: 'note', opacity: 1, quads: q(300, 100, 20, 20), contents: 'Første' })
+  check('note icon: create', 'ok' in n1, 'error' in n1 ? n1.error : `obj#${n1.id}`)
+  const n2 = await applyAnnotation({ ...nbase, type: 'note', opacity: 0.5, quads: q(360, 100, 20, 20), contents: 'Halv' })
+  check('note icon: create @50%', 'ok' in n2, 'error' in n2 ? n2.error : '')
+  await flushAnnotations(NFILE)
+
+  const open = () => mupdf.Document.openDocument(fs.readFileSync(NFILE), 'application/pdf').asPDF()
+  const noteOf = (pdf, pageIndex, id) =>
+    pdf.loadPage(pageIndex).getAnnotations().find((a) => a.getObject().asIndirect() === id)
+  const apStream = (annot) => {
+    const n = annot?.getObject().get('AP')?.get('N')
+    return n && !n.isNull() && n.isStream() ? n : null
+  }
+  const apText = (annot) => apStream(annot)?.readStream().asString() ?? ''
+  const nums = (o) => (String(o).match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+
+  let ourAp = ''
+  {
+    const pdf = open()
+    const a1 = noteOf(pdf, 1, n1.id)
+    ourAp = apText(a1)
+    // The clip is the one thing PDFium's icon never does, and the
+    // pre-composited fill shows up as its own colour
+    check('note icon: the appearance is our bubble', ourAp.includes('W n') && ourAp.includes('0.933 0.796 0.4 rg'),
+      `${ourAp.length} bytes`)
+    const bbox = nums(apStream(a1)?.get('BBox'))
+    const rect = nums(a1?.getObject().get('Rect'))
+    check('note icon: drawn over exactly its /Rect', bbox.length === 4 && bbox.every((v, i) => Math.abs(v - rect[i]) < 0.01),
+      `bbox ${bbox.map((v) => v.toFixed(1))} rect ${rect.map((v) => v.toFixed(1))}`)
+    check('note icon: still a Text annot with its words', a1?.getType() === 'Text' && a1?.getContents() === 'Første')
+    // The see-through one names the ExtGState PDFium left in its Resources
+    const a2 = noteOf(pdf, 1, n2.id)
+    const gs = apStream(a2)?.get('Resources')?.get('ExtGState')?.get('GS')
+    check('note icon: @50% draws through the note\'s own /GS',
+      apText(a2).includes('/GS gs') && !!gs && !gs.isNull() && Math.abs(gs.get('ca').asNumber() - 0.5) < 0.01,
+      gs && !gs.isNull() ? `ca ${gs.get('ca')}` : 'no GS resource')
+
+    // Pixels, in the note's 24-unit icon box (y down), at 4×
+    const SCALE = 4
+    const pix = pdf.loadPage(1).toPixmap(mupdf.Matrix.scale(SCALE, SCALE), mupdf.ColorSpace.DeviceRGB, false, true)
+    const W = pix.getWidth()
+    const px = pix.getPixels()
+    const at = (u, v) => {
+      const i = (Math.round((100 + (v * 20) / 24) * SCALE) * W + Math.round((300 + (u * 20) / 24) * SCALE)) * 3
+      return [px[i], px[i + 1], px[i + 2]]
+    }
+    const near = (got, want) => got.every((c, i) => Math.abs(c - Math.round(want[i] * 255)) <= 4)
+    const fmt = (c) => c.join(',')
+    check('note icon: body painted in the note\'s colour', near(at(17, 14.5), AMBER), fmt(at(17, 14.5)))
+    check('note icon: …and the tail', near(at(7.6, 18), AMBER), fmt(at(7.6, 18)))
+    check('note icon: text line is the colour darkened', near(at(12, 8.7), AMBER.map((v) => v * 0.62)), fmt(at(12, 8.7)))
+    check('note icon: the corner outside the bubble stays paper', near(at(1, 1), [1, 1, 1]), fmt(at(1, 1)))
+    pdf.destroy()
+  }
+
+  // A new text leaves the appearance as it was — ours here, another app's on
+  // the third page (sample.pdf's baked note, read pristine in 3b)
+  const e1 = await updateAnnotation({ path: NFILE, pageIndex: 1, id: n1.id, contents: 'Endret' })
+  check('note icon: edit the text', 'ok' in e1, 'error' in e1 ? e1.error : '')
+  const e2 = await updateAnnotation({ path: NFILE, pageIndex: 2, id: foreignNote.id, contents: 'Endret' })
+  check('note icon: edit a foreign note\'s text', 'ok' in e2, 'error' in e2 ? e2.error : '')
+  const c2 = await updateAnnotation({ path: NFILE, pageIndex: 1, id: n2.id, color: [0.44, 0.71, 1] })
+  check('note icon: recolour', 'ok' in c2, 'error' in c2 ? c2.error : '')
+  await flushAnnotations(NFILE)
+  {
+    const pdf = open()
+    const a1 = noteOf(pdf, 1, n1.id)
+    check('note icon: a new text keeps our appearance', apText(a1) === ourAp && a1?.getContents() === 'Endret',
+      `${apText(a1).length} vs ${ourAp.length} bytes, ${JSON.stringify(a1?.getContents())}`)
+    const fn = noteOf(pdf, 2, foreignNote.id)
+    check('note icon: …and another app\'s', apText(fn) === foreignNote.ap && fn?.getContents() === 'Endret',
+      `${apText(fn).length} vs ${foreignNote.ap.length} bytes`)
+    const a2 = apText(noteOf(pdf, 1, n2.id))
+    check('note icon: a recolour redraws our bubble in the new colour',
+      a2.includes('W n') && a2.includes('0.44 0.71 1 rg') && a2.includes('/GS gs'), `${a2.length} bytes`)
+    pdf.destroy()
+  }
+  fs.rmSync(NFILE, { force: true })
+}
+
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
 process.exit(failures === 0 ? 0 : 1)

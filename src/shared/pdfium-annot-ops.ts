@@ -37,6 +37,7 @@ import { buildAnnotation, hexToRgb, linePad, quadsBBox, rgbToHex, strokesBBox, t
 import { ENGINE_ERRORS } from './engine-errors'
 import { snapshotApLessLinks, stripGeneratedLinkAPs } from './link-ap-guard'
 import { decodePressures, encodePressures, inkPressureApContent } from './ink-outline'
+import { noteIconApContent } from './note-icon'
 
 /** wasm32 heap exhaustion: every open/serialize round-trips the whole file
  *  through the WASM heap, so very large documents can exceed what it can grow to
@@ -343,6 +344,47 @@ export function bakeInkPressureAP(
   })
 }
 
+/** Replace a sticky note's appearance with the app's own bubble — the drawing
+ *  the overlay shows before the save (shared/note-icon.ts, issue #30). Called
+ *  right after the engine has generated ITS appearance, which leaves a stream
+ *  whose /BBox is the note's /Rect and whose Resources carry the /GS state;
+ *  SetAP swaps the content in and keeps that dictionary.
+ *
+ *  False when the note is missing or PDFium refused — the note itself is
+ *  intact either way, it merely shows PDFium's icon. */
+export function bakeNoteAP(
+  open: OpenDoc,
+  pageIndex: number,
+  id: number,
+  color: [number, number, number],
+  opacity: number
+): boolean {
+  const { engine, docId } = open
+  const ok = withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
+    withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
+      if (raw.FPDFAnnot_GetSubtype(annotPtr) !== FPDF_ANNOT_TEXT) return false
+      const rectPtr = raw.pdfium.wasmExports.malloc(16)
+      let box: { left: number; top: number; right: number; bottom: number }
+      try {
+        if (!raw.FPDFAnnot_GetRect(annotPtr, rectPtr)) return false
+        box = {
+          left: raw.pdfium.getValue(rectPtr, 'float'),
+          top: raw.pdfium.getValue(rectPtr + 4, 'float'),
+          right: raw.pdfium.getValue(rectPtr + 8, 'float'),
+          bottom: raw.pdfium.getValue(rectPtr + 12, 'float')
+        }
+      } finally {
+        raw.pdfium.wasmExports.free(rectPtr)
+      }
+      const content = noteIconApContent(color, box, opacity < 1 ? 'GS' : undefined)
+      return withWideString(raw, content, (ptr) =>
+        raw.FPDFAnnot_SetAP(annotPtr, 0 /* FPDF_ANNOT_APPEARANCEMODE_NORMAL */, ptr)
+      )
+    })
+  )
+  return ok === true
+}
+
 /** Pressures stored on an Ink annotation, or null when it never had any. */
 export function readInkPressures(
   open: OpenDoc,
@@ -435,6 +477,9 @@ export function applyOn(open: OpenDoc, req: AnnotateRequest): Promise<AnnotateRe
         return ENGINE_ERRORS.pressureBakeFailed
       }
     }
+    // Unlike the pen above, a refusal here is not a reason to drop the note:
+    // it is complete and readable, and only its icon falls back to PDFium's.
+    if (req.type === 'note') bakeNoteAP(open, req.pageIndex, id, req.color, req.opacity)
     return { ok: true, id }
   })
 }
@@ -621,8 +666,27 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
       m.type === PdfAnnotationSubtype.INK
         ? req.pressures ?? readInkPressures(open, req.pageIndex, req.id)
         : null
-    const ok = await engine.updatePageAnnotation(doc, doc.pages[req.pageIndex], m).toPromise()
+    // A sticky note's appearance is redrawn only when its LOOK changed. A new
+    // text or a move leaves it as it was — ours or another app's (the engine
+    // would otherwise swap in PDFium's icon on every edit, issue #19's loss by
+    // another door). A recolour has to redraw, and gets our bubble below.
+    const isNote = m.type === PdfAnnotationSubtype.TEXT
+    const noteRedraw = isNote && (req.color !== undefined || req.opacity !== undefined)
+    const ok = await engine
+      .updatePageAnnotation(doc, doc.pages[req.pageIndex], m, {
+        regenerateAppearance: !isNote || noteRedraw
+      })
+      .toPromise()
     if (!ok) return ENGINE_ERRORS.updateRejected
+    if (noteRedraw) {
+      bakeNoteAP(
+        open,
+        req.pageIndex,
+        req.id,
+        req.color ?? hexToRgb(m.strokeColor ?? '#ffff00'),
+        (m as { opacity?: number }).opacity ?? 1
+      )
+    }
     // The engine regenerated the appearance uniformly — re-bake the varying
     // width from the (possibly shifted/re-shaped) centerline.
     if (pressures && m.type === PdfAnnotationSubtype.INK && m.inkList) {
