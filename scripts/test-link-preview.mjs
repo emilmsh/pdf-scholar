@@ -264,6 +264,44 @@ function namedDestFixture() {
   check('garbage is null', (await M.resolvePreviewTarget(doc, 42)) === null)
 }
 {
+  // The entry's END comes from the next entry's destination, read out of the
+  // document's /Dests table. This list gives the layout nothing to go on (no
+  // labels, no indent, no gap, and the second entry does not open «Surname,»),
+  // so only a table that was actually read stops the cut in the right place.
+  // pdfjs-dist 6.2 turned getDestinations() into a Map; reading it as an
+  // object yields nothing and the entry ran on into its neighbour.
+  const text =
+    'BT /F1 10 Tf 72 700 Td (Adams, A. \\(2001\\). First paper title here.) Tj ET\n' +
+    'BT /F1 10 Tf 72 688 Td (Journal of Things 1, 1-10.) Tj ET\n' +
+    'BT /F1 10 Tf 72 676 Td (The Brown Group \\(2002\\). Second paper.) Tj ET\n' +
+    'BT /F1 10 Tf 72 664 Td (Journal of Others 2, 3-4.) Tj ET\n'
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R /Names << /Dests 5 0 R >> >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 6 0 R >> >> >>',
+    `<< /Length ${text.length} >>\nstream\n${text}\nendstream`,
+    // hyperref raises each anchor a line above its entry
+    '<< /Names [(cite.adams) [3 0 R /XYZ 72 712 null] (cite.brown) [3 0 R /XYZ 72 688 null]] >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'
+  ]
+  let body = '%PDF-1.7\n'
+  const offsets = []
+  objs.forEach((o, i) => {
+    offsets.push(body.length)
+    body += `${i + 1} 0 obj\n${o}\nendobj\n`
+  })
+  const xref = body.length
+  body += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`
+  for (const off of offsets) body += `${String(off).padStart(10, '0')} 00000 n \n`
+  body += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(Buffer.from(body, 'latin1')), verbosity: 0 }).promise
+  check('destEntries reads a Map and an object alike', M.destEntries(new Map([['a', [1]]])).length === 1 && M.destEntries({ a: [1] }).length === 1 && M.destEntries(null).length === 0)
+  check('this pdf.js hands over a destinations table destEntries can read', M.destEntries(await doc.getDestinations()).length === 2)
+  const target = await M.resolvePreviewTarget(doc, 'cite.adams')
+  const entry = await M.citationEntryText(doc, target)
+  check('real pdf.js: the entry ends at the next destination', entry === 'Adams, A. (2001). First paper title here.\nJournal of Things 1, 1-10.', JSON.stringify(entry))
+}
+{
   const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(SAMPLE)), verbosity: 0 }).promise
   const page = await doc.getPage(1)
   const links = (await page.getAnnotations()).filter((a) => a.subtype === 'Link' && a.dest)

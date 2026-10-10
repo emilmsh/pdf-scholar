@@ -470,7 +470,16 @@ export function entryFromLines(
 
 /** Every document's named destinations, read once — a paper can carry
  *  thousands, and the boundaries of one entry need its whole family */
-const destTables = new WeakMap<PDFDocumentProxy, Promise<Record<string, unknown>>>()
+const destTables = new WeakMap<PDFDocumentProxy, Promise<[string, unknown][]>>()
+
+/** A destinations table as pdf.js hands it over: a Map since pdfjs-dist 6.2,
+ *  a plain object before. Object.entries on the Map is an empty list — the
+ *  boundaries would silently vanish — so both shapes are read here. */
+export function destEntries(table: unknown): [string, unknown][] {
+  if (table instanceof Map) return [...(table as Map<string, unknown>).entries()]
+  if (table && typeof table === 'object') return Object.entries(table as Record<string, unknown>)
+  return []
+}
 
 /** The text of the reference-list entry a citation points at; '' when the
  *  destination names no point or the page has no text there. */
@@ -486,13 +495,13 @@ export async function citationEntryText(pdf: PDFDocumentProxy, target: PreviewTa
       if (!table) {
         table = pdf
           .getDestinations()
-          .then((d) => (d ?? {}) as Record<string, unknown>)
-          .catch(() => ({}))
+          .then((d: unknown) => destEntries(d))
+          .catch(() => [])
         destTables.set(pdf, table)
       }
       const family = destFamily(target.name)
       const ref = (page as unknown as { ref?: { num: number; gen: number } }).ref
-      for (const [name, d] of Object.entries(await table)) {
+      for (const [name, d] of await table) {
         if (name === target.name || !Array.isArray(d) || destFamily(name) !== family) continue
         const r = d[0] as { num?: number; gen?: number } | number | null
         const onPage =
