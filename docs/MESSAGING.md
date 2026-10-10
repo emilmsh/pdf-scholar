@@ -173,7 +173,8 @@ carries no picture of its own.)*
   preview of what it points to opens beside it, without moving the page
   (long-press on a touchscreen). On a citation, one click fetches the cited
   paper's abstract from free scholarly databases (arXiv, Europe PMC, Crossref,
-  OpenAlex) — no key, no account *(reader ask, [issue #31](https://github.com/emilmsh/pdf-scholar/issues/31),
+  OpenAlex) — no key, no account; in the reference list itself, select an
+  entry and «Sammendrag» in the selection menu does the same *(reader ask, [issue #31](https://github.com/emilmsh/pdf-scholar/issues/31),
   2026-10-10 — Sioyek's and Zotero's reader have the preview; the abstract is
   the Hover PDF extension's idea, keyless. A click, never automatic: it is a
   network call, and the app is offline unless you ask. Roughly two in three

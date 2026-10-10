@@ -184,7 +184,8 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
 - Rest the pointer on a citation, a figure or an equation reference and a preview of what
   it points to opens beside it, without moving the page (long-press on a touchscreen).
   On a citation, one click fetches the cited paper's abstract from free scholarly
-  databases (arXiv, Europe PMC, Crossref, OpenAlex) — no key, no account
+  databases (arXiv, Europe PMC, Crossref, OpenAlex) — no key, no account. In the
+  reference list itself, select an entry and choose «Abstract» in the selection menu
 - Reading positions and recent files are remembered; a library home screen lists them —
   as a list, or as a grid of their first pages (three sizes) with how far you read each
   one. Pin the ones you keep coming back to into a group of their own, remove the ones
