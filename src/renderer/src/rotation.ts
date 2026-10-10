@@ -133,8 +133,12 @@ export function svgRotationTransform(pw: number, ph: number, rotation: ViewRotat
 // its own copies, and RENDER_MARGIN had already diverged (700 vs 800).
 
 export const PAGE_GAP = 16
-/** Horizontal gap between the two pages of a spread */
-export const SPREAD_GAP = 24
+/** Horizontal gap between the two pages of a spread. Narrower than PAGE_GAP
+ *  on purpose (2026-10-10, was 24): wider than the rows' gap, the pages of a
+ *  pair read as two columns of a grid rather than as an open book. At 8 the
+ *  pair holds together and the two page shadows meet in the gutter like a
+ *  binding; any closer and they start to merge into one sheet. */
+export const SPREAD_GAP = 8
 /** The margin a fitted page leaves against its column. These are NOT decoration:
  *  fit-width divides by `clientWidth - SIDE_PAD` and buildRows adds the same
  *  SIDE_PAD to the content column, so the two must stay equal or a fitted page
