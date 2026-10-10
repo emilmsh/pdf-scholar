@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FilePayload, ReadingPosition, RecentFile, Settings, ThemeName } from '../../shared/types'
 import { bridge } from './bridge'
 import { buildViewerUrl } from '../../shared/viewer-url'
-import { openInBrowserViewer } from './extension-api'
+import { consumeTakenBack, openInBrowserViewer } from './extension-api'
 import { insecureRetryUrl } from '../../shared/insecure-retry'
 import { errorText, setLanguage, t } from './i18n'
 import { applyPageTune, tuneTitleBar } from './theme-tune'
@@ -212,7 +212,7 @@ export default function ExtensionApp(): React.JSX.Element {
     bridge
       .getPendingPath()
       .then(async (path) => {
-        if (path) await openPath(path, { handOffOnFailure: true })
+        if (path) await openPath(path, { handOffOnFailure: !(await consumeTakenBack(path)) })
       })
       .finally(() => setLoading(false))
   }, [openPath])
