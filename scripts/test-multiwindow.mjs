@@ -98,20 +98,67 @@ const ui = {
     const sel = window.getSelection();
     sel.removeAllRanges();
     sel.addRange(range);
+    const text = (span.textContent || '').trim().slice(0, 30);
     await settle(150);
-    const r = span.getBoundingClientRect();
+    // Measured from the SELECTION, not the span: a re-read of the document
+    // (the other window's mark landing) may rebuild the text layer in these
+    // 150 ms, and the app carries the selection onto the new spans while the
+    // old span is left detached with a zero rect.
+    const r = sel.rangeCount ? sel.getRangeAt(0).getBoundingClientRect() : span.getBoundingClientRect();
     pages.dispatchEvent(new MouseEvent('mouseup', {
       bubbles: true, button: 0, clientX: Math.round(r.right), clientY: Math.round(r.bottom)
     }));
     await settle(400);
     const menu = document.querySelector('.selection-menu');
-    if (!menu) throw new Error('selection menu did not open');
+    if (!menu) {
+      throw new Error('selection menu did not open (selection ' +
+        JSON.stringify(sel.toString().slice(0, 30)) + ', span connected=' + span.isConnected + ')');
+    }
     const swatch = menu.querySelector('.menu-color-group .color-dot, .menu-color-group .color-bar');
     if (!swatch) throw new Error('no colour swatch in the selection menu');
     click(swatch);
     await settle(700);
     window.getSelection()?.removeAllRanges();
-    return (span.textContent || '').trim().slice(0, 30);
+    return text;
+  },
+  /** Select one on-screen line WITHOUT marking it, and start counting text
+   *  layer rebuilds — for the check that a selection outlives a re-read */
+  selectNth(n) {
+    const pages = document.querySelector('.pages[data-pane="a"]');
+    const box = pages.getBoundingClientRect();
+    const span = [...pages.querySelectorAll('.pdf-page .text-host .textLayer > span')]
+      .filter((s) => (s.textContent || '').trim().length > 12)
+      .filter((s) => {
+        const r = s.getBoundingClientRect();
+        return r.top > box.top + 40 && r.bottom < box.bottom - 40 && r.width > 60;
+      })[n];
+    if (!span) throw new Error('no on-screen text to select');
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    window.__layerSwaps = 0;
+    window.__layerWatch?.disconnect();
+    window.__layerWatch = new MutationObserver((ms) => {
+      for (const m of ms) {
+        if (m.target.classList?.contains('text-host') && m.removedNodes.length) window.__layerSwaps++;
+      }
+    });
+    window.__layerWatch.observe(pages, { childList: true, subtree: true });
+    return sel.toString();
+  },
+  /** Wait for the text layer to be rebuilt at least once and then go quiet */
+  async waitForLayerRebuild(timeoutMs = 10000) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline && !window.__layerSwaps) await settle(50);
+    let seen = -1;
+    while (Date.now() < deadline && seen !== window.__layerSwaps) {
+      seen = window.__layerSwaps;
+      await settle(300);
+    }
+    window.__layerWatch?.disconnect();
+    return window.__layerSwaps;
   },
   /** The file is only written when the user presses Save — do it their way */
   async save() {
@@ -214,12 +261,28 @@ try {
     `A=${marks0A} B=${marks0B}, file has ${before.total}`
   )
 
-  // ---- A annotates -> B must show it without being touched
+  // ---- A annotates -> B must show it without being touched. The reader in B
+  //      has text selected meanwhile: B shows A's mark by re-reading the
+  //      document, which rebuilds B's text layer, and that rebuild used to
+  //      collapse the selection (this test's one-in-three flake, 2026-10-10)
+  const selectedInB = await evalIn(B, `return ui.selectNth(2)`)
   const textA = await evalIn(A, `return await ui.highlightNth(0)`)
   const aOwn = await evalIn(A, `return await ui.waitForMarks(${before.total + 1})`)
   check('A made a highlight', aOwn === before.total + 1, `A lists ${aOwn} ("${textA}")`)
   const seenByB = await evalIn(B, `return await ui.waitForMarks(${before.total + 1})`)
   check("B sees A's mark without a manual reload", seenByB === before.total + 1, `B lists ${seenByB}`)
+  const swapsB = await evalIn(B, `return await ui.waitForLayerRebuild()`)
+  const keptInB = await evalIn(
+    B,
+    `const s = window.getSelection(); const a = s.anchorNode;
+     const live = !!a && a.isConnected && !!(a.nodeType === 1 ? a : a.parentElement).closest('.textLayer');
+     const text = s.toString(); s.removeAllRanges(); return { live, text };`
+  )
+  check(
+    "B's text selection survives the re-read of A's mark",
+    swapsB > 0 && keptInB.live && keptInB.text === selectedInB,
+    `${swapsB} layer rebuild(s), selection ${JSON.stringify(keptInB.text.slice(0, 30))} of ${JSON.stringify(selectedInB.slice(0, 30))}, on the live layer: ${keptInB.live}`
+  )
 
   // ---- B annotates -> A must show that too (the reverse direction is a
   //      different code path: B is the sender, A the receiver)
