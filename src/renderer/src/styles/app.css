@@ -6321,12 +6321,14 @@ html.pen-near .draw-layer {
   animation: menu-in 0.1s ease;
 }
 
-/* Modern comment marker (SVG speech bubble) */
+/* Modern comment marker (SVG speech bubble). No drop shadow: the saved file
+   carries this same drawing as the note's appearance (shared/note-icon.ts),
+   and a PDF appearance has no blur — a shadow here would vanish on reopen,
+   which is the change of face issue #30 was about. */
 
 .annot-note-mark {
   position: absolute;
   overflow: visible;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
 /* Free text typed directly on the page, WYSIWYG */

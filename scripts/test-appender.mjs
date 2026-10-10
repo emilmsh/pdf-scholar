@@ -152,6 +152,12 @@ async function bigCorpus() {
 
 const q = (x, y, w, h) => [{ x, y, w, h }]
 
+/** A mupdfAnnots entry's normal appearance stream, as text ('' = none) */
+const noteApText = (entry) => {
+  const n = entry?.annot.getObject().get('AP')?.get('N')
+  return n && !n.isNull() && n.isStream() ? n.readStream().asString() : ''
+}
+
 // =============================================================================
 // (a) + (b): both xref flavors through the production adapter
 // =============================================================================
@@ -194,10 +200,14 @@ for (const objectStreams of [false, true]) {
     check('mupdf reopens the file', true, `${out.length} annots on page 1`)
     check('all reported ids present (mupdf)', Object.values(ids).every((id) => byId.has(id)),
       `ids ${Object.values(ids).join(',')} vs file ${out.map((a) => a.id).join(',')}`)
-    const apOk = Object.entries(ids).every(([type, id]) =>
-      type === 'note' ? !byId.get(id)?.hasAp : byId.get(id)?.hasAp)
-    check('/AP present on all except note', apOk,
+    const apOk = Object.values(ids).every((id) => byId.get(id)?.hasAp)
+    check('/AP present on all, note included', apOk,
       Object.entries(ids).map(([t, id]) => `${t}:${byId.get(id)?.hasAp ? 'AP' : '-'}`).join(' '))
+    // The note carries the app's bubble (issue #30) — the same drawing the
+    // WASM engine bakes; the clip is the one thing a generic icon never does
+    const noteAp = noteApText(byId.get(ids.note))
+    check('note appearance is our bubble', noteAp.includes('W n') && noteAp.includes('0.89 0.29 0.29 rg'),
+      `${noteAp.length} bytes`)
     const ft = byId.get(ids.freetext)
     check('freetext contents round-trip (ÆØÅ)', ft?.annot.getContents() === 'Fri tekst ÆØÅ',
       JSON.stringify(ft?.annot.getContents()))
@@ -229,6 +239,24 @@ for (const objectStreams of [false, true]) {
     check('translate arrow', 'ok' in mv, 'error' in mv ? mv.error : '')
     const del = await deleteAnnotation({ path: FILE, pageIndex: 1, id: ids.square })
     check('delete square', 'ok' in del, 'error' in del ? del.error : '')
+    // A note's new text keeps its appearance; a recolour redraws it
+    const before = (() => {
+      const { pdf, out } = mupdfAnnots(FILE, 1)
+      const ap = noteApText(out.find((a) => a.id === ids.note))
+      pdf.destroy()
+      return ap
+    })()
+    const ntx = await updateAnnotation({ path: FILE, pageIndex: 1, id: ids.note, contents: 'Endret' })
+    check('edit note text', 'ok' in ntx, 'error' in ntx ? ntx.error : '')
+    {
+      const { pdf, out } = mupdfAnnots(FILE, 1)
+      const n = out.find((a) => a.id === ids.note)
+      check("a new text keeps the note's appearance", before !== '' && noteApText(n) === before &&
+        n?.annot.getContents() === 'Endret', `${noteApText(n).length} vs ${before.length} bytes`)
+      pdf.destroy()
+    }
+    const ncol = await updateAnnotation({ path: FILE, pageIndex: 1, id: ids.note, color: [0.44, 0.71, 1] })
+    check('recolour note', 'ok' in ncol, 'error' in ncol ? ncol.error : '')
 
     const { pdf, out } = mupdfAnnots(FILE, 1)
     const byId = new Map(out.map((a) => [a.id, a]))
@@ -249,6 +277,9 @@ for (const objectStreams of [false, true]) {
     try { const o = arrow?.annot.getObject().get('LE'); le = o && !o.isNull() ? String(o) : 'none' } catch { /* keep */ }
     check('arrowhead (/LE) intact after move', /ClosedArrow/.test(le), le)
     check('updated annots still have /AP', !!(hl?.hasAp && arrow?.hasAp))
+    const noteAp = noteApText(byId.get(ids.note))
+    check("a recolour redraws the note's bubble in the new colour",
+      noteAp.includes('W n') && noteAp.includes('0.44 0.71 1 rg'), `${noteAp.length} bytes`)
     pdf.destroy()
   }
 

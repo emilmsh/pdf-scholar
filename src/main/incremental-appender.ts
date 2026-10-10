@@ -26,6 +26,7 @@ import type {
 } from '../shared/types'
 import { ENGINE_ERRORS } from '../shared/engine-errors'
 import { decodePressures, encodePressures, pressureHalfWidths, strokeOutline } from '../shared/ink-outline'
+import { noteIconApContent } from '../shared/note-icon'
 
 // ---------------------------------------------------------------------------
 // User-facing errors. Every one of these carries a CODE from the shared set
@@ -1326,6 +1327,15 @@ function buildAppearance(g: Geom, s: ShapeSpec): Appearance {
       )
       break
     }
+    case 'note': {
+      // The app's bubble, the same drawing the WASM engine bakes and the
+      // overlay shows (shared/note-icon.ts, issue #30). Drawn in plain user
+      // space like PDFium's own note icon: readers keep a Text annot upright.
+      const q = s.quads[0]
+      rect = rectToUser(g, { x: q.x, y: q.y, w: Math.max(q.w, 20), h: Math.max(q.h, 20) })
+      ops.push(noteIconApContent(s.color, { left: rect[0], bottom: rect[1], right: rect[2], top: rect[3] }))
+      break
+    }
     case 'freetext': {
       const q = s.quads[0]
       const size = s.fontSize ?? 12
@@ -1476,7 +1486,9 @@ function buildAnnotDict(
   if (MARKUP_TYPES.has(req.type)) {
     dict.set('QuadPoints', quadPoints(g, req.quads))
   } else if (req.type === 'note') {
-    dict.set('Name', NAME('Note')) // no /AP — viewers draw the standard icon
+    // The icon a reader that ignores /AP draws instead — the speech bubble,
+    // closest to ours and what the WASM engine writes too
+    dict.set('Name', NAME('Comment'))
     if (req.contents === undefined) dict.set('Contents', textString(''))
   } else if (req.type === 'ink') {
     dict.set('InkList', ARR(
@@ -1652,18 +1664,10 @@ async function opCreate(pdf: PdfFile, req: AnnotateRequest): Promise<AnnotateRes
   const annotNum = pdf.allocObjNum()
   const objs: OutObj[] = []
 
-  let rect: [number, number, number, number]
-  let apNum: number | null = null
-  if (req.type === 'note') {
-    const q = req.quads[0]
-    rect = rectToUser(g, { x: q.x, y: q.y, w: Math.max(q.w, 20), h: Math.max(q.h, 20) })
-  } else {
-    const ap = buildAppearance(g, req)
-    apNum = pdf.allocObjNum()
-    objs.push({ num: apNum, gen: 0, data: appearanceObject(apNum, ap) })
-    rect = ap.rect
-  }
-  const dict = buildAnnotDict(req, g, page, rect, apNum)
+  const ap = buildAppearance(g, req)
+  const apNum = pdf.allocObjNum()
+  objs.push({ num: apNum, gen: 0, data: appearanceObject(apNum, ap) })
+  const dict = buildAnnotDict(req, g, page, ap.rect, apNum)
   objs.push({ num: annotNum, gen: 0, data: objectBuffer(annotNum, 0, { t: 'dict', map: dict }) })
 
   const holder = await annotsHolderRewrite(pdf, page, (items) => [...items, REF(annotNum)])
@@ -1789,9 +1793,11 @@ async function opUpdate(pdf: PdfFile, req: ModifyAnnotationRequest): Promise<Ann
 
   const objs: OutObj[] = []
   // ---- regenerate the appearance stream from the PATCHED dict ----
-  // (skip Text notes: they carry no AP of ours; a foreign note's AP keeps
-  // rendering right after a move because /BBox-to-/Rect mapping follows /Rect)
-  if (type !== 'note') {
+  // A Text note only when its look changed: a new text or a move keeps the
+  // appearance it has — ours or another app's, which keeps rendering right
+  // after a move because /BBox-to-/Rect mapping follows /Rect. A recolour
+  // redraws it as our bubble.
+  if (type !== 'note' || req.color !== undefined || req.opacity !== undefined) {
     const spec = await shapeFromDict(pdf, g, type, dict)
     const ap = buildAppearance(g, spec)
     // Keep /Rect in lockstep with the regenerated appearance geometry

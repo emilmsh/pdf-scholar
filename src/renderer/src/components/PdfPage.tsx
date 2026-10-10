@@ -12,6 +12,7 @@ import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
 import { penNear } from '../pen-input'
 import { cleanAttachmentName } from '../../../shared/attachments'
+import { NOTE_ICON_BOX, NOTE_ICON_SVG } from '../../../shared/note-icon'
 import type { DocAttachment } from '../attachments'
 import {
   outlineSvgPath,
@@ -1470,28 +1471,32 @@ function AnnotationMarks({
   }
   if (annotation.type === 'note') {
     // Modern comment marker (speech bubble); stays upright, only its anchor
-    // point rotates
+    // point rotates. The same drawing is baked into the file on save
+    // (shared/note-icon.ts), so the note keeps this face when reopened.
     const q = annotation.quads[0]
     const [vx, vy] = pagePointToView(q.x, q.y, pageW, pageH, rotation)
+    const icon = NOTE_ICON_SVG
     return (
       <svg
         className="annot annot-note-mark"
         style={{ left: vx * scale, top: vy * scale }}
         width={q.w * scale}
         height={q.h * scale}
-        viewBox="0 0 24 24"
+        viewBox={`0 0 ${NOTE_ICON_BOX} ${NOTE_ICON_BOX}`}
       >
         <path
-          d="M3.5 7a3 3 0 0 1 3 -3h11a3 3 0 0 1 3 3v7a3 3 0 0 1 -3 3H10.5l-4 3.5V17H6.5a3 3 0 0 1 -3 -3z"
+          d={icon.bubble}
           fill={rgbCss(annotation.color, 1)}
-          stroke="rgba(0,0,0,0.22)"
-          strokeWidth="1"
+          stroke={`rgba(0,0,0,${icon.outline.alpha})`}
+          strokeWidth={icon.outline.width}
           strokeLinejoin="round"
         />
-        <g stroke="rgba(0,0,0,0.38)" strokeWidth="1.5" strokeLinecap="round">
-          <path d="M7.5 8.7h9" />
-          <path d="M7.5 12.2h6" />
-        </g>
+        <path
+          d={icon.lines}
+          stroke={`rgba(0,0,0,${icon.textLines.alpha})`}
+          strokeWidth={icon.textLines.width}
+          strokeLinecap="round"
+        />
       </svg>
     )
   }
