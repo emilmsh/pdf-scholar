@@ -66,6 +66,7 @@
     "test:torn-read": "node scripts/test-torn-read.mjs",
     "test:recents-grid": "node scripts/test-recents-grid.mjs",
     "test:session-desktop": "node scripts/test-session-desktop.mjs",
+    "test:paged": "node scripts/test-paged.mjs",
     "test:attachments-desktop": "node scripts/test-attachments-desktop.mjs",
     "test:text-menu": "node scripts/test-text-menu.mjs",
     "test:listing": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-store-listing.ps1",

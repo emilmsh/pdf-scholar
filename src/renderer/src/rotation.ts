@@ -170,6 +170,10 @@ export interface PageBox {
 }
 
 export interface LayoutRow {
+  /** The row's band: its pages are centred inside it. In the continuous view
+   *  the band is the row itself; in the paged view it is the row's SLOT — at
+   *  least a viewport tall — so everything that walks rows by `top` (the
+   *  current page, the page handle) reads a slot as the row. */
   top: number
   height: number
   pages: PageBox[]
@@ -208,6 +212,13 @@ export interface LayoutOpts {
   padBottom: number
   sidePad: number
   spreadGap: number
+  /** «Bla side for side» (issue #29): the viewport height. When set, every
+   *  row gets a slot of its own at least this tall, its pages centred in it
+   *  with padTop/padBottom as the least margin, the slots touching — so the
+   *  neighbouring rows always sit a viewport away and never show. A row taller
+   *  than the viewport (zoomed in) gets a slot of its own height plus the
+   *  margins, to be scrolled within. pageGap does not apply. */
+  pagedHeight?: number
 }
 
 /** Left-page index of the spread row containing page index i. Cover mode
@@ -252,6 +263,8 @@ export function flipTarget(
  * rotation; a row is as tall as its tallest page and its pages are centred
  * within it, and every row is centred horizontally in the content column
  * (a lone page — cover or trailing odd page — centres like any other row).
+ * With `opts.pagedHeight` each row sits in a viewport-tall slot instead (see
+ * LayoutOpts) — the paged view.
  */
 export function buildRows(
   sizes: Size[],
@@ -262,6 +275,7 @@ export function buildRows(
   cover = false
 ): RowLayout {
   const { containerWidth, pageGap, padTop, padBottom, sidePad, spreadGap } = opts
+  const paged = opts.pagedHeight !== undefined && opts.pagedHeight > 0 ? opts.pagedHeight : 0
   const n = sizes.length
   const widths: number[] = new Array(n)
   const heights: number[] = new Array(n)
@@ -296,24 +310,31 @@ export function buildRows(
   const tops: number[] = new Array(n)
   const lefts: number[] = new Array(n)
   const rows: LayoutRow[] = []
-  let y = padTop
+  let y = paged ? 0 : padTop
   for (const g of groups) {
     let rowWidth = 0
     for (const i of g) rowWidth += widths[i]
     if (g.length > 1) rowWidth += spreadGap
     const rowHeight = Math.max(...g.map((i) => heights[i]))
+    // The band the row is centred in: the row itself, or its slot. A row that
+    // fits the viewport to within a pixel — a fit-page zoom, after rounding —
+    // takes exactly the viewport, so a fitted page never leaves a sliver to
+    // scroll through.
+    const need = rowHeight + padTop + padBottom
+    const band = paged ? (need <= paged + 1 ? paged : need) : rowHeight
     let x = (contentWidth - rowWidth) / 2
     const boxes: PageBox[] = []
     for (const i of g) {
-      const top = y + (rowHeight - heights[i]) / 2
+      const top = y + (band - heights[i]) / 2
       tops[i] = top
       lefts[i] = x
       boxes.push({ index: i, top, left: x, width: widths[i], height: heights[i] })
       x += widths[i] + spreadGap
     }
-    rows.push({ top: y, height: rowHeight, pages: boxes })
-    y += rowHeight + pageGap
+    rows.push({ top: y, height: band, pages: boxes })
+    y += paged ? band : rowHeight + pageGap
   }
 
-  return { rows, tops, lefts, widths, heights, total: y - pageGap + padBottom, contentWidth }
+  const total = paged ? y : y - pageGap + padBottom
+  return { rows, tops, lefts, widths, heights, total, contentWidth }
 }

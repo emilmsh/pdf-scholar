@@ -257,6 +257,68 @@ console.log('7) flipTarget: page turns move one layout row, never rewrap, never 
   }
 }
 
+console.log('8) buildRows paged: every row in a slot of its own, a viewport apart')
+{
+  const opts = { containerWidth: 1000, pageGap: 16, padTop: 10, padBottom: 10, sidePad: 8, spreadGap: 24 }
+  const VH = 900
+  const page = { w: 600, h: 800 }
+  const land = { w: 800, h: 600 }
+  const mk = (n) => Array.from({ length: n }, () => page)
+
+  // The continuous layout is untouched by the option's absence
+  const plain = R.buildRows(mk(3), 1, 0, false, opts)
+  const zero = R.buildRows(mk(3), 1, 0, false, { ...opts, pagedHeight: 0 })
+  ok(JSON.stringify(plain) === JSON.stringify(zero), 'pagedHeight 0 = the continuous layout, exactly')
+
+  for (const spread of [false, true]) {
+    for (const cover of spread ? [false, true] : [false]) {
+      const sizes = [page, land, page, page, land]
+      const lay = R.buildRows(sizes, 1, 0, spread, { ...opts, pagedHeight: VH }, cover)
+      const tag = `spread=${spread} cover=${cover}`
+      close(lay.rows[0].top, 0, `${tag}: the first slot starts at the top`)
+      for (let r = 0; r < lay.rows.length; r++) {
+        const row = lay.rows[r]
+        ok(row.height >= VH, `${tag} row ${r}: slot at least a viewport tall (got ${row.height})`)
+        if (r > 0) close(row.top, lay.rows[r - 1].top + lay.rows[r - 1].height, `${tag} row ${r}: slots touch`)
+        for (const p of row.pages) {
+          // centred in the slot, inside its margins
+          close(p.top - row.top, (row.height - p.height) / 2, `${tag} page ${p.index + 1}: centred in its slot`)
+          ok(p.top >= row.top + 10 - 1e-9 && p.top + p.height <= row.top + row.height - 10 + 1e-9,
+            `${tag} page ${p.index + 1}: keeps the margin`)
+        }
+      }
+      const last = lay.rows[lay.rows.length - 1]
+      close(lay.total, last.top + last.height, `${tag}: total is the slots and nothing else`)
+      // A neighbour never shows: a viewport-tall window starting at a slot's
+      // top holds pages of that slot only
+      for (const row of lay.rows) {
+        const seen = lay.tops
+          .map((t, i) => ({ i, t, b: t + lay.heights[i] }))
+          .filter((p) => p.b > row.top && p.t < row.top + VH)
+          .map((p) => p.i)
+        const own = row.pages.map((p) => p.index)
+        ok(seen.every((i) => own.includes(i)), `${tag}: the slot at ${row.top} shows only its own pages (${seen})`)
+      }
+    }
+  }
+
+  // Zoomed in: a row taller than the viewport gets its height plus the margins
+  const big = R.buildRows(mk(2), 2, 0, false, { ...opts, pagedHeight: VH })
+  close(big.rows[0].height, 1600 + 20, 'zoomed in: the slot is the page plus its margins')
+  close(big.tops[1], big.rows[1].top + 10, 'zoomed in: the next page starts a margin into its own slot')
+
+  // A fitted page (rounding a hair over the viewport) takes exactly the viewport
+  const fit = (VH - 20) / 800 + 1e-7
+  const fitted = R.buildRows(mk(2), fit, 0, false, { ...opts, pagedHeight: VH })
+  close(fitted.rows[0].height, VH, 'a page fitted to a hair over still gets exactly one viewport')
+
+  // The page turn walks slot by slot just as it walks rows
+  const lay = R.buildRows(mk(5), 1, 0, true, { ...opts, pagedHeight: VH }, true)
+  const starts = lay.rows.map((r) => r.pages[0].index)
+  ok(starts.join(',') === '0,1,3', `paged cover spread rows ${starts}`)
+  ok(R.flipTarget(1, 1, 5, true, true) === 3, 'paged: flipTarget unchanged')
+}
+
 if (failures === 0) {
   console.log('\nALL ROTATION ROUND-TRIPS PASS ✓')
   process.exit(0)

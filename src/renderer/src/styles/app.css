@@ -2775,6 +2775,23 @@ html.pen-near .draw-layer {
   position: relative;
 }
 
+/* «Bla side for side» (issue #29; see paged-view.tsx): the scroller lands on
+   whole slots — one per page or spread, each at least a viewport tall — and
+   never passes one in a single gesture. A slot taller than the viewport (a
+   zoomed-in page) scrolls freely within, then turns at its edge. */
+.pages.paged {
+  scroll-snap-type: y mandatory;
+}
+
+.page-slot {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  pointer-events: none;
+}
+
 /* Also declared with the pdf.js text-layer variables below. */
 .pdf-page {
   position: absolute;

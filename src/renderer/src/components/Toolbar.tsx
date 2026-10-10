@@ -129,6 +129,7 @@ import {
   IconSearch,
   IconSpeaker,
   IconCoverPage,
+  IconPaged,
   IconSpread,
   IconTextMarkup,
   IconShapeArrow,
@@ -238,6 +239,9 @@ interface Props {
   onRotate(dir: 1 | -1): void
   onToggleSpread(): void
   onToggleCoverPage(): void
+  /** «Bla side for side» (issue #29): a preference for every document */
+  paged: boolean
+  onTogglePaged(): void
   onToolPrefChange(tool: DrawPrefKey, patch: Partial<ToolPref>): void
   onToolPrefReset(tool: DrawPrefKey): void
   /** FreeText tool look (text colour + font size) */
@@ -488,6 +492,8 @@ export default function Toolbar({
   onRotate,
   onToggleSpread,
   onToggleCoverPage,
+  paged,
+  onTogglePaged,
   onToolPrefChange,
   onToolPrefReset,
   textPref,
@@ -1825,6 +1831,15 @@ export default function Toolbar({
                 />
                 <IconCoverPage size={15} />
                 {t('tb.coverPage')}
+              </label>
+              {/* One page — or one spread — at a time, turned rather than
+                  scrolled (issue #29). Combines with the spread above; unlike
+                  it, one choice for every document: it is how a reader reads,
+                  not what a document is. Works in a split column too. */}
+              <label className="theme-menu-toggle view-row-toggle" title={t('tb.pagedTip')}>
+                <input type="checkbox" checked={paged} onChange={onTogglePaged} />
+                <IconPaged size={15} />
+                {t('tb.paged')}
               </label>
 
               {/* The two-document split's visible home (Emil, 2026-09-03: it lived

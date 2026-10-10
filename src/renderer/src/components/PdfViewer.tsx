@@ -98,6 +98,7 @@ import {
   viewSize
 } from '../rotation'
 import type { RowLayout } from '../rotation'
+import { createPagedWheel, holdSnap, PageSlots, releaseSnap } from '../paged-view'
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
 import {
@@ -541,7 +542,9 @@ export default function PdfViewer({
   const [sizes, setSizes] = useState<PageSize[]>([])
   const sizesRef = useRef(sizes)
   sizesRef.current = sizes
-  const [scale, setScale] = useState(initialPosition?.zoom ?? 0)
+  // The paged view opens every document at a whole page — what the view is
+  // for — rather than at the zoom it was last read at in the other view
+  const [scale, setScale] = useState(settings.pagedView ? 0 : (initialPosition?.zoom ?? 0))
   /** User view rotation (clockwise) and two-page spread — display settings,
    *  persisted with the reading position, never written into the file */
   const [rotation, setRotation] = useState<ViewRotation>(initialPosition?.rotation ?? 0)
@@ -561,6 +564,9 @@ export default function PdfViewer({
   const coverPageRef = useRef(coverPage)
   coverPageRef.current = coverPage
   const [containerWidth, setContainerWidth] = useState(0)
+  /** The scroller's height — read only by the paged view, whose slots are a
+   *  viewport tall (the continuous layout never depends on it) */
+  const [containerHeight, setContainerHeight] = useState(0)
   const [range, setRange] = useState<[number, number]>([1, 1])
   const [currentPage, setCurrentPage] = useState(initialPosition?.page ?? 1)
   // The keyboard handler is assigned per render but reads through refs, so the
@@ -643,7 +649,7 @@ export default function PdfViewer({
    *  width changes (panel open/close, window resize) so the page never gets
    *  shoved off-centre; 'custom' preserves the exact scale */
   const [fitMode, setFitMode] = useState<'width' | 'page' | 'custom'>(
-    initialPosition?.zoom ? 'custom' : 'page'
+    initialPosition?.zoom && !settings.pagedView ? 'custom' : 'page'
   )
   const fitModeRef = useRef(fitMode)
   fitModeRef.current = fitMode
@@ -1005,7 +1011,8 @@ export default function PdfViewer({
     // document is already split, and the zoom noted when that one opened is
     // the one to come back to
     if (!splitOpenRef.current) noteZoomBeforeSplitRef.current()
-    setFitMode('width')
+    // A split column fits its width — or, paging, its whole page
+    setFitMode(pagedRef.current ? 'page' : 'width')
     lastSplitRef.current = { kind: 'same' }
     if (!splitOpenRef.current) {
       holdPlaceAcrossSplitRef.current()
@@ -1214,7 +1221,7 @@ export default function PdfViewer({
         setPanelW((p) => (p.pane === share ? p : { ...p, pane: share }))
         window.setTimeout(persistPanelWidths, 0)
         noteZoomBeforeSplitRef.current()
-        setFitMode('width')
+        setFitMode(pagedRef.current ? 'page' : 'width')
         holdPlaceAcrossSplitRef.current()
         setSplitOpen(true)
       }
@@ -1902,7 +1909,10 @@ export default function PdfViewer({
   useLayoutEffect(() => {
     const el = containerRef.current
     if (!el) return
-    const measure = (): void => setContainerWidth(el.clientWidth || window.innerWidth || 1200)
+    const measure = (): void => {
+      setContainerWidth(el.clientWidth || window.innerWidth || 1200)
+      setContainerHeight(el.clientHeight || window.innerHeight || 800)
+    }
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(el)
@@ -1981,6 +1991,23 @@ export default function PdfViewer({
   // panels toggle or the window resizes, same as a hand-picked zoom.
   useEffect(() => {
     if (scale > 0 || sizes.length === 0 || containerWidth === 0) return
+    // Paged: the whole page, fitted to its slot
+    const el = containerRef.current
+    if (pagedRef.current && el && el.clientHeight > 0) {
+      const denom = fitDenom()
+      setFitMode('page')
+      setScale(
+        clamp(
+          Math.min(
+            (containerWidth - SIDE_PAD - marginGutter) / denom.w,
+            (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
+          ),
+          ZOOM_MIN,
+          ZOOM_MAX
+        )
+      )
+      return
+    }
     const fitW = (containerWidth - SIDE_PAD - marginGutter) / fitDenom().w
     if (fitW < 1) {
       setFitMode('width')
@@ -1992,6 +2019,15 @@ export default function PdfViewer({
   }, [sizes, scale, containerWidth, fitDenom, marginGutter])
 
   // ---------- Layout ----------
+
+  /** «Bla side for side» (issue #29): every row in a viewport-tall slot of its
+   *  own, the scroller snapping slot to slot (CSS scroll-snap on the slot
+   *  anchors drawn below). A preference for every document, so it comes from
+   *  the settings rather than the reading position. */
+  const paged = settings.pagedView === true
+  const pagedHeight = paged ? containerHeight : 0
+  const pagedRef = useRef(paged)
+  pagedRef.current = paged
 
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
@@ -2006,14 +2042,15 @@ export default function PdfViewer({
         padTop: PAD_TOP,
         padBottom: PAD_BOTTOM,
         sidePad: SIDE_PAD,
-        spreadGap: SPREAD_GAP
+        spreadGap: SPREAD_GAP,
+        ...(pagedHeight > 0 ? { pagedHeight } : {})
       },
       coverPage
     )
     // A left-hand margin means the gutter sits BEFORE the pages: shift every
     // page right by the reserved width so the column has its space.
     return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0)
-  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side])
+  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side, pagedHeight])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -2179,11 +2216,48 @@ export default function PdfViewer({
       inner.style.willChange = ''
       inner.style.transformOrigin = '0 0'
     }
+    releaseSnap(el)
     updateRange()
     // `rotation` is in the deps deliberately: a rotate that changes the layout
     // must never leave a pending anchor (set under the old rotation) to be
     // consumed here with stale coords (rotateView also clears it).
   }, [scale, layout, rotation, updateRange])
+
+  // The paged view switched on or off — in this tab or in another (it is one
+  // preference for every document): stay on the page that was being read, and
+  // going paged, show the whole page, which is what the view is for. Runs
+  // after the restore effect, against the layout that already has (or has
+  // lost) its slots; currentPageRef still holds the page from before.
+  const pagedSeenRef = useRef(paged)
+  useLayoutEffect(() => {
+    const el = containerRef.current
+    if (pagedSeenRef.current === paged || !el || !layout) return
+    pagedSeenRef.current = paged
+    const page = clamp(currentPageRef.current, 1, layout.tops.length)
+    if (paged && fitModeRef.current !== 'page' && sizesRef.current.length > 0) {
+      const cur = clamp(page - 1, 0, sizesRef.current.length - 1)
+      const row = spreadRef.current ? spreadRow(cur, sizesRef.current.length, coverPageRef.current) : [cur]
+      const v = row.map((i) => viewSize(sizesRef.current[i].w, sizesRef.current[i].h, rotationRef.current))
+      const w = v.reduce((sum, x) => sum + x.w, 0) + (v.length > 1 ? SPREAD_GAP : 0)
+      const h = Math.max(...v.map((x) => x.h))
+      const next = clamp(
+        Math.min((el.clientWidth - SIDE_PAD - marginGutterRef.current) / w, (el.clientHeight - PAD_TOP - PAD_BOTTOM) / h),
+        ZOOM_MIN,
+        ZOOM_MAX
+      )
+      fitModeRef.current = 'page'
+      setFitMode('page')
+      if (Math.abs(next - scaleRef.current) / scaleRef.current >= 0.002) {
+        // Land after the relayout the new zoom brings
+        pendingAnchorRef.current = null
+        flipLandRef.current = page - 1
+        setScale(next)
+        return
+      }
+    }
+    el.scrollTop = Math.max(0, layout.tops[page - 1] - 8)
+    updateRange()
+  }, [paged, layout, updateRange])
 
   // "Immersive" reading = the toolbar auto-hides (unpinned). Drives the HUD
   // fade (scrollbar + page pill) and the floating page pill.
@@ -2504,6 +2578,7 @@ export default function PdfViewer({
         inner.style.willChange = ''
         inner.style.transformOrigin = '0 0'
       }
+      releaseSnap(el)
       updateRange()
       return
     }
@@ -2520,8 +2595,14 @@ export default function PdfViewer({
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    const pagedWheel = createPagedWheel()
     const onWheel = (e: WheelEvent): void => {
-      if (!e.ctrlKey) return
+      if (!e.ctrlKey) {
+        // Paged: the wheel turns pages (see createPagedWheel)
+        const lay = layoutRef.current
+        if (pagedRef.current && lay) pagedWheel(e, el, lay)
+        return
+      }
       e.preventDefault()
       const inner = innerRef.current
       if (!inner || scaleRef.current <= 0) return
@@ -2544,6 +2625,7 @@ export default function PdfViewer({
         }
         inner.style.willChange = 'transform'
         inner.style.transformOrigin = `${g.originX}px ${g.originY}px`
+        holdSnap(el)
         setMenu((m) => (m ? null : m))
       }
       // Trackpad pinches arrive as many small deltas — scale the factor by
@@ -2621,6 +2703,7 @@ export default function PdfViewer({
       }
       inner.style.willChange = 'transform'
       inner.style.transformOrigin = `${gestureRef.current.originX}px ${gestureRef.current.originY}px`
+      holdSnap(el)
       pinch.startDist = dist(t)
       pinch.active = true
       setMenu((m) => (m ? null : m))
@@ -2863,6 +2946,14 @@ export default function PdfViewer({
     setSpreadPref(next)
     schedulePositionSave()
   }, [reanchorFor, schedulePositionSave])
+
+  /** «Bla side for side» (issue #29). One preference for every document, so
+   *  it goes to the settings; each mounted viewer — this one and the tabs
+   *  behind it — follows from there, holding its own page (the paged-switch
+   *  effect above). */
+  const togglePaged = useCallback(() => {
+    onSettingsChange({ pagedView: !settingsRef.current.pagedView })
+  }, [onSettingsChange])
 
   /** The spread's cover sub-option (page 1 alone). Per column like spread
    *  itself; only meaningful while the column's spread is on, which is why the
@@ -6643,6 +6734,10 @@ export default function PdfViewer({
         e.preventDefault()
         toggleCoverPage()
         break
+      case 'view.paged':
+        e.preventDefault()
+        togglePaged()
+        break
       case 'view.present':
         e.preventDefault()
         enterPresentation()
@@ -7018,6 +7113,8 @@ export default function PdfViewer({
           onRotate={rotateView}
           onToggleSpread={toggleSpread}
           onToggleCoverPage={toggleCoverPage}
+          paged={paged}
+          onTogglePaged={togglePaged}
           onToolPrefChange={patchToolPref}
           onToolPrefReset={resetToolPref}
           textPref={textPref}
@@ -7253,7 +7350,7 @@ export default function PdfViewer({
             </div>
           )}
         <div
-          className={`pages${drawTool ? ' drawing' : ''}`}
+          className={`pages${drawTool ? ' drawing' : ''}${paged ? ' paged' : ''}`}
           data-pane="a"
           data-dockey={payload.path}
           data-rotation={rotation}
@@ -7273,6 +7370,7 @@ export default function PdfViewer({
               ref={innerRef}
               style={{ height: layout.total, width: layout.contentWidth + marginGutter }}
             >
+              {paged && <PageSlots layout={layout} />}
               {sizes.map((size, i) => {
                 const pageNumber = i + 1
                 const active = pageNumber >= range[0] && pageNumber <= range[1]
@@ -7430,6 +7528,7 @@ export default function PdfViewer({
                 rotation={paneBRotation}
                 spread={paneBSpread}
                 coverPage={paneBCover}
+                paged={paged}
                 scale={paneBScale}
                 fitMode={paneBFit}
                 onZoom={paneBZoom}

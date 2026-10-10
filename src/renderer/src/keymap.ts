@@ -54,6 +54,7 @@ export type CommandId =
   | 'view.rotateLeft'
   | 'view.spread'
   | 'view.coverPage'
+  | 'view.paged'
   | 'view.split'
   | 'view.swapPanes'
   | 'view.marginNotes'
@@ -204,6 +205,7 @@ const REGISTRY: readonly Command[] = [
   { id: 'view.rotateLeft', category: 'view', labelKey: 'keys.viewRotateLeft', defaults: ['['] },
   { id: 'view.spread', category: 'view', labelKey: 'keys.viewSpread', defaults: [] },
   { id: 'view.coverPage', category: 'view', labelKey: 'keys.viewCoverPage', defaults: [] },
+  { id: 'view.paged', category: 'view', labelKey: 'keys.viewPaged', defaults: [] },
   { id: 'view.split', category: 'view', labelKey: 'keys.viewSplit', defaults: ['s'] },
   // Split-view companion: the two columns trade sides (a visual order flip).
   // Shift+S so it reads as "the other S" — does nothing without a split.

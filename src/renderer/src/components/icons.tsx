@@ -619,6 +619,14 @@ export const IconSpread = (p: IconProps): React.JSX.Element => (
   </Svg>
 )
 
+/** «Bla side for side»: one page on its own, turned to either side */
+export const IconPaged = (p: IconProps): React.JSX.Element => (
+  <Svg {...p}>
+    <rect x="7.5" y="3.5" width="9" height="17" rx="1" />
+    <path d="M4.5 9.5 2 12l2.5 2.5M19.5 9.5 22 12l-2.5 2.5" />
+  </Svg>
+)
+
 /** The spread's cover sub-option: page 1 alone on its own row, pairs below. */
 export const IconCoverPage = (p: IconProps): React.JSX.Element => (
   <Svg {...p}>

@@ -49,6 +49,7 @@ import type { MarginViewConfig } from './MarginNotes'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
 import { clampZoom } from '../zoom'
+import { createPagedWheel, holdSnap, PageSlots, releaseSnap } from '../paged-view'
 import PdfPage from './PdfPage'
 import { OverlayScrollbars } from './OverlayScrollbars'
 
@@ -79,6 +80,9 @@ interface Props {
   spread: boolean
   /** Spread sub-option: page 1 alone, pairs 2-3, 4-5 … */
   coverPage: boolean
+  /** «Bla side for side» (issue #29) — the main column's setting, one for
+   *  every document, so both columns page or both scroll */
+  paged: boolean
   /** Controlled zoom: the toolbar's centre owns it, this component reports the
    *  scale it arrives at (fit modes, pinch) back up. */
   scale: number
@@ -167,6 +171,7 @@ export default function PagesPane({
   rotation,
   spread,
   coverPage,
+  paged,
   scale,
   fitMode,
   onZoom,
@@ -207,6 +212,8 @@ export default function PagesPane({
   const containerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
+  /** Read only by the paged view: its slots are a viewport tall */
+  const [containerHeight, setContainerHeight] = useState(0)
   const scaleRef = useRef(scale)
   scaleRef.current = scale
   const fitModeRef = useRef(fitMode)
@@ -243,7 +250,9 @@ export default function PagesPane({
   // silently stops fitting.
   const measureWidth = (): void => {
     const el = containerRef.current
-    if (el) setContainerWidth((w) => (w === el.clientWidth ? w : el.clientWidth))
+    if (!el) return
+    setContainerWidth((w) => (w === el.clientWidth ? w : el.clientWidth))
+    setContainerHeight((h) => (h === el.clientHeight ? h : el.clientHeight))
   }
   const measureRef = useRef(measureWidth)
   measureRef.current = measureWidth
@@ -265,6 +274,9 @@ export default function PagesPane({
   const marginGutterRef = useRef(marginGutter)
   marginGutterRef.current = marginGutter
 
+  const pagedHeight = paged ? containerHeight : 0
+  const pagedRef = useRef(paged)
+  pagedRef.current = paged
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
     const lay = buildRows(
@@ -278,12 +290,13 @@ export default function PagesPane({
         padTop: PAD_TOP,
         padBottom: PAD_BOTTOM,
         sidePad: SIDE_PAD,
-        spreadGap: SPREAD_GAP
+        spreadGap: SPREAD_GAP,
+        ...(pagedHeight > 0 ? { pagedHeight } : {})
       },
       coverPage
     )
     return shiftLayoutX(lay, marginView?.side === 'left' ? marginGutter : 0)
-  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView?.side])
+  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView?.side, pagedHeight])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -334,13 +347,18 @@ export default function PagesPane({
   updateRangeRef.current = updateRange
 
   // First scale once the width is known: fit-width, because a split column is
-  // narrow and a shrunk-to-fit whole page would be a stamp.
+  // narrow and a shrunk-to-fit whole page would be a stamp — unless the reader
+  // pages, where the whole page is the point of the view (see paged-view.tsx)
   useEffect(() => {
     if (scale > 0 || sizes.length === 0 || containerWidth === 0) return
-    onZoomRef.current(
-      clampZoom((containerWidth - SIDE_PAD - marginGutter) / fitDenom(currentPageRef.current).w),
-      'width'
-    )
+    const denom = fitDenom(currentPageRef.current)
+    const fitW = (containerWidth - SIDE_PAD - marginGutter) / denom.w
+    const el = containerRef.current
+    if (pagedRef.current && el && el.clientHeight > 0) {
+      onZoomRef.current(clampZoom(Math.min(fitW, (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h)), 'page')
+      return
+    }
+    onZoomRef.current(clampZoom(fitW), 'width')
   }, [scale, sizes, containerWidth, fitDenom, marginGutter])
 
   /** Capture the page point under (fx, fy) in this column's viewport */
@@ -377,7 +395,7 @@ export default function PagesPane({
     if (!el || !layout) return
     // currentPageRef still holds the page from BEFORE this relayout (only
     // updateRange moves it), which is exactly the page to land back on.
-    const key = `${rotation}:${spread}:${coverPage}`
+    const key = `${rotation}:${spread}:${coverPage}:${paged}`
     if (laidOutForRef.current !== null && laidOutForRef.current !== key) {
       pendingPageRef.current = currentPageRef.current
       anchorRef.current = null
@@ -401,8 +419,9 @@ export default function PagesPane({
       inner.style.willChange = ''
       inner.style.transformOrigin = '0 0'
     }
+    releaseSnap(el)
     updateRangeRef.current()
-  }, [layout, scale, rotation, spread, coverPage])
+  }, [layout, scale, rotation, spread, coverPage, paged])
 
   const zoomTo = useCallback(
     (next: number, mode: FitMode, focalClientX?: number, focalClientY?: number) => {
@@ -459,6 +478,26 @@ export default function PagesPane({
     if (fitMode !== 'custom') refitRef.current()
   }, [fitMode, rotation, spread, coverPage, marginGutter])
 
+  // Going paged shows the whole page, here as in the main column — landing
+  // back on the page being read once the new zoom has laid out
+  const pagedSeenRef = useRef(paged)
+  useEffect(() => {
+    if (pagedSeenRef.current === paged) return
+    pagedSeenRef.current = paged
+    const el = containerRef.current
+    if (!paged || !el || fitModeRef.current === 'page' || sizes.length === 0 || el.clientWidth === 0) return
+    const denom = fitDenom(currentPageRef.current)
+    const next = clampZoom(
+      Math.min(
+        (el.clientWidth - SIDE_PAD - marginGutterRef.current) / denom.w,
+        (el.clientHeight - PAD_TOP - PAD_BOTTOM) / denom.h
+      )
+    )
+    pendingPageRef.current = currentPageRef.current
+    anchorRef.current = null
+    onZoomRef.current(next, 'page')
+  }, [paged, sizes, fitDenom])
+
   /** Commit a pinch: swap the cheap CSS transform for a crisp re-render at the
    *  accumulated scale. The transform is dropped by the layout effect above,
    *  once the new layout is in place — that is what makes release seamless. */
@@ -478,6 +517,7 @@ export default function PagesPane({
         inner.style.willChange = ''
         inner.style.transformOrigin = '0 0'
       }
+      releaseSnap(el)
       updateRangeRef.current()
       return
     }
@@ -505,6 +545,7 @@ export default function PagesPane({
     }
     inner.style.willChange = 'transform'
     inner.style.transformOrigin = `${gestureRef.current.originX}px ${gestureRef.current.originY}px`
+    holdSnap(el)
     return true
   }, [])
 
@@ -514,8 +555,14 @@ export default function PagesPane({
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    const pagedWheel = createPagedWheel()
     const onWheel = (e: WheelEvent): void => {
-      if (!e.ctrlKey) return
+      if (!e.ctrlKey) {
+        // Paged: the wheel turns pages (see createPagedWheel)
+        const lay = layoutRef.current
+        if (pagedRef.current && lay) pagedWheel(e, el, lay)
+        return
+      }
       e.preventDefault()
       const inner = innerRef.current
       if (!inner) return
@@ -667,7 +714,7 @@ export default function PagesPane({
         </div>
       )}
       <div
-        className={`pages${drawTool ? ' drawing' : ''}`}
+        className={`pages${drawTool ? ' drawing' : ''}${paged ? ' paged' : ''}`}
         data-pane="b"
         data-dockey={docKey}
         // Published so PdfViewer's pointer handlers can map a click in THIS
@@ -689,6 +736,7 @@ export default function PagesPane({
             ref={innerRef}
             style={{ height: layout.total, width: layout.contentWidth + marginGutter }}
           >
+            {paged && <PageSlots layout={layout} />}
             {sizes.map((size, i) => {
               const pageNumber = i + 1
               return (
