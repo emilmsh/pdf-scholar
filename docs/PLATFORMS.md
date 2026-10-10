@@ -561,6 +561,21 @@ regressions are treated as bugs, not as acceptable platform lag.
     in the web preview, which has no recents. Covered by
     `npm run test:recent-thumbs` (CI) and `npm run test:recents-grid` (desktop).
 
+29. **Pinned tabs and the restored session are the desktop's; the browser keeps
+    its own.** (issue #29, 2026-10-10) The desktop's tab strip pins tabs and
+    reopens each window's tabs at launch (the rules in `src/shared/session.ts`,
+    main's per-window record in `src/main/index.ts`). The extension shows one
+    document per browser tab and has no strip of its own, so the browser's own
+    pinning and «continue where you left off» do that job there — and the gear
+    menu's «Åpne fanene fra forrige gang» is absent. The library's pin, remove
+    and three grid sizes are identical everywhere (`src/shared/recents.ts`), with
+    one desktop footnote: removing an entry leaves the OS's own recent-documents
+    list (the Windows Jump List, the macOS Dock menu) alone, because Electron can
+    only clear that list whole. «Bla side for side» is renderer-only and
+    identical everywhere. Covered by `npm run test:session` and
+    `test:recent-thumbs` (CI), and by `test:session-desktop`, `test:recents-grid`
+    and `test:paged` (desktop session).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

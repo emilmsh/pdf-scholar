@@ -3,7 +3,7 @@
 The app's own information architecture and toolset: a desktop-first shell (tab bar, split view, task-grouped toolbar) paired with a touch-friendly, expandable toolset concept for reading ergonomics, built natively for Windows.
 
 ## 1. Shell & Window
-- **Tab bar** at top for multiple open documents. Tab context menu: Rename (renames file), Reveal (show in Explorer), Close Other Tabs. Drag to reorder.
+- **Tab bar** at top for multiple open documents. Tab context menu: Rename (renames file), Reveal (show in Explorer), Close Other Tabs. Drag to reorder. *(Shipped 2026-10-10, issue #29, desktop: pinned tabs — first in the strip, no close cross, left standing by the bulk closes — and each window's tabs reopened at the next launch, lazily: a restored document is read when its tab is first shown. Rename remains unbuilt.)*
 - **Split view**: two documents, or two views of the same document, side by side; horizontal or vertical arrangement. *(Shipped: side by side — same document since v0.2x, two documents 2026-09-02 («Åpne i delt visning» on a tab, or drop a PDF on the column), with a «bytt plass» swap. A stacked/vertical arrangement remains unbuilt.)*
 - **Left sidebar** (toggle via panel icon) with exactly four tabs: **Thumbnails, Outline, Bookmarks, Annotations**.
 - **Top toolbar** grouped into task sections: Annotate | Edit | Fill & Sign | Export, with sidebar/layout controls on the left and search on the right. **Toolset** concept: named groups that expand inline; customization with ON TOOLBAR / MORE TOOLS drag sections and user-created toolsets.
@@ -13,7 +13,7 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 ## 2. Reading & View Settings ("aA" popover)
 - **Themes: Day (default), Sepia, Night, Night+ (higher contrast), Auto** (follows OS). Implemented as color transforms on the rendered page + matching chrome. **PDFX addition: adjustable contrast slider per theme** (owner requirement). *(Shipped 2026-09-02, reworked the same day on owner feedback: Sepia folded into «Farge» — one light-tone mode with curated paper tones (sepia cream, gray, green, blue, sand) — and Night got its own dark tones (warm, gray, blue, green) via a screen blend. The tinted modes take a strength slider named for its axis («Fargestyrke» / «Lysstyrke»; 100 % = the shipped look, Day has nothing to dial and Night+ is already maximum), the chrome follows the chosen tone, a night-mode toggle keeps images in their original colours, and 'd' cycles the modes from the keyboard. The stored 'sepia' theme id remains valid — legacy settings and the auto-mode light choice still resolve to it.)*
 - **Brightness slider** (in-app overlay).
-- **Scroll**: vertical + continuous (desktop default) or horizontal + single-page (page-flip). Two-page spread with "first page alone" toggle — suspended while the view is split (each column is half the width), back when the document is shown alone.
+- **Scroll**: vertical + continuous (desktop default) or horizontal + single-page (page-flip). Two-page spread with "first page alone" toggle — suspended while the view is split (each column is half the width), back when the document is shown alone. *(Single-page shipped 2026-10-10 as «Bla side for side», issue #29 — vertical rather than horizontal: one page or spread per viewport-tall slot, the wheel, a swipe and the keys turning it, a zoomed-in page scrolled to its foot first; one preference for every document, in both split columns. The horizontal flip remains unbuilt.)*
 - **Zoom**: ctrl+wheel / trackpad pinch; fit-width and fit-page snap modes.
 - **Crop-margins mode** (hide headers/footers/margins).
 - **Keep awake** toggle (powerSaveBlocker).
@@ -56,7 +56,7 @@ The app's own information architecture and toolset: a desktop-first shell (tab b
 - Later: cross-file content search in the file browser.
 
 ## 8. Files, Recents, Windows Integration
-- **No internal library** — native filesystem. Home screen with Recents (last 20, newest first, Clear) and Favorites (custom order, color tags).
+- **No internal library** — native filesystem. Home screen with Recents (last 20, newest first, Clear) and Favorites (custom order, color tags). *(Shipped 2026-10-10, issue #29: favourites as pinned recents in a «Festet» group — pinning order, outside the 20-cap — single entries removed with «Angre», and three grid sizes. Colour tags and Clear-all remain unbuilt.)*
 - **Explorer integration**: registered .pdf handler ("Open with"; first-run hint for setting default); single-instance routing; taskbar Jump List with Recent category.
 - **Remember per file**: last read position, zoom, view settings.
 - **Cloud (deferred, Phase 8)**: several established desktop PDF readers ship without 2-way sync — precedent that native filesystem + sync-client folders (OneDrive/Dropbox) is acceptable.

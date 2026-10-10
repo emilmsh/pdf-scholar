@@ -155,6 +155,14 @@ carries no picture of its own.)*
   resolution rather than at the size it happened to be on screen *(reader ask,
   [issue #21](https://github.com/emilmsh/pdf-scholar/issues/21))*
 - Page rotation, two-page spread, full-screen presentation mode
+- «Bla side for side» (Page by page): one page — or one spread — at a time,
+  with space around it, turned rather than scrolled. A wheel notch, a swipe,
+  the arrow keys or PageDown turn it; zoomed in, the page scrolls to its foot
+  before it turns. One choice for every document, in both columns of a split
+  *(reader ask, [issue #29](https://github.com/emilmsh/pdf-scholar/issues/29), 2026-10-10 — Acrobat's Single
+  Page / Two-Page view without scrolling. The reporter's first request read as
+  the continuous spread we already had; the follow-up made clear he meant this.
+  Supporting, not a headline)*
 - Table of contents, thumbnails and bookmarks in one panel; the toolbar's page
   field jumps straight to a page number
 - Internal links and cross-references can be followed and returned from —
@@ -169,8 +177,18 @@ carries no picture of its own.)*
   file name. The pictures are taken only while the grid is chosen, stay on the
   machine, and a password-protected document shows a lock instead of its first
   page *(reader ask, [issue #28](https://github.com/emilmsh/pdf-scholar/issues/28),
-  2026-10-06 — a SumatraPDF habit; supporting, not a headline)*. Documents open
-  in tabs or separate windows. A tab drags like a file: into another PDF Scholar window,
+  2026-10-06 — a SumatraPDF habit; supporting, not a headline)*. Entries can be
+  pinned into a «Festet» group at the top, which the 20-file limit never
+  touches, or removed one at a time (with «Angre»); the grid has three sizes and
+  gets the library's full width, and in the grid the page itself scrolls
+  *(same reader, [issue #29](https://github.com/emilmsh/pdf-scholar/issues/29), 2026-10-10; the width and the page scroll
+  were Emil's call — the box under the lockup read as a keyhole)*. Documents open
+  in tabs or separate windows. Tabs can be pinned — they stay at the start of
+  the strip, without a close button — and on the desktop each window gets back
+  the tabs it had at the next launch, each document read only when its tab is
+  first shown, so a long session costs nothing at startup *([issue #29](https://github.com/emilmsh/pdf-scholar/issues/29);
+  the browser extension has no tab strip of its own — there the browser pins
+  and restores its tabs)*. A tab drags like a file: into another PDF Scholar window,
   or into anything that takes a PDF — a browser's upload field, an e-mail, a
   chat, a folder. «Flytt til nytt vindu» in the tab menu tears it into a
   window of its own *(2026-09-17, Emil's ask: dragging a tab into another

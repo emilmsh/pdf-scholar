@@ -171,6 +171,9 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
   before it goes anywhere, and then copies to the clipboard or saves as PNG. A real
   picture comes out at its own resolution, not at the size it was on screen
 - Page rotation (Shift+R) and a two-page spread for wide layouts
+- Page by page: one page — or one spread — at a time with space around it, turned by
+  the wheel, a swipe or the arrow keys instead of scrolled; a zoomed-in page scrolls to
+  its foot before it turns
 - Presentation mode (P): one page at a time, full screen
 - The toolbar can be unpinned (V); the side panels go with it, and each returns on hover
   at its window edge
@@ -179,10 +182,13 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
 - Internal links and cross-references can be followed and returned from: back/forward
   navigation (Alt+← / Alt+→, or the mouse side-buttons) holds the history
 - Reading positions and recent files are remembered; a library home screen lists them —
-  as a list, or as a grid of their first pages with how far you read each one.
-  Going back to it closes nothing: open documents stay in the tab strip, and returning
-  to one restores the page, zoom and panels
-- Several documents open in tabs or separate windows. A tab drags like a file: into
+  as a list, or as a grid of their first pages (three sizes) with how far you read each
+  one. Pin the ones you keep coming back to into a group of their own, remove the ones
+  that should not be there. Going back to it closes nothing: open documents stay in the
+  tab strip, and returning to one restores the page, zoom and panels
+- Several documents open in tabs or separate windows; tabs can be pinned, and each window
+  gets its tabs back at the next launch (a document is read only when you show its tab).
+  A tab drags like a file: into
   another PDF Scholar window, or into anything that takes a PDF (a browser's upload field,
   an e-mail, a chat, a folder), and along the bar to reorder. Ctrl+drag (Cmd on Mac) moves
   it inside the app instead: onto another window, or out onto the desktop for a window of
