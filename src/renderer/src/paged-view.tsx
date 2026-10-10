@@ -9,12 +9,15 @@
 // on whole slots. A slot taller than the viewport (zoomed in) can be scrolled
 // within: a snap area larger than the snapport is valid at any position that
 // covers it, so the page reads top to bottom and only its edge turns it.
+import { memo } from 'react'
 import type { RowLayout } from './rotation'
 
 /** The anchors the scroller snaps to, one per row. Empty, absolutely
  *  positioned and click-through — they only give scroll-snap something to
- *  align, at the slot's top and over the slot's full height. */
-export function PageSlots({ layout }: { layout: RowLayout }): React.JSX.Element {
+ *  align, at the slot's top and over the slot's full height. Memoised on the
+ *  layout: the viewer re-renders on every page change, and a long document's
+ *  thousand anchors need not be compared each time when nothing moved. */
+export const PageSlots = memo(function PageSlots({ layout }: { layout: RowLayout }): React.JSX.Element {
   return (
     <>
       {layout.rows.map((row, i) => (
@@ -22,7 +25,7 @@ export function PageSlots({ layout }: { layout: RowLayout }): React.JSX.Element 
       ))}
     </>
   )
-}
+})
 
 /** A pinch or Ctrl+wheel previews by scaling the pages host with a CSS
  *  transform, which moves the snap anchors with it — a mandatory snap would

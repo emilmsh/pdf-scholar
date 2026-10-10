@@ -432,6 +432,10 @@ export default function App(): React.JSX.Element {
       const existing = tabsRef.current.find((t) => t.payload.path === payload.path)
       if (existing) {
         setError(null)
+        // A restored tab opened from outside before it was ever shown: these
+        // bytes are its first, so this is where main hears of it — taken now,
+        // before the tab is shown, so the lazy loader does not read it again
+        const wasLazy = takeLazy(existing.id)
         // The file may have changed on disk since the tab loaded (opening an
         // updated PDF from Explorer, or dropping a same-named file, must never
         // show stale bytes). Reload with the fresh payload — unless the tab
@@ -451,9 +455,7 @@ export default function App(): React.JSX.Element {
         }
         goToTab(existing.id)
         const initialPosition = await bridge.getPosition(payload.path)
-        // A restored tab opened from outside before it was ever shown: this
-        // read is its first, so this is where main hears of it
-        if (takeLazy(existing.id)) docRegistry.acquire(payload.path)
+        if (wasLazy) docRegistry.acquire(payload.path)
         setTabs((prev) =>
           prev.map((t) =>
             t.id === existing.id
@@ -985,7 +987,8 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     if (atLibrary) return
     const tab = tabs.find((x) => x.id === activeId)
-    if (!tab?.lazy || lazyLoadingRef.current.has(tab.id)) return
+    // Lazy in the state but already taken: openPayload has its bytes in hand
+    if (!tab?.lazy || !lazyIdsRef.current.has(tab.id) || lazyLoadingRef.current.has(tab.id)) return
     const { id } = tab
     lazyLoadingRef.current.add(id)
     void (async () => {
