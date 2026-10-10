@@ -42,7 +42,9 @@ export const DEFAULT_SETTINGS: Settings = {
   // On: a restored tab reads nothing until it is shown, so the cost of
   // remembering a long session is a row of names in the tab strip.
   restoreSession: true,
-  pagedView: false
+  pagedView: false,
+  linkPreview: true,
+  linkPreviewDelay: 'medium'
 }
 
 /** How many files «Nylig lest» remembers, on every platform (docs/SPEC.md §8).

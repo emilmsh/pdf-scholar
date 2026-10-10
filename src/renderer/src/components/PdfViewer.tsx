@@ -127,6 +127,8 @@ import type { AiDocument, ResolvedCitation } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import { rememberRequestTokenLimit } from '../ai-token-limits'
 import AnnotPopover from './AnnotPopover'
+import LinkPreview from './LinkPreview'
+import { linkPreviewDelayMs } from '../link-preview'
 import { PasswordPrompt } from './PasswordPrompt'
 import { SignaturePad } from './SignaturePad'
 import { SignatureInfo } from './SignatureInfo'
@@ -7815,6 +7817,13 @@ export default function PdfViewer({
           onClose={() => setAiQuick(null)}
         />
       )}
+      {/* Hover previews of in-document links (issue #31) — listens on the
+          viewer root, so both columns get them with no per-page wiring */}
+      <LinkPreview
+        hostRef={viewerRootRef}
+        enabled={settings.linkPreview && active}
+        delayMs={linkPreviewDelayMs(settings.linkPreviewDelay)}
+      />
       {annotPopover &&
         (() => {
           const popoverAnnots =

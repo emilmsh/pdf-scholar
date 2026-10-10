@@ -1,6 +1,6 @@
 # PDF Scholar — Privacy Policy
 
-_Last updated: 2026-10-06_
+_Last updated: 2026-10-10_
 
 PDF Scholar (the desktop app and the browser extension) is a local-first PDF
 reader and annotator. **It collects no data about you.**
@@ -115,6 +115,23 @@ to be decrypted, exactly as the app does. That is the ceiling for anything that
 remembers a credential without asking you for a master password every time, so
 set a spending cap in the provider's console as well — the app's key settings link
 straight to it.
+
+## Abstracts of cited papers (optional, on request)
+
+Resting the pointer on a citation shows the reference-list entry it points to,
+read from the document on your machine. That preview sends nothing. Below it, a
+**«Sammendrag» / «Abstract»** button fetches the cited paper's abstract — only
+when you click it. The click sends **the text of that one reference-list
+entry** (or just the DOI or arXiv number printed in it) to these free public
+scholarly databases, with no key and no account:
+
+- Crossref (`api.crossref.org`) — to find which paper the entry names, and for
+  the abstract where the publisher deposited one;
+- Europe PMC (`www.ebi.ac.uk`), OpenAlex (`api.openalex.org`) and arXiv
+  (`export.arxiv.org`) — for the abstract itself.
+
+Nothing else from the document, and nothing about you, goes with the request.
+The answer is kept in memory for the session and forgotten when the app closes.
 
 ## Automatic updates (desktop app)
 

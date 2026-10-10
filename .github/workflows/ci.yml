@@ -90,6 +90,12 @@ jobs:
       # The DOI reserve for a document outside Zotero (DOI in text → doi.org →
       # citation/reference/BibTeX): same shape, fetch injected, keyless
       - run: npm run test:doi
+      # Hover previews of in-document links (issue #31): what a destination name
+      # says it is, where the window looks, and real pdf.js resolving names
+      - run: npm run test:link-preview
+      # …and the abstract behind a citation: entry → DOI/arXiv/Crossref match →
+      # four keyless sources, fetch injected, keyless
+      - run: npm run test:abstract
       # The one place the app proposes dropping encryption: which failures earn
       # the offer at all, and that the rewrite touches the scheme and nothing else
       - run: npm run test:insecure-retry

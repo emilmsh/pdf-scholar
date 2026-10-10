@@ -90,6 +90,7 @@ import { applyPortableUserData } from './portable'
 import { reapplyFileIconAtStartup, registerFileIconIpc } from './file-icon'
 import { zoteroInfo, zoteroSelectUrlFor } from './zotero'
 import { doiCite } from './doi'
+import { citationAbstract } from './abstract'
 import { citationStyleOrDefault } from '../shared/citation-style'
 import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import { createRecentThumbStore } from './recent-thumbs'
@@ -1411,6 +1412,14 @@ function registerIpc(): void {
     typeof doi === 'string'
       ? doiCite(doi, citationStyleOrDefault(style))
       : { error: 'not a DOI', code: 'doi-unknown' }
+  )
+  // The abstract behind a citation (link preview, issue #31): the entry's
+  // TEXT comes in; every request is built in src/shared/abstract.ts from four
+  // fixed hosts, so renderer input never becomes a URL of its own.
+  ipcMain.handle('abstract:lookup', (_e, entry: unknown) =>
+    typeof entry === 'string'
+      ? citationAbstract(entry)
+      : { error: 'not an entry', code: 'abstract-unidentified' }
   )
 
   // «Kopier bilde»: the renderer hands over PNG bytes, main puts them on the

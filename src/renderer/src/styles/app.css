@@ -3078,6 +3078,176 @@ html.pen-near .draw-layer {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
+/* Hover preview of an in-document link (LinkPreview.tsx, issue #31): a window
+   onto the destination page. The sheet is recoloured as ONE layer the way
+   .page-raster is — filter on the sheet, the canvas multiplying onto
+   --page-bg — so a preview reads in the same paper tone as the page. */
+.link-preview {
+  position: fixed;
+  z-index: 60;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+  overflow: hidden;
+  animation: link-preview-in 120ms ease-out;
+}
+
+@keyframes link-preview-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+}
+
+.link-preview-scroll {
+  /* Up and down only: the window starts at the destination's column, and a
+     sideways bar under a two-line entry is chrome for nothing */
+  overflow: hidden auto;
+  /* The wheel at the window's end must not scroll the page under it */
+  overscroll-behavior: contain;
+  cursor: pointer;
+  /* The wheel still scrolls it, but no bar: the window is a glimpse of the
+     page, not a second document (Emil, 2026-10-10) */
+  scrollbar-width: none;
+}
+
+.link-preview-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.link-preview-content {
+  position: relative;
+}
+
+.link-preview-sheet {
+  position: absolute;
+  inset: 0;
+  background: var(--page-bg);
+  filter: var(--page-filter);
+  isolation: isolate;
+}
+
+.link-preview-canvas-host {
+  position: absolute;
+  inset: 0;
+}
+
+.link-preview-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  mix-blend-mode: var(--page-blend);
+}
+
+/* Where the link lands: a short accent tick in the margin beside the line */
+.link-preview-mark {
+  position: absolute;
+  width: 3px;
+  height: 1.1em;
+  margin-top: 0.1em;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.link-preview-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* «Sammendrag» on a citation: a quiet text button in the footer, and the
+   abstract between the page window and the footer once fetched. Read like
+   the assistant's prose — the app's own text, not the page's. */
+.lpa-ask,
+.lpa-retry {
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.lpa-ask:hover,
+.lpa-retry:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.lpa-retry {
+  margin-left: 8px;
+}
+
+.lpa-loading,
+.lpa-source {
+  color: var(--text-secondary);
+}
+
+.lpa-source a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.lpa-source a:hover {
+  text-decoration: underline;
+}
+
+.link-preview-abstract {
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 10px 14px 4px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  user-select: text;
+}
+
+.link-preview-abstract::-webkit-scrollbar {
+  display: none;
+}
+
+.lpa-title {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.lpa-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.lpa-text {
+  margin: 8px 0 0;
+}
+
+.lpa-none,
+.lpa-note {
+  margin: 8px 0 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.lpa-note {
+  font-style: italic;
+}
+
+.link-preview-delays .lang-option:disabled {
+  opacity: 0.45;
+  cursor: default;
+  border-color: var(--border);
+}
+
 /* Loading / errors / toast */
 
 .viewer-loading {

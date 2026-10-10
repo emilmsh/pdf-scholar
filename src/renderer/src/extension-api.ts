@@ -40,6 +40,7 @@ import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
+import { createAbstractClient } from '../../shared/abstract'
 import { cleanAttachmentName, numberedName } from '../../shared/attachments'
 import type { CitationStyleId } from '../../shared/citation-style'
 import { subscribeAssistantJumps } from './assistant-channel'
@@ -85,6 +86,9 @@ const K_TAKEN_BACK = 'pdfx-taken-back'
 const zoteroClient = createZoteroClient(httpZoteroFetch)
 /** Same lifetime for the DOI reserve's cache */
 const doiClient = createDoiClient(httpDoiFetch)
+/** …and for the abstracts behind citations, whose arXiv queue must be one per
+ *  viewer page at least (arXiv's one request per three seconds) */
+const abstractClient = createAbstractClient(httpDoiFetch)
 
 
 /** File System Access handles from in-app "Open" — keyed by the path we return,
@@ -247,6 +251,10 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // alike — since it reads the DOI from the document's own text and doi.org
     // answers CORS-open; the manifest's host permissions are not even needed.
     doiCite: (doi: string, style?: CitationStyleId) => doiClient.cite(doi, style),
+    // The abstract behind a citation: the same shared client as desktop's
+    // main. arXiv sends no CORS header — the manifest's host permissions are
+    // what let that one through.
+    citationAbstract: (entry: string) => abstractClient.lookup(entry),
 
     // ---------- Tabs / windows ----------
 

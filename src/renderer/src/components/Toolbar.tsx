@@ -2512,6 +2512,38 @@ export default function Toolbar({
                 {t('settings.selectionMenuCompact')}
               </label>
 
+              {/* Hover previews of in-document links (issue #31): on/off plus
+                  three fixed delays. The delay row stays in place when the
+                  previews are off — greyed, so the menu does not jump. */}
+              <div className="theme-menu-sep" />
+              <label className="theme-menu-toggle" title={t('settings.linkPreviewTip')}>
+                <input
+                  type="checkbox"
+                  checked={settings.linkPreview}
+                  onChange={(e) => onSettingsChange({ linkPreview: e.target.checked })}
+                />
+                {t('settings.linkPreview')}
+              </label>
+              <div
+                className="lang-options link-preview-delays"
+                role="radiogroup"
+                aria-label={t('settings.linkPreviewDelay')}
+                title={t('settings.linkPreviewDelay')}
+              >
+                {(['short', 'medium', 'long'] as const).map((d) => (
+                  <button
+                    key={d}
+                    role="radio"
+                    aria-checked={settings.linkPreviewDelay === d}
+                    disabled={!settings.linkPreview}
+                    className={`lang-option${settings.linkPreviewDelay === d ? ' selected' : ''}`}
+                    onClick={() => onSettingsChange({ linkPreviewDelay: d })}
+                  >
+                    {t(`settings.linkPreviewDelay.${d}`)}
+                  </button>
+                ))}
+              </div>
+
               {/* Startup (issue #29). Desktop only: the extension has no tab
                   strip of its own — the browser brings its tabs back itself. */}
               {isElectron && (

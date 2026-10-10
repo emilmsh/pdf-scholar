@@ -19,6 +19,7 @@ import { DEFAULT_SETTINGS } from '../../shared/defaults'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 import { AI_ERRORS, CHATGPT_LOGIN_ERRORS } from '../../shared/engine-errors'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
+import { createAbstractClient } from '../../shared/abstract'
 import { attachmentMime, cleanAttachmentName } from '../../shared/attachments'
 import {
   browserApplyAnnotation,
@@ -64,6 +65,8 @@ function saveWebState(state: WebState): void {
 
 /** One DOI client for the page — the success cache lives as long as it does */
 const webDoiClient = createDoiClient(httpDoiFetch)
+/** …and one for the abstracts behind citations (link preview) */
+const webAbstractClient = createAbstractClient(httpDoiFetch)
 
 export const webApi: PdfxApi = {
   openFileDialog: () =>
@@ -223,6 +226,9 @@ export const webApi: PdfxApi = {
   // The DOI reserve needs no filesystem: doi.org is CORS-open, so the preview
   // runs the same shared client from the page (and so does the extension).
   doiCite: (doi, style) => webDoiClient.cite(doi, style),
+  // Crossref, Europe PMC and OpenAlex answer CORS-open; arXiv does not, so in
+  // the preview an arXiv paper falls through to OpenAlex by its 10.48550 DOI
+  citationAbstract: (entry) => webAbstractClient.lookup(entry),
   setFullscreen: (on) => {
     if (on) document.documentElement.requestFullscreen?.().catch(() => {})
     else if (document.fullscreenElement) document.exitFullscreen().catch(() => {})

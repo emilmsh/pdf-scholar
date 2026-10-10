@@ -8,6 +8,7 @@ import type {
   AiErrorCode,
   AttachmentErrorCode,
   DoiErrorCode,
+  AbstractErrorCode,
   ExtensionErrorCode,
   FileError,
   ZoteroErrorCode
@@ -148,6 +149,8 @@ const nb = {
   'doi.loading': 'Henter fra doi.org …',
   'doierr.doi-offline': 'Fikk ikke svar fra doi.org – sjekk nettforbindelsen og prøv igjen.',
   'doierr.doi-unknown': 'doi.org kjenner ikke denne DOI-en.',
+  'abserr.abstract-offline': 'Fikk ikke svar fra kildene – sjekk nettforbindelsen og prøv igjen.',
+  'abserr.abstract-unidentified': 'Fant ikke ut hvilken artikkel referansen gjelder.',
   // The style picker both reference sections share
   'cite.style': 'Stil',
   'cite.styleFallback': 'stilen mangler i Zotero, viser APA',
@@ -417,6 +420,23 @@ const nb = {
   'settings.selectionMenuCompactTip':
     'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
   'settings.restoreSession': 'Åpne fanene fra forrige gang',
+  'settings.linkPreview': 'Forhåndsvis lenker',
+  'settings.linkPreviewTip':
+    'Hold pekeren over en henvisning, en figur eller en ligning for å se hva lenken peker på – uten å forlate siden. Langt trykk på berøringsskjerm.',
+  'settings.linkPreviewDelay': 'Ventetid før forhåndsvisningen',
+  'settings.linkPreviewDelay.short': 'Kort',
+  'settings.linkPreviewDelay.medium': 'Middels',
+  'settings.linkPreviewDelay.long': 'Lang',
+  'linkPreview.label': 'Forhåndsvisning av side {page}',
+  'linkPreview.tip': 'Klikk for å gå dit · Ctrl+klikk åpner det i den andre kolonnen',
+  'linkPreview.page': 'Side {page}',
+  'linkPreview.abstract': 'Sammendrag',
+  'linkPreview.abstractTip': 'Henter artikkelens sammendrag fra arXiv, Europe PMC, Crossref og OpenAlex',
+  'linkPreview.abstractLoading': 'Henter sammendrag …',
+  'linkPreview.abstractNone': 'Fant artikkelen, men ingen av kildene har sammendraget.',
+  'linkPreview.abstractFrom': 'Fra {source}',
+  'linkPreview.abstractMatched': 'Gjenkjent fra referanseteksten – sjekk at tittelen stemmer',
+  'linkPreview.retry': 'Prøv igjen',
   'settings.restoreSessionTip': 'Ved oppstart får hvert vindu tilbake fanene det hadde. Et dokument leses først når du viser fanen. Festede faner kommer alltid tilbake.',
   'settings.annotAuthor': 'Navn på merknader',
   'settings.annotAuthorPlaceholder': 'F.eks. navnet ditt',
@@ -1208,6 +1228,8 @@ const en: Dict = {
   'doi.loading': 'Fetching from doi.org …',
   'doierr.doi-offline': 'No answer from doi.org — check the connection and try again.',
   'doierr.doi-unknown': 'doi.org does not know this DOI.',
+  'abserr.abstract-offline': 'No answer from the sources — check the connection and try again.',
+  'abserr.abstract-unidentified': 'Could not tell which paper this reference is.',
   'cite.style': 'Style',
   'cite.styleFallback': 'style not installed in Zotero, showing APA',
 
@@ -1457,6 +1479,23 @@ const en: Dict = {
   'settings.selectionMenuCompactTip':
     'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',
   'settings.restoreSession': 'Reopen last session’s tabs',
+  'settings.linkPreview': 'Preview links',
+  'settings.linkPreviewTip':
+    'Rest the pointer on a citation, a figure or an equation reference to see what the link points to — without leaving the page. Long-press on a touchscreen.',
+  'settings.linkPreviewDelay': 'Delay before the preview',
+  'settings.linkPreviewDelay.short': 'Short',
+  'settings.linkPreviewDelay.medium': 'Medium',
+  'settings.linkPreviewDelay.long': 'Long',
+  'linkPreview.label': 'Preview of page {page}',
+  'linkPreview.tip': 'Click to go there · Ctrl+click opens it in the other column',
+  'linkPreview.page': 'Page {page}',
+  'linkPreview.abstract': 'Abstract',
+  'linkPreview.abstractTip': 'Fetches the paper’s abstract from arXiv, Europe PMC, Crossref and OpenAlex',
+  'linkPreview.abstractLoading': 'Fetching the abstract …',
+  'linkPreview.abstractNone': 'Found the paper, but none of the sources has its abstract.',
+  'linkPreview.abstractFrom': 'From {source}',
+  'linkPreview.abstractMatched': 'Recognised from the reference text — check that the title matches',
+  'linkPreview.retry': 'Try again',
   'settings.restoreSessionTip': 'At startup, every window gets back the tabs it had. Each document is read only when you show its tab. Pinned tabs always come back.',
   'settings.annotAuthor': 'Name on annotations',
   'settings.annotAuthorPlaceholder': 'E.g. your name',
@@ -2154,6 +2193,7 @@ export function errorText(e: FileError): string {
   if (isExtensionErrorCode(e.code)) return t(`exterr.${e.code}`)
   if (isZoteroErrorCode(e.code)) return t(`zoterr.${e.code}`)
   if (isDoiErrorCode(e.code)) return t(`doierr.${e.code}`)
+  if (isAbstractErrorCode(e.code)) return t(`abserr.${e.code}`)
   if (isAttachmentErrorCode(e.code)) return t(`atterr.${e.code}`)
   if (isFileIconErrorCode(e.code)) return t(`iconerr.${e.code}`)
   return t(`engine.${e.code}`)
@@ -2187,6 +2227,9 @@ const isZoteroErrorCode = (code: NonNullable<FileError['code']>): code is Zotero
 
 const isDoiErrorCode = (code: NonNullable<FileError['code']>): code is DoiErrorCode =>
   code.startsWith('doi-')
+
+const isAbstractErrorCode = (code: NonNullable<FileError['code']>): code is AbstractErrorCode =>
+  code.startsWith('abstract-')
 
 const isAttachmentErrorCode = (
   code: NonNullable<FileError['code']>

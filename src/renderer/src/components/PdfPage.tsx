@@ -24,6 +24,7 @@ import MarginNotes from './MarginNotes'
 import type { MarginViewConfig } from './MarginNotes'
 import { isXfaDocument, renderXfaLayer } from '../xfa'
 import type { XfaLayerHandle } from '../xfa'
+import { LINK_RECORDS } from '../link-preview'
 
 /** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
  *  only place that gesture is advertised. */
@@ -702,7 +703,14 @@ function PdfPage({
         anchor.style.width = `${(100 * Math.abs(px2 - px1)) / viewport.width}%`
         anchor.style.height = `${(100 * Math.abs(py2 - py1)) / viewport.height}%`
         if (link.url) anchor.title = link.url
-        else anchor.title = linkTitle()
+        else {
+          anchor.title = linkTitle()
+          // What the hover preview (LinkPreview) reads to show the target
+          // without following it — the document rides along, since a split
+          // column can show another file than the tab's
+          anchor.classList.add('internal')
+          LINK_RECORDS.set(anchor, { pdf, dest: link.dest, rotation })
+        }
         anchor.addEventListener('click', (e) => {
           e.preventDefault()
           e.stopPropagation()

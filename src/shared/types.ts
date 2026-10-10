@@ -117,6 +117,13 @@ export interface Settings {
    *  habit rather than a property of the document, so it is a preference for
    *  every document, unlike the spread, which is kept per file. */
   pagedView: boolean
+  /** Hover previews of in-document links (issue #31): resting the pointer on
+   *  a citation, a figure or an equation reference opens a window onto the
+   *  destination without moving the page (long-press on touch). */
+  linkPreview: boolean
+  /** How long the pointer rests before the window opens — three fixed
+   *  choices (renderer's link-preview.ts holds the milliseconds) */
+  linkPreviewDelay: 'short' | 'medium' | 'long'
 }
 
 export type RecentsGridSize = 'small' | 'medium' | 'large'
@@ -296,6 +303,31 @@ export type ZoteroErrorCode = 'zotero-off' | 'zotero-api-disabled' | 'zotero-ite
  *  (`doierr.*`, whole sentences on the hint row); `errorText` routes on `doi-`. */
 export type DoiErrorCode = 'doi-offline' | 'doi-unknown'
 
+/** And for the abstract behind a citation (src/shared/abstract.ts): none of
+ *  the sources answered, or the entry could not be tied to one work with any
+ *  confidence. Whole sentences under `abserr.*`; `errorText` routes on
+ *  `abstract-`. A work found WITHOUT an abstract is not an error — see
+ *  CitationAbstract. */
+export type AbstractErrorCode = 'abstract-offline' | 'abstract-unidentified'
+
+/** What the link preview's «Sammendrag» found for a reference-list entry */
+export interface CitationAbstract {
+  title: string
+  year: string
+  /** Journal, proceedings or «arXiv»; empty when no source named one */
+  venue: string
+  /** Empty = the work was identified, but no source has its abstract */
+  abstract: string
+  doi: string
+  arxiv: string
+  /** Where the abstract came from; empty with an empty abstract */
+  source: 'arxiv' | 'europepmc' | 'crossref' | 'openalex' | ''
+  /** How the work was identified: an identifier printed in the entry, or
+   *  Crossref's matcher (then the UI names the matched title, so a reader can
+   *  see a wrong match for what it is) */
+  via: 'doi' | 'arxiv' | 'match'
+}
+
 /** And for files embedded in a document (src/shared/attachments.ts). Fragments
  *  like the `engine.*` family — they ride inside «Kunne ikke åpne vedlegget: …»
  *  — under the `atterr.*` prefix; `errorText` routes on the `attach-` stem.
@@ -360,6 +392,7 @@ export interface FileError {
     | ExtensionErrorCode
     | ZoteroErrorCode
     | DoiErrorCode
+    | AbstractErrorCode
     | AttachmentErrorCode
     | FileIconErrorCode
     | undefined
@@ -1121,6 +1154,12 @@ export interface PdfxApi {
    *  platform runs the same shared client (doi.org is CORS-open). A FileError
    *  with a doi-* code = nothing answered, or the DOI is unknown there. */
   doiCite(doi: string, style?: CitationStyleId): Promise<DoiInfo | FileError>
+  /** The abstract behind a citation: the reference-list entry's TEXT goes in
+   *  (the renderer read it from the page), the platform identifies the work
+   *  and asks the four keyless sources in src/shared/abstract.ts. Only ever on
+   *  a click in the link preview. The renderer never hands over a URL — every
+   *  request is built here from fixed hosts. */
+  citationAbstract(entry: string): Promise<CitationAbstract | FileError>
   setFullscreen(on: boolean): void
   /** Notifies when the window enters/leaves OS fullscreen */
   onFullScreen(cb: (fullscreen: boolean) => void): () => void

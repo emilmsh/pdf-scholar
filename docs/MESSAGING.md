@@ -169,6 +169,17 @@ carries no picture of its own.)*
   back/forward buttons hold the navigation history *(navigation elevated to two
   bullets on Emil's ask, 2026-08-12: moving around a long document matters to
   him as much as the split view, and it was buried in a subclause)*
+- Rest the pointer on a citation, a figure or an equation reference and a
+  preview of what it points to opens beside it, without moving the page
+  (long-press on a touchscreen). On a citation, one click fetches the cited
+  paper's abstract from free scholarly databases (arXiv, Europe PMC, Crossref,
+  OpenAlex) — no key, no account *(reader ask, [issue #31](https://github.com/emilmsh/pdf-scholar/issues/31),
+  2026-10-10 — Sioyek's and Zotero's reader have the preview; the abstract is
+  the Hover PDF extension's idea, keyless. A click, never automatic: it is a
+  network call, and the app is offline unless you ask. Roughly two in three
+  citations find one — books, working papers and paywalled Elsevier papers
+  often do not, so never promise it for every citation. Supporting, not a
+  headline)*
 - The toolbar can be unpinned; the page then fills the window, and the toolbar
   and panels return on hover at the window edges
 - Reading positions and recent files are remembered. The library shows the
