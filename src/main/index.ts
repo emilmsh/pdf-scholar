@@ -25,6 +25,7 @@ import type {
   ModifyAnnotationRequest,
   DocBookmark,
   ReadingPosition,
+  RecentFile,
   RecentThumb,
   RecentThumbView,
   SetFormFieldRequest,
@@ -68,6 +69,9 @@ import {
   getBookmarks,
   getState,
   mergeSettings,
+  pinRecentEntry,
+  removeRecentEntry,
+  restoreRecentEntry,
   saveState,
   setBookmarks,
   setPosition
@@ -917,6 +921,22 @@ function registerIpc(): void {
     }
     return out
   })
+
+  // Keeping the list tidy (issue #29). A removal takes the picture with it at
+  // once — the grid's own prune runs only while the grid is shown, and an entry
+  // taken out of the LIST view must not leave its page 1 on disk.
+  ipcMain.handle('recents:remove', async (_e, path: unknown): Promise<RecentFile[]> => {
+    if (typeof path !== 'string') return getState().recents
+    const recents = removeRecentEntry(path)
+    await recentThumbs.forget(path).catch(() => {})
+    return recents
+  })
+  ipcMain.handle('recents:restore', (_e, entry: RecentFile, index: unknown): RecentFile[] =>
+    restoreRecentEntry(entry, typeof index === 'number' ? index : 0)
+  )
+  ipcMain.handle('recents:pin', (_e, path: unknown, pinned: unknown): RecentFile[] =>
+    typeof path === 'string' ? pinRecentEntry(path, pinned === true) : getState().recents
+  )
 
   ipcMain.on('recent-thumbs:set', (_e, path: unknown, thumb: RecentThumb) => {
     if (!isRecent(path)) return

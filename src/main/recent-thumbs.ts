@@ -26,6 +26,9 @@ export interface RecentThumbStore {
   set(path: string, thumb: RecentThumb): Promise<void>
   /** Delete every file that does not belong to one of these paths */
   prune(keep: string[]): Promise<void>
+  /** Delete one entry's files, after any write of it still in flight — a
+   *  pending set would otherwise put back the picture just removed */
+  forget(path: string): Promise<void>
 }
 
 interface Meta {
@@ -122,6 +125,12 @@ export function createRecentThumbStore(dir: string): RecentThumbStore {
           if (writing.get(key) === mine) writing.delete(key)
         })
       return mine
+    },
+
+    async forget(path) {
+      const key = keyOf(path)
+      await (writing.get(key) ?? Promise.resolve()).catch(() => {})
+      await Promise.all([unlink(jpg(key)).catch(() => {}), unlink(json(key)).catch(() => {})])
     },
 
     async prune(keep) {

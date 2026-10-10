@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   AiConfigView,
   RecentFile,
+  RecentsGridSize,
   Settings,
   UpdateCheckOutcome,
   UpdateUnsupportedReason
 } from '../../../shared/types'
 import { BREW_UPGRADE_COMMAND } from '../../../shared/update-channel'
 import { readingProgress } from '../../../shared/recent-thumbs'
+import { recentsGridSizeOrDefault, splitRecents, stepRecentsGridSize } from '../../../shared/recents'
 import { bridge, isElectron } from '../bridge'
 import { locale, t, useLang } from '../i18n'
 import {
@@ -19,6 +21,10 @@ import {
   IconHeart,
   IconList,
   IconLock,
+  IconMinus,
+  IconPin,
+  IconPinOff,
+  IconPlus,
   IconSparkle
 } from './icons'
 import { AiSettings } from './AiPanel'
@@ -35,6 +41,12 @@ interface Props {
   /** «Nylig lest» as the compact list or as a grid of first pages (issue #28) */
   recentsView: RecentsView
   onRecentsViewChange(view: RecentsView): void
+  /** How large the grid's first pages are drawn (issue #29) */
+  recentsGridSize: RecentsGridSize
+  onRecentsGridSizeChange(size: RecentsGridSize): void
+  /** The list as the store now holds it, after a pin, a removal or its undo
+   *  here — the library calls the bridge itself and hands the answer up */
+  onRecentsChange(recents: RecentFile[]): void
   /** A document still open behind this screen, and the way back to it.
    *
    *  The extension only. There, this screen IS the library and there is no tab
@@ -86,10 +98,142 @@ export default function Welcome({
   onOpenRecent,
   recentsView,
   onRecentsViewChange,
+  recentsGridSize,
+  onRecentsGridSizeChange,
+  onRecentsChange,
   resume
 }: Props): React.JSX.Element {
   useLang()
   const thumbs = useRecentThumbs(recents, recentsView === 'grid')
+  const gridSize = recentsGridSizeOrDefault(recentsGridSize)
+  const { pinned, recent } = splitRecents(recents)
+
+  // ---------- Keeping the list tidy (issue #29) ----------
+  /** The last entry taken out, while its «Angre» is still on offer. Only the
+   *  last: a second removal replaces the offer rather than stacking them. */
+  const [removed, setRemoved] = useState<{ entry: RecentFile; index: number } | null>(null)
+  const removedTimerRef = useRef<number | null>(null)
+  const clearRemovedTimer = (): void => {
+    if (removedTimerRef.current !== null) window.clearTimeout(removedTimerRef.current)
+    removedTimerRef.current = null
+  }
+  useEffect(() => clearRemovedTimer, [])
+
+  const removeEntry = useCallback(
+    (entry: RecentFile) => {
+      const index = recents.findIndex((r) => r.path === entry.path)
+      void bridge.removeRecent(entry.path).then(onRecentsChange)
+      clearRemovedTimer()
+      setRemoved({ entry, index: Math.max(0, index) })
+      removedTimerRef.current = window.setTimeout(() => setRemoved(null), 6000)
+    },
+    [recents, onRecentsChange]
+  )
+  const undoRemove = (): void => {
+    if (!removed) return
+    clearRemovedTimer()
+    void bridge.restoreRecent(removed.entry, removed.index).then(onRecentsChange)
+    setRemoved(null)
+  }
+  const togglePin = (entry: RecentFile): void => {
+    void bridge.pinRecent(entry.path, entry.pinnedAt === undefined).then(onRecentsChange)
+  }
+
+  /** The entry's own two actions, beside — never inside — its button (a
+   *  button cannot hold buttons). Revealed on hover and focus, always shown
+   *  on touch; Delete on the focused entry does what the cross does. */
+  const entryActions = (r: RecentFile): React.JSX.Element => {
+    const isPinned = r.pinnedAt !== undefined
+    const pinLabel = t(isPinned ? 'welcome.recentsUnpin' : 'welcome.recentsPin')
+    return (
+      <span className="recent-actions">
+        <button
+          className={`recent-action${isPinned ? ' is-on' : ''}`}
+          title={pinLabel}
+          aria-label={pinLabel}
+          aria-pressed={isPinned}
+          onClick={() => togglePin(r)}
+        >
+          {isPinned ? <IconPinOff size={14} /> : <IconPin size={14} />}
+        </button>
+        <button
+          className="recent-action"
+          title={t('welcome.recentsRemove')}
+          aria-label={t('welcome.recentsRemove')}
+          onClick={() => removeEntry(r)}
+        >
+          ✕
+        </button>
+      </span>
+    )
+  }
+  const onEntryKey = (e: React.KeyboardEvent, r: RecentFile): void => {
+    if (e.key !== 'Delete') return
+    e.preventDefault()
+    removeEntry(r)
+  }
+
+  const gridItem = (r: RecentFile): React.JSX.Element => {
+    const thumb = thumbs[r.path]
+    const progress = readingProgress(thumb?.page, thumb?.pages)
+    const at = progress
+      ? t('welcome.recentsProgress', {
+          page: String(progress.page),
+          pages: String(progress.pages)
+        })
+      : null
+    return (
+      <li key={r.path} className="recent-item">
+        <button
+          className="recent-card"
+          onClick={() => onOpenRecent(r.path)}
+          onKeyDown={(e) => onEntryKey(e, r)}
+          title={[recentLocation(r.path), formatDate(r.lastOpened)].join('\n')}
+        >
+          {/* A fixed frame whatever arrives in it, so a picture drawn late
+              never moves the grid. The sheet is white paper recoloured as a
+              whole, picture and margin alike, so a letterboxed page has no
+              visible seam. */}
+          <span className="recent-cover">
+            <span className="recent-sheet">
+              {thumb?.url && <img src={thumb.url} alt="" draggable={false} />}
+            </span>
+            {!thumb?.url && (thumb?.locked ? <IconLock size={22} /> : <IconDocument size={22} />)}
+            {progress && (
+              <span className="recent-progress" style={{ width: `${progress.fraction * 100}%` }} />
+            )}
+          </span>
+          <span className="recent-card-name">{r.name}</span>
+          {at && <span className="recent-card-meta">{at}</span>}
+        </button>
+        {entryActions(r)}
+      </li>
+    )
+  }
+
+  const listItem = (r: RecentFile): React.JSX.Element => (
+    <li key={r.path} className="recent-item">
+      <button
+        className="recent-row"
+        onClick={() => onOpenRecent(r.path)}
+        onKeyDown={(e) => onEntryKey(e, r)}
+        title={r.path.startsWith('fsa:') ? undefined : r.path}
+      >
+        <IconDocument />
+        <span className="recent-name">{r.name}</span>
+        <span className="recent-path">{recentLocation(r.path)}</span>
+        <span className="recent-date">{formatDate(r.lastOpened)}</span>
+      </button>
+      {entryActions(r)}
+    </li>
+  )
+
+  const group = (items: RecentFile[]): React.JSX.Element =>
+    recentsView === 'grid' ? (
+      <ul className={`recents-grid size-${gridSize}`}>{items.map(gridItem)}</ul>
+    ) : (
+      <ul className="recents-list">{items.map(listItem)}</ul>
+    )
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showAiSetup, setShowAiSetup] = useState(false)
   const [updateChecking, setUpdateChecking] = useState(false)
@@ -202,90 +346,70 @@ export default function Welcome({
         )}
 
         {recents.length > 0 && (
-          <div className="recents">
+          <div className={`recents${recentsView === 'grid' ? ' is-grid' : ''}`}>
             <div className="recents-head">
               <h2>{t('welcome.recents')}</h2>
-              <div className="recents-view" role="group" aria-label={t('welcome.recentsView')}>
-                <button
-                  className={recentsView === 'list' ? 'is-active' : ''}
-                  aria-pressed={recentsView === 'list'}
-                  title={t('welcome.recentsList')}
-                  aria-label={t('welcome.recentsList')}
-                  onClick={() => onRecentsViewChange('list')}
-                >
-                  <IconList size={16} />
-                </button>
-                <button
-                  className={recentsView === 'grid' ? 'is-active' : ''}
-                  aria-pressed={recentsView === 'grid'}
-                  title={t('welcome.recentsGrid')}
-                  aria-label={t('welcome.recentsGrid')}
-                  onClick={() => onRecentsViewChange('grid')}
-                >
-                  <IconGrid size={16} />
-                </button>
+              <div className="recents-tools">
+                {/* Three fixed sizes — presets, not a slider — and only while
+                    there are first pages to size */}
+                {recentsView === 'grid' && (
+                  <div className="recents-view recents-size" role="group" aria-label={t('welcome.recentsSize')}>
+                    <button
+                      title={t('welcome.recentsSmaller')}
+                      aria-label={t('welcome.recentsSmaller')}
+                      disabled={gridSize === 'small'}
+                      onClick={() => onRecentsGridSizeChange(stepRecentsGridSize(gridSize, -1))}
+                    >
+                      <IconMinus size={15} />
+                    </button>
+                    <button
+                      title={t('welcome.recentsLarger')}
+                      aria-label={t('welcome.recentsLarger')}
+                      disabled={gridSize === 'large'}
+                      onClick={() => onRecentsGridSizeChange(stepRecentsGridSize(gridSize, 1))}
+                    >
+                      <IconPlus size={15} />
+                    </button>
+                  </div>
+                )}
+                <div className="recents-view" role="group" aria-label={t('welcome.recentsView')}>
+                  <button
+                    className={recentsView === 'list' ? 'is-active' : ''}
+                    aria-pressed={recentsView === 'list'}
+                    title={t('welcome.recentsList')}
+                    aria-label={t('welcome.recentsList')}
+                    onClick={() => onRecentsViewChange('list')}
+                  >
+                    <IconList size={16} />
+                  </button>
+                  <button
+                    className={recentsView === 'grid' ? 'is-active' : ''}
+                    aria-pressed={recentsView === 'grid'}
+                    title={t('welcome.recentsGrid')}
+                    aria-label={t('welcome.recentsGrid')}
+                    onClick={() => onRecentsViewChange('grid')}
+                  >
+                    <IconGrid size={16} />
+                  </button>
+                </div>
               </div>
             </div>
-            {recentsView === 'grid' ? (
-              <ul className="recents-grid">
-                {recents.map((r) => {
-                  const thumb = thumbs[r.path]
-                  const progress = readingProgress(thumb?.page, thumb?.pages)
-                  const at = progress
-                    ? t('welcome.recentsProgress', {
-                        page: String(progress.page),
-                        pages: String(progress.pages)
-                      })
-                    : null
-                  return (
-                    <li key={r.path}>
-                      <button
-                        className="recent-card"
-                        onClick={() => onOpenRecent(r.path)}
-                        title={[recentLocation(r.path), formatDate(r.lastOpened)].join('\n')}
-                      >
-                        {/* A fixed frame whatever arrives in it, so a picture
-                            drawn late never moves the grid. The sheet is white
-                            paper recoloured as a whole, picture and margin
-                            alike, so a letterboxed page has no visible seam. */}
-                        <span className="recent-cover">
-                          <span className="recent-sheet">
-                            {thumb?.url && <img src={thumb.url} alt="" draggable={false} />}
-                          </span>
-                          {!thumb?.url &&
-                            (thumb?.locked ? <IconLock size={22} /> : <IconDocument size={22} />)}
-                          {progress && (
-                            <span
-                              className="recent-progress"
-                              style={{ width: `${progress.fraction * 100}%` }}
-                            />
-                          )}
-                        </span>
-                        <span className="recent-card-name">{r.name}</span>
-                        {at && <span className="recent-card-meta">{at}</span>}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            ) : (
-              <ul>
-                {recents.map((r) => (
-                  <li key={r.path}>
-                    <button
-                      className="recent-row"
-                      onClick={() => onOpenRecent(r.path)}
-                      title={r.path.startsWith('fsa:') ? undefined : r.path}
-                    >
-                      <IconDocument />
-                      <span className="recent-name">{r.name}</span>
-                      <span className="recent-path">{recentLocation(r.path)}</span>
-                      <span className="recent-date">{formatDate(r.lastOpened)}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* One box, one scroll: «Festet» on top under its own label,
+                then the rest below a hairline. With nothing pinned there is
+                no label, and the box is the list it always was. */}
+            <div className="recents-box">
+              {pinned.length > 0 && (
+                <section className="recents-group">
+                  <h3>{t('welcome.recentsPinned')}</h3>
+                  {group(pinned)}
+                </section>
+              )}
+              {recent.length > 0 && (
+                <section className={`recents-group${pinned.length > 0 ? ' after-pinned' : ''}`}>
+                  {group(recent)}
+                </section>
+              )}
+            </div>
           </div>
         )}
 
@@ -321,6 +445,15 @@ export default function Welcome({
           </button>
         </p>
       </div>
+
+      {removed && (
+        <div className="toast app-toast recents-undo" role="status">
+          <span>{t('welcome.recentsRemoved', { name: removed.entry.name })}</span>
+          <button className="toast-action" onClick={undoRemove}>
+            {t('welcome.recentsUndo')}
+          </button>
+        </div>
+      )}
 
       {showAiSetup && config && (
         <div className="welcome-ai-backdrop" onMouseDown={() => setShowAiSetup(false)}>

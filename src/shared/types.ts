@@ -101,12 +101,35 @@ export interface Settings {
    *  'grid' is chosen, so a reader who keeps the list pays nothing for them and
    *  has no page content stored outside the files themselves. */
   recentsView: 'list' | 'grid'
+  /** How large the grid's first pages are drawn (issue #29): three fixed
+   *  sizes rather than a slider. An unknown stored value reads as 'medium'
+   *  (`recentsGridSizeOrDefault` in shared/recents.ts). */
+  recentsGridSize: RecentsGridSize
+  /** Desktop: reopen the tabs each window had when the app last quit (issue
+   *  #29). A restored tab reads its file only when it is first shown, so a
+   *  long session costs nothing at startup. Pinned tabs come back either way.
+   *  The extension has no tab strip of its own — the browser restores its
+   *  tabs — so it never reads this. */
+  restoreSession: boolean
+  /** «Bla side for side»: one page — or one spread — at a time, each in a
+   *  viewport-tall slot of its own, turned rather than scrolled (issue #29;
+   *  Acrobat's Single Page / Two-Page view without scrolling). A reading
+   *  habit rather than a property of the document, so it is a preference for
+   *  every document, unlike the spread, which is kept per file. */
+  pagedView: boolean
 }
+
+export type RecentsGridSize = 'small' | 'medium' | 'large'
 
 export interface RecentFile {
   path: string
   name: string
   lastOpened: number
+  /** When the reader pinned the entry into the library's «Festet» group
+   *  (issue #29) — absent for an ordinary entry. Pinned entries never fall
+   *  off the RECENTS_MAX cap, and the group lists them in pinning order, so a
+   *  shelf of favourites stays where it was put. */
+  pinnedAt?: number
 }
 
 /** What one recents entry shows in the library's grid view (issue #28). Taken
@@ -881,6 +904,18 @@ export interface PdfxApi {
    *  in the recents, gone, larger than RECENT_THUMB_READ_MAX_BYTES, or a
    *  platform that would have to download it again (a URL in the extension). */
   readRecentForThumb(path: string): Promise<Uint8Array | null>
+  // ---------- Keeping «Nylig lest» tidy (issue #29, shared/recents.ts) ----------
+  // Each returns the list as it now stands, so the library redraws from the
+  // store's answer rather than a guess of its own.
+  /** Take one entry out of the recents, and its grid picture with it. The OS's
+   *  own recent-documents list (Jump List, Dock) has no single-entry removal,
+   *  so it is left alone. */
+  removeRecent(path: string): Promise<RecentFile[]>
+  /** Undo of removeRecent: the entry back at its index with its own date and
+   *  pin. The picture is not — the grid draws it again where it can. */
+  restoreRecent(entry: RecentFile, index: number): Promise<RecentFile[]>
+  /** Pin the entry into the «Festet» group, or let it go back among the rest */
+  pinRecent(path: string, pinned: boolean): Promise<RecentFile[]>
   getSettings(): Promise<Settings>
   getPosition(path: string): Promise<ReadingPosition | null>
   getPendingPath(): Promise<string | null>

@@ -404,7 +404,7 @@ button {
 .welcome {
   flex: 1;
   min-height: 0;
-  /* The library page itself never scrolls — `.recents ul` absorbs any overflow.
+  /* The library page itself never scrolls — `.recents-box` absorbs any overflow.
      Keeps the whole start screen on one view. */
   overflow: hidden;
   display: flex;
@@ -761,6 +761,38 @@ button {
   min-height: 0;
 }
 
+/* The first pages get the room a list does not need (issue #29: with pins and
+   three sizes, the column's 640 px read as a keyhole). The box steps out of
+   the column on both sides — the centred column lets it overflow evenly — while
+   the lockup and buttons above keep their width. A list stays at the column:
+   wider rows only push the date away from the name. */
+.recents.is-grid {
+  width: min(1040px, 94vw);
+}
+
+/* …and the height: in the grid the PAGE scrolls instead of a box inside it.
+   A box squeezed under the lockup was a keyhole onto twenty first pages (and
+   more with pins); now the box is as tall as its pages, the lockup scrolls away
+   above it and the footer follows below. The list keeps the one-view page it
+   was designed for. */
+.welcome:has(.recents.is-grid) {
+  overflow-y: auto;
+}
+
+.welcome:has(.recents.is-grid) .welcome-inner {
+  height: auto;
+  min-height: 100%;
+}
+
+.welcome-inner > .recents.is-grid {
+  flex: none;
+}
+
+.recents.is-grid .recents-box {
+  flex: none;
+  overflow: visible;
+}
+
 .recents-head {
   display: flex;
   align-items: center;
@@ -776,6 +808,24 @@ button {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-secondary);
+}
+
+/* The head's controls, right-aligned together: the first-page size (grid
+   only) and, after a hairline, the list / first-pages switch */
+.recents-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.recents-size {
+  padding-right: 8px;
+  border-right: 1px solid var(--border);
+}
+
+.recents-view button:disabled {
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 /* List / first-pages switch — two quiet icon buttons, the chosen one sunk */
@@ -804,22 +854,105 @@ button {
   color: var(--text);
 }
 
-.recents ul {
-  list-style: none;
+.recents-box {
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 12px;
   /* Flex-sized within .recents: grows to fit its rows on a tall screen and,
      when the list outgrows the space, scrolls inside the box rather than
-     scrolling the whole library page. */
+     scrolling the whole library page. One box for both groups, so «Festet»
+     and the rest scroll as one list. */
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
 
-.recents li + li {
+.recents-box ul {
+  list-style: none;
+}
+
+.recents-list li + li {
   border-top: 1px solid var(--border);
+}
+
+/* «Festet» (issue #29): the same small caps as the heading above the box,
+   inside it — a label for the group, not a second heading */
+.recents-group h3 {
+  padding: 10px 14px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.recents-group.after-pinned {
+  border-top: 1px solid var(--border);
+}
+
+/* An entry's own actions — pin and remove — sit beside its button, never in
+   it, and show on hover or focus the way a tab's close cross does */
+.recent-item {
+  position: relative;
+}
+
+.recent-actions {
+  position: absolute;
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.recent-item:hover .recent-actions,
+.recent-item:focus-within .recent-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.recent-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+.recent-action:hover {
+  background: var(--active);
+  color: var(--text);
+}
+
+.recent-action.is-on {
+  color: var(--wc-teal);
+}
+
+/* List: the actions take the date's place while they show */
+.recents-list .recent-actions {
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+}
+
+.recents-list .recent-item:hover .recent-date,
+.recents-list .recent-item:focus-within .recent-date {
+  visibility: hidden;
+}
+
+/* Grid: in the cover's top corner, over the paper */
+.recents-grid .recent-actions {
+  top: 12px;
+  right: 12px;
+}
+
+.recents-grid .recent-action {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
 /* Manual update check — quiet footer line on the start screen */
@@ -959,18 +1092,27 @@ button {
    Same box as the list, so switching changes what is inside it and nothing
    else. Every cover sits in a fixed sheet-shaped frame: a picture drawn late
    lands in place instead of pushing the grid, and a landscape slide or an A4
-   page letterboxes onto the same paper, where the bars read as margin. Five
-   across in the library's column. */
-.recents ul.recents-grid {
+   page letterboxes onto the same paper, where the bars read as margin. Three
+   fixed sizes (issue #29): eleven, eight or five across at the grid's full
+   width — fewer in a narrow window, where auto-fill simply drops columns. */
+.recents-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--recent-card-min, 116px), 1fr));
   align-content: start;
   gap: 10px 8px;
   padding: 12px;
 }
 
-.recents-grid li + li {
-  border-top: none;
+.recents-grid.size-small {
+  --recent-card-min: 86px;
+}
+
+.recents-grid.size-large {
+  --recent-card-min: 180px;
+}
+
+.recents-group h3 + .recents-grid {
+  padding-top: 6px;
 }
 
 .recent-card {
@@ -3940,6 +4082,26 @@ html.pen-near .draw-layer {
   position: fixed;
 }
 
+/* A toast that offers one thing back — «Angre» after a removal from the
+   library: a quiet text button in the accent, never a filled one */
+.toast:has(.toast-action) {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-right: 8px;
+}
+
+.toast-action {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.toast-action:hover {
+  background: var(--hover);
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -4054,12 +4216,12 @@ html.pen-near .draw-layer {
 /* Scrollbars */
 
 .welcome::-webkit-scrollbar,
-.recents ul::-webkit-scrollbar {
+.recents-box::-webkit-scrollbar {
   width: 12px;
 }
 
 .welcome::-webkit-scrollbar-thumb,
-.recents ul::-webkit-scrollbar-thumb {
+.recents-box::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--text-secondary) 42%, transparent);
   border-radius: 999px;
   border: 3px solid transparent;
@@ -4067,7 +4229,7 @@ html.pen-near .draw-layer {
 }
 
 .welcome::-webkit-scrollbar-thumb:hover,
-.recents ul::-webkit-scrollbar-thumb:hover {
+.recents-box::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   background-clip: content-box;
   border: 3px solid transparent;
@@ -7676,6 +7838,27 @@ html.touch-ui .tab-close,
 html.touch-ui .annot-delete,
 html.touch-ui .ai-history-delete {
   opacity: 0.6;
+}
+
+/* The library's pin and remove: always there, finger-sized, and in the list
+   with room of their own instead of the date's */
+html.touch-ui .recent-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+html.touch-ui .recent-action {
+  width: 32px;
+  height: 32px;
+}
+
+html.touch-ui .recents-list .recent-row {
+  padding-right: 86px;
+}
+
+html.touch-ui .recents-list .recent-item:hover .recent-date,
+html.touch-ui .recents-list .recent-item:focus-within .recent-date {
+  visibility: visible;
 }
 
 /* The compact assistant chips need finger-sized targets on touch */

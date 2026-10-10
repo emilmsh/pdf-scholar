@@ -54,7 +54,15 @@ import {
   saveFileHandle
 } from './extension-fs-grants'
 import { t } from './i18n'
-import { DEFAULT_SETTINGS, RECENTS_MAX } from '../../shared/defaults'
+import { DEFAULT_SETTINGS } from '../../shared/defaults'
+import {
+  normalizeRecents,
+  pinRecent,
+  recordRecent as recordRecentRule,
+  removeRecent,
+  restoreRecent,
+  trimRecents
+} from '../../shared/recents'
 
 /** True when running inside a WebExtension page (has a runtime id). */
 export function isExtensionContext(): boolean {
@@ -111,14 +119,21 @@ function viewerUrl(path: string): string {
   return buildViewerUrl(chrome?.runtime?.getURL('viewer.html') ?? 'viewer.html', path)
 }
 
+/** The stored recents, shape-checked (shared/recents.ts) */
+async function loadRecents(): Promise<RecentFile[]> {
+  return normalizeRecents(await store.get<unknown>(K_RECENTS, []))
+}
+
+/** Read-modify-write of the recents through one of the shared rules; returns
+ *  the list as stored, for the library to redraw from */
+async function updateRecents(change: (list: RecentFile[]) => RecentFile[]): Promise<RecentFile[]> {
+  const next = change(await loadRecents())
+  store.set(K_RECENTS, next)
+  return next
+}
+
 function recordRecent(payload: { path: string; name: string }): void {
-  void store.get<RecentFile[]>(K_RECENTS, []).then((list) => {
-    const next = [
-      { path: payload.path, name: payload.name, lastOpened: Date.now() },
-      ...list.filter((r) => r.path !== payload.path)
-    ].slice(0, RECENTS_MAX)
-    store.set(K_RECENTS, next)
-  })
+  void updateRecents((list) => recordRecentRule(list, payload.path, payload.name, Date.now()))
 }
 
 export function createExtensionApi(base: PdfxApi): PdfxApi {
@@ -298,9 +313,21 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // applies on read too: a list stored when the extension kept 30 shows the
     // same 20 the desktop does until the next open trims it.
     getRecents: async () =>
-      (await store.get<RecentFile[]>(K_RECENTS, []))
-        .slice(0, RECENTS_MAX)
-        .map((r) => (r.name.startsWith(FSA) ? { ...r, name: fileNameOf(r.name) } : r)),
+      trimRecents(await loadRecents()).map((r) =>
+        r.name.startsWith(FSA) ? { ...r, name: fileNameOf(r.name) } : r
+      ),
+    // Same contract as desktop's main (issue #29): a removal takes the picture
+    // with it at once, whichever view the library is in.
+    removeRecent: async (path) => {
+      const next = await updateRecents((list) => removeRecent(list, path))
+      void forgetRecentThumbs([path])
+      return next
+    },
+    restoreRecent: async (entry, index) => {
+      const [clean] = normalizeRecents([entry])
+      return clean ? updateRecents((list) => restoreRecent(list, clean, index)) : loadRecents()
+    },
+    pinRecent: (path, pinned) => updateRecents((list) => pinRecent(list, path, pinned, Date.now())),
 
     // The library's grid pictures (issue #28) — IndexedDB, see
     // extension-recent-thumbs.ts. Same contract as desktop's main process:

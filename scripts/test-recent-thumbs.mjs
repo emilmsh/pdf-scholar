@@ -7,6 +7,12 @@
 // main something other than a small JPEG to write; pictures outliving the
 // recents list they belong to; a progress line reading 140 % after a document
 // lost pages; and the extension re-downloading a URL to draw a cover.
+//
+// Also the LIST rules both stores share (src/shared/recents.ts, issue #29):
+// a pinned entry outlives the cap and keeps its pin when reopened, a removal
+// takes the picture with it (store.forget, after any write in flight), and
+// the undo puts an entry back where it was with its own date — not on top as
+// if just opened.
 // Run: node scripts/test-recent-thumbs.mjs
 import { build } from 'esbuild'
 import { existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
@@ -16,6 +22,8 @@ import { pathToFileURL, fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 
 const SHARED = fileURLToPath(new URL('../src/shared/recent-thumbs.ts', import.meta.url))
+const LIST = fileURLToPath(new URL('../src/shared/recents.ts', import.meta.url))
+const DEFAULTS = fileURLToPath(new URL('../src/shared/defaults.ts', import.meta.url))
 const STORE = fileURLToPath(new URL('../src/main/recent-thumbs.ts', import.meta.url))
 const buildDir = mkdtempSync(join(tmpdir(), 'recent-thumbs-build-'))
 const bundle = async (entry, name) => {
@@ -33,6 +41,8 @@ const bundle = async (entry, name) => {
 }
 const rules = await bundle(SHARED, 'rules.mjs')
 const { createRecentThumbStore } = await bundle(STORE, 'store.mjs')
+const list = await bundle(LIST, 'recents.mjs')
+const { RECENTS_MAX } = await bundle(DEFAULTS, 'defaults.mjs')
 
 let failures = 0
 const check = (label, cond, detail = '') => {
@@ -50,8 +60,8 @@ const same = (a, b) => a.byteLength === b.byteLength && a.every((v, i) => v === 
 
 // ---------- 1. Render scale ----------
 console.log('\n1. render scale')
-check('portrait Letter: long side lands on 360', Math.round(792 * rules.thumbScale(612, 792)) === 360)
-check('landscape: the WIDTH is the long side', Math.round(792 * rules.thumbScale(792, 612)) === 360)
+check('portrait Letter: long side lands on 480', Math.round(792 * rules.thumbScale(612, 792)) === 480)
+check('landscape: the WIDTH is the long side', Math.round(792 * rules.thumbScale(792, 612)) === 480)
 check('a page with no size draws at 1, not infinity', rules.thumbScale(0, 0) === 1)
 check('NaN dimensions draw at 1', rules.thumbScale(NaN, NaN) === 1)
 
@@ -175,6 +185,96 @@ check(
 check('the entry that left the recents is unreadable now', !((await store.get([A]))[A]))
 await store.prune([])
 check('an empty recents list empties the folder', readdirSync(folder).length === 0)
+
+// forget(): one entry's files go, the others stay — and a write still in
+// flight when the reader removes the entry does not bring the picture back
+await store.set(A, { image: jpeg(), pages: 3, taken: 10 })
+await store.set(B, { image: jpeg(), pages: 4, taken: 11 })
+const late = store.set(A, { image: jpeg(128), pages: 3, taken: 12 })
+await store.forget(A)
+await late
+check('forget removes the entry, even with a write of it in flight', !((await store.get([A]))[A]))
+check('forget leaves the other entries alone', !!(await store.get([B]))[B])
+check(
+  'forget leaves no file of the entry behind',
+  !readdirSync(folder).some((f) => f.startsWith(keyOf(A))),
+  readdirSync(folder).join(', ')
+)
+
+console.log('\n7. the recents list (shared/recents.ts)')
+{
+  const entry = (i, extra = {}) => ({ path: `C:\\docs\\${i}.pdf`, name: `${i}.pdf`, lastOpened: 1000 + i, ...extra })
+  const paths = (l) => l.map((r) => r.path.replace(/^.*\\/, '').replace('.pdf', '')).join(',')
+
+  // normalize: junk dropped, duplicates keep the first, pin survives
+  const norm = list.normalizeRecents([
+    entry(1),
+    { path: 'x.pdf', name: 'x.pdf' }, // no date
+    null,
+    'nonsense',
+    entry(2, { pinnedAt: 5 }),
+    entry(1, { lastOpened: 1 }),
+    { path: 7, name: 'n', lastOpened: 1 },
+    entry(3, { pinnedAt: 'yes' })
+  ])
+  check('normalize keeps the valid entries in order', paths(norm) === '1,2,3', paths(norm))
+  check('normalize keeps a numeric pin', norm[1].pinnedAt === 5)
+  check('normalize drops a pin that is not a number', !('pinnedAt' in norm[2]))
+  check('normalize: anything but an array is an empty list', list.normalizeRecents({}).length === 0)
+
+  // record: to the top, cap applies to the unpinned only
+  let l = []
+  for (let i = 1; i <= RECENTS_MAX + 5; i++) l = list.recordRecent(l, entry(i).path, entry(i).name, 1000 + i)
+  check(`the cap holds at ${RECENTS_MAX}`, l.length === RECENTS_MAX, String(l.length))
+  check('newest first', l[0].name === `${RECENTS_MAX + 5}.pdf`)
+  const oldest = l[l.length - 1]
+  l = list.pinRecent(l, oldest.path, true, 9000)
+  for (let i = 100; i < 100 + RECENTS_MAX; i++) l = list.recordRecent(l, entry(i).path, entry(i).name, 2000 + i)
+  check(
+    'a pinned entry survives a whole cap of newer files',
+    l.some((r) => r.path === oldest.path && r.pinnedAt === 9000)
+  )
+  check('…and the cap still counts twenty unpinned besides it', l.filter((r) => r.pinnedAt === undefined).length === RECENTS_MAX)
+  l = list.recordRecent(l, oldest.path, oldest.name, 5000)
+  check('reopening a pinned entry keeps its pin', l[0].path === oldest.path && l[0].pinnedAt === 9000 && l[0].lastOpened === 5000)
+
+  // pin / unpin
+  let p = [entry(1), entry(2), entry(3)]
+  p = list.pinRecent(p, entry(3).path, true, 50)
+  p = list.pinRecent(p, entry(1).path, true, 60)
+  check('pinning twice keeps the first pin time', list.pinRecent(p, entry(3).path, true, 99)[2].pinnedAt === 50)
+  const split = list.splitRecents(p)
+  check('«Festet» lists in pinning order, not by date', paths(split.pinned) === '3,1', paths(split.pinned))
+  check('the rest keep the list order', paths(split.recent) === '2', paths(split.recent))
+  p = list.pinRecent(p, entry(3).path, false, 70)
+  check('unpinning drops the pin', !('pinnedAt' in p[2]))
+  // An unpinned old favourite is not trimmed the moment it is let go
+  let full = []
+  for (let i = 1; i <= RECENTS_MAX; i++) full.push(entry(i))
+  full.push(entry(99, { pinnedAt: 1 }))
+  full = list.pinRecent(full, entry(99).path, false, 2)
+  check('unpinning never trims on the spot', full.length === RECENTS_MAX + 1)
+
+  // remove + undo
+  const before = [entry(1), entry(2, { pinnedAt: 3 }), entry(3)]
+  const gone = list.removeRecent(before, entry(2).path)
+  check('remove takes exactly that entry', paths(gone) === '1,3')
+  const back = list.restoreRecent(gone, before[1], 1)
+  check('undo puts it back at its index', paths(back) === '1,2,3', paths(back))
+  check('undo keeps its own date and pin', back[1].lastOpened === before[1].lastOpened && back[1].pinnedAt === 3)
+  const opened = list.recordRecent(gone, entry(7).path, entry(7).name, 9999)
+  const back2 = list.restoreRecent(opened, before[1], 1)
+  check('a file opened in between stays ahead of the restored one', paths(back2) === '7,2,1,3', paths(back2))
+  check('undo of an entry already back is not a duplicate', list.restoreRecent(back, before[1], 0).length === 3)
+  check('an index past the end lands at the end', paths(list.restoreRecent(gone, before[1], 99)) === '1,3,2')
+
+  // grid sizes
+  check('grid size: garbage reads as medium', list.recentsGridSizeOrDefault('huge') === 'medium')
+  check('grid size steps and stops at the ends',
+    list.stepRecentsGridSize('medium', 1) === 'large' &&
+    list.stepRecentsGridSize('large', 1) === 'large' &&
+    list.stepRecentsGridSize('small', -1) === 'small')
+}
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

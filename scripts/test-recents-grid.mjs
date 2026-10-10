@@ -13,6 +13,16 @@
 //
 // The pictures must also be PICTURES: each one is drawn onto a canvas and has
 // to carry ink, since a white JPEG would pass every other check here.
+//
+// Keeping the library tidy (issue #29): a pinned entry moves into «Festet»,
+// a removed one leaves the grid AND the disk, «Angre» puts it back where it
+// was with its own date, Delete on a focused card does the same as the cross,
+// the cross is reachable by a real pointer once the card is hovered (a button
+// drawn but covered would pass a dispatched click), and the size buttons
+// change the grid and are remembered.
+//
+// SHOT_DIR=<folder> also saves a screenshot of the grid with a pinned group,
+// for looking at rather than asserting.
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
@@ -163,7 +173,7 @@ async function run() {
     for (const name of ['opened.pdf', 'older.pdf']) {
       const c = byName[name]
       check(`${name}: the picture has ink (not a blank sheet)`, c.ink > 200, `ink=${c.ink}`)
-      check(`${name}: drawn at the stored size`, Math.max(c.width, c.height) === 360, `${c.width}×${c.height}`)
+      check(`${name}: drawn at the stored size`, Math.max(c.width, c.height) === 480, `${c.width}×${c.height}`)
     }
     check('the reading position shows as «s. 2 av N»', /^s\. 2 av \d+$/.test(byName['older.pdf']?.meta ?? ''), byName['older.pdf']?.meta)
     check('…and as a line along the foot of the page', /%$/.test(byName['older.pdf']?.progress ?? ''), byName['older.pdf']?.progress)
@@ -230,8 +240,127 @@ async function run() {
     await sleep(6000)
     check('opening a document while the list is chosen takes no picture', meta(profile, OLDER).taken === takenBefore)
 
-    // ---------- 5. Housekeeping ----------
-    console.log('\n5. housekeeping')
+    // ---------- 5. Keeping the library tidy (issue #29) ----------
+    console.log('\n5. pin, remove, undo, size')
+    await click(send, `button[title="Tilbake til biblioteket"]`)
+    await waitFor(() => readGrid(send), (g) => g.list, 'the library again')
+    await click(send, `.recents-view button[aria-label="Vis forsidene"]`)
+    await waitFor(() => readGrid(send), (g) => g.grid && g.cards.length === 5, 'the grid again')
+
+    const cardSel = (name) =>
+      `[...document.querySelectorAll('.recent-item')].find((li) =>
+         li.querySelector('.recent-card-name, .recent-name')?.textContent === ${JSON.stringify(name)})`
+    const groups = () =>
+      evaluate(
+        send,
+        `return [...document.querySelectorAll('.recents-group')].map((g) => ({
+           label: g.querySelector('h3')?.textContent ?? null,
+           names: [...g.querySelectorAll('.recent-card-name, .recent-name')].map((n) => n.textContent)
+         }))`
+      )
+
+    // Pin
+    await evaluate(send, `${cardSel('gone.pdf')}.querySelector('.recent-action[aria-label="Fest øverst"]').click()`)
+    const pinnedGroups = await waitFor(groups, (g) => g.length === 2, 'the «Festet» group')
+    check('a pinned entry gets a «Festet» group of its own', pinnedGroups[0].label === 'Festet' && pinnedGroups[0].names.join() === 'gone.pdf', JSON.stringify(pinnedGroups))
+    check('…and leaves the rest', !pinnedGroups[1].names.includes('gone.pdf'))
+    const storedPin = (await evaluate(send, 'return window.api.getRecents()')).find((r) => r.path === GONE)
+    check('the pin is stored', typeof storedPin?.pinnedAt === 'number')
+
+    if (process.env.SHOT_DIR) {
+      const shot = await send('Page.captureScreenshot', { format: 'png' })
+      writeFileSync(join(process.env.SHOT_DIR, 'recents-grid-pinned.png'), Buffer.from(shot.data, 'base64'))
+    }
+
+    // A real pointer reaches the cross once the card is hovered
+    const box = await evaluate(
+      send,
+      `const li = ${cardSel('older.pdf')};
+       li.scrollIntoView({ block: 'center' });
+       await new Promise((done) => setTimeout(done, 100));
+       const r = li.getBoundingClientRect();
+       return { x: r.left + r.width / 2, y: r.top + r.height / 2 };`
+    )
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: box.x, y: box.y })
+    const reach = await waitFor(
+      () =>
+        evaluate(
+          send,
+          `const btn = ${cardSel('older.pdf')}.querySelector('.recent-action[aria-label="Fjern fra Nylig lest"]');
+           const r = btn.getBoundingClientRect();
+           return { hit: document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === btn,
+                    shown: getComputedStyle(btn.parentElement).opacity };`
+        ),
+      (v) => v.shown === '1' && v.hit,
+      'the hovered card to show its cross',
+      3000
+    ).catch((err) => ({ hit: false, shown: String(err.message).slice(-60) }))
+    check('hovering a card shows its cross', reach.shown === '1', `opacity ${reach.shown}`)
+    check('…and a pointer at the cross reaches it', reach.hit)
+
+    // Remove → gone from the grid and the disk; Angre → back where it was
+    const listBefore = await evaluate(send, 'return window.api.getRecents()')
+    const indexBefore = listBefore.findIndex((r) => r.path === OLDER)
+    await evaluate(send, `${cardSel('older.pdf')}.querySelector('.recent-action[aria-label="Fjern fra Nylig lest"]').click()`)
+    const afterRemove = await waitFor(() => readGrid(send), (g) => !g.cards.some((c) => c.name === 'older.pdf'), 'the card to go')
+    check('a removed entry leaves the grid', afterRemove.cards.length === 4)
+    await waitFor(() => Promise.resolve(meta(profile, OLDER) === null && !hasPicture(profile, OLDER)), (v) => v, 'its picture to go')
+    check('…and its picture leaves the disk', meta(profile, OLDER) === null && !hasPicture(profile, OLDER))
+    check('…and the store no longer lists it', !(await evaluate(send, 'return window.api.getRecents()')).some((r) => r.path === OLDER))
+    const toast = await evaluate(send, `return document.querySelector('.recents-undo')?.textContent ?? null`)
+    check('a toast offers «Angre»', /older\.pdf/.test(toast ?? '') && /Angre/.test(toast ?? ''), toast)
+    await click(send, '.recents-undo .toast-action')
+    await waitFor(() => readGrid(send), (g) => g.cards.some((c) => c.name === 'older.pdf'), 'the card to come back')
+    const listAfter = await evaluate(send, 'return window.api.getRecents()')
+    const restored = listAfter.find((r) => r.path === OLDER)
+    check('«Angre» puts it back at its place', listAfter.findIndex((r) => r.path === OLDER) === indexBefore)
+    check('…with its own date, not as just opened', restored?.lastOpened === listBefore[indexBefore].lastOpened)
+    check('the toast goes with the undo', !(await evaluate(send, `return !!document.querySelector('.recents-undo')`)))
+
+    // Delete on a focused card
+    await evaluate(
+      send,
+      `const card = ${cardSel('opened.pdf')}.querySelector('.recent-card');
+       card.focus();
+       card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));`
+    )
+    await waitFor(() => readGrid(send), (g) => !g.cards.some((c) => c.name === 'opened.pdf'), 'Delete to remove')
+    check('Delete on a focused card removes it', true)
+    await click(send, '.recents-undo .toast-action')
+    await waitFor(() => readGrid(send), (g) => g.cards.some((c) => c.name === 'opened.pdf'), 'its undo')
+
+    // Size
+    const columnsNow = () =>
+      evaluate(
+        send,
+        `return getComputedStyle(document.querySelector('.recents-group.after-pinned .recents-grid')).gridTemplateColumns.split(' ').length`
+      )
+    const mediumColumns = await columnsNow()
+    const gridWidth = await evaluate(send, `return document.querySelector('.recents-box').getBoundingClientRect().width`)
+    const columnWidth = await evaluate(send, `return document.querySelector('.welcome-inner').getBoundingClientRect().width`)
+    check('the grid steps out of the library column', gridWidth > columnWidth + 100, `${gridWidth} vs ${columnWidth}`)
+    await click(send, `.recents-size button[aria-label="Større forsider"]`)
+    const large = await evaluate(send, `return document.querySelector('.recents-grid')?.className ?? ''`)
+    check('«Større forsider» draws the large size', /size-large/.test(large), large)
+    const largeColumns = await columnsNow()
+    check('…fewer, larger pages across', largeColumns < mediumColumns, `${mediumColumns} → ${largeColumns}`)
+    check('…and is remembered', (await evaluate(send, 'return window.api.getSettings()')).recentsGridSize === 'large')
+    check(
+      'the larger button stops at the largest size',
+      await evaluate(send, `return document.querySelector('.recents-size button[aria-label="Større forsider"]').disabled`)
+    )
+    if (process.env.SHOT_DIR) {
+      const shot = await send('Page.captureScreenshot', { format: 'png' })
+      writeFileSync(join(process.env.SHOT_DIR, 'recents-grid-large.png'), Buffer.from(shot.data, 'base64'))
+    }
+
+    // Unpin: back among the rest, no label left
+    await evaluate(send, `${cardSel('gone.pdf')}.querySelector('.recent-action[aria-label="Løsne"]').click()`)
+    const unpinned = await waitFor(groups, (g) => g.length === 1, 'the «Festet» group to go')
+    check('unpinning the last pin removes the «Festet» label', unpinned[0].label === null && unpinned[0].names.includes('gone.pdf'))
+
+    // ---------- 6. Housekeeping ----------
+    console.log('\n6. housekeeping')
     const files = readdirSync(join(profile, 'recent-thumbs'))
     check(
       'nothing but entry files in the store',

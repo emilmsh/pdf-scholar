@@ -11,12 +11,15 @@
 // scripts/test-recent-thumbs.mjs can import it.
 import type { RecentThumb } from './types'
 
-/** Long side of the stored picture, px. A grid cell is ~140 CSS px wide; at a
- *  device pixel ratio of 2 (a Surface) that is ~280 px across and ~360 down for
- *  a portrait page — so 360 keeps a cover crisp there without storing more. */
-export const RECENT_THUMB_SIDE = 360
+/** Long side of the stored picture, px. Sized for the grid's LARGEST cover
+ *  (issue #29): five across the grid's full width is ~180 CSS px wide, so at a
+ *  device pixel ratio of 2 (a Surface) a portrait page wants ~360 px across and
+ *  ~480 down. 480 keeps that crisp; the two smaller sizes only scale it down.
+ *  (It was 360 while the grid had one size, ~100 px wide; a picture stored then
+ *  is redrawn at this size the next time its document is open in grid view.) */
+export const RECENT_THUMB_SIDE = 480
 
-/** JPEG quality. A page of text at this size is 15–35 KB. */
+/** JPEG quality. A page of text at this size is 25–60 KB. */
 export const RECENT_THUMB_QUALITY = 0.8
 
 /** Largest picture a store accepts. Ten times what a real cover weighs: the

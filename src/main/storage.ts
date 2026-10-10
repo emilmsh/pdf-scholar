@@ -11,7 +11,8 @@ import type {
   RecentFile,
   Settings
 } from '../shared/types'
-import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS, RECENTS_MAX } from '../shared/defaults'
+import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
+import { normalizeRecents, pinRecent, recordRecent, removeRecent, restoreRecent } from '../shared/recents'
 export type { Settings }
 
 export interface StoredAiConfig extends AiConfig {
@@ -106,6 +107,7 @@ export function getState(): AppState {
     loaded = {
       ...DEFAULTS,
       ...parsed,
+      recents: normalizeRecents(parsed.recents),
       settings: mergeSettings(DEFAULTS.settings, parsed.settings ?? {}),
       ai: mergeAiConfig(DEFAULT_AI, parsed.ai ?? {})
     }
@@ -143,11 +145,31 @@ export function saveState(): void {
 
 export function addRecent(path: string, name: string): void {
   const state = getState()
-  state.recents = [
-    { path, name, lastOpened: Date.now() },
-    ...state.recents.filter((r) => r.path !== path)
-  ].slice(0, RECENTS_MAX)
+  state.recents = recordRecent(state.recents, path, name, Date.now())
   saveState()
+}
+
+export function removeRecentEntry(path: string): RecentFile[] {
+  const state = getState()
+  state.recents = removeRecent(state.recents, path)
+  saveState()
+  return state.recents
+}
+
+export function restoreRecentEntry(entry: RecentFile, index: number): RecentFile[] {
+  const state = getState()
+  // Through the same shape check as a loaded file: this arrives over IPC
+  const [clean] = normalizeRecents([entry])
+  if (clean) state.recents = restoreRecent(state.recents, clean, index)
+  saveState()
+  return state.recents
+}
+
+export function pinRecentEntry(path: string, pinned: boolean): RecentFile[] {
+  const state = getState()
+  state.recents = pinRecent(state.recents, path, pinned, Date.now())
+  saveState()
+  return state.recents
 }
 
 export function setPosition(path: string, pos: ReadingPosition): void {

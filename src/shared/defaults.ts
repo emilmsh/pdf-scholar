@@ -37,7 +37,12 @@ export const DEFAULT_SETTINGS: Settings = {
   // themselves live there, next to the commands they belong to, so this stays
   // "nothing rebound" rather than a second copy of the map.
   keymap: {},
-  recentsView: 'list'
+  recentsView: 'list',
+  recentsGridSize: 'medium',
+  // On: a restored tab reads nothing until it is shown, so the cost of
+  // remembering a long session is a row of names in the tab strip.
+  restoreSession: true,
+  pagedView: false
 }
 
 /** How many files «Nylig lest» remembers, on every platform (docs/SPEC.md §8).

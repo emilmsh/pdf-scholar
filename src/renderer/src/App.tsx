@@ -1164,6 +1164,9 @@ export default function App(): React.JSX.Element {
               onOpenRecent={openPath}
               recentsView={settings.recentsView}
               onRecentsViewChange={(recentsView) => updateSettings({ recentsView })}
+              recentsGridSize={settings.recentsGridSize}
+              onRecentsGridSizeChange={(recentsGridSize) => updateSettings({ recentsGridSize })}
+              onRecentsChange={setRecents}
             />
           </div>
         )}

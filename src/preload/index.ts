@@ -11,6 +11,7 @@ import type {
   PdfxApi,
   DocBookmark,
   ReadingPosition,
+  RecentFile,
   RecentThumb,
   SetFormFieldRequest,
   Settings
@@ -25,6 +26,10 @@ const api: PdfxApi = {
   setRecentThumb: (path: string, thumb: RecentThumb) =>
     ipcRenderer.send('recent-thumbs:set', path, thumb),
   readRecentForThumb: (path: string) => ipcRenderer.invoke('recent-thumbs:read', path),
+  removeRecent: (path: string) => ipcRenderer.invoke('recents:remove', path),
+  restoreRecent: (entry: RecentFile, index: number) =>
+    ipcRenderer.invoke('recents:restore', entry, index),
+  pinRecent: (path: string, pinned: boolean) => ipcRenderer.invoke('recents:pin', path, pinned),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   getPosition: (path: string) => ipcRenderer.invoke('position:get', path),
   getBookmarks: (path: string) => ipcRenderer.invoke('bookmarks:get', path),

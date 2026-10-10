@@ -414,6 +414,9 @@ export default function ExtensionApp(): React.JSX.Element {
                 onOpenRecent={openPath}
                 recentsView={settings.recentsView}
                 onRecentsViewChange={(recentsView) => updateSettings({ recentsView })}
+                recentsGridSize={settings.recentsGridSize}
+                onRecentsGridSizeChange={(recentsGridSize) => updateSettings({ recentsGridSize })}
+                onRecentsChange={setRecents}
                 resume={{ name: payload.name, onResume: () => setAtLibrary(false) }}
               />
             </div>
@@ -435,6 +438,9 @@ export default function ExtensionApp(): React.JSX.Element {
           onOpenRecent={openPath}
           recentsView={settings.recentsView}
           onRecentsViewChange={(recentsView) => updateSettings({ recentsView })}
+          recentsGridSize={settings.recentsGridSize}
+          onRecentsGridSizeChange={(recentsGridSize) => updateSettings({ recentsGridSize })}
+          onRecentsChange={setRecents}
         />
       )}
       {extUpdate && (
