@@ -26,6 +26,7 @@ import type { MarginViewConfig } from './MarginNotes'
 import { isXfaDocument, renderXfaLayer } from '../xfa'
 import type { XfaLayerHandle } from '../xfa'
 import { LINK_RECORDS } from '../link-preview'
+import { carrySelection } from '../selection-carry'
 
 /** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
  *  only place that gesture is advertised. */
@@ -639,7 +640,19 @@ function PdfPage({
           once: true
         })
       })
+      // A re-read of the same document (a write elsewhere) rebuilds this layer
+      // under whatever the reader has selected — carry the selection over, and
+      // a drag still in progress keeps its page-covering .endOfContent
+      const oldDiv = textHost.firstElementChild
+      const restoreSelection = carrySelection(oldDiv, textDiv)
+      if (oldDiv?.classList.contains('selecting')) {
+        textDiv.classList.add('selecting')
+        window.addEventListener('mouseup', () => textDiv.classList.remove('selecting'), {
+          once: true
+        })
+      }
       textHost.replaceChildren(textDiv)
+      restoreSelection?.()
 
       // Clickable link annotations (internal destinations + external URLs).
       // Positioned as % of the page box so they reflow on zoom (no baked scale).
