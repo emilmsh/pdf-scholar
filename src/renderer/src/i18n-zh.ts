@@ -588,6 +588,8 @@ export const zh: Dict = {
   'bubble.resizeTip': '拖动调整大小 · 双击恢复默认',
   'bubble.resizeHeightTip': '向上拖动以获得更多空间 · 双击恢复默认',
   'menu.newNoteHere': '在此新建便签',
+  'menu.copyEmail': '复制电子邮件地址',
+  'menu.copyLink': '复制链接地址',
   'menu.notePlaceholder': '写一条便签…',
   'menu.count': '字数统计',
   'menu.words': '单词',

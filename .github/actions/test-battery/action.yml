@@ -115,6 +115,10 @@ runs:
     # says it is, where the window looks, and real pdf.js resolving names
     - run: npm run test:link-preview
       shell: bash
+    # A link's own target for the point menu's «Kopier e-postadresse» /
+    # «Kopier lenkeadresse»: read from the annotation, mailto: reduced to the address
+    - run: npm run test:link-target
+      shell: bash
     # …and the abstract behind a citation: entry → DOI/arXiv/Crossref match →
     # four keyless sources, fetch injected, keyless
     - run: npm run test:abstract

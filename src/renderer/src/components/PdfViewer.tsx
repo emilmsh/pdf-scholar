@@ -165,6 +165,7 @@ import PresentationMode from './PresentationMode'
 import Sidebar from './Sidebar'
 import SearchBar from './SearchBar'
 import Toolbar from './Toolbar'
+import { copyableLink } from '../../../shared/link-target'
 import { NotePopover, SelectionMenu } from './SelectionMenu'
 import { inTextField } from './TextContextMenu'
 import type { MenuAction, MenuState } from './SelectionMenu'
@@ -4566,6 +4567,12 @@ export default function PdfViewer({
           }
           setMenu(null)
           break
+        case 'copyLink': {
+          const link = copyableLink(menu?.linkUrl)
+          if (link) navigator.clipboard?.writeText(link.text).catch(() => {})
+          setMenu(null)
+          break
+        }
         case 'abstract': {
           // The whole selection with its line breaks (selText is trimmed to
           // 500 for the web actions) — the lookup rejoins a DOI broken at a
@@ -5232,7 +5239,9 @@ export default function PdfViewer({
           pageNumber,
           mode: 'point',
           pagePoint: { x: px, y: py },
-          foreign: doc === 'split'
+          foreign: doc === 'split',
+          // Set by PdfPage on each external link's anchor
+          linkUrl: (target as HTMLElement | null)?.closest?.<HTMLElement>('a.pdf-link')?.dataset.url
         })
       } else {
         setMenu(null)
