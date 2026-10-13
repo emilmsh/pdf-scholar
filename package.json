@@ -50,6 +50,7 @@
     "test:zotero": "node scripts/test-zotero.mjs",
     "test:doi": "node scripts/test-doi.mjs",
     "test:link-preview": "node scripts/test-link-preview.mjs",
+    "test:link-target": "node scripts/test-link-target.mjs",
     "test:abstract": "node scripts/test-abstract.mjs",
     "test:insecure-retry": "node scripts/test-insecure-retry.mjs",
     "test:file-access": "node scripts/test-file-access.mjs",

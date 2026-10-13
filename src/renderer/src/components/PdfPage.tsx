@@ -12,6 +12,7 @@ import { PDFIUM_RENDER, renderPdfiumPage } from '../pdfium-renderer'
 import { t } from '../i18n'
 import { penNear } from '../pen-input'
 import { cleanAttachmentName } from '../../../shared/attachments'
+import { selectFromLink } from '../link-drag-select'
 import { NOTE_ICON_BOX, NOTE_ICON_SVG } from '../../../shared/note-icon'
 import type { DocAttachment } from '../attachments'
 import {
@@ -716,8 +717,12 @@ function PdfPage({
         anchor.style.top = `${(100 * Math.min(py1, py2)) / viewport.height}%`
         anchor.style.width = `${(100 * Math.abs(px2 - px1)) / viewport.width}%`
         anchor.style.height = `${(100 * Math.abs(py2 - py1)) / viewport.height}%`
-        if (link.url) anchor.title = link.url
-        else {
+        const draggedFromHere = selectFromLink(anchor, linkHost)
+        if (link.url) {
+          anchor.title = link.url
+          // What the point menu reads to offer «Kopier e-postadresse»
+          anchor.dataset.url = link.url
+        } else {
           anchor.title = linkTitle()
           // What the hover preview (LinkPreview) reads to show the target
           // without following it — the document rides along, since a split
@@ -728,6 +733,8 @@ function PdfPage({
         anchor.addEventListener('click', (e) => {
           e.preventDefault()
           e.stopPropagation()
+          // The release that ended a drag-selection is not a click on the link
+          if (draggedFromHere()) return
           // An EXTERNAL link always hands off to the system browser, modifier or
           // not: there is nothing in this document for a second column to show,
           // and the browser applies its own new-tab conventions from there.

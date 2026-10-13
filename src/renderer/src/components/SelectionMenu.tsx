@@ -33,6 +33,7 @@ import {
 } from './icons'
 import { inTextField } from './TextContextMenu'
 import { looksLikeReference } from '../../../shared/abstract'
+import { copyableLink } from '../../../shared/link-target'
 
 const HEX_RE = /^#?[0-9a-fA-F]{6}$/
 
@@ -154,6 +155,9 @@ export interface MenuState {
    *  because they ask about the tab's document and would answer from the
    *  wrong file. */
   foreign?: boolean
+  /** Point mode over a link: the annotation's own target (the page only shows
+   *  its text), so the menu can offer to copy it */
+  linkUrl?: string | undefined
 }
 
 /** Word Counter Plus-style stats for the current selection. Words split on
@@ -214,6 +218,8 @@ export type MenuAction =
   | { kind: 'note' }
   | { kind: 'comment' }
   | { kind: 'copy' }
+  /** The address of the link under the pointer (point menu) */
+  | { kind: 'copyLink' }
   | { kind: 'search' }
   | { kind: 'dictionary' }
   | { kind: 'translate' }
@@ -278,6 +284,7 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
    *  reference-list entry (shared/abstract.ts looksLikeReference) — prose
    *  never grows a network action it has no use for */
   const isReference = isSelection && looksLikeReference(selText)
+  const link = isSelection ? null : copyableLink(menu.linkUrl)
 
   const showAi = aiEnabled && !menu.foreign
   /* All assistant actions are siblings of one gesture ("ask the assistant
@@ -521,6 +528,15 @@ export function SelectionMenu({ menu, onAction, aiEnabled, compact = false }: Me
           <button className="menu-item" onClick={() => onAction({ kind: 'note' })}>
             <span className="menu-icon"><IconNote size={15} /></span> {t('menu.newNoteHere')}
           </button>
+          {/* First when the pointer is on a link: it is what a right-click
+              there is after. Reads the annotation's target, not the printed
+              text, so it also works on a «click here» or a wrapped address. */}
+          {link && (
+            <button className="menu-item" onClick={() => onAction({ kind: 'copyLink' })}>
+              <span className="menu-icon"><IconCopy size={15} /></span>{' '}
+              {t(link.kind === 'email' ? 'menu.copyEmail' : 'menu.copyLink')}
+            </button>
+          )}
           {/* Works in the split column's other document too — it renders from
               the page under the pointer, not from the tab's file. */}
           <button

@@ -3073,6 +3073,12 @@ html.pen-near .draw-layer {
   pointer-events: auto;
 }
 
+/* link-drag-select.ts looks up the text caret UNDER a link: the links step
+   aside for that one hit-test */
+.link-host.probing .pdf-link {
+  pointer-events: none;
+}
+
 .pdf-link:hover {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
