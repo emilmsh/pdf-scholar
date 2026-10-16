@@ -18,12 +18,12 @@ export const zh: Dict = {
   'app.saveCopy': '另存副本',
   'app.confirmExternalUpdateMessage': '“{name}”已在应用外被修改',
   'app.confirmExternalUpdateDetail':
-    '旧版本中有未保存的标注。要在加载新版本之前将它们另存为副本吗？',
+    '旧版本中有未保存的批注。是否先将它们另存为副本，再加载新版本？',
   'app.delete': '删除',
   'app.back': '返回',
   'app.pageAbbrev': '第',
   'app.openFailed': '无法打开文件：{error}',
-  'app.changedOnDisk': '“{name}”已在磁盘上被修改。当前显示的版本中有未保存的标注。',
+  'app.changedOnDisk': '“{name}”已在磁盘上被修改。当前显示的版本中有未保存的批注。',
   'app.reloadFromDisk': '重新加载…',
   'app.keepMine': '保留我的版本',
   'app.reloadedFromDisk': '“{name}”已在磁盘上被修改，并已重新加载',
@@ -34,7 +34,7 @@ export const zh: Dict = {
   'app.openInBrowser': '在浏览器的阅读器中打开',
   'app.retryInsecure': '不使用 HTTPS 重试',
   'app.retryInsecureHint':
-    '该网站不响应 https。改为通过 http 获取文档——未加密，因此传输途中的第三方原则上可以替换它。不会发送任何 Cookie。',
+    '该网站不响应 HTTPS。改为通过 HTTP 获取文档——未加密，因此传输途中理论上可被第三方替换。不会发送任何 Cookie。',
   'app.saveFailed': '无法保存：{error}',
   'engine.annot-not-found': '在文件中未找到该批注',
   'engine.annot-no-position': '该批注没有位置',
@@ -58,8 +58,8 @@ export const zh: Dict = {
   'engine.doc-not-open': '文档未以编辑方式打开',
   'engine.doc-unreachable': '该网站不响应 https',
   'engine.append-unsupported':
-    '此 PDF 的结构是写入路径尚不支持的——文件未被改动',
-  'engine.append-objstm-edit': '在这么大的文档中尚无法更改此批注',
+    '此 PDF 的结构尚不支持写入——文件未被修改',
+  'engine.append-objstm-edit': '文档过大，尚无法修改此批注',
   'engine.append-encrypted':
     '这么大的受密码保护文档可以阅读，但无法添加批注',
   'engine.append-no-image':
@@ -83,7 +83,7 @@ export const zh: Dict = {
   'aierr.ai-context-overflow':
     '文档（或对话）超出了模型的上下文窗口，请求被拒绝。请开始新的对话，或切换到上下文窗口更大的模型。',
   'aierr.ai-request-too-large':
-    '这一个问题就超过了账户在服务商处的每分钟令牌配额总量。等待无济于事——一分钟后同样的请求会被同样拒绝。请缩小问题范围、选择配额更高的模型，或在服务商处提高配额（使用层级）。',
+    '这个问题本身已超过账户在服务商处的每分钟令牌配额。等待无用——一分钟后同样请求仍会被拒绝。请缩小问题范围、选择配额更高的模型，或提升服务商处的配额（使用层级）。',
   'aierr.ai-rate-limited':
     '服务商拒绝了请求，因为账户的每分钟令牌配额此刻已用尽。请稍候再试、缩小问题范围，或选择配额更高的模型。',
   'aierr.ai-model-overloaded':
@@ -94,7 +94,7 @@ export const zh: Dict = {
     '问题中包含图片，而此模型只读取文本——它根本没有看到图片。请从模型菜单中选择支持图片的模型，或移除图片后再问一次。',
   'aierr.ai-refusal':
     '模型拒绝回答此请求（服务商的安全过滤）。请尝试改写，或切换模型。',
-  'aierr.ai-stream-aborted': '流在回答完成前就结束了。',
+  'aierr.ai-stream-aborted': '回答完成前数据流中断。',
   'aierr.ai-provider-unknown': '来自服务商的未知错误。',
   'aierr.ai-aborted': '已停止',
   'aierr.ai-disabled': 'AI 功能已在 AI 设置中关闭，因此未发送任何请求。',
@@ -131,7 +131,7 @@ export const zh: Dict = {
   'fileaccess.title': '允许本地 PDF',
   'fileaccess.blockedTitle': '此 PDF 位于您自己的计算机上',
   'fileaccess.body':
-    '在您于扩展详情页面打开“允许访问文件 URL”之前，浏览器不会提供本地文件（file://）。该开关只能由您操作——扩展无法自行授予。',
+    '在您于扩展详情页打开“允许访问文件 URL”之前，浏览器不会提供本地文件（file://）。该开关只能由您手动开启——扩展无法自行开启。',
   'fileaccess.step1': '打开 PDF Scholar 的详情页面。',
   'fileaccess.step2': '打开“允许访问文件 URL”。',
   'fileaccess.step3': '回到这里——本地 PDF 随后会在此阅读器中打开。',
@@ -202,7 +202,7 @@ export const zh: Dict = {
   'tb.navForwardTip': '前进',
   'tb.penTip': '手写笔（再次点击查看选项，Esc 结束）',
   'tb.markerTip': '荧光笔（再次点击查看选项，Esc 结束）',
-  'tb.markup': '文本标注',
+  'tb.markup': '文本批注',
   'tb.markupTip': '标注文本——在文本上拖动以高亮（Esc 结束）',
   'tb.markupOptionsTip': '选择类型和颜色',
   'tb.eraserTip': '橡皮擦——移除手写笔、荧光笔和形状（Esc 结束）',
@@ -229,9 +229,9 @@ export const zh: Dict = {
   'tb.textTip': '页面上的文本——点击文本应放置的位置（Esc 结束）',
   'tb.textOptionsTip': '文本颜色和大小',
   'tb.fontSize': '大小',
-  'tb.textMoveHint': '文本框之后可以移动和调整大小——点击它以显示控制柄',
-  'text.hint': '点击文本应放置的位置 · 文本框之后可以移动和调整大小 · Esc 取消',
-  'tb.hideAnnotsTip': '隐藏批注（H）——显示没有标注和便签的页面',
+  'tb.textMoveHint': '文本框稍后可移动和调整大小——点击它以显示控制点',
+  'text.hint': '点击文本应放置的位置 · 文本框稍后可移动和调整大小 · Esc 取消',
+  'tb.hideAnnotsTip': '隐藏批注（H）——显示没有批注和便签的页面',
   'tb.showAnnotsTip': '重新显示批注（H）',
   'tb.pen': '手写笔',
   'tb.marker': '荧光笔',
@@ -324,7 +324,7 @@ export const zh: Dict = {
   'tb.zoom': '缩放',
   'tb.pageLayout': '页面布局',
   'tb.split': '分屏',
-  'tb.splitTip': '分屏——两栏，各有自己的页面和缩放。另一个文档：将其标签页拖入视图，或在视图菜单中选择',
+  'tb.splitTip': '分屏——两栏，各自有独立的页面和缩放。如要打开另一个文档：将其标签页拖入视图，或在视图菜单中选择',
   'tb.marginNotes': '在页边显示评论',
   'tb.marginNotesTip': '在页边显示评论——便签和评论以文本形式显示在页面旁',
   'margin.sideLabel': '位置',
@@ -369,11 +369,11 @@ export const zh: Dict = {
   'iconerr.tab-icon-too-small': '图片至少需要 16 × 16 px。',
   'settings.selectionMenuCompact': '紧凑菜单',
   'settings.selectionMenuCompactTip':
-    '同一菜单的紧凑版：颜色更紧密，图标不带文字（悬停可查看名称）。助手的操作收在 ✦ 之后。',
+    '同一菜单的紧凑版：颜色排列更紧凑，图标不带文字（悬停可查看名称）。助手操作收在 ✦ 之后。',
   'settings.restoreSession': '重新打开上次会话的标签页',
   'settings.linkPreview': '链接预览',
   'settings.linkPreviewTip':
-    '将指针停在引用、图或公式的引用上，即可查看链接指向的内容，而无需离开当前页面。触摸屏上长按。',
+    '将指针停在引用、图或公式上，即可预览链接指向的内容，无需离开当前页面。触摸屏上长按。',
   'settings.linkPreviewDelay': '延迟',
   'settings.linkPreviewDelayTip': '指针在链接上停留多久后打开窗口：150、350 或 700 毫秒',
   'settings.linkPreviewDelay.short': '短',
@@ -391,11 +391,11 @@ export const zh: Dict = {
   'linkPreview.retry': '重试',
   'menu.abstract': '摘要',
   'menu.abstractTip': '获取此参考文献所指论文的摘要——来自 arXiv、Europe PMC、Crossref 和 OpenAlex',
-  'settings.restoreSessionTip': '启动时，每个窗口恢复它原有的标签页。每个文档只在你显示其标签页时才读取。固定的标签页始终会恢复。',
+  'settings.restoreSessionTip': '启动时，每个窗口恢复其原有的标签页。文档只在你显示其标签页时才会被读取。固定的标签页始终会恢复。',
   'settings.annotAuthor': '批注上的署名',
   'settings.annotAuthorPlaceholder': '例如你的姓名',
   'settings.annotAuthorHint':
-    '作为新批注的作者写入 PDF；在导出和其他阅读器中显示。留空 = 不署名。',
+    '作为新批注的作者写入 PDF；在导出和其他阅读器中显示。留空表示不署名。',
   'side.exportMarginBtn': 'PDF（页边）',
   'side.filterHead': '搜索与筛选',
   'side.filterWithComment': '有评论',
@@ -725,7 +725,7 @@ export const zh: Dict = {
   'ai.fallbackChip': '由 {model} 回答',
   'ai.fallbackTip': '所选模型拒绝了该问题，因此 Anthropic 改由 {model} 回答。',
   'ai.excerptTip':
-    '文档超出了单次请求的承载量（模型的上下文窗口，或账户在服务商处的配额），因此只附上了最相关的段落，并标注各自的页码。回答可能遗漏节选之外的内容。用文档自身的语言和术语提问，选取效果最好。',
+    '文档超出了单次请求的容量（模型的上下文窗口，或账户在服务商处的配额），因此只附上了最相关的段落，并标注各自页码。回答可能遗漏节选之外的内容。用文档自身的语言和术语提问，效果最好。',
   'ai.errorLimitLearned':
     '服务商给出的配额为 {limit} 个令牌。下一个问题将发送符合该上限的节选——请重试。',
   'ai.excerptLangHint':
