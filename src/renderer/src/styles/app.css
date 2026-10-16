@@ -3128,21 +3128,29 @@ html.pen-near .draw-layer {
   /* The wheel at the window's end must not scroll the page under it */
   overscroll-behavior: contain;
   cursor: pointer;
-  /* No native bar: Windows draws even the thin one with arrow buttons, on
-     both axes (Emil, 2026-10-16). The app's overlay pills stand in, on
-     hover and while scrolling — see .link-preview-body */
+  /* No bar at all: Windows draws even the thin native one with arrow buttons
+     (2026-10-16), and in a window this small the overlay pills distracted
+     too (Emil, 2026-10-17). An edge with more beyond it fades instead —
+     useEdgeFade in LinkPreview.tsx sets the four depths, 0 where nothing
+     is left to scroll to */
   scrollbar-width: none;
+}
+
+.link-preview-scroll,
+.lp-card {
+  --fade-t: 0px;
+  --fade-b: 0px;
+  --fade-l: 0px;
+  --fade-r: 0px;
+  mask-image:
+    linear-gradient(to bottom, transparent, #000 var(--fade-t), #000 calc(100% - var(--fade-b)), transparent),
+    linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  mask-composite: intersect;
 }
 
 .link-preview-scroll::-webkit-scrollbar,
 .lp-card::-webkit-scrollbar {
   display: none;
-}
-
-/* What the overlay pills (.osb-pill) are placed in: the scroller's own box,
-   not the footer under it */
-.link-preview-body {
-  position: relative;
 }
 
 /* A citation as a CARD, the way Zotero's reader shows one (issue #31, third
@@ -3153,11 +3161,13 @@ html.pen-near .draw-layer {
   overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
-  padding: 6px 0;
+  padding: 8px 0;
 }
 
+/* Room on both sides, the right as much as the left: text close to the
+   window's edge read as crammed (Emil, 2026-10-17) */
 .lp-ref {
-  padding: 6px 14px 4px;
+  padding: 8px 20px 6px;
 }
 
 .lp-ref + .lp-ref {
