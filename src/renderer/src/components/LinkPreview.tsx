@@ -14,11 +14,17 @@
 // Touch has no hover, so a long-press on a link opens the same window (the
 // tap still follows the link); a pen's hover works like the mouse's.
 //
-// On a citation the footer offers «Sammendrag»: the cited paper's abstract,
-// fetched on that click and never before (src/shared/abstract.ts — the app is
-// offline unless you ask). The click is in the WINDOW, so the link itself
-// still goes to the reference list. Once asked, the window stays put when the
-// pointer leaves — it is being read — and grows away from the link.
+// A citation is not a window onto the page but a CARD, the way Zotero's reader
+// shows one (issue #31, third round — Emil, 2026-10-16: Zotero's users are
+// this app's readers): one row per reference, the entry's own text read off
+// the reference list, selectable, with the links the PDF puts in it. A
+// bracket is read whole from any of its numbers — «[3, 5–9]» is six rows,
+// whether the PDF linked «3», «[5» or «9]». Each row has «Sammendrag»: the
+// cited paper's abstract, fetched on that click and never before
+// (src/shared/abstract.ts — the app is offline unless you ask), folding out
+// under its row; and «Gå til» its place in the list. Once read in (a click,
+// a selection, an abstract), the card stays put when the pointer leaves.
+// An entry the page gives no text for falls back to the rendered window.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
@@ -31,14 +37,19 @@ import type { CitationAbstract, FileError } from '../../../shared/types'
 import { AbstractBody, AbstractSource } from './AbstractView'
 import type { AbstractState } from './AbstractView'
 import {
-  citationEntryText,
+  cardEntries,
+  citationGroup,
   citedRange,
+  destFamily,
   destLabel,
   destOnFigureCaption,
   entryBox,
   entryLines,
+  familyDests,
   familySiblings,
+  groupDests,
   LINK_RECORDS,
+  linkKind,
   placeExpanded,
   placePreview,
   previewScale,
@@ -50,7 +61,7 @@ import {
   textExtent,
   textLines
 } from '../link-preview'
-import type { LinkKind, LinkRecord, PreviewTarget } from '../link-preview'
+import type { CardEntry, FamilyDest, LineLink, LinkKind, LinkRecord, PreviewTarget } from '../link-preview'
 
 interface Props {
   /** The viewer's root: only links inside it are this component's */
@@ -65,7 +76,13 @@ interface Open {
   target: PreviewTarget
   pageIndex: number
   kind: LinkKind
-  canvas: HTMLCanvasElement
+  /** The rendered page — null for a citation card, which draws no page */
+  canvas: HTMLCanvasElement | null
+  /** A citation's references as text (Zotero's card), when the entries
+   *  could be read off the reference list; null = the rendered window */
+  card: Card | null
+  /** Where the pointer was: a card is placed again once its height is known */
+  pointerX: number
   /** CSS size of the page image */
   pageW: number
   pageH: number
@@ -88,10 +105,18 @@ interface Open {
   entryFits: boolean
 }
 
+interface Card {
+  entries: CardEntry[]
+  /** «[3, 5–9]» for a group of more than one; null for one reference */
+  label: string | null
+}
+
+/** The card's width: Zotero's 400 px, a little more for our larger type */
+const CARD_W = 440
+
 /** What «Sammendrag» found, per document and destination — a second hover on
  *  the same citation shows it again without asking anyone */
 const abstractCache = new WeakMap<PDFDocumentProxy, Map<string, CitationAbstract>>()
-const destKey = (dest: unknown): string => (typeof dest === 'string' ? dest : JSON.stringify(dest))
 
 
 /** How long the pointer may be between the link and the window (or off both)
@@ -101,14 +126,6 @@ const CLOSE_GRACE_MS = 220
 const LONG_PRESS_MS = 450
 /** The footer line under the page window, borders included (app.css) */
 const FOOT_PX = 27
-/** The page part's height once an abstract is in: the whole entry when it
- *  is short (it usually is — the window is cut to it), at most this share
- *  of the screen for a long range, so the abstract gets the rest. The
- *  entry is never compacted to a band (Emil, 2026-10-13: it read as the
- *  abstract covering the reference). */
-const PAGE_SHARE_WITH_PANEL = 0.4
-const pagePartHeight = (o: Open, hasPanel: boolean, winH: number): number =>
-  hasPanel ? Math.min(o.box.h, Math.round(winH * PAGE_SHARE_WITH_PANEL)) : o.box.h
 /** Rendered pages kept per document. A paper's citations land on its one to
  *  three reference pages, so a handful makes every hover after the first one
  *  on a page instant. */
@@ -166,8 +183,10 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   enabledRef.current = enabled
   const delayRef = useRef(delayMs)
   delayRef.current = delayMs
-  const [abs, setAbs] = useState<AbstractState>({ state: 'idle' })
-  /** Asked for the abstract: the window no longer closes on pointer leave */
+  /** Each card row's abstract, by the entry's destination name */
+  const [abs, setAbs] = useState<Record<string, AbstractState>>({})
+  /** Read in (an abstract asked for, text selected, a zoom, a resize, a
+   *  drag): the window no longer closes on pointer leave */
   const pinnedRef = useRef(false)
   /** Where the window stands once it has been placed for an abstract or
    *  dragged; null = the hover placement from `open.at` */
@@ -175,7 +194,6 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   /** Dragged by the reader: their position wins from then on */
   const draggedRef = useRef(false)
   const dragRef = useRef<{ dx: number; dy: number } | null>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
   /** The corner grip (Emil, 2026-10-13: a figure can be bigger than the
    *  window): sizes the page part; null = the size the rules gave it. A
    *  resized window is being read, so it stays when the pointer leaves. */
@@ -219,6 +237,52 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     const mine = ++seq.current
     const target = await resolvePreviewTarget(rec.pdf, rec.dest)
     if (!target || mine !== seq.current) return
+    if (target.kind === 'citation' && target.y !== null && target.name) {
+      const card = await citationCard(anchor, rec, target).catch(() => null)
+      if (mine !== seq.current || !anchor.isConnected) return
+      if (card) {
+        const w = Math.min(CARD_W, window.innerWidth - 24)
+        // A first guess at the height; the layout effect below places the
+        // card again by its real one before it is painted
+        const h = Math.min(Math.round(window.innerHeight * 0.6), 24 + card.entries.length * 70)
+        const box = { w, h }
+        const r = anchor.getBoundingClientRect()
+        const at = placePreview(r, pointerX, { w, h: h + FOOT_PX }, { w: window.innerWidth, h: window.innerHeight })
+        const known = abstractCache.get(rec.pdf)
+        const found: Record<string, AbstractState> = {}
+        for (const e of card.entries) {
+          const k = known?.get(e.dest)
+          if (k) found[e.dest] = { state: 'done', result: k }
+        }
+        pinnedRef.current = false
+        draggedRef.current = false
+        setPlaced(null)
+        setSize(null)
+        setAbs(found)
+        setOpen({
+          anchor,
+          rec,
+          target,
+          pageIndex: card.entries[0]!.pageIndex,
+          kind: target.kind,
+          canvas: null,
+          card,
+          pointerX,
+          pageW: 0,
+          pageH: 0,
+          vx: null,
+          vy: null,
+          scroll: { left: 0, top: 0 },
+          box,
+          scale: 1,
+          range: null,
+          entry: false,
+          entryFits: false,
+          at
+        })
+        return
+      }
+    }
     // The link's own words: a cited range («5–9») shows every entry it names
     const range = target.kind === 'citation' && target.y !== null ? citedRange(linkText(anchor)) : null
     const box = previewSize(target.kind, window.innerWidth, window.innerHeight)
@@ -345,12 +409,11 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     const r = anchor.getBoundingClientRect()
     // Placed by its whole height: the page window plus the footer line
     const at = placePreview(r, pointerX, { w: box.w, h: box.h + FOOT_PX }, { w: window.innerWidth, h: window.innerHeight })
-    const known = abstractCache.get(rec.pdf)?.get(destKey(rec.dest))
     pinnedRef.current = false
     draggedRef.current = false
     setPlaced(null)
     setSize(null)
-    setAbs(known ? { state: 'done', result: known } : { state: 'idle' })
+    setAbs({})
     setOpen({
       anchor,
       rec,
@@ -358,6 +421,8 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       pageIndex: target.pageIndex,
       kind: target.kind,
       canvas: img.canvas,
+      card: null,
+      pointerX,
       pageW: img.w,
       pageH: img.h,
       vx,
@@ -376,7 +441,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   // window scrolled to the destination once it is in
   useEffect(() => {
     const scroller = scrollerRef.current
-    if (!open || !scroller) return
+    if (!open?.canvas || !scroller) return
     scroller.querySelector('.link-preview-canvas-host')?.replaceChildren(open.canvas)
     scroller.scrollLeft = open.scroll.left
     scroller.scrollTop = open.scroll.top
@@ -386,7 +451,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
    *  point under its top-left corner kept. «Cropped and no way to zoom out»
    *  was the second-round report on issue #31. */
   const rescale = async (o: Open | null, factor: number): Promise<void> => {
-    if (!o) return
+    if (!o?.canvas) return
     const scale = Math.round(Math.min(3, Math.max(0.5, o.scale * factor)) * 20) / 20
     if (scale === o.scale) return
     const img = await renderPage(o.rec.pdf, o.pageIndex, scale, o.rec.rotation)
@@ -540,15 +605,31 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
 
   useDismissable(boxRef, !!open, close)
 
-  // The abstract is in: place the whole window ONCE by what it now needs —
+  // A card is placed by its real height, known only once it is laid out:
+  // before paint, so it never shows at the guessed one first
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    if (!open?.card || placed || size || !box) return
+    const h = box.offsetHeight
+    if (Math.abs(h - (open.box.h + FOOT_PX)) < 1) return
+    const at = placePreview(
+      open.anchor.getBoundingClientRect(),
+      open.pointerX,
+      { w: open.box.w, h },
+      { w: window.innerWidth, h: window.innerHeight }
+    )
+    setOpen({ ...open, at, box: { w: open.box.w, h: h - FOOT_PX } })
+  }, [open, placed, size])
+
+  // An abstract is in: place the whole card ONCE by what it now needs —
   // before paint, so it never shows at the old size first. Loading changes
   // nothing; this is the single move.
-  const hasPanel = abs.state === 'done' || abs.state === 'error'
+  const hasPanel = Object.values(abs).some((a) => a.state === 'done' || a.state === 'error')
   useLayoutEffect(() => {
-    const panel = panelRef.current
+    const list = scrollerRef.current
     const box = boxRef.current
-    if (!open || !hasPanel || !panel || !box) return
-    const need = pagePartHeight(open, true, window.innerHeight) + panel.scrollHeight + FOOT_PX
+    if (!open?.card || !hasPanel || !list || !box) return
+    const need = list.scrollHeight + FOOT_PX
     const winH = window.innerHeight
     const left = box.getBoundingClientRect().left
     if (draggedRef.current) {
@@ -591,24 +672,27 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     }
   }
 
-  /** «Sammendrag»: read the entry off the page, hand its text over */
-  const askAbstract = async (o: Open): Promise<void> => {
+  /** «Sammendrag» on one row: its entry's text, handed over */
+  const askAbstract = async (o: Open, entry: CardEntry): Promise<void> => {
     pinnedRef.current = true
     clearClose()
-    setAbs({ state: 'loading' })
-    const entry = await citationEntryText(o.rec.pdf, o.target)
-    const result: CitationAbstract | FileError = entry
-      ? await bridge.citationAbstract(entry)
-      : { error: 'no entry text at the destination', code: 'abstract-unidentified' }
-    if (openRef.current !== o) return // the window moved on meanwhile
+    setAbs((m) => ({ ...m, [entry.dest]: { state: 'loading' } }))
+    const result: CitationAbstract | FileError = await bridge.citationAbstract(entry.text)
+    if (openRef.current?.card !== o.card) return // the window moved on meanwhile
     if ('error' in result) {
-      setAbs({ state: 'error', error: result })
+      setAbs((m) => ({ ...m, [entry.dest]: { state: 'error', error: result } }))
       return
     }
     let cache = abstractCache.get(o.rec.pdf)
     if (!cache) abstractCache.set(o.rec.pdf, (cache = new Map()))
-    cache.set(destKey(o.rec.dest), result)
-    setAbs({ state: 'done', result })
+    cache.set(entry.dest, result)
+    setAbs((m) => ({ ...m, [entry.dest]: { state: 'done', result } }))
+    // A row low in a long group: its abstract comes into view
+    requestAnimationFrame(() => {
+      boxRef.current
+        ?.querySelector(`[data-dest="${CSS.escape(entry.dest)}"] .link-preview-abstract`)
+        ?.scrollIntoView({ block: 'nearest' })
+    })
   }
 
   if (!open) return null
@@ -623,12 +707,21 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: e.ctrlKey, metaKey: e.metaKey })
     )
   }
+  /** «Gå til» on a card row: that entry's own destination, from the link's
+   *  column (the link itself may point at another row's) */
+  const goTo = (e: React.MouseEvent, dest: string): void => {
+    const rec = open.rec
+    if (dest === rec.dest || !rec.follow) {
+      follow(e)
+      return
+    }
+    close()
+    rec.follow(dest, e.ctrlKey || e.metaKey)
+  }
 
-  const markTop =
-    open.vy !== null && !open.entry && open.kind !== 'figure' && open.kind !== 'table' ? open.vy : null
   // Before it is placed for an abstract (or dragged), the hover placement.
-  // Opened above its link, the window is held by its BOTTOM, so the footer's
-  // «Henter …» never moves it toward the citation.
+  // Opened above its link, the window is held by its BOTTOM, so a growing
+  // footer never moves it toward the citation.
   const winH = window.innerHeight
   const width = size?.w ?? open.box.w
   const place: React.CSSProperties = placed
@@ -636,71 +729,259 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     : open.at.below
       ? { left: open.at.left, top: open.at.top, width }
       : { left: open.at.left, bottom: winH - (open.at.top + open.box.h + FOOT_PX), width }
-  const pageH = size?.h ?? pagePartHeight(open, hasPanel, winH)
-  const panelMax = placed?.height != null ? Math.max(80, placed.height - pageH - FOOT_PX) : undefined
-  const canAsk = open.kind === 'citation' && open.target.y !== null && !open.range
-  return (
+  const shell = (body: React.ReactNode, foot: React.ReactNode): React.JSX.Element => (
     <div
       ref={boxRef}
-      className={`link-preview kind-${open.kind}${open.entry && open.entryFits && !size ? ' is-entry' : ''}`}
+      className={`link-preview kind-${open.kind}${open.card ? ' is-card' : ''}${open.entry && open.entryFits && !size ? ' is-entry' : ''}`}
       style={place}
       onPointerEnter={clearClose}
       onPointerLeave={(e) => {
         if (e.pointerType !== 'touch' && anchorOfTarget(e.relatedTarget) !== open.anchor) scheduleClose()
       }}
       role="dialog"
-      aria-label={t('linkPreview.label', { page: open.pageIndex + 1 })}
+      aria-label={
+        open.card
+          ? t('linkPreview.cardLabel', { count: open.card.entries.length })
+          : t('linkPreview.label', { page: open.pageIndex + 1 })
+      }
     >
-      <div
-        ref={scrollerRef}
-        className="link-preview-scroll"
-        style={{ height: pageH }}
-        onClick={follow}
-        title={t('linkPreview.tip')}
-      >
-        <div className="link-preview-content" style={{ width: open.pageW, height: open.pageH }}>
-          <div className="link-preview-sheet">
-            <div className="link-preview-canvas-host" />
-          </div>
-          {/* Outside the sheet: the theme filter would recolour the accent */}
-          {markTop !== null && (
-            <div
-              className="link-preview-mark"
-              style={{ top: markTop, left: Math.max(2, (open.vx ?? 0) - 10) }}
-            />
-          )}
-        </div>
-      </div>
-      <AbstractBody
-        ref={panelRef}
-        abs={abs}
-        onRetry={() => void askAbstract(open)}
-        maxHeight={panelMax}
-        // Its own cross: the abstract goes, the entry stays, the window keeps
-        // its place (it has been read in, so it stays open as before)
-        onClose={() => setAbs({ state: 'idle' })}
-      />
+      {body}
       <div className="link-preview-foot" {...footHandle}>
-        <span>
-          {t('linkPreview.page', { page: open.pageIndex + 1 })}
-          {open.range && ` · ${open.range[0]}–${open.range[1]}`}
-        </span>
-        {canAsk && abs.state === 'idle' && (
-          <button
-            type="button"
-            className="lpa-ask"
-            title={t('linkPreview.abstractTip')}
-            onClick={() => void askAbstract(open)}
-          >
-            {t('linkPreview.abstract')}
-          </button>
-        )}
-        {abs.state === 'loading' && <span className="lpa-loading">{t('linkPreview.abstractLoading')}</span>}
-        <AbstractSource abs={abs} />
+        {foot}
       </div>
       <span className="box-grip link-preview-grip" title={t('bubble.resizeTip')} {...gripProps} />
     </div>
   )
+
+  if (open.card) {
+    const card = open.card
+    const maxH = placed?.height != null ? placed.height - FOOT_PX : Math.round(winH * 0.6) - FOOT_PX
+    return shell(
+      <div
+        ref={scrollerRef}
+        className="lp-card"
+        style={size?.h != null ? { height: size.h } : { maxHeight: Math.max(80, maxH) }}
+        // Reading in — a press to select, a click on a row — keeps the card
+        onPointerDown={() => {
+          pinnedRef.current = true
+          clearClose()
+        }}
+      >
+        {card.entries.map((entry) => {
+          const a = abs[entry.dest] ?? { state: 'idle' }
+          return (
+            <div key={entry.dest} className="lp-ref" data-dest={entry.dest}>
+              <p className="lp-ref-text">
+                {entry.segments.map((s, i) =>
+                  s.url ? (
+                    <a
+                      key={i}
+                      href={s.url}
+                      title={s.url}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        bridge.openExternal(s.url!)
+                      }}
+                    >
+                      {s.text}
+                    </a>
+                  ) : (
+                    <span key={i}>{s.text}</span>
+                  )
+                )}
+              </p>
+              <div className="lp-ref-acts">
+                {a.state === 'idle' && (
+                  <button
+                    type="button"
+                    className="lp-ref-act"
+                    title={t('linkPreview.abstractTip')}
+                    onClick={() => void askAbstract(open, entry)}
+                  >
+                    {t('linkPreview.abstract')}
+                  </button>
+                )}
+                {a.state === 'loading' && <span className="lpa-loading">{t('linkPreview.abstractLoading')}</span>}
+                <AbstractSource abs={a} />
+                <button
+                  type="button"
+                  className="lp-ref-act"
+                  title={t('linkPreview.goToTip')}
+                  onClick={(e) => goTo(e, entry.dest)}
+                >
+                  {t('linkPreview.goTo', { page: entry.pageIndex + 1 })}
+                </button>
+              </div>
+              <AbstractBody
+                abs={a}
+                className="lp-ref-abstract"
+                onRetry={() => void askAbstract(open, entry)}
+                // Its own cross: the abstract goes, the row and the card stay
+                onClose={() => setAbs((m) => ({ ...m, [entry.dest]: { state: 'idle' } }))}
+              />
+            </div>
+          )
+        })}
+      </div>,
+      <span>{card.label ?? t('linkPreview.page', { page: open.pageIndex + 1 })}</span>
+    )
+  }
+
+  const markTop =
+    open.vy !== null && !open.entry && open.kind !== 'figure' && open.kind !== 'table' ? open.vy : null
+  const pageH = size?.h ?? open.box.h
+  return shell(
+    <div
+      ref={scrollerRef}
+      className="link-preview-scroll"
+      style={{ height: pageH }}
+      onClick={follow}
+      title={t('linkPreview.tip')}
+    >
+      <div className="link-preview-content" style={{ width: open.pageW, height: open.pageH }}>
+        <div className="link-preview-sheet">
+          <div className="link-preview-canvas-host" />
+        </div>
+        {/* Outside the sheet: the theme filter would recolour the accent */}
+        {markTop !== null && (
+          <div className="link-preview-mark" style={{ top: markTop, left: Math.max(2, (open.vx ?? 0) - 10) }} />
+        )}
+      </div>
+    </div>,
+    <span>
+      {t('linkPreview.page', { page: open.pageIndex + 1 })}
+      {open.range && ` · ${open.range[0]}–${open.range[1]}`}
+    </span>
+  )
+}
+
+/** The citation card for a hovered citation link: the whole bracket its
+ *  line holds around it (citationGroup), else the range its own characters
+ *  name, else its one entry. Null when not one entry could be read off the
+ *  reference list — the rendered window shows it then. */
+async function citationCard(anchor: HTMLElement, rec: LinkRecord, target: PreviewTarget): Promise<Card | null> {
+  const name = target.name!
+  const family = await familyDests(rec.pdf, destFamily(name))
+  const self: FamilyDest = family.find((d) => d.name === name) ?? {
+    name,
+    pageIndex: target.pageIndex,
+    x: target.x,
+    y: target.y!,
+    n: destLabel(name)
+  }
+  let dests: FamilyDest[] | null = null
+  let label: string | null = null
+  const ctx = lineAround(anchor)
+  if (ctx) {
+    const others: LineLink<string | null>[] = ctx.others.map((o) => {
+      const d = LINK_RECORDS.get(o.anchor)?.dest
+      const n = typeof d === 'string' ? d : null
+      return { start: o.start, end: o.end, kind: linkKind(n), label: destLabel(n), ref: n }
+    })
+    const group = citationGroup<string | null>(
+      ctx.text,
+      { start: ctx.start, end: ctx.end, kind: 'citation', label: destLabel(name), ref: name },
+      others
+    )
+    if (group) {
+      const per = group.parts.map((p) => groupDests(family, p, p.first, p.last))
+      const whole = per.every((d) => d !== null)
+      const parts = whole ? group.parts : [group.parts[group.hovered]!]
+      const found = whole ? (per as FamilyDest[][]) : per[group.hovered] ? [per[group.hovered]!] : null
+      if (found) {
+        dests = found.flat()
+        label = `[${parts.map((p) => (p.a === p.b ? `${p.a}` : `${p.a}–${p.b}`)).join(', ')}]`
+      }
+    }
+  }
+  if (!dests) {
+    // The link's own characters: «5–9» linked whole, outside any bracket
+    const range = citedRange(linkText(anchor))
+    const inRange = range ? groupDests(family, { a: range[0], b: range[1] }, name, null) : null
+    dests = inRange ?? [self]
+    label = inRange && range ? `${range[0]}–${range[1]}` : null
+  }
+  // One work cited twice in a bracket is one row
+  const seen = new Set<string>()
+  dests = dests.filter((d) => !seen.has(d.name) && !!seen.add(d.name))
+  const entries = await cardEntries(rec.pdf, dests, family.length ? family : [self])
+  if (!entries.length) return null
+  return { entries, label: entries.length > 1 ? label : null }
+}
+
+/** The line a link sits on, read off the page's text layer: its text, where
+ *  the hovered link's characters are in it, and where every other in-document
+ *  link on the line has its own. The line is the run of glyphs around the
+ *  link with no column gap in it — a two-column page's other column is not
+ *  part of it. Characters are placed by their own boxes, so a link that
+ *  starts or ends mid-span («[8» of «[8–13]») is cut where it really is. */
+function lineAround(
+  anchor: HTMLElement
+): { text: string; start: number; end: number; others: { anchor: HTMLElement; start: number; end: number }[] } | null {
+  const page = anchor.closest('.pdf-page')
+  if (!page) return null
+  const box = anchor.getBoundingClientRect()
+  if (box.width === 0) return null
+  const midY = (box.top + box.bottom) / 2
+  const range = document.createRange()
+  const chars: { c: string; l: number; r: number; h: number }[] = []
+  for (const span of page.querySelectorAll<HTMLElement>('.text-host .textLayer > span')) {
+    const sr = span.getBoundingClientRect()
+    if (midY < sr.top - 2 || midY > sr.bottom + 2) continue
+    const node = span.firstChild
+    if (!node || node.nodeType !== Node.TEXT_NODE) continue
+    const text = node.textContent ?? ''
+    for (let i = 0; i < text.length; i++) {
+      range.setStart(node, i)
+      range.setEnd(node, i + 1)
+      const c = range.getBoundingClientRect()
+      chars.push({ c: text[i]!, l: c.left, r: c.right, h: sr.height })
+    }
+  }
+  if (!chars.length) return null
+  chars.sort((p, q) => p.l - q.l)
+  // The run around the link: cut at a gap wider than two line heights
+  const at = chars.findIndex((c) => (c.l + c.r) / 2 >= box.left - 1)
+  if (at < 0) return null
+  let lo = at
+  let hi = at
+  const gap = (i: number): number => chars[i + 1]!.l - chars[i]!.r
+  while (lo > 0 && gap(lo - 1) < chars[lo]!.h * 2) lo--
+  while (hi < chars.length - 1 && gap(hi) < chars[hi]!.h * 2) hi++
+  let text = ''
+  const xs: number[] = []
+  for (let i = lo; i <= hi; i++) {
+    const ch = chars[i]!
+    // Spans meet with no blank between them: a visible gap is one
+    if (i > lo && gap(i - 1) > ch.h * 0.2 && !text.endsWith(' ') && ch.c !== ' ') {
+      text += ' '
+      xs.push(NaN)
+    }
+    text += ch.c
+    xs.push((ch.l + ch.r) / 2)
+  }
+  const within = (r: DOMRect): { start: number; end: number } | null => {
+    let s = -1
+    let e = -1
+    xs.forEach((x, i) => {
+      if (x >= r.left - 1 && x <= r.right + 1) {
+        if (s < 0) s = i
+        e = i + 1
+      }
+    })
+    return s < 0 ? null : { start: s, end: e }
+  }
+  const mine = within(box)
+  if (!mine) return null
+  const others: { anchor: HTMLElement; start: number; end: number }[] = []
+  for (const a of page.querySelectorAll<HTMLElement>('a.pdf-link.internal')) {
+    if (a === anchor || !LINK_RECORDS.has(a)) continue
+    const r = a.getBoundingClientRect()
+    if (midY < r.top - 2 || midY > r.bottom + 2) continue
+    const w = within(r)
+    if (w) others.push({ anchor: a, ...w })
+  }
+  return { text, ...mine, others }
 }
 
 /** A preview that cannot be drawn simply does not open; the link still works */

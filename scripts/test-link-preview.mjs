@@ -301,6 +301,132 @@ const L = (x0, y, text, size = 10) => ({ x0, x1: x0 + text.length * size * 0.5, 
   check('a single-column page is not two columns', !M.isTwoColumn([...Array(10)].map((_, i) => L(72, 700 - i * 12, 'a full width line of running text that crosses the middle of the page easily')), 612))
 }
 
+// ------------------- tier 1c: the citation read from the line (third round)
+{
+  // Where a substring sits in a line: the link's characters
+  const at = (line, s, from = 0) => {
+    const i = line.indexOf(s, from)
+    if (i < 0) throw new Error(`«${s}» not in «${line}»`)
+    return { start: i, end: i + s.length }
+  }
+  const cite = (line, s, ref, from = 0, label = null) => ({ ...at(line, s, from), kind: 'citation', label, ref })
+  const parts = (g) => JSON.stringify(g?.parts.map((p) => [p.a, p.b, p.first, p.last]) ?? null)
+
+  // The bracket itself
+  const b1 = 'wordline M [8–13] in the midst'
+  check('bracket: «[8–13]» from «[8»', JSON.stringify(M.citationBracket(b1, ...Object.values(at(b1, '[8'))).map((p) => [p.a, p.b])) === '[[8,13]]')
+  const b2 = 'models [3, 5–9; 12] here'
+  check('bracket: «[3, 5–9; 12]» is three members', JSON.stringify(M.citationBracket(b2, ...Object.values(at(b2, '9'))).map((p) => [p.a, p.b])) === '[[3,3],[5,9],[12,12]]')
+  check('bracket: «[5 - 9]» with blanks and a hyphen', JSON.stringify(M.citationBracket('[5 - 9]', 1, 2).map((p) => [p.a, p.b])) === '[[5,9]]')
+  check('bracket: the numbers\' own places', JSON.stringify(M.citationBracket(b1, 11, 13)[0].at) === JSON.stringify([at(b1, '8'), at(b1, '13')]))
+  check('not a bracket: «[see 5]»', M.citationBracket('as in [see 5] above', 11, 12) === null)
+  check('not a bracket: «[3, pp. 5–9]» (a locator)', M.citationBracket('in [3, pp. 5–9]', 4, 5) === null)
+  check('not a bracket: a year span «[2017–2019]»', M.citationBracket('[2017–2019]', 1, 5) === null)
+  check('not a bracket: a span no list has «[1–80]»', M.citationBracket('[1–80]', 1, 2) === null)
+  check('not a bracket: backwards «[9–5]»', M.citationBracket('[9–5]', 1, 2) === null)
+  check('not a bracket: the link outside it («[3] and 5»)', M.citationBracket('[3] and 5', 8, 9) === null)
+
+  // Both ends linked (hyperref + cite: «[8» and «13]»), from either end
+  const l1 = 'a type of thickened wordline M [8–13] in the midst of'
+  const end8 = cite(l1, '[8', 'cite.a')
+  const end13 = cite(l1, '13]', 'cite.f')
+  check('group from the first end: 8–13, both ends known', parts(M.citationGroup(l1, end8, [end13])) === '[[8,13,"cite.a","cite.f"]]')
+  check('group from the last end: the same group', parts(M.citationGroup(l1, end13, [end8])) === '[[8,13,"cite.a","cite.f"]]')
+  check('group with the other end unlinked: from the linked one', parts(M.citationGroup(l1, end8, [])) === '[[8,13,"cite.a",null]]')
+  // A link over «8–13» whole stands at its first number
+  check('one link over the whole range', parts(M.citationGroup(l1, cite(l1, '8–13', 'cite.a'), [])) === '[[8,13,"cite.a",null]]')
+
+  // The whole bracket, like Zotero: «[9, 33]» and «[3, 5–9]» from any number
+  const l2 = 'patch in two [29–32] and three [9, 33] dimensional models'
+  const g2 = M.citationGroup(l2, cite(l2, '33]', 'cite.s'), [cite(l2, '[9,', 'cite.c'), cite(l2, '[29', 'cite.x'), cite(l2, '32]', 'cite.y')])
+  check('«[9, 33]» from «33]»: both members, the neighbour bracket not', parts(g2) === '[[9,9,"cite.c","cite.c"],[33,33,"cite.s","cite.s"]]' && g2.hovered === 1)
+  const l3 = 'as shown in [3, 5–9] for the'
+  const g3 = M.citationGroup(l3, cite(l3, '3,', 'cite.p'), [cite(l3, '5', 'cite.q', l3.indexOf('5')), cite(l3, '9]', 'cite.u')])
+  check('«[3, 5–9]» from «3»: 3 and 5–9', parts(g3) === '[[3,3,"cite.p","cite.p"],[5,9,"cite.q","cite.u"]]' && g3.hovered === 0)
+
+  // Corroboration: the links must agree with the reading
+  const eqEnd = { ...at(l1, '13]'), kind: 'equation', label: null, ref: 'equation.13' }
+  check('the other end goes to an equation: no group', M.citationGroup(l1, end8, [eqEnd]) === null)
+  check('a numbered destination that names another entry: no group', M.citationGroup(l1, cite(l1, '[8', 'bib7', 0, 7), []) === null)
+  check('a numbered destination that names this one: the group', parts(M.citationGroup(l1, cite(l1, '[8', 'bib8', 0, 8), [cite(l1, '13]', 'bib13', 0, 13)])) === '[[8,13,"bib8","bib13"]]')
+  // A member whose links contradict it costs the group its OTHER members only
+  const g4 = M.citationGroup(l3, cite(l3, '9]', 'cite.u'), [{ ...at(l3, '3,'), kind: 'figure', label: null, ref: 'figure.3' }])
+  check('«[3, 5–9]» with «3» a figure link: 5–9 alone', parts(g4) === '[[5,9,null,"cite.u"]]' && g4.hovered === 0)
+  check('the hovered link must be a citation', M.citationGroup(l1, { ...end8, kind: 'other' }, [end13]) === null)
+
+  // False positives: what is not a bracketed numeric citation
+  const eqs = 'from (5)–(9) it follows'
+  check('equations «(5)–(9)»: no group', M.citationGroup(eqs, cite(eqs, '5', 'cite.k'), []) === null)
+  const prose = 'see pages 5–9 of the survey [3] for'
+  check('a page range in prose: no group', M.citationGroup(prose, cite(prose, '5', 'cite.k'), []) === null)
+  check('…but its own citation still reads: [3]', parts(M.citationGroup(prose, cite(prose, '3', 'cite.k'), [])) === '[[3,3,"cite.k","cite.k"]]')
+  const sec = 'Sections [5–9] of Ref. [2]'
+  check('a bracket whose other end goes to a section: no group', M.citationGroup(sec, cite(sec, '[5', 'cite.k'), [{ ...at(sec, '9]'), kind: 'section', label: null, ref: 'section.9' }]) === null)
+}
+{
+  // The family in the list's order, and a group's destinations along it
+  const D = (name, pageIndex, x, y, n = null) => ({ name, pageIndex, x, y, n })
+  const fam = [
+    D('cite.k', 45, 320, 700), D('cite.c', 44, 72, 300), D('cite.d', 44, 320, 700),
+    D('cite.a', 44, 72, 700), D('cite.b', 44, 72, 500), D('cite.e', 44, 320, 400)
+  ]
+  const ordered = M.orderFamily(fam, () => 612)
+  check('order: page, then the left column top-down, then the right', ordered.map((d) => d.name).join() === 'cite.a,cite.b,cite.c,cite.d,cite.e,cite.k', ordered.map((d) => d.name).join())
+  const names = (ds) => (ds ? ds.map((d) => d.name).join() : 'null')
+  check('both ends linked: the run between them', names(M.groupDests(ordered, { a: 8, b: 11 }, 'cite.b', 'cite.e')) === 'cite.b,cite.c,cite.d,cite.e')
+  check('both ends linked but the count disagrees: not trusted', M.groupDests(ordered, { a: 8, b: 10 }, 'cite.b', 'cite.e') === null)
+  check('only the first end: counted forward', names(M.groupDests(ordered, { a: 1, b: 3 }, 'cite.a', null)) === 'cite.a,cite.b,cite.c')
+  check('only the last end: counted back, over the column break', names(M.groupDests(ordered, { a: 4, b: 6 }, null, 'cite.k')) === 'cite.d,cite.e,cite.k')
+  check('past the list\'s end: null', M.groupDests(ordered, { a: 1, b: 4 }, 'cite.e', null) === null)
+  check('a name the family lacks: null', M.groupDests(ordered, { a: 1, b: 2 }, 'cite.zz', null) === null)
+  // Numbered names are matched by their number, wherever they are
+  const bib = [D('bib5', 20, 72, 700, 5), D('bib6', 20, 72, 650, 6), D('bib7', 20, 320, 700, 7), D('bib9', 21, 72, 700, 9), D('bib8', 20, 320, 600, 8)]
+  check('numbered: 5–9 by number, across the page', names(M.groupDests(M.orderFamily(bib, () => 612), { a: 5, b: 9 }, 'bib5', null)) === 'bib5,bib6,bib7,bib8,bib9')
+  check('numbered: a number missing → null', M.groupDests(bib, { a: 5, b: 10 }, null, 'bib9') === null)
+}
+{
+  // The entry as text: one paragraph, hyphenation undone, links kept
+  const runLine = (x0, y, parts) => {
+    // parts: [text, width] — runs laid end to end
+    let text = ''
+    let x = x0
+    const runs = []
+    for (const [t, w] of parts) {
+      runs.push({ x0: x, x1: x + w, start: text.length, end: text.length + t.length })
+      text += t
+      x += w
+    }
+    return { x0, x1: x, y, size: 10, text, runs }
+  }
+  const lines = [
+    runLine(72, 700, [['[5] T. Damour, Black Hole Eddy Currents, ', 200], ['Phys. Rev. D 18 (1978)', 110]]),
+    runLine(72, 688, [['3598–3604', 50], ['. Quelques proprietes electromagnet-', 180]]),
+    runLine(72, 676, [['iques des trous noirs, ', 110], ['https://doi.org/10.1103/', 120]]),
+    runLine(72, 664, [['PhysRevD.18.3598', 80], ['.', 3]])
+  ]
+  const links = [
+    { rect: [272, 698, 382, 708], url: 'https://doi.org/10.1103/PhysRevD.18.3598' },
+    { rect: [72, 686, 122, 696], url: 'https://doi.org/10.1103/PhysRevD.18.3598' },
+    { rect: [182, 674, 302, 684], url: 'https://doi.org/x' },
+    { rect: [72, 662, 152, 672], url: 'https://doi.org/x' }
+  ]
+  const seg = M.entrySegments(lines, links)
+  const text = seg.map((s) => s.text).join('')
+  check('entry text: lines joined by a space, a hyphenated word whole, a URL whole', text === '[5] T. Damour, Black Hole Eddy Currents, Phys. Rev. D 18 (1978) 3598–3604. Quelques proprietes electromagnetiques des trous noirs, https://doi.org/10.1103/PhysRevD.18.3598.', JSON.stringify(text))
+  const linked = seg.filter((s) => s.url).map((s) => s.text)
+  check('entry links: the journal reference over two lines is ONE link, its blank included', linked[0] === 'Phys. Rev. D 18 (1978) 3598–3604', JSON.stringify(linked))
+  check('entry links: the URL over two lines is one link, no blank', linked[1] === 'https://doi.org/10.1103/PhysRevD.18.3598', JSON.stringify(linked))
+  check('entry links: the full stop after a link is not the link\'s', seg[seg.length - 1].text === '.' && !seg[seg.length - 1].url)
+  check('entry text without links or runs: plain', JSON.stringify(M.entrySegments([{ x0: 72, x1: 300, y: 700, size: 10, text: 'Smith, A. A title.' }])) === JSON.stringify([{ text: 'Smith, A. A title.' }]))
+  check('a real hyphen before a capital stays', M.entrySegments([L(72, 700, 'the Gibbons-'), L(72, 688, 'Hawking action')]).map((s) => s.text).join('') === 'the Gibbons- Hawking action')
+  // textLines records where each run's characters are, collapsed whitespace and all
+  const tl = M.textLines([
+    { str: '  [5]  T.', transform: [10, 0, 0, 10, 72, 700], width: 40 },
+    { str: 'Damour', transform: [10, 0, 0, 10, 115, 700], width: 35 }
+  ])
+  check('textLines: runs address the final text', tl[0].text === '[5] T. Damour' && JSON.stringify(tl[0].runs) === JSON.stringify([{ x0: 72, x1: 112, start: 0, end: 6 }, { x0: 115, x1: 150, start: 7, end: 13 }]), JSON.stringify(tl[0]))
+}
+
 // ------------------------------------------------------ tier 2: real pdf.js
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href
@@ -391,6 +517,13 @@ function namedDestFixture() {
   const target = await M.resolvePreviewTarget(doc, 'cite.adams')
   const entry = await M.citationEntryText(doc, target)
   check('real pdf.js: the entry ends at the next destination', entry === 'Adams, A. (2001). First paper title here.\nJournal of Things 1, 1-10.', JSON.stringify(entry))
+  // The citation card reads the same table: the whole family in list order,
+  // and each entry as one paragraph of text
+  const fam = await M.familyDests(doc, M.destFamily('cite.adams'))
+  check('real pdf.js: the family in list order, pages resolved', fam.map((d) => `${d.name}@${d.pageIndex}`).join() === 'cite.adams@0,cite.brown@0', JSON.stringify(fam))
+  const card = await M.cardEntries(doc, fam, fam)
+  check('real pdf.js: one card row per entry, as text', card.length === 2 && card[0].segments.map((s) => s.text).join('') === 'Adams, A. (2001). First paper title here. Journal of Things 1, 1-10.', JSON.stringify(card.map((c) => c.segments)))
+  check('real pdf.js: a card row keeps the lookup text line by line', card[0].text === entry)
 }
 {
   const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(SAMPLE)), verbosity: 0 }).promise

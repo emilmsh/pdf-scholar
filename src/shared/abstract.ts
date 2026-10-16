@@ -62,7 +62,11 @@ export function joinEntryLines(text: string): string {
 
 /** arXiv identifiers as references print them: `arXiv:1706.03762v5`,
  *  `arxiv.org/abs/…`, CoRR's `abs/1409.0473`, the 10.48550 DOI, and the old
- *  `hep-th/9901001` scheme. */
+ *  `hep-th/9901001` scheme. Physics prints them BARE too — INSPIRE's
+ *  references end «[2110.14670]» or «2303.02837.», and «[gr-qc/9712077]» —
+ *  so a bare id counts when it could only be one: a real year and month
+ *  (2007 on, when the scheme began), four digits after the dot before 2015
+ *  and five from then, or an old-scheme archive by its name. */
 export function findArxivId(text: string): string | null {
   const patterns = [
     /arxiv[:\s]+(\d{4}\.\d{4,5})(?:v\d+)?/i,
@@ -70,11 +74,19 @@ export function findArxivId(text: string): string | null {
     /10\.48550\/arxiv\.(\d{4}\.\d{4,5})/i,
     /\babs\/(\d{4}\.\d{4,5})\b/i,
     /arxiv[:\s]+([a-z-]+(?:\.[a-z]{2})?\/\d{7})/i,
-    /arxiv\.org\/(?:abs|pdf)\/([a-z-]+(?:\.[a-z]{2})?\/\d{7})/i
+    /arxiv\.org\/(?:abs|pdf)\/([a-z-]+(?:\.[a-z]{2})?\/\d{7})/i,
+    /(?<![\w/-])((?:hep-(?:th|ph|lat|ex)|gr-qc|astro-ph|quant-ph|cond-mat|math-ph|nucl-(?:th|ex)|nlin|physics|math)(?:\.[A-Z]{2})?\/\d{7})(?![\d/])/
   ]
   for (const re of patterns) {
     const m = re.exec(text)
     if (m) return m[1]!
+  }
+  for (const m of text.matchAll(/(?<![\w./:-])(\d{2})(\d{2})\.(\d{4,5})(?:v\d+)?(?![\w/-]|\.\d)/g)) {
+    const yy = Number(m[1])
+    const mm = Number(m[2])
+    if (yy < 7 || mm < 1 || mm > 12) continue
+    if (m[3]!.length !== (yy * 100 + mm >= 1501 ? 5 : 4)) continue
+    return `${m[1]}${m[2]}.${m[3]}`
   }
   return null
 }

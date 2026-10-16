@@ -45,6 +45,17 @@ eq(A.findArxivId('potential local projections. arXiv: 2103.01280.'), '2103.01280
 eq(A.findArxivId('https://doi.org/10.48550/arXiv.1706.03762'), '1706.03762', 'the 10.48550 DOI')
 eq(A.findArxivId('arXiv:hep-th/9901001'), 'hep-th/9901001', 'old scheme')
 eq(A.findArxivId('Econometrica 56, 931–954.'), null, 'none')
+eq(A.findArxivId('[11] E. Witten, Algebras, Regions, and Observers, 2303.02837.'), '2303.02837', 'bare id at the end (INSPIRE)')
+eq(A.findArxivId('JHEP 07 (2022) 140 [2110.14670].'), '2110.14670', 'bare id in brackets')
+eq(A.findArxivId('Phys. Rev. D 58 (1998) 064011, [gr-qc/9712077].'), 'gr-qc/9712077', 'bare old scheme')
+eq(A.findArxivId('JHEP 05 (2012) 1205.1234'), '1205.1234', 'four digits before 2015')
+eq(A.findArxivId('Phys. Lett. B 1234.5678 (1990)'), null, 'not a month: 34')
+eq(A.findArxivId('Rev. 1312.12345'), null, 'five digits before 2015')
+eq(A.findArxivId('vol. 2303.0283'), null, 'four digits from 2015')
+eq(A.findArxivId('pp. 0612.3456'), null, 'before the scheme began (2007)')
+eq(A.findArxivId('https://example.org/x/2303.02837'), null, 'part of a path')
+eq(A.findArxivId('10.1103/2303.02837'), null, 'part of a DOI')
+eq(A.findArxivId('see Table 2303.02837.5'), null, 'part of a longer number')
 eq(A.yearsIn('Neural computation, 9(8):1735–1780, 1997. doi:10.1162/neco.1997.9.8.1735'), [1997], 'years, not DOI fragments or pages')
 
 // --- Does a selection read like a reference? (the selection menu's «Sammendrag») ----

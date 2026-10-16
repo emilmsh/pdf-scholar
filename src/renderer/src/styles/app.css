@@ -3135,6 +3135,83 @@ html.pen-near .draw-layer {
   scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
 }
 
+/* A citation as a CARD, the way Zotero's reader shows one (issue #31, third
+   round): one row per reference, the entry's own text in the app's type —
+   selectable, its DOIs and URLs live — and two quiet actions under each.
+   No page, so no paper tone: this is the app talking, like the abstract. */
+.lp-card {
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
+  padding: 6px 0;
+}
+
+.lp-ref {
+  padding: 6px 14px 4px;
+}
+
+.lp-ref + .lp-ref {
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.lp-ref-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  user-select: text;
+  cursor: text;
+}
+
+.lp-ref-text a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.lp-ref-text a:hover {
+  text-decoration: underline;
+}
+
+.lp-ref-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.lp-ref-act {
+  padding: 1px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.lp-ref-act:hover {
+  color: var(--accent);
+}
+
+/* The last action sits right, away from what the abstract says */
+.lp-ref-acts .lp-ref-act:last-child {
+  margin-left: auto;
+}
+
+/* The abstract folds out under its own row, inset like a quotation */
+.link-preview-abstract.lp-ref-abstract {
+  overflow: visible;
+  margin: 6px 0 4px;
+  padding: 8px 12px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}
+
 /* A citation cut to its entry: nothing beyond it to scroll to */
 .link-preview.is-entry .link-preview-scroll {
   overflow: hidden;

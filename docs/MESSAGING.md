@@ -227,17 +227,20 @@ carries no picture of its own.)*
 
 Rest the pointer on a citation, a figure, a table or an equation reference
 and a preview of what it points to opens beside the text, without moving the
-page (long-press on a touchscreen). A citation shows its reference entry, and
-only that; a citation written as a range («5–9») shows every entry in it. A
-figure, a table or an equation gets a window onto the page it is on: scroll
-it, Ctrl+wheel to rescale it, drag the corner to make it bigger. Click inside
-to go there, Ctrl+click to open it in the other column.
+page (long-press on a touchscreen). A citation shows its reference as text,
+the way Zotero's reader does — selectable, its DOI and web links live — and a
+bracketed citation like «[3, 5–9]» lists every reference in it, whichever of
+its numbers the pointer rests on. Each reference has «Go to» for its place in
+the list (Ctrl+click: the other column). A figure, a table or an equation gets
+a window onto the page it is on: scroll it, Ctrl+wheel to rescale it, drag the
+corner to make it bigger. Click inside to go there, Ctrl+click to open it in
+the other column.
 
 - On a citation, one click fetches the cited paper's abstract from free
   scholarly databases (arXiv, Europe PMC, Crossref, OpenAlex) — no key, no
-  account, and only on that click. It folds out under the entry and closes on
-  its own. In the reference list itself, select an entry and «Sammendrag» in
-  the selection menu does the same
+  account, and only on that click; each reference in a bracket has its own. It
+  folds out under its reference and closes on its own. In the reference list
+  itself, select an entry and «Sammendrag» in the selection menu does the same
 - Roughly two in three citations find an abstract; books, working papers and
   some paywalled journals often do not *(never promise it for every citation)*
 - «Forhåndsvis lenker» in the settings menu turns the previews off, or sets
@@ -251,7 +254,12 @@ a citation shows ONLY its entry, a figure a page window with a thin scrollbar
 and a corner grip, the abstract under the whole entry with its own cross; a
 sideways page is measured through its own transform. Its own section on Emil's
 ask the same day; its frame `link_preview` (a citation with the abstract
-unfolded, page 2) shot and approved the same evening.)*
+unfolded, page 2) shot and approved the same evening. Third round on
+2026-10-16: the citation became Zotero's card — the reporter preferred it to a
+rendered cut of the bibliography page, and Zotero's users are this app's
+readers — and a range is read from the line around the link, since a PDF
+links «[5» and «9]» rather than «5–9». The `link_preview` frame predates the
+card and needs shooting again.)*
 
 ### 2. Split view
 

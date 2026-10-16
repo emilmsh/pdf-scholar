@@ -723,7 +723,7 @@ function PdfPage({
           // without following it — the document rides along, since a split
           // column can show another file than the tab's
           anchor.classList.add('internal')
-          LINK_RECORDS.set(anchor, { pdf, dest: link.dest, rotation })
+          LINK_RECORDS.set(anchor, { pdf, dest: link.dest, rotation, follow: onInternalLink })
         }
         anchor.addEventListener('click', (e) => {
           e.preventDefault()
