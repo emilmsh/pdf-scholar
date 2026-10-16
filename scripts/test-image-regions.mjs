@@ -180,6 +180,31 @@ const walk = (ops) =>
   ])
   check('unknown ops (text, masks, …) are ignored', rects.length === 1 && rectNear(rects[0], 0, 0, 10, 10), JSON.stringify(rects))
 }
+{
+  // Painted paths (the link preview reads a vector figure off these): the
+  // box pdf.js hands over goes through the CTM; a clip paints nothing
+  const P = { ...OPS, constructPath: 20, endPath: 21, stroke: 22, fill: 23 }
+  const ops = [
+    [P.save],
+    [P.transform, [2, 0, 0, 2, 10, 0]],
+    [P.constructPath, [P.stroke, [null], new Float32Array([50, 50, 150, 60])]], // → (110..310, 100..120)
+    [P.restore],
+    [P.constructPath, [P.endPath, [null], new Float32Array([0, 0, 612, 792])]], // a clip
+    [P.constructPath, [P.fill, [null], null]], // an empty path
+    [P.constructPath, [P.fill, [null], new Float32Array([300, 300, 400, 350])]],
+    [P.paintImageXObject, ['img']]
+  ]
+  const fns = ops.map(([f]) => f)
+  const args = ops.map(([, a]) => a ?? null)
+  const paths = M.pathRectsFromOps(fns, args, P)
+  check(
+    'paths: each painted box through its CTM, the clip and the empty path left out',
+    paths.length === 2 && rectNear(paths[0], 110, 100, 310, 120) && rectNear(paths[1], 300, 300, 400, 350),
+    JSON.stringify(paths)
+  )
+  check('paths: images stay images', M.imageRectsFromOps(fns, args, P).length === 1)
+  check('paths: an ops table without constructPath reads none', M.pathRectsFromOps(fns, args, OPS).length === 0)
+}
 
 // ------------------------------------------------- tier 2: the real pipeline
 // A hand-built PDF (the test-signatures way): one 2×2 uncompressed DeviceRGB
@@ -278,6 +303,41 @@ check('fixture parses (3 pages)', doc.numPages === 3, `${doc.numPages}`)
   const page = await doc.getPage(3)
   const rects = await M.pageImageRects(page, pdfjs.OPS)
   check('a page-covering image (scan) is dropped', rects.length === 0, JSON.stringify(rects))
+}
+
+{
+  // Paths through pdf.js's own operator list: a stroked rule under a scale,
+  // a filled box, a clip, and a page-wide background fill (dropped)
+  const content = [
+    '1 1 1 rg 0 0 612 792 re f',
+    'q 2 0 0 2 0 0 cm 50 300 m 150 300 l S Q',
+    '0 0 612 792 re W n',
+    '0 0 1 rg 300 100 100 50 re f',
+    ''
+  ].join('\n')
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>',
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`
+  ]
+  let pdf = '%PDF-1.7\n'
+  const offs = []
+  objs.forEach((o, i) => {
+    offs.push(pdf.length)
+    pdf += `${i + 1} 0 obj\n${o}\nendobj\n`
+  })
+  const at = pdf.length
+  pdf += `xref\n0 5\n0000000000 65535 f \n`
+  for (const o of offs) pdf += `${String(o).padStart(10, '0')} 00000 n \n`
+  pdf += `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${at}\n%%EOF\n`
+  const pdoc = await pdfjs.getDocument({ data: new Uint8Array(Buffer.from(pdf, 'latin1')) }).promise
+  const paths = await M.pagePathRects(await pdoc.getPage(1), pdfjs.OPS)
+  const rule = paths.find((r) => near(r.y0, 600, 2) && near(r.y1, 600, 2))
+  const box = paths.find((r) => rectNear(r, 300, 100, 400, 150))
+  check('real op list: the scaled rule (100..300 at y 600)', !!rule && near(rule.x0, 100) && near(rule.x1, 300), JSON.stringify(paths))
+  check('real op list: the filled box', !!box, JSON.stringify(paths))
+  check('real op list: the clip and the page-wide background are not figure strokes', paths.length === 2, JSON.stringify(paths))
 }
 
 // ------------------------------------------- tier 3: turning one into a file

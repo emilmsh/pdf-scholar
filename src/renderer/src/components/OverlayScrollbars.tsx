@@ -15,12 +15,17 @@ const REVEAL_ZONE = 18
  *  React state — per the standing efficiency concern. */
 export function OverlayScrollbars({
   scrollRef,
-  layoutKey
+  layoutKey,
+  hoverReveal = false
 }: {
   scrollRef: React.RefObject<HTMLDivElement | null>
   /** Changes whenever the scrollable content is re-laid-out (zoom, document
    *  switch, rotation) — anything that moves scrollWidth/scrollHeight. */
   layoutKey: string
+  /** A small scroller (the link preview): the pills show while the pointer
+   *  is over it, not only near its edge — and a re-layout does not flash
+   *  them, the window opening under a pointer that is not in it yet */
+  hoverReveal?: boolean
 }): React.JSX.Element {
   const vRef = useRef<HTMLDivElement>(null)
   const hRef = useRef<HTMLDivElement>(null)
@@ -34,12 +39,15 @@ export function OverlayScrollbars({
     const h = hRef.current
     if (!el || !v || !h) return
 
-    const state = { dragging: false, hovered: false, raf: 0, hideTimer: 0 }
+    const state = { dragging: false, hovered: false, inside: false, raf: 0, hideTimer: 0 }
 
     const update = (): void => {
       const { clientWidth: cw, clientHeight: ch, scrollWidth: sw, scrollHeight: sh } = el
-      const needV = sh > ch + 1
-      const needH = sw > cw + 1
+      // A small scroller may switch an axis off (a preview cut to exactly
+      // its target): content beyond it is then not there to scroll to
+      const cs = hoverReveal ? getComputedStyle(el) : null
+      const needV = sh > ch + 1 && cs?.overflowY !== 'hidden'
+      const needH = sw > cw + 1 && cs?.overflowX !== 'hidden'
       v.style.display = needV ? '' : 'none'
       h.style.display = needH ? '' : 'none'
       if (needV) {
@@ -63,7 +71,7 @@ export function OverlayScrollbars({
       h.classList.add('show')
       window.clearTimeout(state.hideTimer)
       state.hideTimer = window.setTimeout(() => {
-        if (state.dragging || state.hovered) return
+        if (state.dragging || state.hovered || state.inside) return
         v.classList.remove('show')
         h.classList.remove('show')
       }, HIDE_DELAY)
@@ -128,6 +136,17 @@ export function OverlayScrollbars({
       pill.addEventListener('pointercancel', onUp)
     }
 
+    // hoverReveal: over the scroller at all
+    const onScrollerEnter = (): void => {
+      state.inside = true
+      update()
+      show()
+    }
+    const onScrollerLeave = (): void => {
+      state.inside = false
+      show()
+    }
+
     const onEnter = (): void => {
       state.hovered = true
       show()
@@ -141,6 +160,10 @@ export function OverlayScrollbars({
     const dragH = beginDrag('h')
     el.addEventListener('scroll', onScroll, { passive: true })
     el.addEventListener('mousemove', onMouseMove, { passive: true })
+    if (hoverReveal) {
+      el.addEventListener('pointerenter', onScrollerEnter)
+      el.addEventListener('pointerleave', onScrollerLeave)
+    }
     for (const pill of [v, h]) {
       pill.addEventListener('pointerenter', onEnter)
       pill.addEventListener('pointerleave', onLeave)
@@ -156,6 +179,8 @@ export function OverlayScrollbars({
       window.clearTimeout(state.hideTimer)
       el.removeEventListener('scroll', onScroll)
       el.removeEventListener('mousemove', onMouseMove)
+      el.removeEventListener('pointerenter', onScrollerEnter)
+      el.removeEventListener('pointerleave', onScrollerLeave)
       for (const pill of [v, h]) {
         pill.removeEventListener('pointerenter', onEnter)
         pill.removeEventListener('pointerleave', onLeave)
@@ -165,14 +190,14 @@ export function OverlayScrollbars({
       ro.disconnect()
       apiRef.current = null
     }
-  }, [scrollRef])
+  }, [scrollRef, hoverReveal])
 
   // Re-measure on zoom / document switch / rotation, and flash the pills so
   // the reader sees where they landed.
   useEffect(() => {
     apiRef.current?.update()
-    apiRef.current?.show()
-  }, [layoutKey])
+    if (!hoverReveal) apiRef.current?.show()
+  }, [layoutKey, hoverReveal])
 
   return (
     <>

@@ -27,7 +27,11 @@
 // An entry the page gives no text for falls back to the rendered window.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { OPS } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { pageImageRects, pagePathRects } from '../image-regions'
+import type { OpsTable } from '../image-regions'
+import { OverlayScrollbars } from './OverlayScrollbars'
 import { useDismissable } from '../useDismissable'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
@@ -45,9 +49,14 @@ import {
   destOnFigureCaption,
   entryBox,
   entryLines,
+  equationBox,
   familyDests,
   familySiblings,
+  fitBox,
+  floatBox,
+  footnoteLines,
   groupDests,
+  inFootnotes,
   LINK_RECORDS,
   linkKind,
   placeExpanded,
@@ -59,9 +68,10 @@ import {
   resolvePreviewTarget,
   textBounds,
   textExtent,
-  textLines
+  textLines,
+  uprightItems
 } from '../link-preview'
-import type { CardEntry, FamilyDest, LineLink, LinkKind, LinkRecord, PreviewTarget } from '../link-preview'
+import type { CardEntry, FamilyDest, Graphic, LineLink, LinkKind, LinkRecord, PdfBox, PreviewTarget } from '../link-preview'
 
 interface Props {
   /** The viewer's root: only links inside it are this component's */
@@ -98,9 +108,10 @@ interface Open {
    *  the abstract button stands down (one abstract for five works would be
    *  a guess about which) */
   range: [number, number] | null
-  /** Cut to the reference entry itself (a citation whose entry could be
-   *  read off the page): no neighbours, no marker, and no scrolling unless
-   *  the entry is taller than the window may be */
+  /** Cut to the target itself — a citation's reference entry, a
+   *  footnote, a figure or table, an equation's display — when the page
+   *  says where it ends: no neighbours, no marker, and no scrolling unless
+   *  it is bigger than the window may be */
   entry: boolean
   entryFits: boolean
 }
@@ -126,6 +137,9 @@ const CLOSE_GRACE_MS = 220
 const LONG_PRESS_MS = 450
 /** The footer line under the page window, borders included (app.css) */
 const FOOT_PX = 27
+/** Air around a target cut to its box, both sides together: a table's top
+ *  rule or a plot's frame sits right on the box's edge */
+const TARGET_PAD = { x: 24, y: 20 }
 /** Rendered pages kept per document. A paper's citations land on its one to
  *  three reference pages, so a handful makes every hover after the first one
  *  on a page instant. */
@@ -286,6 +300,9 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     // The link's own words: a cited range («5–9») shows every entry it names
     const range = target.kind === 'citation' && target.y !== null ? citedRange(linkText(anchor)) : null
     const box = previewSize(target.kind, window.innerWidth, window.innerHeight)
+    /** The default width, before anything grows it: what a target cut to
+     *  its own box is read to fit */
+    const prefW = box.w
     // Read at the scale that fits the page's column into the window —
     // independent of the document's zoom, which made a fit-width page's
     // window a keyhole onto one column and a fit-page window unreadably small
@@ -301,6 +318,10 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     /** A citation's own entry (and a range's last one): the window is cut
      *  to exactly these lines */
     let entryRect: PdfRect | null = null
+    /** The whole target — a footnote, a float, a display: the window is
+     *  cut to it and sized to hold it (Emil, 2026-10-16) */
+    let targetRect: PdfBox | null = null
+    let fit: ReturnType<typeof fitBox> | null = null
     // Every measure goes through the page's own transform (viewportBox):
     // a landscape table in a portrait thesis is a /Rotate 90 page whose
     // text runs along PDF y, and reading its x as the width made the
@@ -356,6 +377,13 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
           const e = viewportBox(base, entryRect)
           scale = previewScale(e.r - e.l, box.w, e.r - e.l + 24 > box.w ? 0.75 : 1)
         }
+      } else if (content && target.y !== null && base.rotation % 180 === 0) {
+        targetRect = await targetBox(rec.pdf, target, dstPage, content.items, pageWidth, pageHeight)
+        if (targetRect) {
+          const e = viewportBox(base, targetRect)
+          fit = fitBox(e.r - e.l, e.b - e.t, prefW, targetRoom(), 0.75, TARGET_PAD)
+          scale = fit.scale
+        }
       }
     }
     if (mine !== seq.current) return
@@ -377,7 +405,20 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     let scroll: { left: number; top: number }
     let entry = false
     let entryFits = false
-    if (entryRect) {
+    if (targetRect && fit) {
+      // Cut to the target and sized to hold it: grown first, read smaller
+      // only down to the floor, scrolled only past that
+      const { l, t, r, b } = viewportBox(img.viewport, targetRect)
+      const room = targetRoom()
+      box.w = Math.min(room.w, Math.ceil(r - l) + TARGET_PAD.x)
+      box.h = Math.max(40, Math.min(room.h, Math.ceil(b - t) + TARGET_PAD.y))
+      scroll = {
+        left: Math.max(0, Math.floor(l) - TARGET_PAD.x / 2),
+        top: Math.max(0, Math.floor(t) - TARGET_PAD.y / 2)
+      }
+      entry = true
+      entryFits = fit.fits
+    } else if (entryRect) {
       // Cut to the entry: its lines, a little air, nothing of the neighbours
       const { l, t, r, b } = viewportBox(img.viewport, entryRect)
       const need = Math.ceil(b - t) + 12
@@ -468,7 +509,9 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       pageH: img.h,
       vx: o.vx === null ? null : o.vx * k,
       vy: o.vy === null ? null : o.vy * k,
-      scroll: { left: (sc?.scrollLeft ?? o.scroll.left) * k, top: (sc?.scrollTop ?? o.scroll.top) * k }
+      scroll: { left: (sc?.scrollLeft ?? o.scroll.left) * k, top: (sc?.scrollTop ?? o.scroll.top) * k },
+      // Zoomed, a cut-out no longer fits its window: it scrolls
+      entryFits: false
     })
   }
   useEffect(() => {
@@ -745,7 +788,17 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
           : t('linkPreview.label', { page: open.pageIndex + 1 })
       }
     >
-      {body}
+      <div className="link-preview-body">
+        {body}
+        {/* The app's own bars, as over the pages: on hover and while
+            scrolling, gone otherwise (Emil, 2026-10-16 — Windows draws
+            the native thin bar with arrow buttons on both axes) */}
+        <OverlayScrollbars
+          scrollRef={scrollerRef}
+          layoutKey={`${open.card ? 'card' : 'page'}:${open.scale}:${open.pageW}x${open.pageH}:${size?.w}x${size?.h}:${placed?.height}`}
+          hoverReveal
+        />
+      </div>
       <div className="link-preview-foot" {...footHandle}>
         {foot}
       </div>
@@ -982,6 +1035,45 @@ function lineAround(
     if (w) others.push({ anchor: a, ...w })
   }
   return { text, ...mine, others }
+}
+
+/** The room a window cut to its target may take: most of the app window,
+ *  the footer line aside */
+function targetRoom(): { w: number; h: number } {
+  return {
+    w: Math.min(window.innerWidth - 24, Math.round(window.innerWidth * 0.9)),
+    h: Math.round(window.innerHeight * 0.85) - FOOT_PX
+  }
+}
+
+/** The box of the whole thing a destination points at — the footnote, the
+ *  figure or table, the equation's display — read off its page (the rules
+ *  in ../link-preview.ts). Null when the page does not say: the window then
+ *  opens the way it always has. Text drawn rotated (arXiv's margin stamp)
+ *  is left out of the reading. */
+async function targetBox(
+  pdf: PDFDocumentProxy,
+  target: PreviewTarget,
+  page: Awaited<ReturnType<PDFDocumentProxy['getPage']>>,
+  items: readonly unknown[],
+  pageWidth: number,
+  pageHeight: number
+): Promise<PdfBox | null> {
+  if (target.y === null) return null
+  const lines = textLines(uprightItems(items))
+  const dest = { x: target.x, y: target.y }
+  const size = { w: pageWidth, h: pageHeight }
+  if (target.kind === 'footnote' || (target.kind === 'other' && inFootnotes(lines, dest, pageWidth))) {
+    const siblings = target.name ? await familySiblings(pdf, target, page) : []
+    return entryBox(footnoteLines(lines, dest, siblings, pageWidth))
+  }
+  if (target.kind !== 'figure' && target.kind !== 'table' && target.kind !== 'equation') return null
+  const ops = OPS as unknown as OpsTable
+  const [images, paths] = await Promise.all([pageImageRects(page, ops), pagePathRects(page, ops)])
+  const graphics: Graphic[] = [...images, ...paths]
+  return target.kind === 'equation'
+    ? equationBox(dest, lines, graphics, size)
+    : floatBox(target.kind, dest, lines, graphics, size)
 }
 
 /** A preview that cannot be drawn simply does not open; the link still works */

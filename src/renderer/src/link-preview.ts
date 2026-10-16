@@ -52,8 +52,10 @@ export function linkKind(destName: string | null): LinkKind {
   if (/(^|[_.])(CR|bib|ref)\d+$/i.test(n) || /:R\d+(:\d+)?$/.test(n) || /intralink-c\d+$/.test(n)) {
     return 'citation'
   }
-  if (/^(figure|subfigure|fig|f)[-_.]?\d/i.test(n)) return 'figure'
-  if (/^(table|subtable|tab|t)[-_.]?\d/i.test(n)) return 'table'
+  // The caption package's hypcap names a float after its caption's counter:
+  // `figure.caption.3`, `table.caption.2`
+  if (/^(figure|subfigure|fig|f)[-_.]?(caption[-_.])?\d/i.test(n)) return 'figure'
+  if (/^(table|subtable|tab|t)[-_.]?(caption[-_.])?\d/i.test(n)) return 'table'
   if (/^(equation|eq|eqn|AMS|disp|mjx-eqn)[-_.]?/i.test(n)) return 'equation'
   if (/^(Hfootnote|footnote|fn|FN|mpfootnote)[-_.]?/i.test(n)) return 'footnote'
   if (/^(sub)*(section|chapter|part|appendix|paragraph|sec|app)[-_.*]?/i.test(n)) return 'section'
@@ -177,7 +179,7 @@ export function previewScroll(
 /** Does a text line read as a figure caption's start? «Figure 3:», «Fig. 3.»,
  *  «FIGURE 3», plus the Nordic and German forms the app's readers meet. */
 export function isFigureCaption(line: string): boolean {
-  return /^\s*(figure|fig\.?|figur|abbildung|abb\.?)\s*[A-Z]?\d/i.test(line)
+  return /^\s*(figure|fig\.?|figur|abbildung|abb\.?)\s*[A-Z]?\.?\d/i.test(line)
 }
 
 /** Is there a figure caption's first line just below a destination? Then the
@@ -477,10 +479,13 @@ export function textExtent(
   const y1 = Math.max(...long.map((l) => l.y + l.size * 0.95))
   const twoColumn = isTwoColumn(lines, pageWidth)
   if (!twoColumn) return { x0, x1, y0, y1, twoColumn, columnW: x1 - x0 }
-  // The left column's right edge: the lines that start left of the middle
-  // and end before the right column begins
-  const left = long.filter((l) => l.x0 < pageWidth * 0.45 && l.x1 < pageWidth * 0.6)
-  const columnW = left.length ? Math.max(...left.map((l) => l.x1)) - x0 : (x1 - x0) / 2
+  // The left column's right edge: where the lines that start left of the
+  // middle and end before the right column begins mostly end — the median,
+  // not the widest, which a stray line (a first page's affiliation, a
+  // figure's label) could set anywhere
+  const left = long.filter((l) => l.x0 < pageWidth * 0.45 && l.x1 < pageWidth * 0.6).map((l) => l.x1)
+  left.sort((p, q) => p - q)
+  const columnW = left.length ? left[Math.floor(left.length / 2)]! - x0 : (x1 - x0) / 2
   return { x0, x1, y0, y1, twoColumn, columnW }
 }
 
@@ -1085,4 +1090,581 @@ export async function citationEntryText(pdf: PDFDocumentProxy, target: PreviewTa
   } catch {
     return ''
   }
+}
+
+// ---------- The whole target: a footnote, a float, a display ----------
+//
+// A window onto a figure that starts at an arbitrary line and ends at an
+// arbitrary height shows half of it, or a caption and the paragraph under it
+// (Emil, 2026-10-16: «dekk hele elementet»). The window is cut to the
+// ELEMENT instead, the way a citation is cut to its entry: a footnote from
+// its marker to the next one, a figure or a table from its caption to the
+// body text on the far side of it, an equation's display between the
+// paragraphs around it. Zotero's reader only centres the destination; this
+// reads the page. Each rule returns null when the page does not say, and the
+// window then opens the way it always has.
+
+/** A box in PDF user space (y up) — what the window is cut to */
+export interface PdfBox {
+  x0: number
+  x1: number
+  top: number
+  bottom: number
+}
+
+/** A drawn thing on the page — a raster image or a painted path — in PDF
+ *  user space (image-regions.ts) */
+export interface Graphic {
+  x0: number
+  y0: number
+  x1: number
+  y1: number
+}
+
+/** The text items set upright — what the box rules read. arXiv stamps its
+ *  id up the left margin of every preprint's first page, and read as a line
+ *  that rotated stamp is 300 pt wide and turns a two-column page's left
+ *  column into most of the page. */
+export function uprightItems(items: readonly unknown[]): unknown[] {
+  return items.filter((raw) => {
+    const tf = (raw as { transform?: unknown }).transform
+    if (!Array.isArray(tf)) return false
+    const [a, b, c] = tf as number[]
+    return (a ?? 0) > 0 && Math.abs(b ?? 0) < 1e-3 * Math.abs(a ?? 1) && Math.abs(c ?? 0) < 1e-3 * Math.abs(a ?? 1)
+  })
+}
+
+/** The body text's type: the size most of the page's characters are set in
+ *  and the distance between its baselines */
+export function bodyType(lines: readonly TextLine[]): { size: number; pitch: number } {
+  const weight = new Map<number, number>()
+  for (const l of lines) {
+    const k = Math.round(l.size * 2) / 2
+    weight.set(k, (weight.get(k) ?? 0) + l.text.length)
+  }
+  let size = 10
+  let best = -1
+  for (const [k, w] of weight) {
+    if (w > best) {
+      best = w
+      size = k
+    }
+  }
+  const body = lines.filter((l) => Math.abs(l.size - size) <= 0.6).sort((a, b) => b.y - a.y || a.x0 - b.x0)
+  const gaps: number[] = []
+  for (let i = 1; i < body.length; i++) {
+    const a = body[i - 1]!
+    const b = body[i]!
+    const g = a.y - b.y
+    if (Math.abs(a.x0 - b.x0) < size * 4 && g > size * 0.9 && g < size * 2) gaps.push(g)
+  }
+  gaps.sort((p, q) => p - q)
+  const pitch = gaps.length ? gaps[Math.floor(gaps.length / 2)]! : size * 1.2
+  return { size, pitch }
+}
+
+/** A horizontal stretch of the page: a column, or the whole text block */
+export interface Span {
+  left: number
+  right: number
+}
+
+/** The page's columns: one, or the two of a two-column page — and the
+ *  whole text block, which a float set across both columns takes. Read from
+ *  the lines that keep to one half: a two-column page whose floats run
+ *  across it (ResNet's results pages) has too many lines crossing the
+ *  middle for isTwoColumn, but each half's lines still start together. */
+export function pageColumns(lines: readonly TextLine[], pageWidth: number): { cols: Span[]; full: Span } {
+  const e = textExtent(lines, pageWidth)
+  const full = { left: e.x0, right: e.x1 }
+  const long = lines.filter((l) => l.x1 - l.x0 > pageWidth * 0.25)
+  const leftOnly = long.filter((l) => l.x1 < pageWidth * 0.55)
+  const rightOnly = long.filter((l) => l.x0 > pageWidth * 0.45)
+  if (leftOnly.length >= 4 && rightOnly.length >= 4) {
+    const ls = commonStart(leftOnly)
+    const rs = commonStart(rightOnly)
+    if (e.twoColumn || (leftOnly.length >= 6 && rightOnly.length >= 6 && ls.share >= 0.5 && rs.share >= 0.5)) {
+      return {
+        cols: [
+          { left: ls.x, right: median(leftOnly.map((l) => l.x1)) },
+          { left: rs.x, right: median(rightOnly.map((l) => l.x1)) }
+        ],
+        full
+      }
+    }
+  }
+  if (!e.twoColumn) return { cols: [full], full }
+  return {
+    cols: [
+      { left: e.x0, right: e.x0 + e.columnW },
+      { left: e.x1 - e.columnW, right: e.x1 }
+    ],
+    full
+  }
+}
+
+function median(xs: number[]): number {
+  const s = [...xs].sort((p, q) => p - q)
+  return s[Math.floor(s.length / 2)]!
+}
+
+/** Where most of these lines start (to 2 pt), and what share of them do */
+function commonStart(ls: readonly TextLine[]): { x: number; share: number } {
+  const bins = new Map<number, number[]>()
+  for (const l of ls) {
+    const k = Math.round(l.x0 / 2)
+    bins.set(k, [...(bins.get(k) ?? []), l.x0])
+  }
+  let best: number[] = []
+  for (const xs of bins.values()) if (xs.length > best.length) best = xs
+  return { x: Math.min(...best), share: best.length / ls.length }
+}
+
+function columnAt(cols: readonly Span[], x: number | null): Span {
+  if (x === null || cols.length === 1) return cols[0]!
+  // The column that holds x, else the nearer one (a destination in the gutter)
+  const dist = (c: Span): number => (x < c.left ? c.left - x : x > c.right ? x - c.right : 0)
+  return dist(cols[0]!) <= dist(cols[1]!) ? cols[0]! : cols[1]!
+}
+
+/** Does a line belong to a column's stretch: inside it, or across it */
+function inSpan(l: { x0: number; x1: number }, c: Span): boolean {
+  const overlap = Math.min(l.x1, c.right) - Math.max(l.x0, c.left)
+  return overlap > 0.5 * Math.min(l.x1 - l.x0, c.right - c.left)
+}
+
+const lineTop = (l: TextLine): number => l.y + l.size * 0.95
+const lineBottom = (l: TextLine): number => l.y - l.size * 0.35
+
+/** A table caption's start: «Table 2:», «Tab. 2», «Tabell 4» */
+export function isTableCaption(line: string): boolean {
+  return /^\s*(table|tab\.?|tabell|tabelle)\s*[A-Z]?\.?\d/i.test(line)
+}
+
+/** A caption's number followed by its punctuation («Figure 5.3:», «Fig. 2.»,
+ *  «Table A.1 –») — what tells a caption from a paragraph that happens to
+ *  open «Figure 5.3 displays …» */
+function markedCaption(line: string): boolean {
+  return /^\s*\S+\s*[A-Z]?\.?\d+(?:\.\d+)*[a-z]?\s*[:.|–—-](?!\d)/i.test(line)
+}
+
+/** A page's layout as the rules below read it: its columns, its body type,
+ *  and all of its lines (a line's row is read off them) */
+interface Layout {
+  cols: Span[]
+  full: Span
+  body: { size: number; pitch: number }
+  lines: readonly TextLine[]
+}
+
+function layoutOf(lines: readonly TextLine[], pageWidth: number): Layout {
+  return { ...pageColumns(lines, pageWidth), body: bodyType(lines), lines }
+}
+
+/** The page without its number: a few digits (or roman ones) alone as the
+ *  page's lowest or highest line is furniture, not part of what is above */
+function withoutFolio(lines: readonly TextLine[]): TextLine[] {
+  if (lines.length < 2) return [...lines]
+  const ys = lines.map((l) => l.y)
+  const lo = Math.min(...ys)
+  const hi = Math.max(...ys)
+  return lines.filter((l) => !((l.y === lo || l.y === hi) && /^\s*[\divxlc]{1,4}\s*$/i.test(l.text)))
+}
+
+/** The column a line is set in — the whole block for one across both */
+function homeOf(l: TextLine, L: Layout): Span {
+  if (L.cols.length === 1) return L.full
+  const [a, b] = L.cols as [Span, Span]
+  return l.x0 < a.right - 4 && l.x1 > b.left + 4 ? L.full : columnAt(L.cols, l.x0 + 1)
+}
+
+/** A line of running prose: the body's type, starting at its column's edge
+ *  (or a paragraph's indent from it), running most of the column's width,
+ *  and words — a table's row of figures can be all of the rest. A figure's
+ *  labels, a table's cells and a display's formula are none of that.
+ *  `loose`: around a display, a short line of words from the column's edge
+ *  is prose too («and direct substitution gives») — a formula is set in
+ *  from the edge, where a figure's legend may not be. */
+function isProse(l: TextLine, L: Layout, loose = false): boolean {
+  const c = homeOf(l, L)
+  // Judged on the whole row: inline math sets a superscript a few points
+  // off the baseline, which cuts a prose line into pieces (textLines)
+  const row = L.lines
+    .filter((m) => Math.abs(m.y - l.y) < L.body.size * 0.45 && inSpan(m, c))
+    .sort((a, b) => a.x0 - b.x0)
+  const x0 = Math.min(...row.map((m) => m.x0))
+  const x1 = Math.max(...row.map((m) => m.x1))
+  const main = row.reduce((a, b) => (b.text.length > a.text.length ? b : a))
+  if (Math.abs(main.size - L.body.size) > 0.6 || x0 > c.left + L.body.size * 2) return false
+  if (!loose && x1 - x0 < 0.7 * (c.right - c.left)) return false
+  // One run of text: a table's header row is words too, but in cells with
+  // white between them (textLines breaks a line only at such a jump)
+  let reach = -Infinity
+  for (const m of row) {
+    if (reach > -Infinity && m.x0 - reach > L.body.size * 1.5) return false
+    reach = Math.max(reach, m.x1)
+  }
+  const text = row.map((m) => m.text).join(' ')
+  if (loose && !/\p{L}{2,}.*\p{L}{2,}/u.test(text)) return false
+  // A display with its number at the column's edge is not prose
+  if (EQ_NUMBER.test(text) && x1 > c.right - L.body.size * 2) return false
+  const ink = text.replace(/\s+/g, '')
+  return (ink.match(/\p{L}/gu)?.length ?? 0) >= ink.length * 0.6
+}
+
+/** Walking from `from` away in `dir` (+1 up the page, -1 down), the first
+ *  line of body text or caption met — the far side of a float's band — and
+ *  its near edge. A paragraph's short last line and a heading count as the
+ *  block's (a line flush with the column whose neighbour beyond it is prose,
+ *  close by, with no rule between). Null when the walk reaches the end of
+ *  the column. */
+function bodyEdge(
+  lines: readonly TextLine[],
+  L: Layout,
+  c: Span,
+  from: number,
+  dir: 1 | -1,
+  graphics: readonly Graphic[] = [],
+  loose = false
+): { edge: number; line: TextLine } | null {
+  const walk = lines
+    .filter((l) => inSpan(l, c) && (dir > 0 ? lineBottom(l) >= from - 1 : lineTop(l) <= from + 1))
+    .sort((a, b) => (dir > 0 ? a.y - b.y : b.y - a.y))
+  const near = (l: TextLine): number => (dir > 0 ? lineBottom(l) : lineTop(l))
+  // Another float's caption, met from its last line or its first
+  const captions = new Set(
+    L.lines.filter((l) => isFigureCaption(l.text) || isTableCaption(l.text)).flatMap((l) => captionBlock(L.lines, l))
+  )
+  for (let i = 0; i < walk.length; i++) {
+    const l = walk[i]!
+    if (captions.has(l) || isProse(l, L, loose)) return { edge: near(l), line: l }
+    const next = walk[i + 1]
+    const body = L.body
+    if (!next || !isProse(next, L) || l.x0 > homeOf(l, L).left + body.size * 2) continue
+    const lo = Math.min(l.y, next.y)
+    const hi = Math.max(l.y, next.y)
+    // A rule between the two (a table's bottom rule) keeps them apart
+    const ruled = graphics.some(
+      (g) => g.y1 > lo + 1 && g.y0 < hi - 1 && g.x1 > c.left && g.x0 < c.right && g.y1 - g.y0 < body.size
+    )
+    if (ruled) continue
+    const gap = hi - lo
+    // Up the page: a paragraph's last line sits a pitch below the rest of it
+    if (dir > 0 && Math.abs(l.size - body.size) <= 0.6 && gap <= body.pitch * 1.35) return { edge: near(l), line: l }
+    // Down the page: a heading sits up to two pitches above its paragraph
+    if (dir < 0 && l.size >= body.size - 0.6 && gap <= body.pitch * 2.4) return { edge: near(l), line: l }
+  }
+  return null
+}
+
+/** The lines of a caption from its first: same type, set solid, starting
+ *  where it starts (or centred under it) — a table's header row right under
+ *  its caption is the same type too, but set in from it in cells. Pieces of
+ *  a kept line's row (a raised dagger, an inline formula) come along. */
+function captionBlock(lines: readonly TextLine[], first: TextLine): TextLine[] {
+  const span = { left: first.x0, right: Math.max(first.x1, first.x0 + 40) }
+  const below = lines
+    .filter((l) => l !== first && l.y < first.y + first.size * 0.5 && Math.abs(l.size - first.size) <= 0.6 && inSpan(l, span))
+    .sort((a, b) => b.y - a.y || a.x0 - b.x0)
+  // Rows: pieces within half a line of each other
+  const rows: TextLine[][] = [[first]]
+  for (const l of below) {
+    const row = rows[rows.length - 1]!
+    if (Math.abs(l.y - row[0]!.y) < first.size * 0.5) row.push(l)
+    else rows.push([l])
+  }
+  const mid = (r: TextLine[]): number => (Math.min(...r.map((l) => l.x0)) + Math.max(...r.map((l) => l.x1))) / 2
+  const out = [...rows[0]!]
+  let pitch = first.size * 1.6
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i]!
+    const gap = rows[i - 1]![0]!.y - r[0]!.y
+    if (gap > pitch) break
+    const x0 = Math.min(...r.map((l) => l.x0))
+    if (Math.abs(x0 - first.x0) > 2 && Math.abs(mid(r) - mid(rows[0]!)) > 4) break
+    if (i === 1) pitch = gap * 1.2
+    out.push(...r)
+  }
+  return out
+}
+
+/** What lies in a band beyond `from` (up to `limit`), gathered outward while
+ *  it hangs together: lines and graphics taken in order of distance until a
+ *  gap wider than `maxGap` — the white space between a float and whatever
+ *  is beyond it. Returns the extent reached and the stretch across it; null
+ *  when nothing is there. */
+function gather(
+  lines: readonly TextLine[],
+  graphics: readonly Graphic[],
+  c: Span,
+  from: number,
+  limit: number,
+  dir: 1 | -1,
+  maxGap: number
+): { far: number; x0: number; x1: number } | null {
+  type Item = { near: number; far: number; x0: number; x1: number }
+  const items: Item[] = []
+  const lo = Math.min(from, limit)
+  const hi = Math.max(from, limit)
+  for (const l of lines) {
+    const t = lineTop(l)
+    const b = lineBottom(l)
+    // Beyond `from` (a line straddling it counts from it) and not past the limit
+    if (!inSpan(l, c) || (dir > 0 ? t <= from + 0.5 || b >= hi - 0.5 : b >= from - 0.5 || t <= lo + 0.5)) continue
+    items.push(
+      dir > 0
+        ? { near: Math.max(b, from), far: t, x0: l.x0, x1: l.x1 }
+        : { near: Math.min(t, from), far: b, x0: l.x0, x1: l.x1 }
+    )
+  }
+  for (const g of graphics) {
+    if ((dir > 0 ? g.y1 <= from + 0.5 : g.y0 >= from - 0.5) || g.y1 < lo || g.y0 > hi || g.x1 <= c.left || g.x0 >= c.right) continue
+    // A graphic counts only where it stands in the band and the stretch: a
+    // rule across both columns does not widen a one-column figure
+    const y0 = Math.max(g.y0, lo)
+    const y1 = Math.min(g.y1, hi)
+    const x0 = Math.max(g.x0, c.left - 12)
+    const x1 = Math.min(g.x1, c.right + 12)
+    items.push(dir > 0 ? { near: y0, far: y1, x0, x1 } : { near: y1, far: y0, x0, x1 })
+  }
+  items.sort((p, q) => (dir > 0 ? p.near - q.near : q.near - p.near))
+  let far = from
+  let x0 = Infinity
+  let x1 = -Infinity
+  for (const it of items) {
+    if ((dir > 0 ? it.near - far : far - it.near) > maxGap) break
+    far = dir > 0 ? Math.max(far, it.far) : Math.min(far, it.far)
+    x0 = Math.min(x0, it.x0)
+    x1 = Math.max(x1, it.x1)
+  }
+  return x0 === Infinity ? null : { far, x0, x1 }
+}
+
+/** The box of the figure or table a destination points at: its caption and
+ *  everything between the caption and the body text on the far side of it,
+ *  in its column (both, when the caption runs across the middle). Which side
+ *  the float is on: where the anchor says (hyperref's hypcap puts it at the
+ *  float's top, far above a caption under a figure), else where there is
+ *  float content beside the caption, else the custom of the kind — figures
+ *  above their captions, tables below. `graphics` are the page's images and
+ *  painted paths: a vector figure is often nothing else. */
+export function floatBox(
+  kind: 'figure' | 'table',
+  dest: { x: number | null; y: number },
+  lines: readonly TextLine[],
+  graphics: readonly Graphic[],
+  page: { w: number; h: number }
+): PdfBox | null {
+  lines = withoutFolio(lines)
+  const L = layoutOf(lines, page.w)
+  const { cols, full, body } = L
+  const col = columnAt(cols, dest.x)
+  const isCap = kind === 'figure' ? isFigureCaption : isTableCaption
+  // The caption: the nearest one under the anchor (at it, or under the
+  // float the anchor heads), in the anchor's column or across the page
+  const caps = lines
+    .filter((l) => isCap(l.text) && l.y <= dest.y + body.size && inSpan(l, col))
+    .sort((a, b) => b.y - a.y)
+  const cap = caps.find((l) => markedCaption(l.text)) ?? caps[0]
+  if (!cap) return null
+  const capLines = captionBlock(lines, cap)
+  const capBox = entryBox(capLines)!
+  const mid = page.w / 2
+  const c = cols.length > 1 && capBox.x0 < mid - 10 && capBox.x1 > mid + 10 ? full : col
+  const rest = lines.filter((l) => !capLines.includes(l))
+  // How far the nearest float content is from the caption on this side
+  // (Infinity: none within three lines). A caption sits closer to its own
+  // float than to the next one — bovecaptionskip against loatsep.
+  const reach = body.pitch * 3
+  const gapTo = (dir: 1 | -1): number => {
+    const from = dir > 0 ? capBox.top : capBox.bottom
+    let best = Infinity
+    const take = (lo: number, hi: number): void => {
+      const d = dir > 0 ? lo - from : from - hi
+      if (d >= -2 && d <= reach) best = Math.min(best, Math.max(0, d))
+    }
+    for (const l of rest) if (inSpan(l, c) && !isProse(l, L)) take(lineBottom(l), lineTop(l))
+    for (const g of graphics) if (g.x1 > c.left && g.x0 < c.right) take(g.y0, g.y1)
+    return best
+  }
+  let dir: 1 | -1
+  // hyperref's hypcap: the anchor heads the float, far above a caption under it
+  if (dest.y > capBox.top + body.pitch * 2.5) dir = 1
+  else {
+    const up = gapTo(1)
+    const down = gapTo(-1)
+    dir =
+      up === Infinity && down === Infinity
+        ? kind === 'figure'
+          ? 1
+          : -1
+        : Math.abs(up - down) > 2
+          ? up < down
+            ? 1
+            : -1
+          : kind === 'figure'
+            ? 1
+            : -1
+  }
+  const from = dir > 0 ? capBox.top : capBox.bottom
+  const stop = bodyEdge(rest, L, c, from, dir, graphics)
+  const got = gather(
+    rest.filter((l) => l !== stop?.line),
+    graphics,
+    c,
+    from,
+    stop ? stop.edge : dir > 0 ? page.h : 0,
+    dir,
+    Math.max(body.pitch * 3, 24)
+  )
+  let far: number
+  let x0 = capBox.x0
+  let x1 = capBox.x1
+  if (got) {
+    far = got.far
+    x0 = Math.min(x0, got.x0)
+    x1 = Math.max(x1, got.x1)
+  } else if (stop) {
+    // Nothing the page tells of — the empty band up to the body text is
+    // the figure (a vector drawing whose paths could not be read)
+    far = stop.edge - dir * 4
+  } else return null
+  const top = dir > 0 ? Math.max(far, capBox.top) : capBox.top
+  const bottom = dir > 0 ? capBox.bottom : Math.min(far, capBox.bottom)
+  // A caption and nothing beside it is not a float found
+  if (top - bottom < capBox.top - capBox.bottom + body.size) return null
+  return { x0: Math.max(0, x0), x1: Math.min(page.w, x1), top: Math.min(page.h, top), bottom: Math.max(0, bottom) }
+}
+
+/** An equation number as a line holds it: «(3)», «(2.4)», «(A.1)», «(3a)» */
+const EQ_NUMBER = /\(\s*[A-Z]?\d+(?:[.-]\d+)*[a-z]?\s*\)\s*$/
+
+/** The box of the display an equation destination points at: the lines
+ *  between the paragraphs around its number (an aligned group's every line),
+ *  across its column. hyperref raises the anchor above the display, so the
+ *  number is looked for a few lines under it. */
+export function equationBox(
+  dest: { x: number | null; y: number },
+  lines: readonly TextLine[],
+  graphics: readonly Graphic[],
+  page: { w: number; h: number }
+): PdfBox | null {
+  lines = withoutFolio(lines)
+  const L = layoutOf(lines, page.w)
+  const body = L.body
+  const c = columnAt(L.cols, dest.x)
+  const inCol = lines.filter((l) => inSpan(l, c))
+  const reach = body.pitch * 6
+  const anchor =
+    inCol
+      .filter((l) => EQ_NUMBER.test(l.text) && l.y <= dest.y + body.size * 0.5 && l.y >= dest.y - reach)
+      .sort((a, b) => b.y - a.y)[0] ?? inCol.filter((l) => l.y <= dest.y + 1).sort((a, b) => b.y - a.y)[0]
+  if (!anchor) return null
+  // The number's own line, and whatever reaches into it (a fraction's
+  // numerator and denominator stand a little above and below)
+  const level = inCol.filter((l) => lineBottom(l) < lineTop(anchor) - 1 && lineTop(l) > lineBottom(anchor) + 1)
+  const a = entryBox(level)!
+  const rest = lines.filter((l) => !level.includes(l))
+  const up = bodyEdge(rest, L, c, a.top, 1, graphics, true)
+  const down = bodyEdge(rest, L, c, a.bottom, -1, graphics, true)
+  const others = rest.filter((l) => l !== up?.line && l !== down?.line)
+  // A display is set solid; white space wider than a line and a half is
+  // the paragraph's skip, or the page number's
+  const maxGap = body.pitch * 1.5
+  const above = gather(others, graphics, c, a.top, up ? up.edge : a.top + reach, 1, maxGap)
+  const below = gather(others, graphics, c, a.bottom, down ? down.edge : a.bottom - reach, -1, maxGap)
+  return {
+    x0: c.left,
+    x1: c.right,
+    top: Math.max(a.top, above?.far ?? a.top),
+    bottom: Math.min(a.bottom, below?.far ?? a.bottom)
+  }
+}
+
+/** Is a line at or under an anchor: hyperref raises a footnote's anchor to
+ *  its first line's top, a little BELOW the previous footnote's last
+ *  baseline — so the line's middle is what is compared, not its baseline
+ *  (and some typesetters anchor at the baseline itself) */
+function atAnchor(l: TextLine, y: number): boolean {
+  return l.y + l.size * 0.3 <= y + 3
+}
+
+/** The lines of the footnote a destination points at: from the line at the
+ *  anchor down to the next footnote — the family's next destination in the
+ *  column (hyperref's `Hfootnote.N`), the next marker set in where this one
+ *  is, a gap — never further. Emil's report: a window onto footnote 6 that
+ *  showed half a body line, the rule, footnotes 6 AND 7 and then white. */
+export function footnoteLines(
+  lines: readonly TextLine[],
+  dest: { x: number | null; y: number },
+  siblings: readonly DestPoint[],
+  pageWidth: number
+): TextLine[] {
+  lines = withoutFolio(lines)
+  const { cols } = pageColumns(lines, pageWidth)
+  const c = columnAt(cols, dest.x)
+  const inCol = lines.filter((l) => inSpan(l, c)).sort((a, b) => b.y - a.y || a.x0 - b.x0)
+  const start = inCol.findIndex((l) => atAnchor(l, dest.y))
+  if (start < 0) return []
+  const first = inCol[start]!
+  // The next footnote's anchor, raised to its first line's top like this one
+  const below = siblings
+    .filter((s) => s.y < dest.y - 2 && (s.x === null || columnAt(cols, s.x) === c))
+    .map((s) => s.y)
+  const next = below.length ? Math.max(...below) : -Infinity
+  const second = inCol[start + 1]
+  // A marker set in from the margin: the next footnote starts where this did
+  const indented = second !== undefined && first.x0 > second.x0 + 3 && first.y - second.y < first.size * 2
+  const out = [first]
+  for (let i = start + 1; i < inCol.length && out.length < 15; i++) {
+    const l = inCol[i]!
+    const prev = out[out.length - 1]!
+    if (l.y < next - l.size * 0.6) break
+    if (prev.y - l.y > Math.max(prev.size, l.size) * 2.1) break
+    if (indented && Math.abs(l.x0 - first.x0) < 1.5) break
+    out.push(l)
+  }
+  return out
+}
+
+/** Is a point among the footnotes at the foot of its column: the line at it
+ *  is set smaller than the body, there is body text above with a rule's
+ *  skip between, and no body text below. A link with no name landing there
+ *  (a Word or InDesign PDF's footnote link) gets a footnote's window. */
+export function inFootnotes(lines: readonly TextLine[], dest: { x: number | null; y: number }, pageWidth: number): boolean {
+  lines = withoutFolio(lines)
+  const L = layoutOf(lines, pageWidth)
+  const body = L.body
+  const c = columnAt(L.cols, dest.x)
+  const inCol = lines.filter((l) => inSpan(l, c)).sort((a, b) => b.y - a.y)
+  const start = inCol.findIndex((l) => atAnchor(l, dest.y))
+  if (start <= 0) return false
+  const first = inCol[start]!
+  if (first.size > body.size - 0.6) return false
+  const above = inCol.slice(0, start).filter((l) => isProse(l, L))
+  const lastBody = above[above.length - 1]
+  if (!lastBody || lastBody.y - first.y < body.pitch * 1.2) return false
+  return !inCol.slice(start + 1).some((l) => isProse(l, L))
+}
+
+/** The scale a cut-out box is read at, and the window that holds it. `w`/`h`
+ *  are the box at 100 % (CSS px). It reads like a column first — fitted to
+ *  `prefW` with air, 100–160 % (previewScale) — and the window grows to
+ *  hold it, up to `room`; a box that does not fit the room at that scale is
+ *  read smaller, down to `floor` and no further (the sideways-page rule of
+ *  v0.61.3), and only then does the window scroll. 5 % steps, rounded down. */
+export function fitBox(
+  w: number,
+  h: number,
+  prefW: number,
+  room: { w: number; h: number },
+  floor = 0.75,
+  pad = { x: 24, y: 12 }
+): { scale: number; w: number; h: number; fits: boolean } {
+  let s = previewScale(w, prefW)
+  const fit = Math.min((room.w - pad.x) / Math.max(1, w), (room.h - pad.y) / Math.max(1, h))
+  if (fit < s) s = Math.max(floor, Math.floor(fit * 20 + 1e-9) / 20)
+  const W = Math.ceil(w * s) + pad.x
+  const H = Math.ceil(h * s) + pad.y
+  return { scale: s, w: Math.min(W, room.w), h: Math.min(H, room.h), fits: W <= room.w && H <= room.h }
 }

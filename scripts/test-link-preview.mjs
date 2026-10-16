@@ -427,6 +427,149 @@ const L = (x0, y, text, size = 10) => ({ x0, x1: x0 + text.length * size * 0.5, 
   check('textLines: runs address the final text', tl[0].text === '[5] T. Damour' && JSON.stringify(tl[0].runs) === JSON.stringify([{ x0: 72, x1: 112, start: 0, end: 6 }, { x0: 115, x1: 150, start: 7, end: 13 }]), JSON.stringify(tl[0]))
 }
 
+// ------------- tier 1d: the whole target — footnote, float, display (round 4)
+// Emil, 2026-10-16: a window onto a footnote showed half a body line, the
+// rule, footnotes 6 AND 7 and white; a figure came out cut wherever the
+// window happened to end. The window is now cut to the element.
+const T = (x0, x1, y, text, size = 10) => ({ x0, x1, y, size, text })
+const PROSE = 'running prose of the body text set solid in the column'
+const near = (a, b, tol = 1.5) => Math.abs(a - b) <= tol
+{
+  // A page's foot: body text, then footnotes 6 and 7, each a marker set in
+  // from the margin with its continuation flush left, then the folio
+  const lines = []
+  for (let i = 0; i < 20; i++) lines.push(T(72, 540, 700 - i * 12, PROSE))
+  lines.push(
+    T(84, 540, 130, '6The first footnote, which runs on over a line break', 8),
+    T(72, 400, 121, 'and ends here.', 8),
+    T(84, 540, 112, '7The second footnote, which must not come along', 8),
+    T(72, 300, 103, 'with the first.', 8),
+    T(300, 305, 50, '3')
+  )
+  const fn6 = M.footnoteLines(lines, { x: 84, y: 138 }, [{ x: 84, y: 120, n: 7 }], 612)
+  check('footnote: from its marker to the next footnote, by the family\'s next anchor', fn6.length === 2 && fn6[1].text === 'and ends here.', JSON.stringify(fn6.map((l) => l.text)))
+  const bare = M.footnoteLines(lines, { x: 84, y: 138 }, [], 612)
+  check('footnote: without anchors, the next marker set in where this one was ends it', bare.length === 2, JSON.stringify(bare.map((l) => l.text)))
+  const fn7 = M.footnoteLines(lines, { x: 84, y: 120 }, [{ x: 84, y: 138, n: 6 }], 612)
+  check('footnote: the last one stops before the folio', fn7.length === 2 && fn7[0].text.startsWith('7The second'), JSON.stringify(fn7.map((l) => l.text)))
+  check('footnote zone: a point among the footnotes is in it', M.inFootnotes(lines, { x: 84, y: 133 }, 612))
+  check('footnote zone: a point in the body is not', !M.inFootnotes(lines, { x: 72, y: 600 }, 612))
+}
+{
+  // A vector figure (paths and nothing else) with its caption under it, in
+  // a one-column page between two paragraphs
+  const lines = []
+  for (let i = 0; i < 7; i++) lines.push(T(72, 540, 700 - i * 12, PROSE))
+  lines.push(T(72, 300, 616, 'the paragraph ends short.'))
+  lines.push(T(72, 540, 400, 'Figure 2: A vector drawing with no text inside it, whose'), T(72, 330, 389, 'caption runs two lines.'))
+  for (let i = 0; i < 12; i++) lines.push(T(72, 540, 360 - i * 12, PROSE))
+  const paths = [{ x0: 100, y0: 430, x1: 500, y1: 600 }, { x0: 150, y0: 450, x1: 450, y1: 590 }]
+  const box = M.floatBox('figure', { x: 72, y: 412 }, lines, paths, { w: 612, h: 792 })
+  check('vector figure, caption below: from the drawing\'s top to the caption\'s foot', box && near(box.top, 600) && near(box.bottom, 389 - 3.5), JSON.stringify(box))
+  check('vector figure: the paragraph above and below stay out', box && box.top < 616 - 3.5 && box.bottom > 360 + 9.5)
+  const blind = M.floatBox('figure', { x: 72, y: 412 }, lines, [], { w: 612, h: 792 })
+  check('a drawing the page does not tell of: the empty band up to the body text', blind && near(blind.top, 616 - 3.5 - 4) && near(blind.bottom, 389 - 3.5), JSON.stringify(blind))
+  check('no caption under the anchor: no box (the window opens as before)', M.floatBox('figure', { x: 72, y: 800 }, lines.filter((l) => !l.text.startsWith('Figure')), paths, { w: 612, h: 792 }) === null)
+}
+{
+  // A table with its caption ABOVE (the custom), a wordy header row, ruled,
+  // then a section heading and its paragraph
+  const lines = [
+    T(72, 540, 700, 'Table 1: Results on the test set, a caption long enough to'),
+    T(72, 300, 689, 'wrap onto a second line.'),
+    T(90, 160, 668, 'Layer Type'), T(220, 420, 668, 'Complexity per Layer Sequential Operations'),
+    T(90, 170, 655, 'Self-Attention'), T(250, 280, 655, 'O(1)'), T(380, 410, 655, '0.92'),
+    T(90, 150, 643, 'Recurrent'), T(250, 280, 643, 'O(n)'), T(380, 410, 643, '0.87'),
+    T(72, 190, 600, '3.5 Positional Encoding')
+  ]
+  for (let i = 0; i < 12; i++) lines.push(T(72, 540, 580 - i * 12, PROSE))
+  const rules = [{ x0: 85, y0: 678, x1: 420, y1: 678 }, { x0: 85, y0: 637, x1: 420, y1: 637 }]
+  const box = M.floatBox('table', { x: 72, y: 712 }, lines, rules, { w: 612, h: 792 })
+  check('table, caption above: from the caption down to the bottom rule', box && near(box.top, 709.5) && near(box.bottom, 637), JSON.stringify(box))
+  check('table: the wordy header row is the table\'s, not prose; the heading below stays out', box && box.bottom > 600 + 9.5)
+  check('a table caption: «Table 1:», «Tab. 2», appendix «Table A.1»', M.isTableCaption('Table 1: x') && M.isTableCaption('Tab. 2 x') && M.isTableCaption('Table A.1: Calibrations') && !M.isTableCaption('tables are useful'))
+  check('a figure caption numbered in an appendix: «Figure A.1»', M.isFigureCaption('Figure A.1: Urgency'))
+}
+{
+  // Two columns; a figure across both, caption across the middle
+  const lines = []
+  for (let i = 0; i < 14; i++) lines.push(T(56, 296, 700 - i * 12, PROSE), T(316, 556, 700 - i * 12, PROSE))
+  lines.push(T(56, 556, 285, 'Figure 3: A figure set across both columns of the page, its caption too.'))
+  for (let i = 0; i < 14; i++) lines.push(T(56, 296, 250 - i * 12, PROSE), T(316, 556, 250 - i * 12, PROSE))
+  const graphics = [{ x0: 70, y0: 300, x1: 540, y1: 520 }]
+  const box = M.floatBox('figure', { x: 56, y: 297 }, lines, graphics, { w: 612, h: 792 })
+  check('two columns, a figure across both: the box runs across both', box && near(box.x0, 56) && near(box.x1, 556) && near(box.top, 520) && near(box.bottom, 285 - 3.5), JSON.stringify(box))
+  check('pageColumns: two columns', M.pageColumns(lines, 612).cols.length === 2)
+}
+{
+  // Two columns; a figure in the left one, body text beside it in the right
+  const lines = []
+  for (let i = 0; i < 12; i++) lines.push(T(56, 296, 700 - i * 12, PROSE))
+  lines.push(T(56, 296, 365, 'Figure 4: Only the left column.'))
+  for (let i = 0; i < 20; i++) lines.push(T(56, 296, 330 - i * 12, PROSE))
+  for (let i = 0; i < 50; i++) lines.push(T(316, 556, 700 - i * 12, PROSE))
+  const graphics = [{ x0: 60, y0: 380, x1: 290, y1: 540 }, { x0: 0, y0: 760, x1: 612, y1: 761 }]
+  const box = M.floatBox('figure', { x: 56, y: 377 }, lines, graphics, { w: 612, h: 792 })
+  check('a figure beside body text in the other column: in its column only', box && box.x0 >= 55 && box.x1 <= 297 && near(box.top, 540) && near(box.bottom, 365 - 3.5), JSON.stringify(box))
+}
+{
+  // Two columns whose floats run across the middle (a results page): too
+  // many crossing lines for isTwoColumn, but each half's lines start together
+  const lines = []
+  for (let i = 0; i < 10; i++) lines.push(T(56, 556, 740 - i * 11, 'a table row across the whole page in a full width float'))
+  for (let i = 0; i < 10; i++) lines.push(T(56, 296, 600 - i * 12, PROSE), T(316, 556, 600 - i * 12, PROSE))
+  check('pageColumns: two columns under full-width floats', M.pageColumns(lines, 612).cols.length === 2 && !M.isTwoColumn(lines, 612))
+}
+{
+  // A display between two paragraphs: its number, a fraction above and below
+  // the baseline, the lead-in's short last line above and «where» below
+  const lines = []
+  for (let i = 0; i < 6; i++) lines.push(T(72, 540, 730 - i * 12, PROSE))
+  lines.push(
+    T(72, 200, 658, 'the matrix of outputs as:'),
+    T(220, 354, 630, 'Attention(Q, K, V) = softmax('), T(356, 372, 637, 'QK'), T(366, 376, 622, 'dk'), T(380, 390, 630, ')V'),
+    T(520, 534, 630, '(1)')
+  )
+  for (let i = 0; i < 6; i++) lines.push(T(72, 540, 600 - i * 12, 'where the queries and keys are of dimension and the values'))
+  const box = M.equationBox({ x: 220, y: 650 }, lines, [{ x0: 356, y0: 633, x1: 376, y1: 633.5 }], { w: 612, h: 792 })
+  check('display: the number\'s lines, the fraction above and below, across the column', box && near(box.top, 637 + 9.5) && near(box.bottom, 622 - 3.5) && near(box.x0, 72) && near(box.x1, 540), JSON.stringify(box))
+  check('display: the lead-in and the paragraph after stay out', box && box.top < 658 - 3.5 && box.bottom > 600 + 9.5)
+}
+{
+  // A caption is told from a paragraph that opens on «Figure 5.3 …»: the
+  // hypcap anchor at the float's top finds the caption under the drawing
+  const lines = []
+  for (let i = 0; i < 6; i++) lines.push(T(72, 540, 760 - i * 12, PROSE))
+  lines.push(T(72, 300, 688, 'Figure 5.3 displays this decomposition.'))
+  lines.push(T(72, 540, 470, 'Figure 5.3: Buyer actions and observable outcomes.'))
+  for (let i = 0; i < 6; i++) lines.push(T(72, 540, 440 - i * 12, PROSE))
+  const box = M.floatBox('figure', { x: 72, y: 680 }, lines, [{ x0: 90, y0: 490, x1: 520, y1: 670 }], { w: 612, h: 792 })
+  check('the caption, not the paragraph naming the figure', box && near(box.bottom, 470 - 3.5) && near(box.top, 670), JSON.stringify(box))
+  check('hypcap names: figure.caption.3 and table.caption.2', M.linkKind('figure.caption.3') === 'figure' && M.linkKind('table.caption.2') === 'table')
+}
+{
+  // arXiv's id stamped up the margin, drawn rotated: not read as a line
+  const items = [
+    { str: 'arXiv:1512.03385v1 [cs.CV] 10 Dec 2015', transform: [0, 20, -20, 0, 32, 250], width: 300 },
+    { str: 'Deep Residual Learning', transform: [14, 0, 0, 14, 150, 700], width: 200 }
+  ]
+  const up = M.uprightItems(items)
+  check('upright items: the rotated margin stamp is left out', up.length === 1 && up[0].str === 'Deep Residual Learning')
+}
+{
+  // The window sized to its box: grown first, read smaller only to a floor,
+  // scrolled only past that
+  const room = { w: 900, h: 600 }
+  const small = M.fitBox(200, 100, 600, room)
+  check('fit: a small box reads at the column scale, the window holds it whole', small.scale === 1.6 && small.fits && small.w === 200 * 1.6 + 24 && small.h === 100 * 1.6 + 12, JSON.stringify(small))
+  const wide = M.fitBox(800, 200, 600, room)
+  check('fit: a box wider than the default window grows the window first (100 %)', wide.scale === 1 && wide.fits && wide.w === 824, JSON.stringify(wide))
+  const tall = M.fitBox(400, 700, 600, room)
+  check('fit: a tall box is read smaller until it fits', tall.fits && tall.scale < 1 && tall.scale >= 0.75 && tall.h <= 600, JSON.stringify(tall))
+  const huge = M.fitBox(400, 2000, 600, room)
+  check('fit: never below the floor — past it the window scrolls', huge.scale === 0.75 && !huge.fits && huge.h === 600, JSON.stringify(huge))
+}
+
 // ------------------------------------------------------ tier 2: real pdf.js
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href

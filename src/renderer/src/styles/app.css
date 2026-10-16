@@ -3128,11 +3128,21 @@ html.pen-near .draw-layer {
   /* The wheel at the window's end must not scroll the page under it */
   overscroll-behavior: contain;
   cursor: pointer;
-  /* A bar, but an anonymous one: thin and faint, so that the window can be
-     seen to go on without reading as a second document (Emil, 2026-10-13 —
-     «vis et anonymt rullefelt, men det skal ikke distrahere») */
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
+  /* No native bar: Windows draws even the thin one with arrow buttons, on
+     both axes (Emil, 2026-10-16). The app's overlay pills stand in, on
+     hover and while scrolling — see .link-preview-body */
+  scrollbar-width: none;
+}
+
+.link-preview-scroll::-webkit-scrollbar,
+.lp-card::-webkit-scrollbar {
+  display: none;
+}
+
+/* What the overlay pills (.osb-pill) are placed in: the scroller's own box,
+   not the footer under it */
+.link-preview-body {
+  position: relative;
 }
 
 /* A citation as a CARD, the way Zotero's reader shows one (issue #31, third
@@ -3142,8 +3152,7 @@ html.pen-near .draw-layer {
 .lp-card {
   overflow: hidden auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--text) 22%, transparent) transparent;
+  scrollbar-width: none;
   padding: 6px 0;
 }
 
@@ -3212,7 +3221,8 @@ html.pen-near .draw-layer {
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
 
-/* A citation cut to its entry: nothing beyond it to scroll to */
+/* A target cut to itself (a citation's entry, a footnote, a figure, a
+   display): nothing beyond it to scroll to */
 .link-preview.is-entry .link-preview-scroll {
   overflow: hidden;
 }

@@ -76,6 +76,10 @@ export interface OpsTable {
   paintImageXObjectRepeat: number
   paintFormXObjectBegin: number
   paintFormXObjectEnd: number
+  /** Needed only by pathRectsFromOps: a drawn path, and the no-paint end
+   *  that makes a path a clip and nothing on the page */
+  constructPath?: number
+  endPath?: number
 }
 
 /** Walk an operator list and return the user-space AABB of every raster image.
@@ -87,7 +91,31 @@ export function imageRectsFromOps(
   argsArray: ArrayLike<unknown>,
   ops: OpsTable
 ): UserRect[] {
+  return walkOps(fnArray, argsArray, ops).images
+}
+
+/** Every PAINTED path's user-space box — rules, axes, frames, the strokes
+ *  of a vector figure. The link preview reads a figure or a table off these
+ *  (link-preview.ts, floatBox): a vector figure has no image and often no
+ *  text inside, so its paths are the only sign of where it is. A path that
+ *  only clips (ended by `n`) paints nothing and is left out. pdf.js hands
+ *  each path over with its bounding box already in the CTM of the moment
+ *  (constructPath's third argument), so only that box goes through the CTM. */
+export function pathRectsFromOps(
+  fnArray: ArrayLike<number>,
+  argsArray: ArrayLike<unknown>,
+  ops: OpsTable
+): UserRect[] {
+  return walkOps(fnArray, argsArray, ops).paths
+}
+
+function walkOps(
+  fnArray: ArrayLike<number>,
+  argsArray: ArrayLike<unknown>,
+  ops: OpsTable
+): { images: UserRect[]; paths: UserRect[] } {
   const rects: UserRect[] = []
+  const paths: UserRect[] = []
   let ctm: Matrix = IDENTITY
   const stack: Matrix[] = []
 
@@ -156,10 +184,23 @@ export function imageRectsFromOps(
         break
       }
       default:
+        if (ops.constructPath !== undefined && fn === ops.constructPath) {
+          // args = [paint op, [path data], minMax] — minMax [x0, y0, x1, y1]
+          // in the current CTM's space, null for an empty path
+          if (args?.[0] === ops.endPath) break
+          const mm = args?.[2] as ArrayLike<number> | null | undefined
+          if (!mm || mm.length < 4) break
+          const [a, b, c, d] = [mm[0]!, mm[1]!, mm[2]!, mm[3]!]
+          if (![a, b, c, d].every(Number.isFinite) || c < a || d < b) break
+          const pts = [applyMatrix(ctm, a, b), applyMatrix(ctm, c, b), applyMatrix(ctm, a, d), applyMatrix(ctm, c, d)]
+          const xs = pts.map((p) => p[0])
+          const ys = pts.map((p) => p[1])
+          paths.push({ x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) })
+        }
         break
     }
   }
-  return rects
+  return { images: rects, paths }
 }
 
 /** An image covering at least this share of the page is treated as the page
@@ -186,6 +227,31 @@ export function pageImageRects(page: PDFPageProxy, ops: OpsTable): Promise<UserR
       )
     })().catch(() => [] as UserRect[])
     cache.set(page, promise)
+  }
+  return promise
+}
+
+/** A path covering at least this share of the page is a background (a
+ *  coloured page, a full-page frame), not a figure's stroke */
+const BACKGROUND_SHARE = 0.5
+
+const pathCache = new WeakMap<PDFPageProxy, Promise<UserRect[]>>()
+
+/** The page's painted paths in user space, cached per page proxy like
+ *  pageImageRects. `ops` must carry constructPath and endPath. Failure
+ *  degrades to «no paths». */
+export function pagePathRects(page: PDFPageProxy, ops: OpsTable): Promise<UserRect[]> {
+  let promise = pathCache.get(page)
+  if (!promise) {
+    promise = (async () => {
+      const list = await page.getOperatorList()
+      const [vx0, vy0, vx1, vy1] = page.view
+      const pageArea = Math.abs((vx1 - vx0) * (vy1 - vy0))
+      return pathRectsFromOps(list.fnArray, list.argsArray, ops).filter(
+        (r) => (r.x1 - r.x0) * (r.y1 - r.y0) <= BACKGROUND_SHARE * pageArea
+      )
+    })().catch(() => [] as UserRect[])
+    pathCache.set(page, promise)
   }
   return promise
 }
