@@ -568,6 +568,10 @@ const near = (a, b, tol = 1.5) => Math.abs(a - b) <= tol
   check('fit: a tall box is read smaller until it fits', tall.fits && tall.scale < 1 && tall.scale >= 0.75 && tall.h <= 600, JSON.stringify(tall))
   const huge = M.fitBox(400, 2000, 600, room)
   check('fit: never below the floor — past it the window scrolls', huge.scale === 0.75 && !huge.fits && huge.h === 600, JSON.stringify(huge))
+  // A figure is shown whole: its floor is half the 100 % scale
+  const figure = M.fitBox(400, 1000, 600, room, 0.5)
+  check('fit: a tall figure is read smaller rather than scrolled, down to its floor', figure.fits && figure.scale >= 0.5 && figure.scale < 0.75, JSON.stringify(figure))
+  check('fit: past the figure floor it scrolls after all', M.fitBox(400, 2000, 600, room, 0.5).scale === 0.5 && !M.fitBox(400, 2000, 600, room, 0.5).fits)
 }
 
 // ------------------------------------------------------ tier 2: real pdf.js

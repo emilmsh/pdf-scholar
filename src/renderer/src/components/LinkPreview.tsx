@@ -140,6 +140,14 @@ const FOOT_PX = 27
 /** Air around a target cut to its box, both sides together: a table's top
  *  rule or a plot's frame sits right on the box's edge */
 const TARGET_PAD = { x: 24, y: 20 }
+/** How small a cut-out may be read before its window scrolls instead. A
+ *  figure or table is shown WHOLE (Emil, 2026-10-16: «du vil 100 % se hele
+ *  figuren»), down to half the 100 % scale — a 10 pt label at 5 CSS px, the
+ *  smallest at which a plot's shape and its axis labels still read; a
+ *  footnote or a display is text to be read, and stops at 75 % (the
+ *  sideways-page floor of v0.61.3). */
+const FIGURE_FLOOR = 0.5
+const TEXT_FLOOR = 0.75
 /** Rendered pages kept per document. A paper's citations land on its one to
  *  three reference pages, so a handful makes every hover after the first one
  *  on a page instant. */
@@ -381,7 +389,8 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
         targetRect = await targetBox(rec.pdf, target, dstPage, content.items, pageWidth, pageHeight)
         if (targetRect) {
           const e = viewportBox(base, targetRect)
-          fit = fitBox(e.r - e.l, e.b - e.t, prefW, targetRoom(), 0.75, TARGET_PAD)
+          const floor = target.kind === 'figure' || target.kind === 'table' ? FIGURE_FLOOR : TEXT_FLOOR
+          fit = fitBox(e.r - e.l, e.b - e.t, prefW, targetRoom(), floor, TARGET_PAD)
           scale = fit.scale
         }
       }
