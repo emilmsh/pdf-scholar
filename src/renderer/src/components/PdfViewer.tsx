@@ -83,6 +83,7 @@ import {
   flipTarget,
   GESTURE_SETTLE,
   MARGIN_NOTES_W,
+  midGestureZoomIn,
   PAD_BOTTOM,
   PAD_TOP,
   PAGE_GAP,
@@ -99,6 +100,7 @@ import {
 } from '../rotation'
 import type { RowLayout } from '../rotation'
 import { createPagedWheel, holdSnap, PageSlots, releaseSnap } from '../paged-view'
+import { isZoomWheel } from '../platform'
 import AiPanel, { AiQuickPopover } from './AiPanel'
 import type { AiQuickState, AiSeed, EnsuredDocument } from './AiPanel'
 import {
@@ -2613,14 +2615,15 @@ export default function PdfViewer({
   const commitGestureRef = useRef(commitGesture)
   commitGestureRef.current = commitGesture
 
-  // Ctrl+wheel (and trackpad pinch, which Chromium reports as ctrl+wheel):
+  // Ctrl+wheel (and trackpad pinch, which Chromium reports as ctrl+wheel;
+  // Cmd+wheel on macOS too — see isZoomWheel):
   // accumulate into a CSS transform for 60 fps feedback, re-render on settle.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const pagedWheel = createPagedWheel()
     const onWheel = (e: WheelEvent): void => {
-      if (!e.ctrlKey) {
+      if (!isZoomWheel(e)) {
         // Paged: the wheel turns pages (see createPagedWheel)
         const lay = layoutRef.current
         if (pagedRef.current && lay) pagedWheel(e, el, lay)
@@ -2667,7 +2670,7 @@ export default function PdfViewer({
       // Long pinches blur (CSS-scaled canvas): re-render mid-gesture once the
       // factor drifts far enough; the anchored commit makes this seamless and
       // the next wheel event just starts a fresh gesture segment.
-      if (g.factor > 1.3 || g.factor < 1 / 1.3) {
+      if (g.factor > midGestureZoomIn(window.devicePixelRatio || 1) || g.factor < 1 / 1.3) {
         commitGestureRef.current(false)
       } else {
         g.timer = window.setTimeout(() => commitGestureRef.current(), GESTURE_SETTLE)

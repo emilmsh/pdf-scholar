@@ -33,6 +33,7 @@ import {
   buildRows,
   GESTURE_SETTLE,
   MARGIN_NOTES_W,
+  midGestureZoomIn,
   PAD_BOTTOM,
   PAD_TOP,
   PAGE_GAP,
@@ -50,6 +51,7 @@ import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
 import { clampZoom } from '../zoom'
 import { createPagedWheel, holdSnap, PageSlots, releaseSnap } from '../paged-view'
+import { isZoomWheel } from '../platform'
 import PdfPage from './PdfPage'
 import { OverlayScrollbars } from './OverlayScrollbars'
 
@@ -549,7 +551,8 @@ export default function PagesPane({
     return true
   }, [])
 
-  // Ctrl+wheel (and trackpad pinch, which Chromium reports as ctrl+wheel) —
+  // Ctrl+wheel (and trackpad pinch, which Chromium reports as ctrl+wheel;
+  // Cmd+wheel on macOS too) —
   // the same CSS-preview + anchored-commit pipeline as the main column, so a
   // pinch feels identical whichever column the cursor is over.
   useEffect(() => {
@@ -557,7 +560,7 @@ export default function PagesPane({
     if (!el) return
     const pagedWheel = createPagedWheel()
     const onWheel = (e: WheelEvent): void => {
-      if (!e.ctrlKey) {
+      if (!isZoomWheel(e)) {
         // Paged: the wheel turns pages (see createPagedWheel)
         const lay = layoutRef.current
         if (pagedRef.current && lay) pagedWheel(e, el, lay)
@@ -577,8 +580,11 @@ export default function PagesPane({
       window.clearTimeout(g.timer)
       // Long pinches blur (a CSS-scaled canvas): re-render mid-gesture once the
       // factor drifts far enough; the anchored commit keeps that seamless.
-      if (g.factor > 1.3 || g.factor < 1 / 1.3) commitGestureRef.current()
-      else g.timer = window.setTimeout(() => commitGestureRef.current(), GESTURE_SETTLE)
+      if (g.factor > midGestureZoomIn(window.devicePixelRatio || 1) || g.factor < 1 / 1.3) {
+        commitGestureRef.current()
+      } else {
+        g.timer = window.setTimeout(() => commitGestureRef.current(), GESTURE_SETTLE)
+      }
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => {

@@ -27,11 +27,21 @@ const SEED_PX_PER_MS = 250_000
 /** Learned rasterisation throughput, device pixels per millisecond (EWMA). */
 let throughput = SEED_PX_PER_MS
 
-// Only timings from a render that had the main thread to itself are trustworthy:
-// concurrent renders inflate each other's wall-clock. Track in-flight renders
-// and drop any sample from a contended window.
+// Concurrent renders share the main thread, so one render's wall-clock among
+// others says nothing about throughput. A BATCH does: from the first render
+// starting with none in flight to the last one ending, the pixels of all of
+// them over the time of all of them. A lone render is a batch of one (its own
+// timing, as before). Dropping the contended samples instead — what this did
+// until 2026-10 — dropped exactly the zoom commits and page jumps where several
+// pages raster at once: the controller kept its optimistic seed and never
+// eased a 2× screen off full density when it was struggling.
 let inFlight = 0
-let contended = false
+let batchStart = 0
+let batchPixels = 0
+let batchCount = 0
+/** A render in the batch was cancelled or failed: its time is in the batch,
+ *  its pixels are not, so the batch would read slow — drop it. */
+let batchTainted = false
 
 /**
  * Device-pixel scale to render a page at. Returns the display's full density
@@ -49,23 +59,32 @@ export function chooseRenderDpr(cssPixels: number, targetDpr: number): number {
   return Math.min(targetDpr, Math.max(budgetDpr, nativeFloor))
 }
 
-/** Mark the start of a page raster (for contention detection). */
+/** Mark the start of a page raster (opens a batch when none is in flight). */
 export function beginRender(): void {
+  if (inFlight === 0) {
+    batchStart = performance.now()
+    batchPixels = 0
+    batchCount = 0
+    batchTainted = false
+  }
   inFlight += 1
-  if (inFlight > 1) contended = true
+  batchCount += 1
 }
 
 /**
- * Mark the end of a page raster and, if the sample is clean, fold it into the
- * throughput estimate. Pass `pixels = 0` to only release the in-flight slot
- * (cancelled or failed render).
+ * Mark the end of a page raster; when it closes its batch and the batch is
+ * clean, fold the batch into the throughput estimate. Pass `pixels = 0` for a
+ * cancelled or failed render (releases the slot, taints the batch).
  */
 export function endRender(pixels: number, ms: number): void {
-  const clean = !contended
-  inFlight = Math.max(0, inFlight - 1)
-  if (inFlight === 0) contended = false
-  if (clean && pixels >= MIN_SAMPLE_PX && ms > 0) {
-    const sample = pixels / ms
+  if (inFlight === 0) return
+  inFlight -= 1
+  if (pixels > 0) batchPixels += pixels
+  else batchTainted = true
+  if (inFlight > 0) return
+  const elapsed = batchCount === 1 ? ms : performance.now() - batchStart
+  if (!batchTainted && batchPixels >= MIN_SAMPLE_PX && elapsed > 0) {
+    const sample = batchPixels / elapsed
     throughput = throughput * (1 - THROUGHPUT_EWMA) + sample * THROUGHPUT_EWMA
   }
 }
@@ -85,7 +104,9 @@ if (import.meta.env.DEV) {
     reset: () => {
       throughput = SEED_PX_PER_MS
       inFlight = 0
-      contended = false
+      batchPixels = 0
+      batchCount = 0
+      batchTainted = false
     }
   }
 }

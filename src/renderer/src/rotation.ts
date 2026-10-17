@@ -162,6 +162,20 @@ export const MARGIN_NOTES_W = MARGIN_NOTES_CARD_W + MARGIN_NOTES_GAP + 8
 /** ms of wheel silence before a pinch/ctrl-wheel gesture commits a re-render */
 export const GESTURE_SETTLE = 160
 
+/** How far a pinch/ctrl-wheel ZOOM-IN runs on the CSS preview before it
+ *  re-renders mid-gesture. The preview is the bitmap stretched, so it softens
+ *  as it grows; a mid-gesture commit fixes that, but it rasterises every
+ *  mounted page at once on the main thread — where the pinch's own wheel
+ *  events wait their turn — and on a 2× screen that raster is four times the
+ *  pixels of a 1× one: the pinch stutters. There a preview may grow to 2×,
+ *  which still leaves one device pixel per CSS pixel (as sharp as a standard
+ *  screen), and the crisp render waits for the fingers to stop. Below 2× the
+ *  1.3 step stands. Zoom-OUT keeps 1/1.3 everywhere: shrinking uncovers pages
+ *  that are not mounted yet, and its commit reuses the bitmaps it has. */
+export function midGestureZoomIn(dpr: number): number {
+  return dpr >= 2 ? 2 : 1.3
+}
+
 export interface PageBox {
   /** 0-based page index */
   index: number

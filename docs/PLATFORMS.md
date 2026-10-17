@@ -70,9 +70,11 @@ regressions are treated as bugs, not as acceptable platform lag.
    `src/renderer/src/keymap.ts`, where the modifier is written `mod` and
    resolves to Cmd on macOS, Ctrl elsewhere (`parseChord` is the only place that
    decides). Two deliberate exceptions: tab cycling is a literal `ctrl+tab` on
-   every platform (Cmd+Tab is the macOS app switcher), and ctrl+wheel zoom tests
-   `ctrlKey` everywhere via `platform.ts` → `primaryMod` (trackpad pinch arrives
-   as ctrl+wheel, also on macOS). The user can rebind anything from the gear
+   every platform (Cmd+Tab is the macOS app switcher), and wheel zoom
+   (`platform.ts` → `isZoomWheel`) takes Ctrl+wheel everywhere — trackpad pinch
+   arrives as ctrl+wheel, also on macOS — and Cmd+wheel on macOS as well, the
+   mac convention for a mouse (Ctrl+wheel is often the OS's screen zoom there).
+   The user can rebind anything from the gear
    menu's **Hurtigtaster** map; overrides live in `Settings.keymap` and are
    stored as `mod`, so one keymap means the same thing on either platform.
 4. **File open plumbing**: Windows/Linux get paths via argv + `second-instance`;

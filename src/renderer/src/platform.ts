@@ -3,12 +3,20 @@
 export const isMac = /Mac|iP(hone|ad|od)/.test(navigator.platform)
 
 /** The platform's primary command modifier: Cmd on macOS, Ctrl elsewhere.
- *  Use for keyboard SHORTCUTS only — ctrl+wheel zoom must keep testing
- *  ctrlKey on every platform (trackpad pinch arrives as ctrl+wheel, also
- *  on macOS), and Ctrl+Tab cycling is the mac convention as well (Cmd+Tab
- *  is the OS app switcher). */
+ *  Use for keyboard SHORTCUTS only — wheel zoom goes through isZoomWheel
+ *  below, and Ctrl+Tab cycling is the mac convention as well (Cmd+Tab is
+ *  the OS app switcher). */
 export function primaryMod(e: { ctrlKey: boolean; metaKey: boolean }): boolean {
   return isMac ? e.metaKey : e.ctrlKey
+}
+
+/** A wheel event that zooms the pages. Ctrl+wheel on every platform — a
+ *  trackpad pinch arrives as ctrl+wheel, on macOS too, so ctrlKey can never be
+ *  swapped out — plus Cmd+wheel on macOS, which is how a mouse zooms there
+ *  (Preview, PDF Expert); Ctrl+wheel is often taken by the OS's own screen
+ *  zoom before the app sees it. */
+export function isZoomWheel(e: { ctrlKey: boolean; metaKey: boolean }): boolean {
+  return e.ctrlKey || (isMac && e.metaKey)
 }
 
 // Text fields that stop keydown propagation (composer, popovers, the search
