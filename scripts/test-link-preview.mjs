@@ -574,6 +574,92 @@ const near = (a, b, tol = 1.5) => Math.abs(a - b) <= tol
   check('fit: past the figure floor it scrolls after all', M.fitBox(400, 2000, 600, room, 0.5).scale === 0.5 && !M.fitBox(400, 2000, 600, room, 0.5).fits)
 }
 
+// ---------------- tier 1e: the cut-out's edges on a tight page (round 5)
+// Emil's thesis, 2026-10-17: footnotes at 10 pt on 9.25 pt. The window's air
+// is blank paper now, so the box's own edges are all that may show — and
+// entryBox's generous reach ran into the neighbours on both sides.
+{
+  // The page as the thesis set it (PDF y up): a body line, the footnote rule,
+  // footnote 6 over two lines, footnote 7 with a formula
+  const lines = [
+    T(72, 523, 118.6, 'acquisition. Bunnpris has maintained a small but growing presence', 11.96),
+    T(88.8, 523, 99.2, '6Bunnpris is the largest retail chain outside the four umbrella chains', 9.96),
+    T(72, 147, 83.6, 'NorgesGruppen.', 9.96),
+    T(88.8, 485, 74.4, '7Ownership concentration is measured using the HHI', 10.38),
+    T(479, 509, 67.7, 'i=1(Si)', 10.38),
+    T(72, 320, 58.8, '[0, 1], where Si is the market share of firm i in decimals.', 10.38)
+  ]
+  const fn6 = lines.slice(1, 3)
+  const box6 = M.entryBox(fn6)
+  check('tight page: entryBox alone reaches into footnote 7\'s capitals', box6.bottom < 74.4 + 10.38 * 0.72)
+  const clear6 = M.clearOfNeighbours(box6, lines, fn6)
+  check('footnote 6 kept off footnote 7: the edge between its descenders and their capitals', clear6.bottom > box6.bottom && near(clear6.bottom, (74.4 + 10.38 * 0.72 + box6.bottom + 10.38 * 0.13) / 2, 0.01) && clear6.top === box6.top, JSON.stringify(clear6))
+  const fn7 = lines.slice(3)
+  const box7 = M.entryBox(fn7)
+  check('tight page: footnote 6\'s last baseline lies INSIDE footnote 7\'s box', 83.6 < box7.top && 83.6 > box7.bottom)
+  const clear7 = M.clearOfNeighbours(box7, lines, fn7)
+  check('footnote 7 kept off «NorgesGruppen.» once its own lines are named', clear7.top < box7.top && clear7.top < 83.6, JSON.stringify(clear7))
+  check('without its lines named, a baseline inside the box counts as the target\'s', M.clearOfNeighbours(box7, lines).top === box7.top)
+  const rule = [{ x0: 72, y0: 107.2, x1: 252.5, y1: 107.2 }]
+  const under = M.belowFootnoteRule(clear6, rule)
+  check('footnote rule: the box stops under it', near(under.top, 107.2 - 1.5, 0.01) && under.bottom === clear6.bottom, JSON.stringify(under))
+  check('footnote rule: a rule far above, or a short tick, is not it', M.belowFootnoteRule(clear6, [{ x0: 72, y0: 140, x1: 252, y1: 140 }]).top === clear6.top && M.belowFootnoteRule(clear6, [{ x0: 72, y0: 107, x1: 80, y1: 107 }]).top === clear6.top)
+}
+{
+  // A caption whose label is set larger than its words (12 pt, then 10)
+  // keeps its second line
+  const lines = []
+  for (let i = 0; i < 4; i++) lines.push(T(72, 523, 720 - i * 18, PROSE, 12))
+  lines.push(T(72, 523, 335.5, 'Figure 1.1: Evolution of market shares and the HHI by umbrella', 12), T(72, 239, 323.6, 'chain, 2001–2020. Source: AC Nielsen.'))
+  for (let i = 0; i < 4; i++) lines.push(T(72, 523, 290 - i * 18, PROSE, 12))
+  const box = M.floatBox('figure', { x: 72, y: 683 }, lines, [{ x0: 90, y0: 365, x1: 510, y1: 660 }], { w: 595, h: 842 })
+  check('caption label larger than its text: the second line comes along', box && near(box.bottom, 323.6 - 3.5), JSON.stringify(box))
+}
+{
+  // A table's notes under it are the table's
+  const lines = [T(72, 523, 700, 'Table A5: Descriptive statistics: treatment and control groups', 12)]
+  for (let i = 0; i < 8; i++) lines.push(T(72, 523, 670 - i * 15.5, 'Sales (millions NOK) 2.68 2.97 10.82% 3.19 3.19 0.00%'))
+  lines.push(T(72, 523, 530, 'Notes: This table reports mean values of outcome and control variables'), T(72, 523, 518, 'before the first and after the last rebranding.'), T(72, 300, 506, 'Demographic variables are from 2014.'))
+  lines.push(T(72, 523, 470, PROSE, 12))
+  const rules = [{ x0: 72, y0: 690, x1: 523, y1: 690 }, { x0: 72, y0: 555, x1: 523, y1: 555 }]
+  const float = M.floatBox('table', { x: 72, y: 712 }, lines, rules, { w: 595, h: 842 })
+  const box = float && M.withFloatNotes(float, lines)
+  check('table notes: «Notes: …» under the table joins it, to its last line', box && near(box.bottom, 506 - 3.5) && box.top === float.top, JSON.stringify({ float, box }))
+  check('table notes: the body text after them stays out', box && box.bottom > 470 + 12)
+  check('no notes: a box with prose under it is unchanged', M.withFloatNotes(float, lines.filter((l) => !/^(Notes|before|Demographic)/.test(l.text))) === float)
+}
+{
+  // A landscape page (/Rotate 90) whose text is drawn turned so it reads
+  // upright as shown: read in the shown frame, the box carried back
+  const W = 595, H = 842
+  const vp = {
+    width: H, height: W, scale: 1, rotation: 90, viewBox: [0, 0, W, H],
+    // pdf.js's /Rotate 90 at scale 1: shown x = PDF y, shown y = PDF x
+    convertToViewportPoint: (x, y) => [y, x],
+    convertToPdfPoint: (vx, vy) => [vy, vx]
+  }
+  const f = M.viewFrame(vp, W, H)
+  check('view frame: a turned page is read at its shown size', f.w === H && f.h === W)
+  // A run drawn turned in PDF space (up the page) reads left-to-right as shown
+  const items = f.items([{ str: 'Table A5: Descriptive statistics', transform: [0, 12, -12, 0, 100, 60], width: 200 }])
+  const up = M.uprightItems(items)
+  check('view frame: text drawn turned is upright as shown', up.length === 1 && up[0].transform[0] === 12 && up[0].transform[4] === 60 && up[0].transform[5] === W - 100, JSON.stringify(up[0]?.transform))
+  const back = f.back({ x0: 60, x1: 260, top: W - 90, bottom: W - 300 })
+  check('view frame: a box carried back covers the same page area', near(back.x0, 90) && near(back.x1, 300) && near(back.bottom, 60) && near(back.top, 260), JSON.stringify(back))
+  const flat = M.viewFrame({ ...vp, rotation: 0 }, W, H)
+  check('view frame: an upright page is read in PDF space, untouched', flat.w === W && flat.h === H && flat.point({ x: 1, y: 2 }).y === 2)
+}
+
+{
+  // «Søk»: what the card row asks Google Scholar
+  const aea = 'Aguzzoni, Luca, Elena Argentesi, Lorenzo Ciari, Tomaso Duso, and Massimo Tognoni. 2016. “Ex post Merger Evaluation in the U.K. Retail Market for Books.” The Journal of Industrial Economics, 64(1): 170–200.'
+  check('scholar query: a quoted title, the first author and the year', M.scholarQuery(aea) === 'Ex post Merger Evaluation in the U.K. Retail Market for Books Aguzzoni 2016', M.scholarQuery(aea))
+  const numbered = '[12] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning for image recognition. In CVPR, 2016. https://doi.org/10.1109/CVPR.2016.90'
+  check('scholar query: no quotes — the entry itself, its DOI and URL left out', M.scholarQuery(numbered) === '[12] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning for image recognition. In CVPR, 2016.', M.scholarQuery(numbered))
+  const url = M.scholarUrl('a & b?#c')
+  check('scholar url: Google Scholar, the query encoded so it cannot reshape the URL', url === 'https://scholar.google.com/scholar?q=a%20%26%20b%3F%23c', url)
+}
+
 // ------------------------------------------------------ tier 2: real pdf.js
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href

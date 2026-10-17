@@ -776,6 +776,115 @@ export function entryBox(
   }
 }
 
+/** A target's box kept off the lines around it. entryBox's reach (0.95 up,
+ *  0.35 down) is generous on purpose, and on a tightly set page — footnotes
+ *  at 10 pt on 9.25 pt — it runs into the next footnote's capitals and the
+ *  body text's descenders above; the window then showed slivers of both
+ *  (Emil's thesis, 2026-10-17). An edge a neighbour reaches into moves to
+ *  the middle of the gap between the target's real glyphs (descenders 0.22
+ *  of a size, ascenders 0.75) and the neighbour's (capitals 0.72, descenders
+ *  0.22) — never further than that gap. `own` names the target's lines when
+ *  the caller knows them (a footnote): set that tight, the previous
+ *  footnote's baseline lies INSIDE the next one's box, so the box alone
+ *  cannot tell it from the target's own. Without `own`, the lines whose
+ *  baseline lies inside the box are the target's. */
+export function clearOfNeighbours(box: PdfBox, lines: readonly TextLine[], own?: readonly TextLine[]): PdfBox {
+  let { top, bottom } = box
+  const ownSet = own ? new Set(own) : null
+  const ownTop = own?.length ? Math.max(...own.map((l) => l.y)) : null
+  const ownBottom = own?.length ? Math.min(...own.map((l) => l.y)) : null
+  for (const l of lines) {
+    if (l.x1 <= box.x0 || l.x0 >= box.x1 || ownSet?.has(l)) continue
+    const below = ownBottom !== null ? l.y < ownBottom : l.y < box.bottom
+    const above = ownTop !== null ? l.y > ownTop : l.y > box.top
+    if (below) {
+      // Below: its capitals may reach up into the box
+      const cap = l.y + l.size * 0.72
+      const ownDesc = box.bottom + l.size * 0.13
+      if (cap > box.bottom) bottom = Math.max(bottom, (cap + ownDesc) / 2)
+    } else if (above) {
+      // Above: its descenders may reach down into the box
+      const desc = l.y - l.size * 0.22
+      const ownAsc = box.top - l.size * 0.2
+      if (desc < box.top) top = Math.min(top, (desc + ownAsc) / 2)
+    }
+  }
+  return bottom < top ? { ...box, top, bottom } : box
+}
+
+/** A footnote's box stopped under the footnote rule: entryBox's 0.95 reach
+ *  above the first line takes in LaTeX's rule, which sits about that high
+ *  (\footnoterule, 2.6 pt over the first footnote's strut) — a short
+ *  horizontal stroke across the box's left part, within a few points under
+ *  its top edge. */
+export function belowFootnoteRule(box: PdfBox, graphics: readonly Graphic[]): PdfBox {
+  let top = box.top
+  for (const g of graphics) {
+    const y = Math.max(g.y0, g.y1)
+    const flat = Math.abs(g.y1 - g.y0) < 1.5 && g.x1 - g.x0 > 30
+    if (!flat || g.x1 <= box.x0 || g.x0 >= box.x1) continue
+    // 1.5 pt under it: past its own stroke and the pixel the window paints
+    // beyond its box
+    if (y <= box.top && y >= box.top - 4) top = Math.min(top, Math.min(g.y0, g.y1) - 1.5)
+  }
+  return top > box.bottom ? { ...box, top } : box
+}
+
+/** What «Søk» on a card row asks Google Scholar (Emil, 2026-10-17: checking a
+ *  paper usually means googling it — copying the reference, opening the
+ *  browser, pasting — and the row should save those steps). A title set in
+ *  quotes (APA, Chicago, AEA) is the best key there is, with the first
+ *  author's name and the year; otherwise the whole entry, which Scholar reads
+ *  well enough as a pasted reference. DOIs and URLs go: the entry already
+ *  links them, and they only muddy a text search. */
+export function scholarQuery(entry: string): string {
+  const text = entry
+    .replace(/\s+/g, ' ')
+    .replace(/https?:\/\/\S+/g, '')
+    .replace(/\bdoi:\s*\S+/gi, '')
+    .replace(/\b10\.\d{4,9}\/\S+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const quoted = /[“"«]([^”"»]{12,})[”"»]/.exec(text)
+  if (quoted) {
+    const author = /^\s*\[?\d*\]?\s*([\p{L}'’-]{2,})/u.exec(text)?.[1] ?? ''
+    const year = /\b(?:19|20)\d{2}\b/.exec(text)?.[0] ?? ''
+    return [quoted[1]!.trim().replace(/[.,;:]$/, ''), author, year].filter(Boolean).join(' ')
+  }
+  return text.slice(0, 300).trim()
+}
+
+/** Google Scholar's search page for a query — the only host «Søk» opens */
+export function scholarUrl(query: string): string {
+  return `https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`
+}
+
+/** A float's notes taken in: «Notes: …» or «Source: …» set right under a
+ *  table or figure belongs to it (economics puts every table's notes there),
+ *  but floatBox reads it as the body text that ends the float. The paragraph
+ *  opening within two lines under the box with such a word, followed while
+ *  its lines stay set solid and inside the box's width, joins the box. */
+export function withFloatNotes(box: PdfBox, lines: readonly TextLine[]): PdfBox {
+  const under = lines
+    .filter((l) => l.y < box.bottom && l.x0 >= box.x0 - 4 && l.x1 <= box.x1 + 4)
+    .sort((a, b) => b.y - a.y)
+  const first = under[0]
+  if (!first || box.bottom - (first.y + first.size) > first.size * 2) return box
+  if (!/^(notes?|sources?|kilder?|merknad(?:er)?|anm\.?)\s*[:.]/i.test(first.text)) return box
+  let last = first
+  for (const l of under.slice(1)) {
+    if (last.y - l.y > Math.max(last.size, l.size) * 1.6) break
+    last = l
+  }
+  const taken = under.filter((l) => l.y >= last.y)
+  return {
+    x0: Math.min(box.x0, ...taken.map((l) => l.x0)),
+    x1: Math.max(box.x1, ...taken.map((l) => l.x1)),
+    top: box.top,
+    bottom: Math.min(box.bottom, last.y - last.size * 0.35)
+  }
+}
+
 /** The entry's lines themselves (entryFromLines is their text) */
 export function entryLines(
   lines: readonly TextLine[],
@@ -1360,11 +1469,15 @@ function bodyEdge(
 /** The lines of a caption from its first: same type, set solid, starting
  *  where it starts (or centred under it) — a table's header row right under
  *  its caption is the same type too, but set in from it in cells. Pieces of
- *  a kept line's row (a raised dagger, an inline formula) come along. */
+ *  a kept line's row (a raised dagger, an inline formula) come along. «Same
+ *  type» allows the rest a size smaller: a line's size is its largest run's,
+ *  and a caption whose label is set larger than its text («Figure 1.1:» at
+ *  12 pt, the words at 10) lost its second line (Emil's thesis, 2026-10-17). */
 function captionBlock(lines: readonly TextLine[], first: TextLine): TextLine[] {
   const span = { left: first.x0, right: Math.max(first.x1, first.x0 + 40) }
+  const sameType = (l: TextLine): boolean => l.size <= first.size + 0.6 && l.size >= first.size * 0.8 - 0.6
   const below = lines
-    .filter((l) => l !== first && l.y < first.y + first.size * 0.5 && Math.abs(l.size - first.size) <= 0.6 && inSpan(l, span))
+    .filter((l) => l !== first && l.y < first.y + first.size * 0.5 && sameType(l) && inSpan(l, span))
     .sort((a, b) => b.y - a.y || a.x0 - b.x0)
   // Rows: pieces within half a line of each other
   const rows: TextLine[][] = [[first]]
@@ -1667,4 +1780,78 @@ export function fitBox(
   const W = Math.ceil(w * s) + pad.x
   const H = Math.ceil(h * s) + pad.y
   return { scale: s, w: Math.min(W, room.w), h: Math.min(H, room.h), fits: W <= room.w && H <= room.h }
+}
+
+/** What viewFrame needs of a pdf.js PageViewport (at scale 1, with the
+ *  rotation the page is shown at) */
+export interface FrameViewport {
+  width: number
+  height: number
+  scale: number
+  rotation: number
+  viewBox: number[]
+  convertToViewportPoint(x: number, y: number): number[]
+  convertToPdfPoint(x: number, y: number): number[]
+}
+
+/** The frame a page is read in for its boxes: PDF space itself on an upright
+ *  page (the rules have always read that, unchanged), else the page as it is
+ *  shown — x rightward, y up from the shown page's foot — with every text
+ *  item, graphic and point carried into it, and a box carried back. Text that
+ *  is not upright as shown (arXiv's margin stamp, a sideways label) is given
+ *  a turned transform, so uprightItems leaves it out as it always has. */
+export function viewFrame(
+  vp: FrameViewport,
+  pageWidth: number,
+  pageHeight: number
+): {
+  w: number
+  h: number
+  items(items: readonly unknown[]): unknown[]
+  point<P extends { x: number | null; y: number }>(p: P): P
+  rect(g: Graphic): Graphic
+  back(b: PdfBox): PdfBox
+} {
+  if (vp.rotation % 360 === 0) {
+    return { w: pageWidth, h: pageHeight, items: (i) => [...i], point: (p) => p, rect: (g) => g, back: (b) => b }
+  }
+  const W = vp.width / vp.scale
+  const H = vp.height / vp.scale
+  const k = vp.scale
+  const to = (x: number, y: number): [number, number] => {
+    const [vx, vy] = vp.convertToViewportPoint(x, y) as [number, number]
+    return [vx / k, H - vy / k]
+  }
+  const from = (X: number, Y: number): [number, number] => vp.convertToPdfPoint(X * k, (H - Y) * k) as [number, number]
+  const left = vp.viewBox[0] ?? 0
+  return {
+    w: W,
+    h: H,
+    items: (items) =>
+      items.map((raw) => {
+        const it = raw as { transform?: unknown; width?: unknown }
+        if (!Array.isArray(it.transform)) return raw
+        const [a = 0, b = 0, c = 0, d = 0, e = 0, f0 = 0] = it.transform as number[]
+        const size = Math.hypot(c, d) || Math.hypot(a, b) || 10
+        const len = Math.hypot(a, b) || 1
+        const [X0, Y0] = to(e, f0)
+        const [X1, Y1] = to(e + a / len, f0 + b / len)
+        const upright = X1 - X0 > 0.99 && Math.abs(Y1 - Y0) < 0.01
+        return { ...it, transform: upright ? [size, 0, 0, size, X0, Y0] : [0, size, -size, 0, X0, Y0] }
+      }),
+    point: (p) => {
+      const [X, Y] = to(p.x ?? left, p.y)
+      return { ...p, x: p.x === null ? null : X, y: Y }
+    },
+    rect: (g) => {
+      const [ax, ay] = to(g.x0, g.y0)
+      const [bx, by] = to(g.x1, g.y1)
+      return { x0: Math.min(ax, bx), y0: Math.min(ay, by), x1: Math.max(ax, bx), y1: Math.max(ay, by) }
+    },
+    back: (b) => {
+      const [ax, ay] = from(b.x0, b.bottom)
+      const [bx, by] = from(b.x1, b.top)
+      return { x0: Math.min(ax, bx), x1: Math.max(ax, bx), bottom: Math.min(ay, by), top: Math.max(ay, by) }
+    }
+  }
 }

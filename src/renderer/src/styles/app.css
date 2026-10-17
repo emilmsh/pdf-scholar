@@ -3216,8 +3216,10 @@ html.pen-near .draw-layer {
   color: var(--accent);
 }
 
-/* The last action sits right, away from what the abstract says */
-.lp-ref-acts .lp-ref-act:last-child {
+/* The work's own actions sit right, away from what the abstract says */
+.lp-ref-end {
+  display: inline-flex;
+  gap: 12px;
   margin-left: auto;
 }
 

@@ -28,7 +28,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { OPS } from 'pdfjs-dist'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PageViewport, PDFDocumentProxy } from 'pdfjs-dist'
 import { pageImageRects, pagePathRects } from '../image-regions'
 import type { OpsTable } from '../image-regions'
 import { useDismissable } from '../useDismissable'
@@ -40,8 +40,10 @@ import type { CitationAbstract, FileError } from '../../../shared/types'
 import { AbstractBody, AbstractSource } from './AbstractView'
 import type { AbstractState } from './AbstractView'
 import {
+  belowFootnoteRule,
   cardEntries,
   citationGroup,
+  clearOfNeighbours,
   citedRange,
   destFamily,
   destLabel,
@@ -68,8 +70,13 @@ import {
   textBounds,
   textExtent,
   textLines,
-  uprightItems
+  scholarQuery,
+  scholarUrl,
+  uprightItems,
+  viewFrame,
+  withFloatNotes
 } from '../link-preview'
+import { findArxivId } from '../../../shared/abstract'
 import type { CardEntry, FamilyDest, Graphic, LineLink, LinkKind, LinkRecord, PdfBox, PreviewTarget } from '../link-preview'
 
 interface Props {
@@ -118,7 +125,18 @@ interface Open {
    *  and never opens onto the rest of the page (Emil, 2026-10-17: a resized
    *  footnote could suddenly be scrolled around its whole page). Null = a
    *  window onto the page. */
-  clip: { l: number; t: number; w: number; h: number } | null
+  clip: Clip | null
+}
+
+/** A cut-out: the window's content box (the target plus its air) and, inside
+ *  it, the target itself — only that much of the page is painted; the air is
+ *  blank paper, so it never shows the lines around the target */
+interface Clip {
+  l: number
+  t: number
+  w: number
+  h: number
+  inner: { l: number; t: number; r: number; b: number }
 }
 
 interface Card {
@@ -144,8 +162,11 @@ const LONG_PRESS_MS = 450
 const FOOT_PX = 27
 /** Air around a target cut to its box, both sides together: a table's top
  *  rule or a plot's frame sits right on the box's edge, and 12 px a side read
- *  as crammed (Emil, 2026-10-17) */
-const TARGET_PAD = { x: 40, y: 32 }
+ *  as crammed (Emil, 2026-10-17). Of the vertical air, TARGET_PAD_TOP goes
+ *  above and the rest below — a caption's last line sat right on the
+ *  window's foot. */
+const TARGET_PAD = { x: 40, y: 40 }
+const TARGET_PAD_TOP = 16
 /** How small a cut-out may be read before its window scrolls instead. A
  *  figure or table is shown WHOLE (Emil, 2026-10-16: «du vil 100 % se hele
  *  figuren»), down to half the 100 % scale — a 10 pt label at 5 CSS px, the
@@ -441,8 +462,8 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
           const e = viewportBox(base, entryRect)
           scale = previewScale(e.r - e.l, box.w, e.r - e.l + 24 > box.w ? 0.75 : 1)
         }
-      } else if (content && target.y !== null && base.rotation % 180 === 0) {
-        targetRect = await targetBox(rec.pdf, target, dstPage, content.items, pageWidth, pageHeight)
+      } else if (content && target.y !== null) {
+        targetRect = await targetBox(rec.pdf, target, dstPage, content.items, pageWidth, pageHeight, base)
         if (targetRect) {
           const e = viewportBox(base, targetRect)
           const floor = target.kind === 'figure' || target.kind === 'table' ? FIGURE_FLOOR : TEXT_FLOOR
@@ -548,6 +569,15 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   useEffect(() => {
     const scroller = scrollerRef.current
     if (!open?.canvas || !scroller) return
+    // A cut-out paints only the target; its air stays blank paper. On the
+    // canvas itself, not its host: a clip-path makes a stacking context, and
+    // one between the canvas and the sheet would kill the canvas's blend
+    // into the paper tone (CLAUDE.md, mix-blend-mode). The canvas is cached
+    // and shared, so a window onto the page clears it again.
+    const c = open.clip
+    open.canvas.style.clipPath = c
+      ? `inset(${c.inner.t}px ${open.pageW - c.inner.r}px ${open.pageH - c.inner.b}px ${c.inner.l}px)`
+      : ''
     scroller.querySelector('.link-preview-canvas-host')?.replaceChildren(open.canvas)
     scroller.scrollLeft = open.scroll.left
     scroller.scrollTop = open.scroll.top
@@ -569,11 +599,12 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     // A cut-out scales with it, and its window follows — up to the room a
     // target may take, and scrolling inside the target past that — unless
     // the reader sized the window by hand (the grip sets it to match)
-    const clip = o.clip && {
+    const clip: Clip | null = o.clip && {
       l: Math.round(o.clip.l * k),
       t: Math.round(o.clip.t * k),
       w: Math.round(o.clip.w * k),
-      h: Math.round(o.clip.h * k)
+      h: Math.round(o.clip.h * k),
+      inner: { l: o.clip.inner.l * k, t: o.clip.inner.t * k, r: o.clip.inner.r * k, b: o.clip.inner.b * k }
     }
     // Grown where it stands: rightward, and down from a window placed below
     // its link or up from one held by its bottom above it
@@ -935,14 +966,41 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
                 )}
                 {a.state === 'loading' && <span className="lpa-loading">{t('linkPreview.abstractLoading')}</span>}
                 <AbstractSource abs={a} />
-                <button
-                  type="button"
-                  className="lp-ref-act"
-                  title={t('linkPreview.goToTip')}
-                  onClick={(e) => goTo(e, entry.dest)}
-                >
-                  {t('linkPreview.goTo', { page: entry.pageIndex + 1 })}
-                </button>
+                {/* Away from the abstract, on the right: the work itself — a
+                    free PDF when one is known for certain (an arXiv id, printed
+                    or found by «Sammendrag»), a search for it, its place in the
+                    list. Links that open the browser on a click, never before. */}
+                <span className="lp-ref-end">
+                  {(() => {
+                    const arxiv = (a.state === 'done' && a.result.arxiv) || findArxivId(entry.text)
+                    return arxiv ? (
+                      <button
+                        type="button"
+                        className="lp-ref-act"
+                        title={t('linkPreview.pdfTip')}
+                        onClick={() => bridge.openExternal(`https://arxiv.org/pdf/${arxiv}`)}
+                      >
+                        {t('linkPreview.pdf')}
+                      </button>
+                    ) : null
+                  })()}
+                  <button
+                    type="button"
+                    className="lp-ref-act"
+                    title={t('linkPreview.searchTip')}
+                    onClick={() => bridge.openExternal(scholarUrl(scholarQuery(entry.text)))}
+                  >
+                    {t('linkPreview.search')}
+                  </button>
+                  <button
+                    type="button"
+                    className="lp-ref-act"
+                    title={t('linkPreview.goToTip')}
+                    onClick={(e) => goTo(e, entry.dest)}
+                  >
+                    {t('linkPreview.goTo', { page: entry.pageIndex + 1 })}
+                  </button>
+                </span>
               </div>
               <AbstractBody
                 abs={a}
@@ -1170,16 +1228,12 @@ function useEdgeFade(ref: React.RefObject<HTMLElement | null>, deps: unknown[]):
  *  half on each side — the right edge rounded OUT like the left, so the
  *  rounding never takes its air from one side only — kept on the page,
  *  whose paper is the only background the air may show */
-function clipBox(
-  e: { l: number; t: number; r: number; b: number },
-  pageW: number,
-  pageH: number
-): { l: number; t: number; w: number; h: number } {
+function clipBox(e: { l: number; t: number; r: number; b: number }, pageW: number, pageH: number): Clip {
   const l = Math.max(0, Math.floor(e.l - TARGET_PAD.x / 2))
-  const t = Math.max(0, Math.floor(e.t - TARGET_PAD.y / 2))
+  const t = Math.max(0, Math.floor(e.t - TARGET_PAD_TOP))
   const r = Math.min(Math.floor(pageW), Math.ceil(e.r + TARGET_PAD.x / 2))
-  const b = Math.min(Math.floor(pageH), Math.ceil(e.b + TARGET_PAD.y / 2))
-  return { l, t, w: Math.max(1, r - l), h: Math.max(1, b - t) }
+  const b = Math.min(Math.floor(pageH), Math.ceil(e.b + TARGET_PAD.y - TARGET_PAD_TOP))
+  return { l, t, w: Math.max(1, r - l), h: Math.max(1, b - t), inner: { ...e } }
 }
 
 function targetRoom(): { w: number; h: number } {
@@ -1200,23 +1254,41 @@ async function targetBox(
   page: Awaited<ReturnType<PDFDocumentProxy['getPage']>>,
   items: readonly unknown[],
   pageWidth: number,
-  pageHeight: number
+  pageHeight: number,
+  vp: PageViewport
 ): Promise<PdfBox | null> {
   if (target.y === null) return null
-  const lines = textLines(uprightItems(items))
-  const dest = { x: target.x, y: target.y }
-  const size = { w: pageWidth, h: pageHeight }
-  if (target.kind === 'footnote' || (target.kind === 'other' && inFootnotes(lines, dest, pageWidth))) {
-    const siblings = target.name ? await familySiblings(pdf, target, page) : []
-    return entryBox(footnoteLines(lines, dest, siblings, pageWidth))
+  // The rules read a page the way it is SEEN. A landscape table in a portrait
+  // thesis is a /Rotate 90 page whose text is drawn turned, so that it reads
+  // upright once the page is shown turned — read in PDF space it is all
+  // sideways and no box was ever found (64 of the 66 pages in Emil's thesis
+  // where one was missing, 2026-10-17). So a turned page is read in the
+  // frame it is shown in, and the box carried back to PDF space.
+  const f = viewFrame(vp, pageWidth, pageHeight)
+  const lines = textLines(uprightItems(f.items(items)))
+  const dest = f.point({ x: target.x, y: target.y })
+  const size = { w: f.w, h: f.h }
+  // Every box is kept off the lines around it: its edges are where the
+  // page's own content stops showing (the air outside is blank paper)
+  const clear = (b: PdfBox | null): PdfBox | null => (b ? f.back(clearOfNeighbours(b, lines)) : null)
+  const ops = OPS as unknown as OpsTable
+  if (target.kind === 'footnote' || (target.kind === 'other' && inFootnotes(lines, dest, f.w))) {
+    const [siblings, rules] = await Promise.all([
+      target.name ? familySiblings(pdf, target, page) : Promise.resolve([]),
+      pagePathRects(page, ops)
+    ])
+    const own = footnoteLines(lines, dest, siblings.map(f.point), f.w)
+    const box = entryBox(own)
+    return box && f.back(belowFootnoteRule(clearOfNeighbours(box, lines, own), rules.map(f.rect)))
   }
   if (target.kind !== 'figure' && target.kind !== 'table' && target.kind !== 'equation') return null
-  const ops = OPS as unknown as OpsTable
   const [images, paths] = await Promise.all([pageImageRects(page, ops), pagePathRects(page, ops)])
-  const graphics: Graphic[] = [...images, ...paths]
-  return target.kind === 'equation'
-    ? equationBox(dest, lines, graphics, size)
-    : floatBox(target.kind, dest, lines, graphics, size)
+  const graphics: Graphic[] = [...images, ...paths].map(f.rect)
+  const float = target.kind === 'equation' ? null : floatBox(target.kind, dest, lines, graphics, size)
+  const box = target.kind === 'equation' ? equationBox(dest, lines, graphics, size) : float && withFloatNotes(float, lines)
+  // A point past the box first: a plot's frame or a table's rule drawn ON its
+  // edge keeps its whole stroke — unless a neighbour is that close
+  return clear(box && { x0: box.x0 - 1, x1: box.x1 + 1, top: box.top + 1, bottom: box.bottom - 1 })
 }
 
 /** A preview that cannot be drawn simply does not open; the link still works */
