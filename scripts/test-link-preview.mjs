@@ -127,18 +127,19 @@ const check = (label, cond, detail = '') => {
   check('kept inside the window at its right edge', right.left + box.w <= win.w - 12, JSON.stringify(right))
 }
 {
-  // Once an abstract is in, the window is placed by what it needs
+  // Once an abstract is in, the card stays and grows downward (Emil,
+  // 2026-10-17: it used to jump to the other side of the link)
   const win = { h: 800 }
-  const fitsBelow = M.placeExpanded({ top: 100, bottom: 116 }, 500, win)
-  check('expanded: below the link when all of it fits there', fitsBelow.top === 124 && fitsBelow.height === 500 && !fitsBelow.covers, JSON.stringify(fitsBelow))
-  const fitsAbove = M.placeExpanded({ top: 600, bottom: 616 }, 500, win)
-  check('expanded: above when it fits there instead', fitsAbove.top + fitsAbove.height === 592 && fitsAbove.height === 500 && !fitsAbove.covers, JSON.stringify(fitsAbove))
-  const bigger = M.placeExpanded({ top: 500, bottom: 516 }, 700, win)
-  check('expanded: neither side holds it all → the roomier side, the rest scrolls', bigger.top === 12 && bigger.height === 480 && !bigger.covers, JSON.stringify(bigger))
-  const cramped = M.placeExpanded({ top: 300, bottom: 316 }, 520, { h: 620 })
-  check('expanded: no side worth reading in → covers the link, all of it in view', cramped.covers && cramped.height === 520 && cramped.top >= 12 && cramped.top + cramped.height <= 608, JSON.stringify(cramped))
-  const huge = M.placeExpanded({ top: 300, bottom: 316 }, 5000, { h: 620 })
-  check('expanded: never taller than the window', huge.height === 620 - 24, JSON.stringify(huge))
+  const fits = M.growInPlace(124, 500, win)
+  check('abstract in: the card stays put and grows under itself', fits.top === 124 && fits.height === 500 && !fits.moved, JSON.stringify(fits))
+  const longer = M.growInPlace(300, 700, win)
+  check('abstract in: past the window\'s foot it stays put and the rest scrolls', longer.top === 300 && longer.height === 800 - 12 - 300 && !longer.moved, JSON.stringify(longer))
+  const low = M.growInPlace(650, 500, win)
+  check('abstract in: a card near the foot slides up only as far as reading room needs', low.moved && low.top === 800 - 12 - 240 && low.height === 240, JSON.stringify(low))
+  const small = M.growInPlace(650, 130, win)
+  check('abstract in: a short card that still fits under itself does not move', !small.moved && small.top === 650 && small.height === 130, JSON.stringify(small))
+  const huge = M.growInPlace(12, 5000, { h: 620 })
+  check('abstract in: never taller than the window', huge.height === 620 - 24, JSON.stringify(huge))
 }
 {
   check('caption: «Figure 3:»', M.isFigureCaption('Figure 3: The Transformer'))

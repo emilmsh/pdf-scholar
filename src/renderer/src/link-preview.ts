@@ -228,35 +228,24 @@ export function placePreview(
   return { left, top: Math.max(margin, top), below }
 }
 
-/** Where the window goes once it holds an abstract (Emil, 2026-10-10: «nesten
- *  ingen del av abstractet var synlig uten scrolling»). It is placed ONCE, as
- *  a whole, by what it now needs: below the link when it fits there, above
- *  when it fits there. When neither side holds all of it, a side with room
- *  worth reading in (`minSide`) takes it and the abstract scrolls the rest;
- *  when not even that, the abstract wins over the citation and the window
- *  covers the link — it is pinned by then, and it can be dragged aside. */
-export function placeExpanded(
-  anchor: { top: number; bottom: number },
+/** Where the card goes once it holds an abstract. It STAYS where it is and
+ *  the abstract falls out under it (Emil, 2026-10-17: the card jumped to the
+ *  other side of the link to make room, «uheldig») — down to the window's
+ *  foot, the abstract scrolling the rest. Only when that leaves less than
+ *  `minRoom` to read in does the card slide up, and then just far enough;
+ *  `moved` says so, and the caller animates that one slide. */
+export function growInPlace(
+  top: number,
   need: number,
   win: { h: number },
-  gap = 8,
   margin = 12,
-  minSide = 360
-): { top: number; height: number; covers: boolean } {
-  const below = win.h - anchor.bottom - gap - margin
-  const above = anchor.top - gap - margin
-  const h = Math.min(need, win.h - 2 * margin)
-  if (h <= below) return { top: anchor.bottom + gap, height: h, covers: false }
-  if (h <= above) return { top: anchor.top - gap - h, height: h, covers: false }
-  if (Math.max(below, above) >= minSide) {
-    return below >= above
-      ? { top: anchor.bottom + gap, height: below, covers: false }
-      : { top: margin, height: above, covers: false }
-  }
-  // Over the link, but starting a little above it, so the line read just
-  // before the citation is the part that stays in view longest
-  const top = clamp(anchor.top - h / 3, margin, win.h - margin - h)
-  return { top, height: h, covers: true }
+  minRoom = 240
+): { top: number; height: number; moved: boolean } {
+  const want = Math.min(need, win.h - 2 * margin)
+  const room = win.h - margin - top
+  if (room >= Math.min(want, minRoom)) return { top, height: Math.min(want, room), moved: false }
+  const up = Math.max(margin, win.h - margin - Math.min(want, minRoom))
+  return { top: up, height: Math.min(want, win.h - margin - up), moved: true }
 }
 
 /** Hover delay presets (Settings.linkPreviewDelay) — fixed choices rather

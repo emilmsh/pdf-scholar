@@ -60,7 +60,7 @@ import {
   inFootnotes,
   LINK_RECORDS,
   linkKind,
-  placeExpanded,
+  growInPlace,
   placePreview,
   previewScale,
   previewScroll,
@@ -782,24 +782,26 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     setOpen({ ...open, at, box: { w: open.box.w, h: h - FOOT_PX } })
   }, [open, placed, size])
 
-  // An abstract is in: place the whole card ONCE by what it now needs —
-  // before paint, so it never shows at the old size first. Loading changes
-  // nothing; this is the single move.
+  // An abstract is in: the card stays put and grows downward, the abstract
+  // falling out under the row it belongs to (growInPlace) — before paint, so
+  // it never shows at the old size first. Loading changes nothing.
   const hasPanel = Object.values(abs).some((a) => a.state === 'done' || a.state === 'error')
   useLayoutEffect(() => {
     const list = scrollerRef.current
     const box = boxRef.current
     if (!open?.card || !hasPanel || !list || !box) return
     const need = list.scrollHeight + FOOT_PX
-    const winH = window.innerHeight
-    const left = box.getBoundingClientRect().left
-    if (draggedRef.current) {
-      const top = box.getBoundingClientRect().top
-      setPlaced({ left, top, height: Math.min(need, winH - top - 12) })
-      return
+    const r = box.getBoundingClientRect()
+    const at = growInPlace(r.top, need, { h: window.innerHeight })
+    if (at.moved) {
+      // The one slide, too little room under a card near the window's foot:
+      // glided, not jumped (the transition is cleared before any drag)
+      box.style.transition = 'top 180ms ease'
+      window.setTimeout(() => {
+        if (boxRef.current) boxRef.current.style.transition = ''
+      }, 220)
     }
-    const at = placeExpanded(open.anchor.getBoundingClientRect(), need, { h: winH })
-    setPlaced({ left, top: at.top, height: at.height })
+    setPlaced({ left: r.left, top: at.top, height: at.height })
   }, [open, abs, hasPanel])
 
   /** The footer is the handle: drag the window aside to read what is under
