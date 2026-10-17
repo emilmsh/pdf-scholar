@@ -31,7 +31,6 @@ import { OPS } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { pageImageRects, pagePathRects } from '../image-regions'
 import type { OpsTable } from '../image-regions'
-import { OverlayScrollbars } from './OverlayScrollbars'
 import { useDismissable } from '../useDismissable'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
@@ -114,6 +113,12 @@ interface Open {
    *  it is bigger than the window may be */
   entry: boolean
   entryFits: boolean
+  /** A cut-out's own box in the image's CSS pixels, its air included: the
+   *  window's content IS this box, so a zoom or a resize scales the target
+   *  and never opens onto the rest of the page (Emil, 2026-10-17: a resized
+   *  footnote could suddenly be scrolled around its whole page). Null = a
+   *  window onto the page. */
+  clip: { l: number; t: number; w: number; h: number } | null
 }
 
 interface Card {
@@ -138,8 +143,9 @@ const LONG_PRESS_MS = 450
 /** The footer line under the page window, borders included (app.css) */
 const FOOT_PX = 27
 /** Air around a target cut to its box, both sides together: a table's top
- *  rule or a plot's frame sits right on the box's edge */
-const TARGET_PAD = { x: 24, y: 20 }
+ *  rule or a plot's frame sits right on the box's edge, and 12 px a side read
+ *  as crammed (Emil, 2026-10-17) */
+const TARGET_PAD = { x: 40, y: 32 }
 /** How small a cut-out may be read before its window scrolls instead. A
  *  figure or table is shown WHOLE (Emil, 2026-10-16: «du vil 100 % se hele
  *  figuren»), down to half the 100 % scale — a 10 pt label at 5 CSS px, the
@@ -220,16 +226,65 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
    *  window): sizes the page part; null = the size the rules gave it. A
    *  resized window is being read, so it stays when the pointer leaves. */
   const [size, setSize] = useState<BoxSize | null>(null)
-  const { gripProps } = useResizable(
+  const sizeRef = useRef(size)
+  sizeRef.current = size
+  /** A cut-out being resized: the scale it is shown at (by CSS, over its
+   *  last render) until the drag rests and it is rendered at that scale */
+  const [liveScale, setLiveScale] = useState<number | null>(null)
+  const resizeStart = useRef<{ w: number; h: number; scale: number } | null>(null)
+  const resizeTimer = useRef<number | null>(null)
+  /** The scale the rules gave the open target: a double-click on the grip
+   *  goes back to it */
+  const fitScaleRef = useRef(1)
+  const { gripProps: baseGrip } = useResizable(
     scrollerRef,
     size,
     (s) => {
-      setSize(s)
       pinnedRef.current = true
       clearClose()
+      const o = openRef.current
+      if (!o?.clip) {
+        setSize(s)
+        return
+      }
+      // A cut-out IS its window: the grip scales the target, both sides
+      // together, by whichever side the drag moved more
+      if (resizeTimer.current !== null) window.clearTimeout(resizeTimer.current)
+      if (!s) {
+        setSize(null)
+        setLiveScale(null)
+        rescaleTo(o, fitScaleRef.current).catch(previewFailed)
+        return
+      }
+      const start = resizeStart.current
+      if (!start || s.w === null || s.h === null) return
+      const dw = s.w / start.w
+      const dh = s.h / start.h
+      const want = Math.abs(dw - 1) >= Math.abs(dh - 1) ? dw : dh
+      const scale = Math.round(Math.min(3, Math.max(0.5, start.scale * want)) * 1000) / 1000
+      const k = scale / start.scale
+      setSize({ w: Math.round(start.w * k), h: Math.round(start.h * k) })
+      setLiveScale(scale)
+      resizeTimer.current = window.setTimeout(() => {
+        resizeTimer.current = null
+        const cur = openRef.current
+        if (!cur) return
+        rescaleTo(cur, scale)
+          .then(() => setLiveScale(null))
+          .catch(previewFailed)
+      }, 140)
     },
     { axis: 'both', minW: 160, minH: 60 }
   )
+  const gripProps = {
+    ...baseGrip,
+    onPointerDown: (e: React.PointerEvent): void => {
+      const r = scrollerRef.current?.getBoundingClientRect()
+      const o = openRef.current
+      resizeStart.current = r && o ? { w: r.width, h: r.height, scale: o.scale } : null
+      baseGrip.onPointerDown(e)
+    }
+  }
 
   const clearArm = (): void => {
     if (armTimer.current !== null) window.clearTimeout(armTimer.current)
@@ -300,6 +355,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
           range: null,
           entry: false,
           entryFits: false,
+          clip: null,
           at
         })
         return
@@ -414,30 +470,27 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     let scroll: { left: number; top: number }
     let entry = false
     let entryFits = false
+    let clip: Open['clip'] = null
     if (targetRect && fit) {
       // Cut to the target and sized to hold it: grown first, read smaller
-      // only down to the floor, scrolled only past that
-      const { l, t, r, b } = viewportBox(img.viewport, targetRect)
+      // only down to the floor, scrolled (inside the target) only past that
+      clip = clipBox(viewportBox(img.viewport, targetRect), img.w, img.h)
       const room = targetRoom()
-      box.w = Math.min(room.w, Math.ceil(r - l) + TARGET_PAD.x)
-      box.h = Math.max(40, Math.min(room.h, Math.ceil(b - t) + TARGET_PAD.y))
-      scroll = {
-        left: Math.max(0, Math.floor(l) - TARGET_PAD.x / 2),
-        top: Math.max(0, Math.floor(t) - TARGET_PAD.y / 2)
-      }
+      box.w = Math.min(room.w, clip.w)
+      box.h = Math.max(40, Math.min(room.h, clip.h))
+      scroll = { left: 0, top: 0 }
       entry = true
       entryFits = fit.fits
     } else if (entryRect) {
-      // Cut to the entry: its lines, a little air, nothing of the neighbours
-      const { l, t, r, b } = viewportBox(img.viewport, entryRect)
-      const need = Math.ceil(b - t) + 12
+      // Cut to the entry: its lines, the same air, nothing of the neighbours.
       // As wide as the entry needs, within the screen: the 600 px default is
       // a ceiling for page windows, not for a line that must come out whole
-      box.w = Math.min(window.innerWidth - 24, Math.ceil(r - l) + 24)
-      box.h = Math.max(40, Math.min(need, maxH))
-      scroll = { left: Math.max(0, Math.floor(l) - 12), top: Math.max(0, Math.floor(t) - 6) }
+      clip = clipBox(viewportBox(img.viewport, entryRect), img.w, img.h)
+      box.w = Math.min(window.innerWidth - 24, clip.w)
+      box.h = Math.max(40, Math.min(clip.h, maxH))
+      scroll = { left: 0, top: 0 }
       entry = true
-      entryFits = need <= maxH
+      entryFits = clip.h <= maxH
     } else {
       if (range && target.y !== null && vy !== null) {
         // The entry could not be read off the page: a window tall enough for
@@ -461,8 +514,10 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     const at = placePreview(r, pointerX, { w: box.w, h: box.h + FOOT_PX }, { w: window.innerWidth, h: window.innerHeight })
     pinnedRef.current = false
     draggedRef.current = false
+    fitScaleRef.current = scale
     setPlaced(null)
     setSize(null)
+    setLiveScale(null)
     setAbs({})
     setOpen({
       anchor,
@@ -483,6 +538,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       range,
       entry,
       entryFits,
+      clip,
       at
     })
   }, [])
@@ -500,16 +556,34 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   /** Ctrl+wheel (a pinch, too) over the window: the window's own scale, the
    *  point under its top-left corner kept. «Cropped and no way to zoom out»
    *  was the second-round report on issue #31. */
-  const rescale = async (o: Open | null, factor: number): Promise<void> => {
-    if (!o?.canvas) return
-    const scale = Math.round(Math.min(3, Math.max(0.5, o.scale * factor)) * 20) / 20
-    if (scale === o.scale) return
+  const rescale = (o: Open | null, factor: number): Promise<void> =>
+    o ? rescaleTo(o, Math.round(Math.min(3, Math.max(0.5, o.scale * factor)) * 20) / 20) : Promise.resolve()
+  const rescaleTo = async (o: Open, scale: number): Promise<void> => {
+    if (!o.canvas || scale === o.scale) return
     const img = await renderPage(o.rec.pdf, o.pageIndex, scale, o.rec.rotation)
     if (openRef.current !== o) return
     const k = scale / o.scale
     const sc = scrollerRef.current
     // Zooming is reading: the window stays when the pointer leaves it
     pinnedRef.current = true
+    // A cut-out scales with it, and its window follows — up to the room a
+    // target may take, and scrolling inside the target past that — unless
+    // the reader sized the window by hand (the grip sets it to match)
+    const clip = o.clip && {
+      l: Math.round(o.clip.l * k),
+      t: Math.round(o.clip.t * k),
+      w: Math.round(o.clip.w * k),
+      h: Math.round(o.clip.h * k)
+    }
+    // Grown where it stands: rightward, and down from a window placed below
+    // its link or up from one held by its bottom above it
+    const room = targetRoom()
+    const roomW = Math.min(room.w, window.innerWidth - o.at.left - 8)
+    const roomH = Math.min(
+      room.h,
+      o.at.below ? window.innerHeight - o.at.top - FOOT_PX - 8 : o.at.top + o.box.h - 8
+    )
+    const box = clip && !sizeRef.current ? { w: Math.min(roomW, clip.w), h: Math.min(roomH, clip.h) } : o.box
     setOpen({
       ...o,
       scale,
@@ -519,8 +593,11 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       vx: o.vx === null ? null : o.vx * k,
       vy: o.vy === null ? null : o.vy * k,
       scroll: { left: (sc?.scrollLeft ?? o.scroll.left) * k, top: (sc?.scrollTop ?? o.scroll.top) * k },
-      // Zoomed, a cut-out no longer fits its window: it scrolls
-      entryFits: false
+      box,
+      clip,
+      entryFits: clip ? clip.w <= box.w && clip.h <= box.h : false,
+      // Held by its bottom: the bottom stays where it was
+      at: o.at.below ? o.at : { ...o.at, top: o.at.top + o.box.h - box.h }
     })
   }
   useEffect(() => {
@@ -656,6 +733,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   }, [])
 
   useDismissable(boxRef, !!open, close)
+  useEdgeFade(scrollerRef, [open, size, placed, liveScale])
 
   // A card is placed by its real height, known only once it is laid out:
   // before paint, so it never shows at the guessed one first
@@ -775,7 +853,9 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   // Opened above its link, the window is held by its BOTTOM, so a growing
   // footer never moves it toward the citation.
   const winH = window.innerHeight
-  const width = size?.w ?? open.box.w
+  // The box is the scroller's; the window's 1 px border goes around it, or a
+  // cut-out exactly as wide as its window loses 2 px and fades at its edge
+  const width = (size?.w ?? open.box.w) + 2
   const place: React.CSSProperties = placed
     ? { left: placed.left, top: placed.top, width }
     : open.at.below
@@ -797,17 +877,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
           : t('linkPreview.label', { page: open.pageIndex + 1 })
       }
     >
-      <div className="link-preview-body">
-        {body}
-        {/* The app's own bars, as over the pages: on hover and while
-            scrolling, gone otherwise (Emil, 2026-10-16 — Windows draws
-            the native thin bar with arrow buttons on both axes) */}
-        <OverlayScrollbars
-          scrollRef={scrollerRef}
-          layoutKey={`${open.card ? 'card' : 'page'}:${open.scale}:${open.pageW}x${open.pageH}:${size?.w}x${size?.h}:${placed?.height}`}
-          hoverReveal
-        />
-      </div>
+      <div className="link-preview-body">{body}</div>
       <div className="link-preview-foot" {...footHandle}>
         {foot}
       </div>
@@ -892,6 +962,22 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   const markTop =
     open.vy !== null && !open.entry && open.kind !== 'figure' && open.kind !== 'table' ? open.vy : null
   const pageH = size?.h ?? open.box.h
+  const clip = open.clip
+  // A cut-out: the content is the target's own box, the page slid under it —
+  // there is no more of the page to scroll to. Mid-resize it is scaled by CSS
+  // until the drag rests and it is rendered at the new scale.
+  const live = clip && liveScale !== null ? liveScale / open.scale : 1
+  const contentStyle: React.CSSProperties = clip
+    ? {
+        width: clip.w,
+        height: clip.h,
+        overflow: 'hidden',
+        ...(live !== 1 ? { transform: `scale(${live})`, transformOrigin: '0 0' } : {})
+      }
+    : { width: open.pageW, height: open.pageH }
+  const sheetStyle: React.CSSProperties | undefined = clip
+    ? { left: -clip.l, top: -clip.t, width: open.pageW, height: open.pageH, right: 'auto', bottom: 'auto' }
+    : undefined
   return shell(
     <div
       ref={scrollerRef}
@@ -900,8 +986,8 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       onClick={follow}
       title={t('linkPreview.tip')}
     >
-      <div className="link-preview-content" style={{ width: open.pageW, height: open.pageH }}>
-        <div className="link-preview-sheet">
+      <div className="link-preview-content" style={contentStyle}>
+        <div className="link-preview-sheet" style={sheetStyle}>
           <div className="link-preview-canvas-host" />
         </div>
         {/* Outside the sheet: the theme filter would recolour the accent */}
@@ -1048,6 +1134,54 @@ function lineAround(
 
 /** The room a window cut to its target may take: most of the app window,
  *  the footer line aside */
+/** How deep the fade at an edge with more beyond it runs */
+const FADE_PX = 18
+
+/** No scrollbar in the preview, not even the overlay pills — in a window
+ *  this small they distract (Emil, 2026-10-17). What a bar said, that there
+ *  is more, a soft fade at that edge says instead, and only while there is:
+ *  the edges are CSS variables the stylesheet's mask reads. */
+function useEdgeFade(ref: React.RefObject<HTMLElement | null>, deps: unknown[]): void {
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = (): void => {
+      const f = (more: boolean): string => (more ? `${FADE_PX}px` : '0px')
+      el.style.setProperty('--fade-t', f(el.scrollTop > 1))
+      el.style.setProperty('--fade-b', f(el.scrollTop + el.clientHeight < el.scrollHeight - 1))
+      el.style.setProperty('--fade-l', f(el.scrollLeft > 1))
+      el.style.setProperty('--fade-r', f(el.scrollLeft + el.clientWidth < el.scrollWidth - 1))
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    // An abstract folding out, a resize, a render: the scroll range moves
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    for (const child of Array.from(el.children)) ro.observe(child)
+    return () => {
+      el.removeEventListener('scroll', update)
+      ro.disconnect()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ref, ...deps])
+}
+
+/** A cut-out's box in the image's CSS pixels: the target plus TARGET_PAD,
+ *  half on each side — the right edge rounded OUT like the left, so the
+ *  rounding never takes its air from one side only — kept on the page,
+ *  whose paper is the only background the air may show */
+function clipBox(
+  e: { l: number; t: number; r: number; b: number },
+  pageW: number,
+  pageH: number
+): { l: number; t: number; w: number; h: number } {
+  const l = Math.max(0, Math.floor(e.l - TARGET_PAD.x / 2))
+  const t = Math.max(0, Math.floor(e.t - TARGET_PAD.y / 2))
+  const r = Math.min(Math.floor(pageW), Math.ceil(e.r + TARGET_PAD.x / 2))
+  const b = Math.min(Math.floor(pageH), Math.ceil(e.b + TARGET_PAD.y / 2))
+  return { l, t, w: Math.max(1, r - l), h: Math.max(1, b - t) }
+}
+
 function targetRoom(): { w: number; h: number } {
   return {
     w: Math.min(window.innerWidth - 24, Math.round(window.innerWidth * 0.9)),
