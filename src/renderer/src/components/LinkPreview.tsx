@@ -252,6 +252,11 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   /** A cut-out being resized: the scale it is shown at (by CSS, over its
    *  last render) until the drag rests and it is rendered at that scale */
   const [liveScale, setLiveScale] = useState<number | null>(null)
+  const liveScaleRef = useRef<number | null>(null)
+  const setLive = (v: number | null): void => {
+    liveScaleRef.current = v
+    setLiveScale(v)
+  }
   const resizeStart = useRef<{ w: number; h: number; scale: number } | null>(null)
   const resizeTimer = useRef<number | null>(null)
   /** The scale the rules gave the open target: a double-click on the grip
@@ -273,7 +278,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       if (resizeTimer.current !== null) window.clearTimeout(resizeTimer.current)
       if (!s) {
         setSize(null)
-        setLiveScale(null)
+        setLive(null)
         rescaleTo(o, fitScaleRef.current).catch(previewFailed)
         return
       }
@@ -285,13 +290,13 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       const scale = Math.round(Math.min(3, Math.max(0.5, start.scale * want)) * 1000) / 1000
       const k = scale / start.scale
       setSize({ w: Math.round(start.w * k), h: Math.round(start.h * k) })
-      setLiveScale(scale)
+      setLive(scale)
       resizeTimer.current = window.setTimeout(() => {
         resizeTimer.current = null
         const cur = openRef.current
         if (!cur) return
         rescaleTo(cur, scale)
-          .then(() => setLiveScale(null))
+          .then(() => setLive(null))
           .catch(previewFailed)
       }, 140)
     },
@@ -538,7 +543,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     fitScaleRef.current = scale
     setPlaced(null)
     setSize(null)
-    setLiveScale(null)
+    setLive(null)
     setAbs({})
     setOpen({
       anchor,
@@ -583,11 +588,44 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     scroller.scrollTop = open.scroll.top
   }, [open])
 
+  /** A cut-out's window at a scale k over its last render: grown where it
+   *  stands — rightward, and down from a window placed below its link or up
+   *  from one held by its bottom above it — up to the room a target may take */
+  const grownBox = (o: Open, clipW: number, clipH: number): { w: number; h: number } => {
+    const room = targetRoom()
+    const roomW = Math.min(room.w, window.innerWidth - o.at.left - 8)
+    const roomH = Math.min(room.h, o.at.below ? window.innerHeight - o.at.top - FOOT_PX - 8 : o.at.top + o.box.h - 8)
+    return { w: Math.min(roomW, clipW), h: Math.min(roomH, clipH) }
+  }
+
   /** Ctrl+wheel (a pinch, too) over the window: the window's own scale, the
    *  point under its top-left corner kept. «Cropped and no way to zoom out»
-   *  was the second-round report on issue #31. */
-  const rescale = (o: Open | null, factor: number): Promise<void> =>
-    o ? rescaleTo(o, Math.round(Math.min(3, Math.max(0.5, o.scale * factor)) * 20) / 20) : Promise.resolve()
+   *  was the second-round report on issue #31. Each notch scales what is
+   *  already drawn, by CSS, at once; the page is drawn again at the new scale
+   *  only once the wheel rests — a render per notch made it choppy (Emil,
+   *  2026-10-17). */
+  const zoomTimer = useRef<number | null>(null)
+  const zoomBy = (factor: number): void => {
+    const o = openRef.current
+    if (!o?.canvas) return
+    const from = liveScaleRef.current ?? o.scale
+    const scale = Math.round(Math.min(3, Math.max(0.5, from * factor)) * 1000) / 1000
+    if (scale === from) return
+    pinnedRef.current = true
+    clearClose()
+    setLive(scale)
+    if (zoomTimer.current !== null) window.clearTimeout(zoomTimer.current)
+    zoomTimer.current = window.setTimeout(() => {
+      zoomTimer.current = null
+      const cur = openRef.current
+      if (!cur) return
+      rescaleTo(cur, scale)
+        .then(() => {
+          if (liveScaleRef.current === scale) setLive(null)
+        })
+        .catch(previewFailed)
+    }, 160)
+  }
   const rescaleTo = async (o: Open, scale: number): Promise<void> => {
     if (!o.canvas || scale === o.scale) return
     const img = await renderPage(o.rec.pdf, o.pageIndex, scale, o.rec.rotation)
@@ -606,15 +644,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       h: Math.round(o.clip.h * k),
       inner: { l: o.clip.inner.l * k, t: o.clip.inner.t * k, r: o.clip.inner.r * k, b: o.clip.inner.b * k }
     }
-    // Grown where it stands: rightward, and down from a window placed below
-    // its link or up from one held by its bottom above it
-    const room = targetRoom()
-    const roomW = Math.min(room.w, window.innerWidth - o.at.left - 8)
-    const roomH = Math.min(
-      room.h,
-      o.at.below ? window.innerHeight - o.at.top - FOOT_PX - 8 : o.at.top + o.box.h - 8
-    )
-    const box = clip && !sizeRef.current ? { w: Math.min(roomW, clip.w), h: Math.min(roomH, clip.h) } : o.box
+    const box = clip && !sizeRef.current ? grownBox(o, clip.w, clip.h) : o.box
     setOpen({
       ...o,
       scale,
@@ -623,7 +653,12 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       pageH: img.h,
       vx: o.vx === null ? null : o.vx * k,
       vy: o.vy === null ? null : o.vy * k,
-      scroll: { left: (sc?.scrollLeft ?? o.scroll.left) * k, top: (sc?.scrollTop ?? o.scroll.top) * k },
+      // Shown at this scale already (by CSS zoom, mid-gesture): the scroll is
+      // in the new layout's pixels and stays; otherwise it scales with it
+      scroll:
+        liveScaleRef.current !== null
+          ? { left: sc?.scrollLeft ?? o.scroll.left, top: sc?.scrollTop ?? o.scroll.top }
+          : { left: (sc?.scrollLeft ?? o.scroll.left) * k, top: (sc?.scrollTop ?? o.scroll.top) * k },
       box,
       clip,
       entryFits: clip ? clip.w <= box.w && clip.h <= box.h : false,
@@ -640,7 +675,10 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
       e.stopPropagation()
-      rescale(openRef.current, e.deltaY < 0 ? 1.15 : 1 / 1.15).catch(previewFailed)
+      // A mouse notch is a fixed step; a trackpad pinch many small deltas,
+      // scaled by their size so the zoom follows the fingers — the same
+      // reading as the pages' own Ctrl+wheel (PdfViewer)
+      zoomBy(Math.abs(e.deltaY) >= 90 ? (e.deltaY < 0 ? 1.15 : 1 / 1.15) : Math.exp(-e.deltaY * 0.006))
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
@@ -764,6 +802,21 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   }, [])
 
   useDismissable(boxRef, !!open, close)
+
+  // The point under the window's top-left corner stays put through a zoom:
+  // the scroll follows the layout's scale. Measured on what is SHOWN (the
+  // live scale mid-gesture, the rendered one after), so the hand-over from
+  // CSS zoom to the new render moves nothing.
+  const shownScale = liveScale ?? open?.scale ?? 1
+  const prevShown = useRef(shownScale)
+  useLayoutEffect(() => {
+    const sc = scrollerRef.current
+    const r = shownScale / prevShown.current
+    prevShown.current = shownScale
+    if (!sc || r === 1 || !Number.isFinite(r)) return
+    sc.scrollLeft *= r
+    sc.scrollTop *= r
+  }, [shownScale])
   useEdgeFade(scrollerRef, [open, size, placed, liveScale])
 
   // A card is placed by its real height, known only once it is laid out:
@@ -886,9 +939,14 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
   // Opened above its link, the window is held by its BOTTOM, so a growing
   // footer never moves it toward the citation.
   const winH = window.innerHeight
+  // Mid-zoom (or mid-resize), what is drawn is scaled by `live` until it is
+  // drawn again; a cut-out's window follows it at once, as the render will
+  const live = liveScale !== null && open.canvas ? liveScale / open.scale : 1
+  const liveBox =
+    open.clip && live !== 1 && !size ? grownBox(open, Math.round(open.clip.w * live), Math.round(open.clip.h * live)) : null
   // The box is the scroller's; the window's 1 px border goes around it, or a
   // cut-out exactly as wide as its window loses 2 px and fades at its edge
-  const width = (size?.w ?? open.box.w) + 2
+  const width = (size?.w ?? liveBox?.w ?? open.box.w) + 2
   const place: React.CSSProperties = placed
     ? { left: placed.left, top: placed.top, width }
     : open.at.below
@@ -1021,20 +1079,16 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
 
   const markTop =
     open.vy !== null && !open.entry && open.kind !== 'figure' && open.kind !== 'table' ? open.vy : null
-  const pageH = size?.h ?? open.box.h
+  const pageH = size?.h ?? liveBox?.h ?? open.box.h
   const clip = open.clip
   // A cut-out: the content is the target's own box, the page slid under it —
-  // there is no more of the page to scroll to. Mid-resize it is scaled by CSS
-  // until the drag rests and it is rendered at the new scale.
-  const live = clip && liveScale !== null ? liveScale / open.scale : 1
-  const contentStyle: React.CSSProperties = clip
-    ? {
-        width: clip.w,
-        height: clip.h,
-        overflow: 'hidden',
-        ...(live !== 1 ? { transform: `scale(${live})`, transformOrigin: '0 0' } : {})
-      }
-    : { width: open.pageW, height: open.pageH }
+  // there is no more of the page to scroll to. Mid-resize and mid-zoom it is
+  // scaled by CSS `zoom` (which scales the layout too, so the window and the
+  // scroll range follow at once) until it is drawn again at the new scale.
+  const contentStyle: React.CSSProperties = {
+    ...(clip ? { width: clip.w, height: clip.h, overflow: 'hidden' } : { width: open.pageW, height: open.pageH }),
+    ...(live !== 1 ? { zoom: live } : {})
+  }
   const sheetStyle: React.CSSProperties | undefined = clip
     ? { left: -clip.l, top: -clip.t, width: open.pageW, height: open.pageH, right: 'auto', bottom: 'auto' }
     : undefined

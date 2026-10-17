@@ -425,7 +425,15 @@ const L = (x0, y, text, size = 10) => ({ x0, x1: x0 + text.length * size * 0.5, 
     { str: '  [5]  T.', transform: [10, 0, 0, 10, 72, 700], width: 40 },
     { str: 'Damour', transform: [10, 0, 0, 10, 115, 700], width: 35 }
   ])
-  check('textLines: runs address the final text', tl[0].text === '[5] T. Damour' && JSON.stringify(tl[0].runs) === JSON.stringify([{ x0: 72, x1: 112, start: 0, end: 6 }, { x0: 115, x1: 150, start: 7, end: 13 }]), JSON.stringify(tl[0]))
+  check('textLines: runs address the final text', tl[0].text === '[5] T. Damour' && JSON.stringify(tl[0].runs) === JSON.stringify([{ x0: 72, x1: 112, start: 0, end: 6, y: 700 }, { x0: 115, x1: 150, start: 7, end: 13, y: 700 }]), JSON.stringify(tl[0]))
+  // A footnote opens on its raised marker: the line's y is the marker's, its
+  // baseline the words' (footnote 15 in Emil's thesis was cut through them)
+  const marked = M.textLines([
+    { str: '15', transform: [7, 0, 0, 7, 85, 109.7], width: 7 },
+    { str: 'See https://geodata.no/.', transform: [10, 0, 0, 10, 93, 106.2], width: 110 }
+  ])
+  check('a raised marker: one line, its baseline the words\' below the marker', marked.length === 1 && marked[0].y === 109.7 && M.baseline(marked[0]) === 106.2, JSON.stringify(marked))
+  check('a one-line footnote\'s box reaches the words\' descenders, not the marker\'s', Math.abs(M.entryBox(marked).bottom - (106.2 - 3.5)) < 0.01, JSON.stringify(M.entryBox(marked)))
 }
 
 // ------------- tier 1d: the whole target — footnote, float, display (round 4)
@@ -594,12 +602,16 @@ const near = (a, b, tol = 1.5) => Math.abs(a - b) <= tol
   const box6 = M.entryBox(fn6)
   check('tight page: entryBox alone reaches into footnote 7\'s capitals', box6.bottom < 74.4 + 10.38 * 0.72)
   const clear6 = M.clearOfNeighbours(box6, lines, fn6)
-  check('footnote 6 kept off footnote 7: the edge between its descenders and their capitals', clear6.bottom > box6.bottom && near(clear6.bottom, (74.4 + 10.38 * 0.72 + box6.bottom + 10.38 * 0.13) / 2, 0.01) && clear6.top === box6.top, JSON.stringify(clear6))
+  // Their glyphs overlap here: footnote 7's capitals reach above footnote 6's
+  // descenders. The target comes out whole (Emil, 2026-10-17: a cut «g» was
+  // worse than a tip of the neighbour), so the edge stops at its own
+  check('footnote 6 kept off footnote 7 only as far as its own descenders allow', clear6.bottom > box6.bottom && near(clear6.bottom, 83.6 - 9.96 * 0.3, 0.01) && clear6.top === box6.top, JSON.stringify(clear6))
   const fn7 = lines.slice(3)
   const box7 = M.entryBox(fn7)
   check('tight page: footnote 6\'s last baseline lies INSIDE footnote 7\'s box', 83.6 < box7.top && 83.6 > box7.bottom)
   const clear7 = M.clearOfNeighbours(box7, lines, fn7)
   check('footnote 7 kept off «NorgesGruppen.» once its own lines are named', clear7.top < box7.top && clear7.top < 83.6, JSON.stringify(clear7))
+  check('…but never past its own raised marker', clear7.top >= 74.4 + 10.38 * 0.88 - 0.01, JSON.stringify(clear7))
   check('without its lines named, a baseline inside the box counts as the target\'s', M.clearOfNeighbours(box7, lines).top === box7.top)
   const rule = [{ x0: 72, y0: 107.2, x1: 252.5, y1: 107.2 }]
   const under = M.belowFootnoteRule(clear6, rule)

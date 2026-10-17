@@ -286,7 +286,7 @@ export interface TextLine {
   /** Where each glyph run's characters are, text offsets to x — what lets a
    *  link's box be read back as words (entrySegments). Absent on lines a
    *  caller laid out by hand. */
-  runs?: { x0: number; x1: number; start: number; end: number }[]
+  runs?: { x0: number; x1: number; start: number; end: number; y?: number }[]
 }
 
 /** Glyph runs (pdf.js text items) to lines. Runs on one baseline join while
@@ -315,14 +315,14 @@ export function textLines(items: readonly unknown[]): TextLine[] {
     if (cur && Math.abs(y - cur.y) < size * 0.5 && x >= cur.x1 - size && x - cur.x1 < size * 2.5) {
       if (x - cur.x1 > size * 0.15) space(cur)
       if (cur.text.endsWith(' ')) str = str.trimStart()
-      cur.runs!.push({ x0: x, x1: x + w, start: cur.text.length, end: cur.text.length + str.length })
+      cur.runs!.push({ x0: x, x1: x + w, start: cur.text.length, end: cur.text.length + str.length, y })
       cur.text += str
       cur.x1 = Math.max(cur.x1, x + w)
       cur.size = Math.max(cur.size, size)
     } else {
       // A run's leading blank is part of its width: the text starts after it
       str = str.trimStart()
-      cur = { x0: x, x1: x + w, y, size, text: str, runs: [{ x0: x, x1: x + w, start: 0, end: str.length }] }
+      cur = { x0: x, x1: x + w, y, size, text: str, runs: [{ x0: x, x1: x + w, start: 0, end: str.length, y }] }
       lines.push(cur)
     }
   }
@@ -759,20 +759,31 @@ export function entryBox(
   if (lines.length === 0) return null
   return {
     top: Math.max(...lines.map((l) => l.y + l.size * 0.95)),
-    bottom: Math.min(...lines.map((l) => l.y - l.size * 0.35)),
+    bottom: Math.min(...lines.map((l) => baseline(l) - l.size * 0.35)),
     x0: Math.min(...lines.map((l) => l.x0)),
     x1: Math.max(...lines.map((l) => l.x1))
   }
+}
+
+/** A line's real baseline: its lowest run's. A line's `y` is its FIRST run's,
+ *  and a footnote opens on its raised marker — on a one-line footnote the
+ *  box then ended 3.5 pt above the words' own baseline and cut them through
+ *  the middle (Emil's thesis, footnote 15, 2026-10-17). */
+export function baseline(l: TextLine): number {
+  return Math.min(l.y, ...(l.runs ?? []).map((r) => r.y ?? l.y))
 }
 
 /** A target's box kept off the lines around it. entryBox's reach (0.95 up,
  *  0.35 down) is generous on purpose, and on a tightly set page — footnotes
  *  at 10 pt on 9.25 pt — it runs into the next footnote's capitals and the
  *  body text's descenders above; the window then showed slivers of both
- *  (Emil's thesis, 2026-10-17). An edge a neighbour reaches into moves to
- *  the middle of the gap between the target's real glyphs (descenders 0.22
- *  of a size, ascenders 0.75) and the neighbour's (capitals 0.72, descenders
- *  0.22) — never further than that gap. `own` names the target's lines when
+ *  (Emil's thesis, 2026-10-17). An edge a neighbour reaches into moves toward
+ *  it — to the neighbour's capitals (0.72 of a size) or descenders (0.3) —
+ *  but never past the target's own lowest descender (0.3) or highest
+ *  ascender, a raised footnote marker included (0.88). Where the two
+ *  overlap, the target comes out whole and a tip of the neighbour shows:
+ *  a cut «g» was worse (Emil: «prioritere å vise hele fotnoten fremfor å
+ *  helt rent kutte bort nærliggende tekst»). `own` names the target's lines when
  *  the caller knows them (a footnote): set that tight, the previous
  *  footnote's baseline lies INSIDE the next one's box, so the box alone
  *  cannot tell it from the target's own. Without `own`, the lines whose
@@ -781,21 +792,27 @@ export function clearOfNeighbours(box: PdfBox, lines: readonly TextLine[], own?:
   let { top, bottom } = box
   const ownSet = own ? new Set(own) : null
   const ownTop = own?.length ? Math.max(...own.map((l) => l.y)) : null
-  const ownBottom = own?.length ? Math.min(...own.map((l) => l.y)) : null
+  const ownBottom = own?.length ? Math.min(...own.map(baseline)) : null
+  // How far the target's own glyphs reach: its descenders, its ascenders
+  // and a superscript marker riding above them
+  const ownFloor = own?.length ? Math.min(...own.map((l) => baseline(l) - l.size * 0.3)) : null
+  const ownCeil = own?.length ? Math.max(...own.map((l) => l.y + l.size * 0.88)) : null
   for (const l of lines) {
     if (l.x1 <= box.x0 || l.x0 >= box.x1 || ownSet?.has(l)) continue
     const below = ownBottom !== null ? l.y < ownBottom : l.y < box.bottom
     const above = ownTop !== null ? l.y > ownTop : l.y > box.top
     if (below) {
-      // Below: its capitals may reach up into the box
+      // Below: its capitals may reach up into the box — never past the
+      // target's own lowest descender
       const cap = l.y + l.size * 0.72
-      const ownDesc = box.bottom + l.size * 0.13
-      if (cap > box.bottom) bottom = Math.max(bottom, (cap + ownDesc) / 2)
+      const floor = ownFloor ?? box.bottom + l.size * 0.05
+      if (cap > box.bottom) bottom = Math.max(bottom, Math.min(cap, floor))
     } else if (above) {
-      // Above: its descenders may reach down into the box
-      const desc = l.y - l.size * 0.22
-      const ownAsc = box.top - l.size * 0.2
-      if (desc < box.top) top = Math.min(top, (desc + ownAsc) / 2)
+      // Above: its descenders may reach down into the box — never past the
+      // target's own highest ascender
+      const desc = l.y - l.size * 0.3
+      const ceil = ownCeil ?? box.top - l.size * 0.1
+      if (desc < box.top) top = Math.min(top, Math.max(desc, ceil))
     }
   }
   return bottom < top ? { ...box, top, bottom } : box
