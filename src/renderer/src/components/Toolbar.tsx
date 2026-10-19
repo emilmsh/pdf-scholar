@@ -430,7 +430,9 @@ const LANGUAGES: { id: LanguagePreference; label: string }[] = [
   // Language names stay in their own language — standard for language pickers
   { id: 'nb', label: 'Norsk' },
   { id: 'en', label: 'English' },
-  { id: 'zh', label: '中文（简体）' },
+  // «简体中文», not «中文（简体）»: the same name, short enough to share one
+  // row of the gear menu with the others
+  { id: 'zh', label: '简体中文' },
   { id: 'auto', label: 'Auto' }
 ]
 
@@ -669,6 +671,8 @@ export default function Toolbar({
   // The gear menu: the app's technical surface (language, annotation
   // visibility, AI setup, update check, reset, version/about)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
+  /** The gear menu's file/tab-icon picker, folded to one row until opened */
+  const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [resetAsk, setResetAsk] = useState(false)
   /** The keyboard map, opened from the gear menu */
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
@@ -2457,43 +2461,43 @@ export default function Toolbar({
                 ))}
               </div>
 
-              <div className="theme-menu-sep" />
-
               {/* Author (/T) written into new annotations — the standard PDF
                   field other readers show as the commenter. No accounts, so
                   the name is simply typed once; empty = unsigned. The detail
                   lives in the hover title, not a permanent paragraph — the
                   label + placeholder carry enough on their own (standing
-                  hover-hints preference). */}
-              <div className="theme-menu-label" title={t('settings.annotAuthorHint')}>
-                {t('settings.annotAuthor')}
-              </div>
-              <input
-                className="annot-author-input"
-                defaultValue={settings.annotAuthor}
-                placeholder={t('settings.annotAuthorPlaceholder')}
-                title={t('settings.annotAuthorHint')}
-                spellCheck={false}
-                onKeyDown={(e) => {
-                  // Even in a menu: Ctrl+S from here should still save
-                  if (bubblesWhileTyping(e)) return
-                  e.stopPropagation()
-                  if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
-                }}
-                onBlur={(e) => {
-                  const name = e.target.value.trim()
-                  if (name !== settings.annotAuthor) onSettingsChange({ annotAuthor: name })
-                }}
-              />
+                  hover-hints preference). One row, the name beside its label:
+                  the gear menu had grown too long (Emil, 2026-10-19). */}
+              <label className="settings-row" title={t('settings.annotAuthorHint')}>
+                <span>{t('settings.annotAuthor')}</span>
+                <input
+                  className="annot-author-input"
+                  defaultValue={settings.annotAuthor}
+                  placeholder={t('settings.annotAuthorPlaceholder')}
+                  spellCheck={false}
+                  onKeyDown={(e) => {
+                    // Even in a menu: Ctrl+S from here should still save
+                    if (bubblesWhileTyping(e)) return
+                    e.stopPropagation()
+                    if (e.key === 'Enter' || e.key === 'Escape') (e.target as HTMLInputElement).blur()
+                  }}
+                  onBlur={(e) => {
+                    const name = e.target.value.trim()
+                    if (name !== settings.annotAuthor) onSettingsChange({ annotAuthor: name })
+                  }}
+                />
+              </label>
 
               <div className="theme-menu-sep" />
 
-              {/* The menu at a text selection — two independent toggles, the
-                  same shape (Emil, 2026-10-04): WHEN it opens and HOW MUCH it
-                  covers. Off, the menu waits for a right-click (long-press on
-                  touch), which has always opened the same menu — for a reader
-                  who selects text to follow along, not to mark it. */}
-              <div className="theme-menu-label">{t('settings.selectionMenu')}</div>
+              {/* Every on/off of reading in one group of switches, no rule
+                  between them (Emil, 2026-10-19). The menu at a text selection
+                  is two independent toggles, the same shape (Emil, 2026-10-04):
+                  WHEN it opens and HOW MUCH it covers. Off, the menu waits for
+                  a right-click (long-press on touch), which has always opened
+                  the same menu — for a reader who selects text to follow
+                  along, not to mark it. */}
+              <div className="theme-menu-label">{t('settings.reading')}</div>
               <label className="theme-menu-toggle" title={t('settings.selectionMenuAutoTip')}>
                 <input
                   type="checkbox"
@@ -2516,7 +2520,6 @@ export default function Toolbar({
               {/* Hover previews of in-document links (issue #31): on/off plus
                   three fixed delays. The delay row stays in place when the
                   previews are off — greyed, so the menu does not jump. */}
-              <div className="theme-menu-sep" />
               <label className="theme-menu-toggle" title={t('settings.linkPreviewTip')}>
                 <input
                   type="checkbox"
@@ -2525,43 +2528,58 @@ export default function Toolbar({
                 />
                 {t('settings.linkPreview')}
               </label>
-              <div
-                className="lang-options link-preview-delays"
-                role="radiogroup"
-                aria-label={t('settings.linkPreviewDelay')}
-                title={t('settings.linkPreviewDelayTip')}
-              >
+              <div className="link-preview-delays" title={t('settings.linkPreviewDelayTip')}>
                 {/* Named: three bare pills under a checkbox read as sizes, not
                     as the wait before the window opens (Emil, 2026-10-13) */}
                 <span className="link-preview-delay-caption">{t('settings.linkPreviewDelay')}</span>
-                {(['short', 'medium', 'long'] as const).map((d) => (
-                  <button
-                    key={d}
-                    role="radio"
-                    aria-checked={settings.linkPreviewDelay === d}
-                    disabled={!settings.linkPreview}
-                    className={`lang-option${settings.linkPreviewDelay === d ? ' selected' : ''}`}
-                    onClick={() => onSettingsChange({ linkPreviewDelay: d })}
-                  >
-                    {t(`settings.linkPreviewDelay.${d}`)}
-                  </button>
-                ))}
+                <div className="lang-options" role="radiogroup" aria-label={t('settings.linkPreviewDelay')}>
+                  {(['short', 'medium', 'long'] as const).map((d) => (
+                    <button
+                      key={d}
+                      role="radio"
+                      aria-checked={settings.linkPreviewDelay === d}
+                      disabled={!settings.linkPreview}
+                      className={`lang-option${settings.linkPreviewDelay === d ? ' selected' : ''}`}
+                      onClick={() => onSettingsChange({ linkPreviewDelay: d })}
+                    >
+                      {t(`settings.linkPreviewDelay.${d}`)}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Startup (issue #29). Desktop only: the extension has no tab
                   strip of its own — the browser brings its tabs back itself. */}
               {isElectron && (
-                <>
-                  <div className="theme-menu-sep" />
-                  <label className="theme-menu-toggle" title={t('settings.restoreSessionTip')}>
-                    <input
-                      type="checkbox"
-                      checked={settings.restoreSession}
-                      onChange={(e) => onSettingsChange({ restoreSession: e.target.checked })}
-                    />
-                    {t('settings.restoreSession')}
-                  </label>
-                </>
+                <label className="theme-menu-toggle" title={t('settings.restoreSessionTip')}>
+                  <input
+                    type="checkbox"
+                    checked={settings.restoreSession}
+                    onChange={(e) => onSettingsChange({ restoreSession: e.target.checked })}
+                  />
+                  {t('settings.restoreSession')}
+                </label>
+              )}
+              {/* Extension only: the one thing the extension takes from the
+                  browser that a user may want back — a browser set to download
+                  PDFs was overridden by the redirect with no say in it (issue
+                  #16). Off, only file:// documents open here; the desktop app
+                  has no equivalent, since the OS file association is already
+                  the user's own choice. v0.46.0 put it in the VIEW menu by
+                  mistake, where nobody saw it; it is a switch like the others
+                  here (2026-10-19). */}
+              {isExtension && (
+                <label className="theme-menu-toggle" title={t('tb.webTakeoverTip')}>
+                  <input
+                    type="checkbox"
+                    checked={webTakeover}
+                    onChange={(e) => {
+                      setWebTakeoverState(e.target.checked)
+                      setWebTakeover(e.target.checked)
+                    }}
+                  />
+                  {t('tb.webTakeover')}
+                </label>
               )}
 
               {/* The icon Explorer puts on .pdf files (issue #26): the
@@ -2574,12 +2592,27 @@ export default function Toolbar({
               {iconTarget && (
                 <>
                   <div className="theme-menu-sep" />
-                  <div
-                    className="theme-menu-label"
+                  {/* Folded to one row with the icon in use (Emil, 2026-10-19:
+                      the menu had grown long, and the icon is chosen once) —
+                      the picker opens under it */}
+                  <button
+                    className="menu-action settings-disclosure"
+                    aria-expanded={iconPickerOpen}
                     title={t(iconTarget === 'tab' ? 'settings.tabIconTip' : 'settings.fileIconTip')}
+                    onClick={() => setIconPickerOpen((o) => !o)}
                   >
-                    {t(iconTarget === 'tab' ? 'settings.tabIcon' : 'settings.fileIcon')}
-                  </div>
+                    <span>{t(iconTarget === 'tab' ? 'settings.tabIcon' : 'settings.fileIcon')}</span>
+                    {(() => {
+                      const now =
+                        iconChoice === 'custom' && iconTarget === 'tab'
+                          ? settings.tabIconImage || null
+                          : FILE_ICON_PREVIEWS[iconChoice]
+                      return now ? <img className="settings-disclosure-icon" src={now} alt="" width={18} height={18} /> : null
+                    })()}
+                    <IconChevronDown size={11} />
+                  </button>
+                  {iconPickerOpen && (
+                  <>
                   {/* The choices as the icons themselves — a file icon is
                       judged by eye, not by name. Three colourings, the app
                       logo, and «Eget …» for the reader's own; the switch above
@@ -2641,35 +2674,13 @@ export default function Toolbar({
                             }`
                           : t(FILE_ICON_LABELS[iconChoice === 'app' ? 'app' : 'custom'])}
                   </div>
+                  </>
+                  )}
                   {fileIconNote && <div className="menu-hint">{fileIconNote}</div>}
                 </>
               )}
 
               <div className="theme-menu-sep" />
-
-              {/* Extension only: the one thing the extension takes from the
-                  browser that a user may want back — a browser set to download
-                  PDFs was overridden by the redirect with no say in it (issue
-                  #16). Off, only file:// documents open here; the desktop app
-                  has no equivalent, since the OS file association is already
-                  the user's own choice. Lives here with the app's plumbing —
-                  v0.46.0 put it in the VIEW menu by mistake, where nobody saw it. */}
-              {isExtension && (
-                <>
-                  <label className="theme-menu-toggle" title={t('tb.webTakeoverTip')}>
-                    <input
-                      type="checkbox"
-                      checked={webTakeover}
-                      onChange={(e) => {
-                        setWebTakeoverState(e.target.checked)
-                        setWebTakeover(e.target.checked)
-                      }}
-                    />
-                    {t('tb.webTakeover')}
-                  </label>
-                  <div className="theme-menu-sep" />
-                </>
-              )}
 
               <button
                 className="menu-action"
@@ -2707,8 +2718,6 @@ export default function Toolbar({
                   unprompted is already halfway to nagging. The installer's
                   «Open with» association is as far as we go. */}
 
-              <div className="theme-menu-sep" />
-
               <button
                 className="menu-action"
                 onClick={() => {
@@ -2727,31 +2736,32 @@ export default function Toolbar({
                   place they can be answered, so link straight there rather than
                   inventing an in-app form with nowhere to send it. The body is
                   prefilled with the version, which is the one thing a report
-                  needs and the one thing users never think to include. */}
-              <button
-                className="menu-action"
-                onClick={() =>
-                  bridge.openExternal(
-                    'https://github.com/emilmsh/pdf-scholar/issues/new?body=' +
-                      encodeURIComponent(`\n\n---\nPDF Scholar ${appVersion}`)
-                  )
-                }
-                title={t('app.feedbackTip')}
-              >
-                <IconComment size={15} />
-                {t('app.feedback')}
-              </button>
-
-              <button
-                className="menu-action"
-                onClick={() => bridge.openExternal('https://github.com/sponsors/emilmsh')}
-                title={t('app.sponsorTip')}
-              >
-                <IconHeart size={15} />
-                {t('app.sponsor')}
-              </button>
-
-              <div className="theme-menu-sep" />
+                  needs and the one thing users never think to include. With
+                  «Støtt prosjektet», one quiet row over the version line rather
+                  than two menu rows (2026-10-19). */}
+              <div className="menu-footer-links">
+                <button
+                  className="menu-link"
+                  onClick={() =>
+                    bridge.openExternal(
+                      'https://github.com/emilmsh/pdf-scholar/issues/new?body=' +
+                        encodeURIComponent(`\n\n---\nPDF Scholar ${appVersion}`)
+                    )
+                  }
+                  title={t('app.feedbackTip')}
+                >
+                  <IconComment size={13} />
+                  {t('app.feedback')}
+                </button>
+                <button
+                  className="menu-link"
+                  onClick={() => bridge.openExternal('https://github.com/sponsors/emilmsh')}
+                  title={t('app.sponsorTip')}
+                >
+                  <IconHeart size={13} />
+                  {t('app.sponsor')}
+                </button>
+              </div>
 
               <div className="menu-about">
                 <span>{t('settings.about', { version: appVersion })}</span>

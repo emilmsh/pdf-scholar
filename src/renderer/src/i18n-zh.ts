@@ -332,8 +332,8 @@ export const zh: Dict = {
   'margin.sideRight': '右',
   'margin.prevComment': '上一条评论',
   'margin.nextComment': '下一条评论',
-  'settings.selectionMenu': '选中文本时的菜单',
-  'settings.selectionMenuAuto': '自动显示',
+  'settings.reading': '阅读',
+  'settings.selectionMenuAuto': '选中文本时显示菜单',
   'settings.selectionMenuAutoTip':
     '开：选中文本后菜单立即打开。关：选中文本，然后右键点击（或长按）打开菜单。',
   'settings.fileIcon': '资源管理器中的文件图标',
@@ -367,7 +367,7 @@ export const zh: Dict = {
   'iconerr.tab-icon-bad-file': '浏览器无法读取该图片。请尝试 .png、.svg、.ico、.webp 或 .jpg。',
   'iconerr.tab-icon-not-square': '图片必须是正方形——宽度与高度相等。',
   'iconerr.tab-icon-too-small': '图片至少需要 16 × 16 px。',
-  'settings.selectionMenuCompact': '紧凑菜单',
+  'settings.selectionMenuCompact': '紧凑的选择菜单',
   'settings.selectionMenuCompactTip':
     '同一菜单的紧凑版：颜色排列更紧凑，图标不带文字（悬停可查看名称）。助手操作收在 ✦ 之后。',
   'settings.restoreSession': '重新打开上次会话的标签页',

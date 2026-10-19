@@ -388,8 +388,8 @@ const nb = {
   'margin.sideRight': 'Høyre',
   'margin.prevComment': 'Forrige kommentar',
   'margin.nextComment': 'Neste kommentar',
-  'settings.selectionMenu': 'Meny ved tekstmarkering',
-  'settings.selectionMenuAuto': 'Vis automatisk',
+  'settings.reading': 'Lesing',
+  'settings.selectionMenuAuto': 'Meny ved tekstmarkering',
   'settings.selectionMenuAutoTip':
     'På: menyen åpner rett etter at teksten er merket. Av: merk teksten, så høyreklikk (eller hold inne) for menyen.',
   'settings.fileIcon': 'Filikon i Utforsker',
@@ -423,7 +423,7 @@ const nb = {
   'iconerr.tab-icon-bad-file': 'Nettleseren kunne ikke lese bildet. Prøv en .png, .svg, .ico, .webp eller .jpg.',
   'iconerr.tab-icon-not-square': 'Bildet må være kvadratisk – like bredt som høyt.',
   'iconerr.tab-icon-too-small': 'Bildet må være minst 16 × 16 px.',
-  'settings.selectionMenuCompact': 'Kompakt meny',
+  'settings.selectionMenuCompact': 'Kompakt markeringsmeny',
   'settings.selectionMenuCompactTip':
     'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
   'settings.restoreSession': 'Åpne fanene fra forrige gang',
@@ -1469,8 +1469,8 @@ const en: Dict = {
   'margin.sideRight': 'Right',
   'margin.prevComment': 'Previous comment',
   'margin.nextComment': 'Next comment',
-  'settings.selectionMenu': 'Menu on text selection',
-  'settings.selectionMenuAuto': 'Show automatically',
+  'settings.reading': 'Reading',
+  'settings.selectionMenuAuto': 'Menu on text selection',
   'settings.selectionMenuAutoTip':
     'On: the menu opens right after the text is selected. Off: select the text, then right-click (or long-press) for the menu.',
   'settings.fileIcon': 'File icon in Explorer',
@@ -1504,7 +1504,7 @@ const en: Dict = {
   'iconerr.tab-icon-bad-file': 'The browser could not read the picture. Try a .png, .svg, .ico, .webp or .jpg.',
   'iconerr.tab-icon-not-square': 'The picture must be square — as wide as it is tall.',
   'iconerr.tab-icon-too-small': 'The picture must be at least 16 × 16 px.',
-  'settings.selectionMenuCompact': 'Compact menu',
+  'settings.selectionMenuCompact': 'Compact selection menu',
   'settings.selectionMenuCompactTip':
     'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',
   'settings.restoreSession': 'Reopen last session’s tabs',

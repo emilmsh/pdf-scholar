@@ -1888,13 +1888,129 @@ html.pen-near .draw-layer {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 26px;
   font-size: 12.5px;
   cursor: pointer;
   user-select: none;
 }
 
-.theme-menu-toggle input {
-  accent-color: var(--accent);
+/* A switch, not a checkbox (Emil, 2026-10-19): the label reads first, the
+   switch sits at the row's end. Still a real checkbox underneath — keyboard,
+   screen readers and every onChange stay as they were; only its face is
+   drawn here, so every toggle in the menus changes at once. */
+.theme-menu-toggle input[type='checkbox'] {
+  appearance: none;
+  order: 2;
+  flex: none;
+  position: relative;
+  width: 28px;
+  height: 16px;
+  margin: 0 0 0 auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 22%, transparent);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.theme-menu-toggle input[type='checkbox']::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s ease;
+}
+
+.theme-menu-toggle input[type='checkbox']:checked {
+  background: var(--accent);
+}
+
+.theme-menu-toggle input[type='checkbox']:checked::before {
+  transform: translateX(12px);
+}
+
+.theme-menu-toggle input[type='checkbox']:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.theme-menu-toggle input[type='checkbox']:disabled {
+  cursor: default;
+}
+
+/* Wide enough for a label and its control on one row */
+.settings-menu {
+  width: 296px;
+}
+
+/* The language row heads the gear menu, the name row right under it */
+.settings-menu > .lang-options {
+  margin-bottom: 10px;
+}
+
+/* Gear menu: a setting with its control beside it on one row */
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.settings-row > span {
+  flex: none;
+}
+
+.settings-row .annot-author-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* A folded part of the gear menu (the file-icon picker): its name, what is
+   chosen now, a chevron that turns when it is open */
+.menu-action.settings-disclosure {
+  gap: 8px;
+  /* No icon in front: its name lines up with the switches' labels */
+  padding-left: 2px;
+}
+
+.settings-disclosure > span {
+  flex: 1;
+}
+
+.settings-disclosure-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-disclosure svg {
+  transition: transform 0.15s ease;
+}
+
+.settings-disclosure[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+/* Feedback and sponsoring: one quiet row of links over the version line */
+.menu-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 0 0 4px;
+}
+
+.menu-footer-links .menu-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-secondary);
+}
+
+.menu-footer-links .menu-link:hover {
+  color: var(--text);
 }
 
 .theme-menu-label {
@@ -3442,10 +3558,27 @@ html.pen-near .draw-layer {
   font-size: 11px;
 }
 
+/* The delay, as a sub-row of «Forhåndsvis lenker»: set in under it, its
+   segments smaller than the language row's */
+.link-preview-delays {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 4px 14px;
+}
+
+.link-preview-delays .lang-options {
+  flex: 1;
+}
+
+.link-preview-delays .lang-option {
+  padding: 2px 6px;
+  font-size: 11.5px;
+}
+
 .link-preview-delays .lang-option:disabled {
   opacity: 0.45;
   cursor: default;
-  border-color: var(--border);
 }
 
 /* Loading / errors / toast */
@@ -6176,31 +6309,38 @@ button.bookmark-fold:hover {
   color: var(--accent);
 }
 
-/* Language picker in the view menu */
+/* Language picker and the link-preview delays in the gear menu: one
+   segmented row — the four language tiles stood two lines tall and «中文（简体）»
+   broke over three (Emil, 2026-10-19) */
 
 .lang-options {
   display: flex;
-  gap: 6px;
-  padding: 2px 10px 8px;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text) 3%, var(--bg-elevated));
 }
 
 .lang-option {
   flex: 1;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
   font-size: 12px;
+  white-space: nowrap;
   color: var(--text);
-  background: var(--bg-elevated);
+  background: transparent;
 }
 
-.lang-option:hover {
-  border-color: var(--accent);
+.lang-option:hover:not(:disabled) {
+  background: var(--hover);
 }
 
 .lang-option.selected {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
+  background: var(--bg-elevated);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  color: var(--accent);
   font-weight: 600;
 }
 
