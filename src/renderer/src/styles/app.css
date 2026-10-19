@@ -2281,10 +2281,17 @@ html.pen-near .draw-layer {
 }
 
 /* A document name inside a menu row: one line, cut with an ellipsis rather
-   than widening the menu (the view menu's «Åpne i delt visning» list) */
+   than widening the menu (the view menu's «Åpne i delt visning» list; the full
+   path is the row's title). The ellipsis alone was not enough: the menu is
+   absolutely positioned and shrink-wraps its content, and a nowrap line's
+   min-content IS its whole length — a long file name stretched the menu off
+   the left edge of the window (issue #47). Inline-size containment makes the
+   name count as empty when the menu measures itself, so the menu keeps the
+   width the rest of its rows give it and the name fills what is left. */
 .menu-action-text {
   flex: 1 1 auto;
   min-width: 0;
+  contain: inline-size;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
