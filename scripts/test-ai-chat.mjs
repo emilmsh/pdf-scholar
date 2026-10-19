@@ -1056,6 +1056,23 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
   await run({ provider: 'xai' })
   ok(calls[0]?.body?.reasoning_effort === undefined, 'grok-4.3 sends no reasoning_effort (unverified)')
 
+  // Gemini 4 Argon documents reasoning_effort minimal/low/medium/high mapped
+  // to thinking_level (ai.google.dev/gemini-api/docs/openai, verified
+  // 2026-10-19) — the only Gemini id that matches the table by name, so
+  // gemini-3.8-flash (the other curated id) must still send nothing
+  const geminiModel = (id) => ({ anthropic: '', openai: '', azure: '', openrouter: '', gemini: id, xai: '', mistral: '', groq: '', compat: '', mock: '' })
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'gemini', models: geminiModel('gemini-4-argon') })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'gemini-4-argon gets reasoning_effort')
+  // No `none`/off row in the mapping table, and the page says reasoning
+  // "cannot be turned off for Gemini 2.5 Pro or 3 models" — «Av» is the
+  // lowest effort, not a guessed `none`
+  await run({ provider: 'gemini', models: geminiModel('gemini-4-argon'), thinking: 'off' })
+  ok(calls[0]?.body?.reasoning_effort === 'low', `gemini-4-argon off → low (got ${calls[0]?.body?.reasoning_effort})`)
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'gemini', models: geminiModel('gemini-3.8-flash') })
+  ok(calls[0]?.body?.reasoning_effort === undefined, 'gemini-3.8-flash sends no reasoning_effort (unverified)')
+
   // Mistral documents exactly two reasoning_effort values, high and none
   // (docs.mistral.ai/capabilities/reasoning, 2026-10-05): every «on» level is
   // high, «Av» is none, and Mistral Large 3 — which documents neither — is

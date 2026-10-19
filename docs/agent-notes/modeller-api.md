@@ -456,6 +456,7 @@ console.groq.com/docs/models, /docs/reasoning og /docs/deprecations.
 
 | Leverandør | Kuratert id | Kontekst | Notat |
 |---|---|---|---|
+| Gemini | `gemini-4-argon` | 900K (DELT inn+ut-budsjett, se merknad) | **Inn 19.10.2026** som NY toppmodell, ikke erstatning — `gemini-3.1-pro-preview` står fortsatt som Preview uten pensjonerings-merknad (ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview, sjekket 19.10.2026). Google kaller den «our flagship reasoning model» (ai.google.dev/gemini-api/docs/models/gemini-4-argon, sjekket 19.10.2026): tekst/bilde/video/lyd/PDF inn, KUN tekst ut (bilde- og lydgenerering eksplisitt «not supported») — kuratert-regel #2 innfridd. Kontekst er OPPGITT som «unified input and output token limit»: 1 048 576 totalt, synkron ut 65 536 som standard, inntil 1 048 576 med «long decode» — ANNERLEDES enn resten av Gemini-lineupen, der tallet er ren inn-kapasitet atskilt fra ut. Siden budsjettet er DELT (mer ut spiser av det som er igjen til inn), gulvet til 900K i stedet for å bruke hele 1 048 576 — samme sikkerhetsmargin som GPT-6-familiens inn/ut-situasjon, for å unngå den farlige retningen (kode-verdi OVER reell inn-kapasitet). Pris $2/$10 per MTok ut 30.11.2026, stiger til $4/$20 fra 1.12.2026 (ai.google.dev/gemini-api/docs/pricing, sjekket 19.10.2026); ingen gratis-tier. **`reasoning_effort` VERIFISERT** for akkurat denne id-en: OpenAI-kompat-siden (ai.google.dev/gemini-api/docs/openai, sjekket 19.10.2026) har en mappingtabell med egen kolonne «thinking\_level (Gemini 4 Argon)» — minimal/low→low, medium→medium, high→high, toppnivå-felt i request-body. Ingen `none`-rad for denne kolonnen, og siden sier reasoning «cannot be turned off for Gemini 2.5 Pro or 3 models» — lest som at Argon (en nyere reasoning-modell i samme familie) heller ikke kan slå av. Lagt til i `OPENAI_REASONING_RE` og `OPENAI_ALWAYS_REASONS_RE` (`src/shared/ai-provider-profile.ts`), testet i `test:ai-chat`. De tre andre kolonnene i mappingtabellen («Gemini 3.1 Flash-Lite», «Gemini 3 Flash», «Gemini 2.5») svarer FORTSATT ikke på spørsmålet for `gemini-3.1-pro-preview`/`gemini-3.8-flash`/`gemini-3.5-flash-lite` — ingen av radene er en eksakt match, se åpne spørsmål under. **Live spørsmål med ekte nøkkel gjenstår (Emil).** |
 | Gemini | `gemini-3.1-pro-preview` | 1M | Flaggskip (Preview — id-en KAN rotere ved GA, sjekk ved neste review; fortsatt Preview 31.8.2026 (ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview: 1 048 576 inn / 65 536 ut, text+image+video+audio+PDF → text), «Gemini 3.5 Pro»-lansering fortsatt forsinket ifølge presseomtale 13.8.2026) |
 | Gemini | `gemini-3.8-flash` | 1M (1 048 576 dokumentert, gulvet på 1_000_000 som ellers i katalogen) | **Byttet inn 7.9.2026, erstatter `gemini-3.7-flash`** — lansert rundt 4.9.2026, tre uker etter 3.7 Flash (ai.google.dev/gemini-api/docs/models, /gemini-3.8-flash). Modellkortet bekrefter input tekst/bilde/video/lyd/PDF, output kun tekst — kuratert-regel #2 innfridd. Samme pris som 3.7 hadde: $0.75/$3.75 per MTok inn/ut ut 2026, stiger til $1.50/$7.50 fra 1.1.2027 (ai.google.dev/gemini-api/docs/pricing, sjekket 7.9.2026). Modellsiden nevner egen `thinkingLevel: low/medium/high`, men det er den native Gemini-APIens felt, ikke `reasoning_effort` på OpenAI-kompat-laget vi faktisk bruker — svarer ikke på det åpne reasoning-mapping-spørsmålet under. `gemini-3.7-flash` fortsatt tilgjengelig som «previous-generation», ikke pensjonert |
 | Gemini | `gemini-3.5-flash-lite` | ukjent → gulv | GA, billigst ($0.30/$2.50) |
@@ -483,22 +484,22 @@ Flash.
   uendret; om appen bør kutte til utdrag tidligere enn 922K av rene
   kostnadshensyn er en produktbeslutning, ikke en korrekthetsrettelse — flagg
   til Emil, gjør det ikke selv.
-- Gemini: ai.google.dev/gemini-api/docs/openai har en reasoning_effort→
-  thinking_level/-budget-tabell (sjekket 13.8.2026, gjensjekket 17.8.2026,
-  24.8.2026, 7.9.2026 og 12.10.2026 — fortsatt samme fire rader, samme
-  mangler), men radene heter «Gemini
-  3.1 Pro / 3.1 Flash-Lite / 3 Flash / 2.5» — ikke våre eksakte kuraterte
-  id-er (`gemini-3.5-flash-lite` matcher ingen rad, og med byttet til
-  `gemini-3.8-flash` denne runden matcher fortsatt INGEN av de tre kuraterte
-  id-ene en rad eksakt; `gemini-3.1-pro-preview` er trolig samme familie som
-  «3.1 Pro», men tabellen har INGEN `none`-rad). 3.8 Flashs eget modellkort
-  (ai.google.dev/gemini-api/docs/models/gemini-3.8-flash, sjekket 7.9.2026)
-  oppgir riktignok «Thinking: Supported (low, medium, high)» — men det er den
-  native Gemini-APIens `thinkingLevel`-felt, ikke `reasoning_effort` på
-  OpenAI-kompat-laget appen faktisk snakker mot
-  (`generativelanguage.googleapis.com/v1beta/openai`, se
-  `ai-provider-profile.ts`), så det svarer ikke på spørsmålet heller. Fortsatt
-  IKKE lagt til regexen — for tynn/foreldet dekning til å stole på for hele
+- ~~Gemini: ai.google.dev/gemini-api/docs/openai har en reasoning_effort→
+  thinking_level/-budget-tabell, men radene er ikke våre eksakte kuraterte
+  id-er~~ **Delvis lukket 19.10.2026** — tabellen (sjekket 13.8.2026,
+  gjensjekket 17.8.2026, 24.8.2026, 7.9.2026, 12.10.2026 og 19.10.2026) hadde
+  fram til denne runden fire kolonner «Gemini 3.1 Pro / 3.1 Flash-Lite /
+  3 Flash / 2.5», ingen eksakt match for noen kuratert id. Denne runden er
+  «Gemini 3.1 Pro»-kolonnen BYTTET UT med «Gemini 4 Argon» — som nå er en
+  eksakt match for den nylig kuraterte `gemini-4-argon` (se tabellen over og
+  review 19.10.2026 under), lagt til `OPENAI_REASONING_RE`/
+  `OPENAI_ALWAYS_REASONS_RE`. **Fortsatt ÅPENT** for de tre andre kuraterte
+  id-ene: `gemini-3.1-pro-preview` (ikke lenger i tabellen i det hele tatt —
+  erstattet av 4 Argon-kolonnen, selv om selve modellen fortsatt er Preview
+  og ikke pensjonert), `gemini-3.8-flash` (nærmeste kolonne «Gemini 3 Flash»,
+  siden sier ikke de er samme familie) og `gemini-3.5-flash-lite` (nærmeste
+  kolonne «Gemini 3.1 Flash-Lite», samme forbehold). Ingen av de tre er lagt
+  til regexen — for tynn/uverifisert dekning til å stole på for hele
   effort-spekteret vi trenger, og «Av» ville vært et gjett uansett id.
 - ~~Groq: nevner reasoning_effort for gpt-oss-120b/20b i det hele tatt?~~
   **Lukket 31.8.2026** (delvis lukket 17.8.2026) — console.groq.com/docs/reasoning
@@ -580,9 +581,19 @@ Flash.
   cannot be disabled», default `high`) men sier ingenting om `grok-4.3` eller
   noen `grok-4.20`-id utover multi-agent-tolkningen fra 31.8.2026. Ingen
   fremgang; fortsatt utenfor kuratert-kun-regelen.
+
+  **Gjensjekket 19.10.2026** (docs.x.ai/developers/models,
+  /developers/model-capabilities/text/reasoning): docs.x.ai/developers/models'
+  PRISTABELL lister nå `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`
+  og `grok-4.20-multi-agent-0309` UTEN beta-merke eller -suffiks (samt
+  `grok-build-0.1`) — et mulig tegn på at de har forlatt beta, men siden gir
+  ingen dato og reasoning-siden dekker FORTSATT ikke `-0309-reasoning` eller
+  `-0309-non-reasoning` med en `reasoning_effort`-verdiliste; kun
+  multi-agent-tolkningen (agent-antall, ikke tenkedybde) er dokumentert. Ingen
+  fremgang på selve spørsmålet; fortsatt utenfor kuratert-kun-regelen.
 - **xAI Grok 4.3, effort-støtte fortsatt UVERIFISERT** (gjensjekket
-  12.10.2026, docs.x.ai/developers/model-capabilities/text/reasoning) — siden
-  dekker nå 4.5/4.6/4.7 eksplisitt men nevner aldri 4.3. Utenfor
+  12.10.2026 og 19.10.2026, docs.x.ai/developers/model-capabilities/text/reasoning)
+  — siden dekker nå 4.5/4.6/4.7 eksplisitt men nevner aldri 4.3. Utenfor
   `OPENAI_REASONING_RE`/`OPENAI_ALWAYS_REASONS_RE` inntil en kilde sier noe om
   den.
 - **Haiku 5.5: moderne web-søk-verktøy (`web_search_20260209`), nytt
@@ -614,6 +625,24 @@ Flash.
   nøkkel. Ikke gjort her (ingen nøkkel i miljøet). La den stå som åpent
   spørsmål; ikke gjett API-id-en og ikke anta bilde-støtte fra «vision
   encoder»-ordlyden alene.
+
+  **Gjensjekket 19.10.2026** (docs.mistral.ai/models/mistral-large-4-0.md):
+  siden navngir modellen BÅDE `mistral-large-4` og `mistral-large-4-0` uten å
+  si hvilken en chat completion-forespørsel skal bruke — API-ID-en er altså
+  FORTSATT tvetydig på denne kilden alene, samme felle som før. Fortsatt
+  Public Preview (lansert 6.10.2026). Nytt denne runden: siden bekrefter bilde
+  som input-modalitet eksplisitt (ikke bare «vision encoder»-ordlyden), og at
+  output er «Reasoning and text» — altså ikke bilde/lyd, kuratert-regel #2
+  ville trolig vært innfridd på MODALITET alene. `reasoning_effort` fortsatt
+  udokumentert på denne siden. Kontekst sprikende mellom kilder: Mistrals
+  egen side oppgir 1M, en tredjepartskilde (OpenRouter) oppgir 524 288 — ingen
+  av dem er `/v1/models` eller en changelog, så ingen er den typen kilde
+  2026-10-05-runden lærte å kreve. Pris (salgspris) $0.68/$2.09 per MTok
+  inn/ut. Fortsatt ikke kuratert: verken API-id, kontekst eller
+  reasoning_effort-oppførsel er verifisert godt nok til å legge den inn uten
+  å gjette, og bildesjekken (Large 3s fall) er ikke gjort for Large 4. Krever
+  en bekreftet `/v1/models`-id eller en direkte sonde med nøkkel ved neste
+  anledning.
 
 Ukentlig review 2026-09-07 (platform.claude.com/docs/en/models/overview,
 developers.openai.com/api/docs/models, ai.google.dev/gemini-api/docs/models,
@@ -828,6 +857,53 @@ alle sjekket samme dag):
   modeller, alle felt (`input_modalities`/`output_modalities`/`created`/
   `pricing.completion`) intakte.
 
+Ukentlig review 2026-10-19 (platform.claude.com/docs/en/models/overview,
+developers.openai.com/api/docs/models, /api/docs/models/gpt-6-sol,
+ai.google.dev/gemini-api/docs/models, /gemini-api/docs/models/gemini-4-argon,
+/gemini-api/docs/models/gemini-3.1-pro-preview, /gemini-api/docs/pricing,
+/gemini-api/docs/openai, docs.x.ai/developers/models,
+/developers/model-capabilities/text/reasoning, docs.mistral.ai/
+getting-started/models, /models/mistral-large-4-0.md, console.groq.com/
+docs/models, /docs/deprecations, alle sjekket samme dag):
+
+- **Anthropic:** tabellen (platform.claude.com/docs/en/models/overview) stemmer
+  ord for ord — Fable 5.1/Opus 5.5/Sonnet 5.5/Haiku 5.5, samme priser, samme
+  1M kontekst/128K output, samme «Legacy models»-liste (nå også med Opus 5 og
+  Haiku 4.5 der de hører hjemme). Ingen endring.
+- **OpenAI:** `gpt-6-sol`s EGEN modellside svarer 200, uendret kontekst
+  (1,05M/922K input), pris og `reasoning.effort`-verdier (none..max) — enda en
+  bekreftelse av 12.10-rundens «falsk alarm»-konklusjon (den forsvinner fra
+  enkelte oversiktstabeller uten å være pensjonert). Astra, 6.1 Sol, 6 Luna og
+  5.6 Terra uendret. Ingen endring.
+- **Gemini — DRIFT: Gemini 4 Argon (`gemini-4-argon`) lagt til som NY
+  toppmodell** (se tabellen i § Hostede kompat-tjenester over for full
+  verifisering — modaliteter, kontekst, pris, reasoning_effort-mapping,
+  kildene). `gemini-3.1-pro-preview`/`gemini-3.8-flash`/`gemini-3.5-flash-lite`
+  uendret. OpenAI-kompat-siden sin reasoning_effort-tabell byttet samtidig ut
+  sin «Gemini 3.1 Pro»-kolonne med «Gemini 4 Argon» — delvis lukker det
+  stående åpne spørsmålet (se § Åpne spørsmål).
+- **xAI:** `grok-4.7`/`grok-4.3` uendret. Grok 4.20-idene mistet beta-merket i
+  PRISTABELLEN (ny observasjon), men reasoning-siden dokumenterer fortsatt
+  ingen `reasoning_effort` for `-0309-reasoning`/`-non-reasoning` selv — se
+  oppdatert åpent spørsmål under. Grok 4.3 fortsatt uverifisert.
+- **Mistral:** de to kuraterte id-ene (`mistral-medium-2604`,
+  `ministral-14b-2512`) uendret. Mistral Large 4 (`mistral-large-4-0`/
+  `mistral-large-4-0.md`) fortsatt Public Preview, API-id fortsatt tvetydig på
+  kilden alene (`mistral-large-4` vs. `mistral-large-4-0`), bilde-input nå
+  eksplisitt bekreftet men output beskrevet som «Reasoning and text» —
+  `reasoning_effort` fortsatt udokumentert, kontekst sprikende mellom kilder
+  (se oppdatert åpent spørsmål under). Fortsatt ikke kuratert.
+- **Groq:** `openai/gpt-oss-120b`/`-20b` uendret, Production-tier, 131K
+  kontekst. `console.groq.com/docs/models` lister fortsatt
+  `llama-3.1-8b-instant`/`llama-3.3-70b-versatile` som production-modeller UTEN
+  et synlig deprecated-merke, mens `/docs/deprecations` sier begge ble
+  avviklet 16.8.2026 — samme kildemotsigelse som tidligere runder bemerket,
+  ingen av dem er i vår kuraterte liste uansett, så ingen kodeendring.
+- `npm run check:models` (keyless): ingen statisk drift (inkl. den nye
+  `gemini-4-argon`-raden i kontekst-krysskoblingen); OpenRouter-probe 469
+  modeller, alle felt (`input_modalities`/`output_modalities`/`created`/
+  `pricing.completion`) intakte.
+
 ## Standardmodeller og fallback (Emil, 27.9.2026)
 
 - **Standard:** `claude-opus-5-5` for Anthropic og `gpt-6-sol` for OpenAI
@@ -897,9 +973,10 @@ avgjøres separat av en egen `betweenToolsOff`-sjekk, `/sonnet-5-5/i`, som Haiku
 5.5 ikke treffer — den får plain `disabled` som Opus 5/Sonnet 5). Haiku 4.5 og
 eldre (`isLegacyHaiku`, `/haiku/i` uten `haiku-[5-9]`) alltid uten thinking.
 OpenAI-stil: `reasoning_effort` sendes for
-`OPENAI_REASONING_RE` (`gpt-[5-9]|o[0-9]|grok-4.[5-7]|gpt-oss`), og «Av» blir
+`OPENAI_REASONING_RE` (`gpt-[5-9]|o[0-9]|grok-4.[5-7]|gpt-oss|gemini-4-argon`,
+sistnevnte lagt til 19.10.2026 — se § Hostede kompat-tjenester), og «Av» blir
 `low` i stedet for `none` for `OPENAI_ALWAYS_REASONS_RE`
-(`gpt-6-astra|gpt-6\.1-sol|grok-4.[5-7]|gpt-oss`). Mistral: `MISTRAL_REASONING_RE`
+(`gpt-6-astra|gpt-6\.1-sol|grok-4.[5-7]|gpt-oss|gemini-4-argon`). Mistral: `MISTRAL_REASONING_RE`
 (`mistral-medium-2604`/`-3.5`/`-latest`, `mistral-small-2603`/`-latest`)
 sender `high` for alle på-nivåer og `none` for «Av» — Mistral dokumenterer
 bare de to verdiene (5.10.2026).
