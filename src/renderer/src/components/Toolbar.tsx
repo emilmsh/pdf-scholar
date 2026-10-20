@@ -217,6 +217,9 @@ interface Props {
    *  marking, so it lives outside the tool fieldset and its lock. */
   handTool: boolean
   onToggleHand(): void
+  /** The hand's one option: Space held is the hand while held */
+  spaceHand: boolean
+  onSpaceHandChange(on: boolean): void
   activeTool: ToolName | null
   toolPrefs: Record<DrawPrefKey, ToolPref>
   onToolSelect(tool: ToolName | null): void
@@ -483,6 +486,8 @@ export default function Toolbar({
   canNavForward,
   handTool,
   onToggleHand,
+  spaceHand,
+  onSpaceHandChange,
   activeTool,
   toolPrefs,
   onToolSelect,
@@ -745,7 +750,7 @@ export default function Toolbar({
   /** Which tool has its option menu open. Named, because the overflow rows
    *  refer to it too now — a folded tool opens the same menu its inline
    *  chevron would. */
-  type ToolMenuKey = DrawPrefKey | 'markup' | 'eraser' | 'text' | 'signature'
+  type ToolMenuKey = DrawPrefKey | 'markup' | 'eraser' | 'text' | 'signature' | 'hand'
   const [toolMenu, setToolMenu] = useState<ToolMenuKey | null>(null)
   // Last markup type the user activated, so the split button's main click
   // re-arms that type rather than always defaulting to highlight
@@ -753,7 +758,7 @@ export default function Toolbar({
   const themeMenuRef = useRef<HTMLDivElement>(null)
   const viewMenuRef = useRef<HTMLDivElement>(null)
   const saveMenuRef = useRef<HTMLDivElement>(null)
-  const toolMenuRef = useRef<HTMLFieldSetElement>(null)
+  const toolMenuRef = useRef<HTMLDivElement>(null)
   const settingsMenuRef = useRef<HTMLDivElement>(null)
   /** The page field, so the Gå-til-side command can focus it. Only ever one is
    *  rendered — the single cluster drives whichever column is active. */
@@ -1140,7 +1145,7 @@ export default function Toolbar({
     { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup, opts: 'markup', disabled: toolsLocked },
     { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker', opts: 'marker', disabled: toolsLocked },
     { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen', opts: 'pen', disabled: toolsLocked },
-    { key: 'hand', icon: <IconHand size={15} />, label: t('tb.hand'), onClick: onToggleHand, active: handTool },
+    { key: 'hand', icon: <IconHand size={15} />, label: t('tb.hand'), onClick: onToggleHand, active: handTool, opts: 'hand' },
     { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
     { key: 'fullscreen', icon: <IconFullscreen size={15} />, label: t('tb.fullscreen'), onClick: onToggleFullscreen },
     { key: 'redo', icon: <IconRedo size={15} />, label: t('tb.redo'), onClick: onRedo, disabled: !canRedo },
@@ -1362,7 +1367,19 @@ export default function Toolbar({
    *  under, and until now that meant its options were simply gone until you
    *  widened the window — with «Figurer» the worst of it, since that button IS
    *  its menu and the folded row silently drew a rectangle instead. */
-  const toolPopover =toolMenu === 'signature' ? (
+  const toolPopover = toolMenu === 'hand' ? (
+            <div className="tool-menu">
+              <div className="theme-menu-label">{t('tb.hand')}</div>
+              <label className="theme-menu-toggle" title={t('tb.spaceHandTip')}>
+                <input
+                  type="checkbox"
+                  checked={spaceHand}
+                  onChange={(e) => onSpaceHandChange(e.target.checked)}
+                />
+                {t('tb.spaceHand')}
+              </label>
+            </div>
+          ) : toolMenu === 'signature' ? (
             signatureMenu
           ) : toolMenu === 'markup' ? (
             <div className="tool-menu">
@@ -1574,23 +1591,38 @@ export default function Toolbar({
             <IconArrowRight />
           </button>
         )}
-        {inline('hand') && (
-          <button
-            className={`tb-btn${handTool ? ' is-active' : ''}`}
-            onClick={onToggleHand}
-            title={withShortcut(t('tb.handTip'), 'nav.hand')}
-          >
-            <IconHand />
-          </button>
-        )}
 
         <div className="toolbar-sep" />
 
+        {/* The hand and the marking tools are one cluster (Emil, 2026-10-20:
+            no divider between the hand and the pen), so one menu anchor
+            covers them all and the hand's own popover opens under the hand.
+            The hand stays OUTSIDE the fieldset: it draws nothing, so a
+            document that takes no marks may still be dragged. */}
+        <div className="tool-cluster" ref={toolMenuRef}>
+        {inline('hand') && (
+          <span className="tb-split">
+            <button
+              className={`tb-btn${handTool ? ' is-active' : ''}`}
+              onClick={onToggleHand}
+              title={withShortcut(t('tb.handTip'), 'nav.hand')}
+            >
+              <IconHand />
+            </button>
+            <button
+              className={`tb-chevron${toolMenu === 'hand' ? ' is-active' : ''}`}
+              title={t('tb.toolOptionsTip')}
+              onClick={() => setToolMenu((m) => (m === 'hand' ? null : 'hand'))}
+            >
+              <IconChevronDown size={11} />
+            </button>
+          </span>
+        )}
+        {toolMenu === 'hand' && inline('hand') ? toolPopover : null}
         {/* A fieldset, so one `disabled` reaches every tool button and chevron
             in the group at once when the document takes no marks */}
         <fieldset
           className="tool-group"
-          ref={toolMenuRef}
           disabled={toolsLocked}
           title={toolsLocked ? t('tb.xfaToolsOffTip') : undefined}
         >
@@ -1732,8 +1764,9 @@ export default function Toolbar({
             </button>
           )}
 
-          {toolMenu && inline(toolMenu === 'shape' ? 'shapes' : toolMenu) ? toolPopover : null}
+          {toolMenu && toolMenu !== 'hand' && inline(toolMenu === 'shape' ? 'shapes' : toolMenu) ? toolPopover : null}
         </fieldset>
+        </div>
       </div>
 
       {/* Only rendered for the rare document that IS signed — see

@@ -77,6 +77,10 @@ export interface InputPrefs {
    *  pressure-sensitive preset). Only a real pen produces pressure; mouse,
    *  touch, marker and shapes are untouched by this. */
   penPressure: boolean
+  /** Hand tool: Space held is the hand for as long as it is held, and the
+   *  tool you had comes back on release. Off as shipped — Space scrolls a
+   *  page otherwise, and this takes that away while the document has focus. */
+  spaceHand: boolean
 }
 
 export interface ToolPrefs {
@@ -126,7 +130,7 @@ export const DEFAULT_TOOL_PREFS: ToolPrefs = {
   },
   text: { color: FREETEXT_COLOR, fontSize: FREETEXT_SIZE, font: TEXT_FONT_DEFAULT },
   eraserScope: 'draw',
-  input: { fingerDraws: true, penSeen: false, penPressure: true }
+  input: { fingerDraws: true, penSeen: false, penPressure: true, spaceHand: false }
 }
 
 const LS_KEY = 'pdfx-tool-prefs'
@@ -215,7 +219,8 @@ export function loadToolPrefs(): ToolPrefs {
             ? parsed.input.fingerDraws
             : !(parsed?.input?.penSeen === true),
         penSeen: parsed?.input?.penSeen === true,
-        penPressure: parsed?.input?.penPressure !== false
+        penPressure: parsed?.input?.penPressure !== false,
+        spaceHand: parsed?.input?.spaceHand === true
       }
     }
   } catch {

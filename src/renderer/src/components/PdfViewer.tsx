@@ -1340,6 +1340,9 @@ export default function PdfViewer({
   const setEraserScope = useCallback((eraserScope: EraserScope) => {
     setPrefs((p) => ({ ...p, eraserScope }))
   }, [])
+  const setSpaceHand = useCallback((spaceHand: boolean) => {
+    setPrefs((p) => ({ ...p, input: { ...p.input, spaceHand } }))
+  }, [])
   const setFingerDraws = useCallback((fingerDraws: boolean) => {
     setPrefs((p) => ({ ...p, input: { ...p.input, fingerDraws } }))
   }, [])
@@ -1442,6 +1445,26 @@ export default function PdfViewer({
   const [handTool, setHandTool] = useState(false)
   const handToolRef = useRef(handTool)
   handToolRef.current = handTool
+  /** Space is down and it is what put the hand up (the opt-in «Space
+   *  holds the hand»): the release puts it down again. The marking tool
+   *  that was armed stays armed underneath — the hand's class makes the
+   *  page inert while it is up, so the tool is simply back on release. */
+  const spaceHeldRef = useRef(false)
+  useEffect(() => {
+    const release = (e?: KeyboardEvent): void => {
+      if (e && e.key !== ' ') return
+      if (!spaceHeldRef.current) return
+      spaceHeldRef.current = false
+      setHandTool(false)
+    }
+    const onBlur = (): void => release()
+    window.addEventListener('keyup', release)
+    window.addEventListener('blur', onBlur)
+    return () => {
+      window.removeEventListener('keyup', release)
+      window.removeEventListener('blur', onBlur)
+    }
+  }, [])
   const [pillEditing, setPillEditing] = useState(false)
   const [pillInput, setPillInput] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -6751,6 +6774,26 @@ export default function PdfViewer({
       return
     }
 
+    // Space held = the hand, for as long as it is held (opt-in, in the
+    // hand's own menu). Not a command in the map — a chord fires on press,
+    // this one lasts as long as the key — and never from a text field or a
+    // focused button, where Space already means something. With the hand
+    // already up by its toggle, Space keeps scrolling as it always did.
+    if (
+      e.key === ' ' &&
+      !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey &&
+      prefs.input.spaceHand &&
+      !isTyping && tag !== 'BUTTON' && !inTextField(e.target) &&
+      (!handToolRef.current || spaceHeldRef.current)
+    ) {
+      e.preventDefault()
+      if (!e.repeat && !handToolRef.current) {
+        spaceHeldRef.current = true
+        setHandTool(true)
+      }
+      return
+    }
+
     const command = commandForEvent(e, isTyping)
     if (!command) return
     // Every case below preventDefaults: reaching here means the keypress WAS a
@@ -7262,6 +7305,8 @@ export default function PdfViewer({
           onNavForward={goForward}
           handTool={handTool}
           onToggleHand={toggleHandTool}
+          spaceHand={prefs.input.spaceHand}
+          onSpaceHandChange={setSpaceHand}
           activeTool={activeTool}
           toolPrefs={toolPrefs}
           onToolSelect={selectTool}

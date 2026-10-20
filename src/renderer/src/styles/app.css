@@ -1467,6 +1467,14 @@ button {
    rest of the bar looked unfinished beside it. Separators do the grouping. */
 /* A <fieldset>, so the whole group can be disabled at once (an XFA form takes
    no marks); the browser's fieldset chrome is reset here. */
+/* The hand + the marking tools: one anchor for every tool popover */
+.tool-cluster {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 .tool-group {
   position: relative;
   display: flex;

@@ -207,6 +207,8 @@ export const zh: Dict = {
   'tb.markupOptionsTip': '选择类型和颜色',
   'tb.eraserTip': '橡皮擦——移除手写笔、荧光笔和形状（Esc 结束）',
   'tb.handTip': '抓手工具——拖动以移动页面（Esc 结束）',
+  'tb.spaceHand': '按住空格使用抓手',
+  'tb.spaceHandTip': '按住空格键拖动页面，松开后恢复原来的工具',
   'tb.eraserAllTip': '橡皮擦——移除所有批注（Esc 结束）',
   'tb.eraserOptionsTip': '选择橡皮擦移除的内容',
   'tb.eraserScopeDraw': '绘制的标记',
