@@ -125,6 +125,11 @@ export const MODELS: Record<
   // Hosted-service lineups verified against provider docs 2026-08-12/13
   // (docs/agent-notes/modeller-api.md has the sources and open questions)
   gemini: [
+    // Gemini 4 Argon added 2026-10-19 ("our flagship reasoning model",
+    // ai.google.dev/gemini-api/docs/models/gemini-4-argon) as a NEW top tier —
+    // gemini-3.1-pro-preview is still listed as Preview with no deprecation
+    // notice, so this is an addition, not a same-slot replacement
+    { id: 'gemini-4-argon', label: 'Gemini 4 Argon', short: 'Gemini 4 Argon', hint: 'ai.modelHintHeaviest' },
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', short: 'Gemini 3.1 Pro', hint: 'ai.modelHintCapable' },
     // Replaced gemini-3.7-flash this round (superseded 2026-09-04, same slot;
     // 3.7 itself had replaced 3.6 on 2026-08-13)
@@ -317,6 +322,16 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   'gpt-5.6-sol': 900_000,
   'gpt-5.6-terra': 900_000,
   'gpt-5.6-luna': 900_000,
+  // Gemini 4 Argon's context is a SHARED input+output budget (1,048,576
+  // total, synchronous output capped at 65,536 by default, extendable up to
+  // the full budget with "long decode" — ai.google.dev/gemini-api/docs/
+  // models/gemini-4-argon, verified 2026-10-19), unlike the rest of the
+  // Gemini lineup where the documented number is pure input capacity. Floored
+  // to 900K, same margin as the GPT-6 family's analogous total-minus-output
+  // situation, rather than the full 1,048,576 — using the whole figure here
+  // would risk the dangerous direction (a code value OVER the real input
+  // ceiling) that MODEL-UPDATE.md warns against.
+  'gemini-4-argon': 900_000,
   // Verified against provider docs 2026-08-12/13; entries missing here on
   // purpose (Gemini Flash-Lite) fall back to the provider floor because no
   // context number was documented — excerpting early is the cheap failure,
