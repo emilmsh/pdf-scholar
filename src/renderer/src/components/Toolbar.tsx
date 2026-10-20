@@ -100,6 +100,7 @@ import {
   IconFitPage,
   IconFitWidth,
   IconFullscreen,
+  IconHand,
   IconGear,
   IconComment,
   IconHeart,
@@ -211,6 +212,11 @@ interface Props {
   sidebarOpen: boolean
   canNavBack: boolean
   canNavForward: boolean
+  /** Hand tool (issue #44): a mouse drag moves the page instead of
+   *  selecting. A toggle beside back/forward — it is navigation, not
+   *  marking, so it lives outside the tool fieldset and its lock. */
+  handTool: boolean
+  onToggleHand(): void
   activeTool: ToolName | null
   toolPrefs: Record<DrawPrefKey, ToolPref>
   onToolSelect(tool: ToolName | null): void
@@ -475,6 +481,8 @@ export default function Toolbar({
   sidebarOpen,
   canNavBack,
   canNavForward,
+  handTool,
+  onToggleHand,
   activeTool,
   toolPrefs,
   onToolSelect,
@@ -1132,6 +1140,7 @@ export default function Toolbar({
     { key: 'markup', icon: <IconTextMarkup size={15} />, label: t('tb.markup'), onClick: () => onMarkupSelect(activeMarkup ? null : markupType), active: !!activeMarkup, opts: 'markup', disabled: toolsLocked },
     { key: 'marker', icon: <IconMarker size={15} />, label: t('tb.marker'), onClick: () => onToolSelect(activeTool === 'marker' ? null : 'marker'), active: activeTool === 'marker', opts: 'marker', disabled: toolsLocked },
     { key: 'pen', icon: <IconPen size={15} />, label: t('tb.pen'), onClick: () => onToolSelect(activeTool === 'pen' ? null : 'pen'), active: activeTool === 'pen', opts: 'pen', disabled: toolsLocked },
+    { key: 'hand', icon: <IconHand size={15} />, label: t('tb.hand'), onClick: onToggleHand, active: handTool },
     { key: 'present', icon: <IconPresent size={15} />, label: t('tb.present'), onClick: onPresent },
     { key: 'fullscreen', icon: <IconFullscreen size={15} />, label: t('tb.fullscreen'), onClick: onToggleFullscreen },
     { key: 'redo', icon: <IconRedo size={15} />, label: t('tb.redo'), onClick: onRedo, disabled: !canRedo },
@@ -1563,6 +1572,15 @@ export default function Toolbar({
             title={withShortcut(t('tb.navForwardTip'), 'nav.forward')}
           >
             <IconArrowRight />
+          </button>
+        )}
+        {inline('hand') && (
+          <button
+            className={`tb-btn${handTool ? ' is-active' : ''}`}
+            onClick={onToggleHand}
+            title={withShortcut(t('tb.handTip'), 'nav.hand')}
+          >
+            <IconHand />
           </button>
         )}
 

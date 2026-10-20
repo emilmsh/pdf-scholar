@@ -1434,6 +1434,14 @@ export default function PdfViewer({
   }, [activeTool, toolPrefs, prefs.text])
   const drawToolRef = useRef(drawTool)
   drawToolRef.current = drawTool
+  // Hand tool (issue #44): a mouse drag moves the page, as Acrobat's hand
+  // does. A mode of its own rather than a DrawToolType — it draws nothing,
+  // so a rotated or XFA document may use it and the tool fieldset's lock
+  // must not reach it. Exclusive with the marking tools: arming either
+  // side puts the other down. A finger and a trackpad pan without it.
+  const [handTool, setHandTool] = useState(false)
+  const handToolRef = useRef(handTool)
+  handToolRef.current = handTool
   const [pillEditing, setPillEditing] = useState(false)
   const [pillInput, setPillInput] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -3011,6 +3019,7 @@ export default function PdfViewer({
       }
       setActiveTool(tool)
       if (tool) setMarkupTool(null) // freehand and text-markup tools are exclusive
+      if (tool) setHandTool(false)
     },
     [showToast, xfaOf]
   )
@@ -3024,10 +3033,22 @@ export default function PdfViewer({
         return
       }
       if (type) setActiveTool(null)
+      if (type) setHandTool(false)
       setMarkupTool(type)
     },
     [showToast, xfaOf]
   )
+
+  /** Arm/disarm the hand tool. Arming it puts every marking tool down, so
+   *  a press on the page can mean one thing. */
+  const toggleHandTool = useCallback(() => {
+    const on = !handToolRef.current
+    setHandTool(on)
+    if (on) {
+      setActiveTool(null)
+      setMarkupTool(null)
+    }
+  }, [])
 
   /** The note tool's arm/disarm, and the snip tool's — the same read-only
    *  refusal as the other tools, said in words rather than by a dead button. */
@@ -5098,7 +5119,7 @@ export default function PdfViewer({
   // annotations and opens the properties popover
   const onMouseUp = useCallback(
     (e: React.MouseEvent) => {
-      if (e.button !== 0 || drawToolRef.current) return
+      if (e.button !== 0 || drawToolRef.current || handToolRef.current) return
       // A completed note drag must not open the properties popover
       if (performance.now() - dragEndAtRef.current < 400) return
       const { clientX, clientY, target } = e
@@ -5175,6 +5196,37 @@ export default function PdfViewer({
     [pagePointFromClient, openFreeTextEditor, annotsFor]
   )
 
+  /** Hand tool: drag the column under the pointer. Window listeners rather
+   *  than pointer capture, since the pages' handlers are mouse events — a
+   *  finger pans natively and never reaches here, and a pen the browser does
+   *  not pan arrives as compat mouse events and pans the same way. A paged
+   *  column holds its snap for the drag, as the pinch does, and takes it
+   *  back on release. */
+  const startHandDrag = useCallback((e: React.MouseEvent) => {
+    const el = e.currentTarget as HTMLElement
+    const startX = e.clientX
+    const startY = e.clientY
+    const left = el.scrollLeft
+    const top = el.scrollTop
+    e.preventDefault()
+    el.classList.add('is-grabbing')
+    holdSnap(el)
+    const move = (ev: MouseEvent): void => {
+      el.scrollLeft = left - (ev.clientX - startX)
+      el.scrollTop = top - (ev.clientY - startY)
+    }
+    const up = (): void => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      window.removeEventListener('blur', up)
+      el.classList.remove('is-grabbing')
+      releaseSnap(el)
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+    window.addEventListener('blur', up)
+  }, [])
+
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     setMenu((m) => (m ? null : m))
     setAnnotPopover((p) => (p ? null : p))
@@ -5183,6 +5235,10 @@ export default function PdfViewer({
     if (!searchOpenRef.current) setSearchHits((h) => (h ? null : h))
     // Mousedown on a note bubble arms a drag (movement threshold decides
     // between drag and the plain click that opens the popover)
+    if (handToolRef.current) {
+      if (e.button === 0) startHandDrag(e)
+      return
+    }
     if (e.button !== 0 || drawToolRef.current || annotsHiddenRef.current) return
     // A resize handle already took this gesture. Its pointerdown fires first and
     // stops there, but the compat mousedown still arrives here — without this the
@@ -6684,6 +6740,7 @@ export default function PdfViewer({
       else if (aiQuick) setAiQuick(null)
       else if (annotPopover) setAnnotPopover(null)
       else if (selected) setSelected(null)
+      else if (handTool) setHandTool(false)
       else if (activeTool) setActiveTool(null)
       else if (markupTool) setMarkupTool(null)
       else if (readAloud !== 'closed') stopReadAloud()
@@ -6887,6 +6944,10 @@ export default function PdfViewer({
         // sidebar tab, which is where the shortcut is advertised.
         e.preventDefault()
         toggleBookmark(currentPageRef.current)
+        break
+      case 'nav.hand':
+        e.preventDefault()
+        toggleHandTool()
         break
       // Tools toggle: the bound key arms the tool, and pressing it again puts it
       // down — the same thing clicking its toolbar button twice does.
@@ -7199,6 +7260,8 @@ export default function PdfViewer({
           canNavForward={activeNav.forward.length > 0}
           onNavBack={goBack}
           onNavForward={goForward}
+          handTool={handTool}
+          onToggleHand={toggleHandTool}
           activeTool={activeTool}
           toolPrefs={toolPrefs}
           onToolSelect={selectTool}
@@ -7459,7 +7522,7 @@ export default function PdfViewer({
             </div>
           )}
         <div
-          className={`pages${drawTool ? ' drawing' : ''}${paged ? ' paged' : ''}`}
+          className={`pages${drawTool ? ' drawing' : ''}${handTool ? ' hand' : ''}${paged ? ' paged' : ''}`}
           data-pane="a"
           data-dockey={payload.path}
           data-rotation={rotation}
@@ -7644,6 +7707,7 @@ export default function PdfViewer({
                 onPageChange={setPaneBPage}
                 flash={paneFlash === 'b'}
                 drawTool={drawTool}
+                handTool={handTool}
                 fingerDraws={prefs.input.fingerDraws}
                 penPressure={prefs.input.penPressure}
                 // The frame follows the document the column shows — a selection

@@ -1833,6 +1833,26 @@ html.pen-near .draw-layer {
   cursor: crosshair;
 }
 
+/* Hand tool (issue #44): the pointer moves the page, and nothing on it —
+   text, links, marks, handles — answers a press while it is up. The
+   overlay hosts are `pointer-events: none` with their interactive children
+   set back to `auto` (see the link-layer note), so the children need the
+   rule too, and `!important` so no handle's own rule outranks the mode. */
+
+.pages.hand {
+  cursor: grab;
+  user-select: none;
+}
+
+.pages.hand.is-grabbing {
+  cursor: grabbing;
+}
+
+.pages.hand .pdf-page,
+.pages.hand .pdf-page * {
+  pointer-events: none !important;
+}
+
 /* Theme menu */
 
 .theme-menu-anchor {

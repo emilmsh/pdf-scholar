@@ -254,6 +254,7 @@ const nb = {
   'tb.markupTip': 'Marker tekst – dra over tekst for å utheve (Esc avslutter)',
   'tb.markupOptionsTip': 'Velg type og farge',
   'tb.eraserTip': 'Viskelær – sletter penn, tusj og former (Esc avslutter)',
+  'tb.handTip': 'Håndverktøy – dra for å flytte siden (Esc avslutter)',
   'tb.eraserAllTip': 'Viskelær – sletter alle merknader (Esc avslutter)',
   'tb.eraserOptionsTip': 'Velg hva viskelæret sletter',
   'tb.eraserScopeDraw': 'Tegnede merker',
@@ -533,6 +534,7 @@ const nb = {
   'tb.note': 'Notat',
   'tb.signature': 'Signatur',
   'tb.eraser': 'Viskelær',
+  'tb.hand': 'Hånd',
   'tb.tocRailTip': 'Innhold – klikk for å feste, hover for et raskt blikk',
   'tb.aiRailTip': 'Assistent – klikk for å feste, hover for et raskt blikk',
   'tb.rotate': 'Roter siden',
@@ -1103,6 +1105,7 @@ const nb = {
   'keys.toolArrow': 'Pil',
   'keys.toolSignature': 'Signatur',
   'keys.toolSnip': 'Forklar område',
+  'keys.navHand': 'Håndverktøy',
 
   // Auto-update (Electron only)
   'update.available': 'Ny versjon tilgjengelig',
@@ -1343,6 +1346,7 @@ const en: Dict = {
   'tb.markupTip': 'Mark up text — drag over text to highlight (Esc to finish)',
   'tb.markupOptionsTip': 'Choose type and colour',
   'tb.eraserTip': 'Eraser — removes pen, highlighter and shapes (Esc to finish)',
+  'tb.handTip': 'Hand tool — drag to move the page (Esc to finish)',
   'tb.eraserAllTip': 'Eraser — removes every annotation (Esc to finish)',
   'tb.eraserOptionsTip': 'Choose what the eraser removes',
   'tb.eraserScopeDraw': 'Drawn marks',
@@ -1612,6 +1616,7 @@ const en: Dict = {
   'tb.note': 'Note',
   'tb.signature': 'Signature',
   'tb.eraser': 'Eraser',
+  'tb.hand': 'Hand',
   'tb.tocRailTip': 'Contents — click to pin, hover for a quick look',
   'tb.aiRailTip': 'Assistant — click to pin, hover for a quick look',
   'tb.rotate': 'Rotate page',
@@ -2141,6 +2146,7 @@ const en: Dict = {
   'keys.toolArrow': 'Arrow',
   'keys.toolSignature': 'Signature',
   'keys.toolSnip': 'Explain area',
+  'keys.navHand': 'Hand tool',
 
   'update.available': 'New version available',
   'update.availableBody': 'PDF Scholar {version} is ready to download.',

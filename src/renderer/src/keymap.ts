@@ -96,6 +96,7 @@ export type CommandId =
   | 'tool.arrow'
   | 'tool.signature'
   | 'tool.snip'
+  | 'nav.hand'
 
 export type CategoryId =
   | 'file'
@@ -197,6 +198,10 @@ const REGISTRY: readonly Command[] = [
   // in some other field is exactly when you want to jump to the page box.
   { id: 'nav.gotoPage', category: 'nav', labelKey: 'keys.navGotoPage', defaults: ['mod+g'], whileTyping: true },
   { id: 'doc.bookmark', category: 'nav', labelKey: 'keys.docBookmark', defaults: ['b'] },
+  // The hand tool (issue #44): a toggle, so one press arms it and the next
+  // puts it down. Unbound as shipped — «h», the key every other reader
+  // uses for it, already hides annotations here.
+  { id: 'nav.hand', category: 'nav', labelKey: 'keys.navHand', defaults: [] },
 
   // ---------- View ----------
   { id: 'view.fullscreen', category: 'view', labelKey: 'keys.viewFullscreen', defaults: ['f11', 'f'], whileTyping: true },

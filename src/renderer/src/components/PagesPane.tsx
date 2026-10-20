@@ -95,6 +95,8 @@ interface Props {
    *  persistent active-column signal is the toolbar's column switcher. */
   flash: boolean
   drawTool: DrawTool | null
+  /** Hand tool armed: the column takes the viewer's drag-to-pan class */
+  handTool: boolean
   /** Whether a finger may draw when a tool is armed — see tool-prefs InputPrefs */
   fingerDraws: boolean
   /** Pen tool + real pen: stylus pressure varies the stroke width */
@@ -180,6 +182,7 @@ export default function PagesPane({
   onPageChange,
   flash,
   drawTool,
+  handTool,
   fingerDraws,
   penPressure,
   selected,
@@ -720,7 +723,7 @@ export default function PagesPane({
         </div>
       )}
       <div
-        className={`pages${drawTool ? ' drawing' : ''}${paged ? ' paged' : ''}`}
+        className={`pages${drawTool ? ' drawing' : ''}${handTool ? ' hand' : ''}${paged ? ' paged' : ''}`}
         data-pane="b"
         data-dockey={docKey}
         // Published so PdfViewer's pointer handlers can map a click in THIS
