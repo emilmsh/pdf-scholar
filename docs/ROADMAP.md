@@ -405,6 +405,18 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     biblioteket) og 3 (manuell gjenbruk av utdrag i komposisten) står igjen;
     MCP er bevisst utsatt — eksportmappen er grensesnittet inntil noen kommer
     med et konkret behov.
+  - **Flyttede og omdøpte filer gjenkjennes** (2026-10-22): stien var
+    identiteten for alt per fil, så en flyttet PDF åpnet som et fremmed
+    dokument og samtaler, bokmerker og leseposisjon ble liggende igjen.
+    Nå bærer PDF-ens egen /ID[0] (lest fra bytene, null kostnad) postene
+    over til ny sti — men bare fra en sti der filen er BORTE, så en kopi
+    aldri stjeler originalens historikk. /ID[0] overlever begge
+    lagringsveiene våre (full omskriving og appenderen, sjekket mot ekte
+    motor). Valgt framfor tekst-hash av første sider, som jeg først foreslo:
+    /ID leses uten pdf.js og før posisjonen slås opp, så dokumentet åpner
+    rett på siden. En fil uten /ID får ingen gjenkjenning. Beskjed «Gjenkjent
+    fra …» når det skjer. Dekket av `test:doc-identity` (CI) og
+    `test:identity-desktop`; PLATFORMS.md avvik 32.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

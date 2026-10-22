@@ -149,6 +149,10 @@ jobs:
       # an empty list removes its file, a corrupt one is left for the next
       # write, two writes of one document queue (EPERM on Windows otherwise)
       - run: npm run test:chat-history
+      # A moved/renamed file's records follow it (issue #46): /ID[0] read from
+      # the bytes, a copy never steals its original's history, and /ID[0]
+      # survives both of our save paths (the real engine, both bundles)
+      - run: npm run test:doc-identity
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

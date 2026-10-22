@@ -1007,6 +1007,14 @@ export interface PdfxApi {
    *  and a detached assistant edit the same history). `path` is the document,
    *  or null where the platform cannot say which (dev:web's storage event). */
   onConversationsChanged(cb: (path: string | null) => void): () => void
+  // ---------- A document's identity across a move (issue #46, shared/doc-identity.ts) ----------
+  /** Record the document's fingerprint (its /ID[0], read from the bytes by
+   *  the renderer) for this path, and carry over the records — conversations,
+   *  bookmarks, reading position, a pinned recents entry — of any other path
+   *  with the same fingerprint whose file is GONE. Awaited before the position
+   *  is read, so a moved file opens where it was left. Returns the paths the
+   *  records followed from ([] = none). */
+  docIdentity(path: string, name: string, fingerprint: string): Promise<string[]>
   setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
    *  goes through src/main/incremental-appender.ts instead) */

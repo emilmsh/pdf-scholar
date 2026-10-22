@@ -13,7 +13,7 @@ import {
 } from 'electron'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, watch, writeFileSync } from 'node:fs'
 import type { FSWatcher } from 'node:fs'
-import { open, readFile, stat, writeFile } from 'node:fs/promises'
+import { access, open, readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type {
@@ -98,6 +98,7 @@ import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import { createRecentThumbStore } from './recent-thumbs'
 import { createChatHistoryStore } from './chat-history'
 import type { StoredConversation } from '../shared/chat-history'
+import { rebindIdentity, validFingerprint } from '../shared/doc-identity'
 
 // The portable zip keeps its state beside the exe. Before ANY path is read —
 // the migration below, the single-instance lock, the state file, drafts.
@@ -1280,6 +1281,57 @@ function registerIpc(): void {
     }
   })
   ipcMain.handle('chats:list', () => chats.list())
+
+  // A document's identity across a move (issue #46; shared/doc-identity.ts):
+  // the renderer reports the /ID[0] it read from the bytes, main records it
+  // and carries over the records of any other path with the same fingerprint
+  // whose file is gone. Every store involved is main's own, so the move is
+  // one place's work and the renderer's position read waits for it.
+  ipcMain.handle(
+    'identity:report',
+    async (_e, path: unknown, name: unknown, fingerprint: unknown): Promise<string[]> => {
+      if (typeof path !== 'string' || !path || !validFingerprint(fingerprint)) return []
+      const state = getState()
+      const result = await rebindIdentity(path, typeof name === 'string' ? name : '', fingerprint, state.fingerprints, {
+        exists: (p) => access(p).then(() => true, () => false),
+        position: {
+          get: async (p) => state.positions[p] ?? null,
+          set: async (p, pos) => {
+            if (pos) state.positions[p] = pos
+            else delete state.positions[p]
+          }
+        },
+        bookmarks: {
+          get: async (p) => getBookmarks(p),
+          set: async (p, list) => setBookmarks(p, list)
+        },
+        conversations: {
+          get: (p) => chats.get(p),
+          set: (p, n, list) => chats.set(p, n, list)
+        },
+        recents: {
+          takeOut: async (p) => {
+            const entry = state.recents.find((r) => r.path === p)
+            if (!entry) return { pinned: false }
+            removeRecentEntry(p)
+            await recentThumbs.forget(p)
+            return { pinned: entry.pinnedAt !== undefined }
+          },
+          pin: async (p) => {
+            pinRecentEntry(p, true)
+          }
+        }
+      })
+      state.fingerprints = result.map
+      saveState()
+      if (result.from.length > 0) {
+        for (const w of BrowserWindow.getAllWindows()) {
+          if (!w.isDestroyed() && !w.webContents.isDestroyed()) w.webContents.send('chats:changed', path)
+        }
+      }
+      return result.from
+    }
+  )
 
   ipcMain.on('settings:set', (_e, patch: Partial<Settings>) => {
     const state = getState()

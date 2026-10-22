@@ -608,6 +608,19 @@ regressions are treated as bugs, not as acceptable platform lag.
     the handoff itself (`pdfx-open-conversation` in localStorage) is the same
     everywhere. Covered by `npm run test:chat-history` (rules + desktop store).
 
+32. **A moved or renamed file keeps its records on the desktop and for a
+    `file://` document in the extension; a URL and a picked file do not.**
+    (issue #46, 2026-10-22) The rule (`src/shared/doc-identity.ts`) moves a
+    path's conversations, bookmarks, position and pinned recents entry to the
+    new path of a document with the same /ID[0] — but only from a path whose
+    file is known to be GONE. Desktop asks the file system. The extension can
+    know that only for a `file://` URL with file access granted (a fetch that
+    fails); an `http(s)` URL that fails may just be offline, and an `fsa:`
+    handle needs a gesture to read, so both read as present and nothing moves
+    from them. dev:web cannot tell at all and never rebinds (`docIdentity`
+    resolves `[]` in `bridge.ts`). Covered by `npm run test:doc-identity`
+    (rule + /ID[0] through both save paths) and `test:identity-desktop`.
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

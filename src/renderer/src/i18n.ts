@@ -42,6 +42,7 @@ const nb = {
   'app.reloadFromDisk': 'Last inn på nytt …',
   'app.keepMine': 'Behold min versjon',
   'app.reloadedFromDisk': '«{name}» ble endret på disk og er lastet inn på nytt',
+  'app.identityRebound': 'Gjenkjent fra «{from}» – samtaler, bokmerker og leseposisjon er tatt med',
   // Shown by the render-error boundary — the only screen a user sees when the
   // UI itself failed, so it has to say what to do next.
   'crash.title': 'Noe gikk galt',
@@ -1169,6 +1170,7 @@ const en: Dict = {
   'app.reloadFromDisk': 'Reload …',
   'app.keepMine': 'Keep my version',
   'app.reloadedFromDisk': '"{name}" changed on disk and was reloaded',
+  'app.identityRebound': 'Recognised from "{from}" — conversations, bookmarks and reading position came along',
   'crash.title': 'Something went wrong',
   'crash.body':
     'The view stopped unexpectedly. Unsaved annotations are safely stored and will be picked up again when you reload.',

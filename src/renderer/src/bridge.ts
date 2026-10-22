@@ -163,6 +163,10 @@ export const webApi: PdfxApi = {
     }
   },
   listConversations: async () => byNewest(Object.values(loadWebChats()).flatMap(summarizeConversations)),
+  // A browser preview cannot tell whether a fetched path is gone, and a
+  // record is only ever moved away from a path known to be gone — so no
+  // rebinding here (shared/doc-identity.ts; desktop and the extension do it)
+  docIdentity: async () => [],
   // `storage` fires in OTHER tabs only, and names no document — the listener
   // refreshes whatever it shows
   onConversationsChanged: (cb) => {

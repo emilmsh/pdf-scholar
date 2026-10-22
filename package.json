@@ -38,6 +38,8 @@
     "test:recent-thumbs": "node scripts/test-recent-thumbs.mjs",
     "test:session": "node scripts/test-session.mjs",
     "test:chat-history": "node scripts/test-chat-history.mjs",
+    "test:doc-identity": "node scripts/test-doc-identity.mjs",
+    "test:identity-desktop": "node scripts/test-identity-desktop.mjs",
     "test:image-regions": "node scripts/test-image-regions.mjs",
     "test:doc-registry": "node scripts/test-doc-registry.mjs",
     "test:doc-load": "node scripts/test-doc-load.mjs",

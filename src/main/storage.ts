@@ -14,6 +14,7 @@ import type {
 import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
 import { normalizeRecents, pinRecent, recordRecent, removeRecent, restoreRecent } from '../shared/recents'
 import { sanitizeSession, type StoredSession } from '../shared/session'
+import { sanitizeFingerprints } from '../shared/doc-identity'
 export type { Settings }
 
 export interface StoredAiConfig extends AiConfig {
@@ -34,6 +35,9 @@ export interface AppState {
   positions: Record<string, ReadingPosition>
   /** Per-file page bookmarks, keyed by the same path as `positions` */
   bookmarks: Record<string, DocBookmark[]>
+  /** Each opened file's /ID[0] (shared/doc-identity.ts, issue #46): what lets
+   *  a moved or renamed file's records follow it to its new path */
+  fingerprints: Record<string, string>
   settings: Settings
   ai: StoredAiConfig
   /** Live model lists cached from the providers (see shared/ai-model-catalog.ts) */
@@ -75,6 +79,7 @@ const DEFAULTS: AppState = {
   recents: [],
   positions: {},
   bookmarks: {},
+  fingerprints: {},
   settings: { ...DEFAULT_SETTINGS },
   ai: DEFAULT_AI,
   modelCatalog: {}
@@ -113,6 +118,7 @@ export function getState(): AppState {
       ...DEFAULTS,
       ...parsed,
       recents: normalizeRecents(parsed.recents),
+      fingerprints: sanitizeFingerprints(parsed.fingerprints),
       session: sanitizeSession(parsed.session),
       settings: mergeSettings(DEFAULTS.settings, parsed.settings ?? {}),
       ai: mergeAiConfig(DEFAULT_AI, parsed.ai ?? {})

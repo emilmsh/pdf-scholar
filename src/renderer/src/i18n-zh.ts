@@ -27,6 +27,7 @@ export const zh: Dict = {
   'app.reloadFromDisk': '重新加载…',
   'app.keepMine': '保留我的版本',
   'app.reloadedFromDisk': '“{name}”已在磁盘上被修改，并已重新加载',
+  'app.identityRebound': '已识别为“{from}”——对话、书签和阅读位置已一并带过来',
   'crash.title': '出了点问题',
   'crash.body':
     '视图意外停止。未保存的批注已安全存储，重新加载后会自动恢复。',

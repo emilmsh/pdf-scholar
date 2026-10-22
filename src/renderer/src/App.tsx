@@ -11,6 +11,7 @@ import type {
 } from '../../shared/types'
 import { BREW_UPGRADE_COMMAND, RELEASES_PAGE_URL } from '../../shared/update-channel'
 import { bridge, isElectron } from './bridge'
+import { movedFromLabel, positionFor, reportIdentity } from './doc-identity'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
 import { applyPageTune, tuneTitleBar } from './theme-tune'
@@ -459,7 +460,7 @@ export default function App(): React.JSX.Element {
           setTabDirty(existing.id, false)
         }
         goToTab(existing.id)
-        const initialPosition = await bridge.getPosition(payload.path)
+        const initialPosition = await positionFor(payload)
         if (wasLazy) docRegistry.acquire(payload.path)
         setTabs((prev) =>
           prev.map((t) =>
@@ -470,7 +471,13 @@ export default function App(): React.JSX.Element {
         )
         return
       }
-      const initialPosition = await bridge.getPosition(payload.path)
+      const initialPosition = await positionFor(payload)
+      // A moved or renamed file whose records just followed it (issue #46):
+      // say so once, so a history that appears out of nowhere is explained
+      void reportIdentity(payload).then((from) => {
+        if (from.length > 0)
+          flashNotice(t('app.identityRebound', { from: movedFromLabel(from[0], payload) }), 3600)
+      })
       const tab: OpenTab = {
         id: `tab-${++tabCounter}`,
         payload,
@@ -486,7 +493,7 @@ export default function App(): React.JSX.Element {
       goToTab(tab.id)
       setError(null)
     },
-    [confirmExternalUpdateVerdict, setTabDirty, goToTab]
+    [confirmExternalUpdateVerdict, setTabDirty, goToTab, flashNotice]
   )
 
   /** Called by the viewer when Save/Ctrl+S finds the file changed outside the
@@ -504,7 +511,7 @@ export default function App(): React.JSX.Element {
       if (existing) setTabDirty(existing.id, false)
       const result = await bridge.readFile(path)
       if (existing && !('error' in result)) {
-        const initialPosition = await bridge.getPosition(path)
+        const initialPosition = await positionFor(result)
         setTabs((prev) =>
           prev.map((t) =>
             t.id === existing.id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
@@ -589,7 +596,7 @@ export default function App(): React.JSX.Element {
         setError(t('app.openFailed', { error: errorText(result) }))
         return false
       }
-      const initialPosition = await bridge.getPosition(path)
+      const initialPosition = await positionFor(result)
       // Re-read the tab: the guard and the read are awaits, and the split may
       // have been closed under us in the meantime
       const outgoing = tabsRef.current.find((t) => t.id === hostTabId)?.splitDoc
@@ -653,7 +660,7 @@ export default function App(): React.JSX.Element {
       }
       const result = await bridge.readFile(split.payload.path)
       if ('error' in result) return
-      const initialPosition = await bridge.getPosition(split.payload.path)
+      const initialPosition = await positionFor(result)
       docRegistry.release(tab.payload.path)
       // The pane's acquire on Y carries over to the tab — no registry change
       setTabs((prev) =>
@@ -813,7 +820,7 @@ export default function App(): React.JSX.Element {
         setError(t('app.openFailed', { error: errorText(result) }))
         return
       }
-      const initialPosition = await bridge.getPosition(path)
+      const initialPosition = await positionFor(result)
       if (takeLazy(id)) docRegistry.acquire(result.path)
       setTabs((prev) =>
         prev.map((t) =>
@@ -844,7 +851,7 @@ export default function App(): React.JSX.Element {
         setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, staleOnDisk: true } : t)))
         return
       }
-      const initialPosition = await bridge.getPosition(path)
+      const initialPosition = await positionFor(result)
       setTabs((prev) =>
         prev.map((t) =>
           t.id === id
@@ -911,7 +918,7 @@ export default function App(): React.JSX.Element {
         docRegistry.release(oldPath)
         docRegistry.acquire(newPath)
       }
-      const initialPosition = await bridge.getPosition(newPath)
+      const initialPosition = await positionFor(result)
       setTabs((prev) =>
         prev.map((t) =>
           t.id === id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
@@ -1065,7 +1072,7 @@ export default function App(): React.JSX.Element {
         setError(t('app.openFailed', { error: errorText(result) }))
         return
       }
-      const initialPosition = await bridge.getPosition(result.path)
+      const initialPosition = await positionFor(result)
       lazyLoadingRef.current.delete(id)
       if (!takeLazy(id)) return
       docRegistry.acquire(result.path)
