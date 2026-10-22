@@ -588,6 +588,26 @@ regressions are treated as bugs, not as acceptable platform lag.
     `onFileChangedOnDisk` is a no-op in `bridge.ts`. Covered by
     `npm run test:disk-reload` (desktop session).
 
+31. **The AI conversation history is parity-identical by contract; only the
+    store underneath differs.** (issue #46, 2026-10-22) Every platform keeps
+    every conversation a document has had — nothing evicted — and the panel's
+    history view searches across all documents and opens another document on
+    a conversation picked there. The contract is `PdfxApi.getConversations` /
+    `setConversations` / `listConversations` / `onConversationsChanged`, the
+    rules `src/shared/chat-history.ts`. Desktop: one JSON file per document
+    under `userData/chats` (`src/main/chat-history.ts`), other windows told
+    over IPC. Extension: an IndexedDB record per document
+    (`src/renderer/src/extension-chat-history.ts` — chrome.storage.local is
+    capped at 10 MB and a conversation carries page images), other tabs told
+    over a BroadcastChannel. dev:web: localStorage, the `storage` event.
+    What the old localStorage store held (ten per document, thirty documents)
+    is imported once on first read (`chat-store.ts`). One genuine
+    divergence: a conversation picked for a document that is not open opens
+    the document as a TAB on the desktop (App's `openPath`) and in the
+    detached assistant or the extension as a new window/tab (`newWindow`) —
+    the handoff itself (`pdfx-open-conversation` in localStorage) is the same
+    everywhere. Covered by `npm run test:chat-history` (rules + desktop store).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

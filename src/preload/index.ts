@@ -17,6 +17,7 @@ import type {
   SetFormFieldRequest,
   Settings
 } from '../shared/types'
+import type { StoredConversation } from '../shared/chat-history'
 
 const api: PdfxApi = {
   openFileDialog: () => ipcRenderer.invoke('dialog:open'),
@@ -40,6 +41,17 @@ const api: PdfxApi = {
   setPosition: (path: string, pos: ReadingPosition) => ipcRenderer.send('position:set', path, pos),
   setBookmarks: (path: string, bookmarks: DocBookmark[]) =>
     ipcRenderer.send('bookmarks:set', path, bookmarks),
+  getConversations: (path: string) => ipcRenderer.invoke('chats:get', path),
+  setConversations: (path: string, name: string, list: StoredConversation[]) =>
+    ipcRenderer.invoke('chats:set', path, name, list),
+  listConversations: () => ipcRenderer.invoke('chats:list'),
+  onConversationsChanged: (cb: (path: string | null) => void) => {
+    const listener = (_e: unknown, path: string): void => cb(path)
+    ipcRenderer.on('chats:changed', listener)
+    return () => {
+      ipcRenderer.removeListener('chats:changed', listener)
+    }
+  },
   setSettings: (patch: Partial<Settings>) => ipcRenderer.send('settings:set', patch),
   annotate: (req: AnnotateRequest) => ipcRenderer.invoke('annotate', req),
   updateAnnotation: (req: ModifyAnnotationRequest) => ipcRenderer.invoke('annotation:update', req),

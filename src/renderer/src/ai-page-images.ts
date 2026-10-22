@@ -15,7 +15,7 @@ import { clamp } from './clamp'
 /** Long side, in px, of a whole page rendered for the assistant to READ (scanned
  *  documents). 1400 matches the cap on pasted images: enough that body text in a
  *  300 dpi scan stays legible to a vision model, small enough that four of them
- *  fit in a request — and in the localStorage chat store — without trouble. */
+ *  fit in a request — and in the conversation store — without trouble. */
 export const AI_PAGE_IMAGE_SIDE = 1400
 
 export async function renderPagesAsImages(

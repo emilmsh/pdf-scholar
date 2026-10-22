@@ -213,6 +213,9 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
           pagesBusy={pagesBusy}
           currentPage={1}
           pageCount={pdf?.numPages ?? 1}
+          // No tab strip here: another document's conversation opens that
+          // document in a viewer window (or tab), which picks the handoff up
+          onOpenElsewhere={(path) => bridge.newWindow(path)}
         />
       )}
 

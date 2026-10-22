@@ -37,6 +37,7 @@
     "test:file-icon": "node scripts/test-file-icon.mjs",
     "test:recent-thumbs": "node scripts/test-recent-thumbs.mjs",
     "test:session": "node scripts/test-session.mjs",
+    "test:chat-history": "node scripts/test-chat-history.mjs",
     "test:image-regions": "node scripts/test-image-regions.mjs",
     "test:doc-registry": "node scripts/test-doc-registry.mjs",
     "test:doc-load": "node scripts/test-doc-load.mjs",

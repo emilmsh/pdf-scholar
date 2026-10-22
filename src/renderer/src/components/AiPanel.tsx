@@ -43,8 +43,18 @@ import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-sc
 import { bubblesWhileTyping } from '../keymap'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import type { PageText } from '../search'
-import type { ChatMessage, StoredConversation } from '../chat-store'
-import { CHATS_LS_KEY, deleteConversation, loadConversations, newConversationId, saveConversations } from '../chat-store'
+import type { ChatMessage, ConversationHit, ConversationSummary, StoredConversation } from '../chat-store'
+import {
+  deleteConversation,
+  listAllConversations,
+  loadConversations,
+  newConversationId,
+  onConversationsChanged,
+  requestConversationOpen,
+  saveConversations,
+  takeConversationFor
+} from '../chat-store'
+import { searchConversations, summarizeConversations } from '../../../shared/chat-history'
 import { conversationMarkdown } from '../chat-export'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
@@ -168,6 +178,14 @@ interface PanelProps {
   currentPage: number
   /** Total pages, so the range field cannot ask for page 900 of 12 */
   pageCount: number
+  /** Open ANOTHER document, for a conversation picked from the cross-document
+   *  history (issue #46): the panel has recorded which conversation first
+   *  (requestConversationOpen), and the panel that ends up showing the
+   *  document picks it up. A tab here, a window or tab elsewhere. */
+  onOpenElsewhere?(docPath: string): void
+  /** Bumped by the host when a conversation handoff names this document and
+   *  the panel is already mounted — the panel then takes it */
+  conversationAskId?: number
 }
 
 const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
@@ -200,16 +218,26 @@ export default function AiPanel({
   onRequestPageImages,
   pagesBusy,
   currentPage,
-  pageCount
+  pageCount,
+  onOpenElsewhere,
+  conversationAskId = 0
 }: PanelProps): React.JSX.Element | null {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  const [conversations, setConversations] = useState<StoredConversation[]>(() => loadConversations(docPath))
-  const [activeChatId, setActiveChatId] = useState<string | null>(() => conversations[0]?.id ?? null)
-  const [messages, setMessages] = useState<PanelMessage[]>(() => conversations[0]?.messages ?? [])
+  // The store is async (issue #46): the list arrives in the load effect below,
+  // which also picks the newest conversation up as the panel's first view
+  const [conversations, setConversations] = useState<StoredConversation[]>([])
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const [messages, setMessages] = useState<PanelMessage[]>([])
+  /** The history view's search, and whether it spans every document */
+  const [historyQuery, setHistoryQuery] = useState('')
+  const [historyAll, setHistoryAll] = useState(false)
+  /** Every document's conversations, loaded when the view spans them (null =
+   *  not loaded yet) */
+  const [allConversations, setAllConversations] = useState<ConversationSummary[] | null>(null)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [streamText, setStreamText] = useState('')
@@ -229,6 +257,8 @@ export default function AiPanel({
   const currentIdRef = useRef<number | null>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
+  const busyRef = useRef(busy)
+  busyRef.current = busy
   const pinnedRef = useRef(true)
   const jumpingRef = useRef(false)
   const conversationsRef = useRef(conversations)
@@ -609,24 +639,67 @@ export default function AiPanel({
     setShowModelMenu(false)
   }, [open, openSettingsAskId])
 
-  // Another window wrote the shared chat store (a detached assistant and a
-  // docked panel edit the same per-document history). `storage` events fire
-  // only in OTHER windows/tabs, so this can never loop; skipped while busy —
-  // the write-through below persists the settled state right after anyway.
+  /** The document whose list has been loaded once — only that first load
+   *  opens the newest conversation; a refresh never changes what is shown */
+  const loadedForRef = useRef<string | null>(null)
+  const historyAllRef = useRef(historyAll)
+  historyAllRef.current = historyAll
+
+  const refreshAll = useCallback((): void => {
+    void listAllConversations().then(setAllConversations)
+  }, [])
+
+  // The document's conversations, from the store (async: desktop's files, the
+  // extension's IndexedDB). The first load shows the newest conversation, as
+  // the panel always has; a HANDOFF (a conversation picked for this document
+  // from the cross-document history) shows that one instead — taken only
+  // while the panel is open, so the host gets to open it first.
   useEffect(() => {
-    const onStorage = (e: StorageEvent): void => {
-      if (e.key !== CHATS_LS_KEY || busy) return
-      const fresh = loadConversations(docPath)
-      setConversations(fresh)
-      const activeId = activeChatIdRef.current
-      if (activeId) {
-        const chat = fresh.find((c) => c.id === activeId)
-        if (chat) setMessages(chat.messages)
+    // Not a dependency: a reload the moment a stream settles would race the
+    // write-through below (its read answered before that write lands)
+    if (busyRef.current) return
+    let cancelled = false
+    const wanted = open ? takeConversationFor(docPath) : null
+    void loadConversations(docPath).then((list) => {
+      if (cancelled) return
+      setConversations(list)
+      const first = loadedForRef.current !== docPath
+      loadedForRef.current = docPath
+      const target = (wanted && list.find((c) => c.id === wanted)) ||
+        (first && !activeChatIdRef.current && messagesRef.current.length === 0 ? list[0] : undefined)
+      if (target) {
+        pinnedRef.current = true
+        setPinned(true)
+        setActiveChatId(target.id)
+        setMessages(target.messages)
+        if (wanted) setShowHistory(false)
       }
+    })
+    return () => {
+      cancelled = true
     }
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [busy, docPath])
+  }, [docPath, open, conversationAskId])
+
+  // Another window or tab wrote the store (a detached assistant and a docked
+  // panel edit the same per-document history; any window's cross-document
+  // view lists every write). Skipped while busy — the write-through below
+  // persists the settled state right after anyway.
+  useEffect(() => {
+    return onConversationsChanged((path) => {
+      if (busy) return
+      if (path === null || path === docPath) {
+        void loadConversations(docPath).then((fresh) => {
+          setConversations(fresh)
+          const activeId = activeChatIdRef.current
+          if (activeId) {
+            const chat = fresh.find((c) => c.id === activeId)
+            if (chat) setMessages(chat.messages)
+          }
+        })
+      }
+      if (historyAllRef.current) refreshAll()
+    })
+  }, [busy, docPath, refreshAll])
 
   // Write-through: persist only settled states (never mid-stream). An aborted
   // send still settles (error message appended, busy=false) and is persisted.
@@ -642,10 +715,10 @@ export default function AiPanel({
       messages
     }
     const next = [chat, ...conversationsRef.current.filter((c) => c.id !== id)]
-    saveConversations(docPath, next)
-    setConversations(next.slice(0, 10)) // mirror the store cap
+    void saveConversations(docPath, docTitle, next)
+    setConversations(next)
     if (activeChatIdRef.current !== id) setActiveChatId(id)
-  }, [messages, busy, docPath])
+  }, [messages, busy, docPath, docTitle])
 
   const startNewChat = useCallback((): void => {
     if (busy) return
@@ -673,24 +746,74 @@ export default function AiPanel({
 
   const removeConversation = useCallback(
     (id: string): void => {
-      const next = deleteConversation(docPath, id)
-      setConversations(next)
+      void deleteConversation(docPath, docTitle, id).then((next) => {
+        setConversations(next)
+        if (historyAllRef.current) refreshAll()
+      })
       if (activeChatIdRef.current === id) {
         setActiveChatId(null)
         setMessages([]) // stay in the history view
       }
     },
-    [docPath]
+    [docPath, docTitle, refreshAll]
   )
 
   const toggleHistory = useCallback((): void => {
     if (busy) return
     setShowHistory((s) => {
-      if (!s) setConversations(loadConversations(docPath)) // fresh across windows
+      if (!s) {
+        void loadConversations(docPath).then(setConversations) // fresh across windows
+        if (historyAllRef.current) refreshAll()
+      }
       return !s
     })
     setShowSettings(false)
-  }, [busy, docPath])
+  }, [busy, docPath, refreshAll])
+
+  // The history view (issue #46): this document's conversations, or every
+  // document's, each filtered by the search — one list, one row shape
+  const setHistoryScope = useCallback(
+    (all: boolean): void => {
+      setHistoryAll(all)
+      if (all) refreshAll()
+    },
+    [refreshAll]
+  )
+
+  const historyHits = useMemo<ConversationHit[]>(
+    () =>
+      searchConversations(
+        historyAll
+          ? allConversations ?? []
+          : summarizeConversations({ path: docPath, name: docTitle, conversations }),
+        historyQuery
+      ),
+    [historyAll, allConversations, docPath, docTitle, conversations, historyQuery]
+  )
+
+  /** A row clicked: this document's conversation opens here; another
+   *  document's is handed to the host, which opens that document, and the
+   *  panel showing it picks the conversation up */
+  const openHit = useCallback(
+    (hit: ConversationHit): void => {
+      if (hit.docPath === docPath) {
+        openConversation(hit.id)
+        return
+      }
+      if (busy || !onOpenElsewhere) return
+      requestConversationOpen(hit.docPath, hit.id)
+      onOpenElsewhere(hit.docPath)
+    },
+    [docPath, busy, onOpenElsewhere, openConversation]
+  )
+
+  const removeHit = useCallback(
+    (hit: ConversationHit): void => {
+      if (hit.docPath === docPath) removeConversation(hit.id)
+      else void deleteConversation(hit.docPath, hit.docName, hit.id).then(refreshAll)
+    },
+    [docPath, removeConversation, refreshAll]
+  )
 
   const copyConversation = useCallback((): void => {
     const md = conversationMarkdown(docTitle, messagesRef.current, docRef.current?.doc ?? null)
@@ -1195,32 +1318,52 @@ export default function AiPanel({
       ) : showHistory ? (
         <div className="ai-history">
           <div className="ai-history-heading">{t('ai.historyTitle')}</div>
-          {conversations.length === 0 ? (
-            <p className="ai-history-empty">{t('ai.historyEmpty')}</p>
+          <input
+            className="ai-history-search"
+            type="search"
+            placeholder={t('ai.historySearch')}
+            value={historyQuery}
+            onChange={(e) => setHistoryQuery(e.target.value)}
+            autoFocus
+          />
+          <label className="theme-menu-toggle ai-history-scope">
+            <span>{t('ai.historyAllDocs')}</span>
+            <input type="checkbox" checked={historyAll} onChange={(e) => setHistoryScope(e.target.checked)} />
+          </label>
+          {historyAll && allConversations === null ? null : historyHits.length === 0 ? (
+            <p className="ai-history-empty">
+              {t(historyQuery.trim() ? 'ai.historyNoHits' : historyAll ? 'ai.historyEmptyAll' : 'ai.historyEmpty')}
+            </p>
           ) : (
-            conversations.map((c) => (
-              <div
-                key={c.id}
-                className={`ai-history-item${c.id === activeChatId ? ' is-active' : ''}`}
-                onClick={() => openConversation(c.id)}
-              >
-                <span className="ai-history-title">{c.title}</span>
-                <span className="ai-history-meta">
-                  {new Date(c.updatedAt).toLocaleDateString(locale())} ·{' '}
-                  {t('ai.historyMessages', { count: String(c.messages.length) })}
-                </span>
-                <button
-                  className="ai-history-delete"
-                  title={t('ai.historyDeleteTip')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeConversation(c.id)
-                  }}
+            historyHits.map((c) => {
+              const own = c.docPath === docPath
+              return (
+                <div
+                  key={`${c.docPath}\u0000${c.id}`}
+                  className={`ai-history-item${own && c.id === activeChatId ? ' is-active' : ''}`}
+                  onClick={() => openHit(c)}
+                  title={own ? undefined : t('ai.historyOpenElsewhereTip')}
                 >
-                  ✕
-                </button>
-              </div>
-            ))
+                  <span className="ai-history-title">{c.title}</span>
+                  {historyAll && <span className="ai-history-doc">{c.docName}</span>}
+                  <span className="ai-history-meta">
+                    {new Date(c.updatedAt).toLocaleDateString(locale())} ·{' '}
+                    {t('ai.historyMessages', { count: String(c.messageCount) })}
+                  </span>
+                  {c.snippet && <span className="ai-history-snippet">{c.snippet}</span>}
+                  <button
+                    className="ai-history-delete"
+                    title={t('ai.historyDeleteTip')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeHit(c)
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
+            })
           )}
         </div>
       ) : messages.length === 0 && !busy ? (

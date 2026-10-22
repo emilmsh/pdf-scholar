@@ -376,6 +376,35 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
   - Dekket av `test:attachments` (regler + pdf.js-lesing),
     `test:attachments-desktop` (mains håndterere) og `test:engine` seksjon 13
     (vedleggene overlever lagring byte for byte, bindersens utseende urørt).
+- [x] **Varig samtalelager og samlet, søkbar historikk** (issue #46, steg 1 av
+  tre, 2026-10-22; ruzzbehs ønske — «hundrevis av dokumentsamtaler som ikke
+  må bli utilgjengelige fordi de er spredt på enkelt-PDF-er»). Funnet som
+  gjorde det presserende: samtalene lå i localStorage med tak på 10 per
+  dokument og 30 dokumenter, det 31. kastet ut det eldste i stillhet — så
+  «samlet historikk» måtte begynne med at lageret ble varig. Nå:
+  - Samtalene går gjennom `PdfxApi` (`getConversations` / `setConversations`
+    / `listConversations` / `onConversationsChanged`): én JSON-fil per
+    dokument under `userData/chats` på desktop (`src/main/chat-history.ts`,
+    samme mønster som bildelageret: atomisk skriving, kø per dokument),
+    IndexedDB i utvidelsen (`extension-chat-history.ts`), localStorage i
+    dev:web. Ingenting kastes ut. Det gamle lageret importeres én gang ved
+    første lesing og nøkkelen fjernes (`chat-store.ts`).
+  - Historikkvisningen i panelet har søkefelt og bryteren «Alle dokumenter»:
+    hvert ord må finnes (tittel, dokumentnavn eller tekst, uavhengig av
+    store/små bokstaver, regex-tegn bokstavelig), nyeste først, med et
+    utdrag rundt første treff. Et treff i et annet dokument åpner dokumentet
+    (fane her; vindu/fane fra det løsrevne vinduet og i utvidelsen) på den
+    samtalen — overleveringen er en kortlivet localStorage-nøkkel, slik at
+    den krysser vinduer på alle plattformer.
+  - Søket er et HISTORIKKSØK, ikke gjenfinning: BM25-indeksen i
+    `ai-retrieval.ts` ble vurdert og lagt bort — en rangert poengsum er
+    uforutsigbar i en liste av gamle samtaler, der alle-ord-og-nyest-først
+    er det man venter.
+  - Dekket av `test:chat-history` (regler + desktop-lageret mot temp-mappe);
+    PLATFORMS.md avvik 31. Steg 2 (eksport til Markdown/JSON + merke i
+    biblioteket) og 3 (manuell gjenbruk av utdrag i komposisten) står igjen;
+    MCP er bevisst utsatt — eksportmappen er grensesnittet inntil noen kommer
+    med et konkret behov.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

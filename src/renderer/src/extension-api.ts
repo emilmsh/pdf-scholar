@@ -36,6 +36,12 @@ import {
   thumbReadableInExtension
 } from '../../shared/recent-thumbs'
 import { forgetRecentThumbs, loadRecentThumbs, saveRecentThumb } from './extension-recent-thumbs'
+import {
+  listConversationDocs,
+  loadConversationDoc,
+  saveConversationDoc,
+  subscribeConversationChanges
+} from './extension-chat-history'
 import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
@@ -319,6 +325,13 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         return store.set(K_BOOKMARKS, next)
       })
     },
+    // The AI conversations (issue #46) — IndexedDB, see extension-chat-history.ts.
+    // Same contract as desktop's main process: one record per document,
+    // nothing evicted, other tabs told over a BroadcastChannel.
+    getConversations: loadConversationDoc,
+    setConversations: saveConversationDoc,
+    listConversations: listConversationDocs,
+    onConversationsChanged: subscribeConversationChanges,
     // Heal names written before fileNameOf existed (picked files were stored as
     // "fsa:<name>" because the name was derived from the pseudo-path). The cap
     // applies on read too: a list stored when the extension kept 30 shows the

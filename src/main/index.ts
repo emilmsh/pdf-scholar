@@ -96,6 +96,8 @@ import { citationAbstract } from './abstract'
 import { citationStyleOrDefault } from '../shared/citation-style'
 import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import { createRecentThumbStore } from './recent-thumbs'
+import { createChatHistoryStore } from './chat-history'
+import type { StoredConversation } from '../shared/chat-history'
 
 // The portable zip keeps its state beside the exe. Before ANY path is read —
 // the migration below, the single-instance lock, the state file, drafts.
@@ -1259,6 +1261,25 @@ function registerIpc(): void {
   ipcMain.on('bookmarks:set', (_e, path: string, bookmarks: DocBookmark[]) =>
     setBookmarks(path, bookmarks)
   )
+
+  // The AI conversations (issue #46): one file per document under
+  // userData/chats (src/main/chat-history.ts). A write is awaited by the
+  // renderer, and every OTHER window hears of it — a docked panel and a
+  // detached assistant edit the same history, and the cross-document view
+  // in any window lists it.
+  const chats = createChatHistoryStore(join(app.getPath('userData'), 'chats'))
+  ipcMain.handle('chats:get', (_e, path: unknown): Promise<StoredConversation[]> =>
+    typeof path === 'string' && path ? chats.get(path) : Promise.resolve([])
+  )
+  ipcMain.handle('chats:set', async (e, path: unknown, name: unknown, list: unknown): Promise<void> => {
+    if (typeof path !== 'string' || !path) return
+    await chats.set(path, typeof name === 'string' ? name : '', Array.isArray(list) ? list : [])
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.isDestroyed() || w.webContents.isDestroyed() || w.webContents.id === e.sender.id) continue
+      w.webContents.send('chats:changed', path)
+    }
+  })
+  ipcMain.handle('chats:list', () => chats.list())
 
   ipcMain.on('settings:set', (_e, patch: Partial<Settings>) => {
     const state = getState()

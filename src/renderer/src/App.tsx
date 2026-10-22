@@ -1400,6 +1400,7 @@ export default function App(): React.JSX.Element {
                     : undefined
                 }
                 onRequestOpenOtherInSplit={isElectron ? () => void openOtherInSplit(tab.id) : undefined}
+                onOpenPath={openPath}
               />
             </div>
           )
