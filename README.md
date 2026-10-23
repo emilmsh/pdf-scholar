@@ -285,7 +285,7 @@ panel beside the document.
   pressure varies the line width *(beta)* and is preserved in the saved file. A toggle
   in the tool menus hands drawing back to the finger
 - The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold
-  and italic — chosen before typing or changed on an existing box. Nothing is embedded;
+  and italic — and a size, chosen before typing or changed on an existing box. Nothing is embedded;
   the text remains searchable and renders identically in other readers
 - A signature can be drawn once — with a mouse, pen or finger — or uploaded or pasted as
   an image, and stamped where needed. It is stored locally and saved as a standard stamp

@@ -345,7 +345,10 @@ kommentarene satt i en utvidet marg.
 - With a stylus, the pen draws while a finger scrolls and zooms; pen pressure
   varies the line width **(beta)** and is preserved in the saved file
 - The text tool uses the standard PDF typefaces — Helvetica, Times and Courier,
-  with bold and italic — chosen before typing or changed on an existing box.
+  with bold and italic — and a size, chosen before typing or changed on an
+  existing box *(the size on an existing box since [issue #53](https://github.com/emilmsh/pdf-scholar/issues/53), 2026-10-23;
+  before, it was a choice for the next box only. With the text tool armed, a
+  click on a box opens its menu beside the editor, as Edge does)*.
   Nothing is embedded in the file; the text remains searchable and renders
   identically in other readers. (Claim the fonts, never "any font": a typeface
   outside the standard fourteen would have to travel inside the document, and

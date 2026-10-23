@@ -1825,10 +1825,17 @@ html.touch-ui .convs-row {
   scrollbar-width: thin;
 }
 
-.tool-menu input[type='range'] {
+.tool-menu input[type='range'],
+.annot-popover input[type='range'] {
   width: 100%;
   margin: 2px 0 2px;
   accent-color: var(--accent);
+}
+
+/* The text box's own size slider (issue #53): the same control as the text
+   tool's menu, under the colour row and over the face chips */
+.annot-popover .font-size-range {
+  margin-bottom: 6px;
 }
 
 .shape-row {

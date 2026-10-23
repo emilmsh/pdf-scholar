@@ -1083,6 +1083,16 @@ const STANDARD_FACES: Record<number, { res: string; base: string; mono: boolean 
 const faceOf = (font: number | undefined): { res: string; base: string; mono: boolean } =>
   STANDARD_FACES[font ?? 4] ?? STANDARD_FACES[4]
 
+/** The face a /DA resource name stands for — the reverse of faceOf, so a box
+ *  read back from the file keeps its face through every regeneration of its
+ *  appearance. undefined for a name we did not write (another app's box);
+ *  the appearance then falls back to Helvetica, as before. */
+const fontOfRes = (res: string | undefined): number | undefined => {
+  if (!res) return undefined
+  for (const [k, face] of Object.entries(STANDARD_FACES)) if (face.res === res) return Number(k)
+  return undefined
+}
+
 /** Every Courier glyph is 600/1000 — a monospaced face needs no table. */
 const COURIER_W = 600
 
@@ -1726,22 +1736,26 @@ async function opUpdate(pdf: PdfFile, req: ModifyAnnotationRequest): Promise<Ann
   const g = geomOf(page)
 
   // ---- apply the patch to the dict (all geometry in USER space) ----
-  if (req.color) {
-    if (type === 'freetext') {
-      // font colour lives in /DA — keep the existing size AND face. The face
-      // is carried over by resource NAME rather than re-derived: a recolour
-      // must not silently re-set the box in Helvetica.
+  if (type === 'freetext') {
+    // Colour, face and size all live in /DA. Each is replaced on its own and
+    // the other two carried over from the string as it stands — a recolour
+    // must not silently re-set the box in Helvetica at 12 pt, and a new size
+    // (issue #53) must not lose the colour. The appearance regenerated below
+    // reads this very string back (shapeFromDict), so the two agree.
+    if (req.color || req.font !== undefined || req.fontSize !== undefined) {
       const oldDa = dict.get('DA')
       const da = oldDa && (oldDa.t === 'str' || oldDa.t === 'hex') ? decodePdfString(oldDa) : ''
       const m = /\/(\S+)\s+([\d.]+)\s+Tf/.exec(da)
-      const size = m ? Number(m[2]) : 12
-      const res = m?.[1]
+      const c = /([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+rg/.exec(da)
+      const color: Rgb = req.color ?? (c ? [Number(c[1]), Number(c[2]), Number(c[3])] : [0, 0, 0])
+      const size = req.fontSize ?? (m ? Number(m[2]) : 12)
+      const res = req.font !== undefined ? faceOf(req.font).res : (m?.[1] ?? 'Helv')
       dict.set('DA', { t: 'str', raw: Buffer.from(
-        `${fmtRgb(req.color)} rg /${res ?? 'Helv'} ${fmtNum(size)} Tf`, 'latin1') })
-    } else {
-      dict.set('C', ARR(req.color.map(N)))
-      if (dict.has('IC')) dict.set('IC', ARR(req.color.map(N)))
+        `${fmtRgb(color)} rg /${res} ${fmtNum(size)} Tf`, 'latin1') })
     }
+  } else if (req.color) {
+    dict.set('C', ARR(req.color.map(N)))
+    if (dict.has('IC')) dict.set('IC', ARR(req.color.map(N)))
   }
   if (req.opacity !== undefined) dict.set('CA', N(req.opacity))
   if (req.contents !== undefined) {
@@ -1898,7 +1912,7 @@ async function shapeFromDict(
   if (type === 'freetext') {
     const da = dict.get('DA')
     const daStr = da && (da.t === 'str' || da.t === 'hex') ? decodePdfString(da) : ''
-    const sm = /\/\S+\s+([\d.]+)\s+Tf/.exec(daStr)
+    const sm = /\/(\S+)\s+([\d.]+)\s+Tf/.exec(daStr)
     const contentsV = dict.get('Contents')
     return {
       type,
@@ -1906,7 +1920,11 @@ async function shapeFromDict(
       color,
       opacity,
       contents: contentsV && (contentsV.t === 'str' || contentsV.t === 'hex') ? decodePdfString(contentsV) : '',
-      fontSize: sm ? Number(sm[1]) : 12
+      fontSize: sm ? Number(sm[2]) : 12,
+      // The face by its /DA resource name: without it every regeneration
+      // (a recolour, a move) set the appearance back in Helvetica while /DA
+      // still named Times
+      font: fontOfRes(sm?.[1])
     }
   }
   // square / circle: geometry is the /Rect itself

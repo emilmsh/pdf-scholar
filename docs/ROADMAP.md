@@ -111,6 +111,29 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
   verktøylinja som ikon, «Innhold» mistet etiketten (panelet har fire faner,
   ikke bare innhold), fanene kommer tilbake sammen med verktøylinja i
   fullskjerm, og en chevron i enden lister alle faner fra tre og oppover.
+- [x] **Tekstboksens størrelse etterpå, og menyen med verktøyet armert**
+  (issue #53 punkt 2, levert 2026-10-23): skriftstørrelsen kunne bare velges
+  for NESTE boks — boksens egen meny hadde skrift og fet/kursiv, men ingen
+  glider. Nå har den den samme glideren som tekstverktøyets meny, og en
+  endring setter DENNE boksen om (boksen vokser til bokstavene, skriften
+  beholdes; samme gulvregel som skriftbyttet). `fontSize` reiser som `font`:
+  patch → `ModifyAnnotationRequest` → modellens `fontSize` i EmbedPDF, /DA i
+  appenderen — og BEGGE motorene fikk samtidig ansiktet lest tilbake fra /DA
+  (`readFreeTextFace` i `pdfium-annot-ops.ts`, `fontOfRes` i appenderen):
+  modellen PDFium gir tilbake for en eksisterende boks bærer ikke noe ansikt,
+  så HVER gjentegning (en omfarging, en flytting, nå en størrelse) satte en
+  Courier-boks tilbake i Helvetica mens /DA fortsatt sa Courier — målt
+  2026-10-23 med en sonde gjennom motoren; appenderen slapp i tillegg et
+  skriftbytte på gulvet. Og med tekstverktøyet armert åpner
+  et klikk på en eksisterende boks menyen VED SIDEN AV redigeringen (før: bare
+  redigeringen; menyen kom kun av et klikk uten verktøy) — et klikk i menyen
+  lagrer teksten først (redigeringens blur) og setter så boksen om.
+  `test:engine` (størrelse etter skrift, i /DA), `test:appender` (skrift +
+  størrelse i én patch, fargen beholdt, utseendet satt i Times 20) og
+  `test:annot-edit` § 4–5 (glideren dobler bokstavene på siden, menyen sier
+  24 pt, skriften overlever, boksen vokser; armert verktøy gir redigering OG
+  meny) dekker det. Edges rad (størrelse, fet, kursiv) finnes dermed i begge
+  menyer; verktøylinjens meny gjelder fortsatt neste boks.
 - [x] **Skarp tekst ved alle zoomnivåer** (issue #53 punkt 1, levert
   2026-10-23): en leser så teksten «uskarp» ved de fleste zoomnivåer, og ±1 %
   kurerte det — Edge hadde det ikke. Årsaken var subpiksel-resampling av

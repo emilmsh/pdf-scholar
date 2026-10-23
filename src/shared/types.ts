@@ -576,6 +576,12 @@ export interface ModifyAnnotationRequest {
    *  here — so the caller sends the re-measured `quads` in the SAME patch. A
    *  font sent alone is honoured and may leave the text wrapping differently. */
   font?: PdfStandardFont | undefined
+  /** freetext only: re-set the box at another size, in points (issue #53 —
+   *  the size could be chosen for the NEXT box only). Same contract as
+   *  `font`: the engine writes the model's fontSize (the /DA size in the
+   *  appender) and rebuilds the appearance; the re-measured `quads` travel
+   *  in the same patch. */
+  fontSize?: number | undefined
   /** Move/resize (note drag) — page space, top-left origin */
   rect?: PageRect | undefined
   /** Move: translate all geometry by (dx, dy) in page space (top-left origin,
