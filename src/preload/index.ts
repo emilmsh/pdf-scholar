@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   AiChatRequest,
+  AiCitation,
   AiCitationTarget,
   AiConfig,
+  AiDeltaKind,
   AiProviderId,
   AnnotateRequest,
   DeleteAnnotationRequest,
@@ -186,9 +188,16 @@ const api: PdfxApi = {
   aiChatgptLogout: () => ipcRenderer.invoke('ai:chatgpt-logout'),
   aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
   aiAbort: (requestId: number) => ipcRenderer.send('ai:abort', requestId),
-  onAiDelta: (cb: (requestId: number, text: string, kind?: 'thinking') => void) => {
-    const listener = (_e: unknown, requestId: number, text: string, kind?: 'thinking'): void =>
-      cb(requestId, text, kind)
+  onAiDelta: (
+    cb: (requestId: number, text: string, kind?: AiDeltaKind, citation?: AiCitation) => void
+  ) => {
+    const listener = (
+      _e: unknown,
+      requestId: number,
+      text: string,
+      kind?: AiDeltaKind,
+      citation?: AiCitation
+    ): void => cb(requestId, text, kind, citation)
     ipcRenderer.on('ai:delta', listener)
     return () => {
       ipcRenderer.removeListener('ai:delta', listener)

@@ -16,10 +16,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type {
   AiCitation,
   AiConfigView,
+  AiContentPart,
   AiImage,
   AiWebSearchMode
 } from '../../../shared/types'
 import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
+import { appendDelta } from '../../../shared/ai-stream'
 import { bridge } from '../bridge'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import {
@@ -33,6 +35,7 @@ import {
   nextAiRequestId,
   prepareDocumentForRequest,
   resolveCitation,
+  streamedAnswer,
   summaryPrompt,
   WAIT_HINT_S
 } from '../ai'
@@ -41,7 +44,7 @@ import { rememberRequestTokenLimit } from '../ai-token-limits'
 import { errorDetail, errorText, t, useLang, locale } from '../i18n'
 import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-scale'
 import { bubblesWhileTyping } from '../keymap'
-import type { AiDocument, ResolvedCitation } from '../ai'
+import type { AiDocument, ResolvedCitation, StreamCiting } from '../ai'
 import type { PageText } from '../search'
 import type { ChatMessage, ConversationHit, ConversationSummary, StoredConversation } from '../chat-store'
 import {
@@ -58,7 +61,7 @@ import { searchConversations, summarizeConversations } from '../../../shared/cha
 import { conversationMarkdown } from '../chat-export'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
-import { AssistantBody, renderMarkdown } from './ai-markdown'
+import { AssistantBody } from './ai-markdown'
 import { modelSupportsImages, prettyModelName, providerLabels } from './ai-models'
 import { FallbackChip } from './FallbackChip'
 import { AiSettings } from './AiSettings'
@@ -245,7 +248,13 @@ export default function AiPanel({
   const [allConversations, setAllConversations] = useState<ConversationSummary[] | null>(null)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [streamText, setStreamText] = useState('')
+  /** The answer being streamed, as parts so its citation chips show while it
+   *  is written (src/shared/ai-stream.ts) */
+  const [streamParts, setStreamParts] = useState<AiContentPart[]>([])
+  const streamText = streamParts.some((p) => p.text !== '')
+  /** How the request in flight cites: through [KILDE …] markers in the text,
+   *  and into which excerpt its char offsets point (null = the whole document) */
+  const streamCiteRef = useRef<StreamCiting>({ contract: false, excerptDoc: null })
   // The model is reasoning (thinking deltas seen, no answer text yet)
   const [thinking, setThinking] = useState(false)
   /** Seconds spent waiting for the FIRST word of an answer. Only ticks while
@@ -414,14 +423,14 @@ export default function AiPanel({
 
   useEffect(
     () =>
-      bridge.onAiDelta((id, text, kind) => {
+      bridge.onAiDelta((id, text, kind, citation) => {
         if (id !== currentIdRef.current) return
         // Reasoning deltas are liveness, not answer: a reasoning model (Kimi,
         // Claude with utvidet tenking) can spend minutes here before its first
         // content delta, and without this signal the panel sits on «Leser
         // dokumentet …» and reads as hung. The text itself is not rendered.
         if (kind === 'thinking') setThinking(true)
-        else setStreamText((s) => s + text)
+        else setStreamParts((p) => appendDelta(p, text, kind, citation))
       }),
     []
   )
@@ -492,7 +501,7 @@ export default function AiPanel({
   useLayoutEffect(() => {
     const el = scrollRef.current
     if (el && pinnedRef.current) el.scrollTop = el.scrollHeight
-  }, [messages, streamText, busy])
+  }, [messages, streamParts, busy])
 
   const jumpToBottom = useCallback((): void => {
     const el = scrollRef.current
@@ -516,7 +525,7 @@ export default function AiPanel({
       setPinned(true)
       setInput('')
       setBusy(true)
-      setStreamText('')
+      setStreamParts([])
       setThinking(false)
       setMessages((m) => [...m, { role: 'user', text: trimmed, display, images }])
       // Earlier turns' images ride along in the history — the model needs
@@ -558,6 +567,10 @@ export default function AiPanel({
       // nothing and an invitation to answer about pages nobody attached.
       const shownPages = stagedPagesRef.current
       const imagesOnly = shownPages.length > 0 && ensured?.hasText === false
+      streamCiteRef.current = {
+        contract: config ? PROVIDER_PROFILES[config.provider].citations === 'contract' : false,
+        excerptDoc: prep?.excerpt ? prep.doc : null
+      }
       const result = await bridge.aiChat({
         requestId,
         system:
@@ -569,7 +582,7 @@ export default function AiPanel({
         webSearch: webSearchRef.current
       })
       currentIdRef.current = null
-      setStreamText('')
+      setStreamParts([])
       setThinking(false)
       setBusy(false)
       // What the provider published about the account's token ceiling for this
@@ -1479,7 +1492,13 @@ export default function AiPanel({
               {busy && (
                 <div className="ai-msg ai-assistant">
                   {streamText ? (
-                    renderMarkdown(streamText)
+                    // Chips as they arrive; the settled message replaces this
+                    // with the same parts, so nothing moves when it lands
+                    <AssistantBody
+                      parts={streamedAnswer(streamParts, streamCiteRef.current)}
+                      doc={docRef.current?.doc ?? null}
+                      onCitation={handleCitation}
+                    />
                   ) : (
                     // «Tenker …» once reasoning deltas arrive — the difference
                     // between a model that is working and one that is not

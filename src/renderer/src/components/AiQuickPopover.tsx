@@ -23,6 +23,8 @@ import type {
   AiImage,
   AiProviderId
 } from '../../../shared/types'
+import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
+import { appendDelta } from '../../../shared/ai-stream'
 import { bridge } from '../bridge'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { prettyModelName, providerLabels } from './ai-models'
@@ -41,9 +43,10 @@ import {
   prepareDocumentForRequest,
   referenceSystem,
   referenceUserMessage,
+  streamedAnswer,
   WAIT_HINT_S
 } from '../ai'
-import type { AiDocument, PreparedDocument } from '../ai'
+import type { AiDocument, PreparedDocument, StreamCiting } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import { rememberRequestTokenLimit } from '../ai-token-limits'
 import type { PageText } from '../search'
@@ -114,6 +117,9 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
   const [fallbackModel, setFallbackModel] = useState<string | null>(null)
   const [excerptInfo, setExcerptInfo] = useState<{ included: number; total: number } | null>(null)
   const [parts, setParts] = useState<AiContentPart[] | null>(null)
+  /** The answer as it streams, with its chips (the panel's rule, ai-stream.ts) */
+  const [streamParts, setStreamParts] = useState<AiContentPart[]>([])
+  const streamCiteRef = useRef<StreamCiting>({ contract: false, excerptDoc: null })
   const requestIdRef = useRef<number | null>(null)
   const finalRef = useRef('')
   const isReference = state.mode === 'reference'
@@ -187,14 +193,16 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
     let stale = false
     const requestId = nextRequestId()
     requestIdRef.current = requestId
-    const unsubscribe = bridge.onAiDelta((id, delta, kind) => {
+    const unsubscribe = bridge.onAiDelta((id, delta, kind, citation) => {
       if (id !== requestId || stale) return
       // Reasoning is NOT answer: appending it here would print the model's
       // private thinking into the bubble as if it were the explanation the user
       // asked for. The bubble's placeholder already says «Tenker …», so there
       // is nothing for the signal itself to change here — dropping it is the
       // whole handling.
-      if (kind !== 'thinking') setText((s) => s + delta)
+      if (kind === 'thinking') return
+      if (!kind) setText((s) => s + delta)
+      setStreamParts((p) => appendDelta(p, delta, kind, citation))
     })
     void (async () => {
       // Reference lookup, critique and free-form questions attach the whole
@@ -221,6 +229,11 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         else setWholeDoc(true)
       }
       if (provider) markSharedWith(state.docPath, provider)
+      const askedOf = askedOfRef.current
+      streamCiteRef.current = {
+        contract: askedOf ? PROVIDER_PROFILES[askedOf.provider].citations === 'contract' : false,
+        excerptDoc: prep?.excerpt ? prep.doc : null
+      }
       const result = await bridge.aiChat({
         requestId,
         system:
@@ -255,7 +268,6 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         webSearch: 'ask'
       })
       if (stale) return
-      const askedOf = askedOfRef.current
       if (askedOf) rememberRequestTokenLimit(askedOf.provider, askedOf.model, result.tokenLimit)
       setDone(true)
       if ('error' in result) {
@@ -433,9 +445,11 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
             {isAsk && <div className="ai-quick-question">{asked}</div>}
             {error ? (
               <div className="ai-error">{error}</div>
-            ) : parts && usesDocument ? (
+            ) : usesDocument && (parts || text) ? (
+              // While it streams: the chips that have arrived; settled: the
+              // answer's own parts, which are the same parts
               <AssistantBody
-                parts={parts}
+                parts={parts ?? streamedAnswer(streamParts, streamCiteRef.current)}
                 doc={state.document?.doc ?? null}
                 onCitation={(c) => onCitation?.(c)}
               />

@@ -12,14 +12,17 @@ import type { IpcMainInvokeEvent } from 'electron'
 import type {
   AiChatRequest,
   AiChatResult,
+  AiCitation,
   AiConfig,
   AiConfigView,
+  AiDeltaKind,
   AiProviderId,
   ChatgptLoginResult,
   FileError,
   KeyStorageMode
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
+import { partsAsDeltas } from '../shared/ai-stream'
 import { PROVIDER_PROFILES } from '../shared/ai-provider-profile'
 import { AI_ERRORS } from '../shared/engine-errors'
 import { loginChatgpt, refreshChatgpt } from './chatgpt-auth'
@@ -100,12 +103,19 @@ function writeFixture(req: AiChatRequest, result: AiChatResult): void {
 /** Replay an answer the way the UI met it the first time: streamed. The panel
  *  renders deltas as they arrive and only settles when they stop, so handing it
  *  the whole text at once would photograph a state no reader ever sees. */
-async function replay(result: AiChatResult, emit: (t: string) => void): Promise<AiChatResult> {
-  const full = 'parts' in result ? result.parts.map((p) => p.text).join('') : ''
+async function replay(
+  result: AiChatResult,
+  emit: (text: string, kind?: AiDeltaKind, citation?: AiCitation) => void
+): Promise<AiChatResult> {
+  const parts = 'parts' in result ? result.parts : []
+  const full = parts.map((p) => p.text).join('')
   const step = Math.max(1, Math.ceil(full.length / 8))
-  for (let i = 0; i < full.length; i += step) {
-    emit(full.slice(i, i + step))
-    await new Promise((r) => setTimeout(r, 60))
+  const chunks = (text: string): string[] =>
+    Array.from({ length: Math.ceil(text.length / step) }, (_, i) => text.slice(i * step, (i + 1) * step))
+  // Citations ride along per part, as a native stream delivers them
+  for (const delta of partsAsDeltas(parts, chunks)) {
+    emit(delta.text, delta.kind, delta.citation)
+    if (!delta.kind) await new Promise((r) => setTimeout(r, 60))
   }
   return result
 }
@@ -379,8 +389,8 @@ export function registerAiIpc(): void {
     const controller = new AbortController()
     const requestKey = `${sender.id}:${req.requestId}`
     activeRequests.set(requestKey, controller)
-    const emit = (text: string, kind?: 'thinking'): void => {
-      if (!sender.isDestroyed()) sender.send('ai:delta', req.requestId, text, kind)
+    const emit = (text: string, kind?: AiDeltaKind, citation?: AiCitation): void => {
+      if (!sender.isDestroyed()) sender.send('ai:delta', req.requestId, text, kind, citation)
     }
     try {
       const recorded = readFixture(req)

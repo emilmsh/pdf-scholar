@@ -1,6 +1,13 @@
 // Renderer-side AI helpers: document text assembly for the API, mapping
 // citations back to page positions, and token accounting.
-import type { AiCitation, AiModelCatalog, AiProviderId, AiUsage } from '../../shared/types'
+import type {
+  AiCitation,
+  AiContentPart,
+  AiModelCatalog,
+  AiProviderId,
+  AiUsage
+} from '../../shared/types'
+import { streamingParts } from '../../shared/ai-stream'
 import { getLanguage } from './i18n'
 import type { PageText } from './search'
 import type { AiDocument, Bm25Index, DocBlock } from './ai-retrieval'
@@ -8,6 +15,7 @@ import {
   buildBlocks,
   buildBm25Index,
   buildExcerptDocument,
+  charCitationsToQuotes,
   documentFits,
   excerptCharBudget,
   selectExcerptBlocks,
@@ -32,6 +40,23 @@ export const nextAiRequestId = (): number => aiRequestCounter++
  *  took 37 seconds to say anything at all under load (live run, 2026-08-18).
  *  Shared so the panel and the quick popover cannot drift apart on it. */
 export const WAIT_HINT_S = 10
+
+/** How a request in flight cites: through [KILDE …] markers in its text
+ *  (`contract`), and into which excerpt its char offsets point (null = the
+ *  whole document, which a chip resolves against on click as usual) */
+export interface StreamCiting {
+  contract: boolean
+  excerptDoc: AiDocument | null
+}
+
+/** What a streaming answer shows right now: the parts with the chips that have
+ *  arrived (shared/ai-stream.ts), char citations resolved against the excerpt
+ *  the request attached — the same resolution the settled answer gets, so the
+ *  chips do not change page when it lands. */
+export function streamedAnswer(parts: AiContentPart[], citing: StreamCiting): AiContentPart[] {
+  const shown = streamingParts(parts, citing.contract)
+  return citing.excerptDoc ? charCitationsToQuotes(shown, citing.excerptDoc) : shown
+}
 
 /** Page markers let prompt-contract providers (OpenAI/Azure) name page
  *  numbers; Anthropic citations use raw char offsets which we map ourselves.

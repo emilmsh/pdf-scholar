@@ -27,7 +27,8 @@ export async function loadAiCore() {
       contents: [
         `export * from './src/shared/ai-chat'`,
         `export * from './src/shared/ai-provider-profile'`,
-        `export * from './src/shared/ai-model-catalog'`
+        `export * from './src/shared/ai-model-catalog'`,
+        `export * from './src/shared/ai-stream'`
       ].join('\n'),
       resolveDir: ROOT,
       loader: 'ts'
