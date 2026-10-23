@@ -97,6 +97,13 @@ const tsvRow = (level, block, par, line, word, left, top, width, height, conf, t
   check('a paragraph ends with an empty item ending one more line', items[3].str === '' && items[3].hasEOL)
   check('no break after the last paragraph', items[items.length - 1].str === 'block' && items.length === 6)
   check('a word reaches to the next word (one selection band)', items[0].width === (240 - 100) / 2, String(items[0].width))
+  // Two labels of a diagram on one line, a gutter apart: the first must not
+  // stretch across the gutter (its highlight would mark empty paper)
+  const far = M.toTextContent([{ lines: [{ left: 100, top: 0, width: 600, height: 40, words: [
+    { text: 'Left', left: 100, top: 0, width: 60, height: 40, conf: 90 },
+    { text: 'Right', left: 600, top: 0, width: 100, height: 40, conf: 90 }
+  ] }] }], toPdf)
+  check('…but never further than a word space', far.items[0].width === (60 + 0.6 * 40) / 2, String(far.items[0].width))
   check('the last word is its own width', items[1].width === 160 / 2, String(items[1].width))
   check('every word on a line shares its height', items[0].height === 20 && items[1].height === 20)
   const [a, b, c, d, e, f] = items[0].transform
@@ -125,6 +132,32 @@ const tsvRow = (level, block, par, line, word, left, top, width, height, conf, t
   const pgm = M.toPgm(new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255]), 2, 1)
   const header = 'P5\n2 1\n255\n'
   check('PGM: header, then one grey byte per pixel', new TextDecoder().decode(pgm.slice(0, header.length)) === header && pgm[header.length] === 255 && pgm[header.length + 1] === 0)
+}
+
+// ---------- 1b. What is kept between sessions (ocr-store.ts, pure half) ----------
+
+{
+  const storeOut = join(dir, 'ocr-store.mjs')
+  await build({
+    entryPoints: [fileURLToPath(new URL('../src/renderer/src/ocr-store.ts', import.meta.url))],
+    outfile: storeOut, format: 'esm', bundle: true, platform: 'neutral', logLevel: 'silent'
+  })
+  const St = await import(pathToFileURL(storeOut).href)
+  check('a document is known by its fingerprint AND the models it was read with',
+    St.ocrDocKey('abc', ['nor', 'eng']) === 'abc|nor+eng' && St.ocrDocKey('abc', ['nor', 'eng']) !== St.ocrDocKey('abc', ['chi_sim', 'eng']))
+  const rec = { view: [0, 0, 432, 669], rotate: 0 }
+  check('a stored page matches the same box and rotation', St.storedPageMatches(rec, [0, 0, 432.04, 669], 0))
+  check('…not another size', !St.storedPageMatches(rec, [0, 0, 612, 792], 0))
+  check('…not another rotation', !St.storedPageMatches(rec, [0, 0, 432, 669], 90))
+  const docs = [
+    { docKey: 'a', numPages: 3, used: 30 },
+    { docKey: 'b', numPages: 3, used: 10 },
+    { docKey: 'c', numPages: 3, used: 20 },
+    { docKey: 'd', numPages: 3, used: 10 }
+  ]
+  check('nothing goes while under the cap', St.docsToEvict(docs, 4).length === 0)
+  check('the least recently used go first, a tie broken by key', St.docsToEvict(docs, 2).join() === 'b,d', St.docsToEvict(docs, 2).join())
+  check('the cap is a real number', St.OCR_STORE_MAX_DOCS >= 50)
 }
 
 // ---------- 2. The real engine on real scanned pages ----------
@@ -320,6 +353,143 @@ const scanned = await scanOf(original)
   const [sx, sy] = title ? page.getViewport({ scale: 1 }).convertToViewportPoint(title.transform[4], title.transform[5]) : [NaN, NaN]
   check('…and its title sits where the upright page has it on screen', Math.abs(sx - 72) < 3 && Math.abs(sy - (842 - 760)) < 6, `${sx?.toFixed?.(1)},${sy?.toFixed?.(1)}`)
   check('…its text running along the page\'s y axis in PDF space', !!title && Math.abs(title.transform[0]) < 1e-6 && Math.abs(title.transform[1]) > 1)
+  await doc.loadingTask.destroy()
+}
+
+// ---------- 3. Text in images on a page that has text of its own ----------
+//
+// ocr-image.ts: no OCR where the page already has the text, no duplicates,
+// no rubbish — and the page's own text untouched as the prefix of what
+// search and the assistant read.
+
+const imgOut = join(dir, 'ocr-image.mjs')
+await build({ entryPoints: [fileURLToPath(new URL('../src/renderer/src/ocr-image.ts', import.meta.url))], outfile: imgOut, format: 'esm', bundle: true, platform: 'neutral', logLevel: 'silent' })
+const IM = await import(pathToFileURL(imgOut).href)
+const irOut = join(dir, 'image-regions.mjs')
+await build({ entryPoints: [fileURLToPath(new URL('../src/renderer/src/image-regions.ts', import.meta.url))], outfile: irOut, format: 'esm', bundle: true, platform: 'neutral', external: ['pdfjs-dist'], logLevel: 'silent' })
+const IR = await import(pathToFileURL(irOut).href)
+const pgmBody = (pgm) => {
+  const header = new TextDecoder().decode(pgm.slice(0, 20)).match(/^P5\n(\d+) (\d+)\n255\n/)
+  return { w: Number(header[1]), h: Number(header[2]), px: pgm.slice(header[0].length) }
+}
+
+{
+  // Pixel formats as pdf.js decodes them
+  const bw = pgmBody(IM.pixelsToPgm('bw1', new Uint8Array([0b10100000, 0b01000000, 0b00000000, 0b10000000]), 10, 2))
+  check('1 bit: rows padded to a byte, 1 = white', bw.w === 10 && bw.px[0] === 255 && bw.px[1] === 0 && bw.px[2] === 255 && bw.px[9] === 255 && bw.px[10] === 0 && bw.px[18] === 255, Array.from(bw.px).join(','))
+  const rgb = pgmBody(IM.pixelsToPgm('rgb', new Uint8Array([255, 255, 255, 0, 0, 0]), 2, 1))
+  check('RGB: white and black', rgb.px[0] === 255 && rgb.px[1] === 0)
+  const rgba = pgmBody(IM.pixelsToPgm('rgba', new Uint8Array([0, 0, 0, 0, 0, 0, 0, 255]), 2, 1))
+  check('RGBA: a transparent pixel lies on white paper', rgba.px[0] === 255 && rgba.px[1] === 0)
+  const up = pgmBody(IM.pixelsToPgm('rgb', new Uint8Array([0, 0, 0, 255, 255, 255]), 2, 1, 2))
+  check('enlarged twice: twice the size, black to white across', up.w === 4 && up.h === 2 && up.px[0] === 0 && up.px[3] === 255 && up.px[1] < up.px[2])
+
+  // Which images are read
+  const own = { items: [{ str: 'Some caption text here', transform: [10, 0, 0, 10, 100, 500], width: 120, height: 10, hasEOL: true }] }
+  const rect = (x0, y0, x1, y1, extra = {}) => ({ x0, y0, x1, y1, px: { w: 800, h: 300 }, src: { objId: 'img_p0_1' }, upright: true, ...extra })
+  const picked = IM.imageCandidates([
+    rect(50, 100, 350, 220),
+    rect(90, 480, 400, 600), // the caption's text lies on it
+    rect(50, 300, 350, 420, { upright: false }),
+    rect(50, 700, 80, 710), // a rule, not a picture
+    rect(50, 50, 350, 90, { px: { w: 100, h: 20 } }), // too few pixels
+    rect(400, 100, 550, 160, { src: undefined })
+  ], own)
+  check('a figure is read; one with the page\'s own text on it, a turned one, a tiny one, a coarse one and one without pixels are not', picked.length === 1 && picked[0].y0 === 100, JSON.stringify(picked.map((p) => [p.x0, p.y0])))
+  const many = IM.imageCandidates(Array.from({ length: 30 }, (_, i) => rect(10, i * 20, 10 + 70 + i, i * 20 + 25)), { items: [] })
+  check('at most IMAGES_PER_PAGE images per page, the largest first', many.length === IM.IMAGES_PER_PAGE && many[0].x1 - many[0].x0 >= many.at(-1).x1 - many.at(-1).x0)
+  check('a coarse image is enlarged, a fine one is not', IM.imageUpscale({ x0: 0, x1: 72, px: { w: 100, h: 50 } }) === 3 && IM.imageUpscale({ x0: 0, x1: 72, px: { w: 300, h: 50 } }) === 1)
+
+  // Which words are kept
+  const line = (words) => ({ left: 0, top: 0, width: 400, height: 20, words: words.map(([text, conf, left]) => ({ text, conf, left, top: 0, width: 30, height: 20 })) })
+  const map = IM.regionToPdf({ x0: 0, y0: 0, x1: 400, y1: 20, w: 400, h: 20 })
+  const ownOver = { items: [{ str: 'Label', transform: [10, 0, 0, 10, 300, 5], width: 40, height: 10 }] }
+  const kept = IM.imageWords([{ lines: [line([['Revenue', 92, 0], ['2024', 88, 60], ['|]', 95, 100], ['pf', 30, 140], ['Label', 90, 305]])] }], map, ownOver)
+  const keptWords = kept.flatMap((p) => p.lines.flatMap((l) => l.words.map((w) => w.text)))
+  check('kept: sure words with letters or digits — not symbols, not an unsure fragment, not a word on the page\'s own text', keptWords.join() === 'Revenue,2024', keptWords.join())
+  const photo = IM.imageWords([{ lines: [line([['ee', 41, 0], ['Iii', 45, 60], ['mn', 52, 120]])] }], map, { items: [] })
+  check('an image of unsure fragments (a photo) gives nothing at all', photo.length === 0)
+  const one = IM.imageWords([{ lines: [line([['Logo', 95, 0]])] }], map, { items: [] })
+  check('one lone word is not enough to call a picture text', one.length === 0)
+  check('a read image maps its pixels onto its box, y up', JSON.stringify(map(0, 0)) === '[0,20]' && JSON.stringify(map(400, 20)) === '[400,0]')
+
+  // The merge keeps the page's own text as the prefix
+  const ownContent = { items: [{ str: 'Own text', transform: [10, 0, 0, 10, 0, 0], width: 40, height: 10, hasEOL: false, fontName: 'F1' }], styles: { F1: {} }, lang: null }
+  const imgContent = IM.imageTextContent([{ x0: 0, y0: 0, x1: 400, y1: 20, w: 400, h: 20, paragraphs: kept }])
+  const merged = IM.mergeImageText(ownContent, imgContent)
+  const mergedText = pageText(merged)
+  check('merged: the own text first and untouched, a blank line, then the image words', mergedText.startsWith('Own text\n\n') && mergedText.includes('Revenue 2024'), JSON.stringify(mergedText))
+  check('nothing read: the own text comes back as it was', IM.mergeImageText(ownContent, { items: [], styles: {} }) === ownContent)
+}
+
+{
+  // The real engine on a hand-built page: text of its own, a picture of a
+  // table, the same picture with the page's own text over it, and noise
+  const tableDoc = await open(textPdf([
+    [16, 70, 13, 'Kostnader per innbygger'],
+    [16, 46, 11, 'Oslo 2023 1250 kroner'],
+    [16, 26, 11, 'Bergen 2023 980 kroner']
+  ], 300, 100))
+  const { rgba, width: tw, height: th } = await raster(await tableDoc.getPage(1), 200 / 72)
+  await tableDoc.loadingTask.destroy()
+  const grey = Buffer.alloc(tw * th)
+  for (let i = 0, j = 0; j < grey.length; i += 4, j++) grey[j] = (rgba[i] * 77 + rgba[i + 1] * 150 + rgba[i + 2] * 29) >> 8
+  let seed = 7
+  const noise = Buffer.alloc(tw * th, 0).map(() => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) >> 16) & 255)
+  const img = (data) => ({ dict: `<< /Type /XObject /Subtype /Image /Width ${tw} /Height ${th} /ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode /Length ${deflateSync(data).length} >>`, stream: deflateSync(data) })
+  const content = [
+    'BT /F1 12 Tf 72 780 Td (Rapporten viser kostnadene i tabellen under.) Tj ET',
+    'q 300 0 0 100 72 600 cm /Table Do Q',
+    // The same picture, with the page's own words written over it
+    'q 300 0 0 100 72 400 cm /Table Do Q',
+    'BT /F1 13 Tf 88 470 Td (Kostnader per innbygger) Tj ET',
+    'BT /F1 11 Tf 88 446 Td (Oslo 2023 1250 kroner) Tj ET',
+    'q 300 0 0 100 72 200 cm /Noise Do Q'
+  ].join('\n')
+  const pagePdf = pdfOf([
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> /XObject << /Table 6 0 R /Noise 7 0 R >> >> >>',
+    { dict: `<< /Length ${Buffer.byteLength(content, 'latin1')} >>`, stream: Buffer.from(content, 'latin1') },
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
+    img(grey),
+    img(noise)
+  ])
+  const doc = await open(pagePdf)
+  const page = await doc.getPage(1)
+  const own = await page.getTextContent()
+  const ops = await page.getOperatorList()
+  const rects = IR.imageRectsFromOps(ops.fnArray, ops.argsArray, pdfjs.OPS)
+  check('the image walk names each picture\'s pixels and finds it upright', rects.length === 3 && rects.every((r) => r.src?.objId && r.upright), JSON.stringify(rects.map((r) => [r.y0, r.src, r.upright])))
+  const candidates = IM.imageCandidates(rects, own)
+  check('read: the table and the noise — not the picture the page already has the words over', candidates.length === 2 && !candidates.some((c) => c.y0 === 400), JSON.stringify(candidates.map((c) => c.y0)))
+  const regions = []
+  for (const c of candidates) {
+    const data = await new Promise((resolve) => page.objs.get(c.src.objId, resolve))
+    const format = data.kind === 1 ? 'bw1' : data.kind === 2 ? 'rgb' : 'rgba'
+    const upscale = IM.imageUpscale(c)
+    core.FS.writeFile('/input', IM.pixelsToPgm(format, data.data, data.width, data.height, upscale))
+    api.SetImageFile(1, 0)
+    api.SetSourceResolution(Math.round((c.px.w / ((c.x1 - c.x0) / 72)) * upscale))
+    api.Recognize(null)
+    const tsv = api.GetTSVText(0)
+    if (process.env.OCR_DEBUG) console.log(tsv.split('\n').filter((l) => l.startsWith('5\t')).map((l) => l.split('\t').slice(10).join(' ')).join(' | '))
+    api.Clear()
+    const region = { x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1, w: data.width * upscale, h: data.height * upscale }
+    regions.push({ ...region, paragraphs: IM.imageWords(M.parseTsv(tsv), IM.regionToPdf(region), own) })
+  }
+  const table = regions.find((r) => r.y0 === 600)
+  const noiseRegion = regions.find((r) => r.y0 === 200)
+  const tableText = pageText(IM.imageTextContent([table]))
+  check('the table\'s words are read', /Kostnader per innbygger/.test(tableText) && /1250/.test(tableText) && /Bergen/.test(tableText), JSON.stringify(tableText))
+  check('noise gives no words at all', noiseRegion.paragraphs.length === 0, JSON.stringify(noiseRegion.paragraphs))
+  const word = IM.imageTextContent([table]).items.find((i) => /Kostnader/.test(i.str))
+  check('a table word lands on the picture where it is drawn (x within 6 pt, y within the row)', !!word && Math.abs(word.transform[4] - (72 + 16)) < 6 && word.transform[5] > 600 + 60 && word.transform[5] < 600 + 80, word ? `${word.transform[4]},${word.transform[5]}` : 'none')
+  const merged = IM.mergeImageText(own, IM.imageTextContent(regions))
+  const mergedText = pageText(merged)
+  const ownText = pageText(own)
+  check('what search and the assistant read: the page\'s own text unchanged, then the table', mergedText.startsWith(ownText) && /Kostnader per innbygger/.test(mergedText.slice(ownText.length)), JSON.stringify(mergedText))
+  check('…and the picture with the page\'s own words on it is not read twice', (mergedText.match(/Kostnader per innbygger/g) ?? []).length === 2, JSON.stringify(mergedText))
   await doc.loadingTask.destroy()
 }
 

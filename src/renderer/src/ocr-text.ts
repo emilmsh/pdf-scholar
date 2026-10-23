@@ -43,6 +43,10 @@ export const OCR_FONT = 'pdfx-ocr'
  *  baseline is placed this far down its box so the span covers the box. */
 const ASCENT = 0.8
 
+/** The widest gap a word's item spans to reach the next word, as a share of
+ *  the line's height — a generous word space, never a column gutter */
+const MAX_SPACE = 0.6
+
 /** Tesseract's LSTM engine only — the legacy one is not in this build */
 export const OEM_LSTM_ONLY = 1
 /** Fully automatic page segmentation: finds the columns, so a two-column
@@ -198,7 +202,11 @@ export function toTextContent(paragraphs: OcrParagraph[], toPdf: ToPdfPoint): Te
       const dy = (size * (ey - oy)) / Math.max(1e-9, run)
       line.words.forEach((word, i) => {
         const last = i === line.words.length - 1
-        const right = last ? word.left + word.width : line.words[i + 1].left
+        // To the next word — but no further than a word space: in a diagram
+        // Tesseract can put two boxes' labels on one line, and a word
+        // stretched across the gap between them would mark empty paper
+        const gap = last ? 0 : Math.max(0, line.words[i + 1].left - (word.left + word.width))
+        const right = word.left + word.width + Math.min(gap, MAX_SPACE * line.height)
         const [x, y] = at(word.left, baseline)
         items.push({
           str: last ? word.text : `${word.text} `,

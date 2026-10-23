@@ -182,6 +182,8 @@ import {
   buildPageTexts,
   findMatches,
   hasExtractableText,
+  IMAGE_SPANS_READY_SELECTOR,
+  inImageWords,
   resolveAllMatchRects,
   resolveMatchRects,
   TEXT_SPANS_READY_SELECTOR
@@ -191,7 +193,8 @@ import { saveSearchListOpen } from '../search-list-pref'
 import { isPageInverted } from '../theme-tune'
 import { clearAiTextScale } from '../ai-text-scale'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
-import { carryOcr, useOcrProgress } from '../ocr'
+import { allowOcrStore, carryOcr, enableOcr, setOcrAuto, useOcrAllowed, useOcrOffer, useOcrProgress } from '../ocr'
+import { OcrBadge } from './OcrBadge'
 import { offsetAtPoint, rangeOfQuads, snapToWords } from '../text-range'
 import type { CharRange } from '../text-range'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
@@ -1490,6 +1493,16 @@ export default function PdfViewer({
   /** Scanned pages being read by OCR (ocr.ts) — said in the search bar and
    *  the assistant while it lasts */
   const ocrProgress = useOcrProgress(pdf)
+  /** The scanned pages alone — what the assistant waits for */
+  const ocrScanProgress = useOcrProgress(pdf, true)
+  /** OCR on request (settings.ocrAuto off) and this document has a page with
+   *  no text: the toolbar, search bar and assistant offer «Gjenkjenn tekst» */
+  const ocrOffer = useOcrOffer(pdf)
+  const ocrAllowed = useOcrAllowed(pdf)
+  /** Bumped when OCR becomes allowed for this document mid-session (asked
+   *  for, or the setting switched on): page texts read without it are stale,
+   *  so search and the assistant read the document again */
+  const [ocrEpoch, setOcrEpoch] = useState(0)
   const [searchHits, setSearchHits] = useState<{
     pageNumber: number
     rects: PageRect[]
@@ -1752,6 +1765,10 @@ export default function PdfViewer({
     timer: number
   } | null>(null)
   const pageTextsRef = useRef<PageText[] | null>(null)
+  /** pageTextsRef holds the words in the images too — read by a search,
+   *  which waits for them. Everything else builds it without waiting
+   *  (images: 'available'), and a search then reads the document again. */
+  const pageTextsFullRef = useRef(false)
   /** The page texts the current search matches were found in: pageTextsRef
    *  once the whole document is read, a partial array while a scanned
    *  document's pages are still arriving from OCR */
@@ -1761,6 +1778,29 @@ export default function PdfViewer({
   const searchActiveRef = useRef<{ pageNumber: number; start: number } | null>(null)
   const searchOpenRef = useRef(searchOpen)
   searchOpenRef.current = searchOpen
+
+  useEffect(() => setOcrAuto(settings.ocrAuto), [settings.ocrAuto])
+  const ocrAllowedRef = useRef(ocrAllowed)
+  useEffect(() => {
+    if (ocrAllowed && !ocrAllowedRef.current) {
+      pageTextsRef.current = null
+      pageTextsFullRef.current = false
+      searchTextsRef.current = null
+      setOcrEpoch((n) => n + 1)
+    }
+    ocrAllowedRef.current = ocrAllowed
+  }, [ocrAllowed])
+  /** «Gjenkjenn tekst»: read this document now — the whole of it, since the
+   *  reader asked so that search and the assistant would have it */
+  const onEnableOcr = useCallback(() => {
+    if (!pdf) return
+    enableOcr(pdf)
+    void buildPageTexts(pdf)
+      .then((texts) => {
+        pageTextsRef.current ??= texts
+      })
+      .catch(() => {})
+  }, [pdf])
   const aiHitTimerRef = useRef<number | null>(null)
   const searchSeqRef = useRef(0)
   const gotoSeqRef = useRef(0)
@@ -1904,6 +1944,9 @@ export default function PdfViewer({
         }
       }
       if (destroyed) return
+      // What OCR reads may be kept between sessions — but a locked document's
+      // text is not left in the clear on disk (ocr-store.ts)
+      if (docPasswordRef.current === undefined) allowOcrStore(doc)
       setPdf(doc)
       const collected: PageSize[] = []
       for (let i = 1; i <= doc.numPages; i++) {
@@ -6305,14 +6348,18 @@ export default function PdfViewer({
 
   /** Poll until the page's text layer exists (it renders asynchronously) */
   const waitForTextLayer = useCallback(
-    (pane: PaneId, pageNumber: number, timeoutMs = 4000): Promise<HTMLElement | null> =>
+    (pane: PaneId, pageNumber: number, timeoutMs = 4000, imageWords = false): Promise<HTMLElement | null> =>
       new Promise((resolve) => {
         const t0 = Date.now()
         const tick = (): void => {
           const pageEl = handleForRef.current(pane)?.el()?.querySelector<HTMLElement>(
             `.pdf-page[data-page="${pageNumber}"]`
           )
-          if (pageEl?.querySelector(TEXT_SPANS_READY_SELECTOR)) return resolve(pageEl)
+          // A range among the words in the page's images waits for those
+          // too: they join the layer after its first build (PdfPage)
+          if (pageEl?.querySelector(imageWords ? IMAGE_SPANS_READY_SELECTOR : TEXT_SPANS_READY_SELECTOR)) {
+            return resolve(pageEl)
+          }
           if (Date.now() - t0 > timeoutMs) return resolve(pageEl ?? null)
           window.setTimeout(tick, 120)
         }
@@ -6339,7 +6386,7 @@ export default function PdfViewer({
       const seq = ++gotoSeqRef.current
       // Bring the page into view so its text layer renders, then refine
       handle.scrollToPage(match.pageNumber)
-      const pageEl = await waitForTextLayer(pane, match.pageNumber)
+      const pageEl = await waitForTextLayer(pane, match.pageNumber, 6000, inImageWords(texts[match.pageNumber - 1], match))
       if (seq !== gotoSeqRef.current || !pageEl) return
       const rects = resolveMatchRects(pageEl, texts[match.pageNumber - 1], match, handle.scale())
       if (!rects) {
@@ -6415,10 +6462,18 @@ export default function PdfViewer({
     }
     const timer = window.setTimeout(async () => {
       try {
-        const texts = (pageTextsRef.current ??= await buildPageTexts(pdf, {
-          signal: abort.signal,
-          onProgress: (partial) => show(partial, false)
-        }))
+        // Search waits for the words in images (and shows what it has
+        // meanwhile); a text built without them is read again
+        const texts =
+          pageTextsFullRef.current && pageTextsRef.current
+            ? pageTextsRef.current
+            : await buildPageTexts(pdf, {
+                images: 'wait',
+                signal: abort.signal,
+                onProgress: (partial) => show(partial, false)
+              })
+        pageTextsRef.current = texts
+        pageTextsFullRef.current = true
         show(texts, true)
       } catch {
         if (seq === searchSeqRef.current) setSearchBusy(false)
@@ -6428,7 +6483,7 @@ export default function PdfViewer({
       window.clearTimeout(timer)
       abort.abort()
     }
-  }, [searchOpen, searchQuery, searchOptions, pdf, gotoMatch])
+  }, [searchOpen, searchQuery, searchOptions, pdf, gotoMatch, ocrEpoch])
 
   // Highlight-all: resolve every match on the pages that are mounted right now.
   //
@@ -6467,7 +6522,8 @@ export default function PdfViewer({
         if (!host.querySelector(`.pdf-page[data-page="${pageNumber}"]`)) continue
         // Mounted, but the text layer renders asynchronously after mount — wait
         // for it rather than losing the page's highlights until the next scroll.
-        const pageEl = await waitForTextLayer(pane, pageNumber, 2000)
+        const imageWords = list.some((m) => inImageWords(texts[pageNumber - 1], m))
+        const pageEl = await waitForTextLayer(pane, pageNumber, imageWords ? 6000 : 2000, imageWords)
         if (cancelled || seq !== allHitsSeqRef.current) return
         if (!pageEl) continue
         const rects = resolveAllMatchRects(pageEl, texts[pageNumber - 1], list, handle.scale())
@@ -6697,7 +6753,7 @@ export default function PdfViewer({
       pushBack(pane)
       const seq = ++gotoSeqRef.current
       handle.scrollToPage(resolved.pageNumber)
-      const pageEl = await waitForTextLayer(pane, resolved.pageNumber)
+      const pageEl = await waitForTextLayer(pane, resolved.pageNumber, 6000, inImageWords(texts[resolved.pageNumber - 1], resolved))
       if (seq !== gotoSeqRef.current || !pageEl) return
       const rects = resolveMatchRects(
         pageEl,
@@ -7467,6 +7523,8 @@ export default function PdfViewer({
                 active={tocPinned && sidebarTab === 'outline'}
                 onClick={toggleAttachments}
               />
+              {/* A scanned document while OCR waits to be asked for */}
+              <OcrBadge offer={ocrOffer} onEnable={onEnableOcr} />
             </>
           }
           onOpenAiSettings={() => {
@@ -7881,7 +7939,10 @@ export default function PdfViewer({
                 seed={aiSeed}
                 onSeedConsumed={consumeAiSeed}
                 ensureDocument={ensureAiDocument}
-                ocrProgress={ocrProgress}
+                ocrProgress={ocrScanProgress}
+                ocrOffer={ocrOffer}
+                onEnableOcr={onEnableOcr}
+                docEpoch={ocrEpoch}
                 hasAnnotations={hasAnnotations}
                 annotsAskId={annotsAskId}
                 getAnnotationsText={getAnnotationsText}
@@ -7994,6 +8055,8 @@ export default function PdfViewer({
           index={searchIndex}
           busy={searchBusy}
           ocr={ocrProgress}
+          ocrOffer={ocrOffer}
+          onEnableOcr={onEnableOcr}
           mode={searchMode}
           onModeChange={setSearchMode}
           aiStatus={semantic.status}

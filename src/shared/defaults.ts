@@ -44,7 +44,8 @@ export const DEFAULT_SETTINGS: Settings = {
   restoreSession: true,
   pagedView: false,
   linkPreview: true,
-  linkPreviewDelay: 'medium'
+  linkPreviewDelay: 'medium',
+  ocrAuto: true
 }
 
 /** How many files «Nylig lest» remembers, on every platform (docs/SPEC.md §8).

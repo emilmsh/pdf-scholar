@@ -8,11 +8,24 @@
 // relied on, and the extension may load nothing from outside itself.
 import TesseractCore from 'tesseract.js-core/tesseract-core-relaxedsimd-lstm.js'
 import type { TessModule, TessBaseApi } from 'tesseract.js-core/tesseract-core-relaxedsimd-lstm.js'
-import { OEM_LSTM_ONLY, PSM_AUTO, toPgm } from './ocr-text'
+import { OEM_LSTM_ONLY, PSM_AUTO } from './ocr-text'
+import { pixelsToPgm } from './ocr-image'
+import type { PixelFormat } from './ocr-image'
 
 export type OcrRequest =
   | { type: 'init'; wasm: ArrayBuffer; langs: { code: string; data: ArrayBuffer }[] }
-  | { type: 'recognize'; id: number; width: number; height: number; rgba: ArrayBuffer; dpi: number }
+  | {
+      type: 'recognize'
+      id: number
+      /** A page drawn for reading ('rgba'), or an image's pixels as pdf.js
+       *  decoded them — enlarged `upscale` times here, off the main thread */
+      format: PixelFormat
+      data: ArrayBuffer
+      width: number
+      height: number
+      upscale: number
+      dpi: number
+    }
 
 export type OcrReply =
   | { type: 'ready' }
@@ -46,10 +59,10 @@ async function init(msg: Extract<OcrRequest, { type: 'init' }>): Promise<void> {
 function recognize(msg: Extract<OcrRequest, { type: 'recognize' }>): string {
   if (!core || !api) throw new Error('OCR engine not initialised')
   // SetImageFile reads this fixed path (tesseract.js-core's binding)
-  core.FS.writeFile('/input', toPgm(new Uint8ClampedArray(msg.rgba), msg.width, msg.height))
+  core.FS.writeFile('/input', pixelsToPgm(msg.format, new Uint8Array(msg.data), msg.width, msg.height, msg.upscale))
   try {
     if (api.SetImageFile(1, 0) === 1) throw new Error('Tesseract could not read the page image')
-    api.SetSourceResolution(msg.dpi)
+    api.SetSourceResolution(Math.round(msg.dpi * msg.upscale))
     api.Recognize(null)
     return api.GetTSVText(0)
   } finally {

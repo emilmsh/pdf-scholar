@@ -154,6 +154,13 @@ interface PanelProps {
   /** Scanned pages being read by OCR. ensureDocument waits for them — the
    *  landing says why, and how far it has come. */
   ocrProgress?: OcrProgress | null
+  /** OCR is on request and the scanned pages are not read yet: the no-text
+   *  notice offers to read them */
+  ocrOffer?: boolean
+  onEnableOcr?(): void
+  /** Bumped by the host when the document's text changed under the panel
+   *  (OCR became allowed): the ensured document is read again */
+  docEpoch?: number
   /** Whether the document currently has any annotations (gates the suggestion) */
   hasAnnotations: boolean
   /** Bumped by the viewer (sidebar ✦) to fire the annotations question */
@@ -215,6 +222,9 @@ export default function AiPanel({
   onSeedConsumed,
   ensureDocument,
   ocrProgress = null,
+  ocrOffer = false,
+  onEnableOcr,
+  docEpoch = 0,
   hasAnnotations,
   annotsAskId,
   getAnnotationsText,
@@ -456,7 +466,15 @@ export default function AiPanel({
   // that belongs in the landing state rather than in an answer that reports the
   // document says nothing. Extraction is cached in the viewer, so this is the
   // same work the first question would have done anyway.
+  const docEpochRef = useRef(docEpoch)
   useEffect(() => {
+    // The document's text changed under us (OCR became allowed): what was
+    // ensured said «no text», so read it again
+    if (docEpochRef.current !== docEpoch) {
+      docEpochRef.current = docEpoch
+      docRef.current = null
+      setDocReady(false)
+    }
     if (!open || docRef.current) return
     let cancelled = false
     void ensureDocument().then((ensured) => {
@@ -467,7 +485,7 @@ export default function AiPanel({
     return () => {
       cancelled = true
     }
-  }, [open, ensureDocument])
+  }, [open, ensureDocument, docEpoch])
 
   // A region snipped for the chat lands as a staged composer attachment
   useEffect(() => {
@@ -1420,6 +1438,11 @@ export default function AiPanel({
             {docRef.current && !docRef.current.hasText && (
               <div className="ai-notice">
                 <p>{t('ai.calloutNoText')}</p>
+                {ocrOffer && onEnableOcr && (
+                  <button className="btn-primary" onClick={onEnableOcr} title={t('ocr.enableTip')}>
+                    {t('ocr.enable')}
+                  </button>
+                )}
               </div>
             )}
             {aiOff ? offNotice : composer}

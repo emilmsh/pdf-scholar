@@ -125,6 +125,12 @@ export interface Settings {
   /** How long the pointer rests before the window opens — three fixed
    *  choices (renderer's link-preview.ts holds the milliseconds) */
   linkPreviewDelay: 'short' | 'medium' | 'long'
+  /** Text for scanned pages (OCR, read on this machine): read a page with no
+   *  text of its own as soon as it is met, or only once the reader asks for
+   *  the document («Gjenkjenn tekst» — renderer's ocr.ts). Off spares the
+   *  processor on a machine that would rather not; a document read before is
+   *  remembered either way. */
+  ocrAuto: boolean
 }
 
 export type RecentsGridSize = 'small' | 'medium' | 'large'

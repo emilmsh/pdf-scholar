@@ -24,7 +24,7 @@ import { openDocument, isPasswordException } from './pdf-doc'
 import type { DocResources } from './pdf-doc'
 import { renderPagesAsImages } from './ai-page-images'
 import { buildPageTexts, hasExtractableText } from './search'
-import { useOcrProgress } from './ocr'
+import { allowOcrStore, enableOcr, setOcrAuto, useOcrAllowed, useOcrOffer, useOcrProgress } from './ocr'
 import type { PageText } from './search'
 import { buildAiDocument } from './ai'
 import type { ResolvedCitation } from './ai'
@@ -105,6 +105,8 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
     setLanguage(settings.language)
   }, [settings.language])
 
+  useEffect(() => setOcrAuto(settings.ocrAuto), [settings.ocrAuto])
+
   // ---------- The document (text only — no page is ever mounted) ----------
 
   const load = useCallback(
@@ -127,6 +129,8 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
         pageTextsRef.current = null
         // Opened WITH a password: its conversations are stored without images
         lockedRef.current = password !== undefined
+        // OCR kept between sessions — never a locked document's (ocr-store.ts)
+        if (password === undefined) allowOcrStore(doc)
         setPasswordAsk(null)
         setPdf(doc)
       } catch (err) {
@@ -149,7 +153,23 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
 
   // This window reads a scanned document's pages itself — it has its own
   // pdf.js document, and the viewer's OCR lives in the viewer's window
-  const ocrProgress = useOcrProgress(pdf)
+  // The scanned pages alone: the assistant never waits for figures
+  const ocrProgress = useOcrProgress(pdf, true)
+  const ocrOffer = useOcrOffer(pdf)
+  const ocrAllowed = useOcrAllowed(pdf)
+  // OCR allowed mid-session: the texts read without it go, the panel reads again
+  const [ocrEpoch, setOcrEpoch] = useState(0)
+  const ocrAllowedRef = useRef(ocrAllowed)
+  useEffect(() => {
+    if (ocrAllowed && !ocrAllowedRef.current) {
+      pageTextsRef.current = null
+      setOcrEpoch((n) => n + 1)
+    }
+    ocrAllowedRef.current = ocrAllowed
+  }, [ocrAllowed])
+  const onEnableOcr = useCallback(() => {
+    if (pdf) enableOcr(pdf)
+  }, [pdf])
 
   const ensureDocument = useCallback(async (): Promise<EnsuredDocument | null> => {
     if (!pdf) return null
@@ -209,6 +229,9 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
           onSeedConsumed={noop}
           ensureDocument={ensureDocument}
           ocrProgress={ocrProgress}
+          ocrOffer={ocrOffer}
+          onEnableOcr={onEnableOcr}
+          docEpoch={ocrEpoch}
           hasAnnotations={false}
           annotsAskId={0}
           getAnnotationsText={async () => null}

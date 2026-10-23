@@ -27,13 +27,18 @@ import { isXfaDocument, renderXfaLayer } from '../xfa'
 import type { XfaLayerHandle } from '../xfa'
 import { LINK_RECORDS } from '../link-preview'
 import { carrySelection } from '../selection-carry'
-import { OCR_PRIORITY, ocrTextContent } from '../ocr'
+import { OCR_PRIORITY, imageTextRead, ocrImageContent, ocrTextContent, useOcrAllowed } from '../ocr'
+import { mergeImageText } from '../ocr-image'
 import { isVisibleText } from '../ocr-text'
 import type { TextContent } from 'pdfjs-dist/types/src/display/api'
 
 /** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
  *  only place that gesture is advertised. */
 const linkTitle = (): string => t('viewer.linkTip')
+
+/** How long a page with text must stay mounted before the words in its
+ *  images are asked for (ocr.ts reads them in a worker either way) */
+const IMAGE_TEXT_DELAY_MS = 400
 
 const SHAPE_TYPES = new Set(['square', 'circle', 'line', 'arrow'])
 const SVG_NS = 'http://www.w3.org/2000/svg'
@@ -219,6 +224,9 @@ function PdfPage({
   // text-layer effect read the live scale/rotation without taking `scale` as a
   // dependency (which would defeat the whole point — a full rebuild per zoom).
   const textLayerRef = useRef<InstanceType<typeof TextLayer> | null>(null)
+  // OCR on request: when the reader asks for this document, the effect below
+  // runs again and reads the page it left empty
+  const ocrAllowed = useOcrAllowed(pdf)
   const pageRef = useRef<PDFPageProxy | null>(null)
   // An XFA form (xfa.ts): the page is pdf.js's HTML layout of the form, mounted
   // in .xfa-host where a normal page has its text layer. The canvas still
@@ -615,7 +623,9 @@ function PdfPage({
       /** Build the layer from one source and put it in place of the old one.
        *  Null when the effect was torn down meanwhile. */
       const buildTextLayer = async (
-        source: ReturnType<PDFPageProxy['streamTextContent']> | TextContent
+        source: ReturnType<PDFPageProxy['streamTextContent']> | TextContent,
+        /** Spans from this one on are words OCR read in the page's images */
+        imageSpansFrom?: number
       ): Promise<TextLayer | null> => {
         const textDiv = document.createElement('div')
         textDiv.className = 'textLayer'
@@ -662,6 +672,14 @@ function PdfPage({
             once: true
           })
         }
+        // search.ts tells the images' words from the page's own by this mark
+        // (the text it measures against may not have them yet, or the other
+        // way round — the own words are a prefix of both)
+        if (imageSpansFrom !== undefined) {
+          textDiv.querySelectorAll<HTMLElement>(':scope > span').forEach((span, i) => {
+            if (i >= imageSpansFrom) span.dataset.ocr = 'image'
+          })
+        }
         textHost.replaceChildren(textDiv)
         restoreSelection?.()
         return tl
@@ -678,6 +696,24 @@ function PdfPage({
         void ocrTextContent(pdf, pageNumber, { priority: OCR_PRIORITY.visible, signal: ocrAbort.signal })
           .then((content) => (content && content.items.length > 0 && !cancelled ? buildTextLayer(content) : null))
           .catch(() => {})
+      } else if (!xfa) {
+        // A page with text of its own: the words in its images (a figure, a
+        // pasted-in table) join after it, once read. Not at once — a page the
+        // reader flicks past is not worth its pictures' reading. Words read
+        // already (a search went through them) are added at once.
+        window.setTimeout(() => {
+          if (cancelled) return
+          void (async () => {
+            const own = await page.getTextContent()
+            const images = await ocrImageContent(pdf, pageNumber, own, {
+              priority: OCR_PRIORITY.visible,
+              signal: ocrAbort.signal
+            })
+            if (!images || images.items.length === 0 || cancelled) return
+            const ownSpans = own.items.filter((i) => 'str' in i && i.str !== '').length
+            await buildTextLayer(mergeImageText(own, images), ownSpans)
+          })().catch(() => {})
+        }, imageTextRead(pdf, pageNumber) ? 0 : IMAGE_TEXT_DELAY_MS)
       }
 
       // Clickable link annotations (internal destinations + external URLs).
@@ -777,7 +813,7 @@ function PdfPage({
       ocrAbort.abort()
       textLayer?.cancel()
     }
-  }, [pdf, docKey, pageNumber, rotation, active, onInternalLink, onExternalLink, onFileAttachment, xfa])
+  }, [pdf, docKey, pageNumber, rotation, active, onInternalLink, onExternalLink, onFileAttachment, xfa, ocrAllowed])
 
   // ---- Zoom refinement for the text layer ----
   // The spans' horizontal glyph fit (--scale-x) is measured at build scale; on

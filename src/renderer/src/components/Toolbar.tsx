@@ -2599,6 +2599,18 @@ export default function Toolbar({
                 </div>
               </div>
 
+              {/* Text on scanned pages (OCR, on this machine): as they are met,
+                  or only when asked for per document — the toolbar, search
+                  bar and assistant offer «Gjenkjenn tekst» then */}
+              <label className="theme-menu-toggle" title={t('settings.ocrAutoTip')}>
+                <input
+                  type="checkbox"
+                  checked={settings.ocrAuto}
+                  onChange={(e) => onSettingsChange({ ocrAuto: e.target.checked })}
+                />
+                {t('settings.ocrAuto')}
+              </label>
+
               {/* Startup (issue #29). Desktop only: the extension has no tab
                   strip of its own — the browser brings its tabs back itself. */}
               {isElectron && (
