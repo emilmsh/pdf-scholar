@@ -417,6 +417,13 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     rett på siden. En fil uten /ID får ingen gjenkjenning. Beskjed «Gjenkjent
     fra …» når det skjer. Dekket av `test:doc-identity` (CI) og
     `test:identity-desktop`; PLATFORMS.md avvik 32.
+  - **To hull fra risikogjennomgangen tettet** (2026-10-23): samtaler om et
+    passordbeskyttet dokument lagres uten sidebilder og snips (teksten
+    beholdes, boblen sier «Bilder ikke lagret (N)») — samme regel som
+    forsidebildene har for låste filer. Og «Alle dokumenter» leser ikke
+    lenger bildene: main holder et sammendrag per fil og tolker bare filer
+    som er endret siden sist; utvidelsen skriver sammendraget i egen
+    IndexedDB-tabell i samme transaksjon.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

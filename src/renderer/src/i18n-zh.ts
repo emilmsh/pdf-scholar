@@ -881,6 +881,7 @@ export const zh: Dict = {
   'ai.historyAllDocs': '所有文档',
   'ai.historyNoHits': '没有与搜索匹配的对话。',
   'ai.historyOpenElsewhereTip': '打开该文档并显示此对话',
+  'ai.imagesWithheld': '图片未保存（{count}）——该文档受密码保护',
   'ai.historyDeleteTip': '删除对话',
   'ai.historyMessages': '{count} 条消息',
   'ai.jumpNewestTip': '跳到最新消息',

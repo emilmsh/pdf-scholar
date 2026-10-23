@@ -12,7 +12,7 @@
 // instead of left for the next write to replace.
 // Run: node scripts/test-chat-history.mjs
 import { build } from 'esbuild'
-import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
@@ -186,6 +186,65 @@ console.log('\n6. the desktop store, against a temp folder')
   // Garbage in a file is sanitized on the way out
   writeFileSync(bFile, JSON.stringify({ path: B, name: 'b', conversations: [conv('ok', 5), 'junk', { id: 'no' }] }))
   check('garbage inside a file is dropped', (await store.get(B)).map((c) => c.id).join(',') === 'ok')
+}
+
+console.log('\n7. a password-protected document is stored without images')
+{
+  const img = { mediaType: 'image/jpeg', dataBase64: 'SECRETPAGEPIXELS' }
+  const list = [
+    conv('a', 2, [user('Hva viser figuren?', { images: [img, img] }), answer('En graf.'), user('Og denne?', { images: [img] })]),
+    conv('b', 1, [user('Ingen bilder her'), answer('ok')])
+  ]
+  const out = H.withoutImages(list)
+  const json = JSON.stringify(out)
+  check('no image data survives', !json.includes('SECRETPAGEPIXELS'))
+  check('each turn counts what it carried', out[0].messages[0].imagesWithheld === 2 && out[0].messages[2].imagesWithheld === 1)
+  check('the questions and answers stay', out[0].messages[0].text === 'Hva viser figuren?' && out[0].messages[1].parts[0].text === 'En graf.')
+  check('a conversation without images is the same object', out[1] === list[1])
+  check('stripping twice changes nothing', JSON.stringify(H.withoutImages(out)) === json)
+  check('the count survives the store’s shape check', H.sanitizeConversations(out)[0].messages[0].imagesWithheld === 2)
+}
+
+console.log('\n8. the cross-document list does not re-read what has not changed')
+{
+  const dir = join(mkdtempSync(join(tmpdir(), 'chat-history-cache-')), 'chats')
+  // Count the files the store reads and parses: the proof of a cache hit is
+  // a listing that parses NOTHING, which no amount of output can show
+  let parsed = []
+  const store = createChatHistoryStore(dir, { onParse: (f) => parsed.push(f) })
+  const P = 'C:\\docs\\cache.pdf'
+  const Q = 'C:\\docs\\other.pdf'
+  const qFile = join(dir, `${createHash('sha1').update(Q).digest('hex')}.json`)
+
+  await store.set(P, 'cache.pdf', [conv('p1', 10, [user('first'), answer('x')])])
+  // A file written by ANOTHER process: no cache entry from a set of ours
+  writeFileSync(qFile, JSON.stringify({ path: Q, name: 'other.pdf', conversations: [conv('q1', 20, [user('AAAA'), answer('y')])] }))
+  parsed = []
+  const first = await store.list()
+  check('both documents listed', first.map((s) => s.id).join(',') === 'q1,p1', first.map((s) => s.id).join(','))
+  check('the first listing parses only the file this store did not write', parsed.length === 1 && parsed[0] === qFile, String(parsed.length))
+
+  parsed = []
+  const second = await store.list()
+  check('a second listing parses nothing', parsed.length === 0 && second.map((s) => s.id).join(',') === 'q1,p1', String(parsed.length))
+
+  // A real change from outside — new content, new stamp — is read again
+  utimesSync(qFile, new Date(), new Date(statSync(qFile).mtimeMs + 5000))
+  writeFileSync(qFile, JSON.stringify({ path: Q, name: 'other.pdf', conversations: [conv('q1', 20, [user('BBBBBB'), answer('y')])] }))
+  parsed = []
+  const third = await store.list()
+  check('a changed file is re-read, and only that one', parsed.length === 1 && third.find((s) => s.id === 'q1').text.startsWith('BBBBBB'), String(parsed.length))
+
+  // Our own write fills the cache from the list it wrote
+  await store.set(P, 'cache.pdf', [conv('p1', 30, [user('written'), answer('x')])])
+  parsed = []
+  const fourth = await store.list()
+  check('our own write needs no re-read', parsed.length === 0 && fourth.find((s) => s.id === 'p1').text.startsWith('written'), String(parsed.length))
+
+  // A file that goes leaves the list and the cache
+  await store.set(Q, 'other.pdf', [])
+  parsed = []
+  check('a removed document leaves the list', (await store.list()).map((s) => s.id).join(',') === 'p1' && parsed.length === 0)
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

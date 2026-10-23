@@ -7866,6 +7866,7 @@ export default function PdfViewer({
                 currentPage={currentPage}
                 pageCount={sizes.length}
                 conversationAskId={conversationAskId}
+                isLocked={() => docPasswordRef.current !== undefined}
                 onOpenElsewhere={(path) => {
                   // The host opens the document (a tab, focused or created),
                   // then every viewer looks for the handoff — the one showing

@@ -98,6 +98,7 @@ import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import { createRecentThumbStore } from './recent-thumbs'
 import { createChatHistoryStore } from './chat-history'
 import type { StoredConversation } from '../shared/chat-history'
+import { sanitizeConversations, withoutImages } from '../shared/chat-history'
 import { rebindIdentity, validFingerprint } from '../shared/doc-identity'
 
 // The portable zip keeps its state beside the exe. Before ANY path is read —
@@ -1274,7 +1275,12 @@ function registerIpc(): void {
   )
   ipcMain.handle('chats:set', async (e, path: unknown, name: unknown, list: unknown): Promise<void> => {
     if (typeof path !== 'string' || !path) return
-    await chats.set(path, typeof name === 'string' ? name : '', Array.isArray(list) ? list : [])
+    // The renderer strips a password-protected document's images before it
+    // writes; main holds that line too whenever it knows the document was
+    // unlocked this session — the same belt-and-braces as the picture store
+    const clean = sanitizeConversations(list)
+    const stored = passwordFor(path) !== undefined ? withoutImages(clean) : clean
+    await chats.set(path, typeof name === 'string' ? name : '', stored)
     for (const w of BrowserWindow.getAllWindows()) {
       if (w.isDestroyed() || w.webContents.isDestroyed() || w.webContents.id === e.sender.id) continue
       w.webContents.send('chats:changed', path)

@@ -606,7 +606,15 @@ regressions are treated as bugs, not as acceptable platform lag.
     the document as a TAB on the desktop (App's `openPath`) and in the
     detached assistant or the extension as a new window/tab (`newWindow`) —
     the handoff itself (`pdfx-open-conversation` in localStorage) is the same
-    everywhere. Covered by `npm run test:chat-history` (rules + desktop store).
+    everywhere. A document opened with a password has its conversations
+    stored without images on every platform (the renderer strips them before
+    the one write path; desktop's main strips them again when it holds the
+    password). The cross-document list never reads the images either:
+    desktop's main keeps a summary per file, re-read only when the file's
+    mtime or size changes; the extension writes a summary record beside each
+    document in the same IndexedDB transaction (database v2; v1 records get
+    theirs on the first listing). Covered by `npm run test:chat-history`
+    (rules + desktop store).
 
 32. **A moved or renamed file keeps its records on the desktop and for a
     `file://` document in the extension; a URL and a picked file do not.**

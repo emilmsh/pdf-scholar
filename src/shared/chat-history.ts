@@ -30,6 +30,11 @@ export type ChatMessage =
       text: string
       display?: string | undefined
       images?: AiImage[] | undefined
+      /** How many images this turn carried that the store did NOT keep — the
+       *  document was password-protected (withoutImages). The bubble shows a
+       *  line in their place, so a reopened conversation is not silently
+       *  missing what the question was about. */
+      imagesWithheld?: number | undefined
     }
   | {
       role: 'assistant'
@@ -162,6 +167,27 @@ export function mergeConversations(a: StoredConversation[], b: StoredConversatio
     if (!have || c.updatedAt > have.updatedAt) byId.set(c.id, c)
   }
   return [...byId.values()].sort((x, y) => y.updatedAt - x.updatedAt)
+}
+
+/** A password-protected document's conversations as they may be STORED: no
+ *  page images, snips or pasted pictures — each turn keeps a count of what it
+ *  carried instead. The library's picture store keeps nothing of a locked
+ *  document for the same reason (shared/recent-thumbs.ts): the file is
+ *  encrypted, and a picture of its pages on disk in the clear is exactly what
+ *  the encryption withholds. The text stays — the reader's own questions and
+ *  the answers are the history this store exists for. Idempotent. */
+export function withoutImages(list: StoredConversation[]): StoredConversation[] {
+  return list.map((c) => {
+    if (!c.messages.some((m) => m.role === 'user' && m.images && m.images.length > 0)) return c
+    return {
+      ...c,
+      messages: c.messages.map((m) => {
+        if (m.role !== 'user' || !m.images || m.images.length === 0) return m
+        const { images, ...rest } = m
+        return { ...rest, imagesWithheld: (m.imagesWithheld ?? 0) + images.length }
+      })
+    }
+  })
 }
 
 /** The searchable text of a conversation: what the user wrote (as shown) and

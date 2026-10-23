@@ -13,7 +13,7 @@
 // extension's tabs one origin), with a short life — a document that fails to
 // open must not open on that conversation a day later.
 import type { ConversationSummary, StoredConversation } from '../../shared/chat-history'
-import { mergeConversations, sanitizeConversations, docNameFromPath } from '../../shared/chat-history'
+import { mergeConversations, sanitizeConversations, docNameFromPath, withoutImages } from '../../shared/chat-history'
 import { bridge } from './bridge'
 
 export type { ChatMessage, StoredConversation, ConversationSummary, ConversationHit } from '../../shared/chat-history'
@@ -71,18 +71,26 @@ export async function loadConversations(docPath: string): Promise<StoredConversa
   return bridge.getConversations(docPath)
 }
 
-/** Write one document's conversation list (newest first) */
-export function saveConversations(docPath: string, docName: string, list: StoredConversation[]): Promise<void> {
-  return bridge.setConversations(docPath, docName, list)
+/** Write one document's conversation list (newest first). A `locked`
+ *  (password-protected) document's list is stored without its images
+ *  (withoutImages) — on every platform, since this is the one write path. */
+export function saveConversations(
+  docPath: string,
+  docName: string,
+  list: StoredConversation[],
+  locked = false
+): Promise<void> {
+  return bridge.setConversations(docPath, docName, locked ? withoutImages(list) : list)
 }
 
 export async function deleteConversation(
   docPath: string,
   docName: string,
-  id: string
+  id: string,
+  locked = false
 ): Promise<StoredConversation[]> {
   const next = (await loadConversations(docPath)).filter((c) => c.id !== id)
-  await saveConversations(docPath, docName, next)
+  await saveConversations(docPath, docName, next, locked)
   return next
 }
 

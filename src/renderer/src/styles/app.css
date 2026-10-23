@@ -5746,6 +5746,15 @@ button.bookmark-fold:hover {
 }
 
 /* Images sent with a user message, shown above its text */
+/* Where a password-protected document's images were: the store kept the
+   question, not the pictures (shared/chat-history.ts withoutImages) */
+.ai-msg-withheld {
+  font-size: 11.5px;
+  font-style: italic;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
 .ai-msg-images {
   display: flex;
   gap: 6px;

@@ -186,6 +186,10 @@ interface PanelProps {
   /** Bumped by the host when a conversation handoff names this document and
    *  the panel is already mounted — the panel then takes it */
   conversationAskId?: number
+  /** Whether the document was opened with a password. Its conversations are
+   *  then stored WITHOUT images (shared/chat-history.ts withoutImages). A
+   *  function, not a flag: the host learns it from a ref set mid-load. */
+  isLocked?(): boolean
 }
 
 const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
@@ -220,7 +224,8 @@ export default function AiPanel({
   currentPage,
   pageCount,
   onOpenElsewhere,
-  conversationAskId = 0
+  conversationAskId = 0,
+  isLocked
 }: PanelProps): React.JSX.Element | null {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
@@ -259,6 +264,8 @@ export default function AiPanel({
   messagesRef.current = messages
   const busyRef = useRef(busy)
   busyRef.current = busy
+  const isLockedRef = useRef(isLocked)
+  isLockedRef.current = isLocked
   const pinnedRef = useRef(true)
   const jumpingRef = useRef(false)
   const conversationsRef = useRef(conversations)
@@ -715,7 +722,7 @@ export default function AiPanel({
       messages
     }
     const next = [chat, ...conversationsRef.current.filter((c) => c.id !== id)]
-    void saveConversations(docPath, docTitle, next)
+    void saveConversations(docPath, docTitle, next, isLockedRef.current?.() ?? false)
     setConversations(next)
     if (activeChatIdRef.current !== id) setActiveChatId(id)
   }, [messages, busy, docPath, docTitle])
@@ -746,7 +753,7 @@ export default function AiPanel({
 
   const removeConversation = useCallback(
     (id: string): void => {
-      void deleteConversation(docPath, docTitle, id).then((next) => {
+      void deleteConversation(docPath, docTitle, id, isLockedRef.current?.() ?? false).then((next) => {
         setConversations(next)
         if (historyAllRef.current) refreshAll()
       })
@@ -1413,6 +1420,11 @@ export default function AiPanel({
                             alt={t('ai.imageAlt')}
                           />
                         ))}
+                      </div>
+                    )}
+                    {!!m.imagesWithheld && (
+                      <div className="ai-msg-withheld">
+                        {t('ai.imagesWithheld', { count: String(m.imagesWithheld) })}
                       </div>
                     )}
                     {m.display ?? m.text}

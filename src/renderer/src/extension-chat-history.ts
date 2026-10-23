@@ -19,13 +19,24 @@ import {
 
 const DB_NAME = 'pdfx-chats'
 const STORE = 'docs'
+/** Each document's ConversationSummary[] — no messages, so no images — kept
+ *  beside its record and written in the same transaction. The cross-document
+ *  list reads only these: reading the records themselves would clone every
+ *  page image of every conversation into the page to throw it away again. */
+const SUMMARIES = 'summaries'
 const CHANNEL = 'pdfx-chats'
 
 function openDb(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
     try {
-      const req = indexedDB.open(DB_NAME, 1)
-      req.onupgradeneeded = () => req.result.createObjectStore(STORE)
+      // v2 added SUMMARIES; a v1 database keeps its records and gets their
+      // summaries filled in on the first listing (listConversationDocs)
+      const req = indexedDB.open(DB_NAME, 2)
+      req.onupgradeneeded = () => {
+        const db = req.result
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
+        if (!db.objectStoreNames.contains(SUMMARIES)) db.createObjectStore(SUMMARIES)
+      }
       req.onsuccess = () => resolve(req.result)
       req.onerror = () => resolve(null)
     } catch {
@@ -63,13 +74,17 @@ export async function saveConversationDoc(path: string, name: string, list: Stor
   const db = await openDb()
   if (!db) return
   try {
-    const tx = db.transaction(STORE, 'readwrite')
+    const tx = db.transaction([STORE, SUMMARIES], 'readwrite')
     const store = tx.objectStore(STORE)
+    const sums = tx.objectStore(SUMMARIES)
     const clean = sanitizeConversations(list)
-    if (clean.length === 0) store.delete(path)
-    else {
+    if (clean.length === 0) {
+      store.delete(path)
+      sums.delete(path)
+    } else {
       const doc: ConversationDoc = { path, name: name.trim() || docNameFromPath(path), conversations: clean }
       store.put(doc, path)
+      sums.put(summarizeConversations(doc), path)
     }
     await done(tx)
   } catch {
@@ -103,8 +118,55 @@ async function allDocs(): Promise<ConversationDoc[]> {
   })
 }
 
+/** Is this a summary list as saveConversationDoc writes one? Anything else —
+ *  garbage, or a record from before v2 — is rebuilt from its document. */
+const validSummaries = (v: unknown, path: string): v is ConversationSummary[] =>
+  Array.isArray(v) &&
+  v.every((s) => !!s && typeof s === 'object' && (s as ConversationSummary).docPath === path &&
+    typeof (s as ConversationSummary).id === 'string' && typeof (s as ConversationSummary).text === 'string' &&
+    typeof (s as ConversationSummary).updatedAt === 'number')
+
 export async function listConversationDocs(): Promise<ConversationSummary[]> {
-  return byNewest((await allDocs()).flatMap(summarizeConversations))
+  const db = await openDb()
+  if (!db) return []
+  try {
+    const tx = db.transaction([STORE, SUMMARIES], 'readonly')
+    const [docKeys, sumKeys, sumValues] = await Promise.all([
+      request(tx.objectStore(STORE).getAllKeys()),
+      request(tx.objectStore(SUMMARIES).getAllKeys()),
+      request(tx.objectStore(SUMMARIES).getAll())
+    ])
+    const have = new Map<string, ConversationSummary[]>()
+    ;(sumKeys ?? []).forEach((k, i) => {
+      const v = sumValues?.[i]
+      if (typeof k === 'string' && validSummaries(v, k)) have.set(k, v)
+    })
+    const out: ConversationSummary[] = []
+    const missing: string[] = []
+    for (const k of docKeys ?? []) {
+      if (typeof k !== 'string') continue
+      const s = have.get(k)
+      if (s) out.push(...s)
+      else missing.push(k)
+    }
+    // Records written before v2 (or a summary that no longer parses): read
+    // each once, list it, and store its summary so the next listing does not
+    for (const path of missing) {
+      const raw = await request(db.transaction(STORE, 'readonly').objectStore(STORE).get(path))
+      const doc = sanitizeConversationDoc(raw)
+      if (!doc || doc.path !== path) continue
+      const list = summarizeConversations(doc)
+      out.push(...list)
+      try {
+        db.transaction(SUMMARIES, 'readwrite').objectStore(SUMMARIES).put(list, path)
+      } catch {
+        /* listed anyway; filled in next time */
+      }
+    }
+    return byNewest(out)
+  } catch {
+    return []
+  }
 }
 
 export const allConversationDocs = allDocs

@@ -17,7 +17,7 @@
 // still the user's data. Node-only (no Electron import) so
 // scripts/test-chat-history.mjs runs it against a temp folder.
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, readdir, rename, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { ConversationDoc, ConversationSummary, StoredConversation } from '../shared/chat-history'
 import {
@@ -52,12 +52,38 @@ async function writeAtomic(file: string, data: string): Promise<void> {
   await rename(tmp, file)
 }
 
-export function createChatHistoryStore(dir: string): ChatHistoryStore {
+/** One file's summaries as last read, and the file stamp they were read at */
+interface CachedSummary {
+  mtimeMs: number
+  size: number
+  list: ConversationSummary[]
+}
+
+/** `onParse` is told of every file the store reads and parses — the test's
+ *  way to prove the listing skips what has not changed */
+export function createChatHistoryStore(dir: string, opts: { onParse?: (file: string) => void } = {}): ChatHistoryStore {
   const fileOf = (key: string): string => join(dir, `${key}.json`)
   /** The write in flight per document, which the next write of it waits for */
   const writing = new Map<string, Promise<void>>()
+  /** The cross-document list without re-reading what has not changed. Keyed
+   *  by file name; a file whose mtime and size still match is not opened —
+   *  a conversation that asked about ten pages carries megabytes of page
+   *  images, and JSON.parse in main holds every window while it runs. A
+   *  write from this store fills its entry from the list it wrote, so the
+   *  next listing parses nothing at all. */
+  const summaries = new Map<string, CachedSummary>()
+
+  async function remember(name: string, doc: ConversationDoc): Promise<void> {
+    try {
+      const st = await stat(join(dir, name))
+      summaries.set(name, { mtimeMs: st.mtimeMs, size: st.size, list: summarizeConversations(doc) })
+    } catch {
+      summaries.delete(name)
+    }
+  }
 
   async function readDoc(file: string): Promise<ConversationDoc | null> {
+    opts.onParse?.(file)
     try {
       return sanitizeConversationDoc(JSON.parse(await readFile(file, 'utf-8')))
     } catch {
@@ -66,14 +92,47 @@ export function createChatHistoryStore(dir: string): ChatHistoryStore {
   }
 
   async function write(path: string, name: string, list: StoredConversation[]): Promise<void> {
-    const file = fileOf(keyOf(path))
+    const key = keyOf(path)
+    const file = fileOf(key)
     if (list.length === 0) {
       await unlink(file).catch(() => {})
+      summaries.delete(`${key}.json`)
       return
     }
     await mkdir(dir, { recursive: true })
     const doc: ConversationDoc = { path, name: name.trim() || docNameFromPath(path), conversations: list }
     await writeAtomic(file, JSON.stringify(doc))
+    await remember(`${key}.json`, doc)
+  }
+
+  async function listSummaries(): Promise<ConversationSummary[]> {
+    let names: string[]
+    try {
+      names = (await readdir(dir)).filter((n) => ENTRY_FILE.test(n))
+    } catch {
+      summaries.clear()
+      return []
+    }
+    const present = new Set(names)
+    for (const name of summaries.keys()) if (!present.has(name)) summaries.delete(name)
+    const lists = await Promise.all(
+      names.map(async (name) => {
+        let st
+        try {
+          st = await stat(join(dir, name))
+        } catch {
+          return []
+        }
+        const have = summaries.get(name)
+        if (have && have.mtimeMs === st.mtimeMs && have.size === st.size) return have.list
+        const doc = await readDoc(join(dir, name))
+        // An unreadable file lists as nothing, and is tried again when it changes
+        const list = doc ? summarizeConversations(doc) : []
+        summaries.set(name, { mtimeMs: st.mtimeMs, size: st.size, list })
+        return list
+      })
+    )
+    return byNewest(lists.flat())
   }
 
   async function allDocs(): Promise<ConversationDoc[]> {
@@ -107,7 +166,7 @@ export function createChatHistoryStore(dir: string): ChatHistoryStore {
       })
       return next
     },
-    list: async () => byNewest((await allDocs()).flatMap(summarizeConversations)),
+    list: listSummaries,
     all: allDocs
   }
 }

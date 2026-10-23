@@ -63,6 +63,8 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
   /** The last citation click found no window showing the document */
   const [jumpFailed, setJumpFailed] = useState(false)
   const docResourcesRef = useRef<DocResources | null>(null)
+  /** The document was opened with a password (see load) */
+  const lockedRef = useRef(false)
   const pageTextsRef = useRef<PageText[] | null>(null)
 
   // ---------- Theme + language (mirrors ExtensionApp/App) ----------
@@ -122,6 +124,8 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
         const doc = await resources.task.promise
         docResourcesRef.current = resources
         pageTextsRef.current = null
+        // Opened WITH a password: its conversations are stored without images
+        lockedRef.current = password !== undefined
         setPasswordAsk(null)
         setPdf(doc)
       } catch (err) {
@@ -216,6 +220,7 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
           // No tab strip here: another document's conversation opens that
           // document in a viewer window (or tab), which picks the handoff up
           onOpenElsewhere={(path) => bridge.newWindow(path)}
+          isLocked={() => lockedRef.current}
         />
       )}
 
