@@ -873,6 +873,13 @@ export interface AiContentPart {
   citations: AiCitation[]
 }
 
+/** What a streamed delta carries. Absent = answer text to append; 'thinking' =
+ *  the model's reasoning, a liveness signal only; 'block' = a new text block
+ *  opens (native citations attach per block, so the panel needs the boundary
+ *  to put each chip where the final answer will); 'citation' = a native
+ *  citation for the block that is open, carried in the delta's `citation`. */
+export type AiDeltaKind = 'thinking' | 'block' | 'citation'
+
 export interface AiUsage {
   inputTokens: number
   outputTokens: number
@@ -1278,8 +1285,11 @@ export interface PdfxApi {
   aiChat(request: AiChatRequest): Promise<AiChatResult>
   aiAbort(requestId: number): void
   /** `kind` absent = answer text to append; 'thinking' = the model's reasoning
-   *  stream, forwarded as a liveness signal only (never rendered as answer) */
-  onAiDelta(cb: (requestId: number, text: string, kind?: 'thinking') => void): () => void
+   *  stream, forwarded as a liveness signal only (never rendered as answer);
+   *  'block'/'citation' = native citations as they arrive (see AiDeltaKind) */
+  onAiDelta(
+    cb: (requestId: number, text: string, kind?: AiDeltaKind, citation?: AiCitation) => void
+  ): () => void
   // ---------- Detached assistant (chat in its own window/tab) ----------
   /** Open (or focus) the assistant surface for a document: a second
    *  BrowserWindow on desktop, a separate viewer.html tab in the extension,

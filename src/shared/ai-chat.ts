@@ -19,6 +19,7 @@ import type {
   AiChatResult,
   AiCitation,
   AiContentPart,
+  AiDeltaKind,
   AiModelCaps,
   AiModelCatalog,
   AiProviderId,
@@ -35,6 +36,8 @@ import {
   OPENAI_ALWAYS_REASONS_RE,
   OPENAI_REASONING_RE
 } from './ai-provider-profile'
+import type { MessageStreamEvent } from '@anthropic-ai/sdk/resources/messages'
+import { parseQuoteContract, partsAsDeltas } from './ai-stream'
 import { DEFAULT_AZURE_API_VERSION } from './defaults'
 import { AI_ERRORS } from './engine-errors'
 
@@ -243,7 +246,8 @@ const DOC_ACK = 'I have read the document and am ready.'
 // Prompt contract for providers without native citations (mirrors the
 // oe-intervju QUOTE_GROUNDING_RULES pattern): verbatim quotes we can locate.
 // Instructions address the model and stay English for both UI languages; the
-// [KILDE ...] marker syntax is fixed (parsed by regex in parseQuoteContract).
+// [KILDE ...] marker syntax is fixed (parsed by regex in parseQuoteContract,
+// ai-stream.ts).
 const QUOTE_CONTRACT = `
 
 CITATION RULES (important):
@@ -414,8 +418,36 @@ const EMPTY_USAGE: AiUsage = {
  *  minutes producing ONLY thinking deltas — a UI that cannot tell reasoning
  *  from silence shows «Leser dokumentet …» the whole time and reads as a hang
  *  (Kimi K2.5 via OpenRouter, observed 2026-08-16). Thinking text never lands
- *  in the answer; the panel uses it as a liveness signal. */
-type Emit = (text: string, kind?: 'thinking') => void
+ *  in the answer; the panel uses it as a liveness signal. 'block' and
+ *  'citation' carry native citations as they stream (text empty), so the
+ *  chips appear while the answer is written rather than when it ends. */
+type Emit = (text: string, kind?: AiDeltaKind, citation?: AiCitation) => void
+
+// char_location = grounded document citation; web_search_result_location =
+// external source from the web-search tool. Other types are dropped.
+interface AnthropicLocation {
+  type: string
+  start_char_index?: number
+  end_char_index?: number
+  cited_text?: string
+  url?: string
+  title?: string | null
+}
+
+function anthropicCitation(c: AnthropicLocation): AiCitation | null {
+  if (c.type === 'char_location') {
+    return {
+      kind: 'char',
+      start: c.start_char_index ?? 0,
+      end: c.end_char_index ?? 0,
+      citedText: c.cited_text ?? ''
+    }
+  }
+  if (c.type === 'web_search_result_location' && c.url) {
+    return { kind: 'web', url: c.url, title: c.title || c.url }
+  }
+  return null
+}
 
 async function chatAnthropic(
   apiKey: string,
@@ -568,6 +600,20 @@ async function chatAnthropic(
       stream.on('thinking', (delta: string) => {
         emit(delta, 'thinking')
       })
+      // Native citations as they stream: each text block opens, names its
+      // citations, then streams its words — the same blocks the parts below
+      // are built from, so the panel can place every chip where it will stay.
+      stream.on('streamEvent', (event: MessageStreamEvent) => {
+        if (event.type === 'content_block_start' && event.content_block.type === 'text') {
+          emit('', 'block')
+        } else if (event.type === 'content_block_delta' && event.delta.type === 'citations_delta') {
+          const citation = anthropicCitation(event.delta.citation as AnthropicLocation)
+          if (citation) {
+            emitted = true
+            emit('', 'citation', citation)
+          }
+        }
+      })
       final = await stream.finalMessage()
     } catch (err) {
       const status = (err as { status?: unknown } | null)?.status
@@ -598,16 +644,6 @@ async function chatAnthropic(
     return AI_ERRORS.refusal
   }
 
-  // char_location = grounded document citation; web_search_result_location =
-  // external source from the web-search tool. Other types are dropped.
-  interface Loc {
-    type: string
-    start_char_index?: number
-    end_char_index?: number
-    cited_text?: string
-    url?: string
-    title?: string | null
-  }
   // Server-side fallback marks each handoff with a `fallback` content block
   // ({from:{model}, to:{model}}); the last one names who finished the answer.
   // Read it from the block, not final.model: on a mid-stream decline the
@@ -620,62 +656,13 @@ async function chatAnthropic(
   const parts: AiContentPart[] = []
   for (const block of blocks) {
     if (block.type !== 'text') continue
-    const citations = (block.citations ?? []) as Loc[]
+    const citations = (block.citations ?? []) as AnthropicLocation[]
     parts.push({
       text: block.text,
-      citations: citations.flatMap((c): AiCitation[] => {
-        if (c.type === 'char_location') {
-          return [
-            {
-              kind: 'char',
-              start: c.start_char_index ?? 0,
-              end: c.end_char_index ?? 0,
-              citedText: c.cited_text ?? ''
-            }
-          ]
-        }
-        if (c.type === 'web_search_result_location' && c.url) {
-          return [{ kind: 'web', url: c.url, title: c.title || c.url }]
-        }
-        return []
-      })
+      citations: citations.flatMap((c) => anthropicCitation(c) ?? [])
     })
   }
   return { ok: true, parts, usage, model: final.model, ...(fallbackModel && { fallbackModel }) }
-}
-
-/** Split text on [KILDE s.N: "quote"] markers into parts with quote citations */
-function parseQuoteContract(text: string): AiContentPart[] {
-  // Tolerant: curly quotes, «Kilde» casing, flexible spacing around the colon, and
-  // inner quotes inside the excerpt — the content is matched lazily and only closes
-  // on a quote immediately followed by "]", so a model that puts (often escaped)
-  // quotes inside the excerpt no longer breaks the match. Escapes are stripped below
-  // so the quote stays a verbatim document substring for locate + highlight.
-  // The source token is any short bracket-safe run, not the literal KILDE:
-  // models (Gemini, observed 2026-08-12) substitute the document's filename
-  // ("[grebe2015-edoc.pdf s.2: …]"), and a marker that names the right page
-  // and quote is a citation regardless of what the model called the source.
-  const regex = /\s*\[[^\n[\]:«"“]{1,80}?\s+s\.?\s*(\d+)\s*:\s*[«"“]([\s\S]{5,300}?)["»”]\]/gi
-  const parts: AiContentPart[] = []
-  let last = 0
-  let match: RegExpExecArray | null
-  while ((match = regex.exec(text)) !== null) {
-    parts.push({
-      text: text.slice(last, match.index),
-      citations: [
-        {
-          kind: 'quote',
-          pageNumber: parseInt(match[1], 10),
-          // Unescape \" and \\ so the quote is a verbatim document substring
-          quote: match[2].replace(/\\(["\\])/g, '$1').trim()
-        }
-      ]
-    })
-    last = regex.lastIndex
-  }
-  const tail = text.slice(last)
-  if (tail.trim() || parts.length === 0) parts.push({ text: tail, citations: [] })
-  return parts
 }
 
 interface OpenAiAnnotation {
@@ -1212,11 +1199,6 @@ async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Pr
   const searching = req.webSearch === 'on' || (req.webSearch === 'ask' && askedForWeb)
   const answerC = searching ? ' Et nettsøk bekrefter dette i en ekstern kilde.' : ''
   const full = answerA + answerB + answerC
-  for (const word of full.split(/(?<= )/)) {
-    if (signal.aborted) return AI_ERRORS.aborted
-    emit(word)
-    await new Promise((resolve) => setTimeout(resolve, 12))
-  }
   const parts: AiContentPart[] = doc
     ? [
         {
@@ -1243,6 +1225,13 @@ async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Pr
       text: answerC,
       citations: [{ kind: 'web', url: 'https://example.org/kilde', title: 'Eksempelkilde (mock)' }]
     })
+  }
+  // Streamed the way Anthropic streams it — block, citations, words — so the
+  // chips appear while the mock answer is being written, as they do for real
+  for (const delta of partsAsDeltas(parts, (text) => text.split(/(?<= )/))) {
+    if (signal.aborted) return AI_ERRORS.aborted
+    emit(delta.text, delta.kind, delta.citation)
+    if (!delta.kind) await new Promise((resolve) => setTimeout(resolve, 12))
   }
   return {
     ok: true,

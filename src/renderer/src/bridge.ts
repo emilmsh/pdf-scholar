@@ -26,6 +26,7 @@ import {
   summarizeConversations
 } from '../../shared/chat-history'
 import { AI_ERRORS, CHATGPT_LOGIN_ERRORS } from '../../shared/engine-errors'
+import { partsAsDeltas } from '../../shared/ai-stream'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
 import { createAbstractClient } from '../../shared/abstract'
 import { attachmentMime, cleanAttachmentName } from '../../shared/attachments'
@@ -392,17 +393,6 @@ export const webApi: PdfxApi = {
       request.webSearch === 'on' || (request.webSearch === 'ask' && askedForWeb)
     const answerC = searching ? ' Et nettsøk bekrefter dette i en ekstern kilde.' : ''
     const full = answerA + answerB + answerC
-    // Few large chunks: background-tab timer clamping (≥1s) would make
-    // word-by-word streaming crawl in the automated preview
-    const step = Math.ceil(full.length / 5)
-    for (let i = 0; i < full.length; i += step) {
-      if (webAiAborted.has(request.requestId)) {
-        webAiAborted.delete(request.requestId)
-        return { error: t('ai.aborted') }
-      }
-      for (const cb of webAiDeltaListeners) cb(request.requestId, full.slice(i, i + step))
-      await new Promise((resolve) => setTimeout(resolve, 30))
-    }
     const mid = doc ? Math.floor(doc.text.length * 0.4) : 0
     const parts: AiContentPart[] = doc
       ? [
@@ -430,6 +420,20 @@ export const webApi: PdfxApi = {
         text: answerC,
         citations: [{ kind: 'web', url: 'https://example.org/kilde', title: 'Eksempelkilde (mock)' }]
       })
+    }
+    // Few large chunks: background-tab timer clamping (≥1s) would make
+    // word-by-word streaming crawl in the automated preview. Each part streams
+    // as a native block (block, citations, text), like the real provider.
+    const step = Math.ceil(full.length / 5)
+    const chunks = (text: string): string[] =>
+      Array.from({ length: Math.ceil(text.length / step) }, (_, i) => text.slice(i * step, (i + 1) * step))
+    for (const delta of partsAsDeltas(parts, chunks)) {
+      if (webAiAborted.has(request.requestId)) {
+        webAiAborted.delete(request.requestId)
+        return { error: t('ai.aborted') }
+      }
+      for (const cb of webAiDeltaListeners) cb(request.requestId, delta.text, delta.kind, delta.citation)
+      if (!delta.kind) await new Promise((resolve) => setTimeout(resolve, 30))
     }
     return {
       ok: true,
@@ -523,7 +527,7 @@ export function downloadAttachment(rawName: string, data: Uint8Array): { path: s
   return { path: name }
 }
 
-const webAiDeltaListeners = new Set<(requestId: number, text: string, kind?: 'thinking') => void>()
+const webAiDeltaListeners = new Set<Parameters<PdfxApi['onAiDelta']>[0]>()
 const webAiAborted = new Set<number>()
 
 function loadWebAiConfig(): AiConfig {

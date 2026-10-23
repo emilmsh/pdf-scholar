@@ -16,7 +16,10 @@
 // Run: node scripts/test-stream-replay.mjs
 import { loadAiCore, loadRecordings, STREAM_DIR } from './lib/ai-core.mjs'
 
-const { runProviderChat } = await loadAiCore()
+const { runProviderChat, appendDelta, streamingParts, PROVIDER_PROFILES } = await loadAiCore()
+
+// The head of a [KILDE s.N: "…"] marker, whatever the model called the source
+const MARKER_HEAD = /\[[^\n\]]{0,80}\s+s\.?\s*\d+\s*:\s*["«“]/
 
 let failures = 0
 let checks = 0
@@ -84,7 +87,7 @@ for (const rec of recordings) {
         document: DOC,
         webSearch: 'off'
       },
-      emit: (text, kind) => deltas.push([kind ?? 'text', text]),
+      emit: (text, kind, citation) => deltas.push([kind ?? 'text', text, citation]),
       signal: new AbortController().signal
     })
     const want = rec.expect ?? {}
@@ -97,6 +100,24 @@ for (const rec of recordings) {
           const n = (result.parts ?? []).flatMap((p) => p.citations).length
           ok(n === want.citations, `same citation count (${n}, recorded ${want.citations})`)
         }
+        // The panel shows citation chips WHILE the answer streams
+        // (src/shared/ai-stream.ts). On the provider's own chunk boundaries: no
+        // moment of the stream shows a raw [KILDE …] marker, and the stream,
+        // once whole, reads exactly as the settled answer the panel swaps in.
+        const contract = PROVIDER_PROFILES[provider].citations === 'contract'
+        let parts = []
+        let leaked = ''
+        for (const [kind, text, citation] of deltas) {
+          parts = appendDelta(parts, text, kind === 'text' ? undefined : kind, citation)
+          const shown = streamingParts(parts, contract).map((p) => p.text).join('')
+          if (!leaked && MARKER_HEAD.test(shown)) leaked = shown.slice(-60)
+        }
+        ok(!leaked, `no moment of the stream shows a raw citation marker (leaked "…${leaked}")`)
+        const whole = contract ? streamingParts(parts, true) : parts
+        ok(
+          JSON.stringify(whole) === JSON.stringify(result.parts),
+          'the whole stream reads as the settled answer, chips included'
+        )
       }
     } else {
       if (want.code !== undefined && want.code !== null)

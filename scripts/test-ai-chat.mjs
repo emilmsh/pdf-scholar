@@ -29,7 +29,8 @@ await build({
     contents: [
       `export * from './src/shared/ai-chat'`,
       `export * from './src/shared/ai-provider-profile'`,
-      `export * from './src/shared/ai-model-catalog'`
+      `export * from './src/shared/ai-model-catalog'`,
+      `export * from './src/shared/ai-stream'`
     ].join('\n'),
     resolveDir: ROOT,
     loader: 'ts'
@@ -48,7 +49,11 @@ const {
   fetchCompatModels,
   refreshCatalog,
   isLocalEndpoint,
-  catalogStale
+  catalogStale,
+  appendDelta,
+  streamingParts,
+  pendingMarkerStart,
+  parseQuoteContract
 } = await import(pathToFileURL(BUNDLE).href)
 
 let failures = 0
@@ -104,7 +109,7 @@ const http400 = (message) =>
 // ---------- SSE builders ----------
 
 /** Anthropic Messages SSE for one assistant turn (the SDK accumulates these) */
-function anthropicSse({ model = 'claude-sonnet-5', deltas = [], citations = [], stopReason = 'end_turn', inTok = 100, outTok = 7, cacheRead = 0, cacheWrite = 0, fallback = null }) {
+function anthropicSse({ model = 'claude-sonnet-5', deltas = [], citations = [], blocks = null, stopReason = 'end_turn', inTok = 100, outTok = 7, cacheRead = 0, cacheWrite = 0, fallback = null }) {
   const events = [
     {
       type: 'message_start',
@@ -123,12 +128,18 @@ function anthropicSse({ model = 'claude-sonnet-5', deltas = [], citations = [], 
     events.push({ type: 'content_block_start', index: 0, content_block: { type: 'fallback', from: { model: fallback.from }, to: { model: fallback.to } } })
     events.push({ type: 'content_block_stop', index: 0 })
   }
-  if (deltas.length > 0 || citations.length > 0) {
-    events.push({ type: 'content_block_start', index: t0, content_block: { type: 'text', text: '', citations: [] } })
-    for (const d of deltas) events.push({ type: 'content_block_delta', index: t0, delta: { type: 'text_delta', text: d } })
-    for (const c of citations) events.push({ type: 'content_block_delta', index: t0, delta: { type: 'citations_delta', citation: c } })
-    events.push({ type: 'content_block_stop', index: t0 })
-  }
+  // `blocks` = several text blocks, the way a cited answer arrives: each one
+  // its own block with its own citations (`citationsFirst` puts them ahead of
+  // the words — the order is not something the panel may depend on)
+  const textBlocks = blocks ?? (deltas.length > 0 || citations.length > 0 ? [{ deltas, citations }] : [])
+  textBlocks.forEach((b, i) => {
+    const index = t0 + i
+    const cits = (b.citations ?? []).map((c) => ({ type: 'content_block_delta', index, delta: { type: 'citations_delta', citation: c } }))
+    const words = (b.deltas ?? []).map((d) => ({ type: 'content_block_delta', index, delta: { type: 'text_delta', text: d } }))
+    events.push({ type: 'content_block_start', index, content_block: { type: 'text', text: '', citations: [] } })
+    events.push(...(b.citationsFirst ? [...cits, ...words] : [...words, ...cits]))
+    events.push({ type: 'content_block_stop', index })
+  })
   events.push({ type: 'message_delta', delta: { stop_reason: stopReason, stop_sequence: null }, usage: { output_tokens: outTok } })
   events.push({ type: 'message_stop' })
   return sse(events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join(''))
@@ -966,6 +977,112 @@ section('images: a text-only model is named as such')
   ok(unknown.result.ok === true, 'a model the catalogue says nothing about is still tried')
 }
 
+// ---------- streaming citations (src/shared/ai-stream.ts) ----------
+//
+// The chips appear while the answer is written, not when it ends. Two promises
+// are held here: a chip shows as soon as what it supports is finished, and the
+// streamed answer, once whole, IS the settled answer — the panel swaps one for
+// the other, and anything that differs would jump in front of the reader.
+
+/** Every delta a run emitted, as [text, kind, citation] */
+function collectDeltas() {
+  const list = []
+  return { list, emit: (text, kind, citation) => list.push([text, kind, citation]) }
+}
+const fold = (list) => list.reduce((parts, [t, k, c]) => appendDelta(parts, t, k, c), [])
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
+// The head of a [KILDE s.N: "…"] marker, whatever the model called the source
+const MARKER_HEAD = /\[[^\n\]]{0,80}\s+s\.?\s*\d+\s*:\s*["«“]/
+
+section('streaming citations: native (Anthropic) — chips arrive with their block')
+{
+  const loc = (start, end) => ({
+    type: 'char_location', cited_text: DOC.text.slice(start, end), document_index: 0,
+    document_title: DOC.title, start_char_index: start, end_char_index: end
+  })
+  responder = () =>
+    anthropicSse({
+      blocks: [
+        { deltas: ['Dokumentet ', 'sier at '] },
+        { deltas: ['innledningen ', 'setter rammen'], citations: [loc(9, 36)], citationsFirst: true },
+        { deltas: [', og at '] },
+        { deltas: ['metoden er enkel'], citations: [loc(46, 63), { type: 'web_search_result_location', url: 'https://example.org/k', title: 'Kilde' }] },
+        { deltas: ['.'] }
+      ]
+    })
+  const { list, emit } = collectDeltas()
+  const { result } = await run({ emit })
+  ok(result.ok === true, 'a multi-block cited answer settles')
+  ok(list.filter(([, k]) => k === 'block').length === 5, 'one block delta per text block')
+  const cited = list.filter(([, k]) => k === 'citation')
+  ok(
+    cited.length === 3 && cited[0][2]?.kind === 'char' && cited[0][2].start === 9 && cited[2][2]?.kind === 'web',
+    'citations stream as AiCitations, mapped as the result maps them'
+  )
+  ok(list.filter(([, k]) => k).every(([t]) => t === ''), 'a block or citation delta carries no answer text')
+  ok(same(fold(list), result.parts), 'the streamed parts ARE the settled parts — nothing moves when the answer lands')
+
+  let parts = []
+  let early = false
+  let openHeld = true
+  list.forEach(([t, k, c], i) => {
+    parts = appendDelta(parts, t, k, c)
+    const shown = streamingParts(parts, false)
+    if (shown[shown.length - 1]?.citations.length) openHeld = false
+    if (i < list.length - 1 && shown.some((p) => p.citations.length)) early = true
+  })
+  ok(early, 'chips show before the stream ends')
+  ok(openHeld, 'the chips of the block being written wait for it to finish')
+  const thirdBlock = list.findIndex(([, k], i) => k === 'block' && list.slice(0, i).filter(([, kk]) => kk === 'block').length === 2)
+  const atThird = streamingParts(fold(list.slice(0, thirdBlock + 1)), false)
+  ok(
+    atThird[1]?.citations.length === 1 && atThird[1].citations[0].start === 9,
+    'the moment the next block opens, the finished one shows its chip — whichever order its citation came in'
+  )
+}
+
+section('streaming citations: contract — a marker becomes a chip the moment it closes')
+{
+  const full = 'Metoden er enkel [KILDE s.2: "Metoden er enkel"]. Innledningen [KILDE s.1: "Innledningen setter rammen"] setter rammen.'
+  let leaked = ''
+  let firstChipAt = -1
+  for (let n = 1; n <= full.length; n++) {
+    const shown = streamingParts([{ text: full.slice(0, n), citations: [] }], true)
+    const text = shown.map((p) => p.text).join('')
+    if (!leaked && /KILDE|\[/.test(text)) leaked = text
+    if (firstChipAt < 0 && shown.some((p) => p.citations.length)) firstChipAt = n
+  }
+  ok(!leaked, `no prefix of the stream shows a raw marker (leaked "${leaked}")`)
+  ok(firstChipAt === full.indexOf('"]') + 2, `the first chip comes with its marker's closing bracket (at ${firstChipAt})`)
+  ok(same(streamingParts([{ text: full, citations: [] }], true), parseQuoteContract(full)), 'the whole stream reads as the settled answer')
+
+  const at = (s) => pendingMarkerStart(s)
+  ok(at('Se [12] og [13].') === 16, 'closed numeric brackets are prose, never held')
+  ok(at('Se [KILDE s.3: "se [12] for') === 3, 'a bracket inside the excerpt belongs to the marker')
+  ok(at('Likningen \\[ x + y') === 18, 'a display-math opener is not a marker')
+  ok(at('Kort [KILDE s.2: "kort"] videre') === 31, 'a closed marker that does not parse stays visible as text')
+  ok(at('Se [Smith') === 3, 'an open bracket that could still become a marker is held')
+  ok(at('Se [' + 'x'.repeat(100)) === 104, 'a bracket run past the source length is prose again')
+  ok(at('Se [KILDE s.2: "' + 'a'.repeat(500)) === 516, 'an excerpt past the marker ceiling is shown, not held to the end')
+
+  // Through a real provider path, a marker cut across the provider's deltas
+  responder = () =>
+    chatCompletionsSse({
+      deltas: ['Svar ', '[KIL', 'DE s.1: "Innledningen ', 'setter rammen"]', ' slutt.'],
+      usage: { prompt_tokens: 4, completion_tokens: 2 }
+    })
+  const { list, emit } = collectDeltas()
+  const { result } = await run({ provider: 'groq', emit })
+  let leakedLive = false
+  let parts = []
+  for (const [t, k, c] of list) {
+    parts = appendDelta(parts, t, k, c)
+    if (MARKER_HEAD.test(streamingParts(parts, true).map((p) => p.text).join(''))) leakedLive = true
+  }
+  ok(result.ok === true && !leakedLive, 'a marker split across deltas never shows raw')
+  ok(same(streamingParts(fold(list), true), result.parts), 'groq: the whole stream reads as the settled answer')
+}
+
 // ---------- mock ----------
 
 section('mock: keyless offline provider')
@@ -973,12 +1090,15 @@ section('mock: keyless offline provider')
   responder = () => {
     throw new Error('mock must not touch the network')
   }
-  const { result, streamed } = await run({ provider: 'mock', key: '' })
+  const { list, emit } = collectDeltas()
+  const { result } = await run({ provider: 'mock', key: '', emit })
+  const streamed = list.filter(([, k]) => !k).map(([t]) => t).join('')
   ok(result.ok === true && result.model === 'mock-1', 'mock answers with no key and no network')
   ok(streamed.length > 0, 'mock streams its answer')
   const cits = (result.parts ?? []).flatMap((p) => p.citations)
   ok(cits.some((c) => c.kind === 'char'), 'mock emits char citations (native-style)')
   ok(cits.some((c) => c.kind === 'web'), 'mock emits a web citation in webSearch on-mode')
+  ok(same(fold(list), result.parts), 'mock streams its citations as it writes, block by block, as Anthropic does')
   observed.mock = { quoteContract: false, nativeCitations: true, webTool: true, images: true }
 }
 
