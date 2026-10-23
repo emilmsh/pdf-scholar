@@ -155,6 +155,12 @@ export function launchApp({ root, mainJs, args = [], port, prepareProfile, env }
     async cleanup() {
       child.kill()
       await sleep(400)
+      // Wait for the debugging port to be given up, not just for the kill:
+      // on Windows it stays LISTENING for a while after the main process
+      // dies, and a test that relaunches the app straight away (the session
+      // test's section 4) was refused by the guard above for a port its OWN
+      // previous launch still held — on v0.67.2 as much as later (2026-10-23)
+      for (let waited = 0; waited < 5000 && portInUse(port); waited += 200) await sleep(200)
       try {
         rmSync(profile, { recursive: true, force: true })
       } catch {
