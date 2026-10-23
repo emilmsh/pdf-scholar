@@ -19,6 +19,7 @@ scripts/.engine-cache-test-embed.mjs
 scripts/.ai-chat-test-bundle.mjs
 scripts/.ai-core-bundle.mjs
 scripts/.margin-test-bundle.mjs
+scripts/.identity-test-*.mjs
 # Local Claude config stays untracked, but shared skills ship with the repo
 .claude/*
 !.claude/skills/

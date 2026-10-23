@@ -36,6 +36,13 @@ import {
   thumbReadableInExtension
 } from '../../shared/recent-thumbs'
 import { forgetRecentThumbs, loadRecentThumbs, saveRecentThumb } from './extension-recent-thumbs'
+import {
+  listConversationDocs,
+  loadConversationDoc,
+  saveConversationDoc,
+  subscribeConversationChanges
+} from './extension-chat-history'
+import { rebindIdentity, sanitizeFingerprints, validFingerprint } from '../../shared/doc-identity'
 import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
@@ -74,6 +81,8 @@ const K_SETTINGS = 'pdfx-settings'
 const K_POSITIONS = 'pdfx-positions'
 const K_BOOKMARKS = 'pdfx-bookmarks'
 const K_RECENTS = 'pdfx-recents'
+/** Each opened document's /ID[0] by path (shared/doc-identity.ts, issue #46) */
+const K_FINGERPRINTS = 'pdfx-fingerprints'
 /** Why the last document was handed to the browser's own reader — the only trace
  *  of a hand-off that is deliberately invisible (see openInBrowserViewer). */
 const K_LAST_FALLBACK = 'pdfx-last-fallback'
@@ -318,6 +327,67 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
         else next[path] = bookmarks
         return store.set(K_BOOKMARKS, next)
       })
+    },
+    // The AI conversations (issue #46) — IndexedDB, see extension-chat-history.ts.
+    // Same contract as desktop's main process: one record per document,
+    // nothing evicted, other tabs told over a BroadcastChannel.
+    getConversations: loadConversationDoc,
+    setConversations: saveConversationDoc,
+    listConversations: listConversationDocs,
+    onConversationsChanged: subscribeConversationChanges,
+
+    // A document's identity across a move (issue #46; shared/doc-identity.ts).
+    // Only a file:// URL can be known to be GONE here, and only with file
+    // access granted: an http(s) URL that fails may be offline, an fsa: handle
+    // needs a gesture to read — both read as present, so nothing moves.
+    docIdentity: async (path, name, fingerprint) => {
+      if (!validFingerprint(fingerprint)) return []
+      const map = sanitizeFingerprints(await store.get<unknown>(K_FINGERPRINTS, {}))
+      const result = await rebindIdentity(path, name, fingerprint, map, {
+        exists: async (p) => {
+          if (!/^file:/i.test(p) || (await fileAccessGranted()) !== true) return true
+          try {
+            const res = await fetch(p)
+            void res.body?.cancel()
+            return res.ok
+          } catch {
+            return false
+          }
+        },
+        position: {
+          get: async (p) => (await store.get<Record<string, ReadingPosition>>(K_POSITIONS, {}))[p] ?? null,
+          set: async (p, pos) => {
+            const all = { ...(await store.get<Record<string, ReadingPosition>>(K_POSITIONS, {})) }
+            if (pos) all[p] = pos
+            else delete all[p]
+            store.set(K_POSITIONS, all)
+          }
+        },
+        bookmarks: {
+          get: async (p) => (await store.get<Record<string, DocBookmark[]>>(K_BOOKMARKS, {}))[p] ?? [],
+          set: async (p, list) => {
+            const all = { ...(await store.get<Record<string, DocBookmark[]>>(K_BOOKMARKS, {})) }
+            if (list.length > 0) all[p] = list
+            else delete all[p]
+            store.set(K_BOOKMARKS, all)
+          }
+        },
+        conversations: { get: loadConversationDoc, set: saveConversationDoc },
+        recents: {
+          takeOut: async (p) => {
+            const entry = (await loadRecents()).find((r) => r.path === p)
+            if (!entry) return { pinned: false }
+            await updateRecents((list) => removeRecent(list, p))
+            await forgetRecentThumbs([p])
+            return { pinned: entry.pinnedAt !== undefined }
+          },
+          pin: async (p) => {
+            await updateRecents((list) => pinRecent(list, p, true, Date.now()))
+          }
+        }
+      })
+      store.set(K_FINGERPRINTS, result.map)
+      return result.from
     },
     // Heal names written before fileNameOf existed (picked files were stored as
     // "fsa:<name>" because the name was derived from the pseudo-path). The cap

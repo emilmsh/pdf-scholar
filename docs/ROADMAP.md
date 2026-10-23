@@ -376,6 +376,54 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
   - Dekket av `test:attachments` (regler + pdf.js-lesing),
     `test:attachments-desktop` (mains håndterere) og `test:engine` seksjon 13
     (vedleggene overlever lagring byte for byte, bindersens utseende urørt).
+- [x] **Varig samtalelager og samlet, søkbar historikk** (issue #46, steg 1 av
+  tre, 2026-10-22; ruzzbehs ønske — «hundrevis av dokumentsamtaler som ikke
+  må bli utilgjengelige fordi de er spredt på enkelt-PDF-er»). Funnet som
+  gjorde det presserende: samtalene lå i localStorage med tak på 10 per
+  dokument og 30 dokumenter, det 31. kastet ut det eldste i stillhet — så
+  «samlet historikk» måtte begynne med at lageret ble varig. Nå:
+  - Samtalene går gjennom `PdfxApi` (`getConversations` / `setConversations`
+    / `listConversations` / `onConversationsChanged`): én JSON-fil per
+    dokument under `userData/chats` på desktop (`src/main/chat-history.ts`,
+    samme mønster som bildelageret: atomisk skriving, kø per dokument),
+    IndexedDB i utvidelsen (`extension-chat-history.ts`), localStorage i
+    dev:web. Ingenting kastes ut. Det gamle lageret importeres én gang ved
+    første lesing og nøkkelen fjernes (`chat-store.ts`).
+  - Historikkvisningen i panelet har søkefelt og bryteren «Alle dokumenter»:
+    hvert ord må finnes (tittel, dokumentnavn eller tekst, uavhengig av
+    store/små bokstaver, regex-tegn bokstavelig), nyeste først, med et
+    utdrag rundt første treff. Et treff i et annet dokument åpner dokumentet
+    (fane her; vindu/fane fra det løsrevne vinduet og i utvidelsen) på den
+    samtalen — overleveringen er en kortlivet localStorage-nøkkel, slik at
+    den krysser vinduer på alle plattformer.
+  - Søket er et HISTORIKKSØK, ikke gjenfinning: BM25-indeksen i
+    `ai-retrieval.ts` ble vurdert og lagt bort — en rangert poengsum er
+    uforutsigbar i en liste av gamle samtaler, der alle-ord-og-nyest-først
+    er det man venter.
+  - Dekket av `test:chat-history` (regler + desktop-lageret mot temp-mappe);
+    PLATFORMS.md avvik 31. Steg 2 (eksport til Markdown/JSON + merke i
+    biblioteket) og 3 (manuell gjenbruk av utdrag i komposisten) står igjen;
+    MCP er bevisst utsatt — eksportmappen er grensesnittet inntil noen kommer
+    med et konkret behov.
+  - **Flyttede og omdøpte filer gjenkjennes** (2026-10-22): stien var
+    identiteten for alt per fil, så en flyttet PDF åpnet som et fremmed
+    dokument og samtaler, bokmerker og leseposisjon ble liggende igjen.
+    Nå bærer PDF-ens egen /ID[0] (lest fra bytene, null kostnad) postene
+    over til ny sti — men bare fra en sti der filen er BORTE, så en kopi
+    aldri stjeler originalens historikk. /ID[0] overlever begge
+    lagringsveiene våre (full omskriving og appenderen, sjekket mot ekte
+    motor). Valgt framfor tekst-hash av første sider, som jeg først foreslo:
+    /ID leses uten pdf.js og før posisjonen slås opp, så dokumentet åpner
+    rett på siden. En fil uten /ID får ingen gjenkjenning. Beskjed «Gjenkjent
+    fra …» når det skjer. Dekket av `test:doc-identity` (CI) og
+    `test:identity-desktop`; PLATFORMS.md avvik 32.
+  - **To hull fra risikogjennomgangen tettet** (2026-10-23): samtaler om et
+    passordbeskyttet dokument lagres uten sidebilder og snips (teksten
+    beholdes, boblen sier «Bilder ikke lagret (N)») — samme regel som
+    forsidebildene har for låste filer. Og «Alle dokumenter» leser ikke
+    lenger bildene: main holder et sammendrag per fil og tolker bare filer
+    som er endret siden sist; utvidelsen skriver sammendraget i egen
+    IndexedDB-tabell i samme transaksjon.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

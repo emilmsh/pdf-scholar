@@ -1,114 +1,162 @@
-// Per-document AI conversation persistence, mirroring the pdfx-custom-colors
-// localStorage pattern in annotations.ts. Renderer-only by design: works
-// identically in Electron and the dev:web fallback.
-import type { AiContentPart, AiImage, AiUsage, FileError } from '../../shared/types'
+// The renderer's side of the AI conversation store (issue #46): the panel's
+// reads and writes go through PdfxApi — desktop's files, the extension's
+// IndexedDB, dev:web's localStorage — so the history is kept, not evicted.
+// Until 2026-10-22 this module WAS the store: localStorage, ten conversations
+// per document, thirty documents, the oldest dropped in silence. What that
+// store still holds is imported once, below, then the key is removed.
+//
+// Also the handoff that opens a conversation in ANOTHER document: the history
+// view's cross-document list hands the document to the host (a tab here, a
+// window or tab elsewhere), and the panel that ends up showing the document
+// picks the conversation up from here. localStorage because it crosses
+// windows on every platform (desktop's windows share one partition; the
+// extension's tabs one origin), with a short life — a document that fails to
+// open must not open on that conversation a day later.
+import type { ConversationSummary, StoredConversation } from '../../shared/chat-history'
+import { mergeConversations, sanitizeConversations, docNameFromPath, withoutImages } from '../../shared/chat-history'
+import { bridge } from './bridge'
 
-// `| undefined` on every optional field: messages are built as object literals
-// where the unused ones are present and undefined (a user turn with no images
-// still writes `images: pendingImages.length ? … : undefined`). These are append-
-// only records — never spread over an existing message — so present-and-undefined
-// and absent mean the same thing to every reader, including the JSON round-trip
-// through localStorage, which drops undefined values anyway.
-export type ChatMessage =
-  | {
-      role: 'user'
-      text: string
-      display?: string | undefined
-      images?: AiImage[] | undefined
-    }
-  | {
-      role: 'assistant'
-      parts: AiContentPart[]
-      usage?: AiUsage | undefined
-      model?: string | undefined
-      /** AiChatResult.fallbackModel: another model answered because the chosen
-       *  one declined — drives the «Besvart av …» chip on the answer */
-      fallbackModel?: string | undefined
-      error?: string | undefined
-      /** Set when the failure was one we can name. Stored ALONGSIDE `error`
-       *  rather than instead of it: the code is what gets translated at render
-       *  time (so a language switch redraws old failures correctly), and `error`
-       *  stays the fallback for conversations saved before codes existed. */
-      errorCode?: FileError['code']
-      /** Set when the request attached a BM25 excerpt instead of the full
-       *  document (too large for one request to carry) — drives the
-       *  transparency chip on the answer */
-      excerpt?: { included: number; total: number } | undefined
-      /** The per-request token ceiling the provider named while refusing this
-       *  one (see AiChatResult.tokenLimit). Kept so the failure can say what
-       *  the ceiling IS and that the next attempt is cut to fit it — a promise
-       *  we may only make when the provider actually published a number. */
-      tokenLimit?: number | undefined
-    }
+export type { ChatMessage, StoredConversation, ConversationSummary, ConversationHit } from '../../shared/chat-history'
 
-export interface StoredConversation {
-  id: string
-  title: string
-  createdAt: number
-  updatedAt: number
-  messages: ChatMessage[]
-}
-
-/** Exported for the panel's cross-window refresh: a `storage` event on this
- *  key means ANOTHER window/tab (e.g. a detached assistant) wrote the store. */
-export const CHATS_LS_KEY = 'pdfx-ai-chats'
-const LS_KEY = CHATS_LS_KEY
-const MAX_CHATS_PER_DOC = 10
-const MAX_DOCS = 30
-
-type ChatStore = Record<string, StoredConversation[]>
+/** The localStorage store this replaced: `{ [path]: StoredConversation[] }` */
+export const LEGACY_CHATS_LS_KEY = 'pdfx-ai-chats'
 
 export const newConversationId = (): string =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
 
-const readStore = (): ChatStore => {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(LS_KEY) ?? '{}')
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-  } catch {
-    return {}
-  }
+let migration: Promise<void> | null = null
+
+/** Import what the old localStorage store holds into the platform store,
+ *  once per window, before the first read. Merged by id with whatever the
+ *  store has (two windows may import at once; a conversation written there
+ *  since is newer and wins), then the key goes. A store write that fails
+ *  leaves the key for the next launch to try again. */
+export function migrateLegacyChats(): Promise<void> {
+  if (migration) return migration
+  migration = (async () => {
+    let raw: string | null
+    try {
+      raw = localStorage.getItem(LEGACY_CHATS_LS_KEY)
+    } catch {
+      return
+    }
+    if (!raw) return
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      parsed = null
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      for (const [path, list] of Object.entries(parsed as Record<string, unknown>)) {
+        const old = sanitizeConversations(list)
+        if (old.length === 0) continue
+        const have = await bridge.getConversations(path)
+        await bridge.setConversations(path, docNameFromPath(path), mergeConversations(have, old))
+      }
+    }
+    try {
+      localStorage.removeItem(LEGACY_CHATS_LS_KEY)
+    } catch {
+      /* read-only storage: imported again next time, harmlessly */
+    }
+  })().catch(() => {
+    migration = null // try again on the next read
+  })
+  return migration
 }
 
-const validConversation = (c: unknown): c is StoredConversation => {
-  const x = c as StoredConversation
-  return (
-    !!x && typeof x.id === 'string' && typeof x.title === 'string' &&
-    typeof x.updatedAt === 'number' && Array.isArray(x.messages)
-  )
+export async function loadConversations(docPath: string): Promise<StoredConversation[]> {
+  await migrateLegacyChats()
+  return bridge.getConversations(docPath)
 }
 
-export function loadConversations(docPath: string): StoredConversation[] {
-  const list = readStore()[docPath]
-  return Array.isArray(list) ? list.filter(validConversation) : []
+/** Write one document's conversation list (newest first). A `locked`
+ *  (password-protected) document's list is stored without its images
+ *  (withoutImages) — on every platform, since this is the one write path. */
+export function saveConversations(
+  docPath: string,
+  docName: string,
+  list: StoredConversation[],
+  locked = false
+): Promise<void> {
+  return bridge.setConversations(docPath, docName, locked ? withoutImages(list) : list)
 }
 
-/** Write one doc's conversation list (newest first). Caps per-doc count,
- *  evicts the oldest documents beyond MAX_DOCS, and retries once with an
- *  aggressive prune if the quota is hit. */
-export function saveConversations(docPath: string, list: StoredConversation[]): void {
-  const store = readStore() // fresh read: minimizes clobbering across windows
-  store[docPath] = list.slice(0, MAX_CHATS_PER_DOC)
-  if (store[docPath].length === 0) delete store[docPath]
-  const prune = (max: number): void => {
-    const docs = Object.keys(store)
-    if (docs.length <= max) return
-    docs
-      .sort((a, b) => (store[b][0]?.updatedAt ?? 0) - (store[a][0]?.updatedAt ?? 0))
-      .slice(max)
-      .forEach((k) => { if (k !== docPath) delete store[k] })
-  }
-  prune(MAX_DOCS)
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(store))
-  } catch {
-    prune(5)
-    try { localStorage.setItem(LS_KEY, JSON.stringify(store)) } catch { /* give up quietly */ }
-  }
-}
-
-export function deleteConversation(docPath: string, id: string): StoredConversation[] {
-  const next = loadConversations(docPath).filter((c) => c.id !== id)
-  saveConversations(docPath, next)
+export async function deleteConversation(
+  docPath: string,
+  docName: string,
+  id: string,
+  locked = false
+): Promise<StoredConversation[]> {
+  const next = (await loadConversations(docPath)).filter((c) => c.id !== id)
+  await saveConversations(docPath, docName, next, locked)
   return next
 }
+
+/** Every document's conversations, without messages, newest first */
+export async function listAllConversations(): Promise<ConversationSummary[]> {
+  await migrateLegacyChats()
+  return bridge.listConversations()
+}
+
+export const onConversationsChanged = (cb: (path: string | null) => void): (() => void) =>
+  bridge.onConversationsChanged(cb)
+
+// ---------- Opening a conversation in another document ----------
+
+const HANDOFF_KEY = 'pdfx-open-conversation'
+/** A handoff older than this is a document that never opened */
+const HANDOFF_TTL_MS = 20_000
+
+interface Handoff {
+  path: string
+  id: string
+  at: number
+}
+
+function readHandoff(): Handoff | null {
+  try {
+    const raw = localStorage.getItem(HANDOFF_KEY)
+    if (!raw) return null
+    const h = JSON.parse(raw) as Partial<Handoff>
+    if (typeof h.path !== 'string' || typeof h.id !== 'string' || typeof h.at !== 'number') return null
+    if (Date.now() - h.at > HANDOFF_TTL_MS) return null
+    return { path: h.path, id: h.id, at: h.at }
+  } catch {
+    return null
+  }
+}
+
+/** Ask whichever panel shows this document next to open this conversation */
+export function requestConversationOpen(docPath: string, id: string): void {
+  try {
+    localStorage.setItem(HANDOFF_KEY, JSON.stringify({ path: docPath, id, at: Date.now() } satisfies Handoff))
+  } catch {
+    /* no storage: the document still opens, on its newest conversation */
+  }
+}
+
+/** The conversation asked for on this document, if any — left in place for
+ *  the panel to take (the viewer looks first, to open the panel at all) */
+export function pendingConversationFor(docPath: string): string | null {
+  const h = readHandoff()
+  return h && h.path === docPath ? h.id : null
+}
+
+/** The conversation asked for on this document, taken: nobody else opens it */
+export function takeConversationFor(docPath: string): string | null {
+  const id = pendingConversationFor(docPath)
+  if (id !== null) {
+    try {
+      localStorage.removeItem(HANDOFF_KEY)
+    } catch {
+      /* it expires on its own */
+    }
+  }
+  return id
+}
+
+/** Fired on `window` by the host once a document has been opened for a
+ *  handoff — the viewer of that document looks for its conversation then */
+export const CONVERSATION_HANDOFF_EVENT = 'pdfx:conversation-handoff'

@@ -1,6 +1,7 @@
 // Types shared between the Electron main process, preload bridge and renderer.
 import type { PdfStandardFont } from '@embedpdf/models'
 import type { CitationStyleId } from './citation-style'
+import type { ConversationSummary, StoredConversation } from './chat-history'
 import type { FileIconChoice, FileIconErrorCode, FileIconResult } from './file-icon'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
@@ -989,6 +990,31 @@ export interface PdfxApi {
    *  the last one to a crash costs a click. */
   getBookmarks(path: string): Promise<DocBookmark[]>
   setBookmarks(path: string, bookmarks: DocBookmark[]): void
+  // ---------- AI conversations (issue #46, shared/chat-history.ts) ----------
+  /** One document's conversations, newest first. Desktop keeps one file per
+   *  document under userData/chats, the extension an IndexedDB record, dev:web
+   *  localStorage — the same contract everywhere, nothing evicted. */
+  getConversations(path: string): Promise<StoredConversation[]>
+  /** Replace one document's list. `name` rides along so the cross-document
+   *  history can name a document the recents no longer hold. An empty list
+   *  removes the document from the store. Awaited: the panel refreshes its
+   *  list from the store after a delete, so the write must have landed. */
+  setConversations(path: string, name: string, list: StoredConversation[]): Promise<void>
+  /** Every document's conversations without their messages, newest first —
+   *  the cross-document history and its search read this */
+  listConversations(): Promise<ConversationSummary[]>
+  /** Another window or tab wrote a document's conversations (a docked panel
+   *  and a detached assistant edit the same history). `path` is the document,
+   *  or null where the platform cannot say which (dev:web's storage event). */
+  onConversationsChanged(cb: (path: string | null) => void): () => void
+  // ---------- A document's identity across a move (issue #46, shared/doc-identity.ts) ----------
+  /** Record the document's fingerprint (its /ID[0], read from the bytes by
+   *  the renderer) for this path, and carry over the records — conversations,
+   *  bookmarks, reading position, a pinned recents entry — of any other path
+   *  with the same fingerprint whose file is GONE. Awaited before the position
+   *  is read, so a moved file opens where it was left. Returns the paths the
+   *  records followed from ([] = none). */
+  docIdentity(path: string, name: string, fingerprint: string): Promise<string[]>
   setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
    *  goes through src/main/incremental-appender.ts instead) */

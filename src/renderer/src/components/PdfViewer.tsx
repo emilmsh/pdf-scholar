@@ -22,6 +22,7 @@ import type {
   ViewRotation
 } from '../../../shared/types'
 import { bridge, isElectron, isExtension } from '../bridge'
+import { CONVERSATION_HANDOFF_EVENT, pendingConversationFor } from '../chat-store'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { useDropTarget } from './useDropTarget'
 import { useDocumentDrag } from './useDocumentDrag'
@@ -425,6 +426,11 @@ interface Props {
    *  current file's path and this action. Desktop leaves it undefined — the tab
    *  bar already carries the file identity. */
   onOpenFile?(): void
+  /** Open a document by path, as a tab of the host's (App's openPath). For a
+   *  conversation picked from the assistant's cross-document history (issue
+   *  #46). Undefined where there is no tab strip to open it in — the
+   *  document then opens in a new window or tab. */
+  onOpenPath?(path: string): Promise<void> | void
   /** A DIFFERENT file for the second split column (App-owned; «Åpne i delt
    *  visning»). null/undefined = the split shows this document, as always.
    *  All five are optional so single-document hosts (the extension) need not
@@ -518,6 +524,7 @@ export default function PdfViewer({
   onClose,
   onLeaveDocument,
   onOpenFile,
+  onOpenPath,
   splitDoc,
   onSplitDirtyChange,
   onRequestCloseSplitDoc,
@@ -1527,6 +1534,21 @@ export default function PdfViewer({
   const [aiPinned, setAiPinned] = useState(false)
   const aiPinnedRef = useRef(aiPinned)
   aiPinnedRef.current = aiPinned
+  // A conversation picked for THIS document from a panel's cross-document
+  // history (issue #46): open the assistant on it. Looked for when the viewer
+  // mounts (a new tab or window) and when a host says a handoff's document
+  // has been opened (this tab existed already); the panel takes it from there.
+  const [conversationAskId, setConversationAskId] = useState(0)
+  useEffect(() => {
+    const look = (): void => {
+      if (pendingConversationFor(payload.path) === null) return
+      setAiPinned(true)
+      setConversationAskId((n) => n + 1)
+    }
+    look()
+    window.addEventListener(CONVERSATION_HANDOFF_EVENT, look)
+    return () => window.removeEventListener(CONVERSATION_HANDOFF_EVENT, look)
+  }, [payload.path])
   // The dead-man switch (KI-tilgang), cached so menus can hide their AI entries
   // without an IPC roundtrip per open. A courtesy only — the transports enforce
   // the mode on every request regardless. Refreshed when the settings save
@@ -7843,6 +7865,18 @@ export default function PdfViewer({
                 pagesBusy={chatPagesBusy}
                 currentPage={currentPage}
                 pageCount={sizes.length}
+                conversationAskId={conversationAskId}
+                isLocked={() => docPasswordRef.current !== undefined}
+                onOpenElsewhere={(path) => {
+                  // The host opens the document (a tab, focused or created),
+                  // then every viewer looks for the handoff — the one showing
+                  // that path opens its panel on the conversation
+                  if (onOpenPath) {
+                    void Promise.resolve(onOpenPath(path)).then(() =>
+                      window.dispatchEvent(new Event(CONVERSATION_HANDOFF_EVENT))
+                    )
+                  } else bridge.newWindow(path)
+                }}
               />
             </div>
           </div>

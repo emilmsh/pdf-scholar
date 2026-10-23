@@ -588,6 +588,47 @@ regressions are treated as bugs, not as acceptable platform lag.
     `onFileChangedOnDisk` is a no-op in `bridge.ts`. Covered by
     `npm run test:disk-reload` (desktop session).
 
+31. **The AI conversation history is parity-identical by contract; only the
+    store underneath differs.** (issue #46, 2026-10-22) Every platform keeps
+    every conversation a document has had — nothing evicted — and the panel's
+    history view searches across all documents and opens another document on
+    a conversation picked there. The contract is `PdfxApi.getConversations` /
+    `setConversations` / `listConversations` / `onConversationsChanged`, the
+    rules `src/shared/chat-history.ts`. Desktop: one JSON file per document
+    under `userData/chats` (`src/main/chat-history.ts`), other windows told
+    over IPC. Extension: an IndexedDB record per document
+    (`src/renderer/src/extension-chat-history.ts` — chrome.storage.local is
+    capped at 10 MB and a conversation carries page images), other tabs told
+    over a BroadcastChannel. dev:web: localStorage, the `storage` event.
+    What the old localStorage store held (ten per document, thirty documents)
+    is imported once on first read (`chat-store.ts`). One genuine
+    divergence: a conversation picked for a document that is not open opens
+    the document as a TAB on the desktop (App's `openPath`) and in the
+    detached assistant or the extension as a new window/tab (`newWindow`) —
+    the handoff itself (`pdfx-open-conversation` in localStorage) is the same
+    everywhere. A document opened with a password has its conversations
+    stored without images on every platform (the renderer strips them before
+    the one write path; desktop's main strips them again when it holds the
+    password). The cross-document list never reads the images either:
+    desktop's main keeps a summary per file, re-read only when the file's
+    mtime or size changes; the extension writes a summary record beside each
+    document in the same IndexedDB transaction (database v2; v1 records get
+    theirs on the first listing). Covered by `npm run test:chat-history`
+    (rules + desktop store).
+
+32. **A moved or renamed file keeps its records on the desktop and for a
+    `file://` document in the extension; a URL and a picked file do not.**
+    (issue #46, 2026-10-22) The rule (`src/shared/doc-identity.ts`) moves a
+    path's conversations, bookmarks, position and pinned recents entry to the
+    new path of a document with the same /ID[0] — but only from a path whose
+    file is known to be GONE. Desktop asks the file system. The extension can
+    know that only for a `file://` URL with file access granted (a fetch that
+    fails); an `http(s)` URL that fails may just be offline, and an `fsa:`
+    handle needs a gesture to read, so both read as present and nothing moves
+    from them. dev:web cannot tell at all and never rebinds (`docIdentity`
+    resolves `[]` in `bridge.ts`). Covered by `npm run test:doc-identity`
+    (rule + /ID[0] through both save paths) and `test:identity-desktop`.
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

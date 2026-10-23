@@ -17,6 +17,14 @@ import { buildAssistantHash } from '../../shared/viewer-url'
 import { version as appVersion } from '../../../package.json'
 import { DEFAULT_SETTINGS } from '../../shared/defaults'
 import { DEFAULT_AI_MODELS } from '../../shared/defaults'
+import type { ConversationDoc } from '../../shared/chat-history'
+import {
+  byNewest,
+  docNameFromPath,
+  sanitizeConversationDoc,
+  sanitizeConversations,
+  summarizeConversations
+} from '../../shared/chat-history'
 import { AI_ERRORS, CHATGPT_LOGIN_ERRORS } from '../../shared/engine-errors'
 import { createDoiClient, httpDoiFetch } from '../../shared/doi'
 import { createAbstractClient } from '../../shared/abstract'
@@ -61,6 +69,23 @@ function loadWebState(): WebState {
 
 function saveWebState(state: WebState): void {
   localStorage.setItem(LS_KEY, JSON.stringify(state))
+}
+
+const WEB_CHATS_KEY = 'pdfx-web-chats'
+
+function loadWebChats(): Record<string, ConversationDoc> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(WEB_CHATS_KEY) ?? '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const out: Record<string, ConversationDoc> = {}
+    for (const [path, raw] of Object.entries(parsed)) {
+      const doc = sanitizeConversationDoc(raw)
+      if (doc && doc.path === path) out[path] = doc
+    }
+    return out
+  } catch {
+    return {}
+  }
 }
 
 /** One DOI client for the page — the success cache lives as long as it does */
@@ -121,6 +146,35 @@ export const webApi: PdfxApi = {
     if (bookmarks.length === 0) delete state.bookmarks[path]
     else state.bookmarks[path] = bookmarks
     saveWebState(state)
+  },
+  // The AI conversations (issue #46): localStorage here, the same contract as
+  // desktop's files and the extension's IndexedDB. A quota hit loses the
+  // write, which is what a browser preview costs — the panel keeps its copy.
+  getConversations: async (path) => loadWebChats()[path]?.conversations ?? [],
+  setConversations: async (path, name, list) => {
+    const all = loadWebChats()
+    const clean = sanitizeConversations(list)
+    if (clean.length === 0) delete all[path]
+    else all[path] = { path, name: name.trim() || docNameFromPath(path), conversations: clean }
+    try {
+      localStorage.setItem(WEB_CHATS_KEY, JSON.stringify(all))
+    } catch {
+      /* quota: the panel keeps its copy until the next write */
+    }
+  },
+  listConversations: async () => byNewest(Object.values(loadWebChats()).flatMap(summarizeConversations)),
+  // A browser preview cannot tell whether a fetched path is gone, and a
+  // record is only ever moved away from a path known to be gone — so no
+  // rebinding here (shared/doc-identity.ts; desktop and the extension do it)
+  docIdentity: async () => [],
+  // `storage` fires in OTHER tabs only, and names no document — the listener
+  // refreshes whatever it shows
+  onConversationsChanged: (cb) => {
+    const onStorage = (e: StorageEvent): void => {
+      if (e.key === WEB_CHATS_KEY) cb(null)
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   },
   setSettings: (patch) => {
     const state = loadWebState()

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FilePayload, ReadingPosition, RecentFile, Settings, ThemeName } from '../../shared/types'
 import { bridge } from './bridge'
+import { movedFromLabel, positionFor, reportIdentity } from './doc-identity'
 import { buildViewerUrl } from '../../shared/viewer-url'
 import { consumeTakenBack, openInBrowserViewer } from './extension-api'
 import { insecureRetryUrl } from '../../shared/insecure-retry'
@@ -33,6 +34,7 @@ import { DEFAULT_SETTINGS as FALLBACK_SETTINGS } from '../../shared/defaults'
 export default function ExtensionApp(): React.JSX.Element {
   const [payload, setPayload] = useState<FilePayload | null>(null)
   const [initialPosition, setInitialPosition] = useState<ReadingPosition | null>(null)
+  const [reboundNotice, setReboundNotice] = useState<string | null>(null)
   const [recents, setRecents] = useState<RecentFile[]>([])
   const [settings, setSettingsState] = useState<Settings>(FALLBACK_SETTINGS)
   const [systemDark, setSystemDark] = useState(
@@ -113,7 +115,14 @@ export default function ExtensionApp(): React.JSX.Element {
   // ---------- Document loading ----------
 
   const openPayload = useCallback(async (p: FilePayload) => {
-    const pos = await bridge.getPosition(p.path)
+    const pos = await positionFor(p)
+    // A moved or renamed file whose records just followed it (issue #46) —
+    // the same one-line notice as the desktop's
+    void reportIdentity(p).then((from) => {
+      if (from.length === 0) return
+      setReboundNotice(t('app.identityRebound', { from: movedFromLabel(from[0], p) }))
+      window.setTimeout(() => setReboundNotice(null), 3600)
+    })
     setInitialPosition(pos)
     bridge.docOpened(p.path)
     setPayload(p)
@@ -309,7 +318,7 @@ export default function ExtensionApp(): React.JSX.Element {
       if (verdict !== 'cancel') {
         const fresh = await bridge.readFile(path)
         if ('error' in fresh) return verdict
-        setInitialPosition(await bridge.getPosition(path))
+        setInitialPosition(await positionFor(fresh))
         setPayload(fresh)
         setEpoch((e) => e + 1)
       }
@@ -341,6 +350,11 @@ export default function ExtensionApp(): React.JSX.Element {
 
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+      {reboundNotice && (
+        <div key={reboundNotice} className="toast app-toast" role="status">
+          {reboundNotice}
+        </div>
+      )}
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>
