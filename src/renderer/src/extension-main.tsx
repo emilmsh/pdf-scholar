@@ -3,10 +3,16 @@ import ExtensionApp from './ExtensionApp'
 import AssistantApp from './AssistantApp'
 import { parseAssistantTarget } from '../../shared/viewer-url'
 import { initTouchUi } from './touch-ui'
+import { installOcr } from './ocr'
 import './styles/app.css'
 
 // Finger-sized targets follow the input in use (html.touch-ui) — see touch-ui.ts
 initTouchUi()
+
+// Scanned pages get their text from OCR, on this machine (ocr.ts) — without
+// this the text layer still shows OCR words, but search and the assistant
+// see the scan as empty
+installOcr()
 
 // Entry point for the browser-extension viewer page. The renderer's platform
 // bridge (bridge.ts) detects the WebExtension context and routes window.api

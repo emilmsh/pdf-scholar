@@ -351,8 +351,10 @@ export function useOcrProgress(pdf: PDFDocumentProxy | null): OcrProgress | null
 }
 
 /** Hand search.ts the OCR fallback for pages without text. Called once at
- *  startup (main.tsx); search.ts stays free of the engine so its tests run in
- *  plain Node. */
+ *  startup by EVERY entry point — main.tsx (desktop, dev:web) and
+ *  extension-main.tsx — or search and the assistant read a scan as empty
+ *  while its text layer, which asks ocrTextContent directly, looks fine.
+ *  search.ts stays free of the engine so its tests run in plain Node. */
 export function installOcr(): void {
   setTextFallback(ocrTextContent)
 }
