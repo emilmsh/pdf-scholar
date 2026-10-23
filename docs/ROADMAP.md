@@ -436,6 +436,18 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     seks måneder» som innstilling er den stille utkastingen det varige
     lageret ble bygget for å avskaffe. Eksport til Markdown (lesbar uten
     appen) og JSON (alt, med bilder). Dekket av `test:chat-history` seksjon 9.
+  - **Finpuss etter Emils gjennomgang** (2026-10-23): et dempet samtalemerke
+    med antall på «Nylig lest» (forside og rad) og «Vis samtaler» blant
+    handlingene, som åpner fanen filtrert på dokumentet; merkelappen
+    «Filen finnes ikke» på dokumenter som er borte (biblioteket og panelets
+    alle-dokumenter-liste); sortering (sist endret, opprettet, dokument A–Å,
+    flest meldinger) og filtrene «Filen mangler» og «Med bilder»;
+    «Egendefinert …» i både «Eldre enn» og «Behold bare de nyeste»; en
+    kildebrikk utenfor sitt dokument åpner dokumentet PÅ passasjen med den
+    markert, også i en fane som allerede er åpen; og søket på tvers kjører
+    der lageret er (main på desktop), så et vindu bare får treffene — målt
+    2026-10-23: 5 000 samtaler var 22 MB per opplisting, selve søket 15 ms.
+    Dekket av `test:chat-history` seksjon 10 og `test:library-desktop`.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

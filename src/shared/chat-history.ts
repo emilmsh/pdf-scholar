@@ -96,11 +96,23 @@ export interface ConversationSummary {
   imageBytes: number
 }
 
-export interface ConversationHit extends ConversationSummary {
+/** A summary as it crosses to a window: everything the list shows, without
+ *  the conversation's full text. The text stays where the store is — the
+ *  search runs there (PdfxApi.searchConversations) — since 5 000
+ *  conversations' text is ~22 MB a window had to receive on every listing. */
+export type ConversationMeta = Omit<ConversationSummary, 'text'>
+
+export interface ConversationHit extends ConversationMeta {
   /** The text around the first word matched in the conversation's TEXT —
    *  null when the match is in the title or document name alone, which the
    *  row shows anyway */
   snippet: string | null
+}
+
+/** A summary without its text, for the list a window receives */
+export function toMeta(s: ConversationSummary): ConversationMeta {
+  const { text: _text, ...meta } = s
+  return meta
 }
 
 /** Bounds on a stored list — against garbage, not against use */
@@ -291,7 +303,7 @@ export function searchConversations(list: ConversationSummary[], query: string):
         break
       }
     }
-    if (all) hits.push({ ...c, snippet })
+    if (all) hits.push({ ...toMeta(c), snippet })
   }
   return hits
 }

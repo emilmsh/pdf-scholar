@@ -1069,6 +1069,103 @@ button {
   margin: 6px 12px 8px;
 }
 
+/* Order and filters, one quiet row over the list */
+.convs-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin: 0 4px 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.convs-sort select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.convs-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.convs-chip {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.convs-chip:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.convs-chip.is-on {
+  border-color: var(--wc-teal);
+  color: var(--text);
+  background: color-mix(in srgb, var(--wc-teal) 12%, var(--bg-elevated));
+}
+
+.convs-chip:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* «Egendefinert»: a short number field beside the menu */
+.convs-custom {
+  width: 5em;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.convs-custom:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* A document whose file is gone: a small muted label after its name, in the
+   library's groups and the panel's cross-document list alike */
+.conv-gone-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  vertical-align: 1px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+/* The recents' quiet mark that a document has conversations: a speech
+   bubble and the count, in the secondary text colour — beside the date in
+   the list, under the name on a first page */
+.recent-convs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-right: 8px;
+}
+
+.recent-card .recent-convs {
+  margin: -2px 0 0;
+}
+
 /* The tidying: one row per action, what it would take beside its button */
 .convs-tidy {
   display: flex;
