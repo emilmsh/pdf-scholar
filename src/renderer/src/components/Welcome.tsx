@@ -30,13 +30,29 @@ import { AiSettings } from './AiPanel'
 import FileAccessNotice from './FileAccessNotice'
 import { dismissFileAccessNotice, fileAccessGranted, fileAccessNoticeDismissed } from '../extension-file-access'
 import { useRecentThumbs } from '../hooks/useRecentThumbs'
+import ConversationsLibrary from './ConversationsLibrary'
+import type { ConversationSummary } from '../chat-store'
+import { listAllConversations, onConversationsChanged } from '../chat-store'
+
+type LibraryTab = 'recents' | 'conversations'
+const LIBRARY_TAB_KEY = 'pdfx-library-tab'
+
+/** The tab the reader last chose — a per-viewer convenience (localStorage),
+ *  falling back to «Nylig lest» wherever storage is unavailable */
+function loadLibraryTab(): LibraryTab {
+  try {
+    return localStorage.getItem(LIBRARY_TAB_KEY) === 'conversations' ? 'conversations' : 'recents'
+  } catch {
+    return 'recents'
+  }
+}
 
 type RecentsView = Settings['recentsView']
 
 interface Props {
   recents: RecentFile[]
   onOpenDialog(): void
-  onOpenRecent(path: string): void
+  onOpenRecent(path: string): Promise<void> | void
   /** «Nylig lest» as the compact list or as a grid of first pages (issue #28) */
   recentsView: RecentsView
   onRecentsViewChange(view: RecentsView): void
@@ -106,6 +122,31 @@ export default function Welcome({
   const thumbs = useRecentThumbs(recents, recentsView === 'grid')
   const gridSize = recentsGridSizeOrDefault(recentsGridSize)
   const { pinned, recent } = splitRecents(recents)
+
+  // ---------- «Samtaler» (issue #46) ----------
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [tabChoice, setTabChoice] = useState<LibraryTab>(loadLibraryTab)
+  const [tidyOpen, setTidyOpen] = useState(false)
+  const [reading, setReading] = useState(false)
+  const reloadConversations = useCallback(() => {
+    void listAllConversations().then(setConversations)
+  }, [])
+  useEffect(() => {
+    reloadConversations()
+    return onConversationsChanged(() => reloadConversations())
+  }, [reloadConversations])
+  const chooseTab = (tab: LibraryTab): void => {
+    setTabChoice(tab)
+    try {
+      localStorage.setItem(LIBRARY_TAB_KEY, tab)
+    } catch {
+      /* remembered for this visit only */
+    }
+  }
+  // A tab with nothing in it is never the one shown
+  const tab: LibraryTab =
+    conversations.length === 0 ? 'recents' : recents.length === 0 ? 'conversations' : tabChoice
+  const showConvs = tab === 'conversations'
 
   // ---------- Keeping the list tidy (issue #29) ----------
   /** The last entry taken out, while its «Angre» is still on offer. Only the
@@ -345,10 +386,36 @@ export default function Welcome({
           </div>
         )}
 
-        {recents.length > 0 && (
-          <div className={`recents${recentsView === 'grid' ? ' is-grid' : ''}`}>
+        {(recents.length > 0 || conversations.length > 0) && (
+          <div
+            className={`recents${showConvs ? ' is-convs' : recentsView === 'grid' ? ' is-grid' : ''}${showConvs && reading ? ' is-reading' : ''}`}
+          >
             <div className="recents-head">
-              <h2>{t('welcome.recents')}</h2>
+              {conversations.length === 0 ? (
+                <h2>{t('welcome.recents')}</h2>
+              ) : (
+                <div className="library-tabs" role="tablist">
+                  {recents.length > 0 && (
+                    <button role="tab" aria-selected={!showConvs} className={showConvs ? '' : 'is-active'} onClick={() => chooseTab('recents')}>
+                      {t('welcome.recents')}
+                    </button>
+                  )}
+                  <button role="tab" aria-selected={showConvs} className={showConvs ? 'is-active' : ''} onClick={() => chooseTab('conversations')}>
+                    {t('lib.tab')}
+                  </button>
+                </div>
+              )}
+              {showConvs ? (
+                !reading && (
+                  <button
+                    className={`library-tidy-btn${tidyOpen ? ' is-active' : ''}`}
+                    aria-pressed={tidyOpen}
+                    onClick={() => setTidyOpen((o) => !o)}
+                  >
+                    {t('lib.tidy')}
+                  </button>
+                )
+              ) : (
               <div className="recents-tools">
                 {/* Three fixed sizes — presets, not a slider — and only while
                     there are first pages to size */}
@@ -393,11 +460,23 @@ export default function Welcome({
                   </button>
                 </div>
               </div>
+              )}
             </div>
-            {/* One box, one scroll: «Festet» on top under its own label,
-                then the rest below a hairline. With nothing pinned there is
-                no label, and the box is the list it always was. */}
+            {showConvs ? (
+              <ConversationsLibrary
+                conversations={conversations}
+                onChanged={reloadConversations}
+                onOpenDocument={onOpenRecent}
+                onRecentsMaybeChanged={() => void bridge.getRecents().then(onRecentsChange)}
+                tidyOpen={tidyOpen}
+                onTidyOpenChange={setTidyOpen}
+                onReadingChange={setReading}
+              />
+            ) : (
             <div className="recents-box">
+              {/* One box, one scroll: «Festet» on top under its own label,
+                  then the rest below a hairline. With nothing pinned there is
+                  no label, and the box is the list it always was. */}
               {pinned.length > 0 && (
                 <section className="recents-group">
                   <h3>{t('welcome.recentsPinned')}</h3>
@@ -410,6 +489,7 @@ export default function Welcome({
                 </section>
               )}
             </div>
+            )}
           </div>
         )}
 

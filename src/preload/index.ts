@@ -47,6 +47,8 @@ const api: PdfxApi = {
   listConversations: () => ipcRenderer.invoke('chats:list'),
   docIdentity: (path: string, name: string, fingerprint: string) =>
     ipcRenderer.invoke('identity:report', path, name, fingerprint),
+  goneDocuments: () => ipcRenderer.invoke('library:gone'),
+  forgetDocuments: (paths: string[]) => ipcRenderer.invoke('library:forget', paths),
   onConversationsChanged: (cb: (path: string | null) => void) => {
     const listener = (_e: unknown, path: string): void => cb(path)
     ipcRenderer.on('chats:changed', listener)

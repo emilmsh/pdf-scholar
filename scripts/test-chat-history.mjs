@@ -28,6 +28,7 @@ const bundle = async (entry, name) => {
 }
 const H = await bundle(SHARED, 'shared.mjs')
 const { createChatHistoryStore } = await bundle(STORE, 'store.mjs')
+const L = await bundle(fileURLToPath(new URL('../src/shared/chat-library.ts', import.meta.url)), 'library.mjs')
 
 let failures = 0
 const check = (label, cond, detail = '') => {
@@ -245,6 +246,55 @@ console.log('\n8. the cross-document list does not re-read what has not changed'
   await store.set(Q, 'other.pdf', [])
   parsed = []
   check('a removed document leaves the list', (await store.list()).map((s) => s.id).join(',') === 'p1' && parsed.length === 0)
+}
+
+console.log('\n9. the library view: groups, and what each tidying takes')
+{
+  const img = (n) => ({ mediaType: 'image/jpeg', dataBase64: 'A'.repeat(n) })
+  const DAY = 86_400_000
+  const NOW = Date.UTC(2026, 9, 23, 12)
+  const docs = [
+    { path: 'A', name: 'a.pdf', conversations: [
+      conv('a1', NOW - 1 * DAY, [user('q', { images: [img(4000), img(400)] }), answer('x')]),
+      conv('a2', NOW - 400 * DAY)
+    ] },
+    { path: 'B', name: 'b.pdf', conversations: [conv('b1', NOW - 2 * DAY), conv('b2', NOW - 800 * DAY)] },
+    { path: 'C', name: 'c.pdf', conversations: [conv('c1', NOW - 30 * DAY)] }
+  ]
+  const all = docs.flatMap(H.summarizeConversations)
+  const a1 = all.find((s) => s.id === 'a1')
+  check('a summary counts its images and their decoded size', a1.images === 2 && a1.imageBytes === 3300, `${a1.images} / ${a1.imageBytes}`)
+  check('a summary without images counts none', all.find((s) => s.id === 'b1').images === 0)
+
+  const groups = L.groupByDocument(all)
+  check('groups list newest document first, conversations newest first',
+    groups.map((g) => `${g.docPath}:${g.items.map((i) => i.id).join('+')}`).join(' ') === 'A:a1+a2 B:b1+b2 C:c1',
+    groups.map((g) => `${g.docPath}:${g.items.map((i) => i.id).join('+')}`).join(' '))
+
+  const ids = (sel) => [...sel].map(([p, s]) => `${p}:${[...s].sort().join('+')}`).sort().join(' ')
+  const older = L.selectOlderThan(all, L.monthsBefore(NOW, 12))
+  check('older than a year: exactly those', ids(older) === 'A:a2 B:b2', ids(older))
+  check('…counted as conversations about documents', JSON.stringify(L.selectionSize(older)) === '{"conversations":2,"documents":2}')
+  check('nothing older than 24 months but one', ids(L.selectOlderThan(all, L.monthsBefore(NOW, 24))) === 'B:b2')
+
+  const beyond = L.selectBeyondNewest(all, 3)
+  check('keep the 3 newest: the other two go', ids(beyond) === 'A:a2 B:b2', ids(beyond))
+  check('keeping more than there are takes nothing', L.selectBeyondNewest(all, 100).size === 0)
+  const tied = [
+    { ...all[0], docPath: 'Z', id: 'z', updatedAt: 5 },
+    { ...all[0], docPath: 'Y', id: 'y', updatedAt: 5 }
+  ]
+  check('a tie on the time is broken the same way every time',
+    ids(L.selectBeyondNewest(tied, 1)) === ids(L.selectBeyondNewest([...tied].reverse(), 1)) && ids(L.selectBeyondNewest(tied, 1)) === 'Z:z')
+
+  const withImages = L.selectWithImages(all)
+  check('«Fjern bilder» takes only conversations with images', ids(withImages) === 'A:a1')
+  check('…and says what it frees', JSON.stringify(L.selectionImages(all, withImages)) === '{"images":2,"bytes":3300}')
+  const totals = L.storageTotals(all)
+  check('the store at a glance', totals.conversations === 5 && totals.documents === 3 && totals.images === 2 && totals.imageBytes === 3300)
+
+  check('sizes read as kB below a megabyte', L.formatBytes(3300, 'en') === '3 kB' && L.formatBytes(10, 'en') === '1 kB')
+  check('…and as MB with one decimal above', L.formatBytes(5.25 * 1024 * 1024, 'en') === '5.3 MB', L.formatBytes(5.25 * 1024 * 1024, 'en'))
 }
 
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')

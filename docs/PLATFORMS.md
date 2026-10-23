@@ -628,6 +628,15 @@ regressions are treated as bugs, not as acceptable platform lag.
     from them. dev:web cannot tell at all and never rebinds (`docIdentity`
     resolves `[]` in `bridge.ts`). Covered by `npm run test:doc-identity`
     (rule + /ID[0] through both save paths) and `test:identity-desktop`.
+    The library's «Dokumenter som ikke finnes lenger» (`goneDocuments` /
+    `forgetDocuments`) uses the same «gone»: on the desktop every absolute
+    path main keeps anything for, in the extension a `file://` path with
+    file access, in dev:web nothing (the row reads «Alle dokumentene finnes»).
+    Forgetting is bookkeeping and identical everywhere — conversations,
+    position, bookmarks, fingerprint, recents entry and picture — and never
+    touches a draft with unsaved marks. The rest of the «Samtaler» view
+    (search, reading, the other three tidyings, Markdown/JSON export through
+    `saveTextFile`) is the same renderer code on every platform.
 
 ## Maintenance rules
 

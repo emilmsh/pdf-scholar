@@ -24,6 +24,7 @@ import type {
   DeleteAnnotationRequest,
   FileError,
   FilePayload,
+  GoneDocument,
   ModifyAnnotationRequest,
   DocBookmark,
   ReadingPosition,
@@ -1338,6 +1339,65 @@ function registerIpc(): void {
       return result.from
     }
   )
+
+  // The library's tidying (issue #46): documents whose file is gone, across
+  // every store main keeps per path, and forgetting them. A draft with unsaved
+  // marks is NOT touched — that is work, not bookkeeping, and the reader can
+  // still save it as a copy from its tab.
+  const tellAllWindows = (): void => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed() && !w.webContents.isDestroyed()) w.webContents.send('chats:changed', null)
+    }
+  }
+  ipcMain.handle('library:gone', async (): Promise<GoneDocument[]> => {
+    const state = getState()
+    const summaries = await chats.list()
+    const counts = new Map<string, { name: string; n: number }>()
+    for (const s of summaries) {
+      const c = counts.get(s.docPath) ?? { name: s.docName, n: 0 }
+      c.n++
+      counts.set(s.docPath, c)
+    }
+    const paths = new Set<string>([
+      ...counts.keys(),
+      ...Object.keys(state.positions),
+      ...Object.keys(state.bookmarks),
+      ...Object.keys(state.fingerprints),
+      ...state.recents.map((r) => r.path)
+    ])
+    const out: GoneDocument[] = []
+    for (const p of [...paths].sort()) {
+      // Only a real file path can be known gone; anything else (a URL handed
+      // to the app, a garbage key) is left alone
+      if (!isAbsolute(p)) continue
+      if (await access(p).then(() => true, () => false)) continue
+      const recent = state.recents.find((r) => r.path === p)
+      out.push({
+        path: p,
+        name: counts.get(p)?.name ?? recent?.name ?? basename(p),
+        conversations: counts.get(p)?.n ?? 0,
+        other: p in state.positions || p in state.bookmarks || !!recent
+      })
+    }
+    return out
+  })
+  ipcMain.handle('library:forget', async (_e, paths: unknown): Promise<void> => {
+    if (!Array.isArray(paths)) return
+    const state = getState()
+    for (const p of paths) {
+      if (typeof p !== 'string' || !p) continue
+      await chats.set(p, '', [])
+      delete state.positions[p]
+      delete state.fingerprints[p]
+      if (p in state.bookmarks) setBookmarks(p, [])
+      if (state.recents.some((r) => r.path === p)) {
+        removeRecentEntry(p)
+        await recentThumbs.forget(p)
+      }
+    }
+    saveState()
+    tellAllWindows()
+  })
 
   ipcMain.on('settings:set', (_e, patch: Partial<Settings>) => {
     const state = getState()

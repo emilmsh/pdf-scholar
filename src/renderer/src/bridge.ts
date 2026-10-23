@@ -167,6 +167,24 @@ export const webApi: PdfxApi = {
   // record is only ever moved away from a path known to be gone — so no
   // rebinding here (shared/doc-identity.ts; desktop and the extension do it)
   docIdentity: async () => [],
+  // Nothing here can be known gone (see docIdentity above)…
+  goneDocuments: async () => [],
+  // …but forgetting is plain bookkeeping, the same as everywhere
+  forgetDocuments: async (paths) => {
+    const chats = loadWebChats()
+    const state = loadWebState()
+    for (const p of paths) {
+      delete chats[p]
+      delete state.positions[p]
+      if (state.bookmarks) delete state.bookmarks[p]
+    }
+    try {
+      localStorage.setItem(WEB_CHATS_KEY, JSON.stringify(chats))
+    } catch {
+      /* quota: nothing was added, so this cannot really happen */
+    }
+    saveWebState(state)
+  },
   // `storage` fires in OTHER tabs only, and names no document — the listener
   // refreshes whatever it shows
   onConversationsChanged: (cb) => {

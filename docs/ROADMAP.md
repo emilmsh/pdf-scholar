@@ -424,6 +424,18 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     lenger bildene: main holder et sammendrag per fil og tolker bare filer
     som er endret siden sist; utvidelsen skriver sammendraget i egen
     IndexedDB-tabell i samme transaksjon.
+  - **«Samtaler» i biblioteket** (2026-10-23, Emils bestilling): en fane ved
+    siden av «Nylig lest» med alle samtalene gruppert per dokument, søk,
+    lesing i biblioteket (siden ruller — ingen kikkhull-boks, verken for
+    lista eller svaret), «Åpne i dokumentet» på raden og i leseren.
+    «Rydd opp og eksporter» samler fire ENGANGShandlinger — dokumenter som
+    ikke finnes lenger (glemmer alt om dem, men aldri et utkast med ulagrede
+    merknader), eldre enn 3/6/12/24 måneder, behold bare de 50–500 nyeste,
+    fjern bilder og behold teksten — hver med antall før noe skjer og en
+    bekreftelse i raden, siden ingen kan angres. Ingen stående regel: «behold
+    seks måneder» som innstilling er den stille utkastingen det varige
+    lageret ble bygget for å avskaffe. Eksport til Markdown (lesbar uten
+    appen) og JSON (alt, med bilder). Dekket av `test:chat-history` seksjon 9.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som
