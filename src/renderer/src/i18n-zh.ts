@@ -375,6 +375,8 @@ export const zh: Dict = {
   'settings.selectionMenuCompactTip':
     '同一菜单的紧凑版：颜色排列更紧凑，图标不带文字（悬停可查看名称）。助手操作收在 ✦ 之后。',
   'settings.restoreSession': '重新打开上次会话的标签页',
+  'settings.ocrAuto': '自动识别图片中的文字',
+  'settings.ocrAutoTip': '扫描页面和图片（图表、粘贴的表格）中的文字一显示就在本机识别。关闭后：仅在您对该文档提出要求时识别（“识别文字”）。之前识别过的内容无论如何都会被记住。',
   'settings.linkPreview': '链接预览',
   'settings.linkPreviewTip':
     '将指针停在引用、图或公式上，即可预览链接指向的内容，无需离开当前页面。触摸屏上长按。',
@@ -659,7 +661,10 @@ export const zh: Dict = {
   'search.listShow': '显示结果列表',
   'search.listHide': '隐藏结果列表',
   'search.aiNoText': '此文档没有可搜索的文本（扫描件）',
-  'search.ocrReading': '正在识别扫描页面上的文字… {done} / {total}',
+  'search.ocrReading': '正在识别图片和扫描页面中的文字… {done} / {total}',
+  'search.ocrOffer': '扫描页面尚未识别。',
+  'ocr.enable': '识别文字',
+  'ocr.enableTip': '页面为扫描件。在本机识别其中的文字，以便搜索、选择和询问助手。',
   'viewer.errorTitle': '无法显示文档。',
   'viewer.errorBytes': '（已读取 {bytes} 字节，开头为“{head}”，结尾为“{tail}”）',
   'viewer.errorRetry': '重试',

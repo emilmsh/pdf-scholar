@@ -431,6 +431,9 @@ const nb = {
   'settings.selectionMenuCompactTip':
     'Samme meny, mindre: tettere farger og ikoner uten tekst (navnet vises når du holder over). Assistentens valg bak ✦.',
   'settings.restoreSession': 'Åpne fanene fra forrige gang',
+  'settings.ocrAuto': 'Les tekst i bilder automatisk',
+  'settings.ocrAutoTip':
+    'Tekst på skannede sider og i bilder (figurer, innlimte tabeller) gjenkjennes her på maskinen så snart siden vises. Av: bare når du ber om det for dokumentet («Gjenkjenn tekst»). Det som er lest før, huskes uansett.',
   'settings.linkPreview': 'Forhåndsvis lenker',
   'settings.linkPreviewTip':
     'Hold pekeren over en henvisning, en figur eller en ligning for å se hva lenken peker på – uten å forlate siden. Langt trykk på berøringsskjerm.',
@@ -739,7 +742,10 @@ const nb = {
   'search.listShow': 'Vis treffliste',
   'search.listHide': 'Skjul treffliste',
   'search.aiNoText': 'Dokumentet har ingen tekst å søke i (skannet)',
-  'search.ocrReading': 'Leser teksten på skannede sider … {done} av {total}',
+  'search.ocrReading': 'Leser tekst i bilder og skannede sider … {done} av {total}',
+  'search.ocrOffer': 'Skannede sider er ikke lest ennå.',
+  'ocr.enable': 'Gjenkjenn tekst',
+  'ocr.enableTip': 'Sidene er skannet. Les teksten på dem her på maskinen, så du kan søke, markere og spørre assistenten.',
 
   // Viewer
   'viewer.errorTitle': 'Kunne ikke vise dokumentet.',
@@ -1592,6 +1598,9 @@ const en: Dict = {
   'settings.selectionMenuCompactTip':
     'The same menu, smaller: tighter colours and icons without text (hover for the name). The assistant’s actions behind ✦.',
   'settings.restoreSession': 'Reopen last session’s tabs',
+  'settings.ocrAuto': 'Read text in images automatically',
+  'settings.ocrAutoTip':
+    'Text on scanned pages and in images (figures, pasted-in tables) is recognised on this computer as soon as a page is shown. Off: only when you ask for it per document (“Recognise text”). What was read before is remembered either way.',
   'settings.linkPreview': 'Preview links',
   'settings.linkPreviewTip':
     'Rest the pointer on a citation, a figure or an equation reference to see what the link points to — without leaving the page. Long-press on a touchscreen.',
@@ -1883,7 +1892,10 @@ const en: Dict = {
   'search.listShow': 'Show results list',
   'search.listHide': 'Hide results list',
   'search.aiNoText': 'This document has no text to search (scanned)',
-  'search.ocrReading': 'Reading the text on scanned pages … {done} of {total}',
+  'search.ocrReading': 'Reading text in images and scanned pages … {done} of {total}',
+  'search.ocrOffer': 'Scanned pages have not been read yet.',
+  'ocr.enable': 'Recognise text',
+  'ocr.enableTip': 'The pages are scanned. Read their text on this computer so you can search, select and ask the assistant.',
 
   'viewer.errorTitle': 'Could not display the document.',
   'viewer.errorBytes': '({bytes} bytes read, starts “{head}”, ends “{tail}”)',

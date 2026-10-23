@@ -5,13 +5,18 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { TextContent } from 'pdfjs-dist/types/src/display/api'
 import type { PageRect } from '../../shared/types'
 import { clientRectsToPageRects } from './annotations'
-import { hasVisibleText } from './ocr-text'
+import { OCR_FONT, hasVisibleText } from './ocr-text'
 
 export interface PageText {
   /** Concatenated item strings; '\n' appended after items with hasEOL */
   text: string
   /** Non-empty items only: char offset, length, in span order */
   runs: { start: number; length: number }[]
+  /** The first run OCR read, when the page has any: all of a scanned page's,
+   *  or the words in its images after its own text (ocr-image.ts). What lets
+   *  a text layer built with or without the images' words still be measured
+   *  against this text — the page's own runs are a prefix of both. */
+  ocrRunsFrom?: number
 }
 
 export interface SearchMatch {
@@ -30,13 +35,22 @@ export interface SearchOptions {
 
 const MAX_MATCHES = 500
 
-/** Where a page's text comes from when its PDF has none: ocr.ts reads the
- *  page (installOcr). Injected rather than imported so this module — and its
- *  tests — stay free of the engine. */
+/** Whether the words OCR reads in a page's IMAGES are waited for. Only search
+ *  waits ('wait', and it shows what it has meanwhile); everything else takes
+ *  what is already read ('available') — a figure is never a reason for the
+ *  assistant or the export to stand still (Emil, 2026-10-23). A scanned page
+ *  has no text without OCR and is waited for either way. */
+export type ImageText = 'wait' | 'available'
+
+/** Where text the PDF lacks comes from: ocr.ts (installOcr) — a scanned
+ *  page's words in place of its empty `own` text, or `own` with its images'
+ *  words appended; null keeps `own`. Injected rather than imported so this
+ *  module — and its tests — stay free of the engine. */
 export type TextFallback = (
   pdf: PDFDocumentProxy,
   pageNumber: number,
-  opts?: { priority?: number; signal?: AbortSignal }
+  own: TextContent,
+  opts: { priority?: number; signal?: AbortSignal; images?: ImageText }
 ) => Promise<TextContent | null>
 
 let textFallback: TextFallback | null = null
@@ -46,28 +60,30 @@ export function setTextFallback(fallback: TextFallback | null): void {
 }
 
 /** A page's text content: its own, or — a scanned page with none — the words
- *  OCR found on it. The ONE place both the text layer's source and every
- *  extracted PageText come from, so the spans and the runs stay 1:1 on a
- *  scanned page too (see resolveMatchRects). An XFA form's text is never
- *  empty in this sense and never read. */
+ *  OCR found on it, or its own with the words in its images after it. The
+ *  ONE place both the text layer's source and every extracted PageText come
+ *  from, so the spans and the runs correspond (see resolveMatchRects). An XFA
+ *  form's text is never read. */
 export async function pageTextContent(
   pdf: PDFDocumentProxy,
   pageNumber: number,
-  opts?: { priority?: number; signal?: AbortSignal }
+  opts: { priority?: number; signal?: AbortSignal; images?: ImageText } = {}
 ): Promise<TextContent> {
   const page = await pdf.getPage(pageNumber)
   const content = await page.getTextContent()
-  if (!textFallback || pdf.isPureXfa || hasVisibleText(content)) return content
-  return (await textFallback(pdf, pageNumber, opts)) ?? content
+  if (!textFallback || pdf.isPureXfa) return content
+  return (await textFallback(pdf, pageNumber, content, opts)) ?? content
 }
 
 /** Text content → page text, with a run per non-empty item */
 function toPageText(content: TextContent, xfa: boolean): PageText {
   let text = ''
   const runs: { start: number; length: number }[] = []
+  let ocrRunsFrom: number | undefined
   for (const item of content.items) {
     if (!('str' in item)) continue
     if (item.str !== '') {
+      if (ocrRunsFrom === undefined && item.fontName === OCR_FONT) ocrRunsFrom = runs.length
       runs.push({ start: text.length, length: item.str.length })
       text += item.str
     }
@@ -76,7 +92,7 @@ function toPageText(content: TextContent, xfa: boolean): PageText {
     // they would read «Page of Support for…». Each one ends its own line.
     if (item.hasEOL || xfa) text += '\n'
   }
-  return { text, runs }
+  return ocrRunsFrom === undefined ? { text, runs } : { text, runs, ocrRunsFrom }
 }
 
 /**
@@ -95,35 +111,41 @@ export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): 
 /**
  * Every page's text and runs.
  *
- * A scanned document is read in two passes: first every page's own text (fast
- * — there is none), then the pages without any through OCR, a second or two
- * each. `onProgress` hears the pages as they arrive — the array in page order,
- * pages not yet read still empty — so a search can show what it has found so
- * far instead of waiting minutes on a long book. With a `signal` the pass can
- * be given up: pages not yet read leave the OCR queue and the promise rejects.
+ * In two passes: first every page's own text (fast), then what OCR adds — a
+ * scanned page's words, a second or two each, and with `images: 'wait'` the
+ * words in the images of pages that have text. `onProgress` hears the pages
+ * as they change — the array in page order, the own text in place from the
+ * first pass on — so a search shows what it has found at once instead of
+ * waiting minutes on a long book. With a `signal` the pass can be given up:
+ * pages not yet read leave the OCR queue and the promise rejects.
  */
 export async function buildPageTexts(
   pdf: PDFDocumentProxy,
-  opts: { onProgress?(pages: PageText[]): void; signal?: AbortSignal } = {}
+  opts: { onProgress?(pages: PageText[]): void; signal?: AbortSignal; images?: ImageText } = {}
 ): Promise<PageText[]> {
   const pages: PageText[] = []
-  const missing: number[] = []
+  const owns: TextContent[] = []
+  let scanned = false
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
     const content = await page.getTextContent()
     opts.signal?.throwIfAborted()
-    if (textFallback && !pdf.isPureXfa && !hasVisibleText(content)) missing.push(i)
+    if (!hasVisibleText(content)) scanned = true
+    owns.push(content)
     pages.push(toPageText(content, pdf.isPureXfa))
   }
-  if (missing.length === 0 || !textFallback) return pages
+  if (!textFallback || pdf.isPureXfa) return pages
   const fallback = textFallback
+  // The own text is searchable now; what OCR adds follows page by page
+  if (scanned || opts.images === 'wait') opts.onProgress?.(pages.slice())
+  const rest = { images: opts.images ?? 'available', ...(opts.signal ? { signal: opts.signal } : {}) }
   // All at once, so the queue holds the whole pass (and the pages on screen
   // can still jump it); each lands in its slot as it is read
   await Promise.all(
-    missing.map(async (n) => {
-      const content = await fallback(pdf, n, opts.signal ? { signal: opts.signal } : {})
+    owns.map(async (own, i) => {
+      const content = await fallback(pdf, i + 1, own, rest)
       if (!content) return
-      pages[n - 1] = toPageText(content, false)
+      pages[i] = toPageText(content, false)
       opts.onProgress?.(pages.slice())
     })
   )
@@ -205,6 +227,19 @@ export function findMatches(
   return matches
 }
 
+/** Whether a character range lies among the words OCR read in the page's
+ *  images (after its own text) — a range a text layer can only measure once
+ *  those words have joined it, which happens after the layer's first build */
+export function inImageWords(pageText: PageText | undefined, range: { start: number }): boolean {
+  const from = pageText?.ocrRunsFrom
+  if (!pageText || from === undefined || from === 0) return false
+  const first = pageText.runs[from]
+  return !!first && range.start >= first.start
+}
+
+/** «The words in this page's images are in the DOM» */
+export const IMAGE_SPANS_READY_SELECTOR = '.text-host .textLayer > span[data-ocr="image"]'
+
 /** An XFA page's text spans — the laid-out form's text nodes, wrapped in the
  *  order getTextContent() lists them (xfa.ts). */
 const XFA_TEXT_SPANS = '.xfa-host .xfaLayer span.xfa-text'
@@ -220,7 +255,22 @@ export const TEXT_SPANS_READY_SELECTOR = `.text-host .textLayer > span, ${XFA_TE
 function matchSpans(pageEl: HTMLElement, pageText: PageText): NodeListOf<HTMLElement> | null {
   const textLayer = pageEl.querySelectorAll<HTMLElement>('.text-host .textLayer > span')
   const spans = textLayer.length > 0 ? textLayer : pageEl.querySelectorAll<HTMLElement>(XFA_TEXT_SPANS)
-  return spans.length === 0 || spans.length !== pageText.runs.length ? null : spans
+  if (spans.length === 0) return null
+  if (spans.length === pageText.runs.length) return spans
+  // The words OCR read in the page's images come after its own text, in the
+  // layer (spans marked data-ocr="image", PdfPage) and in the text alike —
+  // one of them may have them already and the other not yet. The page's own
+  // words are then still a prefix of both, and measure true; a match among
+  // the images' words finds no span and comes back null (rectsFromSpans).
+  let layerOwn = spans.length
+  for (let i = 0; i < spans.length; i++) {
+    if (spans[i].dataset.ocr === 'image') {
+      layerOwn = i
+      break
+    }
+  }
+  const textOwn = pageText.ocrRunsFrom ?? pageText.runs.length
+  return layerOwn === textOwn ? spans : null
 }
 
 /** One character range's rects, measured against spans the caller already
@@ -243,7 +293,7 @@ function rectsFromSpans(
     if (first === -1 && match.start < runEnd) first = i
     if (match.end > runs[i].start) last = i
   }
-  if (first === -1 || last < first) return null
+  if (first === -1 || last < first || last >= spans.length) return null
   const startNode = spans[first].firstChild
   const endNode = spans[last].firstChild
   if (!startNode || !endNode) return null
