@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AiConfigView,
   RecentFile,
@@ -15,6 +15,7 @@ import { locale, t, useLang } from '../i18n'
 import {
   AppMark,
   IconArrowLeft,
+  IconComment,
   IconDocument,
   IconFolderOpen,
   IconGrid,
@@ -31,7 +32,8 @@ import FileAccessNotice from './FileAccessNotice'
 import { dismissFileAccessNotice, fileAccessGranted, fileAccessNoticeDismissed } from '../extension-file-access'
 import { useRecentThumbs } from '../hooks/useRecentThumbs'
 import ConversationsLibrary from './ConversationsLibrary'
-import type { ConversationSummary } from '../chat-store'
+import type { ConversationMeta } from '../chat-store'
+import { countByDocument } from '../../../shared/chat-library'
 import { listAllConversations, onConversationsChanged } from '../chat-store'
 
 type LibraryTab = 'recents' | 'conversations'
@@ -124,7 +126,10 @@ export default function Welcome({
   const { pinned, recent } = splitRecents(recents)
 
   // ---------- «Samtaler» (issue #46) ----------
-  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [conversations, setConversations] = useState<ConversationMeta[]>([])
+  /** «Vis samtaler» on a recents entry: the tab, filtered on that document */
+  const [docFilter, setDocFilter] = useState<string | null>(null)
+  const convCounts = useMemo(() => countByDocument(conversations), [conversations])
   const [tabChoice, setTabChoice] = useState<LibraryTab>(loadLibraryTab)
   const [tidyOpen, setTidyOpen] = useState(false)
   const [reading, setReading] = useState(false)
@@ -185,8 +190,22 @@ export default function Welcome({
   const entryActions = (r: RecentFile): React.JSX.Element => {
     const isPinned = r.pinnedAt !== undefined
     const pinLabel = t(isPinned ? 'welcome.recentsUnpin' : 'welcome.recentsPin')
+    const convs = convCounts.get(r.path) ?? 0
     return (
       <span className="recent-actions">
+        {convs > 0 && (
+          <button
+            className="recent-action"
+            title={t('lib.showConversations')}
+            aria-label={t('lib.showConversations')}
+            onClick={() => {
+              setDocFilter(r.path)
+              chooseTab('conversations')
+            }}
+          >
+            <IconComment size={14} />
+          </button>
+        )}
         <button
           className={`recent-action${isPinned ? ' is-on' : ''}`}
           title={pinLabel}
@@ -212,6 +231,21 @@ export default function Welcome({
     if (e.key !== 'Delete') return
     e.preventDefault()
     removeEntry(r)
+  }
+
+  /** A quiet mark on an entry that has conversations — the count beside a
+   *  speech bubble, in the secondary text colour. Not a button (it sits
+   *  inside the entry's own); «Vis samtaler» among the actions goes there. */
+  const convBadge = (r: RecentFile): React.JSX.Element | null => {
+    const n = convCounts.get(r.path) ?? 0
+    if (n === 0) return null
+    const label = t('lib.badge', { count: String(n) })
+    return (
+      <span className="recent-convs" title={label} aria-label={label}>
+        <IconComment size={12} />
+        {n}
+      </span>
+    )
   }
 
   const gridItem = (r: RecentFile): React.JSX.Element => {
@@ -245,6 +279,7 @@ export default function Welcome({
             )}
           </span>
           <span className="recent-card-name">{r.name}</span>
+          {convBadge(r)}
           {at && <span className="recent-card-meta">{at}</span>}
         </button>
         {entryActions(r)}
@@ -263,7 +298,10 @@ export default function Welcome({
         <IconDocument />
         <span className="recent-name">{r.name}</span>
         <span className="recent-path">{recentLocation(r.path)}</span>
-        <span className="recent-date">{formatDate(r.lastOpened)}</span>
+        <span className="recent-date">
+          {convBadge(r)}
+          {formatDate(r.lastOpened)}
+        </span>
       </button>
       {entryActions(r)}
     </li>
@@ -465,6 +503,8 @@ export default function Welcome({
             {showConvs ? (
               <ConversationsLibrary
                 conversations={conversations}
+                docFilter={docFilter}
+                onDocFilterChange={setDocFilter}
                 onChanged={reloadConversations}
                 onOpenDocument={onOpenRecent}
                 onRecentsMaybeChanged={() => void bridge.getRecents().then(onRecentsChange)}

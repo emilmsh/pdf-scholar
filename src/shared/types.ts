@@ -1,7 +1,7 @@
 // Types shared between the Electron main process, preload bridge and renderer.
 import type { PdfStandardFont } from '@embedpdf/models'
 import type { CitationStyleId } from './citation-style'
-import type { ConversationSummary, StoredConversation } from './chat-history'
+import type { ConversationHit, ConversationMeta, StoredConversation } from './chat-history'
 import type { FileIconChoice, FileIconErrorCode, FileIconResult } from './file-icon'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
@@ -873,6 +873,10 @@ export type AiCitation =
   | { kind: 'char'; start: number; end: number; citedText: string }
   | { kind: 'quote'; pageNumber: number; quote: string }
   | { kind: 'web'; url: string; title: string }
+  /** An attached earlier conversation the answer drew on — its [SAMTALE n]
+   *  tag, turned into a chip that opens that conversation
+   *  (shared/conversation-context.ts). Never a source in the document. */
+  | { kind: 'conversation'; docPath: string; id: string; docName: string; title: string }
 
 export interface AiContentPart {
   text: string
@@ -1023,9 +1027,14 @@ export interface PdfxApi {
    *  removes the document from the store. Awaited: the panel refreshes its
    *  list from the store after a delete, so the write must have landed. */
   setConversations(path: string, name: string, list: StoredConversation[]): Promise<void>
-  /** Every document's conversations without their messages, newest first —
-   *  the cross-document history and its search read this */
-  listConversations(): Promise<ConversationSummary[]>
+  /** Every document's conversations without their messages or text,
+   *  newest first — what the cross-document lists show and count */
+  listConversations(): Promise<ConversationMeta[]>
+  /** The conversations every word of the query occurs in, newest first,
+   *  each with a snippet. Runs where the store is (desktop: main, over its
+   *  cached summaries), so a window receives the hits and never the text of
+   *  every conversation. An empty query lists them all. */
+  searchConversations(query: string): Promise<ConversationHit[]>
   /** Another window or tab wrote a document's conversations (a docked panel
    *  and a detached assistant edit the same history). `path` is the document,
    *  or null where the platform cannot say which (dev:web's storage event). */

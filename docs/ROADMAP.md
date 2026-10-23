@@ -436,6 +436,37 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     seks måneder» som innstilling er den stille utkastingen det varige
     lageret ble bygget for å avskaffe. Eksport til Markdown (lesbar uten
     appen) og JSON (alt, med bilder). Dekket av `test:chat-history` seksjon 9.
+  - **Finpuss etter Emils gjennomgang** (2026-10-23): et dempet samtalemerke
+    med antall på «Nylig lest» (forside og rad) og «Vis samtaler» blant
+    handlingene, som åpner fanen filtrert på dokumentet; merkelappen
+    «Filen finnes ikke» på dokumenter som er borte (biblioteket og panelets
+    alle-dokumenter-liste); sortering (sist endret, opprettet, dokument A–Å,
+    flest meldinger) og filtrene «Filen mangler» og «Med bilder»;
+    «Egendefinert …» i både «Eldre enn» og «Behold bare de nyeste»; en
+    kildebrikk utenfor sitt dokument åpner dokumentet PÅ passasjen med den
+    markert, også i en fane som allerede er åpen; og søket på tvers kjører
+    der lageret er (main på desktop), så et vindu bare får treffene — målt
+    2026-10-23: 5 000 samtaler var 22 MB per opplisting, selve søket 15 ms.
+    Dekket av `test:chat-history` seksjon 10 og `test:library-desktop`.
+  - **Tidligere samtaler som kontekst** (2026-10-23, Emils bestilling: «viktig
+    at brukeren har kontroll … ikke automatikk»): en knapp med tekst,
+    «Samtaler», i komposisten åpner en velger med søk der INGENTING er
+    krysset av; det som legges ved, står som brikker over komposisten og går
+    med hvert spørsmål i samtalen til det tas av, og lagres med samtalen.
+    Valgt framfor en bryter, som blir automatikk i praksis. Vedleggene går i
+    en egen blokk i SYSTEMPROMPTEN, bygget på nytt ved hver forespørsel —
+    aldri i brukermeldingen (kunne aldri tas ut igjen av historikken) og
+    aldri i dokumentet (en leverandør med innebygde kilder ville pekt inn i
+    feil tekst). Dokumentet er eneste kilde; bruker svaret noe fra en
+    samtale, merkes det [SAMTALE n], som blir en dempet «Samtale»-brikke som
+    åpner den samtalen. Tidligere svar er notater: er de uenige med
+    dokumentet, vinner dokumentet. Bare tekst, ingen bilder; hver samtale og
+    blokken som helhet har et tak, og blokkens størrelse trekkes fra
+    dokumentets budsjett. «Bekreft før deling» navngir et vedlagt dokument
+    som ikke er delt med leverandøren. Dekket av `test:conversation-context`
+    (CI) og `test:attach-desktop` mot et endepunkt som tar opp hva som
+    faktisk sendes. Ikke prøvd mot ekte modeller (AI-TESTING.md). Forslag i
+    velgeren ut fra spørsmålet er ikke bygget.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

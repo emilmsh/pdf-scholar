@@ -297,5 +297,48 @@ console.log('\n9. the library view: groups, and what each tidying takes')
   check('…and as MB with one decimal above', L.formatBytes(5.25 * 1024 * 1024, 'en') === '5.3 MB', L.formatBytes(5.25 * 1024 * 1024, 'en'))
 }
 
+console.log('\n10. the view: no text crosses, sort, filters, custom values, badge counts')
+{
+  const DAY = 86_400_000
+  const mk = (path, name, id, created, updated, n, images = 0) => ({
+    docPath: path, docName: name, id, title: id, createdAt: created, updatedAt: updated,
+    messageCount: n, text: `secret text of ${id}`, images, imageBytes: images * 1000
+  })
+  const list = [
+    mk('/z.pdf', 'zeta.pdf', 'z1', 1 * DAY, 50 * DAY, 2),
+    mk('/z.pdf', 'zeta.pdf', 'z2', 40 * DAY, 41 * DAY, 9),
+    mk('/a.pdf', 'Alfa.pdf', 'a1', 10 * DAY, 30 * DAY, 4, 2),
+    mk('/m.pdf', 'mu 10.pdf', 'm1', 45 * DAY, 46 * DAY, 1),
+    mk('/m2.pdf', 'mu 9.pdf', 'm2', 2 * DAY, 3 * DAY, 3)
+  ]
+  const meta = H.toMeta(list[0])
+  check('a listed summary carries no text', !('text' in meta) && meta.title === 'z1' && meta.images === 0)
+  const hits = H.searchConversations(list, 'secret')
+  check('search hits carry no text either, only the snippet', hits.length === 5 && hits.every((h) => !('text' in h) && h.snippet?.includes('secret')))
+
+  const order = (sort) => L.sortGroups(list, sort).map((g) => `${g.docName}:${g.items.map((i) => i.id).join('+')}`).join(' | ')
+  check('by last change: the document changed last first', order('updated') === 'zeta.pdf:z1+z2 | mu 10.pdf:m1 | Alfa.pdf:a1 | mu 9.pdf:m2', order('updated'))
+  check('by creation: the newest conversation leads, inside a group too', order('created') === 'mu 10.pdf:m1 | zeta.pdf:z2+z1 | Alfa.pdf:a1 | mu 9.pdf:m2', order('created'))
+  check('by name: A–Å, case-folded, numbers in number order', order('name') === 'Alfa.pdf:a1 | mu 9.pdf:m2 | mu 10.pdf:m1 | zeta.pdf:z1+z2', order('name'))
+  check('by messages: the longest conversation first', order('messages') === 'zeta.pdf:z2+z1 | Alfa.pdf:a1 | mu 9.pdf:m2 | mu 10.pdf:m1', order('messages'))
+  check('a stored sort that is not one falls back to last change', L.sortOrDefault('bogus') === 'updated' && L.sortOrDefault('name') === 'name')
+
+  const gone = new Set(['/a.pdf', '/m.pdf'])
+  const ids = (arr) => arr.map((c) => c.id).join(',')
+  check('no filter keeps everything', L.applyFilter(list, L.NO_FILTER, gone).length === 5)
+  check('«Filen mangler» keeps the gone documents', ids(L.applyFilter(list, { ...L.NO_FILTER, missing: true }, gone)) === 'a1,m1')
+  check('«Med bilder» keeps conversations with images', ids(L.applyFilter(list, { ...L.NO_FILTER, images: true }, gone)) === 'a1')
+  check('a document filter keeps that document', ids(L.applyFilter(list, { ...L.NO_FILTER, doc: '/z.pdf' }, gone)) === 'z1,z2')
+  check('filters combine', L.applyFilter(list, { doc: '/z.pdf', missing: true, images: false }, gone).length === 0)
+
+  check('a custom number: whole, in bounds', L.customNumber('18', 1, 600) === 18 && L.customNumber(' 7 ', 1, 600) === 7)
+  check('…anything else is no number (the action offers nothing)',
+    [L.customNumber('', 1, 600), L.customNumber('0', 1, 600), L.customNumber('2.5', 1, 600), L.customNumber('-3', 1, 600), L.customNumber('601', 1, 600), L.customNumber('12 mnd', 1, 600)].every((v) => v === null))
+  check('keeping zero is a number for «behold de nyeste»', L.customNumber('0', 0, 1_000_000) === 0)
+
+  const counts = L.countByDocument(list)
+  check('the badge counts per document', counts.get('/z.pdf') === 2 && counts.get('/a.pdf') === 1 && !counts.has('/none.pdf'))
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)
