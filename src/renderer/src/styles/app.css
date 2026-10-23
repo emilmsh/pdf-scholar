@@ -1851,6 +1851,11 @@ html.touch-ui .convs-row {
   align-items: center;
   gap: 5px;
   color: var(--text-secondary);
+  /* «/ 30» on one line, and the field never yields its width: a chip in the
+     document slot (vedlegg, «Gjenkjenn tekst») squeezed it until the count
+     broke over two lines */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .page-indicator input {
@@ -7835,6 +7840,11 @@ button.bookmark-fold:hover {
   position: relative;
   display: flex;
   align-items: center;
+  /* A chip in the toolbar keeps its whole label: allowed to shrink, it went
+     down to its longest word and the rest ran on under the page field — and a
+     toolbar whose content no longer overflows folds nothing into «…» */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .signature-info-panel {

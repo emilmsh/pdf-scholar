@@ -24,7 +24,7 @@ import { browserCurrentBytes, hasBrowserDoc, registerBrowserDoc } from '../annot
 import { openDocument, isPasswordException } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { collectAnnotations, reloadedAnnotations } from '../doc-load'
-import { carryOcr } from '../ocr'
+import { allowOcrStore, carryOcr } from '../ocr'
 import { onLocalDocEvent } from '../local-doc-events'
 import { t } from '../i18n'
 
@@ -156,6 +156,8 @@ export function useSplitDocSession(
         return
       }
       if (destroyed) return
+      // OCR may be kept between sessions: an encrypted file never opens here
+      allowOcrStore(doc)
       setPdf(doc)
       const collected: { w: number; h: number }[] = []
       for (let i = 1; i <= doc.numPages; i++) {

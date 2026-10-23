@@ -42,6 +42,10 @@ interface Props {
   /** Scanned pages still being read by OCR — the hits so far show already,
    *  and the note line says how far the reading has come */
   ocr: OcrProgress | null
+  /** OCR is on request and this document's scanned pages are not read: the
+   *  note line says so and offers to read them */
+  ocrOffer: boolean
+  onEnableOcr(): void
   /** Search mode: exact text or AI-semantic */
   mode: 'text' | 'ai'
   onModeChange(mode: 'text' | 'ai'): void
@@ -78,6 +82,8 @@ export default function SearchBar({
   index,
   busy,
   ocr,
+  ocrOffer,
+  onEnableOcr,
   mode,
   onModeChange,
   aiStatus,
@@ -510,6 +516,14 @@ export default function SearchBar({
       )}
 
       {ocr && <div className="search-ai-note">{t('search.ocrReading', { done: ocr.done, total: ocr.total })}</div>}
+      {ocrOffer && (
+        <div className="search-ai-note">
+          {t('search.ocrOffer')}{' '}
+          <button className="search-ai-link" onClick={onEnableOcr} title={t('ocr.enableTip')}>
+            {t('ocr.enable')}
+          </button>
+        </div>
+      )}
 
       {!isAi && count > 0 && listOpen && (
         <div className="search-results" ref={listRef}>
