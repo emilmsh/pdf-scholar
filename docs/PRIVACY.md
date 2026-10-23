@@ -33,6 +33,13 @@ your key and their privacy terms. There is no intermediary server operated by
 PDF Scholar. Your key is sent to that one provider, as the credential on your
 own request, and to no one else — never to us.
 
+**Scanned pages.** A page with no text of its own is read by text recognition
+(Tesseract) on your device, so it can be searched, selected and highlighted.
+Nothing is sent anywhere for that, and the recognised words are not written into
+your file — they are kept only while the document is open. When you use the
+assistant on such a document, those words are its text and go along exactly as
+described below.
+
 **What an AI action sends.** Asking the assistant a question, the one-click
 document summary, the AI search, and the quick actions on a selected passage or
 a snipped region all send document content with the request. Normally that is

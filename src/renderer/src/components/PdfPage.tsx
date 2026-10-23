@@ -27,6 +27,9 @@ import { isXfaDocument, renderXfaLayer } from '../xfa'
 import type { XfaLayerHandle } from '../xfa'
 import { LINK_RECORDS } from '../link-preview'
 import { carrySelection } from '../selection-carry'
+import { OCR_PRIORITY, ocrTextContent } from '../ocr'
+import { isVisibleText } from '../ocr-text'
+import type { TextContent } from 'pdfjs-dist/types/src/display/api'
 
 /** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
  *  only place that gesture is advertised. */
@@ -580,6 +583,8 @@ function PdfPage({
 
     let cancelled = false
     let textLayer: Cancellable | null = null
+    // A page scrolled away before its OCR started leaves the queue (ocr.ts)
+    const ocrAbort = new AbortController()
 
     ;(async () => {
       const page = await pdf.getPage(pageNumber)
@@ -607,52 +612,73 @@ function PdfPage({
         return
       }
 
-      const textDiv = document.createElement('div')
-      textDiv.className = 'textLayer'
-      const tl = new TextLayer({
-        textContentSource: page.streamTextContent(),
-        container: textDiv,
-        viewport
-      })
-      textLayer = tl
-      await tl.render()
-      if (cancelled) return
-      textLayerRef.current = tl
-      // Whitespace-only items (LaTeX PDFs often park them in the margins,
-      // one per line) must not paint their own selection box — they stay
-      // in the DOM so copied text keeps its spaces, but render no highlight.
-      // trim() misses zero-width/invisible characters (U+200B, soft
-      // hyphens, BOM…) that HTML-to-PDF generators love to emit
-      for (const span of textDiv.querySelectorAll('span')) {
-        const visible = (span.textContent ?? '').replace(/[\s\u00AD\u200B-\u200F\u2060\uFEFF]/gu, '')
-        if (!visible) span.classList.add('ws-only')
-      }
-      const endOfContent = document.createElement('div')
-      endOfContent.className = 'endOfContent'
-      textDiv.append(endOfContent)
-      // pdf.js's selection trick: while the mouse is down, .endOfContent
-      // expands to cover the page (CSS .selecting) so a drag that starts
-      // in the empty space between lines anchors there instead of
-      // selecting the entire page
-      textDiv.addEventListener('mousedown', () => {
-        textDiv.classList.add('selecting')
-        window.addEventListener('mouseup', () => textDiv.classList.remove('selecting'), {
-          once: true
+      /** Build the layer from one source and put it in place of the old one.
+       *  Null when the effect was torn down meanwhile. */
+      const buildTextLayer = async (
+        source: ReturnType<PDFPageProxy['streamTextContent']> | TextContent
+      ): Promise<TextLayer | null> => {
+        const textDiv = document.createElement('div')
+        textDiv.className = 'textLayer'
+        // At the scale of the moment: an OCR'd layer arrives seconds after
+        // the first build, often at another zoom
+        const tl = new TextLayer({
+          textContentSource: source,
+          container: textDiv,
+          viewport: page.getViewport({ scale: scaleRef.current, rotation: viewport.rotation })
         })
-      })
-      // A re-read of the same document (a write elsewhere) rebuilds this layer
-      // under whatever the reader has selected — carry the selection over, and
-      // a drag still in progress keeps its page-covering .endOfContent
-      const oldDiv = textHost.firstElementChild
-      const restoreSelection = carrySelection(oldDiv, textDiv)
-      if (oldDiv?.classList.contains('selecting')) {
-        textDiv.classList.add('selecting')
-        window.addEventListener('mouseup', () => textDiv.classList.remove('selecting'), {
-          once: true
+        textLayer = tl
+        await tl.render()
+        if (cancelled) return null
+        textLayerRef.current = tl
+        // Whitespace-only items (LaTeX PDFs often park them in the margins,
+        // one per line) must not paint their own selection box — they stay
+        // in the DOM so copied text keeps its spaces, but render no highlight.
+        // trim() misses zero-width/invisible characters (U+200B, soft
+        // hyphens, BOM…) that HTML-to-PDF generators love to emit
+        for (const span of textDiv.querySelectorAll('span')) {
+          if (!isVisibleText(span.textContent ?? '')) span.classList.add('ws-only')
+        }
+        const endOfContent = document.createElement('div')
+        endOfContent.className = 'endOfContent'
+        textDiv.append(endOfContent)
+        // pdf.js's selection trick: while the mouse is down, .endOfContent
+        // expands to cover the page (CSS .selecting) so a drag that starts
+        // in the empty space between lines anchors there instead of
+        // selecting the entire page
+        textDiv.addEventListener('mousedown', () => {
+          textDiv.classList.add('selecting')
+          window.addEventListener('mouseup', () => textDiv.classList.remove('selecting'), {
+            once: true
+          })
         })
+        // A re-read of the same document (a write elsewhere) rebuilds this layer
+        // under whatever the reader has selected — carry the selection over, and
+        // a drag still in progress keeps its page-covering .endOfContent
+        const oldDiv = textHost.firstElementChild
+        const restoreSelection = carrySelection(oldDiv, textDiv)
+        if (oldDiv?.classList.contains('selecting')) {
+          textDiv.classList.add('selecting')
+          window.addEventListener('mouseup', () => textDiv.classList.remove('selecting'), {
+            once: true
+          })
+        }
+        textHost.replaceChildren(textDiv)
+        restoreSelection?.()
+        return tl
       }
-      textHost.replaceChildren(textDiv)
-      restoreSelection?.()
+
+      const tl = await buildTextLayer(page.streamTextContent())
+      if (!tl) return
+      // A scanned page has no words of its own: OCR reads it (ocr.ts) and its
+      // words take the empty layer's place. The links below do not wait —
+      // reading a page takes a second or two. The same recognised words feed
+      // search and the assistant (search.ts pageTextContent), so the spans
+      // and the extracted runs still correspond 1:1.
+      if (!tl.textContentItemsStr.some(isVisibleText)) {
+        void ocrTextContent(pdf, pageNumber, { priority: OCR_PRIORITY.visible, signal: ocrAbort.signal })
+          .then((content) => (content && content.items.length > 0 && !cancelled ? buildTextLayer(content) : null))
+          .catch(() => {})
+      }
 
       // Clickable link annotations (internal destinations + external URLs).
       // Positioned as % of the page box so they reflow on zoom (no baked scale).
@@ -748,6 +774,7 @@ function PdfPage({
 
     return () => {
       cancelled = true
+      ocrAbort.abort()
       textLayer?.cancel()
     }
   }, [pdf, docKey, pageNumber, rotation, active, onInternalLink, onExternalLink, onFileAttachment, xfa])

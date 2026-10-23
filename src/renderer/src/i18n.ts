@@ -739,6 +739,7 @@ const nb = {
   'search.listShow': 'Vis treffliste',
   'search.listHide': 'Skjul treffliste',
   'search.aiNoText': 'Dokumentet har ingen tekst å søke i (skannet)',
+  'search.ocrReading': 'Leser teksten på skannede sider … {done} av {total}',
 
   // Viewer
   'viewer.errorTitle': 'Kunne ikke vise dokumentet.',
@@ -965,6 +966,7 @@ const nb = {
   'ai.calloutNoText':
     'Dette dokumentet har ingen tekst å lese – sidene er bilder (skannet). Assistenten kan derfor ikke søke i teksten eller lese hele dokumentet på egen hånd, men den kan lese sidene du legger ved som bilder. «Forklar område» virker også: dra en firkant rundt en figur, og bildet sendes.',
   'ai.readPagesFrom': 'Fra side',
+  'ai.ocrReading': 'Sidene er skannet, så teksten på dem leses først av her på maskinen: {done} av {total} sider.',
   'ai.readPagesTo': 'til',
   'ai.readPagesCta': 'Legg ved sidene',
   'ai.readPagesBusy': 'Gjengir …',
@@ -1849,6 +1851,7 @@ const en: Dict = {
   'search.listShow': 'Show results list',
   'search.listHide': 'Hide results list',
   'search.aiNoText': 'This document has no text to search (scanned)',
+  'search.ocrReading': 'Reading the text on scanned pages … {done} of {total}',
 
   'viewer.errorTitle': 'Could not display the document.',
   'viewer.errorBytes': '({bytes} bytes read, starts “{head}”, ends “{tail}”)',
@@ -2056,6 +2059,7 @@ const en: Dict = {
   'ai.calloutNoText':
     'This document has no text to read — its pages are images (scanned). The assistant cannot search the text or read the whole document on its own, but it can read the pages you attach as images. “Explain area” works too: drag a box around a figure and the image is sent.',
   'ai.readPagesFrom': 'From page',
+  'ai.ocrReading': 'The pages are scanned, so their text is first read on this computer: {done} of {total} pages.',
   'ai.readPagesTo': 'to',
   'ai.readPagesCta': 'Attach the pages',
   'ai.readPagesBusy': 'Rendering …',

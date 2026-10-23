@@ -659,6 +659,7 @@ export const zh: Dict = {
   'search.listShow': '显示结果列表',
   'search.listHide': '隐藏结果列表',
   'search.aiNoText': '此文档没有可搜索的文本（扫描件）',
+  'search.ocrReading': '正在识别扫描页面上的文字… {done} / {total}',
   'viewer.errorTitle': '无法显示文档。',
   'viewer.errorBytes': '（已读取 {bytes} 字节，开头为“{head}”，结尾为“{tail}”）',
   'viewer.errorRetry': '重试',
@@ -862,6 +863,7 @@ export const zh: Dict = {
   'ai.calloutNoText':
     '此文档没有可读取的文本——页面是图片（扫描件）。助手无法搜索文本或自行阅读整个文档，但可以读取您以图片形式附加的页面。“解释区域”同样可用：在图表周围拖出一个框，图片即会发送。',
   'ai.readPagesFrom': '从第',
+  'ai.ocrReading': '页面为扫描件，正在本机先识别其中的文字：第 {done} / {total} 页。',
   'ai.readPagesTo': '页到',
   'ai.readPagesCta': '附加页面',
   'ai.readPagesBusy': '正在渲染…',

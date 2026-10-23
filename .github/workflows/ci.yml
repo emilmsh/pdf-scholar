@@ -65,6 +65,9 @@ jobs:
       # The search query rule: a phrase the page breaks across a line is one
       # match (every whitespace run in the query matches any on the page)
       - run: npm run test:search
+      # Text on scanned pages: Tesseract's TSV → pdf.js text content, and the
+      # real engine (the shipped wasm and models) on scans built in the test
+      - run: npm run test:ocr
       # Nested bookmarks (issue #43): the tree from a flat page-ordered list,
       # nest/out/remove/fold, a stored list read as untrusted input
       - run: npm run test:bookmarks

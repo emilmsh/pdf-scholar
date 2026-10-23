@@ -24,6 +24,7 @@ import { openDocument, isPasswordException } from './pdf-doc'
 import type { DocResources } from './pdf-doc'
 import { renderPagesAsImages } from './ai-page-images'
 import { buildPageTexts, hasExtractableText } from './search'
+import { useOcrProgress } from './ocr'
 import type { PageText } from './search'
 import { buildAiDocument } from './ai'
 import type { ResolvedCitation } from './ai'
@@ -146,6 +147,10 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
     void load()
   }, [load])
 
+  // This window reads a scanned document's pages itself — it has its own
+  // pdf.js document, and the viewer's OCR lives in the viewer's window
+  const ocrProgress = useOcrProgress(pdf)
+
   const ensureDocument = useCallback(async (): Promise<EnsuredDocument | null> => {
     if (!pdf) return null
     const pages = (pageTextsRef.current ??= await buildPageTexts(pdf))
@@ -203,6 +208,7 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
           seed={null}
           onSeedConsumed={noop}
           ensureDocument={ensureDocument}
+          ocrProgress={ocrProgress}
           hasAnnotations={false}
           annotsAskId={0}
           getAnnotationsText={async () => null}

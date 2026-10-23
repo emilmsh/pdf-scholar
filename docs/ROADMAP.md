@@ -535,4 +535,4 @@ Berøringsparitetsregelen gjelder hele bolken: hver mus/hover-interaksjon trenge
 4. **Inkrementell lagring-kanttilfeller** — sjekk `canBeSavedIncrementally()`, fall tilbake til full lagring; alltid temp-fil + atomisk rename.
 5. **pdf.js API-endringer** (månedlige major-versjoner) — pin eksakt versjon, all pdf.js-bruk bak egen modul.
 6. **Windows-integrasjon**: `second-instance`-argv får Chromium-brytere injisert — defensiv parser; single-instance-lås feiler når første instans kjører forhøyet (kjent Electron-bug).
-7. **Omfang vs. én utvikler** — strengt «brukbar app per fase»; OCR/reflow/skjemaer eksplisitt utenfor omfang (KI kom inn som egen fase 9 etter Emils beslutning 2026-07-10).
+7. **Omfang vs. én utvikler** — strengt «brukbar app per fase»; OCR/reflow/skjemaer eksplisitt utenfor omfang (KI kom inn som egen fase 9 etter Emils beslutning 2026-07-10; OCR for skannede sider kom inn 2026-10-23 — lokalt, bare i minnet, aldri skrevet inn i filen, se `src/renderer/src/ocr.ts`).

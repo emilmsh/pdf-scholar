@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.68.0",
+  "version": "0.69.0",
   "description": "A PDF reader and annotator for Windows and macOS, built for research",
   "main": "out/main/index.js",
   "private": true,
@@ -44,6 +44,7 @@
     "test:doc-registry": "node scripts/test-doc-registry.mjs",
     "test:doc-load": "node scripts/test-doc-load.mjs",
     "test:search": "node scripts/test-search.mjs",
+    "test:ocr": "node scripts/test-ocr.mjs",
     "test:bookmarks": "node scripts/test-bookmarks.mjs",
     "test:retrieval": "node scripts/test-ai-retrieval.mjs",
     "test:ai-chat": "node scripts/test-ai-chat.mjs",
@@ -99,6 +100,9 @@
     "electron-updater": "^6.8.9"
   },
   "devDependencies": {
+    "@tesseract.js-data/chi_sim": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/nor": "^1.0.0",
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
@@ -113,6 +117,7 @@
     "pdfjs-dist": "^6.2.108",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "tesseract.js-core": "^7.0.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.6"
   }
