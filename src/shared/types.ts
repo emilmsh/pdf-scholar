@@ -867,6 +867,10 @@ export type AiCitation =
   | { kind: 'char'; start: number; end: number; citedText: string }
   | { kind: 'quote'; pageNumber: number; quote: string }
   | { kind: 'web'; url: string; title: string }
+  /** An attached earlier conversation the answer drew on — its [SAMTALE n]
+   *  tag, turned into a chip that opens that conversation
+   *  (shared/conversation-context.ts). Never a source in the document. */
+  | { kind: 'conversation'; docPath: string; id: string; docName: string; title: string }
 
 export interface AiContentPart {
   text: string

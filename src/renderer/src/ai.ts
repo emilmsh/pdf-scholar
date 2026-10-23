@@ -101,14 +101,17 @@ export function prepareDocumentForRequest(
   provider: AiProviderId,
   modelId: string,
   queryText: string,
-  catalog?: AiModelCatalog
+  catalog?: AiModelCatalog,
+  /** Characters something else in the request takes — the attached earlier
+   *  conversations (shared/conversation-context.ts) — off the document's room */
+  reserveChars = 0
 ): PreparedDocument {
   const contextTokens = contextTokensFor(provider, modelId, catalog)
   // Two ceilings, and the account's quota is usually the binding one (see
   // ai-token-limits.ts). Unknown until a request has reported it, which is
   // the everyday case and leaves the arithmetic exactly as it was.
   const limitTokens = requestTokenLimit(provider, modelId)
-  if (documentFits(ensured.doc.text.length, contextTokens, limitTokens)) {
+  if (documentFits(ensured.doc.text.length + reserveChars, contextTokens, limitTokens)) {
     return { doc: ensured.doc, excerpt: null }
   }
   const texts = ensured.pages.map((p) => p.text)
@@ -121,7 +124,7 @@ export function prepareDocumentForRequest(
   const selected = selectExcerptBlocks(
     index.blocks,
     queryText,
-    excerptCharBudget(contextTokens, limitTokens),
+    Math.max(4_000, excerptCharBudget(contextTokens, limitTokens) - reserveChars),
     index.bm25
   )
   // The chip counts PAGES, not blocks: «14 of 600 pages» is what the reader
@@ -169,8 +172,9 @@ export function resolveCitation(
   pages: PageText[],
   doc: AiDocument
 ): ResolvedCitation | null {
-  // Web citations point outside the document — opened externally, never resolved
-  if (citation.kind === 'web') return null
+  // Web citations point outside the document — opened externally, never resolved;
+  // a conversation chip points at another conversation, not into this text
+  if (citation.kind === 'web' || citation.kind === 'conversation') return null
   if (citation.kind === 'quote') {
     const pageIndex = citation.pageNumber - 1
     if (pageIndex < 0 || pageIndex >= pages.length) return null
@@ -342,7 +346,7 @@ function normalizeWithMap(text: string): { norm: string; map: number[] } {
 
 /** Page number a citation points at (for chip labels), best effort */
 export function citationPage(citation: AiCitation, doc: AiDocument | null): number | null {
-  if (citation.kind === 'web') return null
+  if (citation.kind === 'web' || citation.kind === 'conversation') return null
   if (citation.kind === 'quote') return citation.pageNumber
   if (!doc || doc.pageStarts.length === 0) return null
   const slot = slotAtOffset(doc.pageStarts, citation.start)

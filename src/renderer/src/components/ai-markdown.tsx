@@ -84,6 +84,20 @@ function renderInline(text: string, keyBase: string, ctx?: ChipContext): React.R
             {host || t('ai.sourceChip')}
           </button>
         )
+      } else if (chip && ctx && chip.kind === 'conversation') {
+        // An attached earlier conversation the answer drew on: opens it
+        out.push(
+          <button
+            key={`${keyBase}-${i++}`}
+            className="ai-chip ai-chip-conversation"
+            title={`${chip.docName}
+«${chip.title}»
+${t('ai.conversationChipTip')}`}
+            onClick={() => ctx.onCitation(chip)}
+          >
+            {t('ai.conversationChip')}
+          </button>
+        )
       } else if (chip && ctx) {
         const page = citationPage(chip, ctx.doc)
         // Hover shows the cited excerpt so two same-page chips ("p. 6", "p. 6")

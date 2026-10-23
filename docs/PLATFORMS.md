@@ -644,7 +644,11 @@ regressions are treated as bugs, not as acceptable platform lag.
     badge, sort, filters and the source chip that opens its document on
     the cited passage are renderer code, identical everywhere; the
     «Filen finnes ikke» tag reads the same «gone» as above, so dev:web never
-    shows it.
+    shows it. Attaching earlier conversations as context (the composer's
+    «Samtaler», `src/shared/conversation-context.ts`) is renderer code too,
+    identical everywhere: the block rides in the system prompt of whichever
+    provider, and «Bekreft før deling» counts an attached conversation's
+    document like the open one.
 
 ## Maintenance rules
 
