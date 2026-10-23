@@ -23,7 +23,9 @@ import {
   docNameFromPath,
   sanitizeConversationDoc,
   sanitizeConversations,
-  summarizeConversations
+  searchConversations,
+  summarizeConversations,
+  toMeta
 } from '../../shared/chat-history'
 import { AI_ERRORS, CHATGPT_LOGIN_ERRORS } from '../../shared/engine-errors'
 import { partsAsDeltas } from '../../shared/ai-stream'
@@ -163,7 +165,9 @@ export const webApi: PdfxApi = {
       /* quota: the panel keeps its copy until the next write */
     }
   },
-  listConversations: async () => byNewest(Object.values(loadWebChats()).flatMap(summarizeConversations)),
+  listConversations: async () => byNewest(Object.values(loadWebChats()).flatMap(summarizeConversations)).map(toMeta),
+  searchConversations: async (query) =>
+    searchConversations(Object.values(loadWebChats()).flatMap(summarizeConversations), query),
   // A browser preview cannot tell whether a fetched path is gone, and a
   // record is only ever moved away from a path known to be gone — so no
   // rebinding here (shared/doc-identity.ts; desktop and the extension do it)

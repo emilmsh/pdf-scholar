@@ -44,6 +44,7 @@ import {
   subscribeConversationChanges
 } from './extension-chat-history'
 import { rebindIdentity, sanitizeFingerprints, validFingerprint } from '../../shared/doc-identity'
+import { searchConversations, toMeta } from '../../shared/chat-history'
 import { offersInsecureRetry } from '../../shared/insecure-retry'
 import { buildAssistantUrl, buildViewerUrl, parseViewerTarget, pdfDisplayName } from '../../shared/viewer-url'
 import { createZoteroClient, httpZoteroFetch } from '../../shared/zotero'
@@ -349,7 +350,10 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // nothing evicted, other tabs told over a BroadcastChannel.
     getConversations: loadConversationDoc,
     setConversations: saveConversationDoc,
-    listConversations: listConversationDocs,
+    listConversations: async () => (await listConversationDocs()).map(toMeta),
+    // In the page itself — the extension's store lives here, there is no
+    // process boundary to keep the text from crossing
+    searchConversations: async (query) => searchConversations(await listConversationDocs(), query),
     onConversationsChanged: subscribeConversationChanges,
 
     // A document's identity across a move (issue #46; shared/doc-identity.ts).

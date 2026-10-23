@@ -11,23 +11,28 @@
 // Tidying is one-off and counted: each action says what it will take before
 // it takes anything, and asks once more, since none of them can be undone.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { GoneDocument } from '../../../shared/types'
-import type { ConversationHit, ConversationSummary, StoredConversation } from '../chat-store'
+import type { AiCitation, GoneDocument } from '../../../shared/types'
+import type { ConversationHit, ConversationMeta, StoredConversation } from '../chat-store'
 import {
   CONVERSATION_HANDOFF_EVENT,
   loadConversations,
   notifyChangedHere,
   requestConversationOpen,
-  saveConversations
+  saveConversations,
+  searchAllConversations
 } from '../chat-store'
-import { searchConversations, withoutImages } from '../../../shared/chat-history'
-import type { Selection } from '../../../shared/chat-library'
+import { withoutImages } from '../../../shared/chat-history'
+import type { ConversationFilter, ConversationSort, Selection } from '../../../shared/chat-library'
 import {
   AGE_CHOICES,
   KEEP_CHOICES,
+  SORTS,
+  applyFilter,
+  customNumber,
   formatBytes,
-  groupByDocument,
   monthsBefore,
+  sortGroups,
+  sortOrDefault,
   selectBeyondNewest,
   selectOlderThan,
   selectionImages,
@@ -43,7 +48,11 @@ import { IconArrowLeft, IconDocument, IconExternal } from './icons'
 
 interface Props {
   /** Every conversation's summary, newest first (the library loads it) */
-  conversations: ConversationSummary[]
+  conversations: ConversationMeta[]
+  /** Show one document's conversations only — the library's «Vis samtaler»
+   *  on a recents entry; null for all. The view's own chip clears it. */
+  docFilter: string | null
+  onDocFilterChange(path: string | null): void
   /** Reload after a change made here */
   onChanged(): void
   /** Open a document (a tab here, the one document of the extension) */
@@ -68,11 +77,25 @@ const recentLocation = (path: string): string => (path.startsWith('fsa:') ? t('d
 const formatDate = (ts: number): string =>
   new Date(ts).toLocaleDateString(locale(), { day: 'numeric', month: 'short', year: 'numeric' })
 
+const SORT_KEY = 'pdfx-conversations-sort'
+function loadSort(): ConversationSort {
+  try {
+    return sortOrDefault(localStorage.getItem(SORT_KEY))
+  } catch {
+    return 'updated'
+  }
+}
+
+/** The «Egendefinert» choice in the age and keep menus */
+const CUSTOM = -1
+
 const ageLabel = (months: number): string =>
   months % 12 === 0 ? t('lib.ageYears', { n: String(months / 12) }) : t('lib.ageMonths', { n: String(months) })
 
 export default function ConversationsLibrary({
   conversations,
+  docFilter,
+  onDocFilterChange,
   onChanged,
   onOpenDocument,
   onRecentsMaybeChanged,
@@ -88,6 +111,21 @@ export default function ConversationsLibrary({
   const [gone, setGone] = useState<GoneDocument[] | null>(null)
   const [age, setAge] = useState<number>(12)
   const [keep, setKeep] = useState<number>(100)
+  const [ageCustom, setAgeCustom] = useState('')
+  const [keepCustom, setKeepCustom] = useState('')
+  const [sort, setSortState] = useState<ConversationSort>(loadSort)
+  const [filter, setFilter] = useState<Omit<ConversationFilter, 'doc'>>({ missing: false, images: false })
+  /** The search's hits, from where the store is (null = no query) */
+  const [hits, setHits] = useState<ConversationHit[] | null>(null)
+  const setSort = (s: ConversationSort): void => {
+    setSortState(s)
+    try {
+      localStorage.setItem(SORT_KEY, s)
+    } catch {
+      /* remembered for this visit only */
+    }
+  }
+  const goneSet = useMemo(() => new Set((gone ?? []).map((d) => d.path)), [gone])
 
   useEffect(() => onReadingChange(reading !== null), [reading, onReadingChange])
   useEffect(() => {
@@ -96,7 +134,28 @@ export default function ConversationsLibrary({
     return () => window.clearTimeout(id)
   }, [notice])
 
-  const groups = useMemo(() => groupByDocument(searchConversations(conversations, query)), [conversations, query])
+  // The search runs where the store is, a moment after typing stops
+  useEffect(() => {
+    if (!query.trim()) {
+      setHits(null)
+      return
+    }
+    let stale = false
+    const id = window.setTimeout(() => {
+      void searchAllConversations(query).then((h) => {
+        if (!stale) setHits(h)
+      })
+    }, 150)
+    return () => {
+      stale = true
+      window.clearTimeout(id)
+    }
+  }, [query, conversations])
+
+  const groups = useMemo(() => {
+    const base: ConversationHit[] = hits ?? conversations.map((c) => ({ ...c, snippet: null }))
+    return sortGroups(applyFilter(base, { ...filter, doc: docFilter }, goneSet), sort)
+  }, [hits, conversations, filter, docFilter, goneSet, sort])
   const totals = useMemo(() => storageTotals(conversations), [conversations])
   const nameOf = useMemo(() => {
     const m = new Map<string, string>()
@@ -104,29 +163,37 @@ export default function ConversationsLibrary({
     return m
   }, [conversations])
 
-  // The gone documents are looked for when the tidying opens (it touches the
-  // file system, so not on every render of the list)
+  // The documents whose file is gone: looked for when the view opens and
+  // whenever the conversations change — the tag on a group, the «Filen
+  // mangler» filter and the tidying's first row all read this one answer
   useEffect(() => {
-    if (!tidyOpen) return
     let stale = false
-    setGone(null)
     void bridge.goneDocuments().then((list) => {
       if (!stale) setGone(list)
     })
     return () => {
       stale = true
     }
-  }, [tidyOpen, conversations])
+  }, [conversations])
 
-  const olderSel = useMemo(() => selectOlderThan(conversations, monthsBefore(Date.now(), age)), [conversations, age])
-  const keepSel = useMemo(() => selectBeyondNewest(conversations, keep), [conversations, keep])
+  /** The age and count in force — a custom one only once it is a number */
+  const ageMonths = age === CUSTOM ? customNumber(ageCustom, 1, 600) : age
+  const keepCount = keep === CUSTOM ? customNumber(keepCustom, 0, 1_000_000) : keep
+  const olderSel = useMemo<Selection>(
+    () => (ageMonths === null ? new Map() : selectOlderThan(conversations, monthsBefore(Date.now(), ageMonths))),
+    [conversations, ageMonths]
+  )
+  const keepSel = useMemo<Selection>(
+    () => (keepCount === null ? new Map() : selectBeyondNewest(conversations, keepCount)),
+    [conversations, keepCount]
+  )
   const imageSel = useMemo(() => selectWithImages(conversations), [conversations])
 
   // ---------- Opening and reading ----------
 
   const openInDocument = useCallback(
-    async (docPath: string, id: string): Promise<void> => {
-      requestConversationOpen(docPath, id)
+    async (docPath: string, id: string, citation?: AiCitation): Promise<void> => {
+      requestConversationOpen(docPath, id, citation)
       await onOpenDocument(docPath)
       // A tab that already shows the document looks for the handoff now
       window.dispatchEvent(new Event(CONVERSATION_HANDOFF_EVENT))
@@ -134,7 +201,7 @@ export default function ConversationsLibrary({
     [onOpenDocument]
   )
 
-  const read = useCallback(async (c: ConversationSummary): Promise<void> => {
+  const read = useCallback(async (c: ConversationMeta): Promise<void> => {
     const conv = (await loadConversations(c.docPath)).find((x) => x.id === c.id)
     if (conv) {
       setReading({ docPath: c.docPath, docName: c.docName, conv })
@@ -314,7 +381,7 @@ export default function ConversationsLibrary({
                 ) : (
                   // A citation chip opens the document on this conversation;
                   // the passage itself is found there (this view has no pages)
-                  <AssistantBody parts={m.parts} doc={null} onCitation={() => void openInDocument(reading.docPath, c.id)} />
+                  <AssistantBody parts={m.parts} doc={null} onCitation={(cite) => void openInDocument(reading.docPath, c.id, cite)} />
                 )}
               </div>
             )
@@ -337,6 +404,46 @@ export default function ConversationsLibrary({
         {t('lib.totals', { conversations: String(totals.conversations), documents: String(totals.documents) })}
         {totals.imageBytes > 0 && ` · ${t('lib.totalsImages', { size: formatBytes(totals.imageBytes, locale()) })}`}
       </p>
+
+      {/* Order and the two filters there are: a gone file, images kept.
+          A document filter from the library shows as a chip of its own. */}
+      {conversations.length > 0 && (
+        <div className="convs-controls">
+          <label className="convs-sort">
+            {t('lib.sort')}{' '}
+            <select value={sort} onChange={(e) => setSort(sortOrDefault(e.target.value))}>
+              {SORTS.map((s) => (
+                <option key={s} value={s}>
+                  {t(`lib.sort_${s}` as const)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="convs-filters" role="group" aria-label={t('lib.filters')}>
+            {docFilter !== null && (
+              <button className="convs-chip is-on" onClick={() => onDocFilterChange(null)} title={t('lib.filterDocClear')}>
+                {nameOf.get(docFilter) ?? docFilter} ✕
+              </button>
+            )}
+            <button
+              className={`convs-chip${filter.missing ? ' is-on' : ''}`}
+              aria-pressed={filter.missing}
+              disabled={!filter.missing && goneSet.size === 0}
+              onClick={() => setFilter((f) => ({ ...f, missing: !f.missing }))}
+            >
+              {t('lib.filterMissing')}
+            </button>
+            <button
+              className={`convs-chip${filter.images ? ' is-on' : ''}`}
+              aria-pressed={filter.images}
+              disabled={!filter.images && totals.images === 0}
+              onClick={() => setFilter((f) => ({ ...f, images: !f.images }))}
+            >
+              {t('lib.filterImages')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {tidyOpen && (
         <div className="convs-tidy">
@@ -365,7 +472,21 @@ export default function ConversationsLibrary({
                     {ageLabel(m)}
                   </option>
                 ))}
+                <option value={CUSTOM}>{t('lib.custom')}</option>
               </select>
+              {age === CUSTOM && (
+                <>
+                  {' '}
+                  <input
+                    className="convs-custom"
+                    inputMode="numeric"
+                    aria-label={t('lib.customMonths')}
+                    value={ageCustom}
+                    onChange={(e) => { setAgeCustom(e.target.value); setPending(null) }}
+                  />{' '}
+                  {t('lib.months')}
+                </>
+              )}
             </label>,
             countLine(olderSel),
             t('lib.delete'),
@@ -381,7 +502,20 @@ export default function ConversationsLibrary({
                     {n}
                   </option>
                 ))}
+                <option value={CUSTOM}>{t('lib.custom')}</option>
               </select>
+              {keep === CUSTOM && (
+                <>
+                  {' '}
+                  <input
+                    className="convs-custom"
+                    inputMode="numeric"
+                    aria-label={t('lib.customCount')}
+                    value={keepCustom}
+                    onChange={(e) => { setKeepCustom(e.target.value); setPending(null) }}
+                  />
+                </>
+              )}
             </label>,
             countLine(keepSel),
             t('lib.delete'),
@@ -430,7 +564,12 @@ export default function ConversationsLibrary({
             <section className="convs-group" key={g.docPath}>
               <div className="convs-doc">
                 <IconDocument />
-                <span className="convs-doc-name">{g.docName}</span>
+                <span className="convs-doc-name">
+                  {g.docName}
+                  {goneSet.has(g.docPath) && (
+                    <span className="conv-gone-tag" title={t('lib.fileMissingTip')}>{t('lib.fileMissing')}</span>
+                  )}
+                </span>
                 <span className="convs-doc-path">{recentLocation(g.docPath)}</span>
               </div>
               <ul>

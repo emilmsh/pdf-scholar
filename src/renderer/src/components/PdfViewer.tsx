@@ -6591,7 +6591,7 @@ export default function PdfViewer({
     for (const part of parts) {
       const label = part.text.replace(/^\s*\d+[.)]\s*/, '').trim()
       for (const c of part.citations) {
-        if (c.kind === 'web') continue // semantic hits must live in the document
+        if (c.kind === 'web' || c.kind === 'conversation') continue // semantic hits must live in the document
         const fallback = c.kind === 'char' ? c.citedText : c.quote
         hits.push({ label: label || fallback.slice(0, 80), citation: c, pageNumber: citationPage(c, prep.doc) })
       }
@@ -6691,7 +6691,15 @@ export default function PdfViewer({
       // Like search: the cited passage opens in the column being worked in
       // (main document — citations resolve against the tab's own text)
       const pane = mainDocPane()
-      const handle = handleForRef.current(pane)
+      // A citation handed over from the library or another document arrives
+      // while this tab is still laying its pages out: wait for that (a few
+      // seconds at most) rather than drop the jump. A click in a settled
+      // view is ready at once and never waits.
+      let handle = handleForRef.current(pane)
+      for (let waited = 0; waited < 5000 && !(handle?.ready() && handle.el()); waited += 100) {
+        await new Promise((r) => setTimeout(r, 100))
+        handle = handleForRef.current(pane)
+      }
       const el = handle?.el()
       if (!handle?.ready() || !el) return
       pushBack(pane)

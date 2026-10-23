@@ -21,6 +21,9 @@ function citationMarker(citation: AiCitation, doc: AiDocument | null): string {
     }
     return `[${host || t('ai.sourceChip')}](${citation.url})`
   }
+  if (citation.kind === 'conversation') {
+    return `[${t('ai.conversationChip')}: ${citation.docName || citation.title}]`
+  }
   const page = citationPage(citation, doc)
   return page !== null ? `[${t('app.pageAbbrev')} ${page}]` : `[${t('ai.sourceChip')}]`
 }
