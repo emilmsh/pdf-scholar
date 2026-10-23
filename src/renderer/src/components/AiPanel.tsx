@@ -47,10 +47,11 @@ import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-sc
 import { bubblesWhileTyping } from '../keymap'
 import type { AiDocument, ResolvedCitation, StreamCiting } from '../ai'
 import type { PageText } from '../search'
-import type { ChatMessage, ConversationHit, ConversationSummary, StoredConversation } from '../chat-store'
+import type { ChatMessage, ConversationHit, ConversationMeta, StoredConversation } from '../chat-store'
 import {
   deleteConversation,
   listAllConversations,
+  searchAllConversations,
   loadConversations,
   newConversationId,
   onConversationsChanged,
@@ -250,7 +251,11 @@ export default function AiPanel({
   const [historyAll, setHistoryAll] = useState(false)
   /** Every document's conversations, loaded when the view spans them (null =
    *  not loaded yet) */
-  const [allConversations, setAllConversations] = useState<ConversationSummary[] | null>(null)
+  const [allConversations, setAllConversations] = useState<ConversationMeta[] | null>(null)
+  /** The cross-document search's hits (searched where the store is), and
+   *  the documents whose file is gone — both only while the view spans them */
+  const [allHits, setAllHits] = useState<ConversationHit[] | null>(null)
+  const [goneDocs, setGoneDocs] = useState<ReadonlySet<string>>(new Set())
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   /** The answer being streamed, as parts so its citation chips show while it
@@ -278,6 +283,9 @@ export default function AiPanel({
   messagesRef.current = messages
   const busyRef = useRef(busy)
   busyRef.current = busy
+  /** A citation handed over with a conversation, until it can be followed */
+  const pendingCiteRef = useRef<AiCitation | null>(null)
+  const [pendingCiteTick, setPendingCiteTick] = useState(0)
   const isLockedRef = useRef(isLocked)
   isLockedRef.current = isLocked
   const pinnedRef = useRef(true)
@@ -672,6 +680,7 @@ export default function AiPanel({
 
   const refreshAll = useCallback((): void => {
     void listAllConversations().then(setAllConversations)
+    void bridge.goneDocuments().then((list) => setGoneDocs(new Set(list.map((d) => d.path))))
   }, [])
 
   // The document's conversations, from the store (async: desktop's files, the
@@ -684,7 +693,8 @@ export default function AiPanel({
     // write-through below (its read answered before that write lands)
     if (busyRef.current) return
     let cancelled = false
-    const wanted = open ? takeConversationFor(docPath) : null
+    const handoff = open ? takeConversationFor(docPath) : null
+    const wanted = handoff?.id ?? null
     void loadConversations(docPath).then((list) => {
       if (cancelled) return
       setConversations(list)
@@ -697,7 +707,19 @@ export default function AiPanel({
         setPinned(true)
         setActiveChatId(target.id)
         setMessages(target.messages)
-        if (wanted) setShowHistory(false)
+        // A conversation asked for by name is what the reader came to see:
+        // it wins over the history list and over the first-run key settings
+        if (wanted) {
+          setShowHistory(false)
+          setShowSettings(false)
+        }
+      }
+      // A source chip clicked outside this document: on to its passage, the
+      // same way a click on the chip here goes — once the document is there
+      // to look it up in (the effect below; a fresh tab is still loading it)
+      if (handoff?.citation && target?.id === wanted) {
+        pendingCiteRef.current = handoff.citation
+        setPendingCiteTick((n) => n + 1)
       }
     })
     return () => {
@@ -805,16 +827,33 @@ export default function AiPanel({
     [refreshAll]
   )
 
-  const historyHits = useMemo<ConversationHit[]>(
-    () =>
-      searchConversations(
-        historyAll
-          ? allConversations ?? []
-          : summarizeConversations({ path: docPath, name: docTitle, conversations }),
-        historyQuery
-      ),
-    [historyAll, allConversations, docPath, docTitle, conversations, historyQuery]
-  )
+  // Across documents the search runs where the store is (a moment after
+  // typing stops, so a fast typist sends one query, not ten); this
+  // document's own conversations are searched here, where they already are
+  useEffect(() => {
+    if (!historyAll || !historyQuery.trim()) {
+      setAllHits(null)
+      return
+    }
+    let stale = false
+    const id = window.setTimeout(() => {
+      void searchAllConversations(historyQuery).then((hits) => {
+        if (!stale) setAllHits(hits)
+      })
+    }, 150)
+    return () => {
+      stale = true
+      window.clearTimeout(id)
+    }
+  }, [historyAll, historyQuery, allConversations])
+
+  const historyHits = useMemo<ConversationHit[]>(() => {
+    if (!historyAll) {
+      return searchConversations(summarizeConversations({ path: docPath, name: docTitle, conversations }), historyQuery)
+    }
+    if (historyQuery.trim()) return allHits ?? []
+    return (allConversations ?? []).map((c) => ({ ...c, snippet: null }))
+  }, [historyAll, allConversations, allHits, docPath, docTitle, conversations, historyQuery])
 
   /** A row clicked: this document's conversation opens here; another
    *  document's is handed to the host, which opens that document, and the
@@ -879,6 +918,23 @@ export default function AiPanel({
     },
     [onCitationClick, ensureDocument]
   )
+  // A handed-over citation waits here until ensureDocument can answer: it is
+  // a new function once the viewer has the document, which re-runs this
+  useEffect(() => {
+    const cite = pendingCiteRef.current
+    if (!cite || !open) return
+    let cancelled = false
+    void ensureDocument().then((ensured) => {
+      if (cancelled || !ensured || pendingCiteRef.current !== cite) return
+      pendingCiteRef.current = null
+      docRef.current = ensured
+      setDocReady(true)
+      void handleCitation(cite)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [ensureDocument, open, pendingCiteTick, handleCitation])
 
   /** The conversation's first excerpt answer — the language hint renders once,
    *  under that answer, not under every excerpt answer */
@@ -1370,7 +1426,12 @@ export default function AiPanel({
                   title={own ? undefined : t('ai.historyOpenElsewhereTip')}
                 >
                   <span className="ai-history-title">{c.title}</span>
-                  {historyAll && <span className="ai-history-doc">{c.docName}</span>}
+                  {historyAll && (
+                    <span className="ai-history-doc">
+                      {c.docName}
+                      {goneDocs.has(c.docPath) && <span className="conv-gone-tag">{t('lib.fileMissing')}</span>}
+                    </span>
+                  )}
                   <span className="ai-history-meta">
                     {new Date(c.updatedAt).toLocaleDateString(locale())} ·{' '}
                     {t('ai.historyMessages', { count: String(c.messageCount) })}

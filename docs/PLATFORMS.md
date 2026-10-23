@@ -636,7 +636,15 @@ regressions are treated as bugs, not as acceptable platform lag.
     position, bookmarks, fingerprint, recents entry and picture — and never
     touches a draft with unsaved marks. The rest of the «Samtaler» view
     (search, reading, the other three tidyings, Markdown/JSON export through
-    `saveTextFile`) is the same renderer code on every platform.
+    `saveTextFile`) is the same renderer code on every platform. The search
+    over every document runs where the store is: in main on the desktop
+    (`chats:search` over its cached summaries — a window receives the hits,
+    never the text of every conversation), in the page itself in the
+    extension and dev:web, where the store already lives. The library's
+    badge, sort, filters and the source chip that opens its document on
+    the cited passage are renderer code, identical everywhere; the
+    «Filen finnes ikke» tag reads the same «gone» as above, so dev:web never
+    shows it.
 
 ## Maintenance rules
 
