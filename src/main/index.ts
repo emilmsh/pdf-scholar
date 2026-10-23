@@ -99,7 +99,7 @@ import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import { createRecentThumbStore } from './recent-thumbs'
 import { createChatHistoryStore } from './chat-history'
 import type { StoredConversation } from '../shared/chat-history'
-import { sanitizeConversations, withoutImages } from '../shared/chat-history'
+import { sanitizeConversations, searchConversations, toMeta, withoutImages } from '../shared/chat-history'
 import { rebindIdentity, validFingerprint } from '../shared/doc-identity'
 
 // The portable zip keeps its state beside the exe. Before ANY path is read —
@@ -1287,7 +1287,13 @@ function registerIpc(): void {
       w.webContents.send('chats:changed', path)
     }
   })
-  ipcMain.handle('chats:list', () => chats.list())
+  // The list a window receives carries no conversation text, and the search
+  // runs here over main's cached summaries: 5 000 conversations' text is
+  // ~22 MB that every listing used to send across (measured 2026-10-23)
+  ipcMain.handle('chats:list', async () => (await chats.list()).map(toMeta))
+  ipcMain.handle('chats:search', async (_e, query: unknown) =>
+    searchConversations(await chats.list(), typeof query === 'string' ? query.slice(0, 500) : '')
+  )
 
   // A document's identity across a move (issue #46; shared/doc-identity.ts):
   // the renderer reports the /ID[0] it read from the bytes, main records it

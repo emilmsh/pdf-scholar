@@ -201,7 +201,9 @@ try {
     !after.buttons.some((b) => /[Nn]ettsøk|web search/i.test(b.title)),
     'no web-search globe for compat (capability profile)'
   )
-  const attach = after.buttons.filter((b) => b.cls.includes('ai-attach-add'))
+  // The two vision-gated tools — not «Samtaler» (ai-attach-convs, issue #46),
+  // which attaches text and works whatever the model can see
+  const attach = after.buttons.filter((b) => b.cls.includes('ai-attach-add') && !b.cls.includes('ai-attach-convs'))
   ok(
     attach.length === 2 && attach.every((b) => !b.disabled),
     'snip + attach enabled (vision unknown → permissive)'

@@ -12,11 +12,12 @@
 // windows on every platform (desktop's windows share one partition; the
 // extension's tabs one origin), with a short life — a document that fails to
 // open must not open on that conversation a day later.
-import type { ConversationSummary, StoredConversation } from '../../shared/chat-history'
+import type { ConversationHit, ConversationMeta, StoredConversation } from '../../shared/chat-history'
+import type { AiCitation } from '../../shared/types'
 import { mergeConversations, sanitizeConversations, docNameFromPath, withoutImages } from '../../shared/chat-history'
 import { bridge } from './bridge'
 
-export type { ChatMessage, StoredConversation, ConversationSummary, ConversationHit } from '../../shared/chat-history'
+export type { ChatMessage, StoredConversation, ConversationMeta, ConversationHit } from '../../shared/chat-history'
 
 /** The localStorage store this replaced: `{ [path]: StoredConversation[] }` */
 export const LEGACY_CHATS_LS_KEY = 'pdfx-ai-chats'
@@ -94,10 +95,17 @@ export async function deleteConversation(
   return next
 }
 
-/** Every document's conversations, without messages, newest first */
-export async function listAllConversations(): Promise<ConversationSummary[]> {
+/** Every document's conversations, without messages or text, newest first */
+export async function listAllConversations(): Promise<ConversationMeta[]> {
   await migrateLegacyChats()
   return bridge.listConversations()
+}
+
+/** The conversations across every document that match a query — searched
+ *  where the store is, so only the hits cross to this window */
+export async function searchAllConversations(query: string): Promise<ConversationHit[]> {
+  await migrateLegacyChats()
+  return bridge.searchConversations(query)
 }
 
 /** Fired on this window's own `window` by notifyChangedHere */
@@ -132,6 +140,9 @@ const HANDOFF_TTL_MS = 20_000
 interface Handoff {
   path: string
   id: string
+  /** A source chip clicked outside its document: the panel that takes the
+   *  handoff jumps to it, exactly as a click on the chip in that panel does */
+  citation?: AiCitation
   at: number
 }
 
@@ -142,16 +153,19 @@ function readHandoff(): Handoff | null {
     const h = JSON.parse(raw) as Partial<Handoff>
     if (typeof h.path !== 'string' || typeof h.id !== 'string' || typeof h.at !== 'number') return null
     if (Date.now() - h.at > HANDOFF_TTL_MS) return null
-    return { path: h.path, id: h.id, at: h.at }
+    const citation = h.citation && typeof h.citation === 'object' && typeof h.citation.kind === 'string' ? h.citation : undefined
+    return { path: h.path, id: h.id, at: h.at, ...(citation ? { citation } : {}) }
   } catch {
     return null
   }
 }
 
-/** Ask whichever panel shows this document next to open this conversation */
-export function requestConversationOpen(docPath: string, id: string): void {
+/** Ask whichever panel shows this document next to open this conversation —
+ *  and, with a citation, to jump to the passage it cites */
+export function requestConversationOpen(docPath: string, id: string, citation?: AiCitation): void {
   try {
-    localStorage.setItem(HANDOFF_KEY, JSON.stringify({ path: docPath, id, at: Date.now() } satisfies Handoff))
+    const h: Handoff = { path: docPath, id, at: Date.now(), ...(citation ? { citation } : {}) }
+    localStorage.setItem(HANDOFF_KEY, JSON.stringify(h))
   } catch {
     /* no storage: the document still opens, on its newest conversation */
   }
@@ -165,16 +179,15 @@ export function pendingConversationFor(docPath: string): string | null {
 }
 
 /** The conversation asked for on this document, taken: nobody else opens it */
-export function takeConversationFor(docPath: string): string | null {
-  const id = pendingConversationFor(docPath)
-  if (id !== null) {
-    try {
-      localStorage.removeItem(HANDOFF_KEY)
-    } catch {
-      /* it expires on its own */
-    }
+export function takeConversationFor(docPath: string): { id: string; citation?: AiCitation } | null {
+  const h = readHandoff()
+  if (!h || h.path !== docPath) return null
+  try {
+    localStorage.removeItem(HANDOFF_KEY)
+  } catch {
+    /* it expires on its own */
   }
-  return id
+  return h.citation ? { id: h.id, citation: h.citation } : { id: h.id }
 }
 
 /** Fired on `window` by the host once a document has been opened for a

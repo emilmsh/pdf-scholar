@@ -17,6 +17,8 @@
 // conversations, and predictable in a way a ranked score is not. Pure
 // functions, Node-testable (scripts/test-chat-history.mjs).
 import type { AiContentPart, AiImage, AiUsage, FileError } from './types'
+import type { AttachedConversation } from './conversation-context'
+import { sanitizeAttached } from './conversation-context'
 
 // `| undefined` on every optional field: messages are built as object literals
 // where the unused ones are present and undefined (a user turn with no images
@@ -67,6 +69,9 @@ export interface StoredConversation {
   createdAt: number
   updatedAt: number
   messages: ChatMessage[]
+  /** Earlier conversations the reader attached as context — sent with every
+   *  question in this one until taken off (shared/conversation-context.ts) */
+  attached?: AttachedConversation[] | undefined
 }
 
 /** One document's conversations as a store keeps them: the document's name
@@ -96,11 +101,23 @@ export interface ConversationSummary {
   imageBytes: number
 }
 
-export interface ConversationHit extends ConversationSummary {
+/** A summary as it crosses to a window: everything the list shows, without
+ *  the conversation's full text. The text stays where the store is — the
+ *  search runs there (PdfxApi.searchConversations) — since 5 000
+ *  conversations' text is ~22 MB a window had to receive on every listing. */
+export type ConversationMeta = Omit<ConversationSummary, 'text'>
+
+export interface ConversationHit extends ConversationMeta {
   /** The text around the first word matched in the conversation's TEXT —
    *  null when the match is in the title or document name alone, which the
    *  row shows anyway */
   snippet: string | null
+}
+
+/** A summary without its text, for the list a window receives */
+export function toMeta(s: ConversationSummary): ConversationMeta {
+  const { text: _text, ...meta } = s
+  return meta
 }
 
 /** Bounds on a stored list — against garbage, not against use */
@@ -133,7 +150,8 @@ export function sanitizeConversations(input: unknown): StoredConversation[] {
       title: c.title,
       createdAt: validTime(c.createdAt) ? c.createdAt : c.updatedAt,
       updatedAt: c.updatedAt,
-      messages: c.messages.filter(validMessage).slice(0, MAX_MESSAGES_PER_CONVERSATION)
+      messages: c.messages.filter(validMessage).slice(0, MAX_MESSAGES_PER_CONVERSATION),
+      ...(Array.isArray(c.attached) && c.attached.length ? { attached: sanitizeAttached(c.attached) } : {})
     })
     if (out.length >= MAX_CONVERSATIONS_PER_DOC) break
   }
@@ -291,7 +309,7 @@ export function searchConversations(list: ConversationSummary[], query: string):
         break
       }
     }
-    if (all) hits.push({ ...c, snippet })
+    if (all) hits.push({ ...toMeta(c), snippet })
   }
   return hits
 }

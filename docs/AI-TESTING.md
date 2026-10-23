@@ -14,7 +14,7 @@ catch.
 | 1. Unit / shaping | `npm run test:ai-chat` | nothing | CI, every push | What we SEND (params per provider, quote contract, images, tools), how we parse streams we imagined, the degrade-on-400 nets, and that every path matches its `PROVIDER_PROFILES` row |
 | 2. Recorded streams | `npm run test:streams` | nothing | CI, every push | What providers ACTUALLY sent, replayed byte for byte with their own write boundaries |
 | 3. Live conformance | `npm run test:live` | API keys | by hand: release + monthly | Everything the other three cannot: that the models we offer today still answer, cite, see images, and do not trip the degrade net |
-| 4. Real UI | `npm run test:ai-settings`, `test:assistant`, `test:quick-ai` | built app, desktop session | by hand before a release | That the answer reaches the USER — settings flow, model menu, streaming, citation chips, the detached window, and the selection bubble |
+| 4. Real UI | `npm run test:ai-settings`, `test:assistant`, `test:quick-ai`, `test:attach-desktop` | built app, desktop session | by hand before a release | That the answer reaches the USER — settings flow, model menu, streaming, citation chips, the detached window, the selection bubble, and what an attached earlier conversation actually sends |
 
 Layers 1 and 2 differ in a way worth stating plainly: **a mock is written from
 the same assumptions as the code it tests.** If we did not know a provider
@@ -170,6 +170,13 @@ Worth writing down so nobody mistakes a green run for a guarantee:
   the real app against a local server — but no live test attaches a 300-page
   document to a real provider and checks the answer is still grounded. Cost,
   mostly.
+- **Whether real models use the [SAMTALE n] tag.** Attached conversations
+  (issue #46) are tested for what we SEND and how we parse the tag
+  (`test:conversation-context`, `test:attach-desktop` against a recording
+  endpoint), but no live case attaches one and checks that a real model tags
+  what it took from it, or keeps the document as its only source. A model
+  that ignores the instruction degrades to an answer without the chip, never
+  to a wrong source — the tag cannot parse as one.
 - **Multi-turn drift.** Every live case is a single question. Context handling
   across ten turns with images in earlier turns is untested.
 - **Answer quality.** We test that a citation parses, not that it is the right

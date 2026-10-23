@@ -33,12 +33,20 @@ your key and their privacy terms. There is no intermediary server operated by
 PDF Scholar. Your key is sent to that one provider, as the credential on your
 own request, and to no one else — never to us.
 
-**Scanned pages.** A page with no text of its own is read by text recognition
-(Tesseract) on your device, so it can be searched, selected and highlighted.
+**Scanned pages and text in images.** A page with no text of its own, and an
+image on a page that has text (a figure, a table pasted in as a picture), is read
+by text recognition (Tesseract) on your device, so its words can be searched,
+selected and highlighted.
 Nothing is sent anywhere for that, and the recognised words are not written into
-your file — they are kept only while the document is open. When you use the
-assistant on such a document, those words are its text and go along exactly as
-described below.
+your file. So that a document does not have to be read again every time it is
+opened, the words are kept in the app's own storage on this device (the
+browser's storage for the extension), for the 150 most recently read documents;
+older ones are dropped. **A password-protected document's words are never
+kept** — they would sit unencrypted on disk for a file its owner chose to
+encrypt. A setting decides whether scanned pages are read as soon as they are
+shown, or only when you ask for it per document. When you use the assistant on
+such a document, those words are its text and go along exactly as described
+below.
 
 **What an AI action sends.** Asking the assistant a question, the one-click
 document summary, the AI search, and the quick actions on a selected passage or

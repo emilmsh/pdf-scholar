@@ -63,6 +63,12 @@ export interface UserRect {
    *  «Kopier bilde» re-render a figure at the resolution the file actually
    *  holds instead of at whatever the screen happens to show. */
   px?: { w: number; h: number }
+  /** Where pdf.js keeps the decoded pixels: an image XObject's object id, or
+   *  an inline image's data from the operator list — what OCR of a figure
+   *  reads instead of drawing the page again (ocr.ts) */
+  src?: { objId?: string; inline?: unknown }
+  /** Drawn without turning or mirroring: the bitmap's first row is the top */
+  upright?: boolean
 }
 
 /** The operator ids the walk needs — injected so the pure function can be
@@ -119,7 +125,11 @@ function walkOps(
   let ctm: Matrix = IDENTITY
   const stack: Matrix[] = []
 
-  const pushUnitSquare = (m: Matrix, px?: { w: number; h: number }): void => {
+  const pushUnitSquare = (
+    m: Matrix,
+    px?: { w: number; h: number },
+    src?: { objId?: string; inline?: unknown }
+  ): void => {
     const pts = [applyMatrix(m, 0, 0), applyMatrix(m, 1, 0), applyMatrix(m, 0, 1), applyMatrix(m, 1, 1)]
     const xs = pts.map((p) => p[0])
     const ys = pts.map((p) => p[1])
@@ -128,7 +138,9 @@ function walkOps(
       y0: Math.min(...ys),
       x1: Math.max(...xs),
       y1: Math.max(...ys),
-      ...(px && px.w > 0 && px.h > 0 ? { px } : {})
+      ...(px && px.w > 0 && px.h > 0 ? { px } : {}),
+      ...(src ? { src } : {}),
+      upright: m[0] > 0 && m[3] > 0 && Math.abs(m[1]) <= 1e-6 * m[0] && Math.abs(m[2]) <= 1e-6 * m[3]
     })
   }
 
@@ -160,12 +172,16 @@ function walkOps(
         break
       // args = [objId, w, h] — w/h are the image's own pixel dimensions
       case ops.paintImageXObject:
-        pushUnitSquare(ctm, pixelSize(args?.[1], args?.[2]))
+        pushUnitSquare(
+          ctm,
+          pixelSize(args?.[1], args?.[2]),
+          typeof args?.[0] === 'string' ? { objId: args[0] } : undefined
+        )
         break
       // args = [imgData], the decoded bitmap, which carries its own size
       case ops.paintInlineImageXObject: {
         const img = args?.[0] as { width?: unknown; height?: unknown } | undefined
-        pushUnitSquare(ctm, pixelSize(img?.width, img?.height))
+        pushUnitSquare(ctm, pixelSize(img?.width, img?.height), img ? { inline: img } : undefined)
         break
       }
       case ops.paintImageXObjectRepeat: {
