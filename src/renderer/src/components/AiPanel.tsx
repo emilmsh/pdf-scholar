@@ -60,6 +60,10 @@ import {
   takeConversationFor
 } from '../chat-store'
 import { searchConversations, summarizeConversations } from '../../../shared/chat-history'
+import type { AttachedConversation } from '../../../shared/conversation-context'
+import { MAX_CHARS_EACH, attachedBlock, capTranscript, splitConversationTags, transcript } from '../../../shared/conversation-context'
+import { estimateTokens } from '../ai-retrieval'
+import ConversationPicker from './ConversationPicker'
 import { conversationMarkdown } from '../chat-export'
 import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
@@ -71,6 +75,7 @@ import { ModelQuickMenu } from './AiModelMenu'
 import type { AiSeed } from './AiQuickPopover'
 import {
   IconChevronDown,
+  IconComment,
   IconCopy,
   IconDetach,
   IconGlobe,
@@ -283,6 +288,32 @@ export default function AiPanel({
   messagesRef.current = messages
   const busyRef = useRef(busy)
   busyRef.current = busy
+  /** Earlier conversations attached as context (issue #46) — the chips above
+   *  the composer, sent with every question in this conversation until taken
+   *  off, and stored with it (shared/conversation-context.ts) */
+  const [attached, setAttached] = useState<AttachedConversation[]>([])
+  const attachedRef = useRef(attached)
+  attachedRef.current = attached
+  const [pickerOpen, setPickerOpen] = useState(false)
+  /** Per chip: roughly what it costs, or that it is gone (deleted since) */
+  const [attachedInfo, setAttachedInfo] = useState<Record<string, { tokens: number; missing: boolean }>>({})
+  useEffect(() => {
+    let stale = false
+    void Promise.all(
+      attached.map(async (a) => {
+        const conv = (await loadConversations(a.docPath)).find((c) => c.id === a.id)
+        const chars = conv ? capTranscript(transcript(conv), MAX_CHARS_EACH).text.length : 0
+        return [`${a.docPath}\u0000${a.id}`, { tokens: Math.round(estimateTokens(chars)), missing: !conv }] as const
+      })
+    ).then((entries) => {
+      if (!stale) setAttachedInfo(Object.fromEntries(entries))
+    })
+    return () => {
+      stale = true
+    }
+  }, [attached])
+  /** The tags the request in flight numbered — what [SAMTALE n] refers to */
+  const taggedRef = useRef<AttachedConversation[]>([])
   /** A citation handed over with a conversation, until it can be followed */
   const pendingCiteRef = useRef<AiCitation | null>(null)
   const [pendingCiteTick, setPendingCiteTick] = useState(0)
@@ -554,6 +585,21 @@ export default function AiPanel({
       const ensured = docRef.current ?? (await ensureDocument())
       docRef.current = ensured
       if (ensured) setDocReady(true)
+      // The attached earlier conversations, read now (one file each) and built
+      // into a block of their own for the system prompt — never the document,
+      // never a user message, so taking a chip off really takes it out
+      const att = attachedRef.current
+      const block = att.length
+        ? attachedBlock(
+            await Promise.all(
+              att.map(async (meta) => ({
+                meta,
+                conversation: (await loadConversations(meta.docPath)).find((c) => c.id === meta.id) ?? null
+              }))
+            )
+          )
+        : null
+      taggedRef.current = block?.tagged ?? []
       // Above the model's context window the full text cannot ride along:
       // attach a BM25 excerpt picked for this conversation's questions instead
       // (ai-retrieval.ts). On the everyday path prep.excerpt is null and the
@@ -568,7 +614,8 @@ export default function AiPanel({
                 .filter((m) => m.role === 'user')
                 .map((m) => m.text)
                 .join('\n'),
-              config.catalog
+              config.catalog,
+              block?.text.length ?? 0
             )
           : { doc: ensured.doc, excerpt: null }
         : null
@@ -589,7 +636,8 @@ export default function AiPanel({
         system:
           chatSystem() +
           (imagesOnly ? scannedPagesNote(shownPages) : '') +
-          (prep?.excerpt && !imagesOnly ? excerptSystemNote() : ''),
+          (prep?.excerpt && !imagesOnly ? excerptSystemNote() : '') +
+          (block?.text ?? ''),
         messages: history,
         document: imagesOnly || !prep ? null : { title: docTitle, text: prep.doc.text },
         webSearch: webSearchRef.current
@@ -621,9 +669,11 @@ export default function AiPanel({
       } else {
         // Char citations point into the excerpt this request attached —
         // resolve them to real pages now, while that exact text is known
-        const parts = prep?.excerpt
+        const cited = prep?.excerpt
           ? charCitationsToQuotes(result.parts, prep.doc)
           : result.parts
+        // [SAMTALE n] tags become chips that open the conversation they name
+        const parts = taggedRef.current.length ? splitConversationTags(cited, taggedRef.current) : cited
         setMessages((m) => [
           ...m,
           {
@@ -707,6 +757,7 @@ export default function AiPanel({
         setPinned(true)
         setActiveChatId(target.id)
         setMessages(target.messages)
+        setAttached(target.attached ?? [])
         // A conversation asked for by name is what the reader came to see:
         // it wins over the history list and over the first-run key settings
         if (wanted) {
@@ -740,7 +791,10 @@ export default function AiPanel({
           const activeId = activeChatIdRef.current
           if (activeId) {
             const chat = fresh.find((c) => c.id === activeId)
-            if (chat) setMessages(chat.messages)
+            if (chat) {
+              setMessages(chat.messages)
+              setAttached(chat.attached ?? [])
+            }
           }
         })
       }
@@ -759,18 +813,20 @@ export default function AiPanel({
       title: existing?.title ?? chatTitle(messages),
       createdAt: existing?.createdAt ?? Date.now(),
       updatedAt: Date.now(),
-      messages
+      messages,
+      ...(attached.length ? { attached } : {})
     }
     const next = [chat, ...conversationsRef.current.filter((c) => c.id !== id)]
     void saveConversations(docPath, docTitle, next, isLockedRef.current?.() ?? false)
     setConversations(next)
     if (activeChatIdRef.current !== id) setActiveChatId(id)
-  }, [messages, busy, docPath, docTitle])
+  }, [messages, busy, docPath, docTitle, attached])
 
   const startNewChat = useCallback((): void => {
     if (busy) return
     setActiveChatId(null)
     setMessages([])
+    setAttached([])
     setShowHistory(false)
     pinnedRef.current = true
     setPinned(true)
@@ -786,6 +842,7 @@ export default function AiPanel({
       setPinned(true)
       setActiveChatId(id)
       setMessages(chat.messages)
+      setAttached(chat.attached ?? [])
       setShowHistory(false)
     },
     [busy]
@@ -898,6 +955,16 @@ export default function AiPanel({
         bridge.openExternal(citation.url)
         return
       }
+      // An attached conversation the answer drew on: that conversation opens —
+      // here when it is this document's, else in its own document
+      if (citation.kind === 'conversation') {
+        if (citation.docPath === docPath) openConversation(citation.id)
+        else if (onOpenElsewhere) {
+          requestConversationOpen(citation.docPath, citation.id)
+          onOpenElsewhere(citation.docPath)
+        }
+        return
+      }
       let ensured = docRef.current
       if (!ensured) {
         ensured = await ensureDocument()
@@ -916,7 +983,7 @@ export default function AiPanel({
         onCitationClick({ pageNumber: page, start: 0, end: 0 })
       }
     },
-    [onCitationClick, ensureDocument]
+    [onCitationClick, ensureDocument, docPath, onOpenElsewhere, openConversation]
   )
   // A handed-over citation waits here until ensureDocument can answer: it is
   // a new function once the viewer has the document, which re-runs this
@@ -978,18 +1045,32 @@ export default function AiPanel({
   // message args, so cancelling loses nothing — the composer text and staged
   // attachments are untouched until the user says send. Every send that
   // actually happens is recorded, in every mode.
-  const [pendingSend, setPendingSend] = useState<{ run: () => void } | null>(null)
+  const [pendingSend, setPendingSend] = useState<{ run: () => void; others: AttachedConversation[] } | null>(null)
   const provider = config?.provider ?? null
+  // Attached conversations are content from OTHER documents: one whose
+  // document has not gone to this provider yet is asked about the same way,
+  // and the strip names it
+  const markShared = useCallback(
+    (others: AttachedConversation[]) => {
+      if (!provider) return
+      markSharedWith(docPath, provider)
+      for (const a of others) markSharedWith(a.docPath, provider)
+    },
+    [provider, docPath]
+  )
   const stageOrRun = useCallback(
     (run: () => void) => {
-      if (config?.access === 'confirm' && provider && !isSharedWith(docPath, provider)) {
-        setPendingSend({ run })
+      const others = provider
+        ? attachedRef.current.filter((a) => a.docPath !== docPath && !isSharedWith(a.docPath, provider))
+        : []
+      if (config?.access === 'confirm' && provider && (!isSharedWith(docPath, provider) || others.length > 0)) {
+        setPendingSend({ run, others })
         return
       }
-      if (provider) markSharedWith(docPath, provider)
+      markShared(attachedRef.current)
       run()
     },
-    [config?.access, provider, docPath]
+    [config?.access, provider, docPath, markShared]
   )
 
   /** Composer send: takes the staged images/annotations along and clears them.
@@ -1085,11 +1166,48 @@ export default function AiPanel({
           )}
         </div>
       )}
+      {pickerOpen && (
+        <ConversationPicker
+          docPath={docPath}
+          activeId={activeChatId}
+          attached={attached}
+          receiverName={receiverName}
+          onApply={(list) => {
+            setAttached(list)
+            setPickerOpen(false)
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
       {/* ChatGPT-style field: the textarea and its controls live INSIDE one
           rounded surface — the buttons sit bottom-right, never beside it. */}
       <div className="ai-composer-field">
-        {(annotsStaged || pendingImages.length > 0) && (
+        {(annotsStaged || pendingImages.length > 0 || attached.length > 0) && (
           <div className="ai-attach-row">
+            {/* Earlier conversations attached as context: they go with every
+                question here until taken off — the chip IS the control */}
+            {attached.map((a) => {
+              const info = attachedInfo[`${a.docPath}\u0000${a.id}`]
+              return (
+                <div
+                  key={`${a.docPath}\u0000${a.id}`}
+                  className={`ai-attach ai-attach-conv${info?.missing ? ' is-missing' : ''}`}
+                  title={[a.docName, `«${a.title}»`, info?.missing ? t('ai.attachedMissing') : info ? t('ai.attachedTokens', { tokens: String(info.tokens) }) : '']
+                    .filter(Boolean)
+                    .join('\n')}
+                >
+                  <IconComment size={12} />
+                  <span className="ai-attach-conv-text">{a.docPath === docPath ? a.title : `${a.docName}: ${a.title}`}</span>
+                  <button
+                    className="ai-attach-x"
+                    title={t('ai.removeAttachedTip')}
+                    onClick={() => setAttached((l) => l.filter((x) => !(x.docPath === a.docPath && x.id === a.id)))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
+            })}
             {/* Which pages are going along, in words — a row of thumbnails does
                 not tell you whether page 7 or page 8 is in the request. */}
             {stagedPages.length > 0 && (
@@ -1140,7 +1258,11 @@ export default function AiPanel({
         )}
         {pendingSend && (
           <div className="ai-confirm">
-            <span>{t('ai.confirmChat', { name: receiverName })}</span>
+            <span>
+              {t('ai.confirmChat', { name: receiverName })}
+              {pendingSend.others.length > 0 &&
+                ` ${t('ai.confirmAttached', { names: [...new Set(pendingSend.others.map((a) => a.docName))].join(', ') })}`}
+            </span>
             <div className="ai-confirm-actions">
               <button className="btn-secondary" onClick={() => setPendingSend(null)}>
                 {t('app.cancel')}
@@ -1150,7 +1272,7 @@ export default function AiPanel({
                 onClick={() => {
                   const staged = pendingSend
                   setPendingSend(null)
-                  if (provider) markSharedWith(docPath, provider)
+                  markShared(attachedRef.current)
                   staged.run()
                 }}
               >
@@ -1221,6 +1343,16 @@ export default function AiPanel({
               )}
             </button>
           )}
+          <button
+            className={`ai-attach-add ai-attach-convs${attached.length ? ' is-on' : ''}`}
+            title={t('ai.attachConvsTip')}
+            aria-expanded={pickerOpen}
+            disabled={busy || !!pendingSend}
+            onClick={() => setPickerOpen((o) => !o)}
+          >
+            <IconComment size={15} />
+            <span>{t('ai.attachConvsBtn')}</span>
+          </button>
           {onRequestSnip && (
             <button
               className="ai-attach-add"
@@ -1566,7 +1698,7 @@ export default function AiPanel({
                     // Chips as they arrive; the settled message replaces this
                     // with the same parts, so nothing moves when it lands
                     <AssistantBody
-                      parts={streamedAnswer(streamParts, streamCiteRef.current)}
+                      parts={splitConversationTags(streamedAnswer(streamParts, streamCiteRef.current), taggedRef.current)}
                       doc={docRef.current?.doc ?? null}
                       onCitation={handleCitation}
                     />

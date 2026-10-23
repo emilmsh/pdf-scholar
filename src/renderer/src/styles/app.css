@@ -5914,6 +5914,158 @@ button.bookmark-fold:hover {
   text-overflow: ellipsis;
 }
 
+/* An attached earlier conversation the answer drew on (issue #46): the same
+   pill as a source chip, in the quiet text colour instead of the accent — a
+   reader's note, never mistaken for a page of the document */
+.ai-chip-conversation {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  border-color: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+/* ---------- Earlier conversations as context (issue #46) ---------- */
+
+/* The composer's «Samtaler»: an icon WITH its word, since what it does is
+   not obvious from a bubble alone; accent-tinted while something is attached */
+.ai-attach-add.ai-attach-convs {
+  width: auto;
+  display: inline-flex;
+  gap: 5px;
+  padding: 0 9px;
+  font-size: calc(12px * var(--ai-scale, 1));
+}
+
+.ai-attach-add.ai-attach-convs.is-on {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.ai-attach-add:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* A chip per attached conversation, the pill the annotations use */
+.ai-attach-conv {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  font-size: calc(11.5px * var(--ai-scale, 1));
+  font-weight: 600;
+  color: var(--accent);
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.ai-attach-conv-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-attach-conv .ai-attach-x {
+  position: static;
+}
+
+.ai-attach-conv.is-missing {
+  color: var(--text-secondary);
+  border-style: dashed;
+  background: none;
+}
+
+.ai-attach-conv.is-missing .ai-attach-conv-text {
+  text-decoration: line-through;
+}
+
+/* The picker: in the flow above the composer, not floating over the answer */
+.ai-conv-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-elevated);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.08);
+}
+
+.ai-conv-picker-head {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.ai-conv-picker-note {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.ai-conv-picker .ai-history-search {
+  margin-bottom: 0;
+}
+
+.ai-conv-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: min(42vh, 360px);
+  overflow-y: auto;
+}
+
+.ai-conv-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.ai-conv-pick:hover {
+  background: var(--hover);
+}
+
+.ai-conv-pick.is-on {
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.ai-conv-pick input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.ai-conv-pick-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ai-conv-picker-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-conv-picker-count {
+  flex: 1;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.ai-conv-picker-foot .btn-secondary,
+.ai-conv-picker-foot .btn-primary {
+  padding: 6px 14px;
+  font-size: 12.5px;
+}
+
 /* KaTeX math in assistant text: inline stays in the sentence flow; display
    blocks get their own line and scroll sideways in the narrow panel instead
    of wrapping badly */

@@ -17,6 +17,8 @@
 // conversations, and predictable in a way a ranked score is not. Pure
 // functions, Node-testable (scripts/test-chat-history.mjs).
 import type { AiContentPart, AiImage, AiUsage, FileError } from './types'
+import type { AttachedConversation } from './conversation-context'
+import { sanitizeAttached } from './conversation-context'
 
 // `| undefined` on every optional field: messages are built as object literals
 // where the unused ones are present and undefined (a user turn with no images
@@ -67,6 +69,9 @@ export interface StoredConversation {
   createdAt: number
   updatedAt: number
   messages: ChatMessage[]
+  /** Earlier conversations the reader attached as context — sent with every
+   *  question in this one until taken off (shared/conversation-context.ts) */
+  attached?: AttachedConversation[] | undefined
 }
 
 /** One document's conversations as a store keeps them: the document's name
@@ -145,7 +150,8 @@ export function sanitizeConversations(input: unknown): StoredConversation[] {
       title: c.title,
       createdAt: validTime(c.createdAt) ? c.createdAt : c.updatedAt,
       updatedAt: c.updatedAt,
-      messages: c.messages.filter(validMessage).slice(0, MAX_MESSAGES_PER_CONVERSATION)
+      messages: c.messages.filter(validMessage).slice(0, MAX_MESSAGES_PER_CONVERSATION),
+      ...(Array.isArray(c.attached) && c.attached.length ? { attached: sanitizeAttached(c.attached) } : {})
     })
     if (out.length >= MAX_CONVERSATIONS_PER_DOC) break
   }
