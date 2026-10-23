@@ -506,7 +506,10 @@ use GitHub's **Cite this repository** button, backed by [`CITATION.cff`](CITATIO
 PDF Scholar is licensed under the **[MIT License](LICENSE)**. Every bundled
 component is permissively licensed: annotations are written by
 [EmbedPDF](https://www.embedpdf.com/)'s PDFium build (MIT / BSD-3-Clause),
-rendering by [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0), plus
+rendering by [pdf.js](https://mozilla.github.io/pdf.js/) (Apache-2.0), text on
+scanned pages by [Tesseract](https://github.com/tesseract-ocr/tesseract) through
+[tesseract.js-core](https://github.com/naptha/tesseract.js-core) and its trained
+models (all Apache-2.0), plus
 [Electron](https://www.electronjs.org/) (MIT), [React](https://react.dev/) (MIT), the
 [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) (MIT) and the
 [Libertinus](https://github.com/alerque/libertinus) wordmark font (SIL OFL 1.1).

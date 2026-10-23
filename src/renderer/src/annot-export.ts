@@ -4,6 +4,7 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import type { PageRect } from '../../shared/types'
 import { annotTypeLabel } from './annotations'
+import { pageTextContent } from './search'
 import { docxParagraph, docxRun, makeDocx } from './docx'
 import { getLanguage, t } from './i18n'
 import type { PageAnnotation } from './annotations'
@@ -32,7 +33,8 @@ interface PositionedItem {
 async function getPositionedItems(pdf: PDFDocumentProxy, pageNumber: number): Promise<PositionedItem[]> {
   const page = await pdf.getPage(pageNumber)
   const pageHeight = page.getViewport({ scale: 1 }).height
-  const content = await page.getTextContent()
+  // A scanned page's OCR words, so a highlight there exports its text too
+  const content = await pageTextContent(pdf, pageNumber)
   const items: PositionedItem[] = []
   for (const item of content.items) {
     if (!('str' in item) || item.str === '') continue

@@ -24,6 +24,7 @@ import { browserCurrentBytes, hasBrowserDoc, registerBrowserDoc } from '../annot
 import { openDocument, isPasswordException } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { collectAnnotations, reloadedAnnotations } from '../doc-load'
+import { carryOcr } from '../ocr'
 import { onLocalDocEvent } from '../local-doc-events'
 import { t } from '../i18n'
 
@@ -97,6 +98,8 @@ export function useSplitDocSession(
         resources.port.terminate()
         return
       }
+      // The pages are the same pictures: what OCR read on them still holds
+      carryOcr((await resourcesRef.current?.task.promise.catch(() => null)) ?? null, doc)
       const old = resourcesRef.current
       resourcesRef.current = resources
       setPdf(doc)

@@ -191,6 +191,7 @@ import { saveSearchListOpen } from '../search-list-pref'
 import { isPageInverted } from '../theme-tune'
 import { clearAiTextScale } from '../ai-text-scale'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
+import { carryOcr, useOcrProgress } from '../ocr'
 import { offsetAtPoint, rangeOfQuads, snapToWords } from '../text-range'
 import type { CharRange } from '../text-range'
 import { collectExportRows, computeExcerpts, toDocx, toHtml, toMarkdown, toPlainText } from '../annot-export'
@@ -1486,6 +1487,9 @@ export default function PdfViewer({
   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
   const [searchIndex, setSearchIndex] = useState(-1)
   const [searchBusy, setSearchBusy] = useState(false)
+  /** Scanned pages being read by OCR (ocr.ts) — said in the search bar and
+   *  the assistant while it lasts */
+  const ocrProgress = useOcrProgress(pdf)
   const [searchHits, setSearchHits] = useState<{
     pageNumber: number
     rects: PageRect[]
@@ -1748,6 +1752,13 @@ export default function PdfViewer({
     timer: number
   } | null>(null)
   const pageTextsRef = useRef<PageText[] | null>(null)
+  /** The page texts the current search matches were found in: pageTextsRef
+   *  once the whole document is read, a partial array while a scanned
+   *  document's pages are still arriving from OCR */
+  const searchTextsRef = useRef<PageText[] | null>(null)
+  /** The match the view was last taken to, so the index can follow it when
+   *  OCR adds hits on earlier pages */
+  const searchActiveRef = useRef<{ pageNumber: number; start: number } | null>(null)
   const searchOpenRef = useRef(searchOpen)
   searchOpenRef.current = searchOpen
   const aiHitTimerRef = useRef<number | null>(null)
@@ -1969,6 +1980,8 @@ export default function PdfViewer({
       // Only the page this window just wrote to is re-read when one is named
       // — see reloadedAnnotations for why that is the whole reload's cost.
       const applyAnnots = await reloadedAnnotations(doc, pageNumber)
+      // The pages are the same pictures: what OCR read on them still holds
+      carryOcr((await docResourcesRef.current?.task.promise.catch(() => null)) ?? null, doc)
       const old = docResourcesRef.current
       docResourcesRef.current = resources
       setPdf(doc)
@@ -6310,7 +6323,7 @@ export default function PdfViewer({
 
   const gotoMatch = useCallback(
     async (matches: SearchMatch[], i: number, recordBack: boolean) => {
-      const texts = pageTextsRef.current
+      const texts = pageTextsRef.current ?? searchTextsRef.current
       if (!texts || matches.length === 0) return
       // Search moves the column being worked in — the active one — so a hit
       // never yanks the column you were using as a reference. (Main document:
@@ -6321,6 +6334,7 @@ export default function PdfViewer({
       if (!handle?.ready() || !el) return
       const match = matches[i]
       setSearchIndex(i)
+      searchActiveRef.current = { pageNumber: match.pageNumber, start: match.start }
       if (recordBack) pushBack(pane)
       const seq = ++gotoSeqRef.current
       // Bring the page into view so its text layer renders, then refine
@@ -6366,26 +6380,54 @@ export default function PdfViewer({
       return
     }
     setSearchBusy(true)
-    const timer = window.setTimeout(async () => {
-      try {
-        const texts = (pageTextsRef.current ??= await buildPageTexts(pdf))
-        if (seq !== searchSeqRef.current) return
-        const matches = findMatches(texts, query, searchOptions)
-        setSearchMatches(matches)
-        setSearchBusy(false)
-        if (matches.length > 0) {
-          const recordBack = !searchJumpedRef.current
-          searchJumpedRef.current = true
-          void gotoMatch(matches, 0, recordBack)
-        } else {
+    // Closing the bar, or the next keystroke, gives up the OCR pages this
+    // search was still waiting for (the next keystroke asks again at once,
+    // and the pages already read are kept)
+    const abort = new AbortController()
+    let jumped = false
+    /** Matches in `texts`; `final` once every page is in. A scanned document
+     *  arrives a page at a time, and its hits show as they are found — a long
+     *  book takes minutes to read, and the first hit is worth having now. */
+    const show = (texts: PageText[], final: boolean): void => {
+      if (seq !== searchSeqRef.current) return
+      const matches = findMatches(texts, query, searchOptions)
+      searchTextsRef.current = texts
+      setSearchMatches(matches)
+      setSearchBusy(false)
+      if (matches.length === 0) {
+        if (final) {
           setSearchIndex(-1)
           setSearchHits(null)
         }
+        return
+      }
+      if (jumped) {
+        // Hits on earlier pages shift the list: keep the index on the hit shown
+        const active = searchActiveRef.current
+        const at = active ? matches.findIndex((m) => m.pageNumber === active.pageNumber && m.start === active.start) : -1
+        if (at >= 0) setSearchIndex(at)
+        return
+      }
+      jumped = true
+      const recordBack = !searchJumpedRef.current
+      searchJumpedRef.current = true
+      void gotoMatch(matches, 0, recordBack)
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const texts = (pageTextsRef.current ??= await buildPageTexts(pdf, {
+          signal: abort.signal,
+          onProgress: (partial) => show(partial, false)
+        }))
+        show(texts, true)
       } catch {
         if (seq === searchSeqRef.current) setSearchBusy(false)
       }
     }, 250)
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      abort.abort()
+    }
   }, [searchOpen, searchQuery, searchOptions, pdf, gotoMatch])
 
   // Highlight-all: resolve every match on the pages that are mounted right now.
@@ -6407,7 +6449,7 @@ export default function PdfViewer({
     setSearchAllHits((prev) =>
       prev && (prev.pane !== pane || prev.rotation !== paneRotation) ? null : prev
     )
-    const texts = pageTextsRef.current
+    const texts = pageTextsRef.current ?? searchTextsRef.current
     const handle = handleForRef.current(pane)
     const host = handle?.el()
     if (!texts || !handle || !host) return
@@ -7839,6 +7881,7 @@ export default function PdfViewer({
                 seed={aiSeed}
                 onSeedConsumed={consumeAiSeed}
                 ensureDocument={ensureAiDocument}
+                ocrProgress={ocrProgress}
                 hasAnnotations={hasAnnotations}
                 annotsAskId={annotsAskId}
                 getAnnotationsText={getAnnotationsText}
@@ -7950,6 +7993,7 @@ export default function PdfViewer({
           matches={searchMatches}
           index={searchIndex}
           busy={searchBusy}
+          ocr={ocrProgress}
           mode={searchMode}
           onModeChange={setSearchMode}
           aiStatus={semantic.status}

@@ -37,6 +37,7 @@ import {
   WAIT_HINT_S
 } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
+import type { OcrProgress } from '../ocr'
 import { rememberRequestTokenLimit } from '../ai-token-limits'
 import { errorDetail, errorText, t, useLang, locale } from '../i18n'
 import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-scale'
@@ -147,6 +148,9 @@ interface PanelProps {
   seed: AiSeed | null
   onSeedConsumed(): void
   ensureDocument(): Promise<EnsuredDocument | null>
+  /** Scanned pages being read by OCR. ensureDocument waits for them — the
+   *  landing says why, and how far it has come. */
+  ocrProgress?: OcrProgress | null
   /** Whether the document currently has any annotations (gates the suggestion) */
   hasAnnotations: boolean
   /** Bumped by the viewer (sidebar ✦) to fire the annotations question */
@@ -207,6 +211,7 @@ export default function AiPanel({
   seed,
   onSeedConsumed,
   ensureDocument,
+  ocrProgress = null,
   hasAnnotations,
   annotsAskId,
   getAnnotationsText,
@@ -1392,6 +1397,11 @@ export default function AiPanel({
                 >
                   {t('ai.calloutCta')}
                 </button>
+              </div>
+            )}
+            {!docRef.current && ocrProgress && (
+              <div className="ai-notice">
+                <p>{t('ai.ocrReading', { done: ocrProgress.done, total: ocrProgress.total })}</p>
               </div>
             )}
             {docRef.current && !docRef.current.hasText && (

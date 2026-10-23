@@ -2,8 +2,10 @@
 // cached; matches are located back on screen by mapping character offsets to
 // the pdf.js text-layer spans (spans correspond 1:1 to non-empty text items).
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { TextContent } from 'pdfjs-dist/types/src/display/api'
 import type { PageRect } from '../../shared/types'
 import { clientRectsToPageRects } from './annotations'
+import { hasVisibleText } from './ocr-text'
 
 export interface PageText {
   /** Concatenated item strings; '\n' appended after items with hasEOL */
@@ -28,21 +30,39 @@ export interface SearchOptions {
 
 const MAX_MATCHES = 500
 
-/**
- * One page's text and runs.
- *
- * Split out of buildPageTexts because a whole-document pass is the wrong unit
- * for anything interactive: on a 15-page paper it takes over a second, and the
- * markup-end drag needs exactly one page's text before the hand has finished
- * moving. Extracting that page alone is a few tens of milliseconds.
- */
-export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): Promise<PageText> {
+/** Where a page's text comes from when its PDF has none: ocr.ts reads the
+ *  page (installOcr). Injected rather than imported so this module — and its
+ *  tests — stay free of the engine. */
+export type TextFallback = (
+  pdf: PDFDocumentProxy,
+  pageNumber: number,
+  opts?: { priority?: number; signal?: AbortSignal }
+) => Promise<TextContent | null>
+
+let textFallback: TextFallback | null = null
+
+export function setTextFallback(fallback: TextFallback | null): void {
+  textFallback = fallback
+}
+
+/** A page's text content: its own, or — a scanned page with none — the words
+ *  OCR found on it. The ONE place both the text layer's source and every
+ *  extracted PageText come from, so the spans and the runs stay 1:1 on a
+ *  scanned page too (see resolveMatchRects). An XFA form's text is never
+ *  empty in this sense and never read. */
+export async function pageTextContent(
+  pdf: PDFDocumentProxy,
+  pageNumber: number,
+  opts?: { priority?: number; signal?: AbortSignal }
+): Promise<TextContent> {
   const page = await pdf.getPage(pageNumber)
   const content = await page.getTextContent()
-  // An XFA form's items are the laid-out form's text nodes (a caption, a
-  // paragraph, a label) with no positions and no hasEOL — glued together they
-  // would read «Page of Support for…». Each one ends its own line instead.
-  const xfa = pdf.isPureXfa
+  if (!textFallback || pdf.isPureXfa || hasVisibleText(content)) return content
+  return (await textFallback(pdf, pageNumber, opts)) ?? content
+}
+
+/** Text content → page text, with a run per non-empty item */
+function toPageText(content: TextContent, xfa: boolean): PageText {
   let text = ''
   const runs: { start: number; length: number }[] = []
   for (const item of content.items) {
@@ -51,21 +71,71 @@ export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): 
       runs.push({ start: text.length, length: item.str.length })
       text += item.str
     }
+    // An XFA form's items are the laid-out form's text nodes (a caption, a
+    // paragraph, a label) with no positions and no hasEOL — glued together
+    // they would read «Page of Support for…». Each one ends its own line.
     if (item.hasEOL || xfa) text += '\n'
   }
   return { text, runs }
 }
 
-export async function buildPageTexts(pdf: PDFDocumentProxy): Promise<PageText[]> {
+/**
+ * One page's text and runs.
+ *
+ * Split out of buildPageTexts because a whole-document pass is the wrong unit
+ * for anything interactive: on a 15-page paper it takes over a second, and the
+ * markup-end drag needs exactly one page's text before the hand has finished
+ * moving. Extracting that page alone is a few tens of milliseconds — a scanned
+ * page the first time it is read takes the OCR's second or two instead.
+ */
+export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): Promise<PageText> {
+  return toPageText(await pageTextContent(pdf, pageNumber), pdf.isPureXfa)
+}
+
+/**
+ * Every page's text and runs.
+ *
+ * A scanned document is read in two passes: first every page's own text (fast
+ * — there is none), then the pages without any through OCR, a second or two
+ * each. `onProgress` hears the pages as they arrive — the array in page order,
+ * pages not yet read still empty — so a search can show what it has found so
+ * far instead of waiting minutes on a long book. With a `signal` the pass can
+ * be given up: pages not yet read leave the OCR queue and the promise rejects.
+ */
+export async function buildPageTexts(
+  pdf: PDFDocumentProxy,
+  opts: { onProgress?(pages: PageText[]): void; signal?: AbortSignal } = {}
+): Promise<PageText[]> {
   const pages: PageText[] = []
-  for (let i = 1; i <= pdf.numPages; i++) pages.push(await buildPageText(pdf, i))
+  const missing: number[] = []
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    opts.signal?.throwIfAborted()
+    if (textFallback && !pdf.isPureXfa && !hasVisibleText(content)) missing.push(i)
+    pages.push(toPageText(content, pdf.isPureXfa))
+  }
+  if (missing.length === 0 || !textFallback) return pages
+  const fallback = textFallback
+  // All at once, so the queue holds the whole pass (and the pages on screen
+  // can still jump it); each lands in its slot as it is read
+  await Promise.all(
+    missing.map(async (n) => {
+      const content = await fallback(pdf, n, opts.signal ? { signal: opts.signal } : {})
+      if (!content) return
+      pages[n - 1] = toPageText(content, false)
+      opts.onProgress?.(pages.slice())
+    })
+  )
   return pages
 }
 
 /** Whether the document has a text layer worth reading at all.
  *
- *  A scanned PDF is pictures of words: getTextContent returns nothing, so every
- *  page comes back as `{ text: '', runs: [] }` with no error anywhere. Callers
+ *  A scanned PDF is pictures of words: getTextContent returns nothing, and
+ *  where OCR could not help either (the engine would not start, the pages are
+ *  photographs) every page comes back as `{ text: '', runs: [] }` with no
+ *  error anywhere. Callers
  *  that would otherwise send an empty document to a model — or search text that
  *  does not exist — have to ask first, because the failure is silent and looks
  *  like the document simply saying nothing.
