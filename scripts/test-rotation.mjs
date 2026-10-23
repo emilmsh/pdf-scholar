@@ -319,6 +319,60 @@ console.log('8) buildRows paged: every row in a slot of its own, a viewport apar
   ok(R.flipTarget(1, 1, 5, true, true) === 3, 'paged: flipTarget unchanged')
 }
 
+console.log('9) buildRows on whole device pixels (issue #53: fuzzy text at most zoom levels)')
+{
+  // An A4 page at 100 % on a 1.5× screen: 595.28 CSS px is 892.92 device
+  // pixels, and centred in a 1000 px column its left edge is 202.36 CSS px =
+  // 303.54 device pixels. Unsnapped, the canvas bitmap (an integer) is
+  // stretched over a fractional box and every glyph is resampled.
+  const a4 = [{ w: 595.28, h: 841.89 }, { w: 595.28, h: 841.89 }, { w: 595.28, h: 841.89 }]
+  const opts = { containerWidth: 1000, pageGap: 10, padTop: 10, padBottom: 10, sidePad: 64, spreadGap: 24 }
+  const onGrid = (v, dpr) => Math.abs(v * dpr - Math.round(v * dpr)) < 1e-6
+  const unsnapped = R.buildRows(a4, 1, 0, false, opts)
+  ok(!onGrid(unsnapped.lefts[0], 1.5), `without the ratio the left edge is fractional (${unsnapped.lefts[0] * 1.5} device px)`)
+  ok(!onGrid(unsnapped.widths[0], 1.5), 'without the ratio the width is fractional')
+  for (const dpr of [1, 1.25, 1.5, 1.75, 2]) {
+    for (const spread of [false, true]) {
+      for (const paged of [0, 700.4]) {
+        const lay = R.buildRows(a4, 1.137, 0, spread, { ...opts, devicePixelRatio: dpr, ...(paged ? { pagedHeight: paged } : {}) })
+        const tag = `dpr ${dpr}${spread ? ' spread' : ''}${paged ? ' paged' : ''}`
+        ok(lay.lefts.every((v) => onGrid(v, dpr)), `${tag}: every left on a device pixel`)
+        ok(lay.tops.every((v) => onGrid(v, dpr)), `${tag}: every top on a device pixel`)
+        ok(lay.widths.every((v) => onGrid(v, dpr)), `${tag}: every width on a device pixel`)
+        ok(lay.heights.every((v) => onGrid(v, dpr)), `${tag}: every height on a device pixel`)
+        ok(lay.rows.every((r) => onGrid(r.top, dpr) && onGrid(r.height, dpr)), `${tag}: every slot on a device pixel`)
+        ok(onGrid(lay.total, dpr), `${tag}: the total on a device pixel`)
+        // Snapping moves nothing further than one device pixel: a size by
+        // half of one, and an edge that depends on a snapped size (the centred
+        // left, the right page of a spread) by half of one more
+        const ref = R.buildRows(a4, 1.137, 0, spread, { ...opts, ...(paged ? { pagedHeight: paged } : {}) })
+        const drift = Math.max(
+          ...lay.lefts.map((v, i) => Math.abs(v - ref.lefts[i])),
+          ...lay.widths.map((v, i) => Math.abs(v - ref.widths[i])),
+          ...lay.heights.map((v, i) => Math.abs(v - ref.heights[i]))
+        )
+        ok(drift <= 1 / dpr + 1e-9, `${tag}: no edge moved more than one device pixel (${drift.toFixed(4)})`)
+        if (paged) {
+          // The slots still touch and still hold their pages
+          ok(lay.rows.every((r, i) => i === 0 || Math.abs(lay.rows[i - 1].top + lay.rows[i - 1].height - r.top) < 1e-6), `${tag}: slots touch`)
+          ok(lay.rows.every((r) => r.pages.every((p) => p.top >= r.top - 1e-6 && p.top + p.height <= r.top + r.height + 1e-6)), `${tag}: pages inside their slots`)
+        }
+      }
+    }
+  }
+  // A ratio of 1 is the unsnapped layout rounded to whole CSS pixels — and a
+  // layout at 1 with integer page sizes is byte-identical to the unsnapped one
+  const ints = [{ w: 600, h: 800 }, { w: 600, h: 800 }]
+  const plain = R.buildRows(ints, 1, 0, false, opts)
+  const one = R.buildRows(ints, 1, 0, false, { ...opts, devicePixelRatio: 1 })
+  ok(JSON.stringify(plain) === JSON.stringify(one), 'dpr 1 with whole-pixel pages changes nothing')
+  // The margin gutter shift is snapped too (322 CSS px is 402.5 device px at 1.25×)
+  const shifted = R.shiftLayoutX(R.buildRows(a4, 1, 0, false, { ...opts, devicePixelRatio: 1.25 }), 322, 1.25)
+  ok(shifted.lefts.every((v) => onGrid(v, 1.25)), 'a shifted layout stays on the grid')
+  ok(Math.abs(R.snapToDevicePixels(213.86, 1.5) * 1.5 - 321) < 1e-9, 'snapToDevicePixels: 213.86 CSS px at 1.5× → 321 device px')
+  ok(R.snapToDevicePixels(213.86, undefined) === 213.86, 'snapToDevicePixels without a ratio is the identity')
+}
+
 if (failures === 0) {
   console.log('\nALL ROTATION ROUND-TRIPS PASS ✓')
   process.exit(0)

@@ -200,6 +200,7 @@ import { clamp } from '../clamp'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { PANEL_DEFAULTS, PANEL_LS_KEY, usePanelWidths } from '../hooks/usePanelWidths'
 import { useUndoStack } from '../hooks/useUndoStack'
+import { useDevicePixelRatio } from '../hooks/useDevicePixelRatio'
 import { DEFAULT_SETTINGS } from '../../../shared/defaults'
 
 // openDocument/isPasswordException live in pdf-doc.ts, shared with the
@@ -2125,6 +2126,9 @@ export default function PdfViewer({
   const pagedRef = useRef(paged)
   pagedRef.current = paged
 
+  // Every page box on whole device pixels (issue #53): the layout re-runs
+  // when the window lands on a monitor of another scale
+  const devicePixelRatio = useDevicePixelRatio()
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
     const lay = buildRows(
@@ -2139,14 +2143,15 @@ export default function PdfViewer({
         padBottom: PAD_BOTTOM,
         sidePad: SIDE_PAD,
         spreadGap: SPREAD_GAP,
+        devicePixelRatio,
         ...(pagedHeight > 0 ? { pagedHeight } : {})
       },
       coverPage
     )
     // A left-hand margin means the gutter sits BEFORE the pages: shift every
     // page right by the reserved width so the column has its space.
-    return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0)
-  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side, pagedHeight])
+    return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0, devicePixelRatio)
+  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side, pagedHeight, devicePixelRatio])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 

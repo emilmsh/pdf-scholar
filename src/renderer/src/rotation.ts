@@ -211,7 +211,8 @@ export interface RowLayout {
 /** Shift a finished layout horizontally (margin view on the LEFT reserves its
  *  gutter before the pages). Both the per-page lefts and the row boxes move —
  *  they describe the same geometry and must not disagree. */
-export function shiftLayoutX(lay: RowLayout, dx: number): RowLayout {
+export function shiftLayoutX(lay: RowLayout, dx: number, dpr?: number): RowLayout {
+  dx = snapToDevicePixels(dx, dpr) // a gutter of 322 CSS px is 402.5 device px at 1.25×
   if (dx === 0) return lay
   return {
     ...lay,
@@ -237,6 +238,22 @@ export interface LayoutOpts {
    *  than the viewport (zoomed in) gets a slot of its own height plus the
    *  margins, to be scrolled within. pageGap does not apply. */
   pagedHeight?: number
+  /** The display's device pixel ratio. When set, every page box edge — left,
+   *  top, width, height, and the rows' slots — lands on a whole device pixel
+   *  (issue #53: text read as «fuzzy» at most zoom levels, and ±1 % cured
+   *  it). A page centred at (contentWidth − rowWidth) / 2 sits on a half
+   *  pixel every other width, and a page 595.28 CSS px wide on a 1.5× screen
+   *  is 892.9 device pixels: the canvas bitmap, an integer, was stretched
+   *  over it and Chromium resampled every glyph. Snapped, the bitmap PdfPage
+   *  sizes from the box maps 1:1 onto the screen. Omitted: the unsnapped
+   *  arithmetic, which the tests pin. */
+  devicePixelRatio?: number
+}
+
+/** `v` moved to the nearest whole device pixel, as a CSS length. */
+export function snapToDevicePixels(v: number, dpr: number | undefined): number {
+  if (!dpr || !(dpr > 0)) return v
+  return Math.round(v * dpr) / dpr
 }
 
 /** Left-page index of the spread row containing page index i. Cover mode
@@ -294,13 +311,14 @@ export function buildRows(
 ): RowLayout {
   const { containerWidth, pageGap, padTop, padBottom, sidePad, spreadGap } = opts
   const paged = opts.pagedHeight !== undefined && opts.pagedHeight > 0 ? opts.pagedHeight : 0
+  const snap = (v: number): number => snapToDevicePixels(v, opts.devicePixelRatio)
   const n = sizes.length
   const widths: number[] = new Array(n)
   const heights: number[] = new Array(n)
   for (let i = 0; i < n; i++) {
     const v = viewSize(sizes[i].w, sizes[i].h, rotation)
-    widths[i] = v.w * scale
-    heights[i] = v.h * scale
+    widths[i] = snap(v.w * scale)
+    heights[i] = snap(v.h * scale)
   }
 
   // Group page indices into rows
@@ -328,7 +346,10 @@ export function buildRows(
   const tops: number[] = new Array(n)
   const lefts: number[] = new Array(n)
   const rows: LayoutRow[] = []
-  let y = paged ? 0 : padTop
+  // Every y below is snapped as it is reached: the gaps and margins are whole
+  // CSS pixels, which is not the same as whole device pixels (10 px is 12.5
+  // of them at 1.25×), so the sum must be snapped, not the terms
+  let y = snap(paged ? 0 : padTop)
   for (const g of groups) {
     let rowWidth = 0
     for (const i of g) rowWidth += widths[i]
@@ -339,20 +360,20 @@ export function buildRows(
     // takes exactly the viewport, so a fitted page never leaves a sliver to
     // scroll through.
     const need = rowHeight + padTop + padBottom
-    const band = paged ? (need <= paged + 1 ? paged : need) : rowHeight
-    let x = (contentWidth - rowWidth) / 2
+    const band = snap(paged ? (need <= paged + 1 ? paged : need) : rowHeight)
+    let x = snap((contentWidth - rowWidth) / 2)
     const boxes: PageBox[] = []
     for (const i of g) {
-      const top = y + (band - heights[i]) / 2
+      const top = snap(y + (band - heights[i]) / 2)
       tops[i] = top
       lefts[i] = x
       boxes.push({ index: i, top, left: x, width: widths[i], height: heights[i] })
-      x += widths[i] + spreadGap
+      x = snap(x + widths[i] + spreadGap)
     }
     rows.push({ top: y, height: band, pages: boxes })
-    y += paged ? band : rowHeight + pageGap
+    y = snap(y + (paged ? band : rowHeight + pageGap))
   }
 
-  const total = paged ? y : y - pageGap + padBottom
+  const total = paged ? y : snap(y - pageGap + padBottom)
   return { rows, tops, lefts, widths, heights, total, contentWidth }
 }

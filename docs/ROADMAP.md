@@ -111,6 +111,21 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
   verktøylinja som ikon, «Innhold» mistet etiketten (panelet har fire faner,
   ikke bare innhold), fanene kommer tilbake sammen med verktøylinja i
   fullskjerm, og en chevron i enden lister alle faner fra tre og oppover.
+- [x] **Skarp tekst ved alle zoomnivåer** (issue #53 punkt 1, levert
+  2026-10-23): en leser så teksten «uskarp» ved de fleste zoomnivåer, og ±1 %
+  kurerte det — Edge hadde det ikke. Årsaken var subpiksel-resampling av
+  lerretet: sidene lå på brøkdels-piksler (sentrert ved (bredde − side)/2, og
+  595,28 CSS-px er 892,9 enhetspiksler ved 1,5×), bitmapet var `floor(bredde ×
+  dpr)` og ble strukket over boksen, og den adaptive kontrolleren kunne velge
+  en tetthet under skjermens (1,12 på 1,25) etter hva gjennomstrømmings-
+  anslaget tilfeldigvis leste — derav «ikke konsekvent». Nå snapper layouten
+  (`buildRows`, `devicePixelRatio` i opsjonene) hver kant, hvert spor og
+  summen til hele enhetspiksler, `PdfPage` dimensjonerer bitmapet fra den
+  snappede boksen og mapper viewporten på det med render-transformen, og
+  kontrolleren går i trinn (1, 1,25, 1,5, 2, 3). Målt i nettforhåndsvisningen
+  ved 1,5×: 100 % gikk fra 321,78/892,9 enhetspiksler til 322/893 = bitmapet,
+  115 % og 132 % like hele. pdf.js' egen viewer gjør det samme med
+  `roundToDivide`. `test:rotation` § 9 dekker aritmetikken.
 - [x] **«Dupliser fane»** (issue #53, levert 2026-10-23): en fane til på
   samme dokument, rett etter kilden og på siden den sto på — som en nettlesers
   duplisering (fanemenyen og Ctrl+Shift+K, Edges tastekombinasjon). Hva en

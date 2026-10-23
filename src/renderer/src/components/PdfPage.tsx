@@ -341,8 +341,18 @@ function PdfPage({
       // Render off-DOM so the previous bitmap stays visible until the caller
       // blits (show) or parks (speculative) the finished one — no flash.
       const canvas = document.createElement('canvas')
-      canvas.width = Math.floor(viewport.width * dpr)
-      canvas.height = Math.floor(viewport.height * dpr)
+      // Sized from the page's CSS box, which the layout snapped to whole
+      // device pixels (rotation.ts, issue #53): at the display's density the
+      // bitmap then maps 1:1 onto the screen and no glyph is resampled.
+      // viewport.width is the unsnapped pageW × scale, a hair off the box —
+      // the render transform below maps it onto the bitmap exactly, so the
+      // page is drawn a few parts in ten thousand off `scale`, never blurred.
+      // (floor(viewport × dpr) stretched over a fractional box was the whole
+      // «fuzzy at most zoom levels» report.)
+      canvas.width = Math.max(1, Math.round(cssWidth * dpr))
+      canvas.height = Math.max(1, Math.round(cssHeight * dpr))
+      const sx = canvas.width / viewport.width
+      const sy = canvas.height / viewport.height
       // Time the raster so the controller learns this machine's throughput.
       // Only feed back clean, completed samples (pixels = 0 skips the sample).
       beginRender()
@@ -372,7 +382,7 @@ function PdfPage({
           const task = page.render({
             canvas,
             viewport,
-            transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+            transform: [sx, 0, 0, sy, 0, 0],
             annotationMode: hideAnnots ? AnnotationMode.DISABLE : AnnotationMode.ENABLE
           })
           renderTask = task
@@ -558,7 +568,9 @@ function PdfPage({
       window.clearTimeout(settleTimer)
       renderTask?.cancel()
     }
-  }, [pdf, docKey, pageNumber, scale, rotation, active, hideAnnots, keepImageColors])
+    // cssWidth/cssHeight: the box the bitmap is sized from — it moves without
+    // `scale` when the window lands on a monitor of another pixel ratio
+  }, [pdf, docKey, pageNumber, scale, rotation, active, hideAnnots, keepImageColors, cssWidth, cssHeight])
 
   // ---- Text layer + clickable links ----
   // Built ONCE per page/rotation, NOT per zoom. pdf.js v6 lays spans out in
