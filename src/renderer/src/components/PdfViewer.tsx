@@ -405,6 +405,10 @@ interface Props {
   onChromeVisible(visible: boolean): void
   /** Unsaved-changes state (save model) — App needs it for close prompts */
   onDirtyChange(dirty: boolean): void
+  /** The path's draft was already on screen in this window when this viewer
+   *  opened — a duplicated tab (issue #53). Its marks load as always, but
+   *  without the «recovered from the previous session» word: nothing was. */
+  draftOnScreen?: boolean
   /** «Save a copy» wrote the current document (edits included) to `path` —
    *  App switches this tab over to the copy so work continues there */
   onSavedAs(path: string): void
@@ -520,6 +524,7 @@ export default function PdfViewer({
   onPresentationChange,
   onChromeVisible,
   onDirtyChange,
+  draftOnScreen = false,
   onSavedAs,
   onExternalSaveConflict,
   onClose,
@@ -3181,7 +3186,7 @@ export default function PdfViewer({
     void bridge.docIsDirty(payload.path).then((isDirty) => {
       if (stale || !isDirty) return
       setDirty(true)
-      showToast(t('viewer.recovered'))
+      if (!draftOnScreen) showToast(t('viewer.recovered'))
     })
     return () => {
       stale = true

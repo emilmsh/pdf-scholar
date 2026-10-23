@@ -37,6 +37,7 @@ export type CommandId =
   | 'tab.prev'
   | 'tab.close'
   | 'tab.reopen'
+  | 'tab.duplicate'
   | 'tab.moveLeft'
   | 'tab.moveRight'
   | 'tab.pin'
@@ -178,6 +179,9 @@ const REGISTRY: readonly Command[] = [
   // recently comes back, and when nothing was closed this session, the most
   // recent file not on screen — what the library would list first.
   { id: 'tab.reopen', category: 'tabs', labelKey: 'keys.tabReopen', defaults: ['mod+shift+t'], whileTyping: true },
+  // Edge's chord for its «Duplicate tab» (issue #53): a second tab on the
+  // same document, at the place the first one stands
+  { id: 'tab.duplicate', category: 'tabs', labelKey: 'keys.tabDuplicate', defaults: ['mod+shift+k'], whileTyping: true },
   { id: 'tab.moveLeft', category: 'tabs', labelKey: 'keys.tabMoveLeft', defaults: ['mod+shift+pageup'], whileTyping: true },
   { id: 'tab.moveRight', category: 'tabs', labelKey: 'keys.tabMoveRight', defaults: ['mod+shift+pagedown'], whileTyping: true },
   // Unbound, like the browsers: pinning is rare enough that a key would only

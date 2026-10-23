@@ -111,9 +111,23 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
   verktøylinja som ikon, «Innhold» mistet etiketten (panelet har fire faner,
   ikke bare innhold), fanene kommer tilbake sammen med verktøylinja i
   fullskjerm, og en chevron i enden lister alle faner fra tre og oppover.
+- [x] **«Dupliser fane»** (issue #53, levert 2026-10-23): en fane til på
+  samme dokument, rett etter kilden og på siden den sto på — som en nettlesers
+  duplisering (fanemenyen og Ctrl+Shift+K, Edges tastekombinasjon). Hva en
+  fane husker er sted og zoom å gå tilbake til; delt visning er fortsatt
+  stedet for å SAMMENLIGNE. Blokkeringen fra august (under) var alt betalt av
+  to-dokument-splitten: `docRegistry` teller visningene foran hovedprosessens
+  sett, den lokale dokumentbussen bærer en skriving fra den ene fanen til den
+  andre, og utkastet er stiens — skitten i én er skitten i begge, og å lukke
+  én spør ingenting så lenge den andre står (`closeTabAwait` sjekker
+  tellingen). Det som faktisk gjensto: sti-oppslagene i `App.tsx` som fant ÉN
+  fane per sti (`tabsOn` gir alle, den aktive først), og at kopien laster
+  utkastet uten å kalle det «gjenopprettet». Økten folder duplikater tilbake
+  til én fane ved omstart (`session.ts` holder én per sti) — bevisst, til noen
+  savner det. `test:tab-duplicate` dekker det.
 - ~~**Kopi av samme dokument i en ny FANE**~~ — **sløyfet (Emil 2026-08-09)**,
-  etter at kostnaden ble kartlagt. Bevaringsverdig fordi forslaget er naturlig
-  og kommer igjen. Ideen var å gjenskape delt visning med to faner i stedet for
+  etter at kostnaden ble kartlagt; **levert likevel 2026-10-23** (over), da
+  splitten hadde betalt den. Ideen var å gjenskape delt visning med to faner i stedet for
   to paneler, live-synket. Det virker for et nytt VINDU fordi vinduet er
   hovedprosessens regnskapsenhet — `openDocs` er nøklet på webContents, og
   varslingen hopper over avsenderen. To faner deler ett webContents og er

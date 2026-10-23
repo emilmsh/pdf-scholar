@@ -190,6 +190,8 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
   tab strip, and returning to one restores the page, zoom and panels
 - Several documents open in tabs or separate windows; tabs can be pinned, and each window
   gets its tabs back at the next launch (a document is read only when you show its tab).
+  A tab can be duplicated (Ctrl+Shift+K, or "Duplicate tab" in the tab menu) for a second
+  place in the same document; a mark made in either tab shows in both.
   A tab drags like a file: into
   another PDF Scholar window, or into anything that takes a PDF (a browser's upload field,
   an e-mail, a chat, a folder), and along the bar to reorder. Ctrl+drag (Cmd on Mac) moves

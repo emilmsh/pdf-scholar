@@ -192,7 +192,11 @@ carries no picture of its own.)*
   the tabs it had at the next launch, each document read only when its tab is
   first shown, so a long session costs nothing at startup *([issue #29](https://github.com/emilmsh/pdf-scholar/issues/29);
   the browser extension has no tab strip of its own — there the browser pins
-  and restores its tabs)*. A tab drags like a file: into another PDF Scholar window,
+  and restores its tabs)*. A tab can be duplicated — «Dupliser fane» in the tab
+  menu, or Ctrl+Shift+K — for a second tab on the same document, on the page
+  the first one stands on; a mark made in either shows in both *([issue #53](https://github.com/emilmsh/pdf-scholar/issues/53),
+  a reader's Edge habit; in the extension the browser duplicates its own tab)*.
+  A tab drags like a file: into another PDF Scholar window,
   or into anything that takes a PDF — a browser's upload field, an e-mail, a
   chat, a folder. «Flytt til nytt vindu» in the tab menu tears it into a
   window of its own *(2026-09-17, Emil's ask: dragging a tab into another

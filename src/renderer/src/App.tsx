@@ -37,6 +37,12 @@ interface OpenTab {
    *  as its own tab: main keeps one draft per path, the local doc bus keeps
    *  the two views converged, and docRegistry keeps the bookkeeping honest. */
   splitDoc: { payload: FilePayload; initialPosition: ReadingPosition | null } | null
+  /** «Dupliser fane» (issue #53): this tab was opened as a second view of a
+   *  document already on screen in this window, so the viewer must not call
+   *  the draft it loads a recovery. The same three mechanisms as the split
+   *  column carry it: one draft per path in main, the local doc bus between
+   *  the tabs, and docRegistry's count in front of main's per-path Set. */
+  draftOnScreen?: boolean
   /** Bumped when «Åpne i delt visning» names this tab's OWN document — the
    *  same-file split, which only the tab's viewer can open */
   sameSplitNonce: number
@@ -200,6 +206,16 @@ export default function App(): React.JSX.Element {
 
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
+  /** Every tab showing `path` — since «Dupliser fane» (issue #53) there can
+   *  be more than one, and whatever happens to the document (fresh bytes
+   *  from Explorer, a change on disk, a retired draft) happens to all of
+   *  them. The active tab comes first, so «focus the tab» stays where the
+   *  reader is. */
+  const tabsOn = useCallback((path: string): OpenTab[] => {
+    const all = tabsRef.current.filter((t) => t.payload.path === path)
+    const i = all.findIndex((t) => t.id === activeIdRef.current)
+    return i > 0 ? [all[i], ...all.slice(0, i), ...all.slice(i + 1)] : all
+  }, [])
   /** Same pattern: the shell key handler is bound once per dep change and
    *  must read the CURRENT theme when cycling, not the one at bind time. */
   const settingsRef = useRef(settings)
@@ -435,19 +451,22 @@ export default function App(): React.JSX.Element {
 
   const openPayload = useCallback(
     async (payload: FilePayload) => {
-      const existing = tabsRef.current.find((t) => t.payload.path === payload.path)
+      const twins = tabsOn(payload.path)
+      const existing = twins[0]
       if (existing) {
         setError(null)
         // A restored tab opened from outside before it was ever shown: these
         // bytes are its first, so this is where main hears of it — taken now,
         // before the tab is shown, so the lazy loader does not read it again
+        // (a lazy tab is alone on its path: the session holds one per path)
         const wasLazy = takeLazy(existing.id)
         // The file may have changed on disk since the tab loaded (opening an
         // updated PDF from Explorer, or dropping a same-named file, must never
         // show stale bytes). Reload with the fresh payload — unless the tab
         // has unsaved annotations, which must not be lost to an external
         // update without the user getting a chance to keep them as a copy.
-        if (dirtyTabsRef.current.has(existing.id)) {
+        // Duplicates share the draft, so one of them dirty is all of them.
+        if (twins.some((t) => dirtyTabsRef.current.has(t.id))) {
           const verdict = await confirmExternalUpdateVerdict(
             existing.payload.path,
             existing.payload.name
@@ -457,14 +476,15 @@ export default function App(): React.JSX.Element {
             return
           }
           await discardDraft(existing.payload.path)
-          setTabDirty(existing.id, false)
+          for (const t of twins) setTabDirty(t.id, false)
         }
         goToTab(existing.id)
         const initialPosition = await positionFor(payload)
         if (wasLazy) docRegistry.acquire(payload.path)
+        const ids = new Set(twins.map((t) => t.id))
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === existing.id
+            ids.has(t.id)
               ? { ...t, payload, initialPosition, epoch: t.epoch + 1, lazy: false }
               : t
           )
@@ -493,7 +513,7 @@ export default function App(): React.JSX.Element {
       goToTab(tab.id)
       setError(null)
     },
-    [confirmExternalUpdateVerdict, setTabDirty, goToTab, flashNotice]
+    [confirmExternalUpdateVerdict, setTabDirty, goToTab, flashNotice, tabsOn]
   )
 
   /** Called by the viewer when Save/Ctrl+S finds the file changed outside the
@@ -506,21 +526,22 @@ export default function App(): React.JSX.Element {
     async (path: string, name: string): Promise<'save' | 'discard' | 'cancel'> => {
       const verdict = await confirmExternalUpdateVerdict(path, name)
       if (verdict === 'cancel') return verdict
-      const existing = tabsRef.current.find((t) => t.payload.path === path)
+      const twins = tabsOn(path)
       await discardDraft(path)
-      if (existing) setTabDirty(existing.id, false)
+      for (const t of twins) setTabDirty(t.id, false)
       const result = await bridge.readFile(path)
-      if (existing && !('error' in result)) {
+      if (twins.length > 0 && !('error' in result)) {
         const initialPosition = await positionFor(result)
+        const ids = new Set(twins.map((t) => t.id))
         setTabs((prev) =>
           prev.map((t) =>
-            t.id === existing.id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
+            ids.has(t.id) ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
           )
         )
       }
       return verdict
     },
-    [confirmExternalUpdateVerdict, setTabDirty, goToTab]
+    [confirmExternalUpdateVerdict, setTabDirty, goToTab, tabsOn]
   )
 
   /** May the split column's document go? The same unsaved-changes guard a tab
@@ -686,7 +707,11 @@ export default function App(): React.JSX.Element {
       // The split column's document first, sequentially — two unsaved
       // documents must not stack two dialogs (same rule closeTabs follows)
       if (tab.splitDoc && !(await closeSplitDoc(id))) return false
-      if (dirtyTabsRef.current.has(id)) {
+      // The draft is the path's, not the tab's: while another view of the
+      // document stays open (a duplicated tab, another tab's split column)
+      // the marks go nowhere, so there is nothing to ask about. The LAST view
+      // to go is the one that asks.
+      if (dirtyTabsRef.current.has(id) && docRegistry.count(tab.payload.path) <= 1) {
         const outcome = await confirmCloseVerdict(tab.payload.path, tab.payload.name)
         if (outcome.verdict === 'cancel') {
           reportCloseFailure(outcome)
@@ -865,15 +890,19 @@ export default function App(): React.JSX.Element {
   )
   const onFileChangedOnDisk = useCallback(
     (path: string) => {
-      const tab = tabsRef.current.find((t) => t.payload.path === path)
-      if (!tab || tab.lazy) return
-      if (dirtyTabsRef.current.has(tab.id)) {
-        setTabs((prev) => prev.map((t) => (t.id === tab.id ? { ...t, staleOnDisk: true } : t)))
+      const twins = tabsOn(path).filter((t) => !t.lazy)
+      if (twins.length === 0) return
+      // One draft per path: a mark in any of the tabs is a mark in all, so
+      // every one of them gets the bar — and the reload below reaches them
+      // all, the notice shown once
+      if (twins.some((t) => dirtyTabsRef.current.has(t.id))) {
+        const ids = new Set(twins.map((t) => t.id))
+        setTabs((prev) => prev.map((t) => (ids.has(t.id) ? { ...t, staleOnDisk: true } : t)))
         return
       }
-      void reloadFromDisk(tab.id, path, true)
+      twins.forEach((tab, i) => void reloadFromDisk(tab.id, path, i === 0))
     },
-    [reloadFromDisk]
+    [reloadFromDisk, tabsOn]
   )
   useEffect(() => bridge.onFileChangedOnDisk(onFileChangedOnDisk), [onFileChangedOnDisk])
   /** The bar's «Last inn på nytt» on a tab holding unsaved marks */
@@ -881,15 +910,17 @@ export default function App(): React.JSX.Element {
     async (id: string) => {
       const tab = tabsRef.current.find((t) => t.id === id)
       if (!tab) return
-      if (dirtyTabsRef.current.has(id)) {
+      const twins = tabsOn(tab.payload.path)
+      if (twins.some((t) => dirtyTabsRef.current.has(t.id))) {
         const verdict = await confirmExternalUpdateVerdict(tab.payload.path, tab.payload.name)
         if (verdict === 'cancel') return
         await discardDraft(tab.payload.path)
-        setTabDirty(id, false)
+        for (const t of twins) setTabDirty(t.id, false)
       }
-      await reloadFromDisk(id, tab.payload.path, false)
+      // The bar stood on every tab of the path; the answer reloads them all
+      for (const t of twins) await reloadFromDisk(t.id, tab.payload.path, false)
     },
-    [confirmExternalUpdateVerdict, setTabDirty, reloadFromDisk]
+    [confirmExternalUpdateVerdict, setTabDirty, reloadFromDisk, tabsOn]
   )
 
   /** «Save a copy» semantics: continue working in the copy. The edits were
@@ -902,14 +933,15 @@ export default function App(): React.JSX.Element {
       const tab = tabsRef.current.find((t) => t.id === id)
       if (!tab) return
       const oldPath = tab.payload.path
-      // The save dialog may have overwritten a file that is open in another
-      // tab: that document was just replaced wholesale, so retire its tab
+      // The save dialog may have overwritten a file that is open in OTHER
+      // tabs: that document was just replaced wholesale, so retire those tabs
       // (and any draft of its previous content) before this tab takes over
-      // the path — tabs must stay unique per path.
-      const other = tabsRef.current.find((t) => t.id !== id && t.payload.path === newPath)
-      if (other) {
+      // the path. Not when the copy went onto this tab's own path — its
+      // duplicates show the same document and simply take the new bytes.
+      const others = tabsRef.current.filter((t) => t.id !== id && t.payload.path === newPath)
+      if (others.length > 0 && newPath !== oldPath) {
         await discardDraft(newPath)
-        reallyCloseTab(other.id)
+        for (const other of others) reallyCloseTab(other.id)
       }
       const result = await bridge.readFile(newPath)
       if ('error' in result) return // the copy is safely on disk; stay on the original
@@ -919,12 +951,13 @@ export default function App(): React.JSX.Element {
         docRegistry.acquire(newPath)
       }
       const initialPosition = await positionFor(result)
+      const ids = new Set([id, ...(newPath === oldPath ? others.map((t) => t.id) : [])])
       setTabs((prev) =>
         prev.map((t) =>
-          t.id === id ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
+          ids.has(t.id) ? { ...t, payload: result, initialPosition, epoch: t.epoch + 1 } : t
         )
       )
-      setTabDirty(id, false)
+      for (const tabId of ids) setTabDirty(tabId, false)
     },
     [reallyCloseTab, setTabDirty]
   )
@@ -944,8 +977,9 @@ export default function App(): React.JSX.Element {
 
   const openPath = useCallback(
     async (path: string) => {
-      const existing = tabsRef.current.find((t) => t.payload.path === path)
-      if (existing && dirtyTabsRef.current.has(existing.id)) {
+      const twins = tabsOn(path)
+      const existing = twins[0]
+      if (existing && twins.some((t) => dirtyTabsRef.current.has(t.id))) {
         const verdict = await confirmExternalUpdateVerdict(path, existing.payload.name)
         if (verdict === 'cancel') {
           // Unsaved annotations trump the external update — just focus the tab
@@ -955,7 +989,7 @@ export default function App(): React.JSX.Element {
         // 'save' (copy flushed elsewhere) or 'discard': the old draft is no
         // longer needed — drop it and fall through to load the fresh bytes.
         await discardDraft(path)
-        setTabDirty(existing.id, false)
+        for (const t of twins) setTabDirty(t.id, false)
       }
       // Existing-but-clean tabs fall through: re-read so an externally updated
       // file shows its latest bytes (openPayload swaps them into the tab).
@@ -970,7 +1004,56 @@ export default function App(): React.JSX.Element {
       }
       await openPayload(result)
     },
-    [openPayload, confirmExternalUpdateVerdict, setTabDirty, goToTab]
+    [openPayload, confirmExternalUpdateVerdict, setTabDirty, goToTab, tabsOn]
+  )
+
+  /** «Dupliser fane» (issue #53): a second tab on the same document, beside
+   *  the first and at the place it stands — the way a browser duplicates a
+   *  tab. The bytes are read afresh so the copy opens on the draft's live
+   *  state (main resolves the draft behind readFile); from there the local
+   *  doc bus keeps the two converged, the registry counts the second viewer
+   *  without a word to main, and the draft stays the path's: dirty in one
+   *  means dirty in both, and closing one asks nothing while the other
+   *  stands. The copy is never pinned, and lands after the pinned group when
+   *  its source is. A session restore folds duplicates back into one tab
+   *  (session.ts keeps one per path). */
+  const duplicateTab = useCallback(
+    async (id: string) => {
+      const source = tabsRef.current.find((t) => t.id === id)
+      if (!source || source.lazy) return
+      const path = source.payload.path
+      const result = await bridge.readFile(path)
+      if ('error' in result) {
+        setError(t('app.openFailed', { error: errorText(result) }))
+        return
+      }
+      // The source's position is saved on a short debounce and flushed when
+      // it leaves the foreground — read AFTER the file, so a scroll just
+      // before the ask has landed
+      const initialPosition = await positionFor(result)
+      const tab: OpenTab = {
+        id: `tab-${++tabCounter}`,
+        payload: result,
+        initialPosition,
+        epoch: 0,
+        splitDoc: null,
+        sameSplitNonce: 0,
+        pinned: false,
+        lazy: false,
+        draftOnScreen: true
+      }
+      docRegistry.acquire(path)
+      setTabs((prev) => {
+        const i = prev.findIndex((x) => x.id === id)
+        if (i === -1) return prev
+        const at = prev[i].pinned ? prev.filter((x) => x.pinned).length : i + 1
+        return [...prev.slice(0, at), tab, ...prev.slice(at)]
+      })
+      if (dirtyTabsRef.current.has(id)) setTabDirty(tab.id, true)
+      goToTab(tab.id)
+      setError(null)
+    },
+    [setTabDirty, goToTab]
   )
 
   /** Ctrl+Shift+T: the tab closed most recently comes back. A closed path that
@@ -1107,11 +1190,11 @@ export default function App(): React.JSX.Element {
   useEffect(
     () =>
       bridge.onAssistantJumpRequest((path) => {
-        const tab = tabsRef.current.find((t) => t.payload.path === path)
+        const tab = tabsOn(path)[0] // the active one when the path has twins
         if (tab) goToTab(tab.id)
         return false
       }),
-    [goToTab]
+    [goToTab, tabsOn]
   )
 
   // Refresh recents whenever the library comes into view — the last tab
@@ -1241,6 +1324,13 @@ export default function App(): React.JSX.Element {
           pinTab(tab.id, !tab.pinned)
           break
         }
+        case 'tab.duplicate': {
+          const id = activeIdRef.current
+          if (!id || atLibraryRef.current) break
+          e.preventDefault()
+          void duplicateTab(id)
+          break
+        }
         default:
           // Every other command belongs to the viewer, which has its own listener
           break
@@ -1248,7 +1338,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, reopenClosedTab, openDialog, moveTab, pinTab, updateSettings, flashThemeName])
+  }, [cycleTab, closeTab, reopenClosedTab, duplicateTab, openDialog, moveTab, pinTab, updateSettings, flashThemeName])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -1333,6 +1423,7 @@ export default function App(): React.JSX.Element {
         onCloseMany={(ids) => void closeTabs(ids)}
         onMoveToNewWindow={moveToNewWindow}
         onReload={(id, path) => void reloadTab(id, path)}
+        onDuplicate={(id) => void duplicateTab(id)}
         onOpenInSplit={(path) => {
           const host = activeIdRef.current
           if (host && !atLibraryRef.current) void openInSplit(host, path)
@@ -1389,6 +1480,7 @@ export default function App(): React.JSX.Element {
                 onPresentationChange={setPresenting}
                 onChromeVisible={setChromeVisible}
                 onDirtyChange={(dirty) => setTabDirty(tab.id, dirty)}
+                draftOnScreen={tab.draftOnScreen === true}
                 onSavedAs={(path) => void adoptSavedCopy(tab.id, path)}
                 onExternalSaveConflict={handleSaveExternalConflict}
                 onClose={() => closeTab(tab.id)}
