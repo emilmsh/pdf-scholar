@@ -124,7 +124,9 @@ const validSummaries = (v: unknown, path: string): v is ConversationSummary[] =>
   Array.isArray(v) &&
   v.every((s) => !!s && typeof s === 'object' && (s as ConversationSummary).docPath === path &&
     typeof (s as ConversationSummary).id === 'string' && typeof (s as ConversationSummary).text === 'string' &&
-    typeof (s as ConversationSummary).updatedAt === 'number')
+    typeof (s as ConversationSummary).updatedAt === 'number' &&
+    // Added with the library view: a summary from before is rebuilt
+    typeof (s as ConversationSummary).images === 'number')
 
 export async function listConversationDocs(): Promise<ConversationSummary[]> {
   const db = await openDb()

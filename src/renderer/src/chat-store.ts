@@ -100,8 +100,28 @@ export async function listAllConversations(): Promise<ConversationSummary[]> {
   return bridge.listConversations()
 }
 
-export const onConversationsChanged = (cb: (path: string | null) => void): (() => void) =>
-  bridge.onConversationsChanged(cb)
+/** Fired on this window's own `window` by notifyChangedHere */
+const CHANGED_HERE_EVENT = 'pdfx:chats-changed-here'
+
+/** Another window's write (the platform's own channel), or one made in THIS
+ *  window by something other than the listener itself — the library tidying
+ *  conversations of a document a background tab has open. The platforms tell
+ *  only OTHER windows; without this, that tab's panel would keep the list it
+ *  loaded and write the deleted conversations back with its next answer. */
+export function onConversationsChanged(cb: (path: string | null) => void): () => void {
+  const off = bridge.onConversationsChanged(cb)
+  const here = (e: Event): void => cb((e as CustomEvent<string | null>).detail ?? null)
+  window.addEventListener(CHANGED_HERE_EVENT, here)
+  return () => {
+    off()
+    window.removeEventListener(CHANGED_HERE_EVENT, here)
+  }
+}
+
+/** Tell this window's panels that the store changed under them */
+export function notifyChangedHere(path: string | null): void {
+  window.dispatchEvent(new CustomEvent(CHANGED_HERE_EVENT, { detail: path }))
+}
 
 // ---------- Opening a conversation in another document ----------
 

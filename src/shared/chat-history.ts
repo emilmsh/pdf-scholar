@@ -90,6 +90,10 @@ export interface ConversationSummary {
   messageCount: number
   /** What the user wrote and the model answered, in order — the search text */
   text: string
+  /** Images the conversation carries, and their size in bytes — what the
+   *  library's «Fjern bilder» would free, counted without reading them */
+  images: number
+  imageBytes: number
 }
 
 export interface ConversationHit extends ConversationSummary {
@@ -202,6 +206,21 @@ export function conversationText(c: StoredConversation): string {
   return out.filter(Boolean).join('\n')
 }
 
+/** The images a conversation carries and their decoded size (base64 is four
+ *  characters for every three bytes) */
+export function conversationImages(c: StoredConversation): { images: number; imageBytes: number } {
+  let images = 0
+  let imageBytes = 0
+  for (const m of c.messages) {
+    if (m.role !== 'user' || !m.images) continue
+    for (const img of m.images) {
+      images++
+      imageBytes += Math.floor(((img?.dataBase64?.length ?? 0) * 3) / 4)
+    }
+  }
+  return { images, imageBytes }
+}
+
 export function summarizeConversations(doc: ConversationDoc): ConversationSummary[] {
   return doc.conversations.map((c) => ({
     docPath: doc.path,
@@ -211,7 +230,8 @@ export function summarizeConversations(doc: ConversationDoc): ConversationSummar
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
     messageCount: c.messages.length,
-    text: conversationText(c)
+    text: conversationText(c),
+    ...conversationImages(c)
   }))
 }
 

@@ -8,6 +8,7 @@ import type { AiCitation, AiContentPart } from '../../shared/types'
 import type { AiDocument } from './ai'
 import { citationPage } from './ai'
 import type { ChatMessage } from './chat-store'
+import type { ConversationDoc } from '../../shared/chat-history'
 import { errorText, locale, t } from './i18n'
 
 function citationMarker(citation: AiCitation, doc: AiDocument | null): string {
@@ -43,19 +44,14 @@ function assistantMarkdown(parts: AiContentPart[], doc: AiDocument | null): stri
   return md.trim()
 }
 
-export function conversationMarkdown(
-  docTitle: string,
-  messages: ChatMessage[],
-  doc: AiDocument | null
-): string {
-  const out: string[] = [
-    `# ${docTitle.trim() || t('ai.untitledChat')}`,
-    `*${new Date().toLocaleDateString(locale())}*`
-  ]
+/** One conversation's turns, as the copy button and the library export share them */
+function messagesMarkdown(messages: ChatMessage[], doc: AiDocument | null): string[] {
+  const out: string[] = []
   for (const m of messages) {
     if (m.role === 'user') {
       const lines = [`**${t('ai.exportYou')}:**`]
       lines.push(...(m.images ?? []).map(() => `*${t('ai.imageAlt')}*`))
+      if (m.imagesWithheld) lines.push(`*${t('ai.imagesWithheld', { count: String(m.imagesWithheld) })}*`)
       lines.push((m.display ?? m.text).trim())
       out.push(lines.join('\n\n'))
     } else {
@@ -65,5 +61,56 @@ export function conversationMarkdown(
       out.push(`**${t('ai.exportAssistant')}:**\n\n${body}`)
     }
   }
+  return out
+}
+
+export function conversationMarkdown(
+  docTitle: string,
+  messages: ChatMessage[],
+  doc: AiDocument | null
+): string {
+  const out: string[] = [
+    `# ${docTitle.trim() || t('ai.untitledChat')}`,
+    `*${new Date().toLocaleDateString(locale())}*`,
+    ...messagesMarkdown(messages, doc)
+  ]
   return `${out.join('\n\n')}\n`
+}
+
+/** Every conversation in the store as one Markdown file (issue #46): a
+ *  heading per document with where it lives, a heading per conversation with
+ *  its date. Readable without the app — the export's whole point. Images are
+ *  named, not embedded; the JSON export carries them. Citations read as page
+ *  markers where the citation names its page («[s. 6]»), else as «[kilde]»:
+ *  the page of a character-offset citation needs the document's text, which
+ *  an export of a hundred documents does not open. */
+export function libraryMarkdown(docs: ConversationDoc[], now = Date.now()): string {
+  const out: string[] = [
+    `# ${t('lib.exportTitle')}`,
+    `*${new Date(now).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })}*`
+  ]
+  const ordered = [...docs].sort(
+    (a, b) => (b.conversations[0]?.updatedAt ?? 0) - (a.conversations[0]?.updatedAt ?? 0)
+  )
+  for (const d of ordered) {
+    out.push(`## ${d.name}`, `\`${d.path}\``)
+    for (const c of d.conversations) {
+      out.push(
+        `### ${c.title.trim() || t('ai.untitledChat')}`,
+        `*${new Date(c.updatedAt).toLocaleDateString(locale())}*`,
+        ...messagesMarkdown(c.messages, null)
+      )
+    }
+  }
+  return `${out.join('\n\n')}\n`
+}
+
+/** Every conversation in the store as JSON, images included — the whole
+ *  history in a form another program can read back */
+export function libraryJson(docs: ConversationDoc[], version: string, now = Date.now()): string {
+  return JSON.stringify(
+    { app: 'PDF Scholar', version, exportedAt: new Date(now).toISOString(), documents: docs },
+    null,
+    2
+  )
 }

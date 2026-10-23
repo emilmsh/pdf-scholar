@@ -22,6 +22,7 @@ import type {
   DocBookmark,
   FilePayload,
   FileError,
+  GoneDocument,
   PdfxApi,
   ReadingPosition,
   RecentFile,
@@ -146,6 +147,21 @@ async function updateRecents(change: (list: RecentFile[]) => RecentFile[]): Prom
   const next = change(await loadRecents())
   store.set(K_RECENTS, next)
   return next
+}
+
+/** Whether the file behind a path is KNOWN to be gone (issue #46). Only a
+ *  file:// URL with file access granted can be: an http(s) URL that fails may
+ *  be offline, an fsa: handle needs a gesture to read — both read as present,
+ *  so nothing is ever moved or forgotten on their account. */
+async function knownGone(path: string): Promise<boolean> {
+  if (!/^file:/i.test(path) || (await fileAccessGranted()) !== true) return false
+  try {
+    const res = await fetch(path)
+    void res.body?.cancel()
+    return !res.ok
+  } catch {
+    return true
+  }
 }
 
 function recordRecent(payload: { path: string; name: string }): void {
@@ -344,16 +360,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       if (!validFingerprint(fingerprint)) return []
       const map = sanitizeFingerprints(await store.get<unknown>(K_FINGERPRINTS, {}))
       const result = await rebindIdentity(path, name, fingerprint, map, {
-        exists: async (p) => {
-          if (!/^file:/i.test(p) || (await fileAccessGranted()) !== true) return true
-          try {
-            const res = await fetch(p)
-            void res.body?.cancel()
-            return res.ok
-          } catch {
-            return false
-          }
-        },
+        exists: async (p) => !(await knownGone(p)),
         position: {
           get: async (p) => (await store.get<Record<string, ReadingPosition>>(K_POSITIONS, {}))[p] ?? null,
           set: async (p, pos) => {
@@ -388,6 +395,54 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
       })
       store.set(K_FINGERPRINTS, result.map)
       return result.from
+    },
+
+    // The library's tidying (issue #46) — the same «gone» as above, over every
+    // path this extension keeps anything for
+    goneDocuments: async () => {
+      const [summaries, positions, bookmarks, fingerprints, recents] = await Promise.all([
+        listConversationDocs(),
+        store.get<Record<string, ReadingPosition>>(K_POSITIONS, {}),
+        store.get<Record<string, DocBookmark[]>>(K_BOOKMARKS, {}),
+        store.get<Record<string, string>>(K_FINGERPRINTS, {}),
+        loadRecents()
+      ])
+      const counts = new Map<string, { name: string; n: number }>()
+      for (const s of summaries) {
+        const c = counts.get(s.docPath) ?? { name: s.docName, n: 0 }
+        c.n++
+        counts.set(s.docPath, c)
+      }
+      const paths = new Set([
+        ...counts.keys(),
+        ...Object.keys(positions),
+        ...Object.keys(bookmarks),
+        ...Object.keys(fingerprints),
+        ...recents.map((r) => r.path)
+      ])
+      const out: GoneDocument[] = []
+      for (const p of [...paths].sort()) {
+        if (!(await knownGone(p))) continue
+        const recent = recents.find((r) => r.path === p)
+        out.push({
+          path: p,
+          name: counts.get(p)?.name ?? recent?.name ?? fileNameOf(p),
+          conversations: counts.get(p)?.n ?? 0,
+          other: p in positions || p in bookmarks || !!recent
+        })
+      }
+      return out
+    },
+    forgetDocuments: async (paths) => {
+      const drop = new Set(paths)
+      const strip = <T,>(all: Record<string, T>): Record<string, T> =>
+        Object.fromEntries(Object.entries(all).filter(([k]) => !drop.has(k)))
+      store.set(K_POSITIONS, strip(await store.get<Record<string, ReadingPosition>>(K_POSITIONS, {})))
+      store.set(K_BOOKMARKS, strip(await store.get<Record<string, DocBookmark[]>>(K_BOOKMARKS, {})))
+      store.set(K_FINGERPRINTS, strip(await store.get<Record<string, string>>(K_FINGERPRINTS, {})))
+      await updateRecents((list) => list.filter((r) => !drop.has(r.path)))
+      await forgetRecentThumbs(paths)
+      for (const p of paths) await saveConversationDoc(p, '', [])
     },
     // Heal names written before fileNameOf existed (picked files were stored as
     // "fsa:<name>" because the name was derived from the pseudo-path). The cap

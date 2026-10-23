@@ -175,6 +175,16 @@ export interface RecentThumb {
 }
 
 /** A RecentThumb as the library reads it: with where the reader is */
+/** A document whose file is gone, and what the app still keeps for it
+ *  (PdfxApi.goneDocuments — the library's tidying, issue #46) */
+export interface GoneDocument {
+  path: string
+  name: string
+  conversations: number
+  /** A reading position, bookmarks or a recents entry is kept too */
+  other: boolean
+}
+
 export interface RecentThumbView extends RecentThumb {
   /** 1-based page of the saved reading position, when there is one */
   page?: number
@@ -1015,6 +1025,17 @@ export interface PdfxApi {
    *  is read, so a moved file opens where it was left. Returns the paths the
    *  records followed from ([] = none). */
   docIdentity(path: string, name: string, fingerprint: string): Promise<string[]>
+  // ---------- The library's tidying (issue #46, shared/chat-library.ts) ----------
+  /** Every document the app keeps anything about — conversations, reading
+   *  position, bookmarks, a recents entry — whose file is known to be GONE,
+   *  with what is kept for it. The same «gone» as docIdentity's: a path that
+   *  cannot be checked (a URL, a picked file, no file access) is never in it. */
+  goneDocuments(): Promise<GoneDocument[]>
+  /** Forget everything kept about these documents: conversations, position,
+   *  bookmarks, fingerprint, recents entry and its picture. For the library's
+   *  «Dokumenter som ikke finnes lenger»; refuses nothing, so the caller
+   *  passes only what goneDocuments named. */
+  forgetDocuments(paths: string[]): Promise<void>
   setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
    *  goes through src/main/incremental-appender.ts instead) */

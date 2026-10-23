@@ -997,6 +997,322 @@ button {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 
+/* ---------- «Samtaler» in the library (issue #46) ----------
+   The head's title becomes two tabs once there are conversations: the same
+   small caps as the plain heading, the chosen one in the text colour */
+.library-tabs {
+  display: inline-flex;
+  gap: 14px;
+}
+
+.library-tabs button {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.library-tabs button:hover {
+  color: var(--text);
+}
+
+.library-tabs button.is-active {
+  color: var(--text);
+  border-bottom-color: var(--wc-teal);
+}
+
+.library-tidy-btn {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  padding: 5px 10px;
+  border-radius: 7px;
+}
+
+.library-tidy-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.library-tidy-btn.is-active {
+  background: var(--active);
+  color: var(--text);
+}
+
+.convs {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.convs-search {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  padding: 8px 12px;
+}
+
+.convs-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.convs-totals {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin: 6px 12px 8px;
+}
+
+/* The tidying: one row per action, what it would take beside its button */
+.convs-tidy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+
+.convs-tidy-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 13px;
+}
+
+.convs-tidy-row + .convs-tidy-row {
+  border-top: 1px solid var(--border);
+}
+
+.convs-tidy-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.convs-tidy-label select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.convs-tidy-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.convs-tidy .btn-secondary,
+.convs-tidy .btn-danger {
+  padding: 5px 12px;
+  font-size: 12.5px;
+  border-radius: 8px;
+}
+
+/* The second click: the sentence that says what will go, in the row itself */
+.convs-tidy-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 2;
+  font-size: 12.5px;
+  padding: 6px 0;
+}
+
+.convs-tidy-confirm span {
+  flex: 1;
+}
+
+.convs-tidy-close {
+  align-self: flex-end;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 4px 6px;
+  margin-top: 4px;
+}
+
+.btn-danger {
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  filter: brightness(1.08);
+}
+
+.btn-danger:disabled,
+.convs-tidy .btn-secondary:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.convs-empty {
+  padding: 18px 16px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.convs-group + .convs-group {
+  border-top: 1px solid var(--border);
+}
+
+/* A document's heading: its name and where it lives */
+.convs-doc {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'icon name'
+    'icon path';
+  column-gap: 10px;
+  padding: 10px 14px 4px;
+}
+
+.convs-doc svg {
+  grid-area: icon;
+  color: var(--wc-teal);
+  align-self: center;
+}
+
+.convs-doc-name {
+  grid-area: name;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.convs-doc-path {
+  grid-area: path;
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.convs-group ul {
+  padding-bottom: 6px;
+}
+
+.convs-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 7px 70px 7px 40px;
+  text-align: left;
+}
+
+.convs-row:hover {
+  background: var(--hover);
+}
+
+.convs-title {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.convs-meta {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.convs-snippet {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.convs-item .recent-actions {
+  top: 8px;
+  right: 10px;
+}
+
+html.touch-ui .convs-row {
+  padding-right: 86px;
+}
+
+/* The conversations — list and reader alike — are the page's own content,
+   and the PAGE scrolls, the way the first pages do (Emil, 2026-10-10: rich
+   content in a small box inside the page is a keyhole; a list of
+   conversations with their snippets is that, and a long answer more so).
+   A little wider than the column, for the snippets and the answers. */
+.recents.is-convs {
+  width: min(760px, 94vw);
+}
+
+.welcome:has(.recents.is-convs) {
+  overflow-y: auto;
+}
+
+.welcome:has(.recents.is-convs) .welcome-inner {
+  height: auto;
+  min-height: 100%;
+}
+
+.welcome-inner > .recents.is-convs {
+  flex: none;
+}
+
+.recents.is-convs .recents-box {
+  flex: none;
+  overflow: visible;
+}
+
+.convs-reader-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.convs-reader-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+.convs-reader-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0 4px 2px;
+}
+
+.convs-reader-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 4px 14px;
+}
+
+/* The panel's own bubbles, without the panel's scroll box */
+.convs-reader-body.ai-messages {
+  overflow: visible;
+  flex: none;
+  padding: 0;
+}
+
 /* Manual update check — quiet footer line on the start screen */
 .welcome-updates {
   margin-top: 34px;
