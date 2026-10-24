@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  addCustomColor,
-  colorLabel,
-  hexToRgb,
-  HIGHLIGHT_COLORS,
-  loadCustomColors,
-  UNDERLINE_COLORS
-} from '../annotations'
+import { addCustomColor, colorLabel, hexToRgb, HIGHLIGHT_COLORS, UNDERLINE_COLORS } from '../annotations'
 import type { HighlightColor } from '../annotations'
+import { normalizeHex } from '../../../shared/custom-colors'
+import { renderSwatches, useCustomColors, withCustomColors } from './ColorSwatches'
 import { t, useLang } from '../i18n'
 import type { MsgKey } from '../i18n'
 import { useDraggable } from '../useDraggable'
@@ -35,7 +30,27 @@ import {
 import { inTextField } from './TextContextMenu'
 import { looksLikeReference } from '../../../shared/abstract'
 
-const HEX_RE = /^#?[0-9a-fA-F]{6}$/
+const WHEEL_START = '#ffd54a'
+
+/** The page selection as it stands, to be put back before the pick lands.
+ *  The pop takes focus — the hex field as it opens, the wheel when clicked —
+ *  and a focused field owns the document's one selection, so by the time a
+ *  colour was chosen the words the reader had marked were no longer selected:
+ *  applyMarkup read an empty selection and marked nothing, while the colour
+ *  was remembered all the same (issue #50, «I can't use the palette»). */
+function saveSelection(): Range | null {
+  const sel = window.getSelection()
+  return sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.getRangeAt(0).cloneRange() : null
+}
+
+function restoreSelection(range: Range | null): void {
+  const sel = window.getSelection()
+  if (!range || !sel) return
+  // Still standing (a pick by keyboard that never moved focus): leave it
+  if (sel.rangeCount > 0 && !sel.isCollapsed) return
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
 
 /** Small popover behind the "+" swatch: a colour wheel and a hex field so
  *  users can pick visually or paste an exact #rrggbb. */
@@ -43,31 +58,60 @@ function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX
   const [open, setOpen] = useState(false)
   const [hex, setHex] = useState('#')
   const ref = useRef<HTMLDivElement>(null)
+  const wheelRef = useRef<HTMLInputElement>(null)
+  const selectionRef = useRef<Range | null>(null)
 
   const closePicker = useCallback(() => setOpen(false), [])
   useDismissable(ref, open, closePicker)
 
+  const toggle = (): void => {
+    if (!open) selectionRef.current = saveSelection()
+    setOpen(!open)
+  }
+
   const commit = (value: string): void => {
-    if (!HEX_RE.test(value)) return
-    onPick(value.startsWith('#') ? value.toLowerCase() : `#${value.toLowerCase()}`)
+    const picked = normalizeHex(value)
+    if (!picked) return
+    restoreSelection(selectionRef.current)
+    onPick(picked)
     setOpen(false)
   }
+  const commitRef = useRef(commit)
+  commitRef.current = commit
+
+  // The wheel reports EVERY movement as an `input` event — the OS dialog on
+  // macOS, Electron's own popup picker on every platform — and React's
+  // onChange is that event. Picking on it meant the first movement marked
+  // the words in a half-chosen colour, closed the menu under the dialog and
+  // remembered that colour; a few tries filled all three slots with shades of
+  // the yellow the wheel starts on (issue #50). The pick is the dialog
+  // CLOSING: the native `change` event, which React folds into onChange, so
+  // it is listened for by hand — and only a value the wheel actually moved
+  // to counts, so a dialog cancelled untouched picks nothing.
+  useEffect(() => {
+    const el = wheelRef.current
+    if (!open || !el) return
+    const opened = el.value
+    const onClose = (): void => {
+      if (el.value !== opened) commitRef.current(el.value)
+    }
+    el.addEventListener('change', onClose)
+    return () => el.removeEventListener('change', onClose)
+  }, [open])
 
   return (
     <div className="color-plus-wrap" ref={ref}>
-      <button className="color-plus" title={t('menu.customColor')} onClick={() => setOpen((o) => !o)}>
+      <button className="color-plus" title={t('menu.customColor')} onClick={toggle}>
         +
       </button>
       {open && (
         <div className="color-picker-pop" onMouseDown={(e) => e.stopPropagation()}>
           <input
+            ref={wheelRef}
             type="color"
             className="color-picker-wheel"
-            value={HEX_RE.test(hex) ? hex : '#ffd54a'}
-            onChange={(e) => {
-              setHex(e.target.value)
-              onPick(e.target.value.toLowerCase())
-            }}
+            value={normalizeHex(hex) ?? WHEEL_START}
+            onChange={(e) => setHex(e.target.value)}
           />
           <input
             type="text"
@@ -85,7 +129,7 @@ function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX
           />
           <button
             className="color-picker-apply"
-            disabled={!HEX_RE.test(hex)}
+            disabled={!normalizeHex(hex)}
             onClick={() => commit(hex)}
           >
             ✓
@@ -108,16 +152,14 @@ export function MarkupColorRow({
   tipKey: MsgKey
   onPick(color: HighlightColor): void
 }): React.JSX.Element {
-  const [customs, setCustoms] = useState<HighlightColor[]>(loadCustomColors)
-  const colors = [...palette, ...customs.filter((c) => !palette.some((p) => p.hex === c.hex))]
+  const colors = withCustomColors(palette, useCustomColors())
   const pickCustom = (hex: string): void => {
     addCustomColor(hex)
-    setCustoms(loadCustomColors())
     onPick({ key: 'custom', hex, rgb: hexToRgb(hex) })
   }
   return (
     <div className="color-row">
-      {colors.map((c) =>
+      {renderSwatches(colors, (c) =>
         swatch === 'dot' ? (
           <button
             key={c.hex}

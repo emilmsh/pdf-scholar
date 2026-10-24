@@ -17,6 +17,7 @@ import {
 } from '@embedpdf/models'
 import { pagePointToView, pageRectToView } from './rotation'
 import { t } from './i18n'
+import { forgetColor, parseCustomColors, rememberColor } from '../../shared/custom-colors'
 
 export interface PageAnnotation {
   /** Local key for React state */
@@ -83,31 +84,46 @@ export function hexToRgb(hex: string): [number, number, number] {
 }
 
 // ---------- Last-used custom colors (color-wheel picks) ----------
+// The list rules live in src/shared/custom-colors.ts (test:custom-colors);
+// this is the localStorage around them.
 
 const CUSTOM_COLORS_KEY = 'pdfx-custom-colors'
-const CUSTOM_COLORS_MAX = 3
 
-export function loadCustomColors(): HighlightColor[] {
+function readCustomColorList(): string[] {
   try {
-    const parsed = JSON.parse(localStorage.getItem(CUSTOM_COLORS_KEY) ?? '[]')
-    if (!Array.isArray(parsed)) return []
-    return parsed
-      .filter((h): h is string => typeof h === 'string' && /^#[0-9a-fA-F]{6}$/.test(h))
-      .slice(0, CUSTOM_COLORS_MAX)
-      .map((hex) => ({ key: 'custom' as const, hex, rgb: hexToRgb(hex) }))
+    return parseCustomColors(localStorage.getItem(CUSTOM_COLORS_KEY))
   } catch {
     return []
   }
 }
 
-/** Remember a color-wheel pick (most recent first, deduped, capped) */
-export function addCustomColor(hex: string): void {
-  const list = [hex, ...loadCustomColors().map((c) => c.hex).filter((h) => h !== hex)]
+/** Fired on window after every change, so the four markup rows of one menu
+ *  (each with its own copy of the list) show the same swatches: a colour
+ *  forgotten on the highlight row goes from the underline row as well. */
+export const CUSTOM_COLORS_EVENT = 'pdfx-custom-colors'
+
+function writeCustomColorList(list: string[]): void {
   try {
-    localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(list.slice(0, CUSTOM_COLORS_MAX)))
+    if (list.length === 0) localStorage.removeItem(CUSTOM_COLORS_KEY)
+    else localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(list))
   } catch {
     /* remembering colors is cosmetic */
   }
+  window.dispatchEvent(new Event(CUSTOM_COLORS_EVENT))
+}
+
+export function loadCustomColors(): HighlightColor[] {
+  return readCustomColorList().map((hex) => ({ key: 'custom' as const, hex, rgb: hexToRgb(hex) }))
+}
+
+/** Remember a color-wheel pick (most recent first, deduped, capped) */
+export function addCustomColor(hex: string): void {
+  writeCustomColorList(rememberColor(readCustomColorList(), hex))
+}
+
+/** Forget one remembered pick — the × on its swatch (issue #50) */
+export function removeCustomColor(hex: string): void {
+  writeCustomColorList(forgetColor(readCustomColorList(), hex))
 }
 
 /** Forget every remembered color-wheel pick (app-wide reset to defaults) */

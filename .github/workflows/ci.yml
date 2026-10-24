@@ -116,6 +116,10 @@ jobs:
       # updates it cannot install, and getting this wrong either nags every four
       # hours or never speaks at all, on hardware we don't own
       - run: npm run test:update-channel
+      # The remembered colour-wheel picks (issue #50): three slots, a repeat
+      # moves to the front, the × forgets exactly one, and the stored value is
+      # untrusted input that must read as a list every time
+      - run: npm run test:custom-colors
       # Windows 8.3 aliases ("EFFECT~1.pdf") never become a document's identity:
       # Save renamed a temp file onto the alias and the long-named paper came
       # back with an eight-character name (issue #24). Logic everywhere; the

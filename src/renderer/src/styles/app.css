@@ -8223,6 +8223,51 @@ button.bookmark-fold:hover {
   display: inline-flex;
 }
 
+/* A remembered colour-wheel pick can be forgotten (issue #50): a × at the
+   swatch's shoulder, shown on hover — and, since a finger has no hover, armed
+   by a long-press (a right-click on a mouse), the touch idiom every other
+   menu here uses. The three slots were a one-way queue before; the only way
+   out of a wrong pick was «Tilbakestill innstillinger». */
+.color-custom {
+  position: relative;
+  display: inline-flex;
+}
+
+.color-forget {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.08s,
+    color 0.08s,
+    border-color 0.08s;
+}
+
+.color-custom:hover .color-forget,
+.color-custom:focus-within .color-forget,
+.color-custom.armed .color-forget {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.color-forget:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 .color-picker-pop {
   position: absolute;
   bottom: calc(100% + 6px);

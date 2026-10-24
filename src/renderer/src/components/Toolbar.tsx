@@ -58,6 +58,7 @@ import {
   UNDERLINE_COLORS
 } from '../annotations'
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
+import { renderSwatches, useCustomColors, withCustomColors } from './ColorSwatches'
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
@@ -588,6 +589,10 @@ export default function Toolbar({
   /** Which column's zoom readout is being typed into (null = neither) */
   const [zoomEditing, setZoomEditing] = useState<'a' | 'b' | null>(null)
   const [zoomInput, setZoomInput] = useState('')
+  /** The remembered colour-wheel picks, after the fixed palette in the
+   *  marker and markup menus — the same swatches the selection menu offers,
+   *  so a colour picked there is a colour the tools can use (issue #50) */
+  const customColors = useCustomColors()
   // Reading-mode menu (themes) and the Visning menu (zoom, page layout,
   // screen, windows) are separate surfaces: one is about how the PAPER looks,
   // the other about how it is laid out in the window.
@@ -1251,7 +1256,7 @@ export default function Toolbar({
             the pen case — black, red, green, yellow, blue — and not the markup
             palette these borrowed until v0.36.0, which had no black in it. */}
         <div className="color-row">
-          {(tool === 'marker' ? HIGHLIGHT_COLORS : PEN_COLORS).map((c) => (
+          {renderSwatches(withCustomColors(tool === 'marker' ? HIGHLIGHT_COLORS : PEN_COLORS, customColors), (c) => (
             <button
               key={c.hex}
               className={`color-dot${pref.color.join() === c.rgb.join() ? ' selected' : ''}`}
@@ -1403,7 +1408,7 @@ export default function Toolbar({
                 })}
               </div>
               <div className="color-row">
-                {(markupType === 'highlight' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS).map((c) =>
+                {renderSwatches(withCustomColors(markupType === 'highlight' ? HIGHLIGHT_COLORS : UNDERLINE_COLORS, customColors), (c) =>
                   markupType === 'highlight' ? (
                     <button
                       key={c.hex}

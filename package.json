@@ -63,6 +63,7 @@
     "test:insecure-retry": "node scripts/test-insecure-retry.mjs",
     "test:file-access": "node scripts/test-file-access.mjs",
     "test:update-channel": "node scripts/test-update-channel.mjs",
+    "test:custom-colors": "node scripts/test-custom-colors.mjs",
     "test:long-path": "node scripts/test-long-path.mjs",
     "test:xfa": "node scripts/test-xfa.mjs",
     "test:attachments": "node scripts/test-attachments.mjs",
