@@ -1731,7 +1731,11 @@ const ui = {
     let win = null;
     for (let i = 0; i < 40 && !win; i++) { await settle(250); win = document.querySelector('.link-preview'); }
     if (!win) throw new Error('the link preview did not open');
-    const ask = win.querySelector('.lpa-ask');
+    // Since the citation card (2026-10-16) the abstract button is one of the
+    // row's actions, «Sammendrag»/«Abstract», not the old .lpa-ask — the shot
+    // failed on every run after that without anyone noticing until a release.
+    const ask = [...win.querySelectorAll('.lp-ref-acts .lp-ref-act')]
+      .find((b) => /^(Sammendrag|Abstract)$/.test((b.textContent || '').trim()));
     if (!ask) throw new Error('the preview has no abstract button — is the link a citation?');
     ask.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     let panel = null;
