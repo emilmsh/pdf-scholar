@@ -8268,10 +8268,10 @@ button.bookmark-fold:hover {
   border-color: var(--danger);
 }
 
+/* Fixed, placed from the «+» by CustomColorPicker: the menus scroll, and a
+   scroll box clips an absolutely placed child that reaches outside it */
 .color-picker-pop {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
+  position: fixed;
   z-index: 5;
   display: flex;
   align-items: center;
