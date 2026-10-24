@@ -8350,15 +8350,27 @@ button.bookmark-fold:hover {
   box-shadow: var(--shadow-menu);
 }
 
+/* The system colour dialog's handle: a rainbow ring around the colour the
+   wheel stands on, so it reads as «open the picker» and not as one more
+   swatch beside the hex field (Emil, 2026-10-24: «bare hex dukker opp») */
 .color-picker-wheel {
   width: 26px;
   height: 26px;
   flex-shrink: 0;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: none;
+  padding: 3px;
+  border: none;
+  border-radius: 50%;
+  background: conic-gradient(#f44, #fc0, #4c4, #2cf, #44f, #f4f, #f44);
   cursor: pointer;
+}
+
+.color-picker-wheel::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.color-picker-wheel::-webkit-color-swatch {
+  border: 1px solid var(--bg-elevated);
+  border-radius: 50%;
 }
 
 .color-picker-hex {

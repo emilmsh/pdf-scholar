@@ -66,6 +66,12 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
     sin egen innpakning og holdt bredden. `.color-row` har `flex-wrap: wrap`
     og hver prikk `flex: none`. Tekstverktøyets egen meny i verktøylinja fikk
     også hjulet og de huskede fargene (popoveren for en tekstboks hadde dem).
+    Og hjulet selv: Emil så «bare hex» — den 26 px fargeruta som åpner
+    systemets fargedialog leste som enda en farge, ikke som en knapp. Den
+    tegnes nå som en regnbuering rundt fargen den står på, med tooltip «Åpne
+    fargevelgeren – hjul, RGB og hex». Poppen BLIR i menyens DOM: en portal
+    til body ble prøvd og forkastet, fordi menyene lukker på pointerdown
+    utenfor sitt eget element, så første klikk i poppen lukket menyen under.
 - [x] **Interop-port**: PDFX-annoterte filer åpner med identisk visning i Edges innebygde viser — Emils manuelle test, godkjent som tilstrekkelig 2026-08-02 (Acrobat/SumatraPDF-matrisen utgår som krav; Edge er uansett interop-baren, jf. plattformparitetsregelen)
 
 ## Fase 5 — Fullt annoteringsverktøysett

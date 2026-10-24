@@ -539,6 +539,7 @@ export const zh: Dict = {
   'menu.squiggly': '波浪线',
   'menu.squigglyTip': '波浪线（{color}）',
   'menu.customColor': '选择颜色…',
+  'menu.customColorWheel': '打开颜色选择器 — 色轮、RGB 和十六进制',
   'menu.forgetColor': '忘记此颜色',
   'menu.aiSection': '助手',
   'menu.note': '便签',

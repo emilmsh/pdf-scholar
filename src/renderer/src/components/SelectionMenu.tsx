@@ -133,12 +133,23 @@ export function CustomColorPicker({ onPick }: { onPick(hex: string): void }): Re
       <button className="color-plus" title={t('menu.customColor')} onClick={toggle}>
         +
       </button>
+      {/* Kept inside the menu's DOM on purpose: the menus close on a pointerdown
+          outside THEIR element, so a pop portalled to the body would close
+          its menu — and the picker with it — on its own first click. (The
+          menus' open animation translates them for 120 ms, which in a hidden
+          dev:web tab freezes and puts this fixed pop off-screen; a real
+          window finishes the animation before anyone can click «+».) */}
       {open && (
         <div className="color-picker-pop" style={popStyle} onMouseDown={(e) => e.stopPropagation()}>
+          {/* The wheel is the system's own colour dialog behind a swatch;
+              drawn as a rainbow ring so it reads as «open the picker», not
+              as one more colour (Emil, 2026-10-24: «bare hex dukker opp») */}
           <input
             ref={wheelRef}
             type="color"
             className="color-picker-wheel"
+            title={t('menu.customColorWheel')}
+            aria-label={t('menu.customColorWheel')}
             value={normalizeHex(hex) ?? WHEEL_START}
             onChange={(e) => setHex(e.target.value)}
           />
