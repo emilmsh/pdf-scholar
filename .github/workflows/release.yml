@@ -14,6 +14,16 @@
 #                                       macOS has no auto-update: unsigned)
 #   PDF-Scholar-<version>-<arch>.dmg  — update-tap.yml resolves these names
 #                                       on publish to bump the Homebrew cask
+#
+# Shape (2026-10-24, for speed without losing the gate): the draft is created
+# EMPTY first, every build job runs the whole test battery and uploads its
+# own files straight into it, and a last job counts them. Before, the three
+# builds went through upload-artifact/download-artifact into one release job
+# — 2–3 minutes of copying 700 MB around — and the release ran only four of
+# the tests, which is why RELEASE.md made everyone wait for a green CI run
+# before tagging. Now the release build IS the complete gate: tag together
+# with the push. A red build leaves a draft nobody can see; delete it and the
+# tag, fix, tag again (RELEASE.md step 2).
 name: Release
 
 on:
@@ -24,61 +34,10 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run typecheck
-      # CI ignores v* tags, so this job is the ONLY gate on a released build —
-      # it has to run the engine write tests itself, not assume a green CI run.
-      - run: npm run test:engine
-      - run: npm run test:appender
-      - run: npm run test:cache
-      - run: npm run test:rotation
-      - run: npm run build
-      - run: npx electron-builder --publish never --config config/electron-builder.yml
-      # pack:ext / pack:ext:store already build the extension. Both zip shapes
-      # come from scripts/pack-extension.mjs so the asset-name and layout
-      # contract above has exactly one implementation.
-      - name: Build extension zips
-        if: matrix.os == 'ubuntu-latest'
-        run: npm run pack:ext && npm run pack:ext:store
-      - uses: actions/upload-artifact@v7
-        with:
-          name: dist-${{ matrix.os }}
-          path: |
-            release/*.exe
-            release/*.dmg
-            release/*.AppImage
-            release/*.deb
-            release/*.zip
-            release/*.blockmap
-            release/latest*.yml
-          if-no-files-found: error
-
-  release:
-    needs: build
+  draft:
     runs-on: ubuntu-latest
     steps:
-      # download-artifact v8 FAILS on a digest mismatch (v4 only warned). That is
-      # the behaviour we want here — a truncated installer must not reach a draft
-      # release — but it means a corrupted transfer stops the release outright
-      # instead of shipping quietly. Re-run the job; only lower `digest-mismatch`
-      # if a hash is provably wrong on the upload side.
-      - uses: actions/download-artifact@v8
-        with:
-          path: artifacts
-          merge-multiple: true
-      - name: Create draft release
+      - name: Create the empty draft release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -88,8 +47,7 @@ jobs:
             --repo "$REPO" \
             --draft \
             --title "PDF Scholar $TAG" \
-            --generate-notes \
-            artifacts/*
+            --generate-notes
           # Prepend a per-platform download table: the raw asset list is
           # cryptic to non-developers (AppImage? blockmap?), so the notes
           # lead with exactly one link per platform and wave the rest off.
@@ -115,3 +73,67 @@ jobs:
             gh release view "$TAG" --repo "$REPO" --json body --jq .body
           } > /tmp/notes.md
           gh release edit "$TAG" --repo "$REPO" --notes-file /tmp/notes.md
+
+  build:
+    needs: draft
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # CI ignores v* tags, so this job is the ONLY gate on a released build:
+      # the whole battery, the same list CI runs (one composite action)
+      - uses: ./.github/actions/test-battery
+      - run: npm run build
+      - run: npx electron-builder --publish never --config config/electron-builder.yml
+      # pack:ext / pack:ext:store already build the extension. Both zip shapes
+      # come from scripts/pack-extension.mjs so the asset-name and layout
+      # contract above has exactly one implementation.
+      - name: Build extension zips
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run pack:ext && npm run pack:ext:store
+      # Straight into the draft from the machine that built it — no artifact
+      # round trip. --clobber so a re-run of one failed job replaces its files.
+      - name: Upload to the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(release/*.exe release/*.dmg release/*.AppImage release/*.deb release/*.zip release/*.blockmap release/latest*.yml)
+          if [ "${#files[@]}" -eq 0 ]; then echo "nothing built in release/"; exit 1; fi
+          printf '%s\n' "${files[@]}"
+          gh release upload '${{ github.ref_name }}' --repo '${{ github.repository }}' --clobber "${files[@]}"
+
+  check:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      # Every build uploaded on its own, so count what the draft holds: the
+      # twelve assets the contract above names. A missing one fails loudly
+      # here instead of being noticed after publishing.
+      - name: Count the draft's assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ github.ref_name }}'
+          VERSION="${TAG#v}"
+          names=$(gh release view "$TAG" --repo '${{ github.repository }}' --json assets --jq '.assets[].name')
+          echo "$names"
+          missing=0
+          for want in \
+            "PDF-Scholar-Setup-$VERSION.exe" "PDF-Scholar-Setup-$VERSION.exe.blockmap" "latest.yml" \
+            "PDF-Scholar-$VERSION-portable-x64.zip" "PDF-Scholar-$VERSION-portable-arm64.zip" \
+            "PDF-Scholar-$VERSION-arm64.dmg" "PDF-Scholar-$VERSION-x64.dmg" \
+            "PDF-Scholar-$VERSION.AppImage" "PDF-Scholar-$VERSION.deb" "latest-linux.yml" \
+            "pdf-scholar-extension.zip" "pdf-scholar-extension-store.zip"; do
+            if ! grep -qxF "$want" <<< "$names"; then echo "MISSING: $want"; missing=1; fi
+          done
+          exit $missing

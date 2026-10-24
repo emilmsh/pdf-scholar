@@ -243,8 +243,28 @@ fallen three releases behind by v0.31.3). Commit as `vX.Y.Z: <one-line summary>`
 git tag -a vX.Y.Z -m "vX.Y.Z: <summary>" && git push origin master --follow-tags
 ```
 
-The tag triggers `.github/workflows/release.yml`: builds Windows, macOS and Linux
-plus the extension zips, and creates a **draft** release. Nothing is public yet.
+**Tag together with the push — do not wait for CI first** (2026-10-24). The
+release workflow runs the whole test battery itself (the same list CI runs,
+one composite action in `.github/actions/test-battery`), so the release build
+is a complete gate on its own; waiting for a green CI run before tagging was
+six minutes spent testing the same commit twice. The step-1 checks above are
+the hand gate; the push is the machine gate.
+
+The tag triggers `.github/workflows/release.yml`: it creates an empty **draft**
+release at once, builds Windows, macOS and Linux plus the extension zips, each
+build uploading its own files straight into the draft, and a last job counts
+the twelve assets. Nothing is public yet. **A red release build** leaves a
+draft nobody can see: delete the draft and the tag, fix forward, tag again —
+
+```bash
+gh release delete vX.Y.Z --yes && git push origin :refs/tags/vX.Y.Z && git tag -d vX.Y.Z
+```
+
+(v0.60.0, 2026-10-10, was left as an orphan tag because moving a tag was
+refused mid-session; deleting an unpublished one is the clean version of the
+same fix — nothing has seen it: electron-updater and the tap only ever read
+PUBLISHED releases.) A single failed build job can instead be re-run from the
+Actions tab; its upload step clobbers its own files.
 
 ## 3. Publish the draft
 
