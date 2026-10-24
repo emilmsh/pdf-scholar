@@ -77,12 +77,14 @@ SEARCH
 Both modes live in one search bar, a tab apart.
 • By words: match case, whole word, a results list with excerpts that folds away so it never covers the hit, and every match marked on the page
 • By meaning: describe a topic in your own words and get the passages that discuss it, ranked (uses the assistant's key)
+• Scanned pages are searched too: a page that is only a picture of text is read by text recognition on your own computer, and its words can then be found, selected, marked and asked about like any other page's. Nothing is sent anywhere for this, and nothing is written into the file
 
 AI ASSISTANT (optional — bring your own key)
 • Answers cite their sources: each claim links to the passage it came from
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
-• Scanned documents are identified as such; a page range can be attached as images for the assistant to read
+• A scanned document is read the same way: the assistant gets the text recognised on your computer, with clickable citations, instead of only pages attached as images
+• Conversations are kept with their document and listed across documents in the library, searchable; an earlier conversation, about this paper or another, can be attached to a new question as context
 • The assistant can open in its own window; a citation click still goes to the passage in the document's window
 • LaTeX in answers is rendered; optional web search, off by default
 • AI access switch: "Confirm before sharing" asks the first time a document goes to a provider and shows what is attached; "Off" blocks every AI request
@@ -134,12 +136,14 @@ SØK
 Begge modusene bor i én søkelinje, en fane fra hverandre.
 • Etter ord: skill store/små, helord, en treffliste med utdrag som kan slås sammen så den aldri dekker treffet, og hvert treff markert på siden
 • Etter mening: beskriv et tema med egne ord og få avsnittene som omtaler det, rangert (bruker assistentens nøkkel)
+• Skannede sider søkes også: en side som bare er et bilde av tekst, leses av tekstgjenkjenning på din egen maskin, og ordene kan deretter finnes, merkes og spørres om som på enhver annen side. Ingenting sendes noe sted for dette, og ingenting skrives inn i filen
 
-AI-ASSISTENT (valgfri — egen nøkkel)
+AI-ASSISTENT (valgfri – egen nøkkel)
 • Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
-• Skannede dokumenter identifiseres som det; et sideutvalg kan legges ved som bilder som assistenten leser
+• Et skannet dokument leses på samme måte: assistenten får teksten som er gjenkjent på maskinen din, med klikkbare kildehenvisninger, i stedet for bare sider lagt ved som bilder
+• Samtaler beholdes sammen med dokumentet og listes på tvers av dokumenter i biblioteket, søkbare; en tidligere samtale, om denne artikkelen eller en annen, kan legges ved et nytt spørsmål som kontekst
 • Assistenten kan åpnes i eget vindu; et sitatklikk går fortsatt til avsnittet i dokumentvinduet
 • LaTeX i svar gjengis; valgfritt nettsøk, av som standard
 • AI-tilgang: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved; «Av» stopper alle AI-forespørsler
@@ -150,28 +154,33 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.61.0
+## What's new in this version (≤ 1 500 chars) — v0.70.0
+
+*(The Store last carried v0.61.0's notes, so this block covers what landed
+between — the headline items, not every release.)*
 
 **EN:**
 ```
-• A document that changes on disk — a LaTeX build, a sync client, another program's save — is reloaded in place; with unsaved marks you are offered the reload instead
-• The interface in Simplified Chinese
-• Link previews read the page at a scale of their own, scroll both ways and zoom with Ctrl+wheel; a citation like «5–9» shows every entry in the range; math in abstracts is rendered
-• Search finds a phrase across a line break
-• «Create bookmark» in the selection menu names the bookmark after the selected text
-• A note you have typed into is saved when you leave it, like a comment on a highlight
-• The AI settings name «Other OpenAI-compatible endpoint» as its own choice, and the quick-answer bubble grows with its window
+• Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere, nothing is written into the file
+• The assistant reads scanned documents the same way, and keeps its conversations: the library lists them across documents, and an earlier one can be attached to a new question
+• Sharp text at every zoom level, on every display scale
+• A text box can be re-set in another size after writing, and its menu opens beside the editor while the text tool is armed
+• A tab can be duplicated (Ctrl+Shift+K) for a second place in the same document
+• Citations preview as a card with the reference entry, the abstract under it; figures, tables, footnotes and equations preview whole
+• Images can be copied or saved from a page at their own resolution; a hand tool pans the page
+• A moved or renamed file keeps its bookmarks, position and conversations
 ```
 
 **NO:**
 ```
-• Et dokument som endres på disk – en LaTeX-bygging, en synkklient, et annet programs lagring – lastes inn på nytt på stedet; med ulagrede merker får du tilbud om det i stedet
-• Grensesnittet på forenklet kinesisk
-• Lenkeforhåndsvisningen leser siden i sin egen skala, ruller begge veier og zoomer med Ctrl+hjul; en henvisning som «5–9» viser alle oppføringene; matematikk i sammendrag gjengis
-• Søk finner en frase over et linjeskift
-• «Lag bokmerke» i markeringsmenyen gir bokmerket navn etter den markerte teksten
-• Et notat du har skrevet i, lagres når du forlater det, som en kommentar på en markering
-• KI-innstillingene har «Annet OpenAI-kompatibelt endepunkt» som eget valg, og hurtigsvar-boblen vokser med vinduet sitt
+• Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted, ingenting skrives inn i filen
+• Assistenten leser skannede dokumenter på samme måte, og tar vare på samtalene: biblioteket lister dem på tvers av dokumenter, og en tidligere samtale kan legges ved et nytt spørsmål
+• Skarp tekst ved alle zoomnivåer, på alle skjermskalaer
+• En tekstboks kan settes om i en annen størrelse etterpå, og menyen åpnes ved siden av redigeringen mens tekstverktøyet er valgt
+• En fane kan dupliseres (Ctrl+Shift+K) for et sted til i samme dokument
+• Henvisninger forhåndsvises som et kort med referansen og sammendraget under; figurer, tabeller, fotnoter og ligninger forhåndsvises hele
+• Bilder kan kopieres eller lagres fra en side i sin egen oppløsning; et håndverktøy flytter siden
+• En flyttet eller omdøpt fil beholder bokmerker, posisjon og samtaler
 ```
 
 ---

@@ -55,6 +55,7 @@ SEARCH
 Both modes live in one search bar, a tab apart.
 • By words: match case, whole word, a results list with excerpts that folds away so it never covers the hit, and every match marked on the page
 • By meaning: describe a topic in your own words and get the passages that discuss it, ranked (uses the assistant's key)
+• Scanned pages are searched too: a page that is only a picture of text is read by text recognition in the browser, on your own computer, and its words can then be found, selected, marked and asked about like any other page's. Nothing is sent anywhere for this, and nothing is written into the file
 
 ANNOTATION
 Selecting text opens the annotation menu at the selection; every mark is listed in a panel beside the document.
@@ -74,6 +75,8 @@ AI ASSISTANT (optional, bring your own key)
 • Answers cite their sources: each claim links to the passage it came from
 • Structured article summaries; explain, simplify, critique or define selected text
 • A figure or region can be cropped into the chat and asked about
+• A scanned document is read the same way: the assistant gets the text recognised on your computer, with clickable citations, instead of only pages attached as images
+• Conversations are kept with their document and listed across documents in the library, searchable; an earlier conversation, about this paper or another, can be attached to a new question as context
 • The assistant can open in its own tab; a citation click still goes to the passage in the tab showing the document
 • An AI access switch: "Confirm before sharing" asks the first time a document goes to a provider and shows what is attached; "Off" blocks every AI request
 • Eight major AI services are supported, one key field each, alongside any endpoint that speaks the standard chat-completions API — including a local model server, which needs no key. The providers are listed on the project page. Requests go directly to the provider you chose; with a local model the document never leaves the machine
@@ -102,6 +105,7 @@ SØK
 Begge modusene bor i én søkelinje, en fane fra hverandre.
 • Etter ord: skill store/små, helord, en treffliste med utdrag som kan slås sammen så den aldri dekker treffet, og hvert treff markert på siden
 • Etter mening: beskriv et tema med egne ord og få avsnittene som omtaler det, rangert (bruker assistentens nøkkel)
+• Skannede sider søkes også: en side som bare er et bilde av tekst, leses av tekstgjenkjenning i nettleseren, på din egen maskin, og ordene kan deretter finnes, merkes og spørres om som på enhver annen side. Ingenting sendes noe sted for dette, og ingenting skrives inn i filen
 
 ANNOTERING
 Å merke tekst åpner annoteringsmenyen ved merkingen; hvert merke listes i et panel ved siden av dokumentet.
@@ -121,6 +125,8 @@ AI-ASSISTENT (valgfri, egen nøkkel)
 • Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
 • Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
+• Et skannet dokument leses på samme måte: assistenten får teksten som er gjenkjent på maskinen din, med klikkbare kildehenvisninger, i stedet for bare sider lagt ved som bilder
+• Samtaler beholdes sammen med dokumentet og listes på tvers av dokumenter i biblioteket, søkbare; en tidligere samtale, om denne artikkelen eller en annen, kan legges ved et nytt spørsmål som kontekst
 • Assistenten kan åpnes i egen fane; et sitatklikk går fortsatt til avsnittet i fanen som viser dokumentet
 • AI-tilgang: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved; «Av» stopper alle AI-forespørsler
 • Åtte store AI-tjenester støttes, med ett nøkkelfelt hver, i tillegg til ethvert endepunkt som følger den vanlige chat-API-standarden — også en lokal modellserver, som ikke trenger nøkkel. Leverandørene er listet opp på prosjektsiden. Forespørslene går rett til leverandøren du valgte; med en lokal modell forlater dokumentet aldri maskinen
