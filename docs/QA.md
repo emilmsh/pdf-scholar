@@ -216,7 +216,7 @@ ikke fått noen versjon siden v0.54.0.
 
 ## Står igjen fra RELEASE.md steg 1 (alltid)
 
-- Skriv ut én gang (Print-dialogen – Electron-patchen kan bryte den stille).
+- Skriv ut én gang – bare når Electrons hovedversjon endres (se RELEASE.md).
 - Last utvidelsen på nytt i `edge://extensions` (ext:release har lagt v0.71.0
   i `dist-extension/`), åpne en PDF fra nett og én fra «Nylig lest».
 - Dra en fane ut til et annet vindu med mus (den native drag-gaten).
