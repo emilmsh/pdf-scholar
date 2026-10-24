@@ -59,6 +59,13 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
   - **Ctrl+N åpner en fil** (2026-10-24, Emils ønske: «som plusstegnet i
     fanebaren»): `file.open` har `mod+o` OG `mod+n` som standard; nytt vindu
     er fortsatt Ctrl+Shift+N.
+  - **Fargeraden bryter linje** (2026-10-24, Emil etter v0.71.0: «merkelig
+    hvordan farge-prikkene komprimeres, men ikke de som er custom»): med tre
+    husket farger ble raden bredere enn tekstboksens popover (248 px), og en
+    flex-prikk krymper som standard — de faste ble ovaler, de huskede sto i
+    sin egen innpakning og holdt bredden. `.color-row` har `flex-wrap: wrap`
+    og hver prikk `flex: none`. Tekstverktøyets egen meny i verktøylinja fikk
+    også hjulet og de huskede fargene (popoveren for en tekstboks hadde dem).
 - [x] **Interop-port**: PDFX-annoterte filer åpner med identisk visning i Edges innebygde viser — Emils manuelle test, godkjent som tilstrekkelig 2026-08-02 (Acrobat/SumatraPDF-matrisen utgår som krav; Edge er uansett interop-baren, jf. plattformparitetsregelen)
 
 ## Fase 5 — Fullt annoteringsverktøysett
@@ -563,8 +570,11 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
   utkast-håndtering og tastaturruting bor samtidig. Det er nøyaktig de områdene
   risikolista nederst i dette dokumentet peker på, så filen er der en feil er
   dyrest å finne.
-- [ ] **Skrevet QA-matrise** (`docs/QA.md`) — den manuelle runden vi i dag gjør
-  etter hukommelse før hver release, skrevet ned én gang.
+- [x] **Skrevet QA-matrise** (`docs/QA.md`, 2026-10-24, Emils bestilling etter
+  v0.71.0: «en cookbook for å kunne teste og kontrollere») — oppskrift per
+  funksjon fra v0.67 til v0.71: gjør, se, og hvilken maskintest som dekker
+  resten. Eldre funksjoner står fortsatt bare i RELEASE.md steg 1; utvid
+  kokeboka når noe eldre feiler for hånd.
 - [ ] **Soak-test:** 1000+ siders dokument, 15 faner, timesvis, med øye på
   minnet. Ingen av testene våre kjører over tid, og risiko 3 i lista under
   handler nettopp om store dokumenter.

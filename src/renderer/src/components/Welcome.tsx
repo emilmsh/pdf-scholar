@@ -279,8 +279,14 @@ export default function Welcome({
             )}
           </span>
           <span className="recent-card-name">{r.name}</span>
-          {convBadge(r)}
-          {at && <span className="recent-card-meta">{at}</span>}
+          {/* One line under the name: the page on the left, the conversation
+              count at the right edge (Emil, 2026-10-24 — they stacked) */}
+          {(at || convCounts.get(r.path)) && (
+            <span className="recent-card-foot">
+              {at && <span className="recent-card-meta">{at}</span>}
+              {convBadge(r)}
+            </span>
+          )}
         </button>
         {entryActions(r)}
       </li>

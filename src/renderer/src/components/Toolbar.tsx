@@ -1468,7 +1468,7 @@ export default function Toolbar({
             <div className="tool-menu">
               <div className="theme-menu-label">{t('tb.textTool')}</div>
               <div className="color-row">
-                {FREETEXT_COLORS.map((c) => (
+                {renderSwatches(withCustomColors(FREETEXT_COLORS, customColors), (c) => (
                   <button
                     key={c.hex}
                     className={`color-dot${textPref.color.join() === c.rgb.join() ? ' selected' : ''}`}
@@ -1477,6 +1477,14 @@ export default function Toolbar({
                     onClick={() => onTextPrefChange({ color: c.rgb })}
                   />
                 ))}
+                {/* The box's own popover offers the wheel for a text box; the
+                    tool's menu offers the same (parity, 2026-10-24) */}
+                <CustomColorPicker
+                  onPick={(hex) => {
+                    addCustomColor(hex)
+                    onTextPrefChange({ color: hexToRgb(hex) })
+                  }}
+                />
               </div>
               <div className="theme-menu-label slider-label">
                 {t('tb.fontSize')}
