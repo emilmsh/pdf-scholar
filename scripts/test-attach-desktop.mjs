@@ -3,14 +3,18 @@
 //
 // A local OpenAI-compatible endpoint records every request body, so this
 // proves what actually LEAVES the machine, not what the panel shows: the
-// picker attaches a conversation from another document; «Bekreft før
-// deling» names that document before anything is sent; the request carries
-// the attached conversation in the system prompt — its question and answer,
-// never its image — and nowhere else; the answer's [SAMTALE 1] tag becomes a
-// «Samtale» chip beside the document's page chip; the attachment rides along
-// with the next question and is stored with the conversation; taken off, it
-// is gone from the next request; and the chip opens the conversation it
-// names, in its own document.
+// paperclip's list (one button with a count, 2026-10-24 — the chips used to
+// sit in the text field) offers «Samtale …», «Bilde …» and «Fil …»; its picker
+// attaches a conversation from another document, the list opens by itself on
+// it and the badge counts it; «Bekreft før deling» names that document before
+// anything is sent; the request carries the attached conversation in the
+// system prompt — its question and answer, never its image — and nowhere
+// else; the answer's [SAMTALE 1] tag becomes a «Samtale» chip beside the
+// document's page chip; the attachment rides along with the next question and
+// is stored with the conversation; taken off, it is gone from the next
+// request; a local file fed to «Fil …» shows as a chip, is named by the strip
+// and travels as a [FILE 1] block in the system prompt only; and the chip
+// opens the conversation it names, in its own document.
 // Needs `npm run build` first. Run: node scripts/test-attach-desktop.mjs
 import { createServer } from 'node:http'
 import { copyFileSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
@@ -83,7 +87,13 @@ const ask = async (question) => {
   await settle(200);
   click(document.querySelector('.ai-send'));
 };
-const chips = () => [...document.querySelectorAll('.ai-attach-conv')].map((c) => c.textContent.replace('✕', '').trim());
+// The chips live in the paperclip's list (2026-10-24; they sat in the text
+// field before): open it when it is closed, then read them
+const openClip = async () => {
+  if (!document.querySelector('.ai-attach-menu')) { click(document.querySelector('.ai-attach-clip')); await settle(300); }
+};
+const chips = async () => { await openClip(); return [...document.querySelectorAll('.ai-attach-menu .ai-attach-conv')].map((c) => c.textContent.replace('✕', '').trim()); };
+const menuAction = (label) => [...document.querySelectorAll('.ai-attach-menu-acts button')].find((b) => b.textContent.trim().startsWith(label));
 `
 const run = (send, body) => evaluate(send, body, PRELUDE)
 
@@ -132,10 +142,14 @@ async function main() {
     await send('Runtime.enable')
     await waitFor(() => run(send, `return document.querySelectorAll('.pdf-page').length`), (n) => n > 0, 'the document')
     await run(send, `window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true })); await settle(600)`)
-    await waitFor(() => run(send, `return !!document.querySelector('.ai-attach-convs')`), (v) => v, 'the composer')
+    await waitFor(() => run(send, `return !!document.querySelector('.ai-attach-clip')`), (v) => v, 'the composer')
 
-    console.log('\n1. the picker attaches a conversation from another document')
-    await run(send, `click(document.querySelector('.ai-attach-convs')); await settle(500)`)
+    console.log('\n1. the paperclip’s picker attaches a conversation from another document')
+    await run(send, `await openClip()`)
+    check('the paperclip opens a list with the three ways to add', await run(send, `return ['Samtale', 'Bilde', 'Fil'].every((l) => !!menuAction(l))`))
+    check('…saying nothing is attached yet', await run(send, `return !!document.querySelector('.ai-attach-menu-empty')`))
+    check('no badge on the paperclip yet', await run(send, `return !document.querySelector('.ai-attach-count')`))
+    await run(send, `click(menuAction('Samtale')); await settle(500)`)
     const offered = await waitFor(
       () => run(send, `return [...document.querySelectorAll('.ai-conv-pick')].map((l) => l.textContent)`),
       (v) => v.length > 0,
@@ -145,8 +159,11 @@ async function main() {
     check('the picker says what leaves and to whom', /sendes til/.test(await run(send, `return document.querySelector('.ai-conv-picker-note').textContent`)))
     check('nothing is ticked for the reader', await run(send, `return [...document.querySelectorAll('.ai-conv-pick input')].every((i) => !i.checked)`))
     await run(send, `click(document.querySelector('.ai-conv-pick input')); await settle(200); click([...document.querySelectorAll('.ai-conv-picker-foot button')].at(-1)); await settle(400)`)
-    const chipText = await run(send, `return chips()`)
-    check('it shows as a chip above the composer', chipText.length === 1 && chipText[0] === 'Other paper.pdf: Metode', JSON.stringify(chipText))
+    check('the list opens by itself on the new attachment', await run(send, `return !!document.querySelector('.ai-attach-menu')`))
+    const chipText = await run(send, `return await chips()`)
+    check('it shows as a chip in the list', chipText.length === 1 && chipText[0] === 'Other paper.pdf: Metode', JSON.stringify(chipText))
+    check('the paperclip counts it', (await run(send, `return document.querySelector('.ai-attach-count')?.textContent`)) === '1')
+    check('the text field itself holds no chip', await run(send, `return !document.querySelector('.ai-composer-field .ai-attach-row, .ai-composer textarea ~ .ai-attach-row')`))
     check('nothing has been sent yet', endpoint.bodies.length === 0)
 
     console.log('\n2. «Bekreft før deling» names the other document first')
@@ -186,13 +203,39 @@ async function main() {
     check('the conversation stores what is attached', stored[0].id === 'o1' && stored[0].docPath === OTHER)
     await waitFor(() => run(send, `return !document.querySelector('.ai-send')?.disabled || document.querySelectorAll('.right-pane .ai-assistant').length >= 2`), (v) => v, 'the follow-up answer')
     await sleep(600)
-    await run(send, `click(document.querySelector('.ai-attach-conv .ai-attach-x')); await settle(300)`)
-    check('the chip is off', (await run(send, `return chips()`)).length === 0)
+    check('sending put the list away', await run(send, `return !document.querySelector('.ai-attach-menu')`))
+    await run(send, `await openClip(); click(document.querySelector('.ai-attach-menu .ai-attach-conv .ai-attach-x')); await settle(300)`)
+    check('the chip is off', (await run(send, `return await chips()`)).length === 0)
+    check('…and the badge with it', await run(send, `return !document.querySelector('.ai-attach-count')`))
     await run(send, `await ask('Og nå uten?')`)
     await waitFor(() => Promise.resolve(endpoint.bodies.length), (n) => n >= 3, 'the request without it')
     check('taken off, it is gone from the next request', !parts(endpoint.bodies[2]).system.includes('SAMTALE') && !endpoint.bodies[2].messages.some((m) => JSON.stringify(m).includes('paneldata')))
 
-    console.log('\n6. the chip opens the conversation it names')
+    console.log('\n6. a local file goes along as context (the paperclip’s «Fil …»)')
+    await waitFor(() => run(send, `return !document.querySelector('.ai-send')?.disabled || document.querySelectorAll('.right-pane .ai-assistant').length >= 3`), (v) => v, 'the third answer')
+    await sleep(600)
+    // The native file dialog cannot be driven: the hidden input is fed directly
+    await run(send, `
+      const input = [...document.querySelectorAll('.ai-composer-controls input[type=file]')].find((i) => (i.accept || '').includes('.md'));
+      const dt = new DataTransfer();
+      dt.items.add(new File(['# Feltnotater\\n\\nUtvalget var 120 bedrifter i Innlandet.'], 'notater.md', { type: 'text/markdown' }));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await settle(800)
+    `)
+    const fileChips = await run(send, `return await chips()`)
+    check('the file shows as a chip, with the badge', fileChips.length === 1 && fileChips[0] === 'notater.md' && (await run(send, `return document.querySelector('.ai-attach-count')?.textContent`)) === '1', JSON.stringify(fileChips))
+    await run(send, `await ask('Hva står i notatene?'); await settle(400)`)
+    const fileStrip = await run(send, `return document.querySelector('.ai-confirm')?.textContent ?? null`)
+    check('«Bekreft før deling» names the file before it leaves', !!fileStrip && fileStrip.includes('notater.md'), String(fileStrip))
+    check('nothing sent while it asks', endpoint.bodies.length === 3)
+    await run(send, `click([...document.querySelectorAll('.ai-confirm-actions button')].at(-1))`)
+    await waitFor(() => Promise.resolve(endpoint.bodies.length), (n) => n >= 4, 'the request with the file')
+    const withFile = parts(endpoint.bodies[3])
+    check('the system prompt carries the file, tagged by name', withFile.system.includes('[FILE 1] "notater.md"') && withFile.system.includes('120 bedrifter i Innlandet'))
+    check('…and not the question or the document', !withFile.rest.includes('120 bedrifter') && !withFile.rest.includes('[FILE'))
+
+    console.log('\n7. the chip opens the conversation it names')
     await sleep(800)
     await run(send, `click(document.querySelector('.right-pane .ai-chip-conversation')); await settle(300)`)
     const opened = await waitFor(

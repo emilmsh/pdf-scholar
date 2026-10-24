@@ -53,8 +53,11 @@ function restoreSelection(range: Range | null): void {
 }
 
 /** Small popover behind the "+" swatch: a colour wheel and a hex field so
- *  users can pick visually or paste an exact #rrggbb. */
-function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX.Element {
+ *  users can pick visually or paste an exact #rrggbb. Exported for the
+ *  toolbar's marker and markup menus (Emil, 2026-10-24: they showed the
+ *  remembered picks but had no way to make one — parity with the selection
+ *  menu, where «+» had lived alone). */
+export function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [hex, setHex] = useState('#')
   const ref = useRef<HTMLDivElement>(null)

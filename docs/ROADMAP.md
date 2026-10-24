@@ -49,6 +49,16 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 - [x] Angre/gjør om for annotasjoner: Ctrl+Z / Ctrl+Shift+Z (også Ctrl+Y) som inverterbare motoroperasjoner — fungerer også på tvers av dokument-gjenåpninger (levert 2026-07-09, opprinnelig fase 5-punkt)
 - [x] «Armert verktøy»-flyt: tekstmarkeringsverktøyene armes fra verktøylinjen, merker utvalget ved museslipp og forblir aktive til neste utvalg (Esc slår av) (levert 2026-07-16)
 - [x] Egendefinert fargevelger + opasitetskontroll: fargehjul bak «+» i markeringsmenyen som husker de sist valgte fargene (levert 2026-07-12), opasitetsglider per verktøy i verktøyvalgene (levert 2026-07-25)
+  - **Fargehjulet i verktøylinjen også** (2026-10-24, Emil: «ikke paritet
+    med kontekstmeny og toolbar»): samme `CustomColorPicker` bak «+» i
+    verktøylinjens farge-rader for penn/tusj og tekstmarkeringene, samme
+    lagrede liste (`addCustomColor`). Og hjulet selv slipper ut av menyens
+    rulleboks (PR #59): `.color-picker-pop` er `position: fixed`, målt fra
+    «+»-knappen, over den når det er plass og under ellers — en
+    `overflow: auto` på menyen klippet det til en stripe.
+  - **Ctrl+N åpner en fil** (2026-10-24, Emils ønske: «som plusstegnet i
+    fanebaren»): `file.open` har `mod+o` OG `mod+n` som standard; nytt vindu
+    er fortsatt Ctrl+Shift+N.
 - [x] **Interop-port**: PDFX-annoterte filer åpner med identisk visning i Edges innebygde viser — Emils manuelle test, godkjent som tilstrekkelig 2026-08-02 (Acrobat/SumatraPDF-matrisen utgår som krav; Edge er uansett interop-baren, jf. plattformparitetsregelen)
 
 ## Fase 5 — Fullt annoteringsverktøysett
@@ -519,6 +529,29 @@ Dette går foran «Neste bolk — penn og nettbrett»; den bolken gjenopptas ett
     (CI) og `test:attach-desktop` mot et endepunkt som tar opp hva som
     faktisk sendes. Ikke prøvd mot ekte modeller (AI-TESTING.md). Forslag i
     velgeren ut fra spørsmålet er ikke bygget.
+  - **Bindersen** (2026-10-24, Emils bestilling: «Samtaler» like godt en
+    generell vedleggsknapp, og brikkene i tekstfeltet var rotete): ÉN
+    binders i komposisten med et tall på, som åpner en liste over alt som er
+    lagt ved — samtaler, filer, sider, annoteringer, bilder, hver med sitt
+    kryss — og tre veier inn: «Samtale …» (velgeren), «Bilde …», «Fil …».
+    Brikkene står ikke lenger i tekstfeltet. Lista åpner seg selv når noe
+    nytt lander (et utsnitt tegnet på siden ville ellers forsvunnet inn i et
+    tall) og lukkes ved sending, Esc og klikk utenfor. Lokale filer
+    (`src/renderer/src/attach-file.ts`, `src/shared/file-context.ts`): en
+    PDF leses med pdf.js i rendereren, en tekstfil (md, txt, csv, json, tex,
+    bib, log) som den er; teksten går i en egen `[FILE n]`-blokk i
+    SYSTEMPROMPTEN etter samtaleblokken, med samme regler — dokumentet er
+    eneste kilde, en fil er notater — tak per fil (40k tegn) og samlet
+    (80k), maks fem, størrelsen trekkes fra dokumentets budsjett, og
+    «Bekreft før deling» navngir filen før første forespørsel med den går.
+    Ingen bilder fra filer. `test:file-context` (CI) og `test:attach-desktop`
+    § 6 dekker det.
+  - **Nettsøk er én bryter** (2026-10-24, Emil: tre-trinns-knappen «lukket /
+    på forespørsel / alltid» var forvirrende; «slik ChatGPT gjør det»): av
+    eller på. På betyr at verktøyet ligger ved og modellen søker når
+    spørsmålet ber om det, rett ut eller underforstått — aldri fordi
+    dokumentet sier det (`WEB_HINT_ON` i `ai-chat.ts`). «Alltid» finnes ikke
+    lenger; `'ask'` lever videre bare for hurtigboblens egne handlinger.
 - [ ] Restene som gjør veikartet rent, alle små: **«Annoterte sider»-eksport**
   (fase 6), **«Kopier chat som Markdown»** (tankeboksen — variant 1, ingen ny
   knapp uten Emils UI-beslutning), og **Gemini-praksistesten** (fase 10) som

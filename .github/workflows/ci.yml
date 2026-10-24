@@ -163,6 +163,7 @@ jobs:
       # Earlier conversations attached as context (issue #46): the block, its
       # caps, and that a [SAMTALE n] tag is never read as a document source
       - run: npm run test:conversation-context
+      - run: npm run test:file-context
       - run: npm run build
       # Package for the host OS without publishing anything
       - run: npx electron-builder --publish never --config config/electron-builder.yml

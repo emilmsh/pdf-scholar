@@ -298,7 +298,9 @@ panel beside the document.
   listed in the side panel and open or save from there; a paperclip on a page opens its
   file. Only document, data and media types open; anything that could run is saved,
   never launched. In the browser extension, attachments download instead
-- Colour, thickness and opacity are set per tool and remembered between sessions
+- Colour, thickness and opacity are set per tool and remembered between sessions; your
+  own colours come from a colour wheel behind "+", in the selection menu and the toolbar's
+  tool menus alike
 - An optional name in settings fills the standard PDF author field on new annotations;
   left empty, they stay unsigned
 - An eraser removes whole strokes, or can be set to remove any kind of annotation
@@ -360,13 +362,19 @@ the claim came from.
   passage it came from — and an earlier conversation, about this paper or another, can be
   attached to a new question as context, chosen by you. A moved or renamed document keeps
   its conversations; old ones can be tidied in one go, and exported
+- One paperclip in the composer attaches context to a question: an earlier conversation,
+  an image, or a local file — a PDF or a text file (Markdown, CSV, JSON, LaTeX, BibTeX …) —
+  whose text goes along as notes beside the document. A badge counts what is attached and
+  the list shows it, each item removable; the open document stays the only source the
+  assistant cites
 - The assistant can open in its own window — the document keeps the whole screen, or a
   second monitor carries the chat. A citation click still goes to the passage in the
   window showing the document, and raises it
 - The answer text has its own size control (80–160 %), from the model menu or
   Ctrl+scroll over the panel — separate from the document's zoom
-- Optional web search, off by default: closed, on request, or always on (Anthropic and
-  OpenAI keys). LaTeX in answers is rendered
+- Optional web search, off by default: switched on, the assistant searches when the
+  question calls for it — outright or by implication — and never because the document
+  says so (Anthropic and OpenAI keys). LaTeX in answers is rendered
 - Providers: Anthropic (Claude, with native citations), OpenAI, Azure OpenAI,
   OpenRouter, Google Gemini, Grok (xAI), Mistral and Groq — one key field each, entered
   once — plus any OpenAI-compatible endpoint and local models via Ollama or LM Studio,

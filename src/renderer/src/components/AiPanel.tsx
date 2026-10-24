@@ -62,6 +62,9 @@ import {
 import { searchConversations, summarizeConversations } from '../../../shared/chat-history'
 import type { AttachedConversation } from '../../../shared/conversation-context'
 import { MAX_CHARS_EACH, attachedBlock, capTranscript, splitConversationTags, transcript } from '../../../shared/conversation-context'
+import { MAX_FILES, attachedFilesBlock, fileTokens } from '../../../shared/file-context'
+import type { AttachedFile } from '../../../shared/file-context'
+import { ATTACHABLE_ACCEPT, readAttachableFile } from '../attach-file'
 import { estimateTokens } from '../ai-retrieval'
 import ConversationPicker from './ConversationPicker'
 import { conversationMarkdown } from '../chat-export'
@@ -76,10 +79,10 @@ import type { AiSeed } from './AiQuickPopover'
 import {
   IconChevronDown,
   IconComment,
+  IconPaperclip,
   IconCopy,
   IconDetach,
   IconGlobe,
-  IconGlobeLive,
   IconGlobeOff,
   IconHistory,
   IconImage,
@@ -305,6 +308,63 @@ export default function AiPanel({
   const attachedRef = useRef(attached)
   attachedRef.current = attached
   const [pickerOpen, setPickerOpen] = useState(false)
+  /** Local files attached as context (shared/file-context.ts): read once
+   *  when picked, sent with every question until taken off, and — unlike the
+   *  conversations — not stored with the conversation: the text can be large
+   *  and the file is on disk already */
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
+  const attachedFilesRef = useRef(attachedFiles)
+  attachedFilesRef.current = attachedFiles
+  /** The paperclip's list (Emil, 2026-10-24): everything attached, and the
+   *  three ways to add. The chips used to sit in the text field. */
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false)
+  const [attachError, setAttachError] = useState<string | null>(null)
+  const docFileInputRef = useRef<HTMLInputElement>(null)
+  const attachMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!attachMenuOpen) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setAttachMenuOpen(false)
+      }
+    }
+    const onDown = (e: PointerEvent): void => {
+      const root = attachMenuRef.current
+      const target = e.target as Node
+      // The paperclip itself toggles; the file dialogs open from inside
+      if (root && !root.contains(target) && !(target instanceof Element && target.closest('.ai-attach-clip'))) {
+        setAttachMenuOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKey, true)
+    window.addEventListener('pointerdown', onDown, true)
+    return () => {
+      window.removeEventListener('keydown', onKey, true)
+      window.removeEventListener('pointerdown', onDown, true)
+    }
+  }, [attachMenuOpen])
+  const addAttachableFiles = useCallback(async (files: Iterable<File>) => {
+    setAttachError(null)
+    for (const file of files) {
+      if (attachedFilesRef.current.length >= MAX_FILES) {
+        setAttachError(t('ai.filesLimit', { max: String(MAX_FILES) }))
+        return
+      }
+      const result = await readAttachableFile(file)
+      if (!result.ok) {
+        setAttachError(
+          t(
+            result.error === 'ai-file-type' ? 'ai.fileType' : result.error === 'ai-file-no-text' ? 'ai.fileNoText' : 'ai.fileUnreadable',
+            { name: result.name }
+          )
+        )
+        continue
+      }
+      // The same name again replaces the earlier read (the file may have changed)
+      setAttachedFiles((l) => [...l.filter((f) => f.name !== result.name), { name: result.name, text: result.text }])
+    }
+  }, [])
   /** Per chip: roughly what it costs, or that it is gone (deleted since) */
   const [attachedInfo, setAttachedInfo] = useState<Record<string, { tokens: number; missing: boolean }>>({})
   useEffect(() => {
@@ -403,10 +463,26 @@ export default function AiPanel({
   /** Annotations staged for the next composer send (sidebar ✦): the block is
    *  fetched and appended at send time, shown as a removable chip until then */
   const [annotsStaged, setAnnotsStaged] = useState(false)
-  /** Composer globe: three web-search modes cycled by click. 'ask' is the
-   *  default — the tool is attached but nothing leaves the machine unless
-   *  the user's own message explicitly asks for a web lookup. */
-  const [webSearch, setWebSearch] = useState<AiWebSearchMode>('ask')
+  /** What the paperclip's badge counts: every chip the list shows */
+  const attachCount =
+    attached.length + attachedFiles.length + pendingImages.length + (stagedPages.length ? 1 : 0) + (annotsStaged ? 1 : 0)
+  // Something new landed (a snip, staged pages, a file, a conversation): show
+  // the list, so the attachment is SEEN to be there — the badge alone is a
+  // number, and a snip drawn on the page would otherwise vanish into it
+  const prevAttachCountRef = useRef(attachCount)
+  useEffect(() => {
+    if (attachCount > prevAttachCountRef.current) setAttachMenuOpen(true)
+    prevAttachCountRef.current = attachCount
+  }, [attachCount])
+  /** Composer globe: web search off or on (Emil, 2026-10-24 — the three-way
+   *  cycle «closed / on request / always» read as confusing). Off is the
+   *  default and sends no tool. On attaches the tool and lets the model
+   *  decide, the way ChatGPT does: it searches when the question asks for
+   *  it, outright or by implication, and not otherwise — and never because
+   *  the document says so (the hint in ai-chat.ts carries that guard). The
+   *  strict «only when the message asks» mode ('ask') lives on for the
+   *  one-click bubble, whose question the reader did not write. */
+  const [webSearch, setWebSearch] = useState<AiWebSearchMode>('off')
   const webSearchRef = useRef(webSearch)
   webSearchRef.current = webSearch
 
@@ -618,6 +694,10 @@ export default function AiPanel({
           )
         : null
       taggedRef.current = block?.tagged ?? []
+      // The attached files the same way: their own block, rebuilt from what
+      // is attached now, and its size taken off the document's budget too
+      const files = attachedFilesRef.current
+      const filesBlock = files.length ? attachedFilesBlock(files) : null
       // Above the model's context window the full text cannot ride along:
       // attach a BM25 excerpt picked for this conversation's questions instead
       // (ai-retrieval.ts). On the everyday path prep.excerpt is null and the
@@ -633,7 +713,7 @@ export default function AiPanel({
                 .map((m) => m.text)
                 .join('\n'),
               config.catalog,
-              block?.text.length ?? 0
+              (block?.text.length ?? 0) + (filesBlock?.text.length ?? 0)
             )
           : { doc: ensured.doc, excerpt: null }
         : null
@@ -655,7 +735,8 @@ export default function AiPanel({
           chatSystem() +
           (imagesOnly ? scannedPagesNote(shownPages) : '') +
           (prep?.excerpt && !imagesOnly ? excerptSystemNote() : '') +
-          (block?.text ?? ''),
+          (block?.text ?? '') +
+          (filesBlock?.text ?? ''),
         messages: history,
         document: imagesOnly || !prep ? null : { title: docTitle, text: prep.doc.text },
         webSearch: webSearchRef.current
@@ -1063,8 +1144,11 @@ export default function AiPanel({
   // message args, so cancelling loses nothing — the composer text and staged
   // attachments are untouched until the user says send. Every send that
   // actually happens is recorded, in every mode.
-  const [pendingSend, setPendingSend] = useState<{ run: () => void; others: AttachedConversation[] } | null>(null)
+  const [pendingSend, setPendingSend] = useState<{ run: () => void; others: AttachedConversation[]; files: string[] } | null>(null)
   const provider = config?.provider ?? null
+  /** Attached files the strip has already named in this conversation — a
+   *  file is new content on its way to the provider, asked about once */
+  const confirmedFilesRef = useRef(new Set<string>())
   // Attached conversations are content from OTHER documents: one whose
   // document has not gone to this provider yet is asked about the same way,
   // and the strip names it
@@ -1081,11 +1165,17 @@ export default function AiPanel({
       const others = provider
         ? attachedRef.current.filter((a) => a.docPath !== docPath && !isSharedWith(a.docPath, provider))
         : []
-      if (config?.access === 'confirm' && provider && (!isSharedWith(docPath, provider) || others.length > 0)) {
-        setPendingSend({ run, others })
+      const files = attachedFilesRef.current.map((f) => f.name).filter((n) => !confirmedFilesRef.current.has(n))
+      if (
+        config?.access === 'confirm' &&
+        provider &&
+        (!isSharedWith(docPath, provider) || others.length > 0 || files.length > 0)
+      ) {
+        setPendingSend({ run, others, files })
         return
       }
       markShared(attachedRef.current)
+      for (const n of files) confirmedFilesRef.current.add(n)
       run()
     },
     [config?.access, provider, docPath, markShared]
@@ -1096,6 +1186,7 @@ export default function AiPanel({
    *  bubble shows only the user's (editable) question. */
   const sendFromComposer = useCallback(() => {
     if (!input.trim() || busy) return
+    setAttachMenuOpen(false) // the list is for staging; the answer is what comes next
     stageOrRun(() => {
       const imgs = pendingImages
       setPendingImages([])
@@ -1184,6 +1275,133 @@ export default function AiPanel({
           )}
         </div>
       )}
+      {/* The paperclip's list: what is attached, each with its ×, and the
+          three ways to add. In the flow above the composer like the picker,
+          never over the answer. */}
+      {attachMenuOpen && !pickerOpen && (
+        <div className="ai-conv-picker ai-attach-menu" ref={attachMenuRef} role="dialog" aria-label={t('ai.attachMenuTitle')}>
+          <div className="ai-conv-picker-head">{t('ai.attachMenuTitle')}</div>
+          <p className="ai-conv-picker-note">{t('ai.attachMenuNote')}</p>
+          {annotsStaged || pendingImages.length > 0 || attached.length > 0 || attachedFiles.length > 0 ? (
+            <div className="ai-attach-row">
+              {/* Earlier conversations attached as context: they go with every
+                  question here until taken off — the chip IS the control */}
+              {attached.map((a) => {
+                const info = attachedInfo[`${a.docPath}\u0000${a.id}`]
+                return (
+                  <div
+                    key={`${a.docPath}\u0000${a.id}`}
+                    className={`ai-attach ai-attach-conv${info?.missing ? ' is-missing' : ''}`}
+                    title={[a.docName, `«${a.title}»`, info?.missing ? t('ai.attachedMissing') : info ? t('ai.attachedTokens', { tokens: String(info.tokens) }) : '']
+                      .filter(Boolean)
+                      .join('\n')}
+                  >
+                    <IconComment size={12} />
+                    <span className="ai-attach-conv-text">{a.docPath === docPath ? a.title : `${a.docName}: ${a.title}`}</span>
+                    <button
+                      className="ai-attach-x"
+                      title={t('ai.removeAttachedTip')}
+                      onClick={() => setAttached((l) => l.filter((x) => !(x.docPath === a.docPath && x.id === a.id)))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )
+              })}
+              {attachedFiles.map((f) => (
+                <div
+                  key={f.name}
+                  className="ai-attach ai-attach-conv"
+                  title={`${f.name}\n${t('ai.attachedTokens', { tokens: String(fileTokens(f)) })}${f.text.length > 40_000 ? t('ai.fileCut') : ''}`}
+                >
+                  <IconPaperclip size={12} />
+                  <span className="ai-attach-conv-text">{f.name}</span>
+                  <button
+                    className="ai-attach-x"
+                    title={t('ai.removeFileTip')}
+                    onClick={() => setAttachedFiles((l) => l.filter((x) => x.name !== f.name))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {/* Which pages are going along, in words — a row of thumbnails does
+                  not tell you whether page 7 or page 8 is in the request. */}
+              {stagedPages.length > 0 && (
+                <div className="ai-attach ai-attach-pages">
+                  {t('ai.pagesChip', { pages: pageListLabel(stagedPages) })}
+                  <button
+                    className="ai-attach-x"
+                    title={t('ai.removePagesTip')}
+                    onClick={() => {
+                      setStagedPages([])
+                      setPendingImages([])
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              {annotsStaged && (
+                <div className="ai-attach ai-attach-annots">
+                  <IconSparkle size={12} />
+                  {t('ai.annotsChip')}
+                  <button
+                    className="ai-attach-x"
+                    title={t('ai.removeAnnotsTip')}
+                    onClick={() => {
+                      setAnnotsStaged(false)
+                      // A pristine default question goes with it; edits are kept
+                      setInput((i) => (i === annotationsDefaultQuestion() ? '' : i))
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              {pendingImages.map((img, i) => (
+                <div className="ai-attach" key={i}>
+                  <img src={`data:${img.mediaType};base64,${img.dataBase64}`} alt={t('ai.imageAlt')} />
+                  <button
+                    className="ai-attach-x"
+                    title={t('ai.removeImageTip')}
+                    onClick={() => setPendingImages((l) => l.filter((_, j) => j !== i))}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="ai-attach-menu-empty">{t('ai.attachMenuEmpty')}</p>
+          )}
+          {attachError && <p className="ai-attach-menu-empty">{attachError}</p>}
+          <div className="ai-attach-menu-acts">
+            <button
+              className="btn-secondary"
+              title={t('ai.attachConvsTip')}
+              disabled={busy || !!pendingSend}
+              onClick={() => setPickerOpen(true)}
+            >
+              <IconComment size={14} />
+              {t('ai.attachMenuConv')}
+            </button>
+            <button
+              className="btn-secondary"
+              disabled={!visionOk}
+              title={visionOk ? t('ai.attachTip') : noVisionTip}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <IconImage size={14} />
+              {t('ai.attachMenuImage')}
+            </button>
+            <button className="btn-secondary" title={t('ai.attachFileTip')} onClick={() => docFileInputRef.current?.click()}>
+              <IconPaperclip size={14} />
+              {t('ai.attachMenuFile')}
+            </button>
+          </div>
+        </div>
+      )}
       {pickerOpen && (
         <ConversationPicker
           docPath={docPath}
@@ -1200,86 +1418,15 @@ export default function AiPanel({
       {/* ChatGPT-style field: the textarea and its controls live INSIDE one
           rounded surface — the buttons sit bottom-right, never beside it. */}
       <div className="ai-composer-field">
-        {(annotsStaged || pendingImages.length > 0 || attached.length > 0) && (
-          <div className="ai-attach-row">
-            {/* Earlier conversations attached as context: they go with every
-                question here until taken off — the chip IS the control */}
-            {attached.map((a) => {
-              const info = attachedInfo[`${a.docPath}\u0000${a.id}`]
-              return (
-                <div
-                  key={`${a.docPath}\u0000${a.id}`}
-                  className={`ai-attach ai-attach-conv${info?.missing ? ' is-missing' : ''}`}
-                  title={[a.docName, `«${a.title}»`, info?.missing ? t('ai.attachedMissing') : info ? t('ai.attachedTokens', { tokens: String(info.tokens) }) : '']
-                    .filter(Boolean)
-                    .join('\n')}
-                >
-                  <IconComment size={12} />
-                  <span className="ai-attach-conv-text">{a.docPath === docPath ? a.title : `${a.docName}: ${a.title}`}</span>
-                  <button
-                    className="ai-attach-x"
-                    title={t('ai.removeAttachedTip')}
-                    onClick={() => setAttached((l) => l.filter((x) => !(x.docPath === a.docPath && x.id === a.id)))}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )
-            })}
-            {/* Which pages are going along, in words — a row of thumbnails does
-                not tell you whether page 7 or page 8 is in the request. */}
-            {stagedPages.length > 0 && (
-              <div className="ai-attach ai-attach-pages">
-                {t('ai.pagesChip', { pages: pageListLabel(stagedPages) })}
-                <button
-                  className="ai-attach-x"
-                  title={t('ai.removePagesTip')}
-                  onClick={() => {
-                    setStagedPages([])
-                    setPendingImages([])
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-            {annotsStaged && (
-              <div className="ai-attach ai-attach-annots">
-                <IconSparkle size={12} />
-                {t('ai.annotsChip')}
-                <button
-                  className="ai-attach-x"
-                  title={t('ai.removeAnnotsTip')}
-                  onClick={() => {
-                    setAnnotsStaged(false)
-                    // A pristine default question goes with it; edits are kept
-                    setInput((i) => (i === annotationsDefaultQuestion() ? '' : i))
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            )}
-            {pendingImages.map((img, i) => (
-              <div className="ai-attach" key={i}>
-                <img src={`data:${img.mediaType};base64,${img.dataBase64}`} alt={t('ai.imageAlt')} />
-                <button
-                  className="ai-attach-x"
-                  title={t('ai.removeImageTip')}
-                  onClick={() => setPendingImages((l) => l.filter((_, j) => j !== i))}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* What is attached lives behind the paperclip now (the list above),
+            counted on the button — the field holds the question alone */}
         {pendingSend && (
           <div className="ai-confirm">
             <span>
               {t('ai.confirmChat', { name: receiverName })}
               {pendingSend.others.length > 0 &&
                 ` ${t('ai.confirmAttached', { names: [...new Set(pendingSend.others.map((a) => a.docName))].join(', ') })}`}
+              {pendingSend.files.length > 0 && ` ${t('ai.confirmFiles', { names: pendingSend.files.join(', ') })}`}
             </span>
             <div className="ai-confirm-actions">
               <button className="btn-secondary" onClick={() => setPendingSend(null)}>
@@ -1291,6 +1438,7 @@ export default function AiPanel({
                   const staged = pendingSend
                   setPendingSend(null)
                   markShared(attachedRef.current)
+                  for (const n of staged.files) confirmedFilesRef.current.add(n)
                   staged.run()
                 }}
               >
@@ -1340,36 +1488,37 @@ export default function AiPanel({
           />
           {config && PROVIDER_PROFILES[config.provider].webSearch && (
             <button
-              className={`ai-attach-add${webSearch === 'off' ? '' : ` ${webSearch}`}`}
-              title={t(
-                webSearch === 'on'
-                  ? 'ai.webSearchOnTip'
-                  : webSearch === 'ask'
-                    ? 'ai.webSearchAskTip'
-                    : 'ai.webSearchOffTip'
-              )}
-              onClick={() =>
-                setWebSearch((m) => (m === 'off' ? 'ask' : m === 'ask' ? 'on' : 'off'))
-              }
+              className={`ai-attach-add${webSearch === 'off' ? '' : ' on'}`}
+              title={t(webSearch === 'off' ? 'ai.webSearchOffTip' : 'ai.webSearchOnTip')}
+              aria-pressed={webSearch !== 'off'}
+              onClick={() => setWebSearch((m) => (m === 'off' ? 'on' : 'off'))}
             >
-              {webSearch === 'off' ? (
-                <IconGlobeOff size={16} />
-              ) : webSearch === 'on' ? (
-                <IconGlobeLive size={16} />
-              ) : (
-                <IconGlobe size={16} />
-              )}
+              {webSearch === 'off' ? <IconGlobeOff size={16} /> : <IconGlobe size={16} />}
             </button>
           )}
+          <input
+            ref={docFileInputRef}
+            type="file"
+            accept={ATTACHABLE_ACCEPT}
+            multiple
+            hidden
+            onChange={(e) => {
+              if (e.target.files) void addAttachableFiles([...e.target.files])
+              e.target.value = ''
+            }}
+          />
           <button
-            className={`ai-attach-add ai-attach-convs${attached.length ? ' is-on' : ''}`}
-            title={t('ai.attachConvsTip')}
-            aria-expanded={pickerOpen}
-            disabled={busy || !!pendingSend}
-            onClick={() => setPickerOpen((o) => !o)}
+            className={`ai-attach-add ai-attach-clip${attachCount ? ' is-on' : ''}`}
+            title={t('ai.attachBtnTip')}
+            aria-expanded={attachMenuOpen}
+            disabled={!!pendingSend}
+            onClick={() => {
+              setPickerOpen(false)
+              setAttachMenuOpen((o) => !o)
+            }}
           >
-            <IconComment size={15} />
-            <span>{t('ai.attachConvsBtn')}</span>
+            <IconPaperclip size={16} />
+            {attachCount > 0 && <span className="ai-attach-count">{attachCount}</span>}
           </button>
           {onRequestSnip && (
             <button
@@ -1381,14 +1530,6 @@ export default function AiPanel({
               <IconSnip size={16} />
             </button>
           )}
-          <button
-            className="ai-attach-add"
-            disabled={!visionOk}
-            title={visionOk ? t('ai.attachTip') : noVisionTip}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <IconImage size={16} />
-          </button>
           {busy ? (
             <button className="ai-send" title={t('ai.stopTip')} onClick={stop}>
               <IconStop size={15} />

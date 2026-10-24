@@ -44,9 +44,11 @@ import {
 import { bridge, isElectron, isExtension } from '../bridge'
 import { setWebTakeover, webTakeoverEnabled } from '../extension-takeover'
 import {
+  addCustomColor,
   annotTypeLabel,
   colorLabel,
   FREETEXT_COLORS,
+  hexToRgb,
   HIGHLIGHT_COLORS,
   MARKUP_TOOL_TYPES,
   PEN_COLORS,
@@ -59,6 +61,7 @@ import {
 } from '../annotations'
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
 import { renderSwatches, useCustomColors, withCustomColors } from './ColorSwatches'
+import { CustomColorPicker } from './SelectionMenu'
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
@@ -1265,6 +1268,14 @@ export default function Toolbar({
               onClick={() => onToolPrefChange(tool, { color: c.rgb })}
             />
           ))}
+          {/* The same «+» as the selection menu's rows: a pick is remembered
+              for every palette and becomes this tool's colour at once */}
+          <CustomColorPicker
+            onPick={(hex) => {
+              addCustomColor(hex)
+              onToolPrefChange(tool, { color: hexToRgb(hex) })
+            }}
+          />
         </div>
         <div className="theme-menu-label slider-label">
           {t('tb.width')}
@@ -1428,6 +1439,12 @@ export default function Toolbar({
                     </button>
                   )
                 )}
+                <CustomColorPicker
+                  onPick={(hex) => {
+                    addCustomColor(hex)
+                    onMarkupPrefChange(markupType, { color: hexToRgb(hex) })
+                  }}
+                />
               </div>
               <div className="theme-menu-label slider-label">
                 {t('tb.opacity')}

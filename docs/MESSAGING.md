@@ -360,7 +360,10 @@ kommentarene satt i en utvidet marg.
   surface may blur the two. Where a document already carries digital signatures
   the app reports them and states that it does not verify them.)*
 - Colour, thickness and opacity are set per tool and remembered between
-  sessions
+  sessions; your own colours come from a colour wheel behind «+», in the
+  selection menu and the toolbar's tool menus alike *(parity since
+  2026-10-24 — the wheel sat in the selection menu only, and the toolbar
+  offered the fixed row)*
 - Existing marks can be adjusted rather than redrawn: the ends of a highlight,
   the corner of a shape, text box or drawing
 - Comments in the margin: every note and comment as a visible card beside the
@@ -453,6 +456,15 @@ that.)*
   you. A document moved or renamed keeps its conversations; the library can
   tidy old ones in one go, and export them. *(The conversations of a
   password-protected document are stored without their images.)*
+- One paperclip in the composer attaches context to a question *(2026-10-24,
+  Emil's call — it replaced the «Samtaler» button and the chips that sat in
+  the text field)*: an earlier conversation, an image, or a local file — a
+  PDF or a text file (Markdown, CSV, JSON, LaTeX, BibTeX …) — whose text
+  goes along as notes beside the document. A badge counts what is attached
+  and the list shows it, each item removable. The open document stays the
+  only source the assistant cites *(a file's text rides in the same system
+  block as conversations, capped, and «Bekreft før deling» names it before
+  it leaves; PRIVACY.md states this)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
@@ -460,7 +472,11 @@ that.)*
 - The answer text has its own size control (80–160 %), separate from the
   document's zoom. *(README only — at listing length this is trivia.)*
 - Optional web search, off by default (Anthropic and OpenAI only — the toggle
-  does not appear elsewhere)
+  does not appear elsewhere). One switch since 2026-10-24: on means the tool
+  is there and the model searches when the question calls for it, outright or
+  by implication, and never because the document says so *(Emil: the earlier
+  three-way «closed / on request / always» read as confusing; «the way ChatGPT
+  does it» is the reference. Never claim "always searches".)*
 - LaTeX in answers is rendered
 - Providers: Anthropic (Claude), OpenAI, Azure OpenAI, OpenRouter, Google
   Gemini, Grok (xAI), Mistral and Groq — one key field each, entered once —

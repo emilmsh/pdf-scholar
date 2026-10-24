@@ -55,7 +55,13 @@ the **whole extractable text** of the document (for documents larger than the
 model's context window, an automatically chosen excerpt of the pages) — plus,
 depending on the action, the selected text, your question and the conversation
 so far, your annotations (for the annotations question), or images: a snipped
-region, or pages you attach so a scanned document can be read. Note that some
+region, or pages you attach so a scanned document can be read. What you attach
+with the composer's paperclip goes too: the text of an earlier conversation
+(never its images), and the text of a local file you choose — a PDF's
+extractable text, or a text file as it is — capped in size and sent with every
+question in that conversation until you take it off; with "Confirm before
+sharing" on, the strip names each file before the first request carrying it
+leaves. Note that some
 quick actions (Explain, Simplify, Critique, Find the reference,
 snip-to-explain) fire as soon as they are chosen — choosing the action **is**
 the request. The assistant labels what rides along (a "whole document" or
