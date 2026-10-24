@@ -156,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.71.0
+## What's new in this version (≤ 1 500 chars) — v0.71.1
 
 *(The Store last carried v0.61.0's notes, so this block covers what landed
 between — the headline items, not every release.)*
@@ -166,7 +166,7 @@ between — the headline items, not every release.)*
 • Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere, nothing is written into the file
 • The assistant reads scanned documents the same way, and keeps its conversations: the library lists them across documents, and an earlier one can be attached to a new question
 • A paperclip in the composer attaches a conversation, an image or a local file as context; web search is one switch, on or off
-• Your own colours from a colour wheel in the toolbar's tool menus too, kept until you replace them; Ctrl+N opens a file
+• Your own colours from a colour wheel in every tool menu, kept until you replace them; Ctrl+N opens a file
 • Sharp text at every zoom level, on every display scale
 • A text box can be re-set in another size after writing, and its menu opens beside the editor while the text tool is armed
 • A tab can be duplicated (Ctrl+Shift+K) for a second place in the same document
@@ -180,7 +180,7 @@ between — the headline items, not every release.)*
 • Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted, ingenting skrives inn i filen
 • Assistenten leser skannede dokumenter på samme måte, og tar vare på samtalene: biblioteket lister dem på tvers av dokumenter, og en tidligere samtale kan legges ved et nytt spørsmål
 • En binders i skrivefeltet legger ved en samtale, et bilde eller en lokal fil som kontekst; nettsøk er én bryter, av eller på
-• Egne farger fra et fargehjul også i verktøylinjens menyer, beholdt til du bytter dem ut; Ctrl+N åpner en fil
+• Egne farger fra et fargehjul i alle verktøymenyene, beholdt til du bytter dem ut; Ctrl+N åpner en fil
 • Skarp tekst ved alle zoomnivåer, på alle skjermskalaer
 • En tekstboks kan settes om i en annen størrelse etterpå, og menyen åpnes ved siden av redigeringen mens tekstverktøyet er valgt
 • En fane kan dupliseres (Ctrl+Shift+K) for et sted til i samme dokument
