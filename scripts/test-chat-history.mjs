@@ -340,5 +340,45 @@ console.log('\n10. the view: no text crosses, sort, filters, custom values, badg
   check('the badge counts per document', counts.get('/z.pdf') === 2 && counts.get('/a.pdf') === 1 && !counts.has('/none.pdf'))
 }
 
+{
+  // The Markdown export lists the passages an answer cites under it: a
+  // «[s. 6]» alone is unreadable without the PDF, and the export is read
+  // without it. The real renderer module, in the master language.
+  const E = await bundle(fileURLToPath(new URL('../src/renderer/src/chat-export.ts', import.meta.url)), 'export.mjs')
+  const long = 'ord '.repeat(400)
+  const cited = {
+    role: 'assistant',
+    parts: [
+      {
+        text: 'Kodingen er sinusformet. ',
+        citations: [
+          { kind: 'quote', pageNumber: 6, quote: 'we use sine and\n  cosine functions' },
+          { kind: 'quote', pageNumber: 6, quote: 'we use sine and cosine functions' },
+          { kind: 'web', url: 'https://example.org/a', title: 'A' }
+        ]
+      },
+      { text: 'Den er fast.', citations: [{ kind: 'char', start: 10, end: 40, citedText: 'fixed, not learned' }] },
+      { text: ' Lang.', citations: [{ kind: 'quote', pageNumber: 2, quote: long }] },
+      { text: ' Tom.', citations: [{ kind: 'quote', pageNumber: 3, quote: '   ' }] },
+      {
+        text: ' Fra før.',
+        citations: [{ kind: 'conversation', docPath: '/b.pdf', id: 'c1', docName: 'b.pdf', title: 'Tidligere' }]
+      }
+    ]
+  }
+  const md = E.libraryMarkdown(
+    [{ path: '/a.pdf', name: 'a.pdf', conversations: [{ id: 'x', title: 'Koding', createdAt: 1, updatedAt: 2, messages: [user('Hva?'), cited, answer('Uten kilder.')] }] }],
+    Date.UTC(2026, 9, 24)
+  )
+  const block = md.slice(md.indexOf('*Siterte passasjer:*'))
+  check('cited passages follow the answer that cites them', md.includes('[s. 6]') && md.indexOf('Kodingen er') < md.indexOf('*Siterte passasjer:*') && md.indexOf('*Siterte passasjer:*') < md.indexOf('Uten kilder.'))
+  check('a passage opens with the marker the text carries, whitespace folded', block.includes('- [s. 6] «we use sine and cosine functions»'))
+  check('…the same passage twice is listed once', block.split('we use sine').length === 2)
+  check('a character-offset citation with no document reads as [kilde]', block.includes('- [kilde] «fixed, not learned»'))
+  check('a long passage is cut with an ellipsis', block.includes('- [s. 2] «ord') && block.includes(' …»') && !block.includes(long.trim()))
+  check('web sources, conversations and empty quotes list no passage', !block.includes('example.org/a)»') && !block.includes('Tidligere»') && !block.includes('[s. 3]'))
+  check('an answer without citations gets no passage list', md.split('*Siterte passasjer:*').length === 2)
+}
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed')
 process.exit(failures ? 1 : 0)

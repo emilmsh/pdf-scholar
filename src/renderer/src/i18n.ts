@@ -1086,6 +1086,8 @@ const nb = {
   'ai.copyMdDone': 'Kopiert',
   'ai.exportYou': 'Du',
   'ai.exportAssistant': 'Assistent',
+  'ai.exportPassages': 'Siterte passasjer:',
+  'ai.exportPassage': '{marker} «{text}»',
 
   // Keyboard map (the Hurtigtaster dialog). Command labels are the same words
   // the toolbar and merknadslisten use for the same thing — a map that renames
@@ -2237,6 +2239,8 @@ const en: Dict = {
   'ai.copyMdDone': 'Copied',
   'ai.exportYou': 'You',
   'ai.exportAssistant': 'Assistant',
+  'ai.exportPassages': 'Cited passages:',
+  'ai.exportPassage': '{marker} “{text}”',
 
   'keys.title': 'Keyboard shortcuts',
   'keys.intro':

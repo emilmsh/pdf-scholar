@@ -982,6 +982,8 @@ export const zh: Dict = {
   'ai.copyMdDone': '已复制',
   'ai.exportYou': '您',
   'ai.exportAssistant': '助手',
+  'ai.exportPassages': '引用的段落：',
+  'ai.exportPassage': '{marker}“{text}”',
   'keys.title': '快捷键',
   'keys.intro':
     '键盘能做的所有操作及其绑定的按键。点击按键可替换，点击“+”可为命令添加第二个快捷键。',
