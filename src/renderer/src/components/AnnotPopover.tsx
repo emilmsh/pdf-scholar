@@ -90,7 +90,8 @@ export default function AnnotPopover({
   // double-clicking the grip restores the default shape.
   const { gripProps, style: sizeStyle } = useResizable(ref, size, onResize, {
     axis: 'both',
-    minW: 224,
+    // The stylesheet's width: the longest colour row on one line (app.css)
+    minW: 320,
     // Floor = the bubble's natural height (header + swatches + a usable comment
     // field + the delete row); below that the fixed rows would have to squeeze.
     minH: 178

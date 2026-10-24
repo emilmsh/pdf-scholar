@@ -64,7 +64,13 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
     husket farger ble raden bredere enn tekstboksens popover (248 px), og en
     flex-prikk krymper som standard — de faste ble ovaler, de huskede sto i
     sin egen innpakning og holdt bredden. `.color-row` har `flex-wrap: wrap`
-    og hver prikk `flex: none`. Tekstverktøyets egen meny i verktøylinja fikk
+    og hver prikk `flex: none` — og siden (Emil, samme kveld: «bedre om vi
+    ikke får overflow … heller litt bredere, uavhengig av om custom farger
+    ligger der») er popoveren 320 px og en verktøymeny med fargerad 324 px
+    (`.tool-menu:has(.color-row)`; håndens ene bryter beholder 218), nok til
+    fem palettfarger, tre huskede og «+» på én linje: 9 × 23 + 8 × 9 = 279,
+    pluss radens 16 og boblens egen innpadding. Bryting står igjen bare som
+    sikkerhetsnett. Tekstverktøyets egen meny i verktøylinja fikk
     også hjulet og de huskede fargene (popoveren for en tekstboks hadde dem).
     Og hjulet selv: Emil så «bare hex» — den 26 px fargeruta som åpner
     systemets fargedialog leste som enda en farge, ikke som en knapp. Den

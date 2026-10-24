@@ -4600,6 +4600,12 @@ html.pen-near .draw-layer {
   padding: 5px 8px 9px;
 }
 
+/* A tool menu with a colour row is as wide as the longest one on one line
+   (see .annot-popover); the hand's one-switch menu keeps the narrow width */
+.tool-menu:has(.color-row) {
+  min-width: 324px; /* 9 × 23 + 8 × 9 = 279, + the row's 16 + the menu's 24, + slack */
+}
+
 /* A swatch keeps its size: with three remembered colours the row outgrows a
    narrow menu, and a flex item shrinks by default — the fixed dots came out
    as ovals beside the remembered ones, which sit in a wrapper of their own
@@ -4709,7 +4715,13 @@ html.pen-near .draw-layer {
 .annot-popover {
   position: fixed;
   z-index: 61;
-  width: 248px;
+  /* Wide enough for the longest colour row on ONE line — five palette
+     swatches, three remembered ones and «+» (9 × 23 px + 8 × 9 px gaps, the
+     row's and the bubble's padding) — whether or not any colour is
+     remembered (Emil, 2026-10-24: a row that wraps only sometimes is worse
+     than a bubble that is always a little wider). useResizable's minW below
+     keeps a drag from making it narrower than that. */
+  width: 320px; /* 279 + 16 + 20, + slack */
   padding: 10px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
