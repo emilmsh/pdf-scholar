@@ -51,6 +51,9 @@ interface Props {
   onMoveToNewWindow(id: string, path: string): void
   /** Re-read the file from disk and remount the viewer (external updates) */
   onReload(id: string, path: string): void
+  /** «Dupliser fane» (issue #53): a second tab on this document, at the
+   *  place the first one stands. Also Ctrl+Shift+K, Edge's chord for it. */
+  onDuplicate(id: string): void
   /** Show this tab's file in the ACTIVE tab's second split column — the two-
    *  document split's main entry point; the tab itself stays open. On the
    *  active tab itself it means that document in both columns. */
@@ -84,6 +87,7 @@ export default function TabBar({
   onCloseMany,
   onMoveToNewWindow,
   onReload,
+  onDuplicate,
   onOpenInSplit
 }: Props): React.JSX.Element {
   useLang()
@@ -352,6 +356,15 @@ export default function TabBar({
           <button
             className="menu-item"
             onClick={() => {
+              onDuplicate(menu.tab.id)
+              setMenu(null)
+            }}
+          >
+            {t('tabs.duplicate')}
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
               onMoveToNewWindow(menu.tab.id, menu.tab.path)
               setMenu(null)
             }}
@@ -367,11 +380,10 @@ export default function TabBar({
           >
             {t('tabs.openInNewWindow')}
           </button>
-          {/* Two-document split: this file beside the ACTIVE tab's document
-              (tabs are unique per path, so another tab is always another
-              file). On the active tab itself: the document in both columns —
-              the same-file split's home now that 's' reopens whatever the
-              split held last. */}
+          {/* Two-document split: this file beside the ACTIVE tab's document.
+              On the active tab itself — or a duplicate of it, which shares
+              its path: the document in both columns, the same-file split's
+              home now that 's' reopens whatever the split held last. */}
           {activeId !== null && (
             <button
               className="menu-item"

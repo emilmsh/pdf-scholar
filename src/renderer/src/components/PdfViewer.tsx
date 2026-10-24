@@ -203,6 +203,7 @@ import { clamp } from '../clamp'
 import { useReadAloud } from '../hooks/useReadAloud'
 import { PANEL_DEFAULTS, PANEL_LS_KEY, usePanelWidths } from '../hooks/usePanelWidths'
 import { useUndoStack } from '../hooks/useUndoStack'
+import { useDevicePixelRatio } from '../hooks/useDevicePixelRatio'
 import { DEFAULT_SETTINGS } from '../../../shared/defaults'
 
 // openDocument/isPasswordException live in pdf-doc.ts, shared with the
@@ -324,6 +325,9 @@ export interface AnnotPatch {
    *  sent with re-measured `quads` — a wider face needs a wider box, and the
    *  measurement (freetextMinSize) is a canvas that only exists here. */
   font?: PdfStandardFont
+  /** freetext: re-set an existing box at another size in points (issue #53).
+   *  Sent with re-measured `quads` like `font`. */
+  fontSize?: number
   /** Note drag: replacement quads (engine gets quads[0] as the new rect) */
   quads?: PageRect[]
   /** Drag-move of an ink/line/arrow: replacement strokes.
@@ -408,6 +412,10 @@ interface Props {
   onChromeVisible(visible: boolean): void
   /** Unsaved-changes state (save model) — App needs it for close prompts */
   onDirtyChange(dirty: boolean): void
+  /** The path's draft was already on screen in this window when this viewer
+   *  opened — a duplicated tab (issue #53). Its marks load as always, but
+   *  without the «recovered from the previous session» word: nothing was. */
+  draftOnScreen?: boolean
   /** «Save a copy» wrote the current document (edits included) to `path` —
    *  App switches this tab over to the copy so work continues there */
   onSavedAs(path: string): void
@@ -523,6 +531,7 @@ export default function PdfViewer({
   onPresentationChange,
   onChromeVisible,
   onDirtyChange,
+  draftOnScreen = false,
   onSavedAs,
   onExternalSaveConflict,
   onClose,
@@ -2163,6 +2172,9 @@ export default function PdfViewer({
   const pagedRef = useRef(paged)
   pagedRef.current = paged
 
+  // Every page box on whole device pixels (issue #53): the layout re-runs
+  // when the window lands on a monitor of another scale
+  const devicePixelRatio = useDevicePixelRatio()
   const layout = useMemo(() => {
     if (sizes.length === 0 || scale <= 0 || containerWidth === 0) return null
     const lay = buildRows(
@@ -2177,14 +2189,15 @@ export default function PdfViewer({
         padBottom: PAD_BOTTOM,
         sidePad: SIDE_PAD,
         spreadGap: SPREAD_GAP,
+        devicePixelRatio,
         ...(pagedHeight > 0 ? { pagedHeight } : {})
       },
       coverPage
     )
     // A left-hand margin means the gutter sits BEFORE the pages: shift every
     // page right by the reserved width so the column has its space.
-    return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0)
-  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side, pagedHeight])
+    return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0, devicePixelRatio)
+  }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side, pagedHeight, devicePixelRatio])
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -3224,7 +3237,7 @@ export default function PdfViewer({
     void bridge.docIsDirty(payload.path).then((isDirty) => {
       if (stale || !isDirty) return
       setDirty(true)
-      showToast(t('viewer.recovered'))
+      if (!draftOnScreen) showToast(t('viewer.recovered'))
     })
     return () => {
       stale = true
@@ -3669,6 +3682,7 @@ export default function PdfViewer({
           color: patch.color,
           contents: patch.contents,
           font: patch.font,
+          fontSize: patch.fontSize,
           rect: markup ? undefined : reshapeQuads?.[0],
           quads: markup ? reshapeQuads : undefined,
           strokes: reshapeStrokes,
@@ -3683,7 +3697,15 @@ export default function PdfViewer({
         ctx.markDirty()
         ctx.emitChanged()
         // 'file' annots are painted by pdf.js from the file — refresh the canvas
-        if (wasFilePainted && (patch.color || patch.quads || patch.strokes || patch.translate)) {
+        if (
+          wasFilePainted &&
+          (patch.color ||
+            patch.quads ||
+            patch.strokes ||
+            patch.translate ||
+            patch.font !== undefined ||
+            patch.fontSize !== undefined)
+        ) {
           void ctx.reload(handle.pageNumber)
         }
       }
@@ -3841,6 +3863,7 @@ export default function PdfViewer({
       // buildAnnotation uses — otherwise undoing a font change on such a box
       // would omit the key and leave the new face in place.
       if (patch.font !== undefined) before.font = record.font ?? TEXT_FONT_DEFAULT
+      if (patch.fontSize !== undefined) before.fontSize = record.fontSize ?? FREETEXT_SIZE
       if (patch.quads) before.quads = record.quads
       if (patch.strokes) before.strokes = record.strokes
       if (patch.translate) before.translate = { dx: -patch.translate.dx, dy: -patch.translate.dy }
@@ -3977,6 +4000,12 @@ export default function PdfViewer({
     [persistAnnotation]
   )
 
+  /** The popover's clear-of rect for a mark — declared further down (it needs
+   *  the page elements); reached from the click handlers above it by ref */
+  const annotAvoidRectRef = useRef<
+    (pageNumber: number, record: PageAnnotation) => { top: number; bottom: number; left: number } | null
+  >(() => null)
+
   /** Re-open an existing FreeText box in the editor (double-click) so its text
    *  and box size can be changed after insertion; commit updates it in place. */
   const openFreeTextEditor = useCallback((pageNumber: number, record: PageAnnotation) => {
@@ -4014,15 +4043,28 @@ export default function PdfViewer({
       }
       // Clicking an existing text box with the tool armed edits that box —
       // stacking a fresh draft on top of it is never what the user meant.
+      // Its style menu opens beside it too (issue #53: with the tool armed the
+      // menu was unreachable — only a click with NO tool raised it): colour,
+      // face, size and delete apply to this box. A click in the menu commits
+      // the editor's text first (its blur), then restyles the committed box.
+      const doc = docOf(activePaneRef.current)
       const existing = annotationHitTest(
-        (docCtxFor(docOf(activePaneRef.current))?.annotsOf(pageNumber) ?? []).filter(
-          (a) => a.type === 'freetext'
-        ),
+        (docCtxFor(doc)?.annotsOf(pageNumber) ?? []).filter((a) => a.type === 'freetext'),
         x,
         y
       )
       if (existing) {
         openFreeTextEditor(pageNumber, existing)
+        setAnnotPopover({
+          x: clientX,
+          y: clientY,
+          // Through a ref: the measurer is declared further down, and this
+          // runs on a click, long after both exist
+          avoid: annotAvoidRectRef.current(pageNumber, existing),
+          pageNumber,
+          localId: existing.id,
+          doc
+        })
         return
       }
       setFreeTextDraft({
@@ -5118,6 +5160,7 @@ export default function PdfViewer({
     },
     [sizes]
   )
+  annotAvoidRectRef.current = annotAvoidRect
 
   /** The annotation records of the document a PANE shows: pane B resolves to
    *  its own session's map when it holds another file. Every DOM-driven
@@ -8232,6 +8275,21 @@ export default function PdfViewer({
                   annotPopover.pageNumber,
                   record,
                   { font, ...(w !== q.w || h !== q.h ? { quads: [{ ...q, w, h }] } : {}) },
+                  annotPopover.doc
+                )
+              }}
+              onFontSize={(fontSize) => {
+                // Same floor rule as the face: bigger letters need a bigger
+                // box, and a box the reader widened on purpose is not shrunk
+                const q = record.quads[0]
+                if (!q || fontSize === (record.fontSize ?? FREETEXT_SIZE)) return
+                const min = freetextMinSize(record.contents ?? '', fontSize, q.w, record.font)
+                const w = Math.max(q.w, min.w)
+                const h = Math.max(q.h, min.h)
+                changeAnnotation(
+                  annotPopover.pageNumber,
+                  record,
+                  { fontSize, ...(w !== q.w || h !== q.h ? { quads: [{ ...q, w, h }] } : {}) },
                   annotPopover.doc
                 )
               }}

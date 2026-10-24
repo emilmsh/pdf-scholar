@@ -111,9 +111,61 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
   verktøylinja som ikon, «Innhold» mistet etiketten (panelet har fire faner,
   ikke bare innhold), fanene kommer tilbake sammen med verktøylinja i
   fullskjerm, og en chevron i enden lister alle faner fra tre og oppover.
+- [x] **Tekstboksens størrelse etterpå, og menyen med verktøyet armert**
+  (issue #53 punkt 2, levert 2026-10-23): skriftstørrelsen kunne bare velges
+  for NESTE boks — boksens egen meny hadde skrift og fet/kursiv, men ingen
+  glider. Nå har den den samme glideren som tekstverktøyets meny, og en
+  endring setter DENNE boksen om (boksen vokser til bokstavene, skriften
+  beholdes; samme gulvregel som skriftbyttet). `fontSize` reiser som `font`:
+  patch → `ModifyAnnotationRequest` → modellens `fontSize` i EmbedPDF, /DA i
+  appenderen — og BEGGE motorene fikk samtidig ansiktet lest tilbake fra /DA
+  (`readFreeTextFace` i `pdfium-annot-ops.ts`, `fontOfRes` i appenderen):
+  modellen PDFium gir tilbake for en eksisterende boks bærer ikke noe ansikt,
+  så HVER gjentegning (en omfarging, en flytting, nå en størrelse) satte en
+  Courier-boks tilbake i Helvetica mens /DA fortsatt sa Courier — målt
+  2026-10-23 med en sonde gjennom motoren; appenderen slapp i tillegg et
+  skriftbytte på gulvet. Og med tekstverktøyet armert åpner
+  et klikk på en eksisterende boks menyen VED SIDEN AV redigeringen (før: bare
+  redigeringen; menyen kom kun av et klikk uten verktøy) — et klikk i menyen
+  lagrer teksten først (redigeringens blur) og setter så boksen om.
+  `test:engine` (størrelse etter skrift, i /DA), `test:appender` (skrift +
+  størrelse i én patch, fargen beholdt, utseendet satt i Times 20) og
+  `test:annot-edit` § 4–5 (glideren dobler bokstavene på siden, menyen sier
+  24 pt, skriften overlever, boksen vokser; armert verktøy gir redigering OG
+  meny) dekker det. Edges rad (størrelse, fet, kursiv) finnes dermed i begge
+  menyer; verktøylinjens meny gjelder fortsatt neste boks.
+- [x] **Skarp tekst ved alle zoomnivåer** (issue #53 punkt 1, levert
+  2026-10-23): en leser så teksten «uskarp» ved de fleste zoomnivåer, og ±1 %
+  kurerte det — Edge hadde det ikke. Årsaken var subpiksel-resampling av
+  lerretet: sidene lå på brøkdels-piksler (sentrert ved (bredde − side)/2, og
+  595,28 CSS-px er 892,9 enhetspiksler ved 1,5×), bitmapet var `floor(bredde ×
+  dpr)` og ble strukket over boksen, og den adaptive kontrolleren kunne velge
+  en tetthet under skjermens (1,12 på 1,25) etter hva gjennomstrømmings-
+  anslaget tilfeldigvis leste — derav «ikke konsekvent». Nå snapper layouten
+  (`buildRows`, `devicePixelRatio` i opsjonene) hver kant, hvert spor og
+  summen til hele enhetspiksler, `PdfPage` dimensjonerer bitmapet fra den
+  snappede boksen og mapper viewporten på det med render-transformen, og
+  kontrolleren går i trinn (1, 1,25, 1,5, 2, 3). Målt i nettforhåndsvisningen
+  ved 1,5×: 100 % gikk fra 321,78/892,9 enhetspiksler til 322/893 = bitmapet,
+  115 % og 132 % like hele. pdf.js' egen viewer gjør det samme med
+  `roundToDivide`. `test:rotation` § 9 dekker aritmetikken.
+- [x] **«Dupliser fane»** (issue #53, levert 2026-10-23): en fane til på
+  samme dokument, rett etter kilden og på siden den sto på — som en nettlesers
+  duplisering (fanemenyen og Ctrl+Shift+K, Edges tastekombinasjon). Hva en
+  fane husker er sted og zoom å gå tilbake til; delt visning er fortsatt
+  stedet for å SAMMENLIGNE. Blokkeringen fra august (under) var alt betalt av
+  to-dokument-splitten: `docRegistry` teller visningene foran hovedprosessens
+  sett, den lokale dokumentbussen bærer en skriving fra den ene fanen til den
+  andre, og utkastet er stiens — skitten i én er skitten i begge, og å lukke
+  én spør ingenting så lenge den andre står (`closeTabAwait` sjekker
+  tellingen). Det som faktisk gjensto: sti-oppslagene i `App.tsx` som fant ÉN
+  fane per sti (`tabsOn` gir alle, den aktive først), og at kopien laster
+  utkastet uten å kalle det «gjenopprettet». Økten folder duplikater tilbake
+  til én fane ved omstart (`session.ts` holder én per sti) — bevisst, til noen
+  savner det. `test:tab-duplicate` dekker det.
 - ~~**Kopi av samme dokument i en ny FANE**~~ — **sløyfet (Emil 2026-08-09)**,
-  etter at kostnaden ble kartlagt. Bevaringsverdig fordi forslaget er naturlig
-  og kommer igjen. Ideen var å gjenskape delt visning med to faner i stedet for
+  etter at kostnaden ble kartlagt; **levert likevel 2026-10-23** (over), da
+  splitten hadde betalt den. Ideen var å gjenskape delt visning med to faner i stedet for
   to paneler, live-synket. Det virker for et nytt VINDU fordi vinduet er
   hovedprosessens regnskapsenhet — `openDocs` er nøklet på webContents, og
   varslingen hopper over avsenderen. To faner deler ett webContents og er

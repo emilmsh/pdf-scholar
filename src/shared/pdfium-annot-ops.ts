@@ -385,6 +385,56 @@ export function bakeNoteAP(
   return ok === true
 }
 
+/** The Standard-14 face a FreeText's /DA names, or undefined when it names
+ *  one we cannot place (another app's resource name, no /DA at all).
+ *
+ *  Needed because the model PDFium hands back for an existing box carries NO
+ *  face: every update regenerated the appearance from that model, and a
+ *  Courier box recoloured, moved or re-sized (issue #53) came back in
+ *  Helvetica while its own /DA still said Courier. PDFium writes the face it
+ *  was given as `/FXF_<BaseFont>` (`/Helv` for the default), so the base
+ *  name is right there to read back. */
+export function readFreeTextFace(
+  open: OpenDoc,
+  pageIndex: number,
+  id: number
+): PdfStandardFont | undefined {
+  const { engine, docId } = open
+  const da = withPageHandle(engine, docId, pageIndex, (pagePtr, raw) =>
+    withAnnotByObjNum(pagePtr, raw, id, (annotPtr) => {
+      const bytes = raw.FPDFAnnot_GetStringValue(annotPtr, 'DA', 0, 0)
+      if (bytes <= 2) return '' // empty or absent (2 = bare terminator)
+      const bufPtr = raw.pdfium.wasmExports.malloc(bytes)
+      try {
+        raw.FPDFAnnot_GetStringValue(annotPtr, 'DA', bufPtr, bytes)
+        return raw.pdfium.UTF16ToString(bufPtr)
+      } finally {
+        raw.pdfium.wasmExports.free(bufPtr)
+      }
+    })
+  )
+  const m = /\/(?:FXF_)?([A-Za-z-]+)\s+[\d.]+\s+Tf/.exec(da ?? '')
+  return m ? FACE_BY_BASE_NAME[m[1]] : undefined
+}
+
+/** /BaseFont (and PDFium's resource names) → PdfStandardFont. The enum's own
+ *  order: Courier 0–3, Helvetica 4–7, Times 8–11. */
+const FACE_BY_BASE_NAME: Record<string, PdfStandardFont> = {
+  Courier: 0,
+  'Courier-Bold': 1,
+  'Courier-BoldOblique': 2,
+  'Courier-Oblique': 3,
+  Helvetica: 4,
+  Helv: 4,
+  'Helvetica-Bold': 5,
+  'Helvetica-BoldOblique': 6,
+  'Helvetica-Oblique': 7,
+  'Times-Roman': 8,
+  'Times-Bold': 9,
+  'Times-BoldItalic': 10,
+  'Times-Italic': 11
+} as Record<string, PdfStandardFont>
+
 /** Pressures stored on an Ink annotation, or null when it never had any. */
 export function readInkPressures(
   open: OpenDoc,
@@ -616,8 +666,18 @@ export function updateOn(open: OpenDoc, req: ModifyAnnotationRequest): Promise<A
     // regenerates the appearance from the model below — so PDFium writes the
     // new face the way it wrote the old one, with no font data embedded. Guarded
     // on the subtype because fontFamily is meaningless on every other one.
-    if (req.font !== undefined && m.type === PdfAnnotationSubtype.FREETEXT) {
-      ;(m as { fontFamily?: PdfStandardFont }).fontFamily = req.font
+    if (m.type === PdfAnnotationSubtype.FREETEXT) {
+      // Any update regenerates the appearance from the model, and the model
+      // read back carries no face — so a patch that does not set one must
+      // carry the box's own over, read from its /DA (see readFreeTextFace)
+      const face = req.font !== undefined ? req.font : readFreeTextFace(open, req.pageIndex, req.id)
+      if (face !== undefined) (m as { fontFamily?: PdfStandardFont }).fontFamily = face
+    }
+    // The size the same way (issue #53): the model's fontSize is what
+    // buildAnnotation set at create time, and the regenerated appearance
+    // lays the words out at the new size in the box the caller re-measured
+    if (req.fontSize !== undefined && m.type === PdfAnnotationSubtype.FREETEXT) {
+      ;(m as { fontSize?: number }).fontSize = req.fontSize
     }
     if (req.rect && m.type !== PdfAnnotationSubtype.LINE) m.rect = toRect(req.rect)
     if (req.translate) {

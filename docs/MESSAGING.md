@@ -192,7 +192,11 @@ carries no picture of its own.)*
   the tabs it had at the next launch, each document read only when its tab is
   first shown, so a long session costs nothing at startup *([issue #29](https://github.com/emilmsh/pdf-scholar/issues/29);
   the browser extension has no tab strip of its own — there the browser pins
-  and restores its tabs)*. A tab drags like a file: into another PDF Scholar window,
+  and restores its tabs)*. A tab can be duplicated — «Dupliser fane» in the tab
+  menu, or Ctrl+Shift+K — for a second tab on the same document, on the page
+  the first one stands on; a mark made in either shows in both *([issue #53](https://github.com/emilmsh/pdf-scholar/issues/53),
+  a reader's Edge habit; in the extension the browser duplicates its own tab)*.
+  A tab drags like a file: into another PDF Scholar window,
   or into anything that takes a PDF — a browser's upload field, an e-mail, a
   chat, a folder. «Flytt til nytt vindu» in the tab menu tears it into a
   window of its own *(2026-09-17, Emil's ask: dragging a tab into another
@@ -341,7 +345,10 @@ kommentarene satt i en utvidet marg.
 - With a stylus, the pen draws while a finger scrolls and zooms; pen pressure
   varies the line width **(beta)** and is preserved in the saved file
 - The text tool uses the standard PDF typefaces — Helvetica, Times and Courier,
-  with bold and italic — chosen before typing or changed on an existing box.
+  with bold and italic — and a size, chosen before typing or changed on an
+  existing box *(the size on an existing box since [issue #53](https://github.com/emilmsh/pdf-scholar/issues/53), 2026-10-23;
+  before, it was a choice for the next box only. With the text tool armed, a
+  click on a box opens its menu beside the editor, as Edge does)*.
   Nothing is embedded in the file; the text remains searchable and renders
   identically in other readers. (Claim the fonts, never "any font": a typeface
   outside the standard fourteen would have to travel inside the document, and
@@ -402,6 +409,16 @@ that.)*
   discuss it, ranked — stepped through with the same arrows as word hits,
   with the list kept open, since these are passages rather than exact
   matches. This mode uses the assistant's key
+- Scanned pages are searched too *(v0.69, 2026-10-23)*: a page that is only
+  a picture of text — a scan, a reprint, a photocopied chapter — is read by
+  text recognition on your own computer, and from then on its words can be
+  found, selected, copied, marked and asked about like any other page's.
+  The pages on screen are read first; a search reads the rest and shows the
+  hits as they come. Nothing is sent anywhere for this and nothing is written
+  into the file; the models cover English, Norwegian and Simplified Chinese.
+  *(Say "read on your computer", never "OCR" alone on a reader-facing surface;
+  and never promise a perfect read — now and then two short words come out
+  joined. The frame that carries this is `search_scan`.)*
 
 ### 5. The assistant
 
@@ -422,8 +439,20 @@ that.)*
   cropping in general; PRIVACY.md states the sending rules and copy must not
   exceed it.)*
 - Questions about your own annotations ("summarize what I've highlighted")
-- Scanned documents are identified as such rather than answered about blindly;
-  a page range can be attached as images instead
+- A scanned document is read the same way *(v0.69)*: the assistant gets the
+  recognised text of the whole document, with clickable citations like any
+  other PDF, instead of only the pages you attach as images — and the panel
+  says so while the pages are being read. *(Until 2026-10-23 the claim was
+  "identified as such rather than answered about blindly"; that sentence is
+  now false and must not survive anywhere.)*
+- Conversations are kept *(issue #46, 2026-10-23)*: every conversation is
+  stored with its document, the library's «Conversations» view lists them
+  across documents — searchable, sorted and filtered, each citation chip
+  opening the passage it came from — and an earlier conversation, about this
+  paper or another, can be attached to a new question as context, chosen by
+  you. A document moved or renamed keeps its conversations; the library can
+  tidy old ones in one go, and export them. *(The conversations of a
+  password-protected document are stored without their images.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
