@@ -437,6 +437,21 @@ const foreignNote = (() => {
     })
     check('textfont: re-set an existing box', 'ok' in changed,
       'error' in changed ? changed.error : '')
+    // …and at another SIZE (issue #53): the size used to be a choice for the
+    // next box only. Sent alone, after the face — the face must survive it.
+    const sized = await updateAnnotation({
+      path: FFILE, pageIndex: 0, id: f3.id, fontSize: 20
+    })
+    check('textfont: re-set an existing box at another size', 'ok' in sized,
+      'error' in sized ? sized.error : '')
+    // …and recoloured, which also regenerates the appearance from the model.
+    // The model read back carries no face, so until 2026-10-23 THIS call set
+    // a Courier box back in Helvetica while /DA still said Courier.
+    const recoloured = await updateAnnotation({
+      path: FFILE, pageIndex: 0, id: f3.id, color: [0.5, 0, 0]
+    })
+    check('textfont: recolour the re-set box', 'ok' in recoloured,
+      'error' in recoloured ? recoloured.error : '')
   }
   await flushAnnotations(FFILE)
 
@@ -479,6 +494,9 @@ const foreignNote = (() => {
   const daText3 = da3 && !da3.isNull() ? da3.asString() : ''
   check('textfont: the re-set box names the NEW face', /Cour/i.test(daText3), daText3 || 'no /DA')
   check('textfont: and no longer the old one', !/Helv/i.test(daText3), daText3 || 'no /DA')
+  check('textfont: /DA carries the new size (20 pt), the face still Courier through size AND colour',
+    /\b20(\.0+)?\s+Tf/.test(daText3) && /Cour/i.test(daText3) && /\.5\d*\s+0\s+0\s+rg/.test(daText3),
+    daText3 || 'no /DA')
   const c3 = o3?.get('Contents')
   check('textfont: re-setting kept the words',
     !!c3 && !c3.isNull() && c3.asString() === 'Skrevet i Helvetica',

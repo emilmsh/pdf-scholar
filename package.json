@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.69.0",
+  "version": "0.70.0",
   "description": "A PDF reader and annotator for Windows and macOS, built for research",
   "main": "out/main/index.js",
   "private": true,
@@ -73,6 +73,7 @@
     "test:windows": "node scripts/test-multiwindow.mjs",
     "test:split-docs": "node scripts/test-split-docs.mjs",
     "test:tab-drag": "node scripts/test-tab-drag.mjs",
+    "test:tab-duplicate": "node scripts/test-tab-duplicate.mjs",
     "test:assistant": "node scripts/test-assistant-window.mjs",
     "test:torn-read": "node scripts/test-torn-read.mjs",
     "test:disk-reload": "node scripts/test-disk-reload.mjs",

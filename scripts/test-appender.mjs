@@ -257,10 +257,29 @@ for (const objectStreams of [false, true]) {
     }
     const ncol = await updateAnnotation({ path: FILE, pageIndex: 1, id: ids.note, color: [0.44, 0.71, 1] })
     check('recolour note', 'ok' in ncol, 'error' in ncol ? ncol.error : '')
+    // A text box re-set in another face AND size (issue #53), in one patch:
+    // /DA carries both and keeps the colour it had, and the regenerated
+    // appearance is set in that face at that size — before this the appender
+    // dropped a face change and every regeneration fell back to Helvetica.
+    // 8 = Times-Roman in PdfStandardFont.
+    const resized = await updateAnnotation({ path: FILE, pageIndex: 1, id: ids.freetext, font: 8, fontSize: 20 })
+    check('re-set freetext face + size', 'ok' in resized, 'error' in resized ? resized.error : '')
 
     const { pdf, out } = mupdfAnnots(FILE, 1)
     const byId = new Map(out.map((a) => [a.id, a]))
     check('square is gone (mupdf)', !byId.has(ids.square))
+    {
+      const ft = byId.get(ids.freetext)
+      const obj = ft?.annot.getObject()
+      const da = obj?.get('DA')
+      const daText = da && !da.isNull() ? da.asString() : ''
+      check('freetext /DA names Times at 20 pt and keeps its colour',
+        /\/Times\s+20\s+Tf/.test(daText) && /0\.11\s+0\.11\s+0\.13\s+rg/.test(daText), daText || 'no /DA')
+      const ap = obj?.get('AP')?.get('N')
+      const apText = ap && !ap.isNull() ? ap.readStream().asString() : ''
+      check('…and the regenerated appearance is set in Times at 20 pt',
+        /\/Times\s+20\s+Tf/.test(apText) && /Tj|TJ/.test(apText), `${apText.length} bytes`)
+    }
     const hl = byId.get(ids.highlight)
     const rgb = hl ? Array.from(hl.annot.getColor(), (v) => Math.round(v * 255)).join(',') : 'missing'
     check('highlight recolored to 112,181,255', rgb === '112,181,255', rgb)

@@ -27,6 +27,16 @@ const SEED_PX_PER_MS = 250_000
 /** Learned rasterisation throughput, device pixels per millisecond (EWMA). */
 let throughput = SEED_PX_PER_MS
 
+/** The densities a page may be rastered at BELOW the display's own, when the
+ *  budget forces it. Whole steps, not the continuous value the budget
+ *  arithmetic yields (issue #53): a bitmap at 1.12× on a 1.25× screen is
+ *  resampled at every pixel, and whether a page came out soft depended on
+ *  what the throughput estimate happened to read at that moment — the
+ *  «fuzzy, but not consistently» half of the report. A step is at least
+ *  stable from one raster to the next; only the display's own density is
+ *  pixel-exact, which is why the budget check prefers it outright. */
+const DPR_STEPS = [1, 1.25, 1.5, 2, 3]
+
 // Concurrent renders share the main thread, so one render's wall-clock among
 // others says nothing about throughput. A BATCH does: from the first render
 // starting with none in flight to the last one ending, the pixels of all of
@@ -55,8 +65,12 @@ export function chooseRenderDpr(cssPixels: number, targetDpr: number): number {
   if (cssPixels <= 0) return targetDpr
   const budgetPixels = RENDER_BUDGET_MS * throughput // device px affordable in budget
   const budgetDpr = Math.sqrt(budgetPixels / cssPixels) // device px scale with dpr²
-  const nativeFloor = Math.min(1, targetDpr)
-  return Math.min(targetDpr, Math.max(budgetDpr, nativeFloor))
+  if (budgetDpr >= targetDpr) return targetDpr
+  // Over budget at full density: the largest step that fits, never above the
+  // display and never below native
+  let best = Math.min(1, targetDpr)
+  for (const step of DPR_STEPS) if (step < targetDpr && step <= budgetDpr && step > best) best = step
+  return best
 }
 
 /** Mark the start of a page raster (opens a batch when none is in flight). */

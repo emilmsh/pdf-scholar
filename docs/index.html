@@ -397,6 +397,22 @@
 
   <section class="feature">
     <div class="body">
+      <h2>Scanned pages have text</h2>
+      <p>
+        A page that is only a picture of text — a scan, a reprint, a photocopied chapter —
+        is read by text recognition on your own computer. From then on its words can be
+        found, selected, copied, marked and asked about like any other page's.
+      </p>
+      <ul class="points">
+        <li>The pages on screen are read first; a search reads the rest and shows the hits as they come.</li>
+        <li>Nothing is sent anywhere for this, and nothing is written into the file. The read is not perfect: now and then two short words come out joined.</li>
+      </ul>
+    </div>
+    <img class="shot" src="screenshots/search_scan.png" alt="Search in a scanned document: the pages read on this computer, every hit marked on the scan.">
+  </section>
+
+  <section class="feature">
+    <div class="body">
       <h2>An assistant that cites its sources</h2>
       <p>
         Optional, and it runs on your own API key — or on your ChatGPT plan. Each claim carries a reference, and
@@ -406,6 +422,8 @@
         <li>Structured article summaries: research question, method, data, findings, limitations.</li>
         <li>A figure or table can be cropped into the chat and asked about.</li>
         <li>Questions about your own annotations — <i>“summarize what I've highlighted”</i>.</li>
+        <li>A scanned document is read the same way: the assistant gets the text recognised on your computer, with clickable citations, instead of only pages attached as images.</li>
+        <li>Conversations are kept with their document and listed across documents in the library, searchable; an earlier conversation — about this paper or another — can be attached to a new question as context.</li>
         <li>The assistant can open in its own window, so the document keeps the whole screen; a citation click still goes to the passage in the window showing the document.</li>
         <li>Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq, one key field each — or any OpenAI-compatible endpoint and local models via Ollama or LM Studio, with no key. Each answer reports the provider's token count.</li>
         <li>In the desktop app, sign in with ChatGPT Plus or Pro and use the plan's allowance instead of an API key — an unofficial route OpenAI allows today, under ChatGPT's terms.</li>

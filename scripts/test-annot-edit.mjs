@@ -138,7 +138,8 @@ const ui = {
         w: Math.round(r.width), h: Math.round(r.height),
         font: getComputedStyle(el).fontFamily,
         weight: getComputedStyle(el).fontWeight,
-        style: getComputedStyle(el).fontStyle
+        style: getComputedStyle(el).fontStyle,
+        size: parseFloat(getComputedStyle(el).fontSize)
       };
     });
   },
@@ -460,6 +461,76 @@ try {
   check('Ctrl+Z puts the box back',
     textUndone[0] && Math.abs(textUndone[0].w - moved[0].w) <= 4,
     `${grown[0]?.w}px -> ${textUndone[0]?.w}px`)
+
+  // ---- 4. the text box's SIZE after writing (issue #53) ----
+  //
+  // The size used to be a choice for the NEXT box only: the box's own menu
+  // had the face and the weight, but no slider. Now it has the one the text
+  // tool's menu has, and a change re-sets THIS box — face kept, box grown to
+  // fit the bigger letters.
+  const sizeBefore = await evalIn(A, `
+    const el = ui.page().querySelector('.annot-freetext');
+    await ui.selectAt(el, 0.5, 0.5);
+    const range = document.querySelector('.annot-popover .font-size-range');
+    if (!range) throw new Error('no size slider in the text box menu');
+    return { box: ui.textBoxes()[0], slider: Number(range.value) };
+  `)
+  check('the box menu has a size slider, at the box’s own size',
+    sizeBefore.slider === 12, `slider at ${sizeBefore.slider}`)
+  const sizeAfter = await evalIn(A, `
+    const range = document.querySelector('.annot-popover .font-size-range');
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+    set.call(range, '36');
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+    range.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle(1500);
+    const out = document.querySelector('.annot-popover .slider-label output');
+    return { box: ui.textBoxes()[0], label: out ? out.textContent : null };
+  `)
+  check('moving it to 36 pt triples the letters on the page',
+    Math.abs(sizeAfter.box.size / sizeBefore.box.size - 3) < 0.1,
+    `${sizeBefore.box.size}px -> ${sizeAfter.box.size}px`)
+  check('…the menu says so', sizeAfter.label === '36 pt', String(sizeAfter.label))
+  check('…the face survives the size change', /Times/i.test(sizeAfter.box.font), sizeAfter.box.font)
+  // The words re-wrap inside the width the box has (the floor measures at
+  // that width, like the corner handles) and the box grows DOWN to hold the
+  // lines: at 36 pt the 48 pt default box cannot, so it must be taller now
+  check('…and the box grew to fit the lines', sizeAfter.box.h > sizeBefore.box.h && sizeAfter.box.w === sizeBefore.box.w,
+    `${sizeBefore.box.w}×${sizeBefore.box.h}px -> ${sizeAfter.box.w}×${sizeAfter.box.h}px`)
+
+  // ---- 5. the box menu with the text tool ARMED (issue #53) ----
+  //
+  // Before: with the tool armed, a click on an existing box opened the editor
+  // and nothing else; the menu came only from a click with no tool at all.
+  const armed = await evalIn(A, `
+    await ui.selectAt(ui.page(), 0.95, 0.95); // a blank spot: closes the menu
+    if (document.querySelector('.annot-popover')) throw new Error('the menu did not close');
+    const b = btn('Tekst');
+    if (!b) throw new Error('no text tool button');
+    if (!b.classList.contains('is-active')) click(b);
+    await settle(300);
+    const el = ui.page().querySelector('.annot-freetext');
+    const r = el.getBoundingClientRect();
+    const layer = ui.page().querySelector('.draw-layer');
+    if (!layer) throw new Error('the text tool did not arm');
+    layer.dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, pointerId: 62, isPrimary: true, button: 0, buttons: 1,
+      clientX: Math.round(r.left + r.width / 2), clientY: Math.round(r.top + r.height / 2)
+    }));
+    await settle(600);
+    const editor = document.querySelector('.freetext-editor');
+    const out = {
+      editor: !!editor, text: editor ? editor.value : null,
+      menu: !!document.querySelector('.annot-popover'),
+      slider: !!document.querySelector('.annot-popover .font-size-range')
+    };
+    if (editor) editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle(300);
+    return out;
+  `)
+  check('with the text tool armed, a click on the box opens the editor on its text',
+    armed.editor && armed.text === 'Tekst i valgt skrift', JSON.stringify(armed))
+  check('…and the box menu beside it, size slider included', armed.menu && armed.slider, JSON.stringify(armed))
 } catch (err) {
   check('the run completed', false, err instanceof Error ? err.message : String(err))
   const log = app.log()

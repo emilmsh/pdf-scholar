@@ -61,7 +61,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync, rmSync } from 'node
 import { join, resolve, dirname } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import {
   cdp,
   openSocket,
@@ -71,6 +71,7 @@ import {
   sleep,
   electronBinary
 } from './lib/cdp.mjs'
+import { scanPdf } from './lib/scan-pdf.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
@@ -96,6 +97,10 @@ const DEMO_CANDIDATES = [
 ].filter(Boolean)
 const DEMO_PDF = DEMO_CANDIDATES.find((c) => existsSync(c)) ?? null
 const FALLBACK_PDF = join(ROOT, 'src', 'renderer', 'public', 'sample.pdf')
+/** The house paper as a SCAN — four pages put back as nothing but images, for
+ *  the search_scan frame. Built from the demo document on the first run that
+ *  needs it (scripts/lib/scan-pdf.mjs), into the gitignored _auto folder. */
+const SCAN_PDF = join(SHOT_DIR, '_auto', 'attention-scan.pdf')
 const PORT = 9333
 const WIDTH = 1440
 const HEIGHT = 900
@@ -417,6 +422,29 @@ const SHOTS = [
     `
   },
   {
+    // Scanned pages have text now (v0.69: OCR on this machine, nothing
+    // written into the file). The house paper photographed as a scanner would
+    // hand it back — four pages put back as nothing but images, leaning a
+    // hair — opened as a SECOND tab through the single-instance route, the
+    // way File Explorer opens one, and a search for a word the text layer
+    // cannot find. The hits come from the recognised text and the list
+    // carries them like any other search; the «Reading text in images and
+    // scanned pages … N of 4» note shows while the pass runs, and this frame
+    // is taken once the hits are in. The tab is closed again afterwards so
+    // the next frame finds the baseline it expects.
+    name: 'search_scan',
+    caption: 'Search in a scanned document: the pages read on this machine, every hit marked on the scan',
+    before: openScan,
+    setup: `
+      await ui.closePanels()
+      await ui.expectTabs(2)
+      await ui.fitWidth()
+      await ui.openScanSearch('attention')
+      await ui.settle(3400)
+    `,
+    cleanup: `await ui.closeActiveTab(); await ui.expectTabs(1)`
+  },
+  {
     // Deliberately NOT an opening frame anywhere: a settings dialog is a thing
     // you go and find, not what an app looks like (Emil, 2026-08-09). It earns
     // a place late in a page, beside the sentence about rebinding keys.
@@ -579,7 +607,12 @@ const L = {
 };
 const titleOf = (el) => el.title || '';
 const startsAny = (el, names) => names.some((n) => titleOf(el).startsWith(n));
-const btn = (names, root = document) =>
+// In the ACTIVE tab's view: every tab keeps its own toolbar mounted (the
+// views are layers, never unmounted), so a document-wide search finds the
+// first tab's buttons — the hidden ones — once a second document is open
+// (search_scan). With one tab the active view is the only one.
+const activeView = () => document.querySelector('.tab-view.active') || document;
+const btn = (names, root = activeView()) =>
   [...root.querySelectorAll('.tb-btn')].find((b) => startsAny(b, names));
 const click = (el) => { el.dispatchEvent(new MouseEvent('click', { bubbles: true })); };
 const ui = {
@@ -791,6 +824,67 @@ const ui = {
     await settle(900);
     if (!document.querySelector('.search-hit')) {
       throw new Error('no marked hits on the page after jumping to the first result');
+    }
+  },
+  /** The tab strip holds exactly n tabs, and the active one has a rendered
+   *  page — a second document opened through the single-instance route lands
+   *  as a tab a second or two after the spawn */
+  async expectTabs(n) {
+    for (let i = 0; i < 80; i++) {
+      const tabs = document.querySelectorAll('.tab').length;
+      const canvas = !!document.querySelector('.tab-view.active .pdf-page canvas');
+      if (tabs === n && canvas) return;
+      await settle(250);
+    }
+    throw new Error('expected ' + n + ' tab(s), have ' + document.querySelectorAll('.tab').length);
+  },
+  /** Ctrl+W on the active tab (the keymap's tab.close) — a tab with no marks
+   *  closes without a prompt. Only while another tab stands: a cleanup that
+   *  runs after the second document never opened must not close the first
+   *  and leave the run on the welcome screen. */
+  async closeActiveTab() {
+    if (document.querySelectorAll('.tab').length < 2) return;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', ctrlKey: true, bubbles: true }));
+    await settle(600);
+  },
+  /** openSearch for a SCANNED document: the hits come from text recognised
+   *  on this machine, page by page, and the whole-document pass a search
+   *  starts takes a while on four pages — so the poll is long, and the note
+   *  the bar shows while it reads is accepted as progress, not as failure.
+   *  If the setting reads pages only on request, the bar's own offer
+   *  («Recognise text») is taken. */
+  async openScanSearch(query) {
+    // Everything inside the ACTIVE tab's view: the first tab's search bar
+    // and pages are still mounted, hidden, and answer document-wide queries
+    const view = activeView();
+    const b = btn(L.search);
+    if (!b) throw new Error('no search button on the toolbar');
+    if (!view.querySelector('.search-bar')) { click(b); await settle(450); }
+    const input = view.querySelector('.search-bar textarea');
+    if (!input) throw new Error('the search bar did not open');
+    input.focus();
+    await settle(80);
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+    setter.call(input, query);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    let sawReading = false;
+    for (let i = 0; i < 600; i++) {
+      const offer = view.querySelector('.search-ai-note .search-ai-link');
+      if (offer) { click(offer); await settle(300); }
+      if (view.querySelector('.search-ai-note')) sawReading = true;
+      const fold = view.querySelector('.search-list-toggle:not(.is-open)');
+      if (fold) { click(fold); await settle(150); }
+      if (view.querySelector('.search-results .search-result-snippet')) break;
+      await settle(250);
+    }
+    if (!view.querySelector('.search-results .search-result-snippet')) {
+      throw new Error('no search results on the scan for "' + query + '" after 150s' +
+        (sawReading ? ' (the reading note did show)' : ' (the reading note never showed — is OCR on?)'));
+    }
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settle(900);
+    if (!view.querySelector('.search-hit')) {
+      throw new Error('no marked hits on the scanned page after jumping to the first result');
     }
   },
   /** The «by meaning» half: switch the search bar to its AI tab and run a
@@ -1718,11 +1812,25 @@ const ui = {
   async previewCitation() {
     const page = this.pageElA();
     const box = this.visibleBoxA();
+    // The citation [2] (Bahdanau et al., the attention paper's own ancestor),
+    // and not «the first link on the page»: the abstract the frame shows is
+    // REPLAYED from docs/ai-fixtures/abstract.json whatever entry is hovered,
+    // and that fixture holds Bahdanau's. The first link in the upper half is
+    // [13] (Hochreiter's LSTM) since the sharp-text layout — the 2026-10-24
+    // run put the LSTM entry over the NMT abstract and nobody would have
+    // noticed in a README. hyperref links one box per number, so the link is
+    // the one over the text span that opens the «[2, 19]» bracket.
+    // (PRELUDE is a template literal: the backslash must be doubled to reach the regex)
+    const spans = [...page.querySelectorAll('.textLayer > span')].filter((s) =>
+      /\\[2,/.test(s.textContent || ''));
+    const over = (r, q) => r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top;
     const links = [...page.querySelectorAll('a.pdf-link.internal')].filter((a) => {
       const r = a.getBoundingClientRect();
-      return r.width > 0 && r.top > box.top + 40 && r.bottom < box.top + box.height * 0.5;
+      if (!(r.width > 0 && r.top > box.top + 40 && r.bottom < box.top + box.height * 0.5)) return false;
+      return spans.some((s) => over(r, s.getBoundingClientRect()));
     });
-    if (links.length === 0) throw new Error('no internal link in the upper half of the page');
+    if (links.length === 0) throw new Error('no internal link over «[2, …]» in the upper half of the page');
+    links.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
     const a = links[0];
     const r = a.getBoundingClientRect();
     a.dispatchEvent(new PointerEvent('pointerover', {
@@ -1731,7 +1839,11 @@ const ui = {
     let win = null;
     for (let i = 0; i < 40 && !win; i++) { await settle(250); win = document.querySelector('.link-preview'); }
     if (!win) throw new Error('the link preview did not open');
-    const ask = win.querySelector('.lpa-ask');
+    // Since the citation card (2026-10-16) the abstract button is one of the
+    // row's actions, «Sammendrag»/«Abstract», not the old .lpa-ask — the shot
+    // failed on every run after that without anyone noticing until a release.
+    const ask = [...win.querySelectorAll('.lp-ref-acts .lp-ref-act')]
+      .find((b) => /^(Sammendrag|Abstract)$/.test((b.textContent || '').trim()));
     if (!ask) throw new Error('the preview has no abstract button — is the link a citation?');
     ask.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     let panel = null;
@@ -2377,6 +2489,22 @@ const app = launchApp({
 let failed = 0
 /** Names that actually produced a PNG this run — what the composer may use */
 const shotOk = new Set()
+
+/** search_scan's preparation: the scan of the house paper (built once, into
+ *  _auto), opened in the running app as a second tab the way File Explorer
+ *  opens a file — a second Electron instance hands the path to the first
+ *  (main's single-instance route) and exits. */
+async function openScan() {
+  if (!existsSync(SCAN_PDF)) {
+    mkdirSync(dirname(SCAN_PDF), { recursive: true })
+    writeFileSync(SCAN_PDF, await scanPdf(readFileSync(pdf), [1, 2, 3, 4]))
+  }
+  const child = spawn(electronBinary(ROOT), [mainJs, SCAN_PDF, `--user-data-dir=${app.profile}`], {
+    cwd: ROOT,
+    stdio: 'ignore'
+  })
+  child.unref()
+}
 try {
   const [target] = await waitForPageTargets(PORT, 1)
   const ws = await openSocket(target.webSocketDebuggerUrl)
@@ -2404,6 +2532,8 @@ try {
   for (const shot of shots) {
     process.stdout.write(`  ${shot.name} … `)
     try {
+      // Node-side preparation a page script cannot do (open a second file)
+      if (shot.before) await shot.before()
       await runSetup(send, shot.setup)
       await sleep(500)
       const { data } = await send('Page.captureScreenshot', {
@@ -2433,7 +2563,10 @@ try {
     try {
       await runSetup(
         send,
-        `await ui.closeOverlays(); await ui.exitFullscreen(); await ui.clearAnnots(); await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
+        // A shot's own cleanup first (a second tab it opened), then the
+        // common baseline
+        (shot.cleanup ? `${shot.cleanup}; ` : '') +
+          `await ui.closeOverlays(); await ui.exitFullscreen(); await ui.clearAnnots(); await ui.pinToolbar(); await ui.closePanels(); await ui.setTheme('day')`
       )
       await runSetup(send, `await ui.expectBaseline()`)
     } catch (err) {

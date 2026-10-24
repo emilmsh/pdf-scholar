@@ -91,6 +91,7 @@ surface missing one it needs.
 | `tricolor` (composed) | hero | hero + `og:image` | 1 |
 | `annotations` | ✓ | ✓ | 2 |
 | `search_ai` | ✓ | ✓ | — (carries the search section) |
+| `search_scan` | ✓ | ✓ | — (scanned pages have text, v0.69; its own section on the landing page) |
 | `assistant` | ✓ | ✓ | 3 |
 | `assistant_figure` | ✓ | — | 4 |
 | `assistant_snip` | ✓ | — | — |
@@ -152,7 +153,13 @@ the current chrome — if the toolbar changes, re-measure rather than assume.
 
 The house demo document is "Attention Is All You Need" (arXiv 1706.03762) at
 `docs/screenshots/attention.pdf` — gitignored, never committed. Keep it free of
-saved annotations, or they turn up as clutter in unrelated shots.
+saved annotations, or they turn up as clutter in unrelated shots. The
+`search_scan` frame photographs a SCAN of it — four pages put back as nothing
+but images, leaning a hair (`scripts/lib/scan-pdf.mjs`) — which `shoot` builds
+into `_auto/attention-scan.pdf` on the first run that needs it and opens as a
+second tab through the single-instance route. Two tabs means the shoot's
+toolbar helpers look only in the ACTIVE tab's view; the first tab's toolbar
+stays mounted underneath and used to answer first.
 
 Being gitignored, it exists only in the checkout you put it in. `shoot` looks in
 this tree, then in the MAIN checkout (so a run from a git worktree finds it),

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   annotTypeLabel,
   FREETEXT_COLORS,
+  FREETEXT_SIZE,
   HIGHLIGHT_COLORS,
   PEN_COLORS,
   TEXT_FONT_DEFAULT,
@@ -12,6 +13,7 @@ import {
   UNDERLINE_COLORS
 } from '../annotations'
 import type { PageAnnotation } from '../annotations'
+import { FONT_SIZE_MAX, FONT_SIZE_MIN, FONT_SIZE_STEP } from '../tool-prefs'
 import type { PdfStandardFont } from '@embedpdf/models'
 import { t, useLang } from '../i18n'
 import { bubblesWhileTyping } from '../keymap'
@@ -48,6 +50,10 @@ interface Props {
    *  re-measures the box in the new face before sending it on — a box typed in
    *  Helvetica and switched to Courier needs more width for the same words. */
   onFont(font: PdfStandardFont): void
+  /** freetext only: re-set the box at another size in points (issue #53 —
+   *  before, the size could be chosen for the NEXT box only). Re-measured by
+   *  the viewer like a face change. */
+  onFontSize(size: number): void
   onContents(text: string): void
   onDelete(): void
   onClose(): void
@@ -66,6 +72,7 @@ export default function AnnotPopover({
   focusText,
   onColor,
   onFont,
+  onFontSize,
   onContents,
   onDelete,
   onClose,
@@ -162,8 +169,27 @@ export default function AnnotPopover({
       {annotation.type === 'freetext' &&
         (() => {
           const parts = textFontParts(annotation.font ?? TEXT_FONT_DEFAULT)
+          const fontSize = annotation.fontSize ?? FREETEXT_SIZE
           return (
             <>
+              {/* The size too (issue #53): the same slider as the text tool's
+                  menu, over the same range, applied to THIS box. The commit
+                  happens on release (change), not on every tick of the drag —
+                  each one is an engine write and an undo step. */}
+              <div className="theme-menu-label slider-label">
+                {t('tb.fontSize')}
+                <output>{fontSize} pt</output>
+              </div>
+              <input
+                type="range"
+                className="font-size-range"
+                min={FONT_SIZE_MIN}
+                max={FONT_SIZE_MAX}
+                step={FONT_SIZE_STEP}
+                defaultValue={fontSize}
+                onChange={(e) => onFontSize(Number(e.target.value))}
+                aria-label={t('tb.fontSize')}
+              />
               <div className="font-row">
                 {TEXT_FONT_FAMILIES.map((family) => {
                   const face = textFontOf(family, parts.bold, parts.italic)

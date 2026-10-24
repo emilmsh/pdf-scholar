@@ -190,6 +190,8 @@ Sepia cream); Night and Night+ are the two dark modes, the second with higher co
   tab strip, and returning to one restores the page, zoom and panels
 - Several documents open in tabs or separate windows; tabs can be pinned, and each window
   gets its tabs back at the next launch (a document is read only when you show its tab).
+  A tab can be duplicated (Ctrl+Shift+K, or "Duplicate tab" in the tab menu) for a second
+  place in the same document; a mark made in either tab shows in both.
   A tab drags like a file: into
   another PDF Scholar window, or into anything that takes a PDF (a browser's upload field,
   an e-mail, a chat, a folder), and along the bar to reorder. Ctrl+drag (Cmd on Mac) moves
@@ -283,7 +285,7 @@ panel beside the document.
   pressure varies the line width *(beta)* and is preserved in the saved file. A toggle
   in the tool menus hands drawing back to the finger
 - The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold
-  and italic — chosen before typing or changed on an existing box. Nothing is embedded;
+  and italic — and a size, chosen before typing or changed on an existing box. Nothing is embedded;
   the text remains searchable and renders identically in other readers
 - A signature can be drawn once — with a mouse, pen or finger — or uploaded or pasted as
   an image, and stamped where needed. It is stored locally and saved as a standard stamp
@@ -320,9 +322,17 @@ Both modes live in one search bar, a tab apart.
   is remembered, and the bar can be dragged aside
 - By meaning: describe a topic in your own words and get the passages that discuss it,
   ranked (uses the assistant's key)
+- Scanned pages are searched too: a page that is only a picture of text — a scan, a
+  reprint, a photocopied chapter — is read by text recognition on your own computer, and
+  from then on its words can be found, selected, copied, marked and asked about like any
+  other page's. The pages on screen are read first; a search reads the rest and shows the
+  hits as they come. Nothing is sent anywhere for this and nothing is written into the
+  file. The read is not perfect — now and then two short words come out joined
 - The selection menu also offers copy, web search, dictionary and translation. It can be
   set to wait for a right-click instead of opening on its own, and has a compact form with
   the same choices at a third of the height
+
+![Search in a scanned document — the pages read on this computer, every hit marked on the scan](docs/screenshots/search_scan.png)
 
 ### An assistant that cites its sources
 
@@ -342,8 +352,14 @@ the claim came from.
   attachment, staged until you press send — the one-click explain action in the
   selection menu is the exception, and sends the crop as soon as it is drawn. Images can
   be pasted or attached the same way
-- A scanned PDF has no text layer, and the assistant reports that instead of guessing;
-  a page range can be attached as images for it to read
+- A scanned document is read the same way: the assistant gets the text recognised on
+  your computer, with clickable citations like any other PDF, instead of only the pages
+  you attach as images — and the panel says so while the pages are being read
+- Conversations are kept with their document. The library's Conversations view lists
+  them across documents — searchable, sorted and filtered, each citation chip opening the
+  passage it came from — and an earlier conversation, about this paper or another, can be
+  attached to a new question as context, chosen by you. A moved or renamed document keeps
+  its conversations; old ones can be tidied in one go, and exported
 - The assistant can open in its own window — the document keeps the whole screen, or a
   second monitor carries the chat. A citation click still goes to the passage in the
   window showing the document, and raises it
