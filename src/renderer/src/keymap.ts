@@ -156,7 +156,10 @@ export const CATEGORY_ORDER: readonly CategoryId[] = [
  *  not have to relearn it because the list moved house. */
 const REGISTRY: readonly Command[] = [
   // ---------- File ----------
-  { id: 'file.open', category: 'file', labelKey: 'keys.fileOpen', defaults: ['mod+o'], whileTyping: true },
+  // Ctrl+N too (Emil, 2026-10-24): the «+» in the tab strip opens a file, and
+  // «new» in this app means a new document, not a new window — that one
+  // keeps Ctrl+Shift+N, the browsers' chord for it
+  { id: 'file.open', category: 'file', labelKey: 'keys.fileOpen', defaults: ['mod+o', 'mod+n'], whileTyping: true },
   { id: 'file.save', category: 'file', labelKey: 'keys.fileSave', defaults: ['mod+s'], whileTyping: true },
   // Both were shipped unbound, which the keyboard map made visible the moment
   // it was photographed (Emil, 2026-08-09). The fourteen TOOL commands below

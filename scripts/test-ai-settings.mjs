@@ -201,12 +201,13 @@ try {
     !after.buttons.some((b) => /[Nn]ettsøk|web search/i.test(b.title)),
     'no web-search globe for compat (capability profile)'
   )
-  // The two vision-gated tools — not «Samtaler» (ai-attach-convs, issue #46),
-  // which attaches text and works whatever the model can see
-  const attach = after.buttons.filter((b) => b.cls.includes('ai-attach-add') && !b.cls.includes('ai-attach-convs'))
+  // The vision-gated snip beside the paperclip (ai-attach-clip, 2026-10-24: one
+  // button for conversations, images and files; the image entry inside it is
+  // the gated one — the paperclip itself attaches text whatever the model sees)
+  const attach = after.buttons.filter((b) => b.cls.includes('ai-attach-add'))
   ok(
-    attach.length === 2 && attach.every((b) => !b.disabled),
-    'snip + attach enabled (vision unknown → permissive)'
+    attach.length === 2 && attach.some((b) => b.cls.includes('ai-attach-clip')) && attach.every((b) => !b.disabled),
+    'paperclip + snip enabled (vision unknown → permissive)'
   )
 
   // The model menu with the server OFFLINE: configured id stays pickable,

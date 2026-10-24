@@ -85,6 +85,7 @@ AI ASSISTANT (optional — bring your own key)
 • A figure or region can be cropped into the chat and asked about
 • A scanned document is read the same way: the assistant gets the text recognised on your computer, with clickable citations, instead of only pages attached as images
 • Conversations are kept with their document and listed across documents in the library, searchable; an earlier conversation, about this paper or another, can be attached to a new question as context
+• A paperclip in the composer attaches an earlier conversation, an image or a local file (a PDF or a text file) as context; the open document stays the only source the assistant cites
 • The assistant can open in its own window; a citation click still goes to the passage in the document's window
 • LaTeX in answers is rendered; optional web search, off by default
 • AI access switch: "Confirm before sharing" asks the first time a document goes to a provider and shows what is attached; "Off" blocks every AI request
@@ -144,6 +145,7 @@ AI-ASSISTENT (valgfri – egen nøkkel)
 • En figur eller et område kan klippes inn i samtalen og spørres om
 • Et skannet dokument leses på samme måte: assistenten får teksten som er gjenkjent på maskinen din, med klikkbare kildehenvisninger, i stedet for bare sider lagt ved som bilder
 • Samtaler beholdes sammen med dokumentet og listes på tvers av dokumenter i biblioteket, søkbare; en tidligere samtale, om denne artikkelen eller en annen, kan legges ved et nytt spørsmål som kontekst
+• En binders i skrivefeltet legger ved en tidligere samtale, et bilde eller en lokal fil (en PDF eller en tekstfil) som kontekst; det åpne dokumentet er fortsatt den eneste kilden assistenten oppgir
 • Assistenten kan åpnes i eget vindu; et sitatklikk går fortsatt til avsnittet i dokumentvinduet
 • LaTeX i svar gjengis; valgfritt nettsøk, av som standard
 • AI-tilgang: «Bekreft før deling» spør første gang et dokument sendes til en leverandør og viser hva som legges ved; «Av» stopper alle AI-forespørsler
@@ -154,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.70.0
+## What's new in this version (≤ 1 500 chars) — v0.71.0
 
 *(The Store last carried v0.61.0's notes, so this block covers what landed
 between — the headline items, not every release.)*
@@ -163,6 +165,8 @@ between — the headline items, not every release.)*
 ```
 • Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere, nothing is written into the file
 • The assistant reads scanned documents the same way, and keeps its conversations: the library lists them across documents, and an earlier one can be attached to a new question
+• A paperclip in the composer attaches a conversation, an image or a local file as context; web search is one switch, on or off
+• Your own colours from a colour wheel in the toolbar's tool menus too, kept until you replace them; Ctrl+N opens a file
 • Sharp text at every zoom level, on every display scale
 • A text box can be re-set in another size after writing, and its menu opens beside the editor while the text tool is armed
 • A tab can be duplicated (Ctrl+Shift+K) for a second place in the same document
@@ -175,6 +179,8 @@ between — the headline items, not every release.)*
 ```
 • Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted, ingenting skrives inn i filen
 • Assistenten leser skannede dokumenter på samme måte, og tar vare på samtalene: biblioteket lister dem på tvers av dokumenter, og en tidligere samtale kan legges ved et nytt spørsmål
+• En binders i skrivefeltet legger ved en samtale, et bilde eller en lokal fil som kontekst; nettsøk er én bryter, av eller på
+• Egne farger fra et fargehjul også i verktøylinjens menyer, beholdt til du bytter dem ut; Ctrl+N åpner en fil
 • Skarp tekst ved alle zoomnivåer, på alle skjermskalaer
 • En tekstboks kan settes om i en annen størrelse etterpå, og menyen åpnes ved siden av redigeringen mens tekstverktøyet er valgt
 • En fane kan dupliseres (Ctrl+Shift+K) for et sted til i samme dokument

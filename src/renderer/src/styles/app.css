@@ -5957,6 +5957,59 @@ button.bookmark-fold:hover {
   pointer-events: none;
 }
 
+/* The paperclip (Emil, 2026-10-24): everything attached in one place — a
+   count on the button, the list and the three ways to add behind it. The
+   chips left the text field: they made it a cluttered box, and a long
+   conversation list widened it. */
+.ai-attach-clip {
+  position: relative;
+}
+
+.ai-attach-clip.is-on {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.ai-attach-count {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.ai-attach-menu .ai-attach-row {
+  padding: 0;
+}
+
+.ai-attach-menu-empty {
+  font-size: calc(11.5px * var(--ai-scale, 1));
+  color: var(--text-secondary);
+}
+
+.ai-attach-menu-acts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ai-attach-menu-acts .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
 /* A chip per attached conversation, the pill the annotations use */
 .ai-attach-conv {
   display: flex;
@@ -6248,17 +6301,9 @@ button.bookmark-fold:hover {
   color: var(--text);
 }
 
-/* Web-search globe, three modes: off = muted (base style), ask = accent
-   outline only (tool armed, fires on request), on = filled pill (proactive) */
-.ai-attach-add.ask {
-  color: var(--accent);
-}
-
-.ai-attach-add.ask:hover {
-  background: var(--hover);
-  color: var(--accent);
-}
-
+/* Web-search globe, two states (2026-10-24): off = muted (base style), on =
+   filled pill — the tool is there and the model uses it when the question
+   calls for it */
 .ai-attach-add.on,
 .ai-attach-add.on:hover {
   color: var(--accent);
@@ -8268,10 +8313,10 @@ button.bookmark-fold:hover {
   border-color: var(--danger);
 }
 
+/* Fixed, placed from the «+» by CustomColorPicker: the menus scroll, and a
+   scroll box clips an absolutely placed child that reaches outside it */
 .color-picker-pop {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
+  position: fixed;
   z-index: 5;
   display: flex;
   align-items: center;

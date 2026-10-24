@@ -53,21 +53,50 @@ function restoreSelection(range: Range | null): void {
 }
 
 /** Small popover behind the "+" swatch: a colour wheel and a hex field so
- *  users can pick visually or paste an exact #rrggbb. */
-function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX.Element {
+ *  users can pick visually or paste an exact #rrggbb. Exported for the
+ *  toolbar's marker and markup menus (Emil, 2026-10-24: they showed the
+ *  remembered picks but had no way to make one — parity with the selection
+ *  menu, where «+» had lived alone). */
+export function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [hex, setHex] = useState('#')
   const ref = useRef<HTMLDivElement>(null)
   const wheelRef = useRef<HTMLInputElement>(null)
   const selectionRef = useRef<Range | null>(null)
+  /** Where the pop goes, measured from the «+» as it opens. The menus it
+   *  lives in scroll (`overflow-y: auto` on .selection-menu and .tool-menu,
+   *  for the compact form and small windows), and a scroll box clips an
+   *  absolutely placed child — the pop over the FIRST row stuck out above
+   *  the menu and only its lower edge showed (Emil, 2026-10-24: «funker
+   *  ikke»). Fixed placement escapes the box; the menus are themselves
+   *  fixed and do not move while open, so one measurement is enough. */
+  const [anchor, setAnchor] = useState<{ top: number; bottom: number; right: number } | null>(null)
 
   const closePicker = useCallback(() => setOpen(false), [])
   useDismissable(ref, open, closePicker)
 
   const toggle = (): void => {
-    if (!open) selectionRef.current = saveSelection()
+    if (!open) {
+      selectionRef.current = saveSelection()
+      const r = ref.current?.getBoundingClientRect()
+      setAnchor(r ? { top: r.top, bottom: r.bottom, right: r.right } : null)
+    }
     setOpen(!open)
   }
+
+  // Above the «+» as designed (the rows below stay uncovered), below it when
+  // the top of the window is too near; right-aligned to the button, but never
+  // past the window's left edge
+  const POP_H = 52
+  const POP_W = 170
+  const popStyle: React.CSSProperties = anchor
+    ? {
+        right: Math.max(8, Math.min(window.innerWidth - anchor.right, window.innerWidth - 8 - POP_W)),
+        ...(anchor.top >= POP_H + 8
+          ? { bottom: window.innerHeight - anchor.top + 6 }
+          : { top: anchor.bottom + 6 })
+      }
+    : {}
 
   const commit = (value: string): void => {
     const picked = normalizeHex(value)
@@ -105,7 +134,7 @@ function CustomColorPicker({ onPick }: { onPick(hex: string): void }): React.JSX
         +
       </button>
       {open && (
-        <div className="color-picker-pop" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="color-picker-pop" style={popStyle} onMouseDown={(e) => e.stopPropagation()}>
           <input
             ref={wheelRef}
             type="color"
