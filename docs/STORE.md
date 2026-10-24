@@ -195,7 +195,8 @@ package and submit it, nothing more.
    **Enable** next to "enable the new experience" (that is the v1.1, API-key
    UI), then **Create API credentials**.
 2. Copy the **Client ID** and the **API key**. The key has an **expiry date** —
-   a 401 later means "renew it", not "the script broke".
+   72 days from creation, Microsoft's fixed term — so a 401 later means
+   "renew it", not "the script broke".
 3. Repo secrets: `EDGE_CLIENT_ID`, `EDGE_API_KEY`. The product ID
    (`2d23581d-291e-4953-aaf1-0db8715d42ad`, from **Microsoft Edge → Overview →**
    the extension **→ Extension identity**) is an identifier, not a credential —

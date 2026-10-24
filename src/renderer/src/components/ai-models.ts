@@ -423,7 +423,7 @@ export function modelSupportsImages(
 // for the same kind of reason — a local Ollama or LM Studio needs no key at
 // all, and a custom endpoint's key comes from whoever runs it.
 export const KEY_CREATE_URLS: Partial<Record<AiProviderId, string>> = {
-  anthropic: 'https://console.anthropic.com/settings/keys',
+  anthropic: 'https://platform.claude.com/settings/keys',
   openai: 'https://platform.openai.com/api-keys',
   openrouter: 'https://openrouter.ai/keys',
   gemini: 'https://aistudio.google.com/apikey',
@@ -435,7 +435,7 @@ export const KEY_CREATE_URLS: Partial<Record<AiProviderId, string>> = {
 // Where each provider lets you set a spending cap — linked from the key field
 // so the reminder to cap a key is one click from acting on it.
 export const SPEND_CAP_URLS: Partial<Record<AiProviderId, string>> = {
-  anthropic: 'https://console.anthropic.com/settings/limits',
+  anthropic: 'https://platform.claude.com/settings/limits',
   openai: 'https://platform.openai.com/settings/organization/limits',
   azure: 'https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/overview',
   openrouter: 'https://openrouter.ai/settings/credits',
