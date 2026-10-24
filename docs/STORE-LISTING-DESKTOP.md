@@ -156,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.71.1
+## What's new in this version (≤ 1 500 chars) — v0.71.2
 
 *(The Store last carried v0.61.0's notes, so this block covers what landed
 between — the headline items, not every release.)*
