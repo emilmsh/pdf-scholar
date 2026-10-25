@@ -156,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.71.2
+## What's new in this version (≤ 1 500 chars) — v0.73.0
 
 *(The Store last carried v0.61.0's notes, so this block covers what landed
 between — the headline items, not every release.)*
@@ -173,6 +173,8 @@ between — the headline items, not every release.)*
 • Citations preview as a card with the reference entry, the abstract under it; figures, tables, footnotes and equations preview whole
 • Images can be copied or saved from a page at their own resolution; a hand tool pans the page
 • A moved or renamed file keeps its bookmarks, position and conversations
+• A conversation exported to Markdown carries the passages each answer cites; a link's address can be copied from its menu
+• With the toolbar hidden, Ctrl+G and the tool keys show it, so you see the page number you type
 ```
 
 **NO:**
@@ -187,6 +189,8 @@ between — the headline items, not every release.)*
 • Henvisninger forhåndsvises som et kort med referansen og sammendraget under; figurer, tabeller, fotnoter og ligninger forhåndsvises hele
 • Bilder kan kopieres eller lagres fra en side i sin egen oppløsning; et håndverktøy flytter siden
 • En flyttet eller omdøpt fil beholder bokmerker, posisjon og samtaler
+• En samtale eksportert til Markdown har med passasjene hvert svar henviser til; en lenkes adresse kan kopieres fra menyen
+• Med skjult verktøylinje viser Ctrl+G og verktøytastene den, så du ser sidetallet du skriver
 ```
 
 ---
