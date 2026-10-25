@@ -347,6 +347,11 @@ interface Props {
   /** Toolbar auto-hide: pinned = always shown, unpinned = reveals on hover */
   toolbarPinned: boolean
   onTogglePin(): void
+  /** The page field was focused by its shortcut: the viewer peeks a tucked
+   *  toolbar so the field is SEEN (issue #61 — Ctrl+G with the toolbar hidden
+   *  used to put the caret in a field with opacity 0, and every digit typed
+   *  went somewhere the reader could not look) */
+  onPageFieldShortcut(): void
   onPresent(): void
   onToggleFullscreen(): void
   /** Split view: a second pages column, equal in every way except that page and
@@ -564,6 +569,7 @@ export default function Toolbar({
   onOpenAiSettings,
   toolbarPinned,
   onTogglePin,
+  onPageFieldShortcut,
   onPresent,
   onToggleFullscreen,
   splitOpen,
@@ -771,6 +777,9 @@ export default function Toolbar({
   /** The page field, so the Gå-til-side command can focus it. Only ever one is
    *  rendered — the single cluster drives whichever column is active. */
   const pageInputRef = useRef<HTMLInputElement>(null)
+  /** Read through a ref by the once-mounted shortcut listener below */
+  const onPageFieldShortcutRef = useRef(onPageFieldShortcut)
+  onPageFieldShortcutRef.current = onPageFieldShortcut
   // Responsive overflow: secondary buttons fold into a "…" menu (left of the
   // protected Assistant button) when the toolbar is too narrow for them all.
   const toolbarRef = useRef<HTMLDivElement>(null)
@@ -877,6 +886,10 @@ export default function Toolbar({
       if (!el) return // the cluster is folded away — nothing to focus
       e.preventDefault()
       e.stopPropagation()
+      // A tucked toolbar is translated away at opacity 0, which focus() does
+      // not mind — so the viewer is told first, and peeks it, before the caret
+      // lands (issue #61)
+      onPageFieldShortcutRef.current()
       el.focus()
       // …and select explicitly. The field's own onFocus does this for a CLICK,
       // but a programmatic focus lets the caret land at the end instead, and
