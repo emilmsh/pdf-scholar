@@ -214,6 +214,23 @@ og `docs/store-screenshots/` – «Screenshots by hand» er regelen. README,
 landingssiden og begge butikklistene er oppdatert for alt over; butikkene har
 ikke fått noen versjon siden v0.54.0.
 
+## 12. Snarveier med skjult verktøylinje (issue #61)
+
+**Gjør:** V (løsne verktøylinja), flytt musa ned på sidene. Ctrl+G, skriv et
+sidetall, Enter. Så en verktøytast du har bundet (Innstillinger →
+tastatursnarveier → f.eks. «Markeringstusj»), og håndverktøyets tast om du
+har gitt det en. Så Ctrl++ og Shift+R.
+
+**Se:** Ctrl+G titter verktøylinja fram med markøren i sidefeltet og tallet
+markert; den står så lenge markøren er i feltet og gjemmer seg et par
+sekunder etter Enter. Verktøytasten og hånden titter den fram like lenge,
+med knappen tent – regelen er at det som setter deg i et modus vises, det
+som virker med én gang (zoom, rotasjon, oppslag, H) ikke: Ctrl++ og Shift+R
+henter ikke verktøylinja. Med musa hvilende på verktøylinja blir den
+stående; den gjemmer seg når musa forlater den. Festet verktøylinje (V
+igjen): ingenting av dette skjer, alt står som før. Sidepillen nede til
+høyre: klikk på den markerer tallet, så et nytt sidetall erstatter det.
+
 ## Står igjen fra RELEASE.md steg 1 (alltid)
 
 - Skriv ut én gang – bare når Electrons hovedversjon endres (se RELEASE.md).
