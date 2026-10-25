@@ -5,7 +5,8 @@
 // Load the result via edge://extensions or chrome://extensions → "Load unpacked"
 // → pick dist-extension/. See docs/BROWSER-EXTENSION.md.
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
+import { gunzipSync } from 'node:zlib'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { pdfjsAssets } from './vite.pdfjs-assets'
@@ -37,10 +38,43 @@ function copyManifest(): Plugin {
   }
 }
 
+// Edge Add-ons refuses a package that holds a compressed file
+// («PackageValidationError | The uploaded package consists of a compressed
+// file», v0.73.0's submission, 2026-10-25) — and the OCR models arrive from
+// @tesseract.js-data as .traineddata.gz. So the extension build ships them
+// unpacked: the ?url import of a .traineddata.gz is answered with an emitted
+// .traineddata asset instead. ocr.worker.ts's gunzip passes bytes without the
+// gzip magic through untouched, so nothing at runtime changes. The store zip
+// is no bigger for it — zip's own deflate brings each model back to its gzip
+// size. Build only: `vite serve` keeps the .gz, which the worker unpacks.
+function unpackOcrModels(): Plugin {
+  const suffix = '.traineddata.gz?url'
+  return {
+    name: 'pdfx-unpack-ocr-models',
+    apply: 'build',
+    enforce: 'pre',
+    async resolveId(source, importer) {
+      if (!source.endsWith(suffix)) return null
+      const file = await this.resolve(source.slice(0, -'?url'.length), importer, { skipSelf: true })
+      return file ? `\0ocr-model:${file.id}` : null
+    },
+    load(id) {
+      if (!id.startsWith('\0ocr-model:')) return null
+      const file = id.slice('\0ocr-model:'.length)
+      const ref = this.emitFile({
+        type: 'asset',
+        name: basename(file, '.gz'),
+        source: gunzipSync(readFileSync(file))
+      })
+      return `export default import.meta.ROLLUP_FILE_URL_${ref}`
+    }
+  }
+}
+
 export default defineConfig({
   root: extensionDir,
   base: './',
-  plugins: [react(), copyManifest(), pdfjsAssets()],
+  plugins: [unpackOcrModels(), react(), copyManifest(), pdfjsAssets()],
   build: {
     outDir,
     emptyOutDir: true,
