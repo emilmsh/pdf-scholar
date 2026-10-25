@@ -523,39 +523,23 @@ async function printViaHiddenFrame(url: string): Promise<boolean> {
   }
 }
 
-/** How long a tucked toolbar stays up after a shortcut pressed one of its
- *  buttons — long enough to read the zoom figure or see which tool lit up,
- *  short enough that a run of Ctrl++ never feels like the toolbar came back.
- *  The HUD's own idle fade is 2.6 s; this sits with it. */
+/** How long a tucked toolbar stays up after a shortcut armed a mode — long
+ *  enough to see which tool lit up, short enough that it never feels like the
+ *  toolbar came back. The HUD's own idle fade is 2.6 s; this sits with it. */
 const KEY_PEEK_MS = 2500
 
-/** The shortcuts whose outcome the TOOLBAR reports (issue #61): the page
- *  field, the zoom readout, the fit state, the lit tool button, the column
- *  switcher, the annotations-hidden toggle. With the toolbar tucked, one of
- *  these used to land in silence — Ctrl+G focused a field nobody could see.
- *  Not in the set: fullscreen, presentation and the pin itself (they are about
- *  the chrome), the panels and the search bar (what they open IS the
- *  feedback), save and bookmark (they toast), undo/redo and delete (the page
- *  shows it). nav.gotoPage is missing because the toolbar's own listener
- *  swallows it before this handler — it reports through onPageFieldShortcut. */
-const TOOLBAR_REPORTED: ReadonlySet<CommandId> = new Set<CommandId>([
-  'zoom.in',
-  'zoom.out',
-  'zoom.actual',
-  'zoom.fitToggle',
-  'zoom.fitWidth',
-  'zoom.fitPage',
-  'view.rotateRight',
-  'view.rotateLeft',
-  'view.spread',
-  'view.coverPage',
-  'view.paged',
-  'view.split',
-  'view.swapPanes',
-  'view.marginNotes',
-  'annot.toggleHidden',
-  'nav.hand'
-])
+/** The shortcuts that put the reader in a MODE rather than doing something at
+ *  once (issue #61; the rule is Emil's, 2026-10-25): a tool armed and waiting
+ *  for a stroke, the hand, the page field waiting for digits. With the
+ *  toolbar tucked, one of these used to land in silence — Ctrl+G focused a
+ *  field nobody could see, a tool key lit a button nobody could see. What
+ *  acts on the keypress itself (zoom, rotate, spread, split, hiding the
+ *  annotations) is its own feedback and stays out, and so does what opens a
+ *  surface of its own (the search bar, the panels, presentation). The tool
+ *  keys are matched by prefix below; nav.gotoPage is not here because the
+ *  toolbar's own listener swallows it before this handler — it reports
+ *  through onPageFieldShortcut instead. */
+const ARMS_A_MODE: ReadonlySet<CommandId> = new Set<CommandId>(['nav.hand'])
 
 export default function PdfViewer({
   payload,
@@ -2859,9 +2843,9 @@ export default function PdfViewer({
     touchToolbarTimerRef.current = window.setTimeout(() => setToolbarPeek(false), 6000)
   }, [])
 
-  /** A shortcut that pressed one of the toolbar's buttons (TOOLBAR_REPORTED,
-   *  the tool keys, Ctrl+G) peeks a tucked toolbar for a beat, the way a tap
-   *  on the top strip does, so the keypress is seen to land (issue #61). It
+  /** A shortcut that arms a mode (ARMS_A_MODE, the tool keys, Ctrl+G) peeks
+   *  a tucked toolbar for a beat, the way a tap on the top strip does, so
+   *  the mode is seen to be on (issue #61). It
    *  stays as long as the reader is IN it — the caret in the page or zoom
    *  field, the pointer resting on it — and tucks a beat after. Only a field
    *  holds it, not a button: a button clicked earlier keeps focus after the
@@ -7038,10 +7022,10 @@ export default function PdfViewer({
 
     const command = commandForEvent(e, isTyping)
     if (!command) return
-    // A toolbar button's shortcut shows the (tucked) toolbar it pressed —
-    // before the switch, so a tool key that ends up arming nothing (AI off
-    // for the snip) still shows the reader where the press went
-    if (TOOLBAR_REPORTED.has(command) || command.startsWith('tool.')) revealToolbarKey()
+    // A shortcut that arms a mode shows the (tucked) toolbar where the mode
+    // is lit — before the switch, so a tool key that ends up arming nothing
+    // (AI off for the snip) still shows the reader where the press went
+    if (ARMS_A_MODE.has(command) || command.startsWith('tool.')) revealToolbarKey()
     // Every case below preventDefaults: reaching here means the keypress WAS a
     // bound command, and letting the browser also act on it (Ctrl+S offering to
     // save the viewer page, Ctrl+F opening its own find bar) is never wanted.
