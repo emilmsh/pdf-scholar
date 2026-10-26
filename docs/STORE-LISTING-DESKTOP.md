@@ -156,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.73.2
+## What's new in this version (≤ 1 500 chars) — v0.73.3
 
 *(The Store last carried v0.61.0's notes — v0.73.0 went into certification
 with this block — so it covers what landed between: the headline items, not
@@ -164,36 +164,38 @@ every release.)*
 
 **EN:**
 ```
+• Presentation mode fills the screen edge to edge, as in Acrobat
 • Journal PDFs that draw every line twice (JSTOR, the AEA journals) now search, select and copy as one text
-• Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere, nothing is written into the file
-• The assistant reads scanned documents the same way, and keeps its conversations: the library lists them across documents, and an earlier one can be attached to a new question
+• Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere or written into the file
+• The assistant reads scanned documents too, and keeps its conversations: the library lists them across documents, and an earlier one can be attached to a new question
 • A paperclip in the composer attaches a conversation, an image or a local file as context; web search is one switch, on or off
 • Your own colours from a colour wheel in every tool menu, kept until you replace them; Ctrl+N opens a file
 • Sharp text at every zoom level and display scale
-• A text box can be re-set in another size after writing, and its menu opens beside the editor while the text tool is armed
+• A text box can be re-set in another size after writing; its menu opens beside the editor
 • A tab can be duplicated (Ctrl+Shift+K)
 • Citations preview as a card with the reference entry, the abstract under it; figures, tables, footnotes and equations preview whole
 • Images can be copied or saved from a page at their own resolution; a hand tool pans the page
 • A moved or renamed file keeps its bookmarks, position and conversations
 • A conversation exported to Markdown carries the passages each answer cites; a link's address can be copied from its menu
-• With the toolbar hidden, Ctrl+G and the tool keys show it, so you see the page number you type
+• With the toolbar hidden, Ctrl+G and the tool keys bring it back
 ```
 
 **NO:**
 ```
+• Presentasjonsmodus fyller skjermen kant til kant, som i Acrobat
 • Tidsskrift-PDF-er som tegner hver linje dobbelt (JSTOR, AEA-tidsskriftene) søkes, merkes og kopieres nå som én tekst
-• Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted, ingenting skrives inn i filen
-• Assistenten leser skannede dokumenter på samme måte, og tar vare på samtalene: biblioteket lister dem på tvers av dokumenter, og en tidligere samtale kan legges ved et nytt spørsmål
+• Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted eller skrives inn i filen
+• Assistenten leser skannede dokumenter også, og tar vare på samtalene: biblioteket lister dem på tvers av dokumenter, og en tidligere samtale kan legges ved et nytt spørsmål
 • En binders i skrivefeltet legger ved en samtale, et bilde eller en lokal fil som kontekst; nettsøk er én bryter, av eller på
 • Egne farger fra et fargehjul i alle verktøymenyene, beholdt til du bytter dem ut; Ctrl+N åpner en fil
 • Skarp tekst ved alle zoomnivåer og skjermskalaer
-• En tekstboks kan settes om i en annen størrelse etterpå, og menyen åpnes ved siden av redigeringen mens tekstverktøyet er valgt
+• En tekstboks kan settes om i en annen størrelse etterpå; menyen åpnes ved siden av redigeringen
 • En fane kan dupliseres (Ctrl+Shift+K)
 • Henvisninger forhåndsvises som et kort med referansen og sammendraget under; figurer, tabeller, fotnoter og ligninger forhåndsvises hele
 • Bilder kan kopieres eller lagres fra en side i sin egen oppløsning; et håndverktøy flytter siden
 • En flyttet eller omdøpt fil beholder bokmerker, posisjon og samtaler
 • En samtale eksportert til Markdown har med passasjene hvert svar henviser til; en lenkes adresse kan kopieres fra menyen
-• Med skjult verktøylinje viser Ctrl+G og verktøytastene den, så du ser sidetallet du skriver
+• Med skjult verktøylinje henter Ctrl+G og verktøytastene den fram
 ```
 
 ---
