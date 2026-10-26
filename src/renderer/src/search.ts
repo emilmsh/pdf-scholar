@@ -59,6 +59,82 @@ export function setTextFallback(fallback: TextFallback | null): void {
   textFallback = fallback
 }
 
+/** How far apart two items may stand and still be one text drawn twice —
+ *  at most this, and never more than a tenth of the glyph size (a poor man's
+ *  bold, LaTeX's \pmb, is three copies 0.04 em apart; a dotted rule drawn
+ *  with full stops 0.2 pt apart collapses too, which costs nothing) */
+const SAME_PLACE_PT = 0.5
+
+/** A page's text with every item drawn TWICE in the same place read once.
+ *
+ *  Some publisher PDFs (Atypon's PDFplus, behind JSTOR and the AEA journals)
+ *  draw every line two times: first as glyph outlines (text render mode 1,
+ *  stroke only, one glyph per Tj) and then filled over them. One text on
+ *  paper, but pdf.js reports both, so a word that occurs twice in the paper
+ *  searched as four, selected and copied as «conductconduct», and read twice
+ *  by the assistant (Emil, 2026-10-26, Einav & Levin 2010 from JSTOR). PDFium
+ *  stumbles on it too — its search found three of the four.
+ *
+ *  The rule: an item with text (a space between two words counts — the
+ *  outline copy has its own), the same string as an earlier item on the
+ *  page, at the same place (within SAME_PLACE_PT) and at the same size is
+ *  the same text and is dropped; its line end carries over to the one kept
+ *  (pdf.js hangs hasEOL on the LAST item of a line — the copy). The widths
+ *  are not compared: the outline copy's, summed over its glyph moves, differs
+ *  from the filled line's. A word repeated elsewhere on the line, a column of
+ *  equal numbers, a word set larger over the same point, the empty items
+ *  that mark a break, an XFA form's text nodes (no positions at all) — all
+ *  untouched; a clean page comes back as the same object. Applied wherever a
+ *  page's text is read — the text layer, search, the assistant, the export —
+ *  so the spans and the runs still correspond 1:1. */
+export function dedupeTextContent(content: TextContent): TextContent {
+  const items = content.items
+  // str → indexes (into `out`) of the kept items with that string
+  const kept = new Map<string, number[]>()
+  const out: TextContent['items'] = []
+  let dropped = false
+  for (const item of items) {
+    // An item with no text is a line or paragraph break, and one with no
+    // position (an XFA form's text nodes) has no place to be the same at
+    if (!('str' in item) || item.str === '' || !Array.isArray(item.transform) || item.transform.length < 6) {
+      out.push(item)
+      continue
+    }
+    const t = item.transform as number[]
+    const size = Math.hypot(t[0], t[1])
+    const near = Math.min(SAME_PLACE_PT, size * 0.1)
+    const earlier = kept.get(item.str)
+    let same = -1
+    if (earlier) {
+      for (const idx of earlier) {
+        const o = (out[idx] as typeof item).transform as number[]
+        // The same place, and the same size AND direction (a «1» drawn
+        // upright and again turned 90° from the same origin is two)
+        if (
+          Math.abs(o[4] - t[4]) <= near &&
+          Math.abs(o[5] - t[5]) <= near &&
+          Math.abs(o[0] - t[0]) <= size * 0.01 &&
+          Math.abs(o[1] - t[1]) <= size * 0.01 &&
+          Math.abs(o[2] - t[2]) <= size * 0.01 &&
+          Math.abs(o[3] - t[3]) <= size * 0.01
+        ) {
+          same = idx
+          break
+        }
+      }
+    }
+    if (same >= 0) {
+      dropped = true
+      if (item.hasEOL && !(out[same] as typeof item).hasEOL) out[same] = { ...(out[same] as typeof item), hasEOL: true }
+      continue
+    }
+    if (earlier) earlier.push(out.length)
+    else kept.set(item.str, [out.length])
+    out.push(item)
+  }
+  return dropped ? { ...content, items: out } : content
+}
+
 /** A page's text content: its own, or — a scanned page with none — the words
  *  OCR found on it, or its own with the words in its images after it. The
  *  ONE place both the text layer's source and every extracted PageText come
@@ -70,7 +146,7 @@ export async function pageTextContent(
   opts: { priority?: number; signal?: AbortSignal; images?: ImageText } = {}
 ): Promise<TextContent> {
   const page = await pdf.getPage(pageNumber)
-  const content = await page.getTextContent()
+  const content = dedupeTextContent(await page.getTextContent())
   if (!textFallback || pdf.isPureXfa) return content
   return (await textFallback(pdf, pageNumber, content, opts)) ?? content
 }
@@ -128,7 +204,7 @@ export async function buildPageTexts(
   let scanned = false
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i)
-    const content = await page.getTextContent()
+    const content = dedupeTextContent(await page.getTextContent())
     opts.signal?.throwIfAborted()
     if (!hasVisibleText(content)) scanned = true
     owns.push(content)

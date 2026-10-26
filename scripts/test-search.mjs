@@ -31,7 +31,7 @@ await build({
   external: ['pdfjs-dist'],
   logLevel: 'silent'
 })
-const { findMatches, queryPattern } = await import(pathToFileURL(out).href)
+const { findMatches, queryPattern, dedupeTextContent } = await import(pathToFileURL(out).href)
 
 let failures = 0
 const check = (label, cond, detail = '') => {
@@ -67,6 +67,64 @@ check('overlapping occurrences are each found', find('aaa', 'aa').length === 2)
 
 const m3 = find('x\n'.repeat(3) + 'needle', 'needle')
 check('a match after several line breaks keeps its offset', m3.length === 1 && m3[0].start === 6)
+
+// ---- Text drawn twice in the same place (Atypon's PDFplus: every line as
+// outlines, then filled over them — pdf.js reports both) ----
+const item = (str, x, y, extra = {}) => ({
+  str,
+  dir: 'ltr',
+  width: str.length * 5,
+  height: 10,
+  transform: [10, 0, 0, 10, x, y],
+  fontName: 'g_d0_f3',
+  hasEOL: false,
+  ...extra
+})
+const content = (items) => ({ items, styles: {}, lang: null })
+const strs = (c) => c.items.map((i) => i.str)
+
+const twice = content([
+  item('structure–', 66, 290),
+  item('structure–', 66, 290, { hasEOL: true }),
+  item('conduct–performance', 66, 278, { width: 92.3 }),
+  item('conduct–performance', 66, 278, { width: 95.1, hasEOL: true }),
+  item('', 0, 0, { hasEOL: true }),
+  item('conduct', 300, 278),
+  item('conduct', 300, 278.4, { hasEOL: true })
+])
+const once = dedupeTextContent(twice)
+check('a line drawn twice in the same place is read once', JSON.stringify(strs(once)) === JSON.stringify(['structure–', 'conduct–performance', '', 'conduct']), JSON.stringify(strs(once)))
+check('the line end on the copy carries to the kept item', once.items[0].hasEOL === true && once.items[1].hasEOL === true && once.items[3].hasEOL === true)
+check('the kept item is the first one (the outline copy, its own width)', once.items[1].width === 92.3)
+check('a copy a hair off (0.4 pt) still counts as the same place', once.items[3].str === 'conduct' && once.items.length === 4)
+check('the input is left untouched', twice.items.length === 7 && twice.items[0].hasEOL === false)
+
+const apart = content([item('0.00', 100, 500), item('0.00', 140, 500), item('0.00', 100, 488)])
+check('the same string elsewhere on the line or on another line is kept', dedupeTextContent(apart) === apart)
+const sized = content([item('A', 66, 700, { transform: [24, 0, 0, 24, 66, 700] }), item('A', 66, 700)])
+check('the same string at another size in the same place is kept', dedupeTextContent(sized) === sized)
+const turned = content([item('1', 66, 700), item('1', 66, 700, { transform: [0, 10, -10, 0, 66, 700] })])
+check('the same string turned 90° from the same origin is two', dedupeTextContent(turned) === turned)
+// LaTeX's \pmb: three copies of a symbol 0.04 em apart (Cardoso 2020, p. 11)
+const pmb = content([item('M C', 404.41, 515.84, { transform: [9.01, 0, 0, 9.01, 404.41, 515.84] }), item('M C', 404.65, 516.13, { transform: [9.01, 0, 0, 9.01, 404.65, 516.13] }), item('M C', 404.88, 515.84, { transform: [9.01, 0, 0, 9.01, 404.88, 515.84] })])
+check('a poor man\'s bold (three copies a hair apart) is one', dedupeTextContent(pmb).items.length === 1)
+const tiny = content([item('a', 100, 700, { transform: [3, 0, 0, 3, 100, 700] }), item('a', 100.4, 700, { transform: [3, 0, 0, 3, 100.4, 700] })])
+check('at 3 pt, 0.4 pt apart is another place (the tolerance follows the size)', dedupeTextContent(tiny) === tiny)
+// The outline copy of a line brings its own space items; left in, every
+// line's copy of a space opened the next line («useful\n instrumental»)
+const blanks = content([item('fi', 66, 700), item(' ', 76, 700), item('rm', 80, 700), item('fi', 66, 700), item(' ', 76, 700), item('rm', 80, 700, { hasEOL: true })])
+check('a space drawn twice in the same place goes with its line', JSON.stringify(strs(dedupeTextContent(blanks))) === JSON.stringify(['fi', ' ', 'rm']))
+const breaks = content([item('', 0, 0, { hasEOL: true }), item('', 0, 0, { hasEOL: true }), item('x', 70, 700)])
+check('the empty items that mark a paragraph break are never deduplicated', dedupeTextContent(breaks) === breaks)
+const xfaItems = { items: [{ str: 'Name', dir: 'ltr', width: 0, height: 0, transform: null, fontName: '', hasEOL: false }, { str: 'Name', dir: 'ltr', width: 0, height: 0, transform: null, fontName: '', hasEOL: false }], styles: {}, lang: null }
+check('items with no position (an XFA form) are left alone', dedupeTextContent(xfaItems) === xfaItems)
+const noTransform = { items: [{ str: 'a', dir: 'ltr', width: 0, height: 0, hasEOL: false }, { str: 'a', dir: 'ltr', width: 0, height: 0, hasEOL: false }], styles: {}, lang: null }
+check('items with no transform at all do not throw', dedupeTextContent(noTransform) === noTransform)
+const clean = content([item('one', 66, 700), item('two', 90, 700, { hasEOL: true }), item('one', 66, 688)])
+check('a clean page comes back as the same object', dedupeTextContent(clean) === clean)
+const far = content([item('one', 66, 700), item('one', 66, 700), item('one', 66, 698)])
+const farOut = dedupeTextContent(far)
+check('a non-consecutive copy is still found, a line below is not', farOut.items.length === 2 && farOut.items[1].transform[5] === 698)
 
 console.log(failures === 0 ? '\nAll search checks passed' : `\n${failures} search check(s) FAILED`)
 process.exit(failures === 0 ? 0 : 1)
