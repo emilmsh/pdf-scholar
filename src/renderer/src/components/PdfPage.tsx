@@ -31,6 +31,7 @@ import { carrySelection } from '../selection-carry'
 import { OCR_PRIORITY, imageTextRead, ocrImageContent, ocrTextContent, useOcrAllowed } from '../ocr'
 import { mergeImageText } from '../ocr-image'
 import { isVisibleText } from '../ocr-text'
+import { dedupeTextContent } from '../search'
 import type { TextContent } from 'pdfjs-dist/types/src/display/api'
 
 /** Tooltip for an in-document link — names the Ctrl/Cmd shortcut, which is the
@@ -306,7 +307,7 @@ function PdfPage({
   // ---- Canvas raster ----
   // Re-runs on zoom because a crisp bitmap must be rasterised at the new scale.
   // Deliberately separate from the text/link layers below: a zoom re-rasters
-  // only this canvas and must NOT rebuild the text layer (streamTextContent +
+  // only this canvas and must NOT rebuild the text layer (getTextContent +
   // a DOM node per span) or re-fetch link annotations — those are scale-free.
   useEffect(() => {
     const host = hostRef.current
@@ -636,7 +637,7 @@ function PdfPage({
       /** Build the layer from one source and put it in place of the old one.
        *  Null when the effect was torn down meanwhile. */
       const buildTextLayer = async (
-        source: ReturnType<PDFPageProxy['streamTextContent']> | TextContent,
+        source: TextContent,
         /** Spans from this one on are words OCR read in the page's images */
         imageSpansFrom?: number
       ): Promise<TextLayer | null> => {
@@ -698,7 +699,14 @@ function PdfPage({
         return tl
       }
 
-      const tl = await buildTextLayer(page.streamTextContent())
+      // The page's own text, read once for the layer and for the words in its
+      // images below. Through dedupeTextContent, like search.ts reads it: a
+      // publisher PDF that draws every line twice (outline, then fill) must
+      // give the layer ONE span per text, or a search's runs and the spans
+      // would not correspond — and a copied word would come out doubled.
+      const own = dedupeTextContent(await page.getTextContent())
+      if (cancelled) return
+      const tl = await buildTextLayer(own)
       if (!tl) return
       // A scanned page has no words of its own: OCR reads it (ocr.ts) and its
       // words take the empty layer's place. The links below do not wait —
@@ -717,7 +725,6 @@ function PdfPage({
         window.setTimeout(() => {
           if (cancelled) return
           void (async () => {
-            const own = await page.getTextContent()
             const images = await ocrImageContent(pdf, pageNumber, own, {
               priority: OCR_PRIORITY.visible,
               signal: ocrAbort.signal
