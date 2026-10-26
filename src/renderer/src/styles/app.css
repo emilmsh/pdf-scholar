@@ -8709,9 +8709,18 @@ button.bookmark-fold:hover {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0b0b0d;
+  /* Pure black, as Acrobat's full screen: on a projector the letterbox bands
+     around a deck of another aspect ratio should read as no picture at all */
+  background: #000;
+  overflow: hidden;
   cursor: default;
   animation: fade-in 0.18s ease;
+}
+
+/* The pointer goes away with the controls — a talk is given with the slide
+   alone on the screen. Any movement brings both back. */
+.presentation.controls-hidden {
+  cursor: none;
 }
 
 @keyframes fade-in {
@@ -8723,21 +8732,19 @@ button.bookmark-fold:hover {
   }
 }
 
-/* Anchors the invisible link overlays to the slide's exact canvas box.
-   The drop shadow lives HERE, not on the canvas: a CSS filter applies to
-   the element's whole rendering including its own box-shadow, so a shadow
-   on the filtered canvas gets inverted into a white glow in night mode. */
+/* Anchors the invisible link overlays to the slide's exact canvas box. The
+   slide meets the screen's edge on the axis that binds, so it carries no
+   shadow and no rounded corner — a clipped corner on a full-screen page is a
+   visible flaw, and a shadow has nothing to fall on. */
 .presentation-page {
   position: relative;
   line-height: 0;
-  border-radius: 2px;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
 }
 
 .presentation-canvas {
   /* Match the reading view's page recolouring (night inverts, sepia warms) */
   filter: var(--page-filter, none);
-  border-radius: 2px;
+  display: block;
 }
 
 /* Invisible until hovered — no visible chrome on the slide itself */

@@ -176,14 +176,19 @@ export default function PresentationMode({
       const pageObj = await pdf.getPage(page)
       if (cancelled) return
       const base = pageObj.getViewport({ scale: 1 })
-      const pad = 56
-      const fit = Math.min((viewport.w - pad) / base.width, (viewport.h - pad) / base.height)
+      // Acrobat's full screen: the page fills the screen edge to edge on the
+      // axis that binds, no air around it. A 16:9 deck on a 16:10 display still
+      // gets a black band above and below — the aspect ratio is the slide's, and
+      // stretching it is not an option — but never a margin on the other axis.
+      const fit = Math.min(viewport.w / base.width, viewport.h / base.height)
       const dpr = window.devicePixelRatio || 1
       const vp = pageObj.getViewport({ scale: Math.max(0.1, fit) * dpr })
+      // Whole device pixels, and the CSS box derived from the bitmap so the two
+      // stay 1:1 on screen (a bitmap stretched over a fractional box reads soft)
       canvas.width = Math.floor(vp.width)
       canvas.height = Math.floor(vp.height)
-      canvas.style.width = `${vp.width / dpr}px`
-      canvas.style.height = `${vp.height / dpr}px`
+      canvas.style.width = `${canvas.width / dpr}px`
+      canvas.style.height = `${canvas.height / dpr}px`
       task = pageObj.render({ canvas, viewport: vp })
       await task.promise.catch(() => {})
       if (cancelled) return
