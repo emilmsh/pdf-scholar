@@ -167,11 +167,18 @@ text field is the baseline and must work alone.
 - **Shape.** One text field, «Leseskrift», in the appearance group of
   settings next to the theme, with the system face as the empty default. The
   field's placeholder names the system face. Under it a one-line preview
-  rendered in the typed face (a pangram with æøå), and when
-  `document.fonts.check()` reports the face missing the preview says so and
-  shows the system face instead of a silent fallback. Hover hint, not a
+  rendered in the typed face (a pangram with æøå), and when the face is not
+  on the machine a line says so while the preview shows the system face
+  instead of a silent fallback. The «is it installed» question cannot be
+  put to `document.fonts.check()` — in Chromium it answers only for
+  @font-face sets, so an installed face and a missing one both read as
+  true — so it is measured: a probe string in the typed face with a generic
+  fallback against the generic alone, for monospace, serif and sans-serif;
+  any width that differs means the face was used. Hover hint, not a
   permanent line (`feedback-hover-hints`). A reset link when the value is not
-  the default, as the AI text scale has.
+  the default, as the AI text scale has. The field commits on Enter or on
+  leaving it, not per keystroke — the reading surfaces must not flicker
+  through every prefix of a name — while the preview follows the keystrokes.
 - **The stored value is untrusted input.** The name goes into a CSS custom
   property, so the pure half (`src/renderer/src/reading-font.ts`) normalises
   it: trim, cap the length, drop quotes, semicolons, braces, backslashes and
@@ -199,6 +206,13 @@ text field is the baseline and must work alone.
 2. **Measure** Segoe UI Variable Text's x-height ratio for section 4.
    Done 2026-10-27: 0.50.
 3. **The setting** per section 6, with the pure half and its test first.
+   Done 2026-10-27: `src/renderer/src/reading-font.ts`, `test:reading-font`,
+   the «Leseskrift» field at the foot of the reading-mode menu, the face
+   applied at start in all three apps (viewer, detached assistant,
+   extension) and cleared by the app-wide reset. Checked in dev:web: the
+   sample follows the keystrokes, Enter commits, the reading surfaces get
+   the face and the adjustment, body and code do not, a name the machine
+   lacks says so, reset clears everything.
 4. **Try `queryLocalFonts`** on desktop and in the extension; keep the menu
    only if it works on both without a dialog the reader would not expect.
 5. Only on request, and on the same roles: an interface-font field, or

@@ -194,6 +194,7 @@ import { addSearchHistory, clearSearchHistory } from '../search-history'
 import { saveSearchListOpen } from '../search-list-pref'
 import { isPageInverted } from '../theme-tune'
 import { clearAiTextScale } from '../ai-text-scale'
+import { applyReadingFont, clearReadingFont } from '../reading-font'
 import type { PageText, SearchMatch, SearchOptions } from '../search'
 import { allowOcrStore, carryOcr, enableOcr, setOcrAuto, useOcrAllowed, useOcrOffer, useOcrProgress } from '../ocr'
 import { OcrBadge } from './OcrBadge'
@@ -6108,6 +6109,10 @@ export default function PdfViewer({
     saveSearchListOpen(false)
     // The assistant re-reads this when the panel next opens
     clearAiTextScale()
+    // The reading font goes back to the system face at once; the menu's
+    // field re-reads the store when it next opens
+    clearReadingFont()
+    applyReadingFont('')
     setPanelW({ ...PANEL_DEFAULTS })
     try {
       localStorage.removeItem(PANEL_LS_KEY)
