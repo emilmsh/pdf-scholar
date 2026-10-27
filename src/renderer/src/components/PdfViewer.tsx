@@ -7594,6 +7594,10 @@ export default function PdfViewer({
           canSaveInPlace={isElectron || isExtension}
           annotsHidden={annotsHidden}
           onToggleAnnots={() => setAnnotsHidden((h) => !h)}
+          marginOn={marginNotes}
+          marginSide={marginView.side}
+          onToggleMargin={toggleMarginNotes}
+          onMarginSideChange={setMarginSide}
           canUndo={undoDepths.undo > 0}
           canRedo={undoDepths.redo > 0}
           onUndo={() => void performUndoRedo('undo')}
