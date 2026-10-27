@@ -114,7 +114,13 @@ import {
 import { buildMarginCopy } from '../../../shared/margin-export'
 import type { MarginExportCard } from '../../../shared/margin-export'
 import { WASM_SAFE_LIMIT } from '../../../shared/pdfium-annot-ops'
-import { marginCardAnnotations, MarginJumpArrows } from './MarginNotes'
+import {
+  marginCardAnnotations,
+  MarginJumpArrows,
+  marginStackBottom,
+  resetMarginStacks,
+  useMarginColumnBottom
+} from './MarginNotes'
 import type { MarginViewConfig } from './MarginNotes'
 import { registerPdfiumDoc, releasePdfiumDoc } from '../pdfium-renderer'
 import {
@@ -2215,10 +2221,15 @@ export default function PdfViewer({
       },
       coverPage
     )
+    // The margin strips' overhangs are in the old layout's coordinates: forget
+    // them here, before the pages lay out again and report fresh ones.
+    resetMarginStacks(innerRef.current)
     // A left-hand margin means the gutter sits BEFORE the pages: shift every
     // page right by the reserved width so the column has its space.
     return shiftLayoutX(lay, marginView.side === 'left' ? marginGutter : 0, devicePixelRatio)
   }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView.side, pagedHeight, devicePixelRatio])
+  // A page whose comments run on below it: the scroll height reaches them
+  const marginColumnBottom = useMarginColumnBottom(innerRef, payload.path, marginNotes)
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -2246,14 +2257,17 @@ export default function PdfViewer({
     let to = 1
     for (let i = 0; i < layout.tops.length; i++) {
       const pageTop = layout.tops[i]
-      const pageBottom = pageTop + layout.heights[i]
+      // A page whose margin comments run on below it stays mounted while
+      // they are near — the cards are in ITS tree, they vanish with it
+      const stackBottom = marginNotes ? marginStackBottom(innerRef.current, payload.path, i + 1) : null
+      const pageBottom = Math.max(pageTop + layout.heights[i], stackBottom ?? 0)
       if (pageBottom < top) from = i + 2
       if (pageTop <= bottom) to = i + 1
     }
     setRange((prev) => (prev[0] === from && prev[1] === to ? prev : [from, Math.max(from, to)]))
     const current = computeCurrent()
     if (current) setCurrentPage(current.page)
-  }, [layout, computeCurrent])
+  }, [layout, computeCurrent, marginNotes, payload.path])
   const updateRangeRef = useRef(updateRange)
   updateRangeRef.current = updateRange
 
@@ -7832,7 +7846,10 @@ export default function PdfViewer({
             <div
               className="pages-inner"
               ref={innerRef}
-              style={{ height: layout.total, width: layout.contentWidth + marginGutter }}
+              style={{
+                height: Math.max(layout.total, marginColumnBottom + PAD_BOTTOM),
+                width: layout.contentWidth + marginGutter
+              }}
             >
               {paged && <PageSlots layout={layout} />}
               {sizes.map((size, i) => {

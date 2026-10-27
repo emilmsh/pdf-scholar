@@ -45,7 +45,12 @@ import {
   spreadRow,
   viewSize
 } from '../rotation'
-import { MarginJumpArrows } from './MarginNotes'
+import {
+  MarginJumpArrows,
+  marginStackBottom,
+  resetMarginStacks,
+  useMarginColumnBottom
+} from './MarginNotes'
 import type { MarginViewConfig } from './MarginNotes'
 import { makePaneHandle } from '../pane-handle'
 import type { PaneHandle } from '../pane-handle'
@@ -300,8 +305,12 @@ export default function PagesPane({
       },
       coverPage
     )
+    // The margin strips' overhangs are in the old layout's coordinates (see
+    // the first column)
+    resetMarginStacks(innerRef.current)
     return shiftLayoutX(lay, marginView?.side === 'left' ? marginGutter : 0)
   }, [sizes, scale, containerWidth, rotation, spread, coverPage, marginGutter, marginView?.side, pagedHeight])
+  const marginColumnBottom = useMarginColumnBottom(innerRef, docKey, !!marginView)
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
@@ -331,7 +340,9 @@ export default function PagesPane({
     let from = 1
     let to = 1
     for (let i = 0; i < lay.tops.length; i++) {
-      if (lay.tops[i] + lay.heights[i] < top) from = i + 2
+      // Overhanging margin comments keep their page mounted (see column A)
+      const stackBottom = marginView ? marginStackBottom(innerRef.current, docKey, i + 1) : null
+      if (Math.max(lay.tops[i] + lay.heights[i], stackBottom ?? 0) < top) from = i + 2
       if (lay.tops[i] <= bottom) to = i + 1
     }
     setRange((prev) => (prev[0] === from && prev[1] === to ? prev : [from, Math.max(from, to)]))
@@ -347,7 +358,7 @@ export default function PagesPane({
       currentPageRef.current = page
       onPageChange(page)
     }
-  }, [onPageChange])
+  }, [onPageChange, marginView, docKey])
   const updateRangeRef = useRef(updateRange)
   updateRangeRef.current = updateRange
 
@@ -743,7 +754,10 @@ export default function PagesPane({
           <div
             className="pages-inner"
             ref={innerRef}
-            style={{ height: layout.total, width: layout.contentWidth + marginGutter }}
+            style={{
+              height: Math.max(layout.total, marginColumnBottom + PAD_BOTTOM),
+              width: layout.contentWidth + marginGutter
+            }}
           >
             {paged && <PageSlots layout={layout} />}
             {sizes.map((size, i) => {
