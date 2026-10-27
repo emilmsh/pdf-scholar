@@ -222,10 +222,10 @@ const REGISTRY: readonly Command[] = [
   // Split-view companion: the two columns trade sides (a visual order flip).
   // Shift+S so it reads as "the other S" — does nothing without a split.
   { id: 'view.swapPanes', category: 'view', labelKey: 'keys.viewSwapPanes', defaults: ['shift+s'] },
-  // Unbound as shipped, like the tools: the margin view arrived after the
-  // reading letters were spoken for, and 'm' is the kind of key a reader should
-  // get to spend themselves.
-  { id: 'view.marginNotes', category: 'view', labelKey: 'keys.viewMarginNotes', defaults: [] },
+  // 'm' for margin (Emil, 2026-10-27): the view sat unbound and three clicks
+  // deep — the notes tab's switch — which is too far from the margin it
+  // governs, most of all with the toolbar hidden. 'm' was free.
+  { id: 'view.marginNotes', category: 'view', labelKey: 'keys.viewMarginNotes', defaults: ['m'] },
   { id: 'view.togglePin', category: 'view', labelKey: 'keys.viewTogglePin', defaults: ['v'] },
   // Cycles day→Farge→night→night+ (a reader-feature ask, 2026-09-02). 'd' was
   // free and reads as dag/dark in both languages; handled in App.tsx's shell

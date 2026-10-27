@@ -2372,6 +2372,12 @@ html.pen-near .draw-layer {
   margin: 10px -4px;
 }
 
+/* The margin view's side choice, folded out under its switch in the view
+   menu: indented past the switch's icon so it reads as the switch's own row */
+.theme-margin-side {
+  margin: 2px 0 6px 23px;
+}
+
 .theme-menu-toggle {
   display: flex;
   align-items: center;

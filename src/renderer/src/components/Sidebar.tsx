@@ -762,9 +762,11 @@ function AnnotationList({
   }, [flat, query, colorFilter, typeFilter, withComment, excerpts])
 
   // The margin VIEW controls live HERE — the tab is the one home for
-  // everything comment-related (toolbar keeps only the quick on/off toggle).
-  // Rendered even with zero annotations: turning the margin on first is a
-  // valid start. Exports — both kinds — live together in the export section.
+  // everything comment-related. Since 2026-10-27 the toolbar's view menu holds
+  // the same switch and side choice (and «m» toggles it): this tab was three
+  // steps away from the margin it governs. Rendered even with zero
+  // annotations: turning the margin on first is a valid start. Exports — both
+  // kinds — live together in the export section.
   const marginControls = (
     <div className="annot-margin">
       <label className="theme-menu-toggle">
