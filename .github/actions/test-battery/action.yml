@@ -24,6 +24,11 @@ runs:
     # the copy (incl. /Rotate 90 pages and the link-AP guard)
     - run: npm run test:margin
       shell: bash
+    # The margin view's ON-SCREEN stacking rule: cards taller than their page
+    # overhang it instead of landing on each other at the top edge, and a
+    # stack that fits lays out exactly as before
+    - run: npm run test:margin-stack
+      shell: bash
     # The >150 MB path takes the incremental appender instead of the engine —
     # a separate write implementation, so it needs its own gate
     - run: npm run test:appender
