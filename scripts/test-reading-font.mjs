@@ -134,15 +134,51 @@ same(F.orderFamilies(fam, ''), fam, 'the default changes nothing')
 same(F.orderFamilies([], 'Georgia'), [], 'an empty list stays empty')
 ok(F.orderFamilies(fam, 'Georgia') !== fam, 'ordering returns a new array, the listing is not mutated')
 
-// the typed filter
+// the typed filter — the chips' rule (section 6) with no cap, and the exact
+// name kept at the top: the current face must stay in the list it opened
 same(F.filterFamilies(fam, ''), fam, 'an empty query keeps everything')
 same(F.filterFamilies(fam, '   '), fam, 'a blank query keeps everything')
 same(F.filterFamilies(fam, 'geo'), ['Georgia', 'Georgia Bold'], 'a prefix, case-folded')
+same(F.filterFamilies(fam, 'Georgia'), ['Georgia', 'Georgia Bold'], 'the exact name stays, first')
 same(F.filterFamilies(fam, 'serif'), ['Libertinus Serif'], 'a word inside the name')
 same(F.filterFamilies(fam, 'sans'), ['Noto Sans 2', 'Noto Sans 10'], 'inner matches keep the list order')
 same(F.filterFamilies(fam, 'se'), ['Segoe UI', 'Libertinus Serif'], 'names that start with the query come before names that merely contain it')
 same(F.filterFamilies(fam, 'Zapf'), [], 'no match → empty, never the whole list')
 same(F.filterFamilies(fam, 'geo;{'), ['Georgia', 'Georgia Bold'], 'the query is normalised like a name before it is matched')
+eq(F.filterFamilies(fam, 'o').length, fam.filter((f) => f.toLowerCase().includes('o')).length, 'the open list has no cap')
+
+// 6) suggestions as the name is typed
+console.log('6) the suggestions')
+const NAMES = ['Georgia', 'Libertinus Serif', 'Libertinus Sans', 'Source Serif 4', 'Noto Serif', 'Segoe UI', 'Gill Sans']
+const m = (q, limit) => F.matchFontNames(q, NAMES, limit)
+eq(JSON.stringify(m('')), '[]', 'an empty query offers nothing')
+eq(JSON.stringify(m('   ')), '[]', 'blanks offer nothing')
+eq(JSON.stringify(m('lib')), '["Libertinus Serif","Libertinus Sans"]', 'a prefix, in list order')
+eq(JSON.stringify(m('LIB')), '["Libertinus Serif","Libertinus Sans"]', 'case-folded')
+eq(
+  JSON.stringify(m('serif')),
+  '["Libertinus Serif","Source Serif 4","Noto Serif"]',
+  'a word the query opens, after no whole name does'
+)
+eq(JSON.stringify(m('eorg')), '["Georgia"]', 'an occurrence anywhere, last')
+eq(JSON.stringify(m('Georgia')), '[]', 'the exact name is not offered back')
+eq(JSON.stringify(m('georgia')), '[]', 'nor the exact name in another case')
+eq(
+  JSON.stringify(F.matchFontNames('s', ['Segoe UI', 'Source Serif 4', 'Gill Sans', 'Noto Serif'])),
+  '["Segoe UI","Source Serif 4","Gill Sans","Noto Serif"]',
+  'whole-name openers before word openers, each tier in list order'
+)
+eq(m('s', 2).length, 2, 'the limit cuts the list')
+eq(JSON.stringify(m('s', 0)), '[]', 'a limit of zero offers nothing')
+eq(JSON.stringify(F.matchFontNames('g', ['Georgia', 'georgia', 'Gill Sans'])), '["Georgia","Gill Sans"]', 'a name twice is offered once')
+eq(JSON.stringify(m('"lib;')), '["Libertinus Serif","Libertinus Sans"]', 'the query is normalised like the name')
+eq(JSON.stringify(m('xyz')), '[]', 'nothing matches → nothing')
+ok(Array.isArray(F.COMMON_FONT_FAMILIES) && F.COMMON_FONT_FAMILIES.length > 50, 'the common list is a real list')
+eq(new Set(F.COMMON_FONT_FAMILIES.map((s) => s.toLowerCase())).size, F.COMMON_FONT_FAMILIES.length, 'no family twice')
+ok(
+  F.COMMON_FONT_FAMILIES.every((s) => n(s) === s),
+  'every common family survives normalising unchanged (it goes straight into the stack)'
+)
 
 if (failures) {
   console.error(`\n${failures} failure(s)`)

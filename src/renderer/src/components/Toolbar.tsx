@@ -40,10 +40,12 @@ import {
   localFontsAvailable,
   normalizeReadingFont,
   orderFamilies,
-  queryLocalFontFamilies,
   readingFontStack,
+  listInstalledFonts,
+  matchFontNames,
   saveReadingFont,
 } from '../reading-font'
+import type { InstalledFonts } from '../reading-font'
 import { CITATION_STYLES } from '../../../shared/citation-style'
 import type { CitationStyleId } from '../../../shared/citation-style'
 import {
@@ -662,36 +664,45 @@ export default function Toolbar({
   }
   const fontDraftName = normalizeReadingFont(fontDraft)
   const fontInstalled = useMemo(() => isFontInstalled(fontDraftName), [fontDraftName])
-  // The machine's faces as a list behind «Velg …» (TYPOGRAPHY.md § 5): asked
-  // on that click only, never at start. On the desktop Electron answers with
-  // no dialog; in the extension the browser prompts once, named after the
-  // extension, and a Block comes back as an EMPTY list — the result kinds are
-  // what the UI goes by. A pick fills the same field through
-  // commitReadingFont, so the typed name stays the baseline and the sample,
-  // the missing-hint and the reset are untouched.
-  const [fontPicker, setFontPicker] = useState<'idle' | 'busy' | 'open' | 'denied' | 'gone'>(() =>
+  // The machine's faces, ONE list behind two offers (TYPOGRAPHY.md § 5–6):
+  // chips under the field as the name is typed, and the whole list behind
+  // «Velg …». The list is asked for on the first keystroke WITHOUT a prompt
+  // (Chromium's where the state already reads granted — the desktop — else
+  // the common faces that measure as installed) and again, the browser's one
+  // prompt allowed, on the «Velg …» click. A Block in the extension comes
+  // back as an empty list, read through the permission state; the measured
+  // list then stands in and the open list says so. Either way a pick fills
+  // the same field through commitReadingFont, so the typed name stays the
+  // baseline and the sample, the missing-hint and the reset are untouched.
+  const [fontFaces, setFontFaces] = useState<InstalledFonts | null>(null)
+  const [fontPicker, setFontPicker] = useState<'idle' | 'busy' | 'open' | 'gone'>(() =>
     localFontsAvailable() ? 'idle' : 'gone'
   )
-  const [fontList, setFontList] = useState<string[]>([])
   const [fontActive, setFontActive] = useState(-1)
   const [fontHover, setFontHover] = useState<string | null>(null)
   const fontInputRef = useRef<HTMLInputElement>(null)
   const fontListRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!fontDraftName || fontFaces !== null) return
+    let live = true
+    void listInstalledFonts(false).then((faces) => {
+      if (live) setFontFaces(faces)
+    })
+    return () => {
+      live = false
+    }
+  }, [fontDraftName, fontFaces])
   const closeFontList = (): void => {
     setFontPicker((p) => (p === 'open' ? 'idle' : p))
     setFontHover(null)
   }
   const openFontPicker = async (): Promise<void> => {
     setFontPicker('busy')
-    const result = await queryLocalFontFamilies()
-    if (result.kind === 'list') {
-      setFontList(result.families)
-      setFontActive(-1)
-      setFontPicker('open')
-      fontInputRef.current?.focus()
-    } else if (result.kind === 'denied') setFontPicker('denied')
-    else if (result.kind === 'unavailable') setFontPicker('gone')
-    else setFontPicker('idle')
+    const faces = await listInstalledFonts(true)
+    setFontFaces(faces)
+    setFontActive(-1)
+    setFontPicker('open')
+    fontInputRef.current?.focus()
   }
   const pickFont = (name: string): void => {
     commitReadingFont(name)
@@ -700,10 +711,16 @@ export default function Toolbar({
   // With the committed name in the field the whole list shows, the current
   // face first; anything else typed narrows it
   const fontChoices = useMemo(() => {
-    if (fontPicker !== 'open') return []
+    if (fontPicker !== 'open' || !fontFaces) return []
     const query = fontDraftName === readingFont ? '' : fontDraft
-    return filterFamilies(orderFamilies(fontList, readingFont), query)
-  }, [fontPicker, fontList, readingFont, fontDraft, fontDraftName])
+    return filterFamilies(orderFamilies(fontFaces.families, readingFont), query)
+  }, [fontPicker, fontFaces, readingFont, fontDraft, fontDraftName])
+  // The chips as the name is typed; the open list narrows itself instead
+  const fontSuggestions = useMemo(
+    () =>
+      fontFaces && fontDraftName && fontPicker !== 'open' ? matchFontNames(fontDraftName, fontFaces.families) : [],
+    [fontFaces, fontDraftName, fontPicker]
+  )
   useEffect(() => {
     if (fontActive < 0) return
     const item = fontListRef.current?.children[fontActive]
@@ -2626,6 +2643,26 @@ export default function Toolbar({
                     </button>
                   )}
                 </div>
+                {/* The installed faces the typed name opens, each chip in its
+                    own face; gone once the whole name stands in the field, and
+                    while the list below is open and narrows itself */}
+                {fontSuggestions.length > 0 && (
+                  <div className="theme-auto-choices theme-font-suggest" aria-label={t('tb.readingFontSuggest')}>
+                    {fontSuggestions.map((name) => (
+                      <button
+                        key={name}
+                        className="theme-chip"
+                        style={{ fontFamily: readingFontStack(name) }}
+                        // Keep the focus (and the caret) in the field: a blur
+                        // would commit the half-typed name first
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={() => commitReadingFont(name)}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {fontPicker === 'open' && (
                   <div
                     ref={fontListRef}
@@ -2674,7 +2711,9 @@ export default function Toolbar({
                 {fontDraftName && fontInstalled === false && !fontHover && (
                   <div className="theme-auto-hint">{t('tb.readingFontMissing')}</div>
                 )}
-                {fontPicker === 'denied' && <div className="theme-auto-hint">{t('tb.readingFontDenied')}</div>}
+                {fontPicker === 'open' && fontFaces?.refused && (
+                  <div className="theme-auto-hint">{t('tb.readingFontDenied')}</div>
+                )}
                 <ResetLink hidden={!readingFont && !fontDraftName} onClick={() => commitReadingFont('')} />
               </div>
               <div className="theme-menu-sep" />

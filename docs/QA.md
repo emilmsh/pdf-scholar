@@ -231,6 +231,29 @@ stående; den gjemmer seg når musa forlater den. Festet verktøylinje (V
 igjen): ingenting av dette skjer, alt står som før. Sidepillen nede til
 høyre: klikk på den markerer tallet, så et nytt sidetall erstatter det.
 
+## 13. Kommentarkortet ved hover og boblen ved klikk (v0.74.2)
+
+Et notat eller en markering med en LANG kommentar (et avsnitt på 80–120 ord,
+og ett på flere hundre).
+
+- Hold pekeren over merket: kortet legger seg under merket (over det nederst i
+  vinduet), står stille, og teksten fader i bunnen når det er mer. Flytt pekeren
+  over på kortet – det blir stående – og rull med hjulet: siden under står
+  stille. Pekeren bort fra begge, Esc, rulling av siden eller et klikk et annet
+  sted lukker det.
+- Klikk merket: boblen åpner høy nok til hele avsnittet uten rulling, opp til
+  omtrent halve vinduet, og 400 px bred når kommentaren er lang. Dobbeltklikk på
+  gripet viser hele teksten (opp til 80 % av vinduet); dobbeltklikk igjen gir
+  standard. Dra gripet: den dratte størrelsen vinner, og dobbeltklikk går
+  tilbake til standard.
+- Berøring (Surface): det finnes ikke hover, så boblen er leseflaten; dobbelt-
+  trykk på gripet skal veksle som dobbeltklikk. Penn: hover-kortet skal komme
+  fra pennens sveving, og ikke stjele strøket.
+
+**Dekket av maskin:** ingenting enda – kortet og boblens tilpasning er
+pekerdrevet. Håndsjekk: følelsen av at kortet «venter» på deg (220 ms), og at
+tilpasningen aldri flytter en boble du selv har dratt.
+
 ## Står igjen fra RELEASE.md steg 1 (alltid)
 
 - Skriv ut én gang – bare når Electrons hovedversjon endres (se RELEASE.md).

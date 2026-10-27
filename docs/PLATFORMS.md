@@ -660,10 +660,14 @@ regressions are treated as bugs, not as acceptable platform lag.
     Electron passes it through with no permission handler in main and no UI;
     Edge/Chrome show their own permission bubble, named after the extension,
     once per origin — a Block there comes back as an empty list, which the
-    renderer reads through the permission state and answers with one hint
-    line. dev:web on localhost gets the browser's prompt like the extension;
-    on any origin without the API the button is not drawn. The typed name —
-    the baseline — is identical everywhere.
+    renderer reads through the permission state and answers with the common
+    faces that measure as installed plus one hint line. The chips under the
+    field as the name is typed share that list but never prompt: Chromium's
+    list where the state already reads granted (the desktop; the extension
+    once allowed), the measured faces otherwise. dev:web on localhost gets
+    the browser's prompt like the extension; on any origin without the API
+    the button is not drawn and the chips are the measured faces. The typed
+    name — the baseline — is identical everywhere.
 
 ## Maintenance rules
 

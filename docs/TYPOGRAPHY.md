@@ -38,7 +38,7 @@ wordmark and the Standard-14 fallbacks on the page marks.
 | Role | Property | Surfaces | User setting |
 |---|---|---|---|
 | Interface | `--font-ui` | tabs, toolbar, menus, buttons, search bar, dialogs, settings, sidebar headers, the library's chrome | **none** — always the system stack |
-| Reading | `--font-reading` | the assistant's messages (`.ai-assistant`, `.ai-quick-body`), comment and note text in the sidebar and popovers, the link preview card's entry text and abstracts (`.lp-card`, `.lpa-text`), conversation snippets in the library's «Samtaler» view | **yes** |
+| Reading | `--font-reading` | the assistant's messages (`.ai-assistant`, `.ai-quick-body`) and the reader's own (`.ai-user` — since 2026-10-27, Emil: a conversation reads as one surface), comment and note text in the sidebar and popovers, the link preview card's entry text and abstracts (`.lp-card`, `.lpa-text`), conversation snippets in the library's «Samtaler» view | **yes** |
 | Mono | `--font-mono` | code blocks in answers, the few monospace fields | none |
 
 Outside the roles, and unchanged: the wordmark (its own `@font-face`), the
@@ -185,14 +185,23 @@ as the baseline:
   button is not drawn — the field alone, as everywhere else.
 
 So the menu ships (§ 7 step 4): a «Velg …» button beside the field asks the
-API on that click only — never at start — and the list it opens fills the
-same field through the same commit path: the current face first, the rest
-sorted, typing in the field narrows it (names that start with the text
-before names that contain it), Enter or a click commits, Escape or leaving
-the field closes it, and the sample line follows the hovered row. The pure
-half (one entry per family across its cuts, every name normalised like a
-typed one, the sort, the order, the filter, a junk or runaway listing) is
-in `reading-font.ts` and `test:reading-font`.
+API on that click — the one place the browser's prompt may be raised, never
+at start — and the list it opens fills the same field through the same
+commit path: the current face first, the rest sorted, typing in the field
+narrows it (the chips' rule of § 6 with no cap, the exact name kept at the
+top), Enter or a click commits, Escape or leaving the field closes it, and
+the sample line follows the hovered row. Where the browser said no, the
+list holds the common faces that measure as installed (§ 6) and says so in
+one hint line. The pure half (one entry per family across its cuts, every
+name normalised like a typed one, the sort, the order, the filter, a junk
+or runaway listing) is in `reading-font.ts` and `test:reading-font`.
+
+The chips of § 6 and this list share ONE list per session
+(`listInstalledFonts`): the keystroke path asks Chromium only where the
+permission state already reads «granted» — the desktop, and the extension
+once allowed — and otherwise takes the measured common faces, so typing
+never raises a dialog; the «Velg …» click asks with the prompt allowed, and
+Chromium's list then replaces a measured one.
 
 ## 6. The setting
 
@@ -215,6 +224,22 @@ in `reading-font.ts` and `test:reading-font`.
   the default, as the AI text scale has. The field commits on Enter or on
   leaving it, not per keystroke — the reading surfaces must not flicker
   through every prefix of a name — while the preview follows the keystrokes.
+- **Suggestions as the name is typed** (Emil, 2026-10-27). Under the field,
+  chips with the installed faces whose names the typed text opens — a whole
+  name first, then a word of it, then anywhere in it — each chip drawn in its
+  own face, at most six, gone once the whole name stands in the field. A
+  click commits that face (the chip keeps the focus in the field, or the blur
+  would commit the half-typed name first). The list of faces is asked for
+  once per session, on the first keystroke: Chromium's own
+  `queryLocalFonts()` where the platform offers it and the permission state
+  already reads «granted» (the desktop; the extension once the reader has
+  allowed it from «Velg …», § 5), and otherwise a curated list of common
+  faces (`COMMON_FONT_FAMILIES`: the Windows, macOS and Linux sets plus the
+  reading faces people install on purpose) filtered by the measured
+  installed rule. Nothing leaves the machine either way, and typing never
+  raises the browser's prompt — the «Velg …» button is where it may come.
+  While that list is open the chips step aside (the list narrows itself).
+  The matching rule is `matchFontNames`, proved by `test:reading-font`.
 - **The stored value is untrusted input.** The name goes into a CSS custom
   property, so the pure half (`src/renderer/src/reading-font.ts`) normalises
   it: trim, cap the length, drop quotes, semicolons, braces, backslashes and
@@ -254,8 +279,8 @@ in `reading-font.ts` and `test:reading-font`.
    Done 2026-10-27: it does — no dialog on the desktop, the browser's one
    named prompt in the extension, from a «Velg …» button the reader
    pressed (§ 5 has the measurements). The list fills the field; the field
-   stays the baseline. `docs/PLATFORMS.md` divergence 33 records the
-   prompt.
+   stays the baseline; the chips of § 6 (same day) share the list and never
+   prompt. `docs/PLATFORMS.md` divergence 33 records the prompt.
 5. Only on request, and on the same roles: an interface-font field, or
    shipped families (option 2).
 

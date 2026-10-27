@@ -125,11 +125,13 @@ export function clearReadingFont(): void {
   }
 }
 
-// ---- The machine's faces as a LIST (TYPOGRAPHY.md § 5, «Font picker»):
-// Chromium's Local Font Access API, asked only when the reader presses
-// «Velg …» beside the field — never at start — and filling the same field
-// through the same commit path, so the typed name stays the baseline and
-// works alone wherever the list does not come.
+// ---- The machine's faces (TYPOGRAPHY.md § 5 «Font picker» and § 6): ONE
+// list behind two offers — chips under the field as the name is typed, and
+// the whole list behind «Velg …». Chromium's Local Font Access API where the
+// browser allows it without asking, or from the button the reader pressed
+// for it; otherwise the common faces that measure as installed. Both fill
+// the same field through the same commit path, so the typed name stays the
+// baseline and works alone wherever no list comes.
 
 /** A listing is untrusted input too: a runaway one is cut here. */
 export const READING_FONT_LIST_MAX = 1000
@@ -170,26 +172,131 @@ export function orderFamilies(families: readonly string[], current: string): str
   return [families[i], ...families.slice(0, i), ...families.slice(i + 1)]
 }
 
-/** The names a typed query keeps: those that start with it first, then those
- *  that contain it, case-folded; an empty query keeps everything. */
+/** Faces common enough to be worth measuring for when the machine cannot be
+ *  asked for its list (`queryLocalFonts` is Chromium's, behind a permission
+ *  a browser prompts for and a gesture): the OS faces of Windows, macOS and
+ *  the usual Linux sets, plus the reading faces people install on purpose.
+ *  Only the ones the installed rule finds are ever offered. */
+export const COMMON_FONT_FAMILIES: readonly string[] = [
+  // Windows
+  'Segoe UI',
+  'Segoe UI Variable Text',
+  'Aptos',
+  'Aptos Serif',
+  'Calibri',
+  'Cambria',
+  'Candara',
+  'Constantia',
+  'Corbel',
+  'Georgia',
+  'Times New Roman',
+  'Garamond',
+  'Book Antiqua',
+  'Palatino Linotype',
+  'Century Schoolbook',
+  'Sitka Text',
+  'Bahnschrift',
+  'Verdana',
+  'Tahoma',
+  'Trebuchet MS',
+  'Arial',
+  // macOS
+  'New York',
+  'SF Pro Text',
+  'Helvetica Neue',
+  'Avenir',
+  'Avenir Next',
+  'Baskerville',
+  'Hoefler Text',
+  'Iowan Old Style',
+  'Charter',
+  'Palatino',
+  'Optima',
+  'Gill Sans',
+  'Times',
+  // Linux
+  'Noto Serif',
+  'Noto Sans',
+  'DejaVu Serif',
+  'DejaVu Sans',
+  'Liberation Serif',
+  'Liberation Sans',
+  'Ubuntu',
+  'Cantarell',
+  // Installed on purpose
+  'Libertinus Serif',
+  'Libertinus Sans',
+  'Linux Libertine',
+  'Source Serif 4',
+  'Source Serif Pro',
+  'Source Sans 3',
+  'IBM Plex Serif',
+  'IBM Plex Sans',
+  'Literata',
+  'Merriweather',
+  'EB Garamond',
+  'Crimson Pro',
+  'Crimson Text',
+  'Cormorant Garamond',
+  'PT Serif',
+  'PT Sans',
+  'Lora',
+  'Vollkorn',
+  'Alegreya',
+  'Spectral',
+  'Bitter',
+  'Roboto',
+  'Roboto Slab',
+  'Open Sans',
+  'Lato',
+  'Inter',
+  'Fira Sans',
+  'Atkinson Hyperlegible',
+  'Lexend',
+  'OpenDyslexic',
+  'Minion Pro',
+  'Sabon',
+  'Bembo',
+  'Bookerly'
+]
+
+/** The names worth offering for what is typed so far: a name the query
+ *  opens, then one of whose words it opens, then one it occurs in — case-
+ *  folded, each once, the exact name left out (nothing left to complete),
+ *  at most `limit`. An empty query offers nothing. */
+export function matchFontNames(query: string, names: readonly string[], limit = 6): string[] {
+  const q = normalizeReadingFont(query).toLowerCase()
+  if (!q) return []
+  const seen = new Set<string>()
+  const tiers: [string[], string[], string[]] = [[], [], []]
+  for (const name of names) {
+    const n = name.toLowerCase()
+    if (n === q || seen.has(n)) continue
+    seen.add(n)
+    if (n.startsWith(q)) tiers[0].push(name)
+    else if (n.split(' ').some((word) => word.startsWith(q))) tiers[1].push(name)
+    else if (n.includes(q)) tiers[2].push(name)
+  }
+  return tiers.flat().slice(0, Math.max(0, limit))
+}
+
+/** The open list as the typed text narrows it: an empty query keeps
+ *  everything; otherwise the name the query IS (the current face must stay
+ *  in the list it opened), then the rest by the chips' own rule — names the
+ *  query opens, then a word of them, then anywhere in them — with no cap. */
 export function filterFamilies(families: readonly string[], query: string): string[] {
   const q = normalizeReadingFont(query).toLowerCase()
   if (!q) return [...families]
-  const starts: string[] = []
-  const contains: string[] = []
-  for (const f of families) {
-    const lower = f.toLowerCase()
-    if (lower.startsWith(q)) starts.push(f)
-    else if (lower.includes(q)) contains.push(f)
-  }
-  return [...starts, ...contains]
+  const exact = families.filter((f) => f.toLowerCase() === q)
+  return [...exact, ...matchFontNames(q, families, Number.POSITIVE_INFINITY)]
 }
 
 type LocalFontsWindow = { queryLocalFonts?: () => Promise<unknown> }
 
 /** Whether this browser offers the listing at all — Chromium in a secure
  *  context: Electron, the extension, dev:web on localhost. Another engine, or
- *  a plain http origin, has no such function and the field stands alone. */
+ *  a plain http origin, has no such function, and the field stands with the
+ *  measured chips alone. */
 export const localFontsAvailable = (): boolean =>
   typeof (window as unknown as LocalFontsWindow).queryLocalFonts === 'function'
 
@@ -201,6 +308,8 @@ export type LocalFontsResult =
   | { kind: 'denied' }
   /** the browser's prompt was closed without an answer */
   | { kind: 'dismissed' }
+  /** the browser would have to ask, and this was not a click made for that */
+  | { kind: 'unasked' }
 
 async function localFontsPermission(): Promise<string> {
   try {
@@ -213,13 +322,20 @@ async function localFontsPermission(): Promise<string> {
 
 /** Ask for the machine's faces. Measured 2026-10-27 (TYPOGRAPHY.md § 5):
  *  Electron answers with no handler in main and no gesture (about 2 s the
- *  first time, at once after); the extension needs a user gesture — so this
- *  runs from a click — and shows the browser's one prompt, and a Block there
- *  resolves with an EMPTY list rather than an error, which is why an empty
- *  list is checked against the permission state before it is believed. */
-export async function queryLocalFontFamilies(): Promise<LocalFontsResult> {
+ *  first time, at once after) and its permission state reads «granted»; the
+ *  extension needs a user gesture and shows the browser's one prompt, and a
+ *  Block there resolves with an EMPTY list rather than an error, which is
+ *  why an empty list is checked against the permission state before it is
+ *  believed. `mayPrompt` false — the keystroke path — asks only where the
+ *  state already reads «granted», so typing never raises a dialog. */
+export async function queryLocalFontFamilies(mayPrompt = true): Promise<LocalFontsResult> {
   const w = window as unknown as LocalFontsWindow
   if (typeof w.queryLocalFonts !== 'function') return { kind: 'unavailable' }
+  if (!mayPrompt) {
+    const state = await localFontsPermission()
+    if (state === 'denied') return { kind: 'denied' }
+    if (state !== 'granted') return { kind: 'unasked' }
+  }
   let listing: unknown
   try {
     listing = await w.queryLocalFonts()
@@ -233,4 +349,47 @@ export async function queryLocalFontFamilies(): Promise<LocalFontsResult> {
   const families = familiesFromListing(listing)
   if (families.length === 0 && (await localFontsPermission()) === 'denied') return { kind: 'denied' }
   return { kind: 'list', families }
+}
+
+export type InstalledFonts = {
+  families: string[]
+  /** `local`: Chromium's own listing; `measured`: the common faces that measure as installed */
+  source: 'local' | 'measured'
+  /** the browser's setting for this origin said no — the list says so */
+  refused: boolean
+}
+
+let installed: InstalledFonts | null = null
+const pending: { quiet?: Promise<InstalledFonts>; asking?: Promise<InstalledFonts> } = {}
+
+/** The faces the machine has, remembered for the session; never a rejection,
+ *  so the field always has something to offer. Chromium's own list where it
+ *  comes, else the common faces that measure as installed. `mayPrompt` is
+ *  the «Velg …» click — the one place the browser's prompt may be raised —
+ *  and a measured list made while the browser would still ask is replaced
+ *  by Chromium's once that click allows it. */
+export function listInstalledFonts(mayPrompt = false): Promise<InstalledFonts> {
+  if (installed && (installed.source === 'local' || installed.refused || !mayPrompt)) {
+    return Promise.resolve(installed)
+  }
+  const slot = mayPrompt ? 'asking' : 'quiet'
+  const running = pending[slot]
+  if (running) return running
+  const run = (async (): Promise<InstalledFonts> => {
+    const result = await queryLocalFontFamilies(mayPrompt)
+    const found: InstalledFonts =
+      result.kind === 'list'
+        ? { families: result.families, source: 'local', refused: false }
+        : {
+            families: COMMON_FONT_FAMILIES.filter((name) => isFontInstalled(name) === true),
+            source: 'measured',
+            refused: result.kind === 'denied'
+          }
+    if (!installed || installed.source !== 'local') installed = found
+    return installed
+  })().finally(() => {
+    delete pending[slot]
+  })
+  pending[slot] = run
+  return run
 }

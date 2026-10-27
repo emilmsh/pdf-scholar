@@ -136,6 +136,7 @@ import {
 import type { AiDocument, ResolvedCitation } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import { rememberRequestTokenLimit } from '../ai-token-limits'
+import AnnotHoverCard from './AnnotHoverCard'
 import AnnotPopover from './AnnotPopover'
 import LinkPreview from './LinkPreview'
 import AbstractBubble from './AbstractBubble'
@@ -5212,24 +5213,40 @@ export default function PdfViewer({
    *  on top of the very handles that let you resize the thing (measured with
    *  elementFromPoint: a corner grip's topmost element was the popover's colour
    *  row). The bubble stays draggable, so this only decides where it starts. */
-  const annotAvoidRect = useCallback(
-    (pageNumber: number, record: PageAnnotation): { top: number; bottom: number; left: number } | null => {
+  /** A mark's box in viewport coordinates, read off the page element it is
+   *  drawn in — so a split column's copy of the page answers for itself */
+  const annotClientRect = useCallback(
+    (
+      pageEl: HTMLElement,
+      pageNumber: number,
+      record: PageAnnotation
+    ): { left: number; top: number; right: number; bottom: number } | null => {
       if (record.quads.length === 0) return null
-      const el = allPageElsRef.current().find((p) => Number(p.dataset.page) === pageNumber)
-      if (!el) return null
-      const size = sizesOfPageElRef.current(el)[pageNumber - 1]
+      const size = sizesOfPageElRef.current(pageEl)[pageNumber - 1]
       if (!size) return null
-      const scale = scaleOfPageElRef.current(el)
-      const v = pageRectToView(quadsUnion(record.quads), size.w, size.h, rotationOfPageElRef.current(el))
-      const r = el.getBoundingClientRect()
-      const PAD = 16 // the handles sit ~10 px outside the frame
+      const scale = scaleOfPageElRef.current(pageEl)
+      const v = pageRectToView(quadsUnion(record.quads), size.w, size.h, rotationOfPageElRef.current(pageEl))
+      const r = pageEl.getBoundingClientRect()
       return {
-        top: r.top + v.y * scale - PAD,
-        bottom: r.top + (v.y + v.h) * scale + PAD,
-        left: r.left + v.x * scale
+        left: r.left + v.x * scale,
+        top: r.top + v.y * scale,
+        right: r.left + (v.x + v.w) * scale,
+        bottom: r.top + (v.y + v.h) * scale
       }
     },
     [sizes]
+  )
+
+  const annotAvoidRect = useCallback(
+    (pageNumber: number, record: PageAnnotation): { top: number; bottom: number; left: number } | null => {
+      const el = allPageElsRef.current().find((p) => Number(p.dataset.page) === pageNumber)
+      if (!el) return null
+      const box = annotClientRect(el, pageNumber, record)
+      if (!box) return null
+      const PAD = 16 // the handles sit ~10 px outside the frame
+      return { top: box.top - PAD, bottom: box.bottom + PAD, left: box.left }
+    },
+    [annotClientRect]
   )
   annotAvoidRectRef.current = annotAvoidRect
 
@@ -5481,10 +5498,73 @@ export default function PdfViewer({
     }
   }, [pagePointFromClient, annotsFor])
 
-  // ---------- Hover comment tooltip ----------
+  // ---------- Hover comment card ----------
+  //
+  // A note's or a markup's comment, shown while the pointer rests on the
+  // mark. Until 2026-10-27 this was a tooltip: it followed the pointer, had
+  // no height limit and died the moment the pointer left the mark, so a long
+  // comment ran off the window and could not be reached (Emil). Now it is a
+  // card in the link preview's mould: hung off the mark itself so it stands
+  // still while the pointer travels to it, kept open while the pointer is on
+  // the mark OR the card (with the preview's grace for the way between), cut
+  // at a height with the edge fading where more is left (no scrollbar), and
+  // closed by Esc, a scroll, a click, or the pointer leaving both.
 
-  const [hoverTip, setHoverTip] = useState<{ x: number; y: number; text: string } | null>(null)
+  const HOVER_CLOSE_GRACE_MS = 220
+  const [hoverTip, setHoverTip] = useState<{
+    id: string
+    text: string
+    /** The mark's box in viewport coordinates — the card hangs off it */
+    anchor: { left: number; top: number; right: number; bottom: number }
+  } | null>(null)
+  const hoverTipRef = useRef(hoverTip)
+  hoverTipRef.current = hoverTip
   const hoverThrottleRef = useRef(0)
+  const hoverCloseTimer = useRef(0)
+  /** The pointer is on the card itself — a miss on the pages must not close it */
+  const hoverOnCardRef = useRef(false)
+  const clearHoverClose = useCallback(() => {
+    if (hoverCloseTimer.current) {
+      window.clearTimeout(hoverCloseTimer.current)
+      hoverCloseTimer.current = 0
+    }
+  }, [])
+  const scheduleHoverClose = useCallback(() => {
+    if (!hoverTipRef.current) return
+    clearHoverClose()
+    hoverCloseTimer.current = window.setTimeout(() => {
+      hoverCloseTimer.current = 0
+      if (!hoverOnCardRef.current) setHoverTip(null)
+    }, HOVER_CLOSE_GRACE_MS)
+  }, [clearHoverClose])
+  const closeHoverTip = useCallback(() => {
+    clearHoverClose()
+    hoverOnCardRef.current = false
+    if (hoverTipRef.current) setHoverTip(null)
+  }, [clearHoverClose])
+  // The card is a transient: anything that moves the page under it or asks
+  // for something else closes it at once. A scroll INSIDE the card is its
+  // own (overscroll-behavior: contain keeps it off the pages).
+  useEffect(() => {
+    if (!hoverTip) return
+    const inCard = (target: EventTarget | null): boolean =>
+      !!(target as Element | null)?.closest?.('.annot-hover-tip')
+    const onScroll = (e: Event): void => {
+      if (!inCard(e.target)) closeHoverTip()
+    }
+    const onDown = (e: MouseEvent): void => {
+      if (!inCard(e.target)) closeHoverTip()
+    }
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('mousedown', onDown, true)
+    return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('mousedown', onDown, true)
+    }
+  }, [hoverTip, closeHoverTip])
+  /** Open AND on screen: a menu, a bubble or a note draft over the mark
+   *  takes the card's place, and Esc then goes to that, not to the card */
+  const hoverCardShown = hoverTip !== null && !menu && !annotPopover && !noteDraft
 
   const onPagesMouseMove = useCallback((e: React.MouseEvent) => {
     const now = performance.now()
@@ -5499,27 +5579,31 @@ export default function PdfViewer({
       if (aiPeekRef.current) setAiPeek(false)
     }
     if (drawToolRef.current || annotDragRef.current || annotsHiddenRef.current) {
-      setHoverTip((tip) => (tip ? null : tip))
+      closeHoverTip()
       return
     }
     const pageEl = (e.target as HTMLElement | null)?.closest?.('.pdf-page') as HTMLElement | null
     if (!pageEl) {
-      setHoverTip((tip) => (tip ? null : tip))
+      scheduleHoverClose()
       return
     }
     const pageNumber = Number(pageEl.dataset.page)
     const [hx, hy] = pagePointFromClient(e.clientX, e.clientY, pageEl)
-    // annotsFor: tooltips read whatever document the hovered COLUMN shows
+    // annotsFor: the card reads whatever document the hovered COLUMN shows
     const hit = annotationHitTest(annotsFor(paneOfEl(pageEl), pageNumber), hx, hy)
     const text = hit?.type !== 'freetext' ? hit?.contents?.trim() : undefined
-    if (text) {
-      setHoverTip((tip) =>
-        tip && tip.text === text ? tip : { x: e.clientX, y: e.clientY, text }
-      )
+    if (hit && text) {
+      // Back on the mark (or still on it): whatever close was pending is off
+      clearHoverClose()
+      const open = hoverTipRef.current
+      if (open && open.id === hit.id && open.text === text) return
+      const anchor = annotClientRect(pageEl, pageNumber, hit)
+      if (anchor) setHoverTip({ id: hit.id, text, anchor })
     } else {
-      setHoverTip((tip) => (tip ? null : tip))
+      // Off the mark: the grace lets the pointer reach the card
+      scheduleHoverClose()
     }
-  }, [pagePointFromClient, annotsFor])
+  }, [pagePointFromClient, annotsFor, annotClientRect, clearHoverClose, scheduleHoverClose, closeHoverTip])
 
   // ---------- Annotation dragging (note bubbles + geometric shapes) ----------
 
@@ -7005,7 +7089,8 @@ export default function PdfViewer({
     // innermost thing first. Only bare Escape, so a chord like Ctrl+Escape can
     // still be bound to something below.
     if (e.key === 'Escape' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-      if (freeTextDraft) setFreeTextDraft(null)
+      if (hoverCardShown) closeHoverTip()
+      else if (freeTextDraft) setFreeTextDraft(null)
       else if (noteDraft) discardNote()
       else if (menu) setMenu(null)
       else if (aiQuick) setAiQuick(null)
@@ -7840,7 +7925,7 @@ export default function PdfViewer({
           onMouseDown={onMouseDown}
           onDoubleClick={onPagesDoubleClick}
           onMouseMove={onPagesMouseMove}
-          onMouseLeave={() => setHoverTip(null)}
+          onMouseLeave={scheduleHoverClose}
         >
           {layout && pdf ? (
             <div
@@ -8033,7 +8118,7 @@ export default function PdfViewer({
                 onMouseDown={onMouseDown}
                 onDoubleClick={onPagesDoubleClick}
                 onMouseMove={onPagesMouseMove}
-                onMouseLeave={() => setHoverTip(null)}
+                onMouseLeave={scheduleHoverClose}
                 onScroll={onPaneBScroll}
                 onStrokeComplete={onStrokeComplete}
                 onErase={onEraseAt}
@@ -8451,16 +8536,19 @@ export default function PdfViewer({
           </select>
         </div>
       )}
-      {hoverTip && !menu && !annotPopover && !noteDraft && (
-        <div
-          className="annot-hover-tip"
-          style={{
-            left: Math.min(hoverTip.x + 12, window.innerWidth - 280),
-            top: Math.min(hoverTip.y + 14, window.innerHeight - 120)
+      {hoverCardShown && hoverTip && (
+        <AnnotHoverCard
+          text={hoverTip.text}
+          anchor={hoverTip.anchor}
+          onPointerEnter={() => {
+            hoverOnCardRef.current = true
+            clearHoverClose()
           }}
-        >
-          {hoverTip.text}
-        </div>
+          onPointerLeave={() => {
+            hoverOnCardRef.current = false
+            scheduleHoverClose()
+          }}
+        />
       )}
       {toast && <div className="toast">{toast}</div>}
       {presentation && pdf && sizes.length > 0 && (
