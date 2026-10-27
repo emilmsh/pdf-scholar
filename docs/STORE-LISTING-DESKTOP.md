@@ -156,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.74.0
+## What's new in this version (≤ 1 500 chars) — v0.74.1
 
 *(The Store last carried v0.61.0's notes — v0.73.0 went into certification
 with this block — so it covers what landed between: the headline items, not
@@ -164,6 +164,8 @@ every release.)*
 
 **EN:**
 ```
+• Margin view: «m» toggles the comments in the margin, and so does a switch in the reading-mode menu, with the side choice folding out under it
+• Margin comments taller than their page overhang it instead of overlapping, and the next page's comments start under them
 • Reading font: name any font your computer has, and the assistant's answers, comments and notes are set in it – the menus keep the interface face, and nothing is written into the file
 • Margin export: comments taller than their page continue on the next page instead of printing over each other
 • Presentation mode fills the screen edge to edge, as in Acrobat
@@ -174,13 +176,12 @@ every release.)*
 • Your own colours from a colour wheel in every tool menu, kept until you replace them; Ctrl+N opens a file
 • Sharp text at every zoom level and display scale
 • A text box can be re-set in another size after writing; its menu opens beside the editor
-• A tab can be duplicated (Ctrl+Shift+K)
-• Citations preview as a card with the reference entry, the abstract under it; figures, tables, footnotes and equations preview whole
-• Images can be copied or saved from a page at their own resolution; a hand tool pans the page
 ```
 
 **NO:**
 ```
+• Margvisning: «m» slår kommentarene i margen av og på, og det samme gjør en bryter i lesemodusmenyen, med sidevalget foldet ut under
+• Margkommentarer som er høyere enn siden henger ut over kanten i stedet for å overlappe, og neste sides kommentarer begynner under dem
 • Leseskrift: nevn en skrift maskinen har, og assistentens svar, kommentarer og notater settes i den – menyene beholder grensesnittets skrift, og ingenting skrives inn i filen
 • Margeksport: kommentarer som er høyere enn siden fortsetter på neste side i stedet for å skrives over hverandre
 • Presentasjonsmodus fyller skjermen kant til kant, som i Acrobat
@@ -191,9 +192,6 @@ every release.)*
 • Egne farger fra et fargehjul i alle verktøymenyene, beholdt til du bytter dem ut; Ctrl+N åpner en fil
 • Skarp tekst ved alle zoomnivåer og skjermskalaer
 • En tekstboks kan settes om i en annen størrelse etterpå; menyen åpnes ved siden av redigeringen
-• En fane kan dupliseres (Ctrl+Shift+K)
-• Henvisninger forhåndsvises som et kort med referansen og sammendraget under; figurer, tabeller, fotnoter og ligninger forhåndsvises hele
-• Bilder kan kopieres eller lagres fra en side i sin egen oppløsning; et håndverktøy flytter siden
 ```
 
 ---
