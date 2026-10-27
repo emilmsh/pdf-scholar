@@ -43,8 +43,10 @@ wordmark and the Standard-14 fallbacks on the page marks.
 
 Outside the roles, and unchanged: the wordmark (its own `@font-face`), the
 text tool's boxes (Standard-14 — a FreeText appearance stream can carry
-nothing else, so a reading font can never reach the page), and the page
-text itself.
+nothing else, so a reading font can never reach the page), the text tool's
+own **A** / *A* toggles (`.font-style`, a Times «A» in bold and italic — they
+depict the page mark, so they keep the literal face and the `bold` keyword),
+and the page text itself.
 
 **Why the interface is not a setting.** At 11–13 px the chrome has to match
 the operating system to read as native, and a book serif in a button reads
@@ -72,17 +74,21 @@ The reading role asks a face for exactly four cuts:
 
 Rules that follow:
 
-- **One emphasis weight.** The assistant's h3–h5 and table headers move from
-  700 to 600; the three 650 rules become 600 (they exist only because Segoe
-  UI Variable interpolates — a chosen face has no such axis). After this,
-  `font-weight` in `app.css` is 400, 500 or 600 and nothing else, in both
-  roles. A face without a 600 cut gets the browser's nearest (700) or a
-  synthesised one; both are acceptable fallbacks for a face the user picked.
+- **One emphasis weight in the reading role.** The assistant's h3 moves
+  from 700 to 600, its h4/h5 and table headers from 650 to 600 (650 existed
+  only because Segoe UI Variable interpolates — a chosen face has no such
+  axis). After this, no reading surface asks for anything above 600. A face
+  without a 600 cut gets the browser's nearest (700) or a synthesised one;
+  both are acceptable fallbacks for a face the user picked. Two 700s remain
+  in the interface role — the paperclip's attachment counter and the
+  toolbar's Zotero badge, 8.5–9.5 px white-on-colour marks that need the
+  weight to survive at that size — and that role is the system stack always,
+  so no chosen face is ever asked for them.
 - **Italic lives in the reading role only.** The interface never sets
   `font-style: italic`; the four existing hint rules are reading text and
   stay.
-- **No `bold` keyword, no 700**, so a face with a heavy bold (Libertinus
-  Bold is heavy) is never asked for it.
+- **No `bold` keyword, no 700, on a reading surface**, so a face with a
+  heavy bold (Libertinus Bold is heavy) is never asked for it.
 - The interface role keeps using 400/500/600 of the system stack as today.
 
 ## 4. Size: x-height, not pixels
@@ -164,9 +170,14 @@ text field is the baseline and must work alone.
 ## 7. Order of work
 
 1. **Name the roles.** Refactor every `font-family` in `app.css` onto
-   `--font-ui` / `--font-reading` / `--font-mono`, and collapse 700/650/bold
-   to 600 per section 3. No visible change beyond the headings' weight step;
-   `npm run check:shots` tells if any shipped frame shows one.
+   `--font-ui` / `--font-reading` / `--font-mono`, and collapse 700/650 to
+   600 on the reading surfaces per section 3. No visible change beyond the
+   headings' weight step; `npm run check:shots` tells if any shipped frame
+   shows one. Done 2026-10-27: the three monospace stacks that had drifted
+   (`Consolas, monospace` in two places) were unified onto `--font-mono`,
+   which resolves to the same face on every platform — Chromium ignores
+   `ui-monospace`, so Windows lands on Consolas and macOS on Menlo, its
+   default monospace, either way.
 2. **Measure** Segoe UI Variable Text's x-height ratio for section 4.
 3. **The setting** per section 6, with the pure half and its test first.
 4. **Try `queryLocalFonts`** on desktop and in the extension; keep the menu
