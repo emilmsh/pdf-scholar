@@ -419,6 +419,8 @@ export const zh: Dict = {
   'margin.exportReadFailed': '无法读取文档的当前内容',
   'margin.exportSuffix': ' – 评论',
   'margin.exportDone': '已保存带页边评论的副本',
+  'margin.exportContinued': '续自第 {page} 页',
+  'margin.exportMoved': '来自第 {page} 页',
   'tb.paneLeft': '左栏',
   'tb.paneRight': '右栏',
   'tb.zoomAppliesLeft': '应用于左栏',

@@ -476,6 +476,11 @@ const nb = {
   'margin.exportReadFailed': 'fikk ikke lest dokumentets gjeldende innhold',
   'margin.exportSuffix': ' – kommentarer',
   'margin.exportDone': 'Kopi med kommentarer i margen lagret',
+  // The mark on a margin card printed away from its anchor's page (the comments
+  // on a page were taller than the page): the rest of a card cut there, or a
+  // whole card that found no room. The caller adds the brackets.
+  'margin.exportContinued': 'forts. fra s. {page}',
+  'margin.exportMoved': 'fra s. {page}',
   'tb.paneLeft': 'Venstre kolonne',
   'tb.paneRight': 'Høyre kolonne',
   'tb.zoomAppliesLeft': 'Gjelder venstre kolonne',
@@ -1671,6 +1676,8 @@ const en: Dict = {
   'margin.exportReadFailed': 'could not read the document’s current contents',
   'margin.exportSuffix': ' – comments',
   'margin.exportDone': 'Copy with margin comments saved',
+  'margin.exportContinued': 'cont. from p. {page}',
+  'margin.exportMoved': 'from p. {page}',
   'tb.paneLeft': 'Left column',
   'tb.paneRight': 'Right column',
   'tb.zoomAppliesLeft': 'Applies to the left column',
