@@ -156,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.73.3
+## What's new in this version (≤ 1 500 chars) — v0.74.0
 
 *(The Store last carried v0.61.0's notes — v0.73.0 went into certification
 with this block — so it covers what landed between: the headline items, not
@@ -164,6 +164,8 @@ every release.)*
 
 **EN:**
 ```
+• Reading font: name any font your computer has, and the assistant's answers, comments and notes are set in it – the menus keep the interface face, and nothing is written into the file
+• Margin export: comments taller than their page continue on the next page instead of printing over each other
 • Presentation mode fills the screen edge to edge, as in Acrobat
 • Journal PDFs that draw every line twice (JSTOR, the AEA journals) now search, select and copy as one text
 • Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere or written into the file
@@ -175,13 +177,12 @@ every release.)*
 • A tab can be duplicated (Ctrl+Shift+K)
 • Citations preview as a card with the reference entry, the abstract under it; figures, tables, footnotes and equations preview whole
 • Images can be copied or saved from a page at their own resolution; a hand tool pans the page
-• A moved or renamed file keeps its bookmarks, position and conversations
-• A conversation exported to Markdown carries the passages each answer cites; a link's address can be copied from its menu
-• With the toolbar hidden, Ctrl+G and the tool keys bring it back
 ```
 
 **NO:**
 ```
+• Leseskrift: nevn en skrift maskinen har, og assistentens svar, kommentarer og notater settes i den – menyene beholder grensesnittets skrift, og ingenting skrives inn i filen
+• Margeksport: kommentarer som er høyere enn siden fortsetter på neste side i stedet for å skrives over hverandre
 • Presentasjonsmodus fyller skjermen kant til kant, som i Acrobat
 • Tidsskrift-PDF-er som tegner hver linje dobbelt (JSTOR, AEA-tidsskriftene) søkes, merkes og kopieres nå som én tekst
 • Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted eller skrives inn i filen
@@ -193,9 +194,6 @@ every release.)*
 • En fane kan dupliseres (Ctrl+Shift+K)
 • Henvisninger forhåndsvises som et kort med referansen og sammendraget under; figurer, tabeller, fotnoter og ligninger forhåndsvises hele
 • Bilder kan kopieres eller lagres fra en side i sin egen oppløsning; et håndverktøy flytter siden
-• En flyttet eller omdøpt fil beholder bokmerker, posisjon og samtaler
-• En samtale eksportert til Markdown har med passasjene hvert svar henviser til; en lenkes adresse kan kopieres fra menyen
-• Med skjult verktøylinje henter Ctrl+G og verktøytastene den fram
 ```
 
 ---
