@@ -102,11 +102,29 @@ surfaces set `font-size-adjust` to the default face's x-height ratio.
 Chromium then scales the chosen face so its x-height matches Segoe's at the
 same `font-size`, and every pixel value in `app.css` keeps meaning what it
 means. `--ai-scale` stays what it is: the user's own size step, now riding on
-top of a normalised face. The ratio is **measured** on Segoe UI Variable
-Text before implementation (render a 100 px «x», read its height), not
-guessed; it is likely near 0.5. With the default face active no
+top of a normalised face. With the default face active no
 `font-size-adjust` is set at all, so the shipped rendering is untouched —
 the same «1 = exactly as shipped» discipline `theme-tune.ts` uses.
+
+Measured 2026-10-27 in Chromium on Windows (canvas `measureText('x')`
+ascent at 100 px, so ±0.01):
+
+| Face | x-height | cap height |
+|---|---|---|
+| Segoe UI Variable Text (400 and 600) | 0.50 | 0.70 |
+| Segoe UI | 0.50 | 0.70 |
+| Libertinus Serif | 0.43 | 0.65 |
+| Palatino Linotype | 0.46 | 0.69 |
+| Cambria | 0.47 | 0.67 |
+| Georgia | 0.48 | 0.69 |
+| Times New Roman | 0.45 | 0.67 |
+| Calibri | 0.46 | 0.63 |
+
+So the value is **`font-size-adjust: 0.5`**, and Libertinus at 13 px
+renders at about 15 px, Georgia at about 13.5 px. The ratio is Segoe's,
+not the platform's: on macOS the default face is San Francisco (x-height
+near 0.52), and the shipped look there is also untouched, since the
+adjustment applies only when a reader has chosen a face.
 
 Line height on the reading surfaces is already unitless, so it follows.
 
@@ -179,6 +197,7 @@ text field is the baseline and must work alone.
    `ui-monospace`, so Windows lands on Consolas and macOS on Menlo, its
    default monospace, either way.
 2. **Measure** Segoe UI Variable Text's x-height ratio for section 4.
+   Done 2026-10-27: 0.50.
 3. **The setting** per section 6, with the pure half and its test first.
 4. **Try `queryLocalFonts`** on desktop and in the extension; keep the menu
    only if it works on both without a dialog the reader would not expect.
