@@ -3794,7 +3794,8 @@ html.pen-near .draw-layer {
 }
 
 .link-preview-scroll,
-.lp-card {
+.lp-card,
+.annot-hover-text {
   --fade-t: 0px;
   --fade-b: 0px;
   --fade-l: 0px;
@@ -4802,6 +4803,15 @@ html.pen-near .draw-layer {
   border-radius: 12px;
   box-shadow: var(--shadow-menu);
   animation: menu-in 0.12s ease;
+}
+
+/* A bubble opened on a LONG comment takes the second width step (Emil,
+   2026-10-27): at 320 px a line holds ~45 characters, cramped for reading a
+   paragraph; 400 px gives ~58, close to the readable norm, and still leaves
+   the page in view on both sides. Two steps, not a slide — a dragged size
+   overrides either (AnnotPopover.tsx). */
+.annot-popover.is-wide {
+  width: 400px;
 }
 
 .annot-popover-head {
@@ -7688,11 +7698,18 @@ button.bookmark-fold:hover {
 
 /* Hover tooltip showing an annotation's comment */
 
+/* The comment card shown while the pointer rests on a mark
+   (AnnotHoverCard.tsx). Pointer events ON: the card is hung off the mark and
+   kept open while the pointer is on it, so a long comment can be scrolled
+   inside it — the wheel stays in the card (overscroll-behavior), no bar is
+   drawn and an edge with more beyond it fades (useEdgeFade sets the depths) */
 .annot-hover-tip {
   position: fixed;
   z-index: 55;
-  max-width: 264px;
-  padding: 7px 11px;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  display: flex;
+  flex-direction: column;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -7700,9 +7717,22 @@ button.bookmark-fold:hover {
   font-size: 12px;
   line-height: 1.5;
   color: var(--text);
-  white-space: pre-wrap;
-  pointer-events: none;
   animation: menu-in 0.1s ease;
+}
+
+.annot-hover-text {
+  min-height: 0;
+  padding: 7px 11px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  white-space: pre-wrap;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
+}
+
+.annot-hover-text::-webkit-scrollbar {
+  display: none;
 }
 
 /* Modern comment marker (SVG speech bubble). No drop shadow: the saved file

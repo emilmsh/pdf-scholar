@@ -30,7 +30,16 @@ export function useResizable(
   ref: React.RefObject<HTMLElement | null>,
   size: BoxSize | null,
   onResize: (size: BoxSize | null) => void,
-  opts: { axis: 'both' | 'height'; minW?: number; minH?: number; invert?: boolean }
+  opts: {
+    axis: 'both' | 'height'
+    minW?: number
+    minH?: number
+    invert?: boolean
+    /** What a double-click on the grip does instead of the plain reset —
+     *  the comment bubble makes it a toggle (fit to the text ⇄ default) and
+     *  owns the state behind it */
+    onReset?: () => void
+  }
 ): {
   gripProps: {
     onPointerDown(e: React.PointerEvent): void
@@ -81,11 +90,12 @@ export function useResizable(
       e.stopPropagation()
     },
     // Back to the shipped shape — the escape hatch that makes dragging safe to
-    // experiment with.
+    // experiment with (or the caller's own toggle, see opts.onReset).
     onDoubleClick: (e: React.MouseEvent): void => {
       e.stopPropagation()
       e.preventDefault()
-      onResize(null)
+      if (opts.onReset) opts.onReset()
+      else onResize(null)
     }
   }
 

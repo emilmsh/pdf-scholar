@@ -593,6 +593,7 @@ export const zh: Dict = {
   'menu.dictionary': '查词',
   'menu.translate': '翻译',
   'bubble.resizeTip': '拖动调整大小 · 双击恢复默认',
+  'bubble.resizeFitTip': '拖动调整大小 · 双击显示全文，再次双击恢复默认',
   'bubble.resizeHeightTip': '向上拖动以获得更多空间 · 双击恢复默认',
   'menu.newNoteHere': '在此新建便签',
   'menu.copyEmail': '复制电子邮件地址',
