@@ -85,6 +85,65 @@ eq(F.installedFromWidths([[100, 100], [120, 120], [110, 110]]), false, 'every pa
 eq(F.installedFromWidths([[100, 100], [121, 120], [110, 110]]), true, 'one pair differing → installed')
 eq(F.installedFromWidths([]), false, 'no measurements → not installed')
 
+// 5) the machine's faces as a list — a queryLocalFonts() listing is untrusted
+//    input like the typed name, and the menu derived from it is what the
+//    picker shows
+console.log('5) the listing behind the picker')
+const same = (a, b, msg) => eq(JSON.stringify(a), JSON.stringify(b), msg)
+const listing = [
+  { family: 'Segoe UI', fullName: 'Segoe UI Bold', postscriptName: 'SegoeUI-Bold', style: 'Bold' },
+  { family: 'Segoe UI', fullName: 'Segoe UI', postscriptName: 'SegoeUI', style: 'Regular' },
+  { family: 'Libertinus Serif', fullName: 'Libertinus Serif Italic', style: 'Italic' },
+  { family: 'libertinus serif', fullName: 'Libertinus Serif Semibold', style: 'Semibold' },
+  { family: 'Cambria', fullName: 'Cambria' },
+  { fullName: 'Georgia Bold' },
+  { family: '', fullName: 'Georgia' },
+  { family: 'Noto Sans 10', fullName: 'Noto Sans 10' },
+  { family: 'Noto Sans 2', fullName: 'Noto Sans 2' },
+  { family: 'Évora', fullName: 'Évora' },
+  { family: 'Bad; One }', fullName: 'Bad; One }' },
+  { family: ';;;' },
+  { family: 42, fullName: 42 },
+  null,
+  'Arial',
+  7,
+  {},
+]
+const fam = F.familiesFromListing(listing)
+same(
+  fam,
+  ['Bad One', 'Cambria', 'Évora', 'Georgia', 'Georgia Bold', 'Libertinus Serif', 'Noto Sans 2', 'Noto Sans 10', 'Segoe UI'],
+  'families: one per family (cuts folded, case-insensitively), family over fullName, fullName when family is missing or blank, junk normalised, non-objects and junk-only names dropped, sorted with base letters and numbers in number order'
+)
+same(F.familiesFromListing(null), [], 'a non-array listing → nothing')
+same(F.familiesFromListing('Segoe UI'), [], 'a string → nothing')
+same(F.familiesFromListing({ length: 2, 0: { family: 'A' } }), [], 'an array-like object → nothing')
+same(F.familiesFromListing([]), [], 'an empty listing → nothing')
+const runaway = Array.from({ length: F.READING_FONT_LIST_MAX + 500 }, (_, i) => ({ family: 'F' + i }))
+eq(F.familiesFromListing(runaway).length, F.READING_FONT_LIST_MAX, 'a runaway listing is capped')
+ok(
+  F.familiesFromListing(fam.map((family) => ({ family }))).every((n, i) => n === fam[i]),
+  'listing the result again gives the same list (idempotent)'
+)
+
+// the order the menu shows: the current face first
+same(F.orderFamilies(fam, 'Libertinus Serif'), ['Libertinus Serif', 'Bad One', 'Cambria', 'Évora', 'Georgia', 'Georgia Bold', 'Noto Sans 2', 'Noto Sans 10', 'Segoe UI'], 'the current face first, the rest in order')
+same(F.orderFamilies(fam, ' "libertinus serif" '), F.orderFamilies(fam, 'Libertinus Serif'), 'the current name is normalised and case-folded before it is looked up')
+same(F.orderFamilies(fam, 'Palatino'), fam, 'a current face the machine lacks changes nothing')
+same(F.orderFamilies(fam, ''), fam, 'the default changes nothing')
+same(F.orderFamilies([], 'Georgia'), [], 'an empty list stays empty')
+ok(F.orderFamilies(fam, 'Georgia') !== fam, 'ordering returns a new array, the listing is not mutated')
+
+// the typed filter
+same(F.filterFamilies(fam, ''), fam, 'an empty query keeps everything')
+same(F.filterFamilies(fam, '   '), fam, 'a blank query keeps everything')
+same(F.filterFamilies(fam, 'geo'), ['Georgia', 'Georgia Bold'], 'a prefix, case-folded')
+same(F.filterFamilies(fam, 'serif'), ['Libertinus Serif'], 'a word inside the name')
+same(F.filterFamilies(fam, 'sans'), ['Noto Sans 2', 'Noto Sans 10'], 'inner matches keep the list order')
+same(F.filterFamilies(fam, 'se'), ['Segoe UI', 'Libertinus Serif'], 'names that start with the query come before names that merely contain it')
+same(F.filterFamilies(fam, 'Zapf'), [], 'no match → empty, never the whole list')
+same(F.filterFamilies(fam, 'geo;{'), ['Georgia', 'Georgia Bold'], 'the query is normalised like a name before it is matched')
+
 if (failures) {
   console.error(`\n${failures} failure(s)`)
   process.exit(1)

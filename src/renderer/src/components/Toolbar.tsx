@@ -34,9 +34,13 @@ import {
   READING_FONT_MAX_LEN,
   READING_FONT_X_HEIGHT,
   applyReadingFont,
+  filterFamilies,
   isFontInstalled,
   loadReadingFont,
+  localFontsAvailable,
   normalizeReadingFont,
+  orderFamilies,
+  queryLocalFontFamilies,
   readingFontStack,
   saveReadingFont,
 } from '../reading-font'
@@ -632,6 +636,8 @@ export default function Toolbar({
     const stored = loadReadingFont()
     setReadingFont(stored)
     setFontDraft(stored)
+    setFontPicker((p) => (p === 'gone' ? p : 'idle'))
+    setFontHover(null)
   }, [themeMenuOpen])
   const commitReadingFont = (raw: string): void => {
     const name = normalizeReadingFont(raw)
@@ -643,6 +649,55 @@ export default function Toolbar({
   }
   const fontDraftName = normalizeReadingFont(fontDraft)
   const fontInstalled = useMemo(() => isFontInstalled(fontDraftName), [fontDraftName])
+  // The machine's faces as a list behind «Velg …» (TYPOGRAPHY.md § 5): asked
+  // on that click only, never at start. On the desktop Electron answers with
+  // no dialog; in the extension the browser prompts once, named after the
+  // extension, and a Block comes back as an EMPTY list — the result kinds are
+  // what the UI goes by. A pick fills the same field through
+  // commitReadingFont, so the typed name stays the baseline and the sample,
+  // the missing-hint and the reset are untouched.
+  const [fontPicker, setFontPicker] = useState<'idle' | 'busy' | 'open' | 'denied' | 'gone'>(() =>
+    localFontsAvailable() ? 'idle' : 'gone'
+  )
+  const [fontList, setFontList] = useState<string[]>([])
+  const [fontActive, setFontActive] = useState(-1)
+  const [fontHover, setFontHover] = useState<string | null>(null)
+  const fontInputRef = useRef<HTMLInputElement>(null)
+  const fontListRef = useRef<HTMLDivElement>(null)
+  const closeFontList = (): void => {
+    setFontPicker((p) => (p === 'open' ? 'idle' : p))
+    setFontHover(null)
+  }
+  const openFontPicker = async (): Promise<void> => {
+    setFontPicker('busy')
+    const result = await queryLocalFontFamilies()
+    if (result.kind === 'list') {
+      setFontList(result.families)
+      setFontActive(-1)
+      setFontPicker('open')
+      fontInputRef.current?.focus()
+    } else if (result.kind === 'denied') setFontPicker('denied')
+    else if (result.kind === 'unavailable') setFontPicker('gone')
+    else setFontPicker('idle')
+  }
+  const pickFont = (name: string): void => {
+    commitReadingFont(name)
+    closeFontList()
+  }
+  // With the committed name in the field the whole list shows, the current
+  // face first; anything else typed narrows it
+  const fontChoices = useMemo(() => {
+    if (fontPicker !== 'open') return []
+    const query = fontDraftName === readingFont ? '' : fontDraft
+    return filterFamilies(orderFamilies(fontList, readingFont), query)
+  }, [fontPicker, fontList, readingFont, fontDraft, fontDraftName])
+  useEffect(() => {
+    if (fontActive < 0) return
+    const item = fontListRef.current?.children[fontActive]
+    if (item instanceof HTMLElement) item.scrollIntoView({ block: 'nearest' })
+  }, [fontActive])
+  // The sample follows the hovered row while the list is open
+  const fontSampleName = fontHover ?? fontDraftName
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   // Save is a split button: the frequent action (write changes back to the
   // file) stays one click, the rare one (save a copy) moves behind the
@@ -894,6 +949,12 @@ export default function Toolbar({
         setResetAsk(false)
         return
       }
+      // The font list closes before the menu that holds it
+      if (fontPicker === 'open') {
+        setFontPicker('idle')
+        setFontHover(null)
+        return
+      }
       setThemeMenuOpen(false)
       setViewMenuOpen(false)
       setSaveMenuOpen(false)
@@ -903,7 +964,7 @@ export default function Toolbar({
     }
     window.addEventListener('keydown', onKey, true)
     return () => window.removeEventListener('keydown', onKey, true)
-  }, [themeMenuOpen, viewMenuOpen, saveMenuOpen, settingsMenuOpen, overflowMenuOpen, toolMenu, resetAsk])
+  }, [themeMenuOpen, viewMenuOpen, saveMenuOpen, settingsMenuOpen, overflowMenuOpen, toolMenu, resetAsk, fontPicker])
 
   // «Gå til side» is the toolbar's own shortcut: the command focuses the page
   // field, which lives here, so the listener does too rather than routing a
@@ -2498,34 +2559,109 @@ export default function Toolbar({
                 <div className="slider-label">
                   <span title={t('tb.readingFontTip')}>{t('tb.readingFont')}</span>
                 </div>
-                <input
-                  className="theme-font-input"
-                  type="text"
-                  value={fontDraft}
-                  placeholder={t('tb.readingFontPlaceholder')}
-                  spellCheck={false}
-                  maxLength={READING_FONT_MAX_LEN}
-                  onChange={(e) => setFontDraft(e.target.value)}
-                  onBlur={() => commitReadingFont(fontDraft)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') commitReadingFont(fontDraft)
-                  }}
-                />
+                <div className="theme-font-row">
+                  <input
+                    ref={fontInputRef}
+                    className="theme-font-input"
+                    type="text"
+                    value={fontDraft}
+                    placeholder={t('tb.readingFontPlaceholder')}
+                    spellCheck={false}
+                    autoComplete="off"
+                    maxLength={READING_FONT_MAX_LEN}
+                    onChange={(e) => {
+                      setFontDraft(e.target.value)
+                      setFontActive(-1)
+                    }}
+                    onBlur={() => {
+                      commitReadingFont(fontDraft)
+                      closeFontList()
+                    }}
+                    onKeyDown={(e) => {
+                      if (fontPicker === 'open' && fontChoices.length > 0) {
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setFontActive((i) => Math.min(i + 1, fontChoices.length - 1))
+                          return
+                        }
+                        if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setFontActive((i) => Math.max(i - 1, 0))
+                          return
+                        }
+                        if (e.key === 'Enter' && fontActive >= 0 && fontActive < fontChoices.length) {
+                          e.preventDefault()
+                          pickFont(fontChoices[fontActive])
+                          return
+                        }
+                      }
+                      if (e.key === 'Enter') commitReadingFont(fontDraft)
+                    }}
+                  />
+                  {fontPicker !== 'gone' && (
+                    <button
+                      type="button"
+                      className="theme-font-pick"
+                      title={t('tb.readingFontPickTip')}
+                      disabled={fontPicker === 'busy'}
+                      // Keep the focus in the field (its blur would close the
+                      // list this click toggles)
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => (fontPicker === 'open' ? closeFontList() : void openFontPicker())}
+                    >
+                      {fontPicker === 'busy' ? t('tb.readingFontPicking') : t('tb.readingFontPick')}
+                    </button>
+                  )}
+                </div>
+                {fontPicker === 'open' && (
+                  <div
+                    ref={fontListRef}
+                    className="theme-font-list"
+                    role="listbox"
+                    // Keep the focus in the field: a blur here would commit a
+                    // half-typed filter as the face before the pick lands
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseLeave={() => setFontHover(null)}
+                  >
+                    {fontChoices.length === 0 ? (
+                      <div className="theme-font-empty">{t('tb.readingFontNoMatch')}</div>
+                    ) : (
+                      fontChoices.map((name, i) => (
+                        <button
+                          key={name}
+                          type="button"
+                          role="option"
+                          aria-selected={name === readingFont}
+                          className={
+                            'theme-font-item' +
+                            (i === fontActive ? ' active' : '') +
+                            (name === readingFont ? ' current' : '')
+                          }
+                          onMouseEnter={() => setFontHover(name)}
+                          onClick={() => pickFont(name)}
+                        >
+                          {name}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
                 <div
                   className="theme-font-sample"
                   style={
-                    fontDraftName
+                    fontSampleName
                       ? // A string: React appends px to a number here, and the
                         // adjustment is a bare ratio
-                        { fontFamily: readingFontStack(fontDraftName), fontSizeAdjust: String(READING_FONT_X_HEIGHT) }
+                        { fontFamily: readingFontStack(fontSampleName), fontSizeAdjust: String(READING_FONT_X_HEIGHT) }
                       : undefined
                   }
                 >
                   {t('tb.readingFontSample')}
                 </div>
-                {fontDraftName && fontInstalled === false && (
+                {fontDraftName && fontInstalled === false && !fontHover && (
                   <div className="theme-auto-hint">{t('tb.readingFontMissing')}</div>
                 )}
+                {fontPicker === 'denied' && <div className="theme-auto-hint">{t('tb.readingFontDenied')}</div>}
                 <ResetLink hidden={!readingFont && !fontDraftName} onClick={() => commitReadingFont('')} />
               </div>
               <div className="theme-menu-sep" />

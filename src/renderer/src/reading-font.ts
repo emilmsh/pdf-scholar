@@ -124,3 +124,113 @@ export function clearReadingFont(): void {
     /* nothing to forget */
   }
 }
+
+// ---- The machine's faces as a LIST (TYPOGRAPHY.md § 5, «Font picker»):
+// Chromium's Local Font Access API, asked only when the reader presses
+// «Velg …» beside the field — never at start — and filling the same field
+// through the same commit path, so the typed name stays the baseline and
+// works alone wherever the list does not come.
+
+/** A listing is untrusted input too: a runaway one is cut here. */
+export const READING_FONT_LIST_MAX = 1000
+
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+/** The family names in a `queryLocalFonts()` listing: a non-array or an item
+ *  that is not an object gives nothing; `family` is read (`fullName` behind
+ *  it, which carries the cut — «Libertinus Serif Bold»); every name is
+ *  normalised like a typed one; the cuts of one family fold to one entry,
+ *  case-insensitively; sorted the way a reader reads them (base letters,
+ *  numbers in number order); capped. */
+export function familiesFromListing(listing: unknown): string[] {
+  if (!Array.isArray(listing)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const item of listing) {
+    if (!item || typeof item !== 'object') continue
+    const { family, fullName } = item as { family?: unknown; fullName?: unknown }
+    const name = normalizeReadingFont(family) || normalizeReadingFont(fullName)
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(name)
+    if (out.length >= READING_FONT_LIST_MAX) break
+  }
+  return out.sort(collator.compare)
+}
+
+/** The list as the menu shows it: the current face first when the machine
+ *  has it, the rest in listing order. */
+export function orderFamilies(families: readonly string[], current: string): string[] {
+  const cur = normalizeReadingFont(current).toLowerCase()
+  if (!cur) return [...families]
+  const i = families.findIndex((f) => f.toLowerCase() === cur)
+  if (i < 0) return [...families]
+  return [families[i], ...families.slice(0, i), ...families.slice(i + 1)]
+}
+
+/** The names a typed query keeps: those that start with it first, then those
+ *  that contain it, case-folded; an empty query keeps everything. */
+export function filterFamilies(families: readonly string[], query: string): string[] {
+  const q = normalizeReadingFont(query).toLowerCase()
+  if (!q) return [...families]
+  const starts: string[] = []
+  const contains: string[] = []
+  for (const f of families) {
+    const lower = f.toLowerCase()
+    if (lower.startsWith(q)) starts.push(f)
+    else if (lower.includes(q)) contains.push(f)
+  }
+  return [...starts, ...contains]
+}
+
+type LocalFontsWindow = { queryLocalFonts?: () => Promise<unknown> }
+
+/** Whether this browser offers the listing at all — Chromium in a secure
+ *  context: Electron, the extension, dev:web on localhost. Another engine, or
+ *  a plain http origin, has no such function and the field stands alone. */
+export const localFontsAvailable = (): boolean =>
+  typeof (window as unknown as LocalFontsWindow).queryLocalFonts === 'function'
+
+export type LocalFontsResult =
+  | { kind: 'list'; families: string[] }
+  /** no API, or it failed with something other than a refusal */
+  | { kind: 'unavailable' }
+  /** the browser's setting for this origin says no */
+  | { kind: 'denied' }
+  /** the browser's prompt was closed without an answer */
+  | { kind: 'dismissed' }
+
+async function localFontsPermission(): Promise<string> {
+  try {
+    const status = await navigator.permissions.query({ name: 'local-fonts' as PermissionName })
+    return status.state
+  } catch {
+    return 'unknown'
+  }
+}
+
+/** Ask for the machine's faces. Measured 2026-10-27 (TYPOGRAPHY.md § 5):
+ *  Electron answers with no handler in main and no gesture (about 2 s the
+ *  first time, at once after); the extension needs a user gesture — so this
+ *  runs from a click — and shows the browser's one prompt, and a Block there
+ *  resolves with an EMPTY list rather than an error, which is why an empty
+ *  list is checked against the permission state before it is believed. */
+export async function queryLocalFontFamilies(): Promise<LocalFontsResult> {
+  const w = window as unknown as LocalFontsWindow
+  if (typeof w.queryLocalFonts !== 'function') return { kind: 'unavailable' }
+  let listing: unknown
+  try {
+    listing = await w.queryLocalFonts()
+  } catch (e) {
+    const name = (e as { name?: unknown } | null)?.name
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return (await localFontsPermission()) === 'denied' ? { kind: 'denied' } : { kind: 'dismissed' }
+    }
+    return { kind: 'unavailable' }
+  }
+  const families = familiesFromListing(listing)
+  if (families.length === 0 && (await localFontsPermission()) === 'denied') return { kind: 'denied' }
+  return { kind: 'list', families }
+}

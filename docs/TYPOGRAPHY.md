@@ -152,11 +152,47 @@ system stack, so any glyph the chosen face lacks — a Chinese interface, æøå
 in a font without them — falls through per glyph instead of breaking the
 line.
 
-**Font picker.** Chromium has a Local Font Access API (`queryLocalFonts`)
-that could list the installed faces in a menu. Whether Electron passes it
-through without a permission handler, and whether the extension's permission
-prompt is acceptable, is untested — try it during implementation, but the
-text field is the baseline and must work alone.
+**Font picker.** Chromium's Local Font Access API (`queryLocalFonts`) lists
+the installed faces. Tried 2026-10-27 on both platforms, the text field kept
+as the baseline:
+
+- *Desktop* (Electron 43.8.3 / Chromium 150, the `file://` renderer, and
+  `src/main/index.ts` sets no permission handler at all): the call resolves
+  with every face — 456 on this machine — with no gesture and no dialog.
+  Electron has no permission UI, and `navigator.permissions.query({ name:
+  'local-fonts' })` reads «granted». A `session.setPermissionCheckHandler`
+  IS consulted (as `local-fonts`; the request handler never fires), and a
+  handler that says no gives an EMPTY list, not an error — so the app must
+  never grow a blanket deny-all check handler without an exception for it.
+  The first call takes about 2 s (Chromium enumerates the fonts once per
+  process), every later one answers at once; the button reads «Henter …»
+  meanwhile.
+- *Extension* (Edge 155, a `chrome-extension://` page): the call needs a
+  user gesture («SecurityError: User activation is required» without one)
+  and raises the browser's own prompt, anchored to the address bar and
+  named after the extension — «PDF Scholar ønsker å: Bruk skriftene på
+  datamaskinen, slik at du kan opprette innhold med nøyaktig gjengivelse»,
+  Blokker / Tillat. Allow and Block are remembered per origin (site
+  settings → Fonts); the prompt's × leaves it to be asked again. A Block
+  resolves with an EMPTY list, never an error, so an empty list is read
+  against the permission state before it is believed. Acceptable: the
+  prompt says what is asked, is asked once, and comes only from a button
+  the reader pressed; a refusal costs one hint line and the field works
+  as before.
+- *dev:web* (`http://localhost`): localhost is a secure context, so the
+  browser's prompt as in the extension. On a plain-http origin, or an
+  engine without the API, `window.queryLocalFonts` is undefined and the
+  button is not drawn — the field alone, as everywhere else.
+
+So the menu ships (§ 7 step 4): a «Velg …» button beside the field asks the
+API on that click only — never at start — and the list it opens fills the
+same field through the same commit path: the current face first, the rest
+sorted, typing in the field narrows it (names that start with the text
+before names that contain it), Enter or a click commits, Escape or leaving
+the field closes it, and the sample line follows the hovered row. The pure
+half (one entry per family across its cuts, every name normalised like a
+typed one, the sort, the order, the filter, a junk or runaway listing) is
+in `reading-font.ts` and `test:reading-font`.
 
 ## 6. The setting
 
@@ -215,6 +251,11 @@ text field is the baseline and must work alone.
    lacks says so, reset clears everything.
 4. **Try `queryLocalFonts`** on desktop and in the extension; keep the menu
    only if it works on both without a dialog the reader would not expect.
+   Done 2026-10-27: it does — no dialog on the desktop, the browser's one
+   named prompt in the extension, from a «Velg …» button the reader
+   pressed (§ 5 has the measurements). The list fills the field; the field
+   stays the baseline. `docs/PLATFORMS.md` divergence 33 records the
+   prompt.
 5. Only on request, and on the same roles: an interface-font field, or
    shipped families (option 2).
 

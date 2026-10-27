@@ -653,6 +653,18 @@ regressions are treated as bugs, not as acceptable platform lag.
     «Bekreft før deling» counts an attached conversation's document like
     the open one and names each attached file.
 
+33. **The reading font's «Velg …» list comes with no dialog on the desktop
+    and behind the browser's one prompt in the extension.** (2026-10-27,
+    `docs/TYPOGRAPHY.md` § 5) Both ask Chromium's Local Font Access API
+    (`queryLocalFonts`) from the same renderer code, on that click only.
+    Electron passes it through with no permission handler in main and no UI;
+    Edge/Chrome show their own permission bubble, named after the extension,
+    once per origin — a Block there comes back as an empty list, which the
+    renderer reads through the permission state and answers with one hint
+    line. dev:web on localhost gets the browser's prompt like the extension;
+    on any origin without the API the button is not drawn. The typed name —
+    the baseline — is identical everywhere.
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,
