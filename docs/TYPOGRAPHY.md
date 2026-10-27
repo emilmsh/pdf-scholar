@@ -38,7 +38,7 @@ wordmark and the Standard-14 fallbacks on the page marks.
 | Role | Property | Surfaces | User setting |
 |---|---|---|---|
 | Interface | `--font-ui` | tabs, toolbar, menus, buttons, search bar, dialogs, settings, sidebar headers, the library's chrome | **none** — always the system stack |
-| Reading | `--font-reading` | the assistant's messages (`.ai-assistant`, `.ai-quick-body`), comment and note text in the sidebar and popovers, the link preview card's entry text and abstracts (`.lp-card`, `.lpa-text`), conversation snippets in the library's «Samtaler» view | **yes** |
+| Reading | `--font-reading` | the assistant's messages (`.ai-assistant`, `.ai-quick-body`) and the reader's own (`.ai-user` — since 2026-10-27, Emil: a conversation reads as one surface), comment and note text in the sidebar and popovers, the link preview card's entry text and abstracts (`.lp-card`, `.lpa-text`), conversation snippets in the library's «Samtaler» view | **yes** |
 | Mono | `--font-mono` | code blocks in answers, the few monospace fields | none |
 
 Outside the roles, and unchanged: the wordmark (its own `@font-face`), the
@@ -179,6 +179,20 @@ text field is the baseline and must work alone.
   the default, as the AI text scale has. The field commits on Enter or on
   leaving it, not per keystroke — the reading surfaces must not flicker
   through every prefix of a name — while the preview follows the keystrokes.
+- **Suggestions as the name is typed** (Emil, 2026-10-27). Under the field,
+  chips with the installed faces whose names the typed text opens — a whole
+  name first, then a word of it, then anywhere in it — each chip drawn in its
+  own face, at most six, gone once the whole name stands in the field. A
+  click commits that face (the chip keeps the focus in the field, or the blur
+  would commit the half-typed name first). The list of faces is asked for
+  once per session, on the first keystroke: Chromium's own
+  `queryLocalFonts()` where the platform offers and allows it — it wants a
+  user gesture, which the keystroke is — and otherwise a curated list of
+  common faces (`COMMON_FONT_FAMILIES`: the Windows, macOS and Linux sets
+  plus the reading faces people install on purpose) filtered by the measured
+  installed rule. Nothing leaves the machine either way; the extension, where
+  the browser would prompt, takes the measured list. The matching rule is
+  `matchFontNames`, proved by `test:reading-font`.
 - **The stored value is untrusted input.** The name goes into a CSS custom
   property, so the pure half (`src/renderer/src/reading-font.ts`) normalises
   it: trim, cap the length, drop quotes, semicolons, braces, backslashes and

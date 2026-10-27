@@ -124,3 +124,140 @@ export function clearReadingFont(): void {
     /* nothing to forget */
   }
 }
+
+// ---- Suggestions as the name is typed (TYPOGRAPHY.md § 6; Emil, 2026-10-27:
+// the installed faces should start showing as the name is typed) ----
+
+/** Faces common enough to be worth measuring for when the machine cannot be
+ *  asked for its list (`queryLocalFonts` is Chromium's, behind a permission
+ *  a browser prompts for and a gesture): the OS faces of Windows, macOS and
+ *  the usual Linux sets, plus the reading faces people install on purpose.
+ *  Only the ones the installed rule finds are ever offered. */
+export const COMMON_FONT_FAMILIES: readonly string[] = [
+  // Windows
+  'Segoe UI',
+  'Segoe UI Variable Text',
+  'Aptos',
+  'Aptos Serif',
+  'Calibri',
+  'Cambria',
+  'Candara',
+  'Constantia',
+  'Corbel',
+  'Georgia',
+  'Times New Roman',
+  'Garamond',
+  'Book Antiqua',
+  'Palatino Linotype',
+  'Century Schoolbook',
+  'Sitka Text',
+  'Bahnschrift',
+  'Verdana',
+  'Tahoma',
+  'Trebuchet MS',
+  'Arial',
+  // macOS
+  'New York',
+  'SF Pro Text',
+  'Helvetica Neue',
+  'Avenir',
+  'Avenir Next',
+  'Baskerville',
+  'Hoefler Text',
+  'Iowan Old Style',
+  'Charter',
+  'Palatino',
+  'Optima',
+  'Gill Sans',
+  'Times',
+  // Linux
+  'Noto Serif',
+  'Noto Sans',
+  'DejaVu Serif',
+  'DejaVu Sans',
+  'Liberation Serif',
+  'Liberation Sans',
+  'Ubuntu',
+  'Cantarell',
+  // Installed on purpose
+  'Libertinus Serif',
+  'Libertinus Sans',
+  'Linux Libertine',
+  'Source Serif 4',
+  'Source Serif Pro',
+  'Source Sans 3',
+  'IBM Plex Serif',
+  'IBM Plex Sans',
+  'Literata',
+  'Merriweather',
+  'EB Garamond',
+  'Crimson Pro',
+  'Crimson Text',
+  'Cormorant Garamond',
+  'PT Serif',
+  'PT Sans',
+  'Lora',
+  'Vollkorn',
+  'Alegreya',
+  'Spectral',
+  'Bitter',
+  'Roboto',
+  'Roboto Slab',
+  'Open Sans',
+  'Lato',
+  'Inter',
+  'Fira Sans',
+  'Atkinson Hyperlegible',
+  'Lexend',
+  'OpenDyslexic',
+  'Minion Pro',
+  'Sabon',
+  'Bembo',
+  'Bookerly'
+]
+
+/** The names worth offering for what is typed so far: a name the query
+ *  opens, then one of whose words it opens, then one it occurs in — case-
+ *  folded, each once, the exact name left out (nothing left to complete),
+ *  at most `limit`. An empty query offers nothing. */
+export function matchFontNames(query: string, names: readonly string[], limit = 6): string[] {
+  const q = normalizeReadingFont(query).toLowerCase()
+  if (!q) return []
+  const seen = new Set<string>()
+  const tiers: [string[], string[], string[]] = [[], [], []]
+  for (const name of names) {
+    const n = name.toLowerCase()
+    if (n === q || seen.has(n)) continue
+    seen.add(n)
+    if (n.startsWith(q)) tiers[0].push(name)
+    else if (n.split(' ').some((word) => word.startsWith(q))) tiers[1].push(name)
+    else if (n.includes(q)) tiers[2].push(name)
+  }
+  return tiers.flat().slice(0, Math.max(0, limit))
+}
+
+let installedList: Promise<readonly string[]> | null = null
+
+/** The faces the machine has, asked for once per session: Chromium's own
+ *  list where the platform offers it and allows it (it wants a user gesture,
+ *  which the keystroke in the field is), else the common faces that measure
+ *  as installed. Never rejects — a refusal is the measured list, and with
+ *  nothing found the field simply offers nothing. */
+export function listInstalledFonts(): Promise<readonly string[]> {
+  if (installedList) return installedList
+  installedList = (async () => {
+    const local = (globalThis as { queryLocalFonts?: () => Promise<ReadonlyArray<{ family: string }>> })
+      .queryLocalFonts
+    if (local) {
+      try {
+        const faces = await local.call(globalThis)
+        const names = [...new Set(faces.map((f) => normalizeReadingFont(f.family)).filter(Boolean))]
+        if (names.length > 0) return names.sort((a, b) => a.localeCompare(b))
+      } catch {
+        /* no permission or no gesture: measure the common faces instead */
+      }
+    }
+    return COMMON_FONT_FAMILIES.filter((name) => isFontInstalled(name) === true)
+  })()
+  return installedList
+}

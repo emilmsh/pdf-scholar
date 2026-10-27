@@ -85,6 +85,39 @@ eq(F.installedFromWidths([[100, 100], [120, 120], [110, 110]]), false, 'every pa
 eq(F.installedFromWidths([[100, 100], [121, 120], [110, 110]]), true, 'one pair differing → installed')
 eq(F.installedFromWidths([]), false, 'no measurements → not installed')
 
+// 5) suggestions as the name is typed
+console.log('5) the suggestions')
+const NAMES = ['Georgia', 'Libertinus Serif', 'Libertinus Sans', 'Source Serif 4', 'Noto Serif', 'Segoe UI', 'Gill Sans']
+const m = (q, limit) => F.matchFontNames(q, NAMES, limit)
+eq(JSON.stringify(m('')), '[]', 'an empty query offers nothing')
+eq(JSON.stringify(m('   ')), '[]', 'blanks offer nothing')
+eq(JSON.stringify(m('lib')), '["Libertinus Serif","Libertinus Sans"]', 'a prefix, in list order')
+eq(JSON.stringify(m('LIB')), '["Libertinus Serif","Libertinus Sans"]', 'case-folded')
+eq(
+  JSON.stringify(m('serif')),
+  '["Libertinus Serif","Source Serif 4","Noto Serif"]',
+  'a word the query opens, after no whole name does'
+)
+eq(JSON.stringify(m('eorg')), '["Georgia"]', 'an occurrence anywhere, last')
+eq(JSON.stringify(m('Georgia')), '[]', 'the exact name is not offered back')
+eq(JSON.stringify(m('georgia')), '[]', 'nor the exact name in another case')
+eq(
+  JSON.stringify(F.matchFontNames('s', ['Segoe UI', 'Source Serif 4', 'Gill Sans', 'Noto Serif'])),
+  '["Segoe UI","Source Serif 4","Gill Sans","Noto Serif"]',
+  'whole-name openers before word openers, each tier in list order'
+)
+eq(m('s', 2).length, 2, 'the limit cuts the list')
+eq(JSON.stringify(m('s', 0)), '[]', 'a limit of zero offers nothing')
+eq(JSON.stringify(F.matchFontNames('g', ['Georgia', 'georgia', 'Gill Sans'])), '["Georgia","Gill Sans"]', 'a name twice is offered once')
+eq(JSON.stringify(m('"lib;')), '["Libertinus Serif","Libertinus Sans"]', 'the query is normalised like the name')
+eq(JSON.stringify(m('xyz')), '[]', 'nothing matches → nothing')
+ok(Array.isArray(F.COMMON_FONT_FAMILIES) && F.COMMON_FONT_FAMILIES.length > 50, 'the common list is a real list')
+eq(new Set(F.COMMON_FONT_FAMILIES.map((s) => s.toLowerCase())).size, F.COMMON_FONT_FAMILIES.length, 'no family twice')
+ok(
+  F.COMMON_FONT_FAMILIES.every((s) => n(s) === s),
+  'every common family survives normalising unchanged (it goes straight into the stack)'
+)
+
 if (failures) {
   console.error(`\n${failures} failure(s)`)
   process.exit(1)

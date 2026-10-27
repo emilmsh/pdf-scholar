@@ -2806,6 +2806,13 @@ html.pen-near .draw-layer {
   overflow-wrap: anywhere;
 }
 
+/* Installed faces whose names match what is typed so far (Toolbar), each
+   chip drawn in its own face — the row is a preview as much as a completion */
+.theme-font-suggest {
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
 .theme-auto-row {
   display: flex;
   align-items: center;
@@ -5880,6 +5887,11 @@ button.bookmark-fold:hover {
   border-radius: 12px 12px 3px 12px;
   padding: 8px 12px;
   white-space: pre-wrap;
+  /* The reader's own messages in the reading face too (Emil, 2026-10-27): a
+     conversation reads as one surface, and a question in the interface face
+     over an answer in a serif read as two */
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
 }
 
 .ai-assistant {
