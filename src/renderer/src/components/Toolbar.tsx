@@ -38,6 +38,8 @@ import {
   loadReadingFont,
   normalizeReadingFont,
   readingFontStack,
+  listInstalledFonts,
+  matchFontNames,
   saveReadingFont,
 } from '../reading-font'
 import { CITATION_STYLES } from '../../../shared/citation-style'
@@ -656,6 +658,25 @@ export default function Toolbar({
   }
   const fontDraftName = normalizeReadingFont(fontDraft)
   const fontInstalled = useMemo(() => isFontInstalled(fontDraftName), [fontDraftName])
+  // Installed faces offered as the name is typed (TYPOGRAPHY.md § 6): the
+  // machine's list is asked for once, on the first keystroke in the field
+  // (a gesture, which Chromium's own list wants), and chips show the faces
+  // whose names match what is typed so far.
+  const [fontList, setFontList] = useState<readonly string[] | null>(null)
+  useEffect(() => {
+    if (!fontDraftName || fontList !== null) return
+    let live = true
+    void listInstalledFonts().then((names) => {
+      if (live) setFontList(names)
+    })
+    return () => {
+      live = false
+    }
+  }, [fontDraftName, fontList])
+  const fontSuggestions = useMemo(
+    () => (fontList && fontDraftName ? matchFontNames(fontDraftName, fontList) : []),
+    [fontList, fontDraftName]
+  )
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   // Save is a split button: the frequent action (write changes back to the
   // file) stays one click, the rare one (save a copy) moves behind the
@@ -2524,6 +2545,25 @@ export default function Toolbar({
                     if (e.key === 'Enter') commitReadingFont(fontDraft)
                   }}
                 />
+                {/* The installed faces the typed name opens, each chip in its
+                    own face; gone once the whole name stands in the field */}
+                {fontSuggestions.length > 0 && (
+                  <div className="theme-auto-choices theme-font-suggest" aria-label={t('tb.readingFontSuggest')}>
+                    {fontSuggestions.map((name) => (
+                      <button
+                        key={name}
+                        className="theme-chip"
+                        style={{ fontFamily: readingFontStack(name) }}
+                        // Keep the focus (and the caret) in the field: a blur
+                        // would commit the half-typed name first
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={() => commitReadingFont(name)}
+                      >
+                        {name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div
                   className="theme-font-sample"
                   style={

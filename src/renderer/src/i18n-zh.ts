@@ -465,6 +465,7 @@ export const zh: Dict = {
   'tb.readingFontPlaceholder': '系统字体',
   'tb.readingFontSample': '天地玄黄，宇宙洪荒。The quick brown fox jumps over the lazy dog.',
   'tb.readingFontMissing': '本机未安装该字体——将显示系统字体。',
+  'tb.readingFontSuggest': '本机匹配的字体',
   'tb.pinTip': '固定工具栏——它现在会自动隐藏；将指针悬停在顶部可显示',
   'tb.unpinTip': '取消固定工具栏——让它自动隐藏，阅读更清爽',
   'tb.presentTip': '演示模式——一次一页，全屏',
