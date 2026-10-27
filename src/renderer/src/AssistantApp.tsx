@@ -20,6 +20,7 @@ import type { AiImage, FilePayload, Settings, ThemeName } from '../../shared/typ
 import { bridge, isExtension } from './bridge'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { applyPageTune, tuneTitleBar } from './theme-tune'
+import { applyReadingFont, loadReadingFont } from './reading-font'
 import { openDocument, isPasswordException } from './pdf-doc'
 import type { DocResources } from './pdf-doc'
 import { renderPagesAsImages } from './ai-page-images'
@@ -87,6 +88,11 @@ export default function AssistantApp({ docPath }: { docPath: string }): React.JS
 
   // Theme + tone override — mirrors App.tsx (no page is mounted here, but the
   // variables must never disagree between the two windows of one app).
+  // The reading font, once at start (the detached window reads the store the
+  // viewer window's menu wrote; it has no field of its own)
+  useEffect(() => {
+    applyReadingFont(loadReadingFont())
+  }, [])
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
     applyPageTune(resolvedTheme, settings.themeTune, settings.customTone, settings.nightTone)
