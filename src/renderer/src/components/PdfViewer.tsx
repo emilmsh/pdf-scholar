@@ -3490,7 +3490,10 @@ export default function PdfViewer({
       settingsRef.current.annotAuthor.trim() || undefined,
       // The bytes above are the CURRENT document — still encrypted, because both
       // the draft and the engine's own rewrite keep the encryption.
-      docPasswordRef.current
+      docPasswordRef.current,
+      // A card printed on another page than its anchor's (the page's comments
+      // were taller than the page) says so, in the reader's language.
+      (page, how) => t(how === 'cut' ? 'margin.exportContinued' : 'margin.exportMoved', { page })
     )
     if (!(out instanceof Uint8Array)) {
       showToast(t('viewer.saveFailed', { error: errorText(out) }))
