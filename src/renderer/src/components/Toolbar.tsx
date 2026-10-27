@@ -123,6 +123,7 @@ import {
   IconComment,
   IconHeart,
   IconKeyboard,
+  IconMarginNotes,
   IconMarker,
   IconMarkupHighlight,
   IconMarkupSquiggly,
@@ -314,9 +315,17 @@ interface Props {
   /** All annotations temporarily hidden (clean reading view) */
   annotsHidden: boolean
   onToggleAnnots(): void
-  /* No marginNotes here: the margin view is toggled from the Merknader tab,
-     the one home for everything comment-related, and the toolbar's duplicate
-     toggle came out on 2026-08-09. */
+  /** The margin view (comments as cards beside the page): a switch in the view
+   *  menu under «Skjul merknader», with the side choice folding out when on.
+   *  The notes tab keeps the same controls — that is the home for everything
+   *  comment-related — but reaching it took three steps, more with the toolbar
+   *  hidden, and the view menu is where the reading surface is shaped
+   *  (Emil, 2026-10-27; the toolbar's own button came out on 2026-08-09 and
+   *  stays out — no new icon in the strip). */
+  marginOn: boolean
+  marginSide: 'left' | 'right'
+  onToggleMargin(): void
+  onMarginSideChange(side: 'left' | 'right'): void
   /** Annotation undo/redo (mirrors Ctrl+Z/Y — needed for pen/touch use) */
   canUndo: boolean
   canRedo: boolean
@@ -560,6 +569,10 @@ export default function Toolbar({
   canSaveInPlace,
   annotsHidden,
   onToggleAnnots,
+  marginOn,
+  marginSide,
+  onToggleMargin,
+  onMarginSideChange,
   canUndo,
   canRedo,
   onUndo,
@@ -2677,6 +2690,30 @@ export default function Toolbar({
                 {annotsHidden ? <IconEyeOff size={15} /> : <IconEye size={15} />}
                 {t('tb.hideAnnots')}
               </label>
+              {/* The margin view, right under the other switch that decides
+                  what of the marks is seen. The side choice folds out only
+                  while it is on — off, the row is one line like the others. */}
+              <label className="theme-menu-toggle" title={withShortcut(t('tb.marginNotesTip'), 'view.marginNotes')}>
+                <input type="checkbox" checked={marginOn} onChange={onToggleMargin} />
+                <IconMarginNotes size={15} />
+                {t('tb.marginNotes')}
+              </label>
+              {marginOn && (
+                <div className="theme-auto-row theme-margin-side">
+                  <span className="theme-auto-label">{t('margin.sideLabel')}</span>
+                  <div className="theme-auto-choices">
+                    {(['left', 'right'] as const).map((s) => (
+                      <button
+                        key={s}
+                        className={`theme-chip${marginSide === s ? ' selected' : ''}`}
+                        onClick={() => onMarginSideChange(s)}
+                      >
+                        {t(s === 'left' ? 'margin.sideLeft' : 'margin.sideRight')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {/* Night themes invert the whole page raster — this repaints the
                   picture regions in their original colours. Only offered while
                   a night theme is what the reader sees: in day/sepia nothing
@@ -2703,10 +2740,8 @@ export default function Toolbar({
           )}
         </div>
 
-        {/* No margin-comments toggle here (Emil, 2026-08-09). The switch — and
-            the left/right choice that belongs with it — already live in the
-            notes tab, which is the one home for everything comment-related; this
-            was a second copy of a control that was never in the wrong place. */}
+        {/* No margin-comments BUTTON in the strip (Emil, 2026-08-09): the
+            switch lives in the view menu above, with the notes tab's copy. */}
         {inline('split') && (
           <button
             className={`tb-btn${splitOpen ? ' is-active' : ''}`}

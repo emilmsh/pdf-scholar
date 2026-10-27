@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.73.3",
+  "version": "0.74.1",
   "description": "A PDF reader and annotator for Windows and macOS, built for research",
   "main": "out/main/index.js",
   "private": true,
@@ -30,6 +30,7 @@
     "check:models": "node scripts/check-models.mjs",
     "test:engine": "esbuild src/main/annotation-engine-embedpdf.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.engine-test-bundle.mjs && node scripts/test-engine-embedpdf.mjs",
     "test:margin": "esbuild src/shared/margin-export.ts --bundle --platform=node --format=esm --packages=external --outfile=scripts/.margin-test-bundle.mjs && node scripts/test-margin-export.mjs",
+    "test:margin-stack": "node scripts/test-margin-stack.mjs",
     "test:appender": "node scripts/test-appender.mjs",
     "test:cache": "node scripts/test-engine-cache.mjs",
     "test:rotation": "node scripts/test-rotation.mjs",

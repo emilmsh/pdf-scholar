@@ -1297,7 +1297,9 @@ function PdfPage({
           the teacher's fresh ones belong in the same column */}
       {marginView && !hideAnnots && (
         <MarginNotes
+          docKey={docKey}
           pageNumber={pageNumber}
+          pageTop={top}
           annotations={annotations}
           scale={scale}
           rotation={rotation}

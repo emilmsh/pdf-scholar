@@ -3,8 +3,11 @@
 // text is readable on sight instead of hiding behind a click (a note bubble
 // or a popover). Cards sit at their anchor's height unless the one above
 // pushes them down (Word's comment-column rule); the stack is pushed back up
-// if it would run off the paper, mirroring the export. The strip shows even
-// on pages with no comments — it IS the margin, not a popup.
+// if it would run off the paper, as far as the paper allows — comments taller
+// than their page run on below it, the strip with them, and the next page's
+// stack starts under them (src/shared/margin-stack.ts; the export lays the
+// whole document out in one column instead). The strip shows even on pages
+// with no comments — it IS the margin, not a popup.
 //
 // This is deliberately the ONLY margin layout. The list job — search, filter,
 // export, jump-navigation — lives in the sidebar's Merknader tab, which
@@ -13,8 +16,9 @@
 //
 // Card geometry is CSS px on purpose — zooming the document must not zoom the
 // comments; they are chrome, not content.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ViewRotation } from '../../../shared/types'
+import { stackMarginCards } from '../../../shared/margin-stack'
 import { MARGIN_NOTES_GAP, MARGIN_NOTES_W, pageRectToView, viewSize } from '../rotation'
 import type { RowLayout } from '../rotation'
 import { quadsUnion, rgbCss } from '../annotations'
@@ -28,6 +32,108 @@ import { inTextField } from './TextContextMenu'
 const CARD_GAP = 8
 /** Cards keep this clear of the paper's top/bottom edges */
 const EDGE_PAD = 8
+
+// ---------- What runs on from one page to the next ----------
+//
+// A page's stack may overhang its bottom edge (margin-stack.ts). The pages are
+// separate React trees that know nothing of each other, so each strip reports
+// where its column ENDS, in the column's layout coordinates, and the page
+// below starts its strip under that. Keyed by the column's .pages-inner — the
+// split view has two columns, each with a document of its own. The viewers
+// read the same store to keep an overhanging page mounted while its cards are
+// near, and to let the scroll height reach the last card. Only overhanging
+// pages have an entry; a page that fits reports none.
+
+interface StackEntry {
+  docKey: string
+  /** The page's top in the column's layout */
+  top: number
+  /** Where the strip ends: the last card's foot plus the edge pad */
+  bottom: number
+}
+const columnStacks = new WeakMap<Element, Map<string, StackEntry>>()
+const stackListeners = new Set<() => void>()
+const stackKey = (docKey: string, pageNumber: number): string => `${docKey}\u0000${pageNumber}`
+
+function reportMarginStack(
+  column: Element,
+  docKey: string,
+  pageNumber: number,
+  entry: { top: number; bottom: number } | null
+): void {
+  const key = stackKey(docKey, pageNumber)
+  let stacks = columnStacks.get(column)
+  const prev = stacks?.get(key)
+  if (!entry) {
+    if (!prev) return
+    stacks!.delete(key)
+  } else {
+    if (prev && prev.top === entry.top && prev.bottom === entry.bottom) return
+    if (!stacks) {
+      stacks = new Map()
+      columnStacks.set(column, stacks)
+    }
+    stacks.set(key, { docKey, ...entry })
+  }
+  for (const fn of stackListeners) fn()
+}
+
+function subscribeMarginStacks(fn: () => void): () => void {
+  stackListeners.add(fn)
+  return () => {
+    stackListeners.delete(fn)
+  }
+}
+
+/** Where a page's strip may begin, relative to the page's top: under the
+ *  lowest strip of the pages above it that runs past `pageTop`; 0 when none */
+function marginStripStart(column: Element, docKey: string, pageTop: number): number {
+  const stacks = columnStacks.get(column)
+  if (!stacks) return 0
+  let start = 0
+  for (const e of stacks.values()) {
+    if (e.docKey !== docKey || e.top >= pageTop) continue
+    start = Math.max(start, e.bottom - pageTop)
+  }
+  return start
+}
+
+/** The foot of a page's strip in the column's layout, when it runs past the
+ *  page — the viewer keeps the page mounted while that is in reach */
+export function marginStackBottom(
+  column: Element | null,
+  docKey: string,
+  pageNumber: number
+): number | null {
+  const e = column ? columnStacks.get(column)?.get(stackKey(docKey, pageNumber)) : undefined
+  return e ? e.bottom : null
+}
+
+/** Every strip's foot forgotten — the viewer calls this when its layout
+ *  changes, since the entries are in layout coordinates and a page scrolled
+ *  out of the mounted range cannot re-report its own */
+export function resetMarginStacks(column: Element | null): void {
+  if (column) columnStacks.delete(column)
+}
+
+/** The lowest strip foot in a column (0 when nothing overhangs, or the view
+ *  is off): the scroll height must reach it, or the last page's comments
+ *  cannot be scrolled to */
+export function useMarginColumnBottom(
+  columnRef: React.RefObject<HTMLElement | null>,
+  docKey: string,
+  on: boolean
+): number {
+  const subscribe = useCallback((fn: () => void) => subscribeMarginStacks(fn), [])
+  const read = useCallback((): number => {
+    const stacks = on && columnRef.current ? columnStacks.get(columnRef.current) : undefined
+    if (!stacks) return 0
+    let bottom = 0
+    for (const e of stacks.values()) if (e.docKey === docKey) bottom = Math.max(bottom, e.bottom)
+    return bottom
+  }, [columnRef, docKey, on])
+  return useSyncExternalStore(subscribe, read)
+}
 
 export interface MarginViewConfig {
   side: 'left' | 'right'
@@ -266,7 +372,12 @@ export function MarginJumpArrows({
 }
 
 interface Props {
+  /** The document the column shows — the overhang store is per document */
+  docKey: string
   pageNumber: number
+  /** The page's top in the column's layout (CSS px): what the strips of the
+   *  pages above and below are measured against */
+  pageTop: number
   annotations: PageAnnotation[]
   scale: number
   rotation: ViewRotation
@@ -288,7 +399,9 @@ interface Props {
 /** The per-page flow strip (rendered inside .pdf-page). Always visible while
  *  the margin view is on — an empty margin is still the margin. */
 export default function MarginNotes({
+  docKey,
   pageNumber,
+  pageTop,
   annotations,
   scale,
   rotation,
@@ -316,44 +429,85 @@ export default function MarginNotes({
     })
     .sort((x, y) => x.anchor.y - y.anchor.y)
 
+  /** The strip's box, relative to the page: it starts at the page's top
+   *  unless a page above runs on into this one, and ends at the page's
+   *  bottom (`bottom` null) unless this page's own stack runs past it. With
+   *  neither, no inline style at all — the CSS box, pixel for pixel. */
+  const [strip, setStrip] = useState<{ top: number; bottom: number | null }>({ top: 0, bottom: null })
+
   /** Size each textarea to its text, then place the cards at their anchors,
    *  never overlapping, pushed back up when the stack would run off the
-   *  paper. Runs after every render and on every keystroke — a page has a
-   *  handful of cards, the pass is cheap. */
+   *  paper — as far as the paper allows, the rest overhanging (margin-stack.ts).
+   *  Runs after every render and on every keystroke — a page has a handful
+   *  of cards, the pass is cheap. Card tops are in PAGE coordinates until the
+   *  write, where the strip's own top comes off. */
   const restack = (): void => {
     const host = hostRef.current
-    if (!host) return
+    const page = host?.parentElement
+    if (!host || !page) return
+    const column = host.closest('.pages-inner')
     const cards = Array.from(host.querySelectorAll<HTMLElement>('.margin-note-card'))
-    let prevBottom = EDGE_PAD - CARD_GAP
-    const placed: { el: HTMLElement; top: number }[] = []
-    for (const card of cards) {
+    const items = cards.map((card) => {
       const ta = card.querySelector('textarea')
       if (ta) autosize(ta)
-      const top = Math.max(Number(card.dataset.anchor) || 0, prevBottom + CARD_GAP)
-      placed.push({ el: card, top })
-      prevBottom = top + card.offsetHeight
+      return { anchor: Number(card.dataset.anchor) || 0, height: card.offsetHeight }
+    })
+    // Whole CSS px: the page tops are snapped to device pixels, so the
+    // difference between two of them can be a fraction
+    const start = column ? Math.round(marginStripStart(column, docKey, pageTop)) : 0
+    const stack = stackMarginCards(items, page.clientHeight, {
+      gap: CARD_GAP,
+      edgePad: EDGE_PAD,
+      floor: start + EDGE_PAD
+    })
+    cards.forEach((card, i) => {
+      card.style.top = `${stack.tops[i] - start}px`
+    })
+    const bottom = stack.overhang > 0 ? stack.bottom + EDGE_PAD : null
+    setStrip((s) => (s.top === start && s.bottom === bottom ? s : { top: start, bottom }))
+    if (column) {
+      reportMarginStack(
+        column,
+        docKey,
+        pageNumber,
+        bottom === null ? null : { top: pageTop, bottom: pageTop + bottom }
+      )
     }
-    // Push the stack back up if it runs off the paper — same rule the export
-    // applies, so the screen and the printed copy agree.
-    let ceiling = host.clientHeight - EDGE_PAD
-    for (let i = placed.length - 1; i >= 0; i--) {
-      const p = placed[i]
-      p.top = Math.max(EDGE_PAD, Math.min(p.top, ceiling - p.el.offsetHeight))
-      ceiling = p.top - CARD_GAP
-    }
-    for (const p of placed) p.el.style.top = `${p.top}px`
   }
   const restackRef = useRef(restack)
   restackRef.current = restack
   useLayoutEffect(() => {
     restackRef.current()
   })
+  // A strip above this one moved its foot: restack under it. Deferred to a
+  // microtask — still before the frame paints, but outside the reporting
+  // page's own layout effect, so the pages never re-enter each other.
+  useEffect(() => {
+    let queued = false
+    return subscribeMarginStacks(() => {
+      if (queued) return
+      queued = true
+      queueMicrotask(() => {
+        queued = false
+        restackRef.current()
+      })
+    })
+  }, [])
 
   /** Anchor coordinates in HOST space: the host hangs off the page's chosen
    *  edge, so the page content lies at negative x (right side) or beyond the
-   *  host's width (left side). The SVG draws there — overflow is visible. */
+   *  host's width (left side) — and above the host when the strip starts
+   *  below the page's top. The SVG draws there — overflow is visible. */
   const anchorToHost = (r: { x: number; y: number; w: number; h: number }): { x: number; y: number; w: number; h: number } =>
-    view.side === 'right' ? { ...r, x: r.x - pageWCss } : { ...r, x: r.x + MARGIN_NOTES_W }
+    view.side === 'right'
+      ? { ...r, x: r.x - pageWCss, y: r.y - strip.top }
+      : { ...r, x: r.x + MARGIN_NOTES_W, y: r.y - strip.top }
+  const stripStyle: React.CSSProperties | undefined =
+    strip.top === 0 && strip.bottom === null
+      ? undefined
+      : strip.bottom === null
+        ? { top: strip.top }
+        : { top: strip.top, bottom: 'auto', height: strip.bottom - strip.top }
   const cardEdgeX = view.side === 'right' ? MARGIN_NOTES_GAP - 2 : MARGIN_NOTES_W - MARGIN_NOTES_GAP + 2
 
   const active = items.filter(({ a }) => a.id === hoveredId || a.id === selectedId)
@@ -362,6 +516,7 @@ export default function MarginNotes({
     <div
       className={`margin-notes side-${view.side}`}
       ref={hostRef}
+      style={stripStyle}
       // Right-click on the strip (cards included — it is all "the margin")
       // asks the viewer to offer hiding the view. Inside a comment's textarea
       // the TEXT menu is wanted instead (paste!): the event is left to bubble,
@@ -414,7 +569,7 @@ export default function MarginNotes({
           onDelete={onDelete}
           extraProps={{
             'data-anchor': anchor.y,
-            style: { top: anchor.y },
+            style: { top: anchor.y - strip.top },
             onPointerEnter: () => setHoveredId(a.id),
             onPointerLeave: () => setHoveredId((h) => (h === a.id ? null : h)),
             onInput: () => restackRef.current()
