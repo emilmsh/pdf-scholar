@@ -50,6 +50,10 @@ runs:
     # (shipped CSS renders untouched) and every custom tone stays AAA-readable
     - run: npm run test:theme-tune
       shell: bash
+    # The reading font chosen by name: the default produces NO override, the
+    # stored name is untrusted input, and the installed rule
+    - run: npm run test:reading-font
+      shell: bash
     # «Behold bildefarger»: the CTM walk that finds raster-image regions
     # (night mode repaints them unfiltered), incl. the scanned-page guard
     - run: npm run test:image-regions

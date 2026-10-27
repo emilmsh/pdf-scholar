@@ -197,8 +197,26 @@ body,
   height: 100%;
 }
 
+/* Font roles (docs/TYPOGRAPHY.md). A font-family declaration anywhere below
+   names a role, never a face; the literal faces left are the wordmark's
+   @font-face above and the Standard-14 stand-ins on the page marks and the
+   text tool's own toggles. The interface role is the system stack, always.
+   The reading role — the assistant's messages, comment and note text, the
+   link preview card, the library's conversation snippets — is where a
+   reader's own face will land once the setting exists; until then it IS the
+   interface face, so nothing renders differently. */
+:root {
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font-reading: var(--font-ui);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* A chosen reading face sets --font-reading and --font-reading-adjust
+     inline on the root (reading-font.ts); the reading surfaces read the
+     adjustment with `none` as the fallback, so with no face chosen nothing
+     here is overridden and nothing renders differently. */
+}
+
 body {
-  font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  font-family: var(--font-ui);
   font-size: 13px;
   color: var(--text);
   background: var(--bg-canvas);
@@ -765,7 +783,7 @@ button {
   /* Selectable in one click — pasting it is the fallback when the browser
      refuses to let us open its own settings page. */
   user-select: all;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   padding: 1px 5px;
   border-radius: 5px;
@@ -1345,6 +1363,8 @@ button {
 }
 
 .convs-snippet {
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   font-size: 11.5px;
   color: var(--text-secondary);
   display: -webkit-box;
@@ -2034,6 +2054,8 @@ html.touch-ui .convs-row {
   left: 14px; /* MARGIN_NOTES_GAP */
   width: 200px; /* MARGIN_NOTES_CARD_W */
   pointer-events: auto;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-left: 3px solid var(--border); /* colour set inline per anchor */
@@ -2742,6 +2764,40 @@ html.pen-near .draw-layer {
   flex-direction: column;
   gap: 8px;
   margin-top: 10px;
+}
+
+/* The reading font (docs/TYPOGRAPHY.md § 6): a face the machine has, by
+   name, for the reading surfaces alone. The sample line under the field is
+   set in the typed face with the same x-height adjustment the surfaces get,
+   so it shows what the setting does before it is committed. */
+.theme-font {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.theme-font-input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-canvas);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.theme-font-input:focus {
+  border-color: var(--accent);
+}
+
+.theme-font-sample {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .theme-auto-row {
@@ -3757,6 +3813,8 @@ html.pen-near .draw-layer {
   overscroll-behavior: contain;
   scrollbar-width: none;
   padding: 8px 0;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
 }
 
 /* Room on both sides, the right as much as the left: text close to the
@@ -3928,6 +3986,8 @@ html.pen-near .draw-layer {
 
 .link-preview-abstract {
   position: relative;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -3999,6 +4059,8 @@ html.pen-near .draw-layer {
 .abstract-bubble {
   position: fixed;
   z-index: 60;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   display: flex;
   flex-direction: column;
   width: min(460px, calc(100vw - 24px));
@@ -4768,6 +4830,8 @@ html.pen-near .draw-layer {
   height: 72px;
   resize: none;
   font: inherit;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   color: var(--text);
   background: var(--bg-chrome);
   border: 1px solid var(--border);
@@ -5248,7 +5312,7 @@ button.bookmark-fold:hover {
   padding: 5px 8px;
   border-radius: 6px;
   background: var(--hover);
-  font-family: Consolas, ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--text);
 }
@@ -5814,6 +5878,8 @@ button.bookmark-fold:hover {
 
 .ai-assistant {
   align-self: stretch;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   color: var(--text);
 }
 
@@ -5845,24 +5911,27 @@ button.bookmark-fold:hover {
   margin: 3px 0 0;
 }
 
+/* Headings at 600, the app's one emphasis weight (docs/TYPOGRAPHY.md § 3):
+   the reading face may be the reader's own, and a face is asked for exactly
+   regular, italic, 600 and 600 italic — never a bold cut. */
 .ai-assistant h3,
 .ai-quick-body h3 {
   font-size: calc(13.5px * var(--ai-scale, 1));
-  font-weight: 700;
+  font-weight: 600;
   margin: 12px 0 6px;
 }
 
 .ai-assistant h4,
 .ai-quick-body h4 {
   font-size: calc(13px * var(--ai-scale, 1));
-  font-weight: 650;
+  font-weight: 600;
   margin: 10px 0 5px;
 }
 
 .ai-assistant h5,
 .ai-quick-body h5 {
   font-size: calc(12.5px * var(--ai-scale, 1));
-  font-weight: 650;
+  font-weight: 600;
   margin: 8px 0 4px;
 }
 
@@ -5874,7 +5943,9 @@ button.bookmark-fold:hover {
 
 .ai-assistant code,
 .ai-quick-body code {
-  font-family: Consolas, monospace;
+  font-family: var(--font-mono);
+  /* The mono role is not the reader's choice, so it is not normalised to it */
+  font-size-adjust: none;
   font-size: calc(12px * var(--ai-scale, 1));
   background: var(--hover);
   border-radius: 4px;
@@ -5935,7 +6006,7 @@ button.bookmark-fold:hover {
 
 .ai-table-wrap th {
   background: var(--hover);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 /* Citation chips flow inline with the sentence they support */
@@ -6240,7 +6311,8 @@ button.bookmark-fold:hover {
 .ai-error-detail {
   margin-top: 7px;
   font-size: calc(11px * var(--ai-scale, 1));
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
+  font-size-adjust: none;
   color: var(--text-secondary);
   overflow-wrap: anywhere;
   user-select: text;
@@ -6502,6 +6574,8 @@ button.bookmark-fold:hover {
 
 /* The text around the search's first hit in the conversation */
 .ai-history-snippet {
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   font-size: 11.5px;
   color: var(--text-secondary);
   margin-top: 2px;
@@ -6864,6 +6938,8 @@ button.bookmark-fold:hover {
 
 .ai-quick-body {
   padding: 11px 13px;
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
   font-size: calc(13px * var(--ai-scale, 1));
   line-height: 1.55;
   color: var(--text);
@@ -8399,7 +8475,7 @@ button.bookmark-fold:hover {
   color: var(--text);
   font: inherit;
   font-size: 12px;
-  font-family: Consolas, monospace;
+  font-family: var(--font-mono);
   padding: 4px 7px;
   outline: none;
 }

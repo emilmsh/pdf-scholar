@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type {
   CitedItem,
   CustomTone,
@@ -30,6 +30,16 @@ import previewDocumentQuiet from '../assets/file-icons/document-quiet.png'
 import previewDocumentQuietPlain from '../assets/file-icons/document-quiet-plain.png'
 import previewApp from '../assets/file-icons/app.png'
 import { pickTabIconFile, readTabIconFile } from '../tab-icon'
+import {
+  READING_FONT_MAX_LEN,
+  READING_FONT_X_HEIGHT,
+  applyReadingFont,
+  isFontInstalled,
+  loadReadingFont,
+  normalizeReadingFont,
+  readingFontStack,
+  saveReadingFont,
+} from '../reading-font'
 import { CITATION_STYLES } from '../../../shared/citation-style'
 import type { CitationStyleId } from '../../../shared/citation-style'
 import {
@@ -610,6 +620,29 @@ export default function Toolbar({
    *  COMMITTED to settings on release — settings:set is a synchronous file
    *  write per call, and a drag emits dozens of ticks. null = not dragging. */
   const [tuneDraft, setTuneDraft] = useState<{ key: 'sepia' | 'night' | 'custom'; value: number } | null>(null)
+  // The reading font (docs/TYPOGRAPHY.md § 6). The field's draft follows the
+  // keystrokes and feeds the sample line; the face itself is committed on
+  // Enter or on leaving the field, so the reading surfaces never flicker
+  // through every prefix of a name. Re-read whenever the menu opens, since
+  // the app-wide reset (PdfViewer) clears the store behind this component.
+  const [readingFont, setReadingFont] = useState(loadReadingFont)
+  const [fontDraft, setFontDraft] = useState(readingFont)
+  useEffect(() => {
+    if (!themeMenuOpen) return
+    const stored = loadReadingFont()
+    setReadingFont(stored)
+    setFontDraft(stored)
+  }, [themeMenuOpen])
+  const commitReadingFont = (raw: string): void => {
+    const name = normalizeReadingFont(raw)
+    setFontDraft(name)
+    if (name === readingFont) return
+    setReadingFont(name)
+    saveReadingFont(name)
+    applyReadingFont(name)
+  }
+  const fontDraftName = normalizeReadingFont(fontDraft)
+  const fontInstalled = useMemo(() => isFontInstalled(fontDraftName), [fontDraftName])
   const [viewMenuOpen, setViewMenuOpen] = useState(false)
   // Save is a split button: the frequent action (write changes back to the
   // file) stays one click, the rare one (save a copy) moves behind the
@@ -2458,6 +2491,43 @@ export default function Toolbar({
                   </>
                 )
               })()}
+              {/* The reading font: a face the machine has, by name, for the
+                  reading surfaces — the assistant's answers, comments, the
+                  preview card — never the menus. Empty is the system face. */}
+              <div className="theme-font">
+                <div className="slider-label">
+                  <span title={t('tb.readingFontTip')}>{t('tb.readingFont')}</span>
+                </div>
+                <input
+                  className="theme-font-input"
+                  type="text"
+                  value={fontDraft}
+                  placeholder={t('tb.readingFontPlaceholder')}
+                  spellCheck={false}
+                  maxLength={READING_FONT_MAX_LEN}
+                  onChange={(e) => setFontDraft(e.target.value)}
+                  onBlur={() => commitReadingFont(fontDraft)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitReadingFont(fontDraft)
+                  }}
+                />
+                <div
+                  className="theme-font-sample"
+                  style={
+                    fontDraftName
+                      ? // A string: React appends px to a number here, and the
+                        // adjustment is a bare ratio
+                        { fontFamily: readingFontStack(fontDraftName), fontSizeAdjust: String(READING_FONT_X_HEIGHT) }
+                      : undefined
+                  }
+                >
+                  {t('tb.readingFontSample')}
+                </div>
+                {fontDraftName && fontInstalled === false && (
+                  <div className="theme-auto-hint">{t('tb.readingFontMissing')}</div>
+                )}
+                <ResetLink hidden={!readingFont && !fontDraftName} onClick={() => commitReadingFont('')} />
+              </div>
               <div className="theme-menu-sep" />
 
               {/* Both of these shape the READING experience rather than the

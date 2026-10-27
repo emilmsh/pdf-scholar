@@ -7,6 +7,7 @@ import { consumeTakenBack, openInBrowserViewer } from './extension-api'
 import { insecureRetryUrl } from '../../shared/insecure-retry'
 import { errorText, setLanguage, t } from './i18n'
 import { applyPageTune, tuneTitleBar } from './theme-tune'
+import { applyReadingFont, loadReadingFont } from './reading-font'
 import { applyTabIcon } from './tab-icon'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import {
@@ -84,6 +85,10 @@ export default function ExtensionApp(): React.JSX.Element {
 
   // Theme + tone override — mirrors App.tsx exactly (parity:
   // docs/PLATFORMS.md holds the extension to the desktop's reading modes).
+  // The reading font, once at start — the same store and rule as the desktop
+  useEffect(() => {
+    applyReadingFont(loadReadingFont())
+  }, [])
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
     applyPageTune(resolvedTheme, settings.themeTune, settings.customTone, settings.nightTone)

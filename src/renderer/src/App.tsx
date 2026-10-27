@@ -15,6 +15,7 @@ import { movedFromLabel, positionFor, reportIdentity } from './doc-identity'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
 import { applyPageTune, tuneTitleBar } from './theme-tune'
+import { applyReadingFont, loadReadingFont } from './reading-font'
 import { applyTabIcon } from './tab-icon'
 import { createDocRegistry } from './doc-registry'
 import { emitLocalDocEvent } from './local-doc-events'
@@ -252,6 +253,11 @@ export default function App(): React.JSX.Element {
   // exactly the shipped CSS. The native window-controls overlay follows: the
   // static map (MUST mirror --bg-titlebar / --text in app.css) unless the
   // active tone derives its own pair.
+  // The reading font, once at start: a renderer-only preference read from
+  // the same store the menu writes, so every window of the app agrees with it
+  useEffect(() => {
+    applyReadingFont(loadReadingFont())
+  }, [])
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme
     applyPageTune(resolvedTheme, settings.themeTune, settings.customTone, settings.nightTone)
