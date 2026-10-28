@@ -268,8 +268,51 @@ button {
   align-items: flex-end;
   gap: 3px;
   padding: 5px 8px 0;
+  /* Only the tab strip inside scrolls — the row itself never does, so the
+     buttons after it stay put */
+  overflow: hidden;
+}
+
+/* The tabs, scrolling sideways once they are at their narrowest (Emil,
+   2026-10-28). Sized to its tabs, so «+» follows the last one until the row
+   is full. No scrollbar: an edge with more beyond it fades out instead.
+   The whole strip is no-drag, not just each tab — Electron's drag regions are
+   laid out from the page and are not guaranteed to follow a scroll, and a
+   stale one would drag the window where a tab now stands. */
+.tab-strip {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
+  -webkit-app-region: no-drag;
+  --fade-start: 0px;
+  --fade-end: 0px;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--fade-start),
+    #000 calc(100% - var(--fade-end)),
+    transparent
+  );
+}
+
+.tab-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-strip.fade-start {
+  --fade-start: 28px;
+}
+
+.tab-strip.fade-end {
+  --fade-end: 28px;
 }
 
 .tab-app-glyph {
@@ -293,13 +336,14 @@ button {
 .tab {
   display: flex;
   align-items: center;
-  /* Every tab the same width, as in Edge (Emil, 2026-10-28): a zero basis
-     means the strip's free space is dealt out equally and a full strip
-     shrinks every tab alike. Without it a tab's width came from its file
-     name, and the long names stayed widest all the way down. */
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: 220px;
+  /* Every tab the same width, as in Edge (Emil, 2026-10-28): one width for
+     all, so a full strip shrinks every tab alike — without it a tab's width
+     came from its file name, and the long names stayed widest all the way
+     down. They stop at a width that still reads a dozen characters, and past
+     that the strip scrolls. */
+  flex: 0 1 auto;
+  width: 220px;
+  min-width: 120px;
   border-radius: 8px 8px 0 0;
   color: var(--text-secondary);
   -webkit-app-region: no-drag;
@@ -332,23 +376,60 @@ button {
   font-size: 12px;
   font-weight: 600;
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
   white-space: nowrap;
   text-align: left;
+}
+
+/* The name in one or two parts (src/shared/tab-labels.ts): the head gives
+   way first, so where a name parts from its neighbour's stays in view —
+   «Hort…Syverson 2015». `pre` keeps a space at a part's edge, which a flex
+   item would otherwise drop. */
+.tab-name-head,
+.tab-name-tail,
+.tab-name-dir {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+/* The head gives way first, down to a few letters; the tail keeps its full
+   width until it would leave the head less than that, and only then is cut
+   itself. (Shrink weights cannot say this exactly: a long head still takes
+   a pixel or two off a short tail, «3.p…».) */
+.tab-name-head {
+  flex: 0 1 auto;
+}
+
+.tab-name-tail,
+.tab-name-dir {
+  flex: none;
+  max-width: calc(100% - 2.5em);
+}
+
+/* The folder that tells an identical name apart, quieter than the name */
+.tab-name-dir {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--text-secondary);
 }
 
 /* A pinned tab (issue #29): narrower, a tack before the name, no close
    cross — it stays at the strip's start until it is let go */
 .tab.pinned {
-  max-width: 150px;
+  width: 150px;
+  min-width: 96px;
 }
 
 .tab.pinned .tab-label {
   padding-right: 12px;
 }
 
-/* Inline with the name, so the name still ellipsizes as one line */
+/* Before the name, which ellipsizes on its own */
 .tab-pin {
+  flex: none;
   margin-right: 5px;
   vertical-align: -2px;
   color: var(--accent);
@@ -8581,10 +8662,12 @@ button.bookmark-fold:hover {
   right: 8px;
   top: 34px;
   z-index: 60;
-  min-width: 220px;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: 70vh;
+  padding: 6px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -8592,16 +8675,65 @@ button.bookmark-fold:hover {
   -webkit-app-region: no-drag;
 }
 
-.tab-all-menu .menu-item {
+/* The list's search field: the conversation search's look */
+.tab-all-search {
+  flex: none;
   width: 100%;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  box-sizing: border-box;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
 }
 
-.tab-all-menu .menu-item.is-active {
+.tab-all-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tab-all-list {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.tab-all-empty {
+  padding: 8px 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+/* Name over folder, each on one line */
+.tab-all-menu .menu-item {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 1px;
+  text-align: left;
+}
+
+.tab-all-name,
+.tab-all-dir {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-all-dir {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.tab-all-menu .menu-item.is-active .tab-all-name {
   color: var(--accent);
+}
+
+/* The row Enter would open, moved by ↑/↓ */
+.tab-all-row.is-highlighted .menu-item {
+  background: var(--hover);
 }
 
 /* A row of the list: the tab, and its pin at the end (issue #29) */

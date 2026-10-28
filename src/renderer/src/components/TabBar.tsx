@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { folderOf, matchesTabQuery, tabLabels } from '../../../shared/tab-labels'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
 import { bridge, isElectron } from '../bridge'
 import { TAB_DRAG_MIME } from '../drag-types'
@@ -20,6 +21,8 @@ export interface TabInfo {
 interface Props {
   tabs: TabInfo[]
   activeId: string | null
+  /** Bumped by Ctrl+Shift+A (tab.search): open «Alle faner», or close it */
+  listSignal: number
   /** Fullscreen or presentation: collapse the strip */
   hidden: boolean
   onSelect(id: string): void
@@ -60,6 +63,10 @@ interface Props {
   onOpenInSplit(path: string): void
 }
 
+/** How far the strip's edges fade when there is more to that side — also the
+ *  room the active tab is scrolled clear of them by */
+const FADE_PX = 28
+
 /** Tiny scroll glyph shown at the left of the titlebar (matches the app icon) */
 const AppGlyph = (): React.JSX.Element => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
@@ -72,6 +79,7 @@ const AppGlyph = (): React.JSX.Element => (
 export default function TabBar({
   tabs,
   activeId,
+  listSignal,
   hidden,
   onSelect,
   onClose,
@@ -115,6 +123,16 @@ export default function TabBar({
   }, [menu])
   /** The "all tabs" list, opened from the chevron at the end of the strip */
   const [allOpen, setAllOpen] = useState(false)
+  /** The list's search field, and the row Enter would open */
+  const [query, setQuery] = useState('')
+  const [highlight, setHighlight] = useState(0)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  // Ctrl+Shift+A: the first bump opens the list, the next one closes it, as
+  // the browsers' tab search does. The initial 0 is not a press.
+  useEffect(() => {
+    if (listSignal > 0) setAllOpen((o) => !o)
+  }, [listSignal])
   const [draggingId, setDraggingId] = useState<string | null>(null)
   /** How the pointer that is about to drag a tab touched it. The native file
    *  drag is for a MOUSE drag only (see PdfxApi.dragTabFile — the OS drag loop
@@ -147,6 +165,29 @@ export default function TabBar({
     }
   }, [menu])
 
+  const labels = useMemo(() => tabLabels(tabs), [tabs])
+  const matching = useMemo(
+    () => tabs.map((tab, i) => ({ tab, label: labels[i] })).filter(({ tab }) => matchesTabQuery(tab, query)),
+    [tabs, labels, query]
+  )
+  // Each opening starts with an empty field, the caret in it and the CURRENT
+  // tab highlighted — so ↓ / ↑ step from where you are
+  useLayoutEffect(() => {
+    if (!allOpen) return
+    setQuery('')
+    setHighlight(Math.max(0, tabs.findIndex((x) => x.id === activeId)))
+    searchRef.current?.focus()
+    // Only on opening — a tab arriving while the list is open must not reset it
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allOpen])
+  useEffect(() => {
+    listRef.current?.querySelector('.is-highlighted')?.scrollIntoView({ block: 'nearest' })
+  }, [highlight, allOpen, query])
+  const chooseFromList = (id: string): void => {
+    onSelect(id)
+    setAllOpen(false)
+  }
+
   useEffect(() => {
     if (!allOpen) return
     const close = (): void => setAllOpen(false)
@@ -163,6 +204,67 @@ export default function TabBar({
     }
   }, [allOpen])
 
+  // The tabs scroll sideways once they are at their narrowest (Emil,
+  // 2026-10-28: not Edge's row of ever-thinner icons — every tab here has the
+  // same icon, so the name is all there is to read). No scrollbar in a strip
+  // this tight: the edge that has more beyond it fades instead.
+  const stripRef = useRef<HTMLDivElement>(null)
+  const [fade, setFade] = useState({ start: false, end: false })
+  const updateFade = (): void => {
+    const el = stripRef.current
+    if (!el) return
+    const start = el.scrollLeft > 1
+    const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+    setFade((f) => (f.start === start && f.end === end ? f : { start, end }))
+  }
+  useLayoutEffect(updateFade)
+  useEffect(() => {
+    const el = stripRef.current
+    if (!el) return undefined
+    const observer = new ResizeObserver(updateFade)
+    observer.observe(el)
+    el.addEventListener('scroll', updateFade, { passive: true })
+    // A mouse wheel turns vertically; over the strip that means sideways. A
+    // gesture that is ALREADY sideways — a touchpad's two-finger pan, a tilt
+    // wheel, Shift+wheel — is left to the browser, which scrolls the strip
+    // natively (and a finger on a touch screen pans it the same way). Wheel
+    // notches glide to an accumulated target so a fast spin loses nothing;
+    // a touchpad's small vertical steps move the strip directly.
+    const wheel = { at: 0, target: 0 }
+    const onWheel = (e: WheelEvent): void => {
+      const room = el.scrollWidth - el.clientWidth
+      if (room <= 0 || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return
+      e.preventDefault()
+      const px = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaMode === 2 ? e.deltaY * el.clientWidth : e.deltaY
+      const now = performance.now()
+      const base = now - wheel.at < 300 ? wheel.target : el.scrollLeft
+      wheel.target = Math.max(0, Math.min(room, base + px))
+      wheel.at = now
+      if (Math.abs(px) >= 40) el.scrollTo({ left: wheel.target, behavior: 'smooth' })
+      else el.scrollLeft = wheel.target
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => {
+      observer.disconnect()
+      el.removeEventListener('scroll', updateFade)
+      el.removeEventListener('wheel', onWheel)
+    }
+  }, [])
+  // The current tab is always in view, clear of the fades — clicked half-
+  // hidden at an edge, reached by Ctrl+Tab, Ctrl+1–9 or the list
+  const scrolledOnce = useRef(false)
+  useLayoutEffect(() => {
+    const strip = stripRef.current
+    const el = activeId ? strip?.querySelector<HTMLElement>(`[data-tab-id="${CSS.escape(activeId)}"]`) : null
+    if (!strip || !el) return
+    const behavior: ScrollBehavior = scrolledOnce.current ? 'smooth' : 'auto'
+    scrolledOnce.current = true
+    const left = el.offsetLeft - FADE_PX
+    const right = el.offsetLeft + el.offsetWidth + FADE_PX
+    if (left < strip.scrollLeft) strip.scrollTo({ left, behavior })
+    else if (right > strip.scrollLeft + strip.clientWidth) strip.scrollTo({ left: right - strip.clientWidth, behavior })
+  }, [activeId, tabs.length])
+
   // The strip lives inside the frameless window's titlebar: the row is a
   // window-drag region, every interactive child opts out (CSS app-region),
   // and the content is inset to the OS-reported titlebar area so it never
@@ -178,9 +280,14 @@ export default function TabBar({
           <span className="tab-app-name">PDF Scholar</span>
         </>
       )}
+      <div
+        ref={stripRef}
+        className={`tab-strip${fade.start ? ' fade-start' : ''}${fade.end ? ' fade-end' : ''}`}
+      >
       {tabs.map((tab, index) => (
         <div
           key={tab.id}
+          data-tab-id={tab.id}
           className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}`}
           title={tab.path}
           draggable
@@ -256,7 +363,11 @@ export default function TabBar({
           <button className="tab-label" onClick={() => onSelect(tab.id)}>
             {tab.pinned && <IconPin size={12} className="tab-pin" />}
             {tab.dirty && <span className="tab-dirty-dot">•</span>}
-            {tab.name}
+            {/* Head + tail is the whole name; a name that only begins like a
+                neighbour's gives way at the head, so what differs stays */}
+            <span className="tab-name-head">{labels[index].head}</span>
+            {labels[index].tail && <span className="tab-name-tail">{labels[index].tail}</span>}
+            {labels[index].dir && <span className="tab-name-dir">{labels[index].dir}</span>}
           </button>
           {!tab.pinned && (
             <button className="tab-close" aria-label={t('tabs.close')} onClick={() => onClose(tab.id)}>
@@ -265,6 +376,7 @@ export default function TabBar({
           )}
         </div>
       ))}
+      </div>
       <button className="tab-new" onClick={onNewTab} title={withShortcut(t('tabs.new'), 'file.open')}>
         +
       </button>
@@ -278,7 +390,7 @@ export default function TabBar({
       {tabs.length > 2 && (
         <button
           className={`tab-all${allOpen ? ' is-open' : ''}`}
-          title={t('tabs.allTip')}
+          title={withShortcut(t('tabs.allTip'), 'tab.search')}
           aria-expanded={allOpen}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={() => setAllOpen((o) => !o)}
@@ -290,19 +402,50 @@ export default function TabBar({
 
       {allOpen && (
         <div className="tab-all-menu" onMouseDown={(e) => e.stopPropagation()}>
-          <div className="theme-menu-label">{t('tabs.allLabel')}</div>
-          {tabs.map((tab) => (
-            <div key={tab.id} className="tab-all-row">
+          {/* Type a few letters of the name or the folder, ↑/↓, Enter — the
+              way in once the strip holds more than can be read */}
+          <input
+            ref={searchRef}
+            className="tab-all-search"
+            type="search"
+            value={query}
+            placeholder={t('tabs.searchPlaceholder')}
+            aria-label={t('tabs.searchPlaceholder')}
+            spellCheck={false}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setHighlight(0)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                const n = matching.length
+                if (n > 0) setHighlight((h) => (h + (e.key === 'ArrowDown' ? 1 : n - 1)) % n)
+              } else if (e.key === 'Enter') {
+                e.preventDefault()
+                const row = matching[Math.min(highlight, matching.length - 1)]
+                if (row) chooseFromList(row.tab.id)
+              }
+            }}
+          />
+          <div className="tab-all-list" ref={listRef}>
+          {matching.length === 0 && <div className="tab-all-empty">{t('tabs.searchEmpty')}</div>}
+          {matching.map(({ tab, label }, row) => (
+            <div key={tab.id} className={`tab-all-row${row === highlight ? ' is-highlighted' : ''}`}>
               <button
                 className={`menu-item${tab.id === activeId ? ' is-active' : ''}`}
                 title={tab.path}
-                onClick={() => {
-                  onSelect(tab.id)
-                  setAllOpen(false)
-                }}
+                onClick={() => chooseFromList(tab.id)}
               >
-                {tab.dirty && <span className="tab-dirty-dot">•</span>}
-                {tab.name}
+                <span className="tab-all-name">
+                  {tab.dirty && <span className="tab-dirty-dot">•</span>}
+                  {tab.name}
+                </span>
+                {/* The folder on a line of its own — what tells two
+                    identical names apart, and a second thing to search by */}
+                {(label.dir ?? folderOf(tab.path)) && (
+                  <span className="tab-all-dir">{label.dir ?? folderOf(tab.path)}</span>
+                )}
               </button>
               {/* The pin's visible home besides the tab menu — this list is
                   where a strip too full to read gets sorted out */}
@@ -319,6 +462,7 @@ export default function TabBar({
               </button>
             </div>
           ))}
+          </div>
         </div>
       )}
 

@@ -15,6 +15,7 @@ import {
   CATEGORY_ORDER,
   COMMANDS,
   commandById,
+  commandLabel,
   commandForChord,
   formatChord,
   hasCustomBindings,
@@ -187,7 +188,7 @@ export default function ShortcutsDialog({ onChange, onClose }: Props): React.JSX
     const q = query.trim().toLowerCase()
     if (!q) return COMMANDS
     return COMMANDS.filter((c) => {
-      if (t(c.labelKey).toLowerCase().includes(q)) return true
+      if (commandLabel(c).toLowerCase().includes(q)) return true
       if (t(CATEGORY_LABELS[c.category]).toLowerCase().includes(q)) return true
       // Searching for the KEY is the other way in: "what does F11 do?"
       return bindingsFor(c.id).some((chord) => formatChord(chord).toLowerCase().includes(q))
@@ -209,7 +210,7 @@ export default function ShortcutsDialog({ onChange, onClose }: Props): React.JSX
     const defaultLabel = command.defaults.map(formatChord).join(' / ')
     return (
       <div className="keys-row" key={id}>
-        <span className="keys-label">{t(command.labelKey)}</span>
+        <span className="keys-label">{commandLabel(command)}</span>
         <span className="keys-binding">
           {chords.map((chord) => (
             <span className="keys-chip-wrap" key={chord}>
@@ -280,7 +281,7 @@ export default function ShortcutsDialog({ onChange, onClose }: Props): React.JSX
           <span className="keys-note keys-note-ask">
             {t('keys.conflict', {
               keys: formatChord(conflict.chord),
-              from: t(commandById(conflict.owner)!.labelKey)
+              from: commandLabel(commandById(conflict.owner)!)
             })}
             <button
               className="keys-note-action"
@@ -305,7 +306,7 @@ export default function ShortcutsDialog({ onChange, onClose }: Props): React.JSX
           <span className="keys-note">
             {t('keys.tookOver', {
               keys: formatChord(takeover.chord),
-              from: t(commandById(takeover.from)!.labelKey)
+              from: commandLabel(commandById(takeover.from)!)
             })}
             <button
               className="keys-note-undo"
