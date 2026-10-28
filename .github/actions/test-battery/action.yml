@@ -151,6 +151,11 @@ runs:
     # untrusted input that must read as a list every time
     - run: npm run test:custom-colors
       shell: bash
+    # What a tab shows when its name does not tell it apart: names that begin
+    # alike split where they part, identical names carry their folder, and
+    # the «Alle faner» search
+    - run: npm run test:tab-labels
+      shell: bash
     # Windows 8.3 aliases ("EFFECT~1.pdf") never become a document's identity:
     # Save renamed a temp file onto the alias and the long-named paper came
     # back with an eight-character name (issue #24). Logic everywhere; the

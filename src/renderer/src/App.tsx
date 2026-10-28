@@ -157,6 +157,8 @@ export default function App(): React.JSX.Element {
    *  (Emil, 2026-09-02). App-level like the shortcut itself, so it also works
    *  from the library. */
   const [themeToast, setThemeToast] = useState<string | null>(null)
+  /** Bumped by Ctrl+Shift+A: the strip opens (or closes) «Alle faner» */
+  const [tabListSignal, setTabListSignal] = useState(0)
   const themeToastTimerRef = useRef<number | null>(null)
   /** The same pill for any one-line app-level notice */
   const flashNotice = useCallback((text: string, ms: number) => {
@@ -1337,6 +1339,38 @@ export default function App(): React.JSX.Element {
           void duplicateTab(id)
           break
         }
+        case 'tab.search':
+          if (tabsRef.current.length === 0) break
+          e.preventDefault()
+          setTabListSignal((n) => n + 1)
+          break
+        case 'tab.goto1':
+        case 'tab.goto2':
+        case 'tab.goto3':
+        case 'tab.goto4':
+        case 'tab.goto5':
+        case 'tab.goto6':
+        case 'tab.goto7':
+        case 'tab.goto8':
+        case 'tab.last': {
+          // A number past the last tab does nothing, as in the browsers
+          const list = tabsRef.current
+          const target = command === 'tab.last' ? list[list.length - 1] : list[Number(command.slice('tab.goto'.length)) - 1]
+          if (!target) break
+          e.preventDefault()
+          goToTab(target.id)
+          break
+        }
+        case 'doc.copyPath': {
+          const tab = tabsRef.current.find((x) => x.id === activeIdRef.current)
+          if (!tab || atLibraryRef.current) break
+          e.preventDefault()
+          void navigator.clipboard
+            ?.writeText(tab.payload.path)
+            .then(() => flashNotice(t('doc.pathCopied'), 1400))
+            .catch(() => {})
+          break
+        }
         default:
           // Every other command belongs to the viewer, which has its own listener
           break
@@ -1344,7 +1378,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, reopenClosedTab, duplicateTab, openDialog, moveTab, pinTab, updateSettings, flashThemeName])
+  }, [cycleTab, closeTab, reopenClosedTab, duplicateTab, openDialog, moveTab, pinTab, updateSettings, flashThemeName, flashNotice, goToTab])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -1403,6 +1437,7 @@ export default function App(): React.JSX.Element {
         // stays, so the open documents are visible and one click away from
         // there, but none of them is what you are looking at.
         activeId={atLibrary ? null : activeId}
+        listSignal={tabListSignal}
         // Fullscreen tucks the strip — but reaching for the top brings it
         // back with the toolbar. Only worth it with MORE THAN ONE tab: with a
         // single document open the strip is a title bar, and revealing it adds

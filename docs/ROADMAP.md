@@ -101,7 +101,7 @@ Grunnmuren levert 2026-07-09: mupdf `AnnotationEngine` skriver Highlight (5 farg
 
 ## Fase 6.5 — Faner (Emil ønsker dette tidlig, trukket frem fra fase 7)
 - [x] Fanelinje for flere åpne dokumenter: klikk/klikk-på-✕/midtklikk lukker, + åpner, Ctrl+Tab / Ctrl+Shift+Tab veksler, Ctrl+W lukker, Ctrl+O åpner; bakgrunnsfaner beholder full tilstand (scroll, zoom, angre-stakk) og leseposisjon lagres ved fanebytte (levert 2026-07-10)
-- [x] Dra faner for å endre rekkefølge; «lukk andre faner»-meny (levert 2026-07-29) — dra bytter plass live i linja (ingen protokollendring: main svarte allerede `'same'` når slippet skjer i eget vindu), meny med «Lukk andre faner»/«Lukk faner til høyre» som spør om én fane om gangen, og «Flytt til venstre/høyre» + Ctrl+Shift+PageUp/PageDown for berøring og tastatur
+- [x] Dra faner for å endre rekkefølge; «lukk andre faner»-meny (levert 2026-07-29) — dra bytter plass live i linja (ingen protokollendring: main svarte allerede `'same'` når slippet skjer i eget vindu), meny med «Lukk andre faner» som spør om én fane om gangen, og Ctrl+Shift+PageUp/PageDown for tastaturet («Lukk faner til høyre» og «Flytt til venstre/høyre» tatt ut av menyen 2026-10-28, «Kopier sti» inn ved siden av «Vis i Filutforsker»)
 - [x] **En fane dras som en fil** (2026-09-17, Emils ønske: «dra fanen inn i
   et annet vindu skal fungere som en filopplastning»). Fanelinja avbryter
   HTML5-draget og ber main om `webContents.startDrag` med dokumentets sti —

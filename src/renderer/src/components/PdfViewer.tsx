@@ -8285,6 +8285,7 @@ export default function PdfViewer({
           index={searchIndex}
           busy={searchBusy}
           ocr={ocrProgress}
+          ocrScan={ocrScanProgress}
           ocrOffer={ocrOffer}
           onEnableOcr={onEnableOcr}
           mode={searchMode}

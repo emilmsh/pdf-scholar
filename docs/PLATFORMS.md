@@ -574,7 +574,13 @@ regressions are treated as bugs, not as acceptable platform lag.
     one desktop footnote: removing an entry leaves the OS's own recent-documents
     list (the Windows Jump List, the macOS Dock menu) alone, because Electron can
     only clear that list whole. «Bla side for side» is renderer-only and
-    identical everywhere. Covered by `npm run test:session` and
+    identical everywhere. The strip's own ways in (2026-10-28) are the
+    desktop's for the same reason: the sideways-scrolling strip, «Alle faner»
+    with its search on Ctrl+Shift+A and Ctrl+1–9 — the browser has its own tab
+    search and numbered tabs on the very same chords. Ctrl+Shift+C (copy the
+    document's path) is desktop-only too: in Edge and Chrome it is the
+    browser's element picker, and the extension's document menu carries
+    «Kopier sti» instead. Covered by `npm run test:session` and
     `test:recent-thumbs` (CI), and by `test:session-desktop`, `test:recents-grid`
     and `test:paged` (desktop session).
 30. **A document that changes on disk follows the file on the desktop only.**

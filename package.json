@@ -1,7 +1,7 @@
 {
   "name": "pdfx",
   "productName": "PDF Scholar",
-  "version": "0.74.1",
+  "version": "0.76.0",
   "description": "A PDF reader and annotator for Windows and macOS, built for research",
   "main": "out/main/index.js",
   "private": true,
@@ -67,6 +67,7 @@
     "test:file-access": "node scripts/test-file-access.mjs",
     "test:update-channel": "node scripts/test-update-channel.mjs",
     "test:custom-colors": "node scripts/test-custom-colors.mjs",
+    "test:tab-labels": "node scripts/test-tab-labels.mjs",
     "test:long-path": "node scripts/test-long-path.mjs",
     "test:xfa": "node scripts/test-xfa.mjs",
     "test:attachments": "node scripts/test-attachments.mjs",
