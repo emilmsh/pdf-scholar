@@ -20,7 +20,7 @@
 // either platform — the same reason platform.ts exists.
 import { isMac } from './platform'
 import { READ_ALOUD } from './flags'
-import type { MsgKey } from './i18n'
+import { t, type MsgKey } from './i18n'
 
 /** Command ids are the stable keys a stored keymap is written against — they
  *  outlive labels and defaults, so renaming one silently drops the user's
@@ -41,6 +41,17 @@ export type CommandId =
   | 'tab.moveLeft'
   | 'tab.moveRight'
   | 'tab.pin'
+  | 'tab.search'
+  | 'tab.goto1'
+  | 'tab.goto2'
+  | 'tab.goto3'
+  | 'tab.goto4'
+  | 'tab.goto5'
+  | 'tab.goto6'
+  | 'tab.goto7'
+  | 'tab.goto8'
+  | 'tab.last'
+  | 'doc.copyPath'
   // Navigation
   | 'nav.back'
   | 'nav.forward'
@@ -125,6 +136,13 @@ export interface Command {
   whileTyping?: boolean
   /** Hidden unless the feature flag is on (read-aloud, see flags.ts) */
   flagged?: boolean
+  /** Filled into the label — «Gå til fane {n}» is eight rows, one string */
+  labelVars?: Record<string, number>
+}
+
+/** A command's name as the map and its messages show it */
+export function commandLabel(c: Command): string {
+  return t(c.labelKey, c.labelVars)
 }
 
 export const CATEGORY_LABELS: Record<CategoryId, MsgKey> = {
@@ -190,6 +208,27 @@ const REGISTRY: readonly Command[] = [
   // Unbound, like the browsers: pinning is rare enough that a key would only
   // be one more to press by accident — the map lets a reader give it one
   { id: 'tab.pin', category: 'tabs', labelKey: 'keys.tabPin', defaults: [], whileTyping: true },
+  // Chrome's and Edge's chord for their tab search (Emil, 2026-10-28): with
+  // thirty documents open, typing three letters of the one you want beats
+  // reading a strip of «Hortacs…». Opens «Alle faner» with the caret in it.
+  { id: 'tab.search', category: 'tabs', labelKey: 'keys.tabSearch', defaults: ['mod+shift+a'], whileTyping: true },
+  // The browsers' numbered tabs: Ctrl+1–8 the tab at that place, Ctrl+9 the
+  // LAST one, however many there are
+  ...([1, 2, 3, 4, 5, 6, 7, 8] as const).map(
+    (n): Command => ({
+      id: `tab.goto${n}`,
+      category: 'tabs',
+      labelKey: 'keys.tabGoto',
+      labelVars: { n },
+      defaults: [`mod+${n}`],
+      whileTyping: true
+    })
+  ),
+  { id: 'tab.last', category: 'tabs', labelKey: 'keys.tabLast', defaults: ['mod+9'], whileTyping: true },
+  // The open document's path to the clipboard — the tab menu's «Kopier sti»
+  // without the menu (Emil, 2026-10-28). Desktop only in practice: in Edge
+  // and Chrome the chord is the browser's own element picker.
+  { id: 'doc.copyPath', category: 'file', labelKey: 'keys.copyPath', defaults: ['mod+shift+c'], whileTyping: true },
 
   // ---------- Navigation ----------
   { id: 'nav.back', category: 'nav', labelKey: 'keys.navBack', defaults: ['alt+arrowleft'] },
