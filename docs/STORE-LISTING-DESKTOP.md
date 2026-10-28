@@ -156,7 +156,7 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.74.1
+## What's new in this version (≤ 1 500 chars) — v0.75.0
 
 *(The Store last carried v0.61.0's notes — v0.73.0 went into certification
 with this block — so it covers what landed between: the headline items, not
@@ -164,6 +164,9 @@ every release.)*
 
 **EN:**
 ```
+• Hovering a note or a comment shows the whole text: the card stays while the pointer is on it, fades at the edge where more follows, and scrolls
+• The comment bubble opens at the height of its text, wider for a long one; a double-click on the grip switches to all of it
+• Reading font: the fonts your computer has are offered as you type the name, and your own messages in the assistant are set in it too
 • Margin view: «m» toggles the comments in the margin, and so does a switch in the reading-mode menu, with the side choice folding out under it
 • Margin comments taller than their page overhang it instead of overlapping, and the next page's comments start under them
 • Reading font: name any font your computer has, and the assistant's answers, comments and notes are set in it – the menus keep the interface face, and nothing is written into the file
@@ -171,15 +174,13 @@ every release.)*
 • Presentation mode fills the screen edge to edge, as in Acrobat
 • Journal PDFs that draw every line twice (JSTOR, the AEA journals) now search, select and copy as one text
 • Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere or written into the file
-• The assistant reads scanned documents too, and keeps its conversations: the library lists them across documents, and an earlier one can be attached to a new question
-• A paperclip in the composer attaches a conversation, an image or a local file as context; web search is one switch, on or off
-• Your own colours from a colour wheel in every tool menu, kept until you replace them; Ctrl+N opens a file
-• Sharp text at every zoom level and display scale
-• A text box can be re-set in another size after writing; its menu opens beside the editor
 ```
 
 **NO:**
 ```
+• Hold pekeren over et notat eller en kommentar, og hele teksten vises: kortet blir stående så lenge pekeren er på det, tones ut i kanten der mer følger, og ruller
+• Kommentarboblen åpnes i tekstens høyde, bredere for en lang; et dobbeltklikk på gripet veksler til hele teksten
+• Leseskrift: skriftene maskinen har, foreslås etter hvert som du skriver navnet, og dine egne meldinger i assistenten settes også i den
 • Margvisning: «m» slår kommentarene i margen av og på, og det samme gjør en bryter i lesemodusmenyen, med sidevalget foldet ut under
 • Margkommentarer som er høyere enn siden henger ut over kanten i stedet for å overlappe, og neste sides kommentarer begynner under dem
 • Leseskrift: nevn en skrift maskinen har, og assistentens svar, kommentarer og notater settes i den – menyene beholder grensesnittets skrift, og ingenting skrives inn i filen
@@ -187,11 +188,6 @@ every release.)*
 • Presentasjonsmodus fyller skjermen kant til kant, som i Acrobat
 • Tidsskrift-PDF-er som tegner hver linje dobbelt (JSTOR, AEA-tidsskriftene) søkes, merkes og kopieres nå som én tekst
 • Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted eller skrives inn i filen
-• Assistenten leser skannede dokumenter også, og tar vare på samtalene: biblioteket lister dem på tvers av dokumenter, og en tidligere samtale kan legges ved et nytt spørsmål
-• En binders i skrivefeltet legger ved en samtale, et bilde eller en lokal fil som kontekst; nettsøk er én bryter, av eller på
-• Egne farger fra et fargehjul i alle verktøymenyene, beholdt til du bytter dem ut; Ctrl+N åpner en fil
-• Skarp tekst ved alle zoomnivåer og skjermskalaer
-• En tekstboks kan settes om i en annen størrelse etterpå; menyen åpnes ved siden av redigeringen
 ```
 
 ---
