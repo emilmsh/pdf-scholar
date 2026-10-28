@@ -39,9 +39,13 @@ interface Props {
   matches: SearchMatch[]
   index: number
   busy: boolean
-  /** Scanned pages still being read by OCR — the hits so far show already,
-   *  and the note line says how far the reading has come */
+  /** Pages still being read by OCR (scanned pages and the images of pages
+   *  with text) — the hits so far show already, and the note line says how
+   *  far the reading has come */
   ocr: OcrProgress | null
+  /** The scanned pages alone among `ocr` — what decides whether the note
+   *  speaks of scanned pages, of images, or of both */
+  ocrScan: OcrProgress | null
   /** OCR is on request and this document's scanned pages are not read: the
    *  note line says so and offers to read them */
   ocrOffer: boolean
@@ -82,6 +86,7 @@ export default function SearchBar({
   index,
   busy,
   ocr,
+  ocrScan,
   ocrOffer,
   onEnableOcr,
   mode,
@@ -515,7 +520,16 @@ export default function SearchBar({
         </div>
       )}
 
-      {ocr && <div className="search-ai-note">{t('search.ocrReading', { done: ocr.done, total: ocr.total })}</div>}
+      {ocr && (
+        <div className="search-ai-note">
+          {/* A book with figures has no scanned page, and «skannede sider»
+              read as if the whole book were scanned */}
+          {t(
+            !ocrScan ? 'search.ocrImages' : ocrScan.total === ocr.total ? 'search.ocrPages' : 'search.ocrReading',
+            { done: ocr.done, total: ocr.total }
+          )}
+        </div>
+      )}
       {ocrOffer && (
         <div className="search-ai-note">
           {t('search.ocrOffer')}{' '}
