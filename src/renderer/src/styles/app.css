@@ -293,6 +293,11 @@ button {
 .tab {
   display: flex;
   align-items: center;
+  /* Every tab the same width, as in Edge (Emil, 2026-10-28): a zero basis
+     means the strip's free space is dealt out equally and a full strip
+     shrinks every tab alike. Without it a tab's width came from its file
+     name, and the long names stayed widest all the way down. */
+  flex: 1 1 0;
   min-width: 0;
   max-width: 220px;
   border-radius: 8px 8px 0 0;

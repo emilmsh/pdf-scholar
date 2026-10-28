@@ -134,14 +134,7 @@ export default function TabBar({
    *  several Linux desktops. */
   const dragPointer = useRef<{ type: string; buttons: number; mod: boolean } | null>(null)
   const modOf = (e: { ctrlKey: boolean; metaKey: boolean }): boolean => (isMac ? e.metaKey : e.ctrlKey)
-  /** Where the right-clicked tab currently sits — the move/close-to-the-right
-   *  items are all relative to it, and it moves while the menu is open. */
-  const menuIndex = menu ? tabs.findIndex((x) => x.id === menu.tab.id) : null
-  /** The pinned group is the strip's start; moves stay inside a tab's own group */
-  const pinnedCount = tabs.filter((x) => x.pinned).length
   const menuPinned = menu ? tabs.find((x) => x.id === menu.tab.id)?.pinned === true : false
-  const groupStart = menuPinned ? 0 : pinnedCount
-  const groupEnd = menuPinned ? pinnedCount - 1 : tabs.length - 1
 
   useEffect(() => {
     if (!menu) return
@@ -329,7 +322,7 @@ export default function TabBar({
         </div>
       )}
 
-      {menu && menuIndex !== null && (
+      {menu && (
         <div
           className="tab-menu"
           style={{ left: Math.min(menu.x, window.innerWidth - 220), top: menu.y }}
@@ -404,6 +397,19 @@ export default function TabBar({
           >
             {t('tabs.showInFolder')}
           </button>
+          {/* «Kopier sti» beside «Vis i Filutforsker» (Emil, 2026-10-28): the
+              tab's path as it is on disk, for pasting into a chat, a mail or
+              a reference manager. The same string the browser build's
+              document button uses; the menu closes, so no «Kopiert» flash. */}
+          <button
+            className="menu-item"
+            onClick={() => {
+              void navigator.clipboard?.writeText(menu.tab.path).catch(() => {})
+              setMenu(null)
+            }}
+          >
+            {t('doc.copyPath')}
+          </button>
           {menuZotero && (
             <button
               className="menu-item"
@@ -415,33 +421,9 @@ export default function TabBar({
               {t('zotero.show')}
             </button>
           )}
-          {/* Touch has no HTML5 drag, and a keyboard has no cursor: the same
-              reorder lives here (long-press opens this menu) and on
-              Ctrl+Shift+PageUp/PageDown. */}
-          {groupEnd > groupStart && (
-            <>
-              <button
-                className="menu-item"
-                disabled={menuIndex <= groupStart}
-                onClick={() => {
-                  onReorder(menu.tab.id, menuIndex - 1)
-                  setMenu(null)
-                }}
-              >
-                {t('tabs.moveLeft')}
-              </button>
-              <button
-                className="menu-item"
-                disabled={menuIndex === -1 || menuIndex >= groupEnd}
-                onClick={() => {
-                  onReorder(menu.tab.id, menuIndex + 1)
-                  setMenu(null)
-                }}
-              >
-                {t('tabs.moveRight')}
-              </button>
-            </>
-          )}
+          {/* «Flytt til venstre/høyre» and «Lukk faner til høyre» left this
+              menu 2026-10-28 (Emil: tidiness) — a tab is reordered by drag,
+              or by Ctrl+Shift+PageUp/PageDown from the keyboard. */}
           <button
             className="menu-item"
             onClick={() => {
@@ -462,17 +444,6 @@ export default function TabBar({
               }}
             >
               {t('tabs.closeOthers')}
-            </button>
-          )}
-          {menuIndex !== -1 && tabs.slice(menuIndex + 1).some((x) => !x.pinned) && (
-            <button
-              className="menu-item"
-              onClick={() => {
-                onCloseMany(tabs.slice(menuIndex + 1).filter((x) => !x.pinned).map((x) => x.id))
-                setMenu(null)
-              }}
-            >
-              {t('tabs.closeToRight')}
             </button>
           )}
         </div>
