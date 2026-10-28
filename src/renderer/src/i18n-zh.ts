@@ -156,6 +156,7 @@ export const zh: Dict = {
   'welcome.recentsList': '以列表显示',
   'welcome.recentsGrid': '显示首页',
   'welcome.recentsProgress': '第 {page} 页，共 {pages} 页',
+  'tabs.cardPage': '第 {page} 页',
   'welcome.recentsPinned': '已固定',
   'welcome.recentsPin': '固定到顶部',
   'welcome.recentsUnpin': '取消固定',

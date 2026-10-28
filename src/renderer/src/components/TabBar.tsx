@@ -6,6 +6,7 @@ import { t, useLang } from '../i18n'
 import { isMac } from '../platform'
 import { withShortcut } from '../keymap'
 import { IconChevronDown, IconPin } from './icons'
+import { useTabHoverCard } from './TabHoverCard'
 
 export interface TabInfo {
   id: string
@@ -135,6 +136,8 @@ export default function TabBar({
   const dragPointer = useRef<{ type: string; buttons: number; mod: boolean } | null>(null)
   const modOf = (e: { ctrlKey: boolean; metaKey: boolean }): boolean => (isMac ? e.metaKey : e.ctrlKey)
   const menuPinned = menu ? tabs.find((x) => x.id === menu.tab.id)?.pinned === true : false
+  /** The hover card (TabHoverCard.tsx) — none while a menu owns the strip */
+  const hoverCard = useTabHoverCard(menu !== null || allOpen || draggingId !== null)
 
   useEffect(() => {
     if (!menu) return
@@ -182,8 +185,11 @@ export default function TabBar({
         <div
           key={tab.id}
           className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}`}
-          title={tab.path}
           draggable
+          // The hover card says what the native title did (the path), and
+          // more — two tooltips at once would be worse than either
+          onPointerEnter={(e) => hoverCard.enter(e, tab)}
+          onPointerLeave={hoverCard.leave}
           onPointerDown={(e) => {
             dragPointer.current = { type: e.pointerType, buttons: e.buttons, mod: modOf(e) }
           }}
@@ -287,6 +293,8 @@ export default function TabBar({
         </button>
       )}
       </div>
+
+      {hoverCard.card}
 
       {allOpen && (
         <div className="tab-all-menu" onMouseDown={(e) => e.stopPropagation()}>
