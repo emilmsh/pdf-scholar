@@ -4,7 +4,8 @@
 // Names that begin alike are split where they part, so the strip can give way
 // at the head and keep what differs; head + tail is always the whole name. The
 // same name on two paths carries the fewest trailing folders that tell them
-// apart. And the «Alle faner» search: every word, name or path, case-folded.
+// apart. Names are shown without «.pdf». And the «Alle faner» search: every
+// word, name or path, case-folded.
 // Run: node scripts/test-tab-labels.mjs
 import { build } from 'esbuild'
 import { mkdtempSync } from 'node:fs'
@@ -36,43 +37,57 @@ const labels = (...paths) => L.tabLabels(paths.map(tab))
 eq(
   labels('C:\\a\\Davis and Hall.pdf', 'C:\\a\\Einav et al.pdf'),
   [
-    { head: 'Davis and Hall.pdf', tail: '', dir: null },
-    { head: 'Einav et al.pdf', tail: '', dir: null }
+    { head: 'Davis and Hall', tail: '', dir: null },
+    { head: 'Einav et al', tail: '', dir: null }
   ],
   'unrelated names are left whole'
 )
-eq(labels('C:\\a\\only.pdf'), [{ head: 'only.pdf', tail: '', dir: null }], 'a single tab is left whole')
+eq(labels('C:\\a\\only.pdf'), [{ head: 'only', tail: '', dir: null }], 'a single tab is left whole')
 eq(L.tabLabels([]), [], 'no tabs, no labels')
+
+// --- Shown without «.pdf» --------------------------------------------------------
+eq(L.shownName('Paper.PDF'), 'Paper', 'the extension goes in any case')
+eq(L.shownName('.pdf'), '.pdf', 'a name that is only the extension stays')
+eq(L.shownName('jep.29.4.89'), 'jep.29.4.89', 'a name without it is untouched')
+eq(L.shownName('notes.pdf.pdf'), 'notes.pdf', 'only the last one')
+{
+  // Identity still compares the whole name: «x.pdf» and «x» are two names
+  const [a, b] = L.tabLabels([
+    { name: 'x.pdf', path: 'C:\\a\\x.pdf' },
+    { name: 'x', path: 'C:\\b\\x' }
+  ])
+  eq([a.dir, b.dir], [null, null], 'names that only look alike once shown get no folder')
+}
 
 // --- Names that begin alike ----------------------------------------------------
 {
   const [a, b] = labels('C:\\p\\Hortacsu Syverson 2015.pdf', 'C:\\p\\Hortacsu Puller 2008.pdf')
-  eq([a.head, a.tail], ['Hortacsu ', 'Syverson 2015.pdf'], 'split at the word where they part')
-  eq([b.head, b.tail], ['Hortacsu ', 'Puller 2008.pdf'], 'both sides are split')
-  eq(a.head + a.tail, 'Hortacsu Syverson 2015.pdf', 'head + tail is the whole name')
+  eq([a.head, a.tail], ['Hortacsu ', 'Syverson 2015'], 'split at the word where they part')
+  eq([b.head, b.tail], ['Hortacsu ', 'Puller 2008'], 'both sides are split')
+  eq(a.head + a.tail, 'Hortacsu Syverson 2015', 'head + tail is the whole name')
 }
 {
   // Parting mid-word goes back to that word's start
   const [a, b] = labels('C:\\p\\Handbook of IO vol3.pdf', 'C:\\p\\Handbook of IO vol4.pdf')
-  eq([a.head, a.tail], ['Handbook of IO ', 'vol3.pdf'], 'mid-word parting backs up to the word start')
-  eq([b.head, b.tail], ['Handbook of IO ', 'vol4.pdf'], 'and the same for the other')
+  eq([a.head, a.tail], ['Handbook of IO ', 'vol3'], 'mid-word parting backs up to the word start')
+  eq([b.head, b.tail], ['Handbook of IO ', 'vol4'], 'and the same for the other')
 }
 {
   // Parting AT a break cuts there
   const [a, b] = labels('C:\\p\\Handbook of IO.pdf', 'C:\\p\\Handbook of IO vol 2.pdf')
-  eq([a.head, a.tail], ['Handbook of IO', '.pdf'], 'parting at a full stop cuts there')
-  eq([b.head, b.tail], ['Handbook of IO', ' vol 2.pdf'], 'parting at a space cuts there (space kept)')
+  eq([a.head, a.tail], ['Handbook of IO', ''], 'a name that is all of its neighbour’s beginning stays whole')
+  eq([b.head, b.tail], ['Handbook of IO', ' vol 2'], 'parting at a space cuts there (space kept)')
 }
 {
   // Underscores and hyphens are word breaks, as file names use them
   const [a] = labels('C:\\p\\Aguirre_Reguant_2024.pdf', 'C:\\p\\Aguirre_Reguant_2019.pdf')
-  eq([a.head, a.tail], ['Aguirre_Reguant_', '2024.pdf'], 'underscores break words')
+  eq([a.head, a.tail], ['Aguirre_Reguant_', '2024'], 'underscores break words')
 }
 {
   // A long word parting deep inside keeps a few characters before the difference
   const [a] = labels('C:\\p\\Supercalifragilisticexpialidocious-A.pdf', 'C:\\p\\Supercalifragilisticexpialidocious-B.pdf')
   eq(a.tail.startsWith('-A') || a.tail.length <= 6, true, 'a long shared word is not backed up to its start')
-  eq(a.head + a.tail, 'Supercalifragilisticexpialidocious-A.pdf', 'still the whole name')
+  eq(a.head + a.tail, 'Supercalifragilisticexpialidocious-A', 'still the whole name')
 }
 {
   // A short shared beginning survives an end ellipsis by itself
@@ -82,20 +97,20 @@ eq(L.tabLabels([]), [], 'no tabs, no labels')
 {
   // Case does not hide a shared beginning
   const [a] = labels('C:\\p\\hortacsu syverson.pdf', 'C:\\p\\Hortacsu Puller.pdf')
-  eq(a.tail, 'syverson.pdf', 'prefix compared case-folded')
+  eq(a.tail, 'syverson', 'prefix compared case-folded')
 }
 {
   // The closest neighbour decides: three names, one shares more with one of them
   const [a, b, c] = labels('C:\\p\\Report_2024_final.pdf', 'C:\\p\\Report_2024_draft.pdf', 'C:\\p\\Report_2019.pdf')
-  eq(a.tail, 'final.pdf', 'the longest shared beginning wins')
-  eq(b.tail, 'draft.pdf', 'for both sharers')
-  eq(c.tail, '2019.pdf', 'the third parts earlier')
+  eq(a.tail, 'final', 'the longest shared beginning wins')
+  eq(b.tail, 'draft', 'for both sharers')
+  eq(c.tail, '2019', 'the third parts earlier')
 }
 
 // --- The same name on different paths: folders --------------------------------
 {
   const [a, b] = labels('C:\\x\\Downloads\\main.pdf', 'C:\\x\\Papers\\main.pdf')
-  eq([a.head, a.tail, a.dir], ['main.pdf', '', 'Downloads'], 'identical names carry their folder')
+  eq([a.head, a.tail, a.dir], ['main', '', 'Downloads'], 'identical names carry their folder')
   eq(b.dir, 'Papers', 'both of them')
 }
 {
@@ -124,7 +139,7 @@ eq(L.tabLabels([]), [], 'no tabs, no labels')
   // An identical pair beside a third that only begins alike
   const [a, b, c] = labels('C:\\a\\Smith 2020.pdf', 'C:\\b\\Smith 2020.pdf', 'C:\\a\\Smith 2021.pdf')
   eq([a.dir, b.dir], ['a', 'b'], 'the twins get folders')
-  eq([a.tail, c.tail], ['2020.pdf', '2021.pdf'], 'and the near-twin still splits against them')
+  eq([a.tail, c.tail], ['2020', '2021'], 'and the near-twin still splits against them')
 }
 {
   // URLs: the host is the outermost folder, query and fragment are not folders

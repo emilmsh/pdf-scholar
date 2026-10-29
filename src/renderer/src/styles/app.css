@@ -344,6 +344,7 @@ button {
   flex: 0 1 auto;
   width: 220px;
   min-width: 120px;
+  position: relative;
   border-radius: 8px 8px 0 0;
   color: var(--text-secondary);
   -webkit-app-region: no-drag;
@@ -372,7 +373,7 @@ button {
 .tab-label {
   flex: 1;
   min-width: 0;
-  padding: 7px 4px 7px 12px;
+  padding: 7px 8px 7px 10px;
   font-size: 12px;
   font-weight: 600;
   overflow: hidden;
@@ -424,7 +425,7 @@ button {
 }
 
 .tab.pinned .tab-label {
-  padding-right: 12px;
+  padding-right: 10px;
 }
 
 /* Before the name, which ellipsizes on its own */
@@ -435,11 +436,18 @@ button {
   color: var(--accent);
 }
 
+/* The cross lies OVER the name rather than beside it (Emil, 2026-10-29): an
+   inactive tab's name runs to the edge, and the cross shown on hover fades
+   the end of it out instead of moving it — no reflow under the pointer. The
+   active tab, whose cross always shows, and a touch screen, where every cross
+   does, keep its room clear. */
 .tab-close {
-  flex-shrink: 0;
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
   width: 20px;
   height: 20px;
-  margin: 0 6px 0 2px;
   border-radius: 5px;
   font-size: 10px;
   color: var(--text-secondary);
@@ -447,12 +455,193 @@ button {
 }
 
 .tab:hover .tab-close,
-.tab.active .tab-close {
+.tab.active .tab-close,
+.tab-close:focus-visible {
   opacity: 1;
+}
+
+.tab:not(.active):hover .tab-label,
+.tab:not(.active):has(.tab-close:focus-visible) .tab-label {
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent calc(100% - 25px));
+}
+
+.tab.active:not(.pinned) .tab-label,
+html.touch-ui .tab:not(.pinned) .tab-label {
+  padding-right: 28px;
 }
 
 .tab-close:hover {
   background: var(--active);
+}
+
+/* Tab groups (src/shared/tab-groups.ts). Six fixed colours, muted to sit in
+   the calm chrome; the dark modes take lighter ones to keep the same weight. */
+:root {
+  --group-blue: #4a7fc9;
+  --group-green: #4b9165;
+  --group-yellow: #b8902a;
+  --group-red: #c75a50;
+  --group-purple: #8a63c2;
+  --group-grey: #85858c;
+}
+
+:root[data-theme='night'],
+:root[data-theme='nightHc'] {
+  --group-blue: #7fa6dc;
+  --group-green: #79b48d;
+  --group-yellow: #d4b25e;
+  --group-red: #e08a80;
+  --group-purple: #ad92da;
+  --group-grey: #a4a29a;
+}
+
+/* The chip in front of a group's tabs: its colour, its name, and when folded
+   the number of tabs it holds */
+.tab-group-chip {
+  flex: none;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 160px;
+  height: 22px;
+  margin: 0 1px 0 3px;
+  padding: 0 9px 0 8px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: color-mix(in srgb, var(--group-color) 18%, transparent);
+  -webkit-app-region: no-drag;
+}
+
+.tab-group-chip:hover {
+  background: color-mix(in srgb, var(--group-color) 28%, transparent);
+}
+
+.tab-group-chip.unnamed {
+  padding: 0 8px;
+}
+
+.tab-group-chip.collapsed {
+  background: var(--group-color);
+  color: #fff;
+}
+
+.tab-group-chip.collapsed:hover {
+  background: color-mix(in srgb, var(--group-color) 86%, var(--text));
+}
+
+:root[data-theme='night'] .tab-group-chip.collapsed,
+:root[data-theme='nightHc'] .tab-group-chip.collapsed {
+  color: #1b1b1d;
+}
+
+.tab-group-dot {
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--group-color);
+}
+
+.tab-group-chip.collapsed .tab-group-dot {
+  display: none;
+}
+
+.tab-group-chip.collapsed.unnamed .tab-group-dot {
+  display: inline-block;
+  background: currentColor;
+}
+
+.tab-group-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-group-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* A member's line along the strip's foot, unbroken across the gaps between
+   members and ending at the last one */
+.tab.grouped::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: -3px;
+  bottom: 0;
+  height: 2px;
+  background: var(--group-color);
+  pointer-events: none;
+}
+
+.tab.grouped.group-last::after {
+  right: 0;
+}
+
+.tab-menu-group {
+  gap: 8px;
+}
+
+.tab-all-name .tab-group-dot {
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.tab-group-editor {
+  position: fixed;
+  z-index: 70;
+  width: 240px;
+  padding: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-menu);
+  -webkit-app-region: no-drag;
+}
+
+.tab-group-name-input {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.tab-group-name-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.tab-group-colors {
+  display: flex;
+  gap: 8px;
+  padding: 10px 3px 6px;
+}
+
+.tab-group-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--group-color);
+}
+
+.tab-group-swatch.is-on {
+  box-shadow:
+    0 0 0 2px var(--bg-elevated),
+    0 0 0 4px var(--group-color);
+}
+
+.tab-group-editor .menu-item {
+  width: 100%;
 }
 
 .tab-new {

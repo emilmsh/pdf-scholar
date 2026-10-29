@@ -11,6 +11,10 @@
 //    before the tail — «Hort…Syverson 2015». Head + tail is always the whole
 //    name, so a tab wide enough reads exactly as before.
 //
+// The name is shown without «.pdf» (Emil, 2026-10-29): every tab holds a PDF,
+// so the extension told nothing and cost a narrow tab a fifth of its text.
+// Identity still compares the whole name.
+//
 // Pure, so test:tab-labels can hold the rules.
 
 export interface TabLabelInput {
@@ -56,6 +60,13 @@ function fold(s: string): string {
   return s.toLocaleLowerCase()
 }
 
+/** A name as a tab shows it: without a trailing «.pdf», unless that is all
+ *  there is */
+export function shownName(name: string): string {
+  const bare = name.replace(/\.pdf$/i, '')
+  return bare === '' ? name : bare
+}
+
 function sharedLength(a: string, b: string): number {
   const x = fold(a)
   const y = fold(b)
@@ -94,7 +105,8 @@ function distinguishingDirs(paths: string[]): string[] {
 }
 
 export function tabLabels(tabs: readonly TabLabelInput[]): TabLabel[] {
-  const out: TabLabel[] = tabs.map((tab) => ({ head: tab.name, tail: '', dir: null }))
+  const shown = tabs.map((tab) => shownName(tab.name))
+  const out: TabLabel[] = shown.map((name) => ({ head: name, tail: '', dir: null }))
 
   // The same name on different paths: folders. A tab duplicated on ONE path is
   // the same document, and no folder could tell it apart anyway.
@@ -117,14 +129,14 @@ export function tabLabels(tabs: readonly TabLabelInput[]): TabLabel[] {
   // Identical names were handled above — their difference is not in the name.
   tabs.forEach((tab, i) => {
     let shared = 0
-    for (const other of tabs) {
-      if (fold(other.name) === fold(tab.name)) continue
-      shared = Math.max(shared, sharedLength(tab.name, other.name))
-    }
-    const at = splitPoint(tab.name, shared)
+    tabs.forEach((other, j) => {
+      if (fold(other.name) === fold(tab.name)) return
+      shared = Math.max(shared, sharedLength(shown[i], shown[j]))
+    })
+    const at = splitPoint(shown[i], shared)
     if (at === null) return
-    out[i].head = tab.name.slice(0, at)
-    out[i].tail = tab.name.slice(at)
+    out[i].head = shown[i].slice(0, at)
+    out[i].tail = shown[i].slice(at)
   })
   return out
 }

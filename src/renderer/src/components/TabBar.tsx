@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { folderOf, matchesTabQuery, tabLabels } from '../../../shared/tab-labels'
+import { stripItems, TAB_GROUP_COLORS, TAB_GROUP_NAME_MAX } from '../../../shared/tab-groups'
+import type { TabGroup, TabGroupColor } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
 import { bridge, isElectron } from '../bridge'
 import { TAB_DRAG_MIME } from '../drag-types'
@@ -17,10 +19,28 @@ export interface TabInfo {
   dirty?: boolean
   /** Pinned (issue #29): first in the strip, no close cross */
   pinned?: boolean
+  /** The tab group it belongs to (src/shared/tab-groups.ts) */
+  groupId?: string | null
 }
+
+/** A group's colour as the CSS custom property its chip, line and swatch read */
+const groupColorStyle = (color: TabGroupColor): React.CSSProperties =>
+  ({ '--group-color': `var(--group-${color})` }) as React.CSSProperties
 
 interface Props {
   tabs: TabInfo[]
+  groups: TabGroup[]
+  /** Bumped when a group is created: its chip's editor opens to name it */
+  editGroupSignal: { id: string; n: number } | null
+  onGroupNew(tabId: string): void
+  onGroupAdd(tabId: string, groupId: string): void
+  onGroupRemove(tabId: string): void
+  onGroupUpdate(groupId: string, patch: Partial<Pick<TabGroup, 'name' | 'color'>>): void
+  /** Fold the group away, or open it */
+  onGroupToggle(groupId: string): void
+  onGroupUngroup(groupId: string): void
+  /** Close every tab in the group (one at a time, as «Lukk andre faner») */
+  onGroupClose(groupId: string): void
   activeId: string | null
   /** Bumped by Ctrl+Shift+A (tab.search): open «Alle faner», or close it */
   listSignal: number
@@ -79,6 +99,15 @@ const AppGlyph = (): React.JSX.Element => (
 
 export default function TabBar({
   tabs,
+  groups,
+  editGroupSignal,
+  onGroupNew,
+  onGroupAdd,
+  onGroupRemove,
+  onGroupUpdate,
+  onGroupToggle,
+  onGroupUngroup,
+  onGroupClose,
   activeId,
   listSignal,
   hidden,
@@ -154,6 +183,7 @@ export default function TabBar({
   const dragPointer = useRef<{ type: string; buttons: number; mod: boolean } | null>(null)
   const modOf = (e: { ctrlKey: boolean; metaKey: boolean }): boolean => (isMac ? e.metaKey : e.ctrlKey)
   const menuPinned = menu ? tabs.find((x) => x.id === menu.tab.id)?.pinned === true : false
+  const menuGroupId = menu ? (tabs.find((x) => x.id === menu.tab.id)?.groupId ?? null) : null
   /** The hover card (TabHoverCard.tsx) — none while a menu owns the strip */
   const hoverCard = useTabHoverCard(menu !== null || allOpen || draggingId !== null)
 
@@ -169,6 +199,34 @@ export default function TabBar({
   }, [menu])
 
   const labels = useMemo(() => tabLabels(tabs), [tabs])
+  const items = useMemo(() => stripItems(tabs, groups), [tabs, groups])
+  const groupById = useMemo(() => new Map(groups.map((g) => [g.id, g])), [groups])
+
+  /** The group editor (name, colour, fold, ungroup, close), under its chip.
+   *  Opened by a right-click on the chip — a long press on a touch screen —
+   *  and by itself when a group is made, so it can be named at once. */
+  const [groupEdit, setGroupEdit] = useState<{ id: string; x: number; y: number } | null>(null)
+  const editedGroup = groupEdit ? (groupById.get(groupEdit.id) ?? null) : null
+  const openGroupEdit = (id: string): void => {
+    const chip = stripRef.current?.querySelector<HTMLElement>(`[data-group-id="${CSS.escape(id)}"]`)
+    if (!chip) return
+    const r = chip.getBoundingClientRect()
+    setGroupEdit({ id, x: Math.max(8, Math.min(r.left, window.innerWidth - 248)), y: r.bottom + 4 })
+  }
+  useLayoutEffect(() => {
+    if (editGroupSignal) openGroupEdit(editGroupSignal.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editGroupSignal])
+  useEffect(() => {
+    if (!groupEdit) return undefined
+    const close = (): void => setGroupEdit(null)
+    window.addEventListener('mousedown', close)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('resize', close)
+    }
+  }, [groupEdit])
   const matching = useMemo(
     () => tabs.map((tab, i) => ({ tab, label: labels[i] })).filter(({ tab }) => matchesTabQuery(tab, query)),
     [tabs, labels, query]
@@ -287,11 +345,40 @@ export default function TabBar({
         ref={stripRef}
         className={`tab-strip${fade.start ? ' fade-start' : ''}${fade.end ? ' fade-end' : ''}`}
       >
-      {tabs.map((tab, index) => (
+      {items.map((item) => {
+        if (item.kind === 'group') {
+          const { group, members } = item
+          // The group's chip, in front of its tabs: a click folds the group
+          // away or opens it — the reason groups exist (Emil, 2026-10-29) —
+          // and a right-click (a long press) opens its editor
+          return (
+            <button
+              key={`group-${group.id}`}
+              data-group-id={group.id}
+              className={`tab-group-chip${group.collapsed ? ' collapsed' : ''}${group.name ? '' : ' unnamed'}`}
+              style={groupColorStyle(group.color)}
+              title={t('tabs.groupChipTip', { n: members.length })}
+              aria-expanded={!group.collapsed}
+              aria-label={group.name || t(`tabs.groupColor.${group.color}`)}
+              onClick={() => onGroupToggle(group.id)}
+              onContextMenu={(e) => {
+                e.preventDefault()
+                openGroupEdit(group.id)
+              }}
+            >
+              <span className="tab-group-dot" aria-hidden="true" />
+              {group.name && <span className="tab-group-name">{group.name}</span>}
+              {group.collapsed && <span className="tab-group-count">{members.length}</span>}
+            </button>
+          )
+        }
+        const { tab, index, group, last } = item
+        return (
         <div
           key={tab.id}
           data-tab-id={tab.id}
-          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}`}
+          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}${group ? ' grouped' : ''}${last ? ' group-last' : ''}`}
+          style={group ? groupColorStyle(group.color) : undefined}
           draggable
           // The hover card says what the native title did (the path), and
           // more — two tooltips at once would be worse than either
@@ -381,7 +468,8 @@ export default function TabBar({
             </button>
           )}
         </div>
-      ))}
+        )
+      })}
       </div>
       <button className="tab-new" onClick={onNewTab} title={withShortcut(t('tabs.new'), 'file.open')}>
         +
@@ -446,6 +534,15 @@ export default function TabBar({
                 onClick={() => chooseFromList(tab.id)}
               >
                 <span className="tab-all-name">
+                  {/* The group's colour, so a folded group's tabs are found
+                      here too — choosing one unfolds its group */}
+                  {tab.groupId && groupById.has(tab.groupId) && (
+                    <span
+                      className="tab-group-dot"
+                      style={groupColorStyle(groupById.get(tab.groupId)!.color)}
+                      title={groupById.get(tab.groupId)!.name || undefined}
+                    />
+                  )}
                   {tab.dirty && <span className="tab-dirty-dot">•</span>}
                   {tab.name}
                 </span>
@@ -489,6 +586,49 @@ export default function TabBar({
           >
             {t(menuPinned ? 'tabs.unpin' : 'tabs.pin')}
           </button>
+          {/* Groups: a pinned tab is never in one (the pinned run is the
+              strip's start), so it is offered none */}
+          {!menuPinned && (
+            <>
+              <button
+                className="menu-item"
+                onClick={() => {
+                  onGroupNew(menu.tab.id)
+                  setMenu(null)
+                }}
+              >
+                {t('tabs.groupNew')}
+              </button>
+              {groups
+                .filter((g) => g.id !== menuGroupId)
+                .map((g) => (
+                  <button
+                    key={g.id}
+                    className="menu-item tab-menu-group"
+                    style={groupColorStyle(g.color)}
+                    onClick={() => {
+                      onGroupAdd(menu.tab.id, g.id)
+                      setMenu(null)
+                    }}
+                  >
+                    <span className="tab-group-dot" aria-hidden="true" />
+                    {g.name ? t('tabs.groupAddTo', { name: g.name }) : t('tabs.groupAddToUnnamed')}
+                  </button>
+                ))}
+              {menuGroupId !== null && (
+                <button
+                  className="menu-item"
+                  onClick={() => {
+                    onGroupRemove(menu.tab.id)
+                    setMenu(null)
+                  }}
+                >
+                  {t('tabs.groupRemove')}
+                </button>
+              )}
+              <div className="menu-sep" />
+            </>
+          )}
           <button
             className="menu-item"
             onClick={() => {
@@ -598,6 +738,73 @@ export default function TabBar({
               {t('tabs.closeOthers')}
             </button>
           )}
+        </div>
+      )}
+
+      {editedGroup && groupEdit && (
+        <div
+          className="tab-group-editor"
+          style={{ left: groupEdit.x, top: groupEdit.y }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <input
+            className="tab-group-name-input"
+            value={editedGroup.name}
+            placeholder={t('tabs.groupNamePlaceholder')}
+            aria-label={t('tabs.groupNamePlaceholder')}
+            maxLength={TAB_GROUP_NAME_MAX}
+            spellCheck={false}
+            autoFocus
+            onChange={(e) => onGroupUpdate(editedGroup.id, { name: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                e.preventDefault()
+                setGroupEdit(null)
+              }
+            }}
+          />
+          <div className="tab-group-colors" role="radiogroup">
+            {TAB_GROUP_COLORS.map((c) => (
+              <button
+                key={c}
+                role="radio"
+                aria-checked={c === editedGroup.color}
+                className={`tab-group-swatch${c === editedGroup.color ? ' is-on' : ''}`}
+                style={groupColorStyle(c)}
+                title={t(`tabs.groupColor.${c}`)}
+                aria-label={t(`tabs.groupColor.${c}`)}
+                onClick={() => onGroupUpdate(editedGroup.id, { color: c })}
+              />
+            ))}
+          </div>
+          <div className="menu-sep" />
+          <button
+            className="menu-item"
+            onClick={() => {
+              onGroupToggle(editedGroup.id)
+              setGroupEdit(null)
+            }}
+          >
+            {t(editedGroup.collapsed ? 'tabs.groupExpand' : 'tabs.groupCollapse')}
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
+              onGroupUngroup(editedGroup.id)
+              setGroupEdit(null)
+            }}
+          >
+            {t('tabs.groupUngroup')}
+          </button>
+          <button
+            className="menu-item"
+            onClick={() => {
+              onGroupClose(editedGroup.id)
+              setGroupEdit(null)
+            }}
+          >
+            {t('tabs.groupClose')}
+          </button>
         </div>
       )}
     </div>
