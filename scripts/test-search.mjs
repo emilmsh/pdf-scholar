@@ -114,6 +114,13 @@ check('at 3 pt, 0.4 pt apart is another place (the tolerance follows the size)',
 // line's copy of a space opened the next line («useful\n instrumental»)
 const blanks = content([item('fi', 66, 700), item(' ', 76, 700), item('rm', 80, 700), item('fi', 66, 700), item(' ', 76, 700), item('rm', 80, 700, { hasEOL: true })])
 check('a space drawn twice in the same place goes with its line', JSON.stringify(strs(dedupeTextContent(blanks))) === JSON.stringify(['fi', ' ', 'rm']))
+// The AEA's footnote markers: «2» (outline) then «2 » (filled, with the blank
+// before the next word) — read as «22» while the strings were compared whole
+const marker = content([item('2', 138.21, 243, { width: 3.12 }), item('2 ', 138.21, 243, { width: 5.7 }), item('as well', 143.91, 239)])
+const markerOut = dedupeTextContent(marker)
+check('a copy that differs only by a trailing blank is the same text, and the blank is kept', JSON.stringify(strs(markerOut)) === JSON.stringify(['2 ', 'as well']) && markerOut.items[0].width === 5.7, JSON.stringify(strs(markerOut)))
+const markerEol = dedupeTextContent(content([item('2 ', 66, 700), item('2', 66, 700, { hasEOL: true })]))
+check('…either order, and the line end carries', JSON.stringify(strs(markerEol)) === JSON.stringify(['2 ']) && markerEol.items[0].hasEOL === true)
 const breaks = content([item('', 0, 0, { hasEOL: true }), item('', 0, 0, { hasEOL: true }), item('x', 70, 700)])
 check('the empty items that mark a paragraph break are never deduplicated', dedupeTextContent(breaks) === breaks)
 const xfaItems = { items: [{ str: 'Name', dir: 'ltr', width: 0, height: 0, transform: null, fontName: '', hasEOL: false }, { str: 'Name', dir: 'ltr', width: 0, height: 0, transform: null, fontName: '', hasEOL: false }], styles: {}, lang: null }

@@ -485,6 +485,43 @@ const near = (a, b, tol = 1.5) => Math.abs(a - b) <= tol
   check('footnote: the last one stops before the folio', fn7.length === 2 && fn7[0].text.startsWith('7The second'), JSON.stringify(fn7.map((l) => l.text)))
   check('footnote zone: a point among the footnotes is in it', M.inFootnotes(lines, { x: 84, y: 133 }, 612))
   check('footnote zone: a point in the body is not', !M.inFootnotes(lines, { x: 72, y: 600 }, 612))
+  // A destination that does not say (the AEA journals point every footnote
+  // link at «375 pt up»): the footnote is found by the marker it opens on
+  const by6 = M.footnoteByMarker(lines, '6', 612)
+  check('marker: «6» finds footnote 6\'s first line', by6 && by6.x === 84 && M.footnoteLines(lines, by6, by6.siblings, 612)[0]?.text.startsWith('6The first'), JSON.stringify(by6))
+  const by7 = M.footnoteByMarker(lines, '7', 612)
+  check('marker: «7» finds footnote 7, not 6\'s run-on', by7 && M.footnoteLines(lines, by7, by7.siblings, 612).map((l) => l.text).join('|') === '7The second footnote, which must not come along|with the first.', JSON.stringify(by7))
+  check('marker: a number no footnote opens on finds nothing', M.footnoteByMarker(lines, '8', 612) === null)
+  check('marker: the folio is no footnote', M.footnoteByMarker(lines, '3', 612) === null)
+  check('marker: words are no marker', M.footnoteByMarker(lines, 'Section', 612) === null)
+  // Body text opening on the number is not a footnote; «12» does not open on «1»
+  const body = [...lines, T(72, 540, 712, '1 percent of the firms, a body line opening on a number')]
+  check('marker: a body line opening on the number is not a footnote', M.footnoteByMarker(body, '1', 612) === null)
+  const twelve = [...lines.slice(0, 20), T(84, 540, 130, '12The twelfth footnote', 8), T(300, 305, 50, '3')]
+  check('marker: «12» is not footnote 1', M.footnoteByMarker(twelve, '1', 612) === null && M.footnoteByMarker(twelve, '12', 612) !== null)
+  // Two footnotes opening on one marker (a run-on line «6 per cent …»): unsure, so nothing
+  const twice = [...lines, T(72, 300, 94, '6 per cent of the sample, run on', 8)]
+  check('marker: two lines opening on it is not a verdict', M.footnoteByMarker(twice, '6', 612) === null)
+  // Outlines, then filled over them: the same line twice in one place is one
+  const doubled = [...lines, T(84, 540, 112, '7The second footnote, which must not come along', 8)]
+  check('marker: a line drawn twice is one footnote', M.footnoteByMarker(doubled, '7', 612) !== null)
+  // Math in a footnote's lines (Dworczak et al. 2021, p. 30): a fraction's
+  // numerator a hair above the baseline is a line of its own, a display sits
+  // further in — with nothing to stop it, footnote 28 ran on into 29. The
+  // other footnotes' openings are its siblings.
+  const math = [...lines.slice(0, 20),
+    T(64, 130, 89.8, '28In particular, M ≤ 1', 8.5),
+    T(174, 178, 90.1, '1', 5.5),
+    T(139, 160, 83.7, 'gB (rB ) +', 8.5),
+    T(168, 540, 83.7, 'gS (¯rS ) , which is finite by our assumption that', 8.5),
+    T(54, 120, 75.2, 'and continuous.', 8.5),
+    T(64, 540, 68.3, '29While kidneys are not quite homogeneous due to blood type', 8.5),
+    T(54, 300, 55.3, 'market clears independently of the others.', 8.5)]
+  const by28 = M.footnoteByMarker(math, '28', 612)
+  const fn28 = by28 && M.footnoteLines(math, by28, by28.siblings, 612).map((l) => l.text)
+  check('marker: footnote 28 with math in it stops before 29', fn28 && fn28.includes('28In particular, M ≤ 1') && fn28[fn28.length - 1] === 'and continuous.' && !fn28.some((t) => t.startsWith('29')), JSON.stringify(fn28))
+  const box28 = by28 && M.entryBox(M.footnoteLines(math, by28, by28.siblings, 612))
+  check('…and its box is 28\'s lines, the numerator inside the first', box28 && box28.x0 === 54 && box28.bottom > 68.3 + 1 && box28.top < 89.8 + 8.5 * 1.2, JSON.stringify(box28))
 }
 {
   // A vector figure (paths and nothing else) with its caption under it, in

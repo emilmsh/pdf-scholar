@@ -28,8 +28,9 @@ writes that line for you when you turn a tool on.
      told through its own `claude mcp add` command, at user scope, so the
      server is there in every project. Claude Desktop's
      `claude_desktop_config.json` gets the entry.
-   - **Codex** covers the Codex app, CLI and VS Code extension, which share
-     `~/.codex/config.toml`.
+   - **Codex** covers Codex in the ChatGPT desktop app (the Codex app became
+     part of it in July 2026), the Codex CLI and the VS Code extension. All
+     of them read `~/.codex/config.toml`.
 3. Start a new session in the tool. Claude Desktop needs a restart.
 
 PDF Scholar changes nothing in a tool's configuration except its own
@@ -135,8 +136,10 @@ Take the two paths from **Copy setup**. For reference, they are:
 
 ## ChatGPT
 
-ChatGPT, on the web, connects only to MCP servers on the internet, not to a
-program on your own computer. Use **Copy for AI** instead. It is in the
+In the **ChatGPT desktop app**, Codex is the part that can read your notes.
+Turn on the **Codex** switch and use Codex in the app. ChatGPT on the web
+(chatgpt.com) connects only to MCP servers on the internet, not to a program on
+your own computer. There, use **Copy for AI** instead. It is in the
 **Annotations** tab of the sidebar, under the export buttons. It copies the
 open document's highlights, comments and AI conversations as text, ready to
 paste into ChatGPT or any other chat. This also works in the browser

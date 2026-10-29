@@ -383,11 +383,12 @@ you noted about a method, and it looks it up without opening a PDF.
 
 - **Nothing to download.** The MCP server is part of the desktop app. In the settings
   menu, "AI tools" has one switch for **Claude** (Claude Code and Claude Desktop) and one
-  for **Codex**; turning it on writes PDF Scholar into that tool's own settings
+  for **Codex** (in the ChatGPT desktop app, and the Codex CLI); turning it on writes PDF
+  Scholar into that tool's own settings
 - **opencode, Cursor, VS Code, Gemini CLI** and other MCP tools take one config entry,
   which "Copy setup" fills in with your paths. Each tool's format is in
   [docs/MCP.md](docs/MCP.md)
-- **ChatGPT** (and any other chat): "Copy for AI" in the Annotations tab copies the open
+- **ChatGPT on the web** (and any other chat): "Copy for AI" in the Annotations tab copies the open
   document's notes and conversations as text, ready to paste. This also works in the
   browser extension
 - Read-only: four tools (search, list papers, one paper's notes, one conversation).
