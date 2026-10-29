@@ -85,6 +85,9 @@ export interface PreviewTarget {
   /** The destination's name, when it has one — what the reference-list
    *  entry's neighbours are found by (citationEntryText) */
   name: string | null
+  /** A footnote found by its marker (footnoteByMarker): where the page's
+   *  other footnotes open, standing in for a named family's anchors */
+  siblings?: DestPoint[]
 }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null)
@@ -1419,6 +1422,10 @@ function isProse(l: TextLine, L: Layout, loose = false): boolean {
   const row = L.lines
     .filter((m) => Math.abs(m.y - l.y) < L.body.size * 0.45 && inSpan(m, c))
     .sort((a, b) => a.x0 - b.x0)
+  // A line its home column does not hold (it straddles the gutter): no row
+  // to judge, and no prose — reduce on the empty row threw, and the window
+  // never opened (a library sweep, 2026-10-29)
+  if (!row.length) return false
   const x0 = Math.min(...row.map((m) => m.x0))
   const x1 = Math.max(...row.map((m) => m.x1))
   const main = row.reduce((a, b) => (b.text.length > a.text.length ? b : a))
@@ -1780,6 +1787,42 @@ export function inFootnotes(lines: readonly TextLine[], dest: { x: number | null
   const lastBody = above[above.length - 1]
   if (!lastBody || lastBody.y - first.y < body.pitch * 1.2) return false
   return !inCol.slice(start + 1).some((l) => isProse(l, L))
+}
+
+/** The footnote a raised marker names, found on its page by the marker
+ *  itself — for a link whose destination does not say. The AEA journals'
+ *  footnote links all point at «this page, 375 pt up» whatever the page
+ *  (Einav and Levin 2010, Emil 2026-10-29), so the window showed the body
+ *  text there, which on one page was the marker's own line. The point of the
+ *  ONE line among the footnotes that opens on the marker (not «12» for «1»),
+ *  or null: none, or two, and the destination keeps its word. With it, where
+ *  the page's other footnotes open — the siblings footnoteLines stops at, as
+ *  a named family's next anchor (math in a footnote's lines otherwise ran it
+ *  on into the next: Dworczak et al. 2021, footnote 28). */
+export function footnoteByMarker(
+  lines: readonly TextLine[],
+  marker: string,
+  pageWidth: number
+): { x: number; y: number; siblings: DestPoint[] } | null {
+  if (!/^(\d{1,3}|[*†‡§¶]{1,3})$/.test(marker)) return null
+  const esc = marker.replace(/[*]/g, '\\$&')
+  // Half a line up: the line itself is at it (atAnchor), the one above not
+  const point = (l: TextLine): { x: number; y: number } => ({ x: l.x0, y: l.y + l.size * 0.5 })
+  const opening = (re: RegExp): TextLine[] => {
+    const at = withoutFolio(lines).filter((l) => re.test(l.text) && inFootnotes(lines, point(l), pageWidth))
+    // A line drawn twice in one place (outlines, then filled over them) is one
+    return at.filter((l, i) => at.findIndex((m) => Math.abs(m.x0 - l.x0) < 1 && Math.abs(m.y - l.y) < 1) === i)
+  }
+  const hits = opening(new RegExp(`^${esc}(?![\\d*†‡§¶])`))
+  if (hits.length !== 1) return null
+  const hit = hits[0]!
+  // Every other footnote-opening line, at its top — where hyperref raises a
+  // footnote's anchor. A stray number opening a line inside a footnote only
+  // cuts it shorter, never longer.
+  const siblings = opening(/^(\d{1,3}|[*†‡§¶]{1,3})(?![\d*†‡§¶])\s*\p{L}/u)
+    .filter((l) => Math.abs(l.x0 - hit.x0) >= 1 || Math.abs(l.y - hit.y) >= 1)
+    .map((l) => ({ x: l.x0, y: l.y + l.size }))
+  return { ...point(hit), siblings }
 }
 
 /** The scale a cut-out box is read at, and the window that holds it. `w`/`h`
