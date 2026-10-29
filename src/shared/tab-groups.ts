@@ -13,8 +13,14 @@
 //  - A group with no members is gone.
 //  - The tab being read is never hidden: folding its group moves the reader to
 //    the nearest tab outside it, and showing a tab in a folded group unfolds it.
-//  - Moving a tab by drag: dropped between two members it joins their group;
-//    dropped beside its own group's members it stays; anywhere else it leaves.
+//  - Moving a tab by drag goes by the half of the tab or chip under the
+//    pointer (placeTab, Emil 2026-10-29: «dra faner rundt, inn og ut av
+//    eksisterende grupper»): beside a member it is in that member's group,
+//    before a chip it is outside the group, after an open group's chip it is
+//    the group's first member, and past the strip's last tab it is last and
+//    ungrouped. So a group is entered and left at either end.
+//  - Several tabs (Ctrl/Shift+click) are grouped, added or let go in ONE
+//    step; grouped together they gather where the first of them stood.
 //    By keyboard (Ctrl+Shift+PageUp/PageDown) one step at a time, as the
 //    browsers do: a tab at its group's edge first steps OUT of the group where
 //    it stands, a tab beside an open group first steps IN, a folded group is
@@ -133,69 +139,148 @@ function runOf(tabs: readonly GroupableTab[], groupId: string): [number, number]
   return [first, last]
 }
 
-/** Take a tab out of its group: it goes to just after the group's run, so
- *  the run stays unbroken */
-function detach<T extends GroupableTab>(tabs: readonly T[], id: string): T[] {
-  const at = tabs.findIndex((t) => t.id === id)
-  if (at === -1) return [...tabs]
+/** The same strip, by order and by group — so a no-op gives back the very
+ *  array it was handed */
+function sameStrip(a: readonly GroupableTab[], b: readonly GroupableTab[]): boolean {
+  return a.length === b.length && a.every((t, i) => t.id === b[i].id && groupOf(t) === groupOf(b[i]))
+}
+
+/** Never inside a group's run: an insertion point between two members of
+ *  one group moves to that run's end */
+function outsideRuns(tabs: readonly GroupableTab[], at: number): number {
   const g = groupOf(tabs[at])
-  if (g === null) return [...tabs]
-  const run = runOf(tabs, g)!
+  if (g === null || groupOf(tabs[at - 1]) !== g) return at
+  return runOf(tabs, g)![1] + 1
+}
+
+/** The unpinned tabs among `ids`, in strip order */
+function picked<T extends GroupableTab>(tabs: readonly T[], ids: readonly string[]): T[] {
+  const want = new Set(ids)
+  return tabs.filter((t) => want.has(t.id) && !t.pinned)
+}
+
+/** A new group of these tabs (pinned ones left out), gathered where the
+ *  first of them stood — or just past the group it stood in, when the rest
+ *  of that group would be cut in two */
+export function groupTabs<T extends GroupableTab>(tabs: readonly T[], ids: readonly string[], groupId: string): T[] {
+  const moving = picked(tabs, ids)
+  if (moving.length === 0) return tabs as T[]
+  const ids2 = new Set(moving.map((t) => t.id))
+  const firstAt = tabs.findIndex((t) => ids2.has(t.id))
+  const rest = tabs.filter((t) => !ids2.has(t.id))
+  const at = outsideRuns(rest, tabs.slice(0, firstAt).filter((t) => !ids2.has(t.id)).length)
+  return [...rest.slice(0, at), ...moving.map((t) => ({ ...t, groupId })), ...rest.slice(at)]
+}
+
+/** These tabs join an existing group, at the END of its run, in their order */
+export function addTabsToGroup<T extends GroupableTab>(tabs: readonly T[], ids: readonly string[], groupId: string): T[] {
+  const moving = picked(tabs, ids).filter((t) => groupOf(t) !== groupId)
+  if (moving.length === 0 || runOf(tabs, groupId) === null) return tabs as T[]
+  const ids2 = new Set(moving.map((t) => t.id))
+  const rest = tabs.filter((t) => !ids2.has(t.id))
+  const [, last] = runOf(rest, groupId)!
+  return [...rest.slice(0, last + 1), ...moving.map((t) => ({ ...t, groupId })), ...rest.slice(last + 1)]
+}
+
+/** These tabs leave their groups. Those at a run's front or back — counting
+ *  the ones leaving with them — leave where they stand; those inside go just
+ *  past the run, in their order, so the run stays whole. */
+export function removeTabsFromGroups<T extends GroupableTab>(tabs: readonly T[], ids: readonly string[]): T[] {
+  const leaving = new Set(picked(tabs, ids).filter((t) => groupOf(t) !== null).map((t) => t.id))
+  if (leaving.size === 0) return tabs as T[]
   const next = [...tabs]
-  const [tab] = next.splice(at, 1)
-  next.splice(run[1], 0, { ...tab, groupId: null })
-  return next
+  const free = (i: number): void => {
+    next[i] = { ...next[i], groupId: null }
+    leaving.delete(next[i].id)
+  }
+  // The front of each run, then its back: in place
+  for (let i = 0; i < next.length; i++) {
+    if (leaving.has(next[i].id) && groupOf(next[i - 1]) !== groupOf(next[i])) free(i)
+  }
+  for (let i = next.length - 1; i >= 0; i--) {
+    if (leaving.has(next[i].id) && groupOf(next[i + 1]) !== groupOf(next[i])) free(i)
+  }
+  // The middle: past the run, the rightmost first so the order holds
+  for (const tab of [...next].reverse()) {
+    if (!leaving.has(tab.id)) continue
+    const g = groupOf(tab)!
+    const [moved] = next.splice(next.findIndex((t) => t.id === tab.id), 1)
+    next.splice(runOf(next, g)![1] + 1, 0, { ...moved, groupId: null })
+  }
+  return sameStrip(next, tabs) ? (tabs as T[]) : next
 }
 
-/** A new group holding this one tab (never a pinned one). A tab already in a
- *  group steps out of that run first. */
-export function groupTab<T extends GroupableTab>(tabs: readonly T[], id: string, groupId: string): T[] {
-  const tab = tabs.find((t) => t.id === id)
-  if (!tab || tab.pinned) return [...tabs]
-  return detach(tabs, id).map((t) => (t.id === id ? { ...t, groupId } : t))
-}
-
-/** Add a tab to an existing group: it joins the END of the group's run */
-export function addToGroup<T extends GroupableTab>(tabs: readonly T[], id: string, groupId: string): T[] {
-  const tab = tabs.find((t) => t.id === id)
-  if (!tab || tab.pinned || groupOf(tab) === groupId) return [...tabs]
-  const next = detach(tabs, id)
-  const at = next.findIndex((t) => t.id === id)
-  const [moved] = next.splice(at, 1)
-  const run = runOf(next, groupId)
-  if (!run) return tabs.map((t) => t)
-  next.splice(run[1] + 1, 0, { ...moved, groupId })
-  return next
-}
-
-export function removeFromGroup<T extends GroupableTab>(tabs: readonly T[], id: string): T[] {
-  return detach(tabs, id)
-}
+/** One tab — the single-tab menu's three actions */
+export const groupTab = <T extends GroupableTab>(tabs: readonly T[], id: string, groupId: string): T[] =>
+  groupTabs(tabs, [id], groupId)
+export const addToGroup = <T extends GroupableTab>(tabs: readonly T[], id: string, groupId: string): T[] =>
+  addTabsToGroup(tabs, [id], groupId)
+export const removeFromGroup = <T extends GroupableTab>(tabs: readonly T[], id: string): T[] =>
+  removeTabsFromGroups(tabs, [id])
 
 /** Every member let go, in place */
 export function ungroup<T extends GroupableTab>(tabs: readonly T[], groupId: string): T[] {
   return tabs.map((t) => (groupOf(t) === groupId ? { ...t, groupId: null } : t))
 }
 
-/** A drag: the tab takes `toIndex` (pinned and unpinned tabs each stay in
- *  their own run), and its group follows from where it lands */
-export function moveTab<T extends GroupableTab>(tabs: readonly T[], id: string, toIndex: number): T[] {
-  const from = tabs.findIndex((t) => t.id === id)
-  if (from === -1) return tabs as T[]
-  const pinnedCount = tabs.filter((t) => t.pinned).length
-  const [lo, hi] = tabs[from].pinned ? [0, pinnedCount - 1] : [pinnedCount, tabs.length - 1]
-  const to = Math.max(lo, Math.min(hi, toIndex))
-  if (from === to) return tabs as T[]
-  const next = [...tabs]
-  const [moved] = next.splice(from, 1)
-  next.splice(to, 0, moved)
-  if (moved.pinned) return next
-  const left = groupOf(next[to - 1])
-  const right = groupOf(next[to + 1])
-  const own = groupOf(moved)
-  const g = left !== null && left === right ? left : own !== null && (left === own || right === own) ? own : null
-  if (g !== own) next[to] = { ...moved, groupId: g }
-  return next
+/** Where a dragged tab is over: a half of a tab, a half of a group's chip, or
+ *  the strip past its last tab */
+export type TabDropTarget =
+  | { kind: 'before' | 'after'; id: string }
+  | { kind: 'chipBefore' | 'chipAfter'; groupId: string }
+  | { kind: 'end' }
+
+/** A drag of one tab, by where the pointer is (see the rules at the top).
+ *  Pinned and unpinned tabs each stay in their own run, and a pinned tab is
+ *  never grouped. Nothing to change gives back the same array. */
+export function placeTab<T extends GroupableTab>(
+  tabs: readonly T[],
+  groups: readonly TabGroup[],
+  id: string,
+  target: TabDropTarget
+): T[] {
+  const tab = tabs.find((t) => t.id === id)
+  if (!tab) return tabs as T[]
+  const rest = tabs.filter((t) => t.id !== id)
+  let at: number
+  let g: string | null
+  if (target.kind === 'before' || target.kind === 'after') {
+    const j = rest.findIndex((t) => t.id === target.id)
+    if (j === -1) return tabs as T[]
+    at = target.kind === 'before' ? j : j + 1
+    g = groupOf(rest[j])
+  } else if (target.kind === 'chipBefore' || target.kind === 'chipAfter') {
+    const run = runOf(rest, target.groupId)
+    if (!run) return tabs as T[]
+    const folded = groups.find((x) => x.id === target.groupId)?.collapsed === true
+    // After a folded group's chip is past the group: a folded group takes no
+    // tab by drag — the tab would vanish under the pointer
+    if (target.kind === 'chipBefore') [at, g] = [run[0], null]
+    else [at, g] = folded ? [run[1] + 1, null] : [run[0], target.groupId]
+  } else {
+    ;[at, g] = [rest.length, null]
+  }
+  const pinnedCount = rest.filter((t) => t.pinned).length
+  if (tab.pinned) [at, g] = [Math.min(at, pinnedCount), null]
+  else if (at < pinnedCount) [at, g] = [pinnedCount, null]
+  const next = [...rest.slice(0, at), { ...tab, groupId: g }, ...rest.slice(at)]
+  return sameStrip(next, tabs) ? (tabs as T[]) : next
+}
+
+/** Shift+click: the shown tabs from `anchorId` to `id`, both included, in
+ *  strip order (a folded group's tabs are not picked up on the way) */
+export function tabRange(
+  tabs: readonly GroupableTab[],
+  groups: readonly TabGroup[],
+  anchorId: string,
+  id: string
+): string[] {
+  const shown = visibleTabs(tabs, groups)
+  const a = shown.findIndex((t) => t.id === anchorId)
+  const b = shown.findIndex((t) => t.id === id)
+  if (b === -1) return []
+  if (a === -1) return [id]
+  return shown.slice(Math.min(a, b), Math.max(a, b) + 1).map((t) => t.id)
 }
 
 /** A drag of a group's chip (Emil, 2026-10-29: a folded group must move as

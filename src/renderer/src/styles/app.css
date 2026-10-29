@@ -589,8 +589,20 @@ html.touch-ui .tab:not(.pinned) .tab-label {
   right: 0;
 }
 
-.tab-menu-group {
-  gap: 8px;
+/* The group's colour before its name in the tab menu, with room to breathe */
+.tab-menu-group .tab-group-dot {
+  margin-right: 9px;
+  vertical-align: 1px;
+}
+
+/* Picked with Ctrl/Shift+click, to be grouped together */
+.tab.selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--text);
+}
+
+.tab.selected.active {
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-chrome));
 }
 
 .tab-all-name .tab-group-dot {

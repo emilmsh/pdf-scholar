@@ -13,16 +13,17 @@ import type {
 import {
   activeAfterClose,
   activeAfterCollapse,
-  addToGroup,
-  groupTab,
+  addTabsToGroup,
+  groupTabs,
   insertOpened,
   isHidden,
   moveGroup,
-  moveTab as moveTabInStrip,
   nextGroupColor,
   normalizeGroups,
-  removeFromGroup,
+  placeTab,
+  removeTabsFromGroups,
   stepTab,
+  type TabDropTarget,
   ungroup,
   visibleTabs
 } from '../../shared/tab-groups'
@@ -812,12 +813,12 @@ export default function App(): React.JSX.Element {
     [closeTabAwait]
   )
 
-  /** Drag a tab to a new position. Pinned tabs move among themselves and the
-   *  rest among themselves: the pinned run is always the strip's start, so a
-   *  drag across the border stops at it rather than mixing the two. Where it
-   *  lands decides its group (moveTab in tab-groups.ts). */
-  const moveTab = useCallback((id: string, toIndex: number) => {
-    setTabs((prev) => moveTabInStrip(prev, id, toIndex))
+  /** Drag a tab to where the pointer is (placeTab in tab-groups.ts): beside a
+   *  tab, before or after a group's chip, or past the last tab — which also
+   *  decides its group, so a drag takes a tab into a group and out of it.
+   *  Pinned tabs move among themselves and the rest among themselves. */
+  const placeTabAt = useCallback((id: string, target: TabDropTarget) => {
+    setTabs((prev) => placeTab(prev, tabGroupsRef.current, id, target))
   }, [])
 
   /** Pin a tab (it joins the end of the pinned run, leaving any group) or let
@@ -836,18 +837,20 @@ export default function App(): React.JSX.Element {
   /** Tab groups, from the tab menu and the group's chip. A new group opens
    *  its chip's editor so it can be named at once (`editGroupSignal`). */
   const [editGroupSignal, setEditGroupSignal] = useState<{ id: string; n: number } | null>(null)
-  const newTabGroup = useCallback((tabId: string) => {
+  // Each takes the tabs the menu was opened on: one, or the Ctrl/Shift+click
+  // selection — grouped, added or let go in one step
+  const newTabGroup = useCallback((tabIds: string[]) => {
     // Unique past a restart too: a restored session brings its own ids
     const id = `group-${Date.now().toString(36)}-${++groupCounter}`
     setTabGroups((prev) => [...prev, { id, name: '', color: nextGroupColor(prev), collapsed: false }])
-    setTabs((prev) => groupTab(prev, tabId, id))
+    setTabs((prev) => groupTabs(prev, tabIds, id))
     setEditGroupSignal((s) => ({ id, n: (s?.n ?? 0) + 1 }))
   }, [])
-  const addTabToGroup = useCallback((tabId: string, groupId: string) => {
-    setTabs((prev) => addToGroup(prev, tabId, groupId))
+  const addTabsToTabGroup = useCallback((tabIds: string[], groupId: string) => {
+    setTabs((prev) => addTabsToGroup(prev, tabIds, groupId))
   }, [])
-  const removeTabFromGroup = useCallback((tabId: string) => {
-    setTabs((prev) => removeFromGroup(prev, tabId))
+  const removeTabsFromTabGroups = useCallback((tabIds: string[]) => {
+    setTabs((prev) => removeTabsFromGroups(prev, tabIds))
   }, [])
   const updateTabGroup = useCallback((groupId: string, patch: Partial<Pick<TabGroup, 'name' | 'color'>>) => {
     setTabGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, ...patch } : g)))
@@ -1479,7 +1482,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [cycleTab, closeTab, reopenClosedTab, duplicateTab, openDialog, moveTab, pinTab, updateSettings, flashThemeName, flashNotice, goToTab])
+  }, [cycleTab, closeTab, reopenClosedTab, duplicateTab, openDialog, pinTab, updateSettings, flashThemeName, flashNotice, goToTab])
 
   const onDrop = useCallback(
     async (e: React.DragEvent) => {
@@ -1538,8 +1541,8 @@ export default function App(): React.JSX.Element {
         groups={tabGroups}
         editGroupSignal={editGroupSignal}
         onGroupNew={newTabGroup}
-        onGroupAdd={addTabToGroup}
-        onGroupRemove={removeTabFromGroup}
+        onGroupAdd={addTabsToTabGroup}
+        onGroupRemove={removeTabsFromTabGroups}
         onGroupUpdate={updateTabGroup}
         onGroupToggle={toggleTabGroup}
         onGroupUngroup={ungroupTabs}
@@ -1573,7 +1576,7 @@ export default function App(): React.JSX.Element {
         onShowInZotero={(path) => void bridge.zoteroSelect(path)}
         onTabDragFile={dragTabFile}
         onTabDragOut={(id, path) => void moveTabOut(id, path)}
-        onReorder={moveTab}
+        onPlaceTab={placeTabAt}
         onTogglePin={pinTab}
         onCloseMany={(ids) => void closeTabs(ids)}
         onMoveToNewWindow={moveToNewWindow}

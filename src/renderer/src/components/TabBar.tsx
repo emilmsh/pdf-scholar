@@ -1,6 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { folderOf, matchesTabQuery, tabLabels } from '../../../shared/tab-labels'
-import { stripItems, TAB_GROUP_COLORS, TAB_GROUP_NAME_MAX } from '../../../shared/tab-groups'
+import {
+  stripItems,
+  tabRange,
+  TAB_GROUP_COLORS,
+  TAB_GROUP_NAME_MAX,
+  type TabDropTarget
+} from '../../../shared/tab-groups'
 import type { TabGroup, TabGroupColor } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
 import { bridge, isElectron } from '../bridge'
@@ -32,9 +38,11 @@ interface Props {
   groups: TabGroup[]
   /** Bumped when a group is created: its chip's editor opens to name it */
   editGroupSignal: { id: string; n: number } | null
-  onGroupNew(tabId: string): void
-  onGroupAdd(tabId: string, groupId: string): void
-  onGroupRemove(tabId: string): void
+  /** These take the tabs the menu was opened on: one, or the Ctrl/Shift+click
+   *  selection — so several tabs are grouped in one step */
+  onGroupNew(tabIds: string[]): void
+  onGroupAdd(tabIds: string[], groupId: string): void
+  onGroupRemove(tabIds: string[]): void
   onGroupUpdate(groupId: string, patch: Partial<Pick<TabGroup, 'name' | 'color'>>): void
   /** Fold the group away, or open it */
   onGroupToggle(groupId: string): void
@@ -66,8 +74,9 @@ interface Props {
   /** The in-window HTML5 drag ended (touch, pen, web preview) — main decides
    *  where the tab lands from the cursor position */
   onTabDragOut(id: string, path: string): void
-  /** A tab was dragged onto another position within this bar */
-  onReorder(id: string, toIndex: number): void
+  /** A tab dragged across this bar is over `target`: it moves there, into a
+   *  group or out of one (placeTab in tab-groups.ts) */
+  onPlaceTab(id: string, target: TabDropTarget): void
   /** Pin the tab, or let it go. Lives in the tab menu, the «Alle åpne faner»
    *  list and the shortcut map — never in the right-click menu alone. */
   onTogglePin(id: string, pinned: boolean): void
@@ -123,7 +132,7 @@ export default function TabBar({
   onShowInZotero,
   onTabDragFile,
   onTabDragOut,
-  onReorder,
+  onPlaceTab,
   onTogglePin,
   onCloseMany,
   onMoveToNewWindow,
@@ -174,6 +183,19 @@ export default function TabBar({
    *  half of it. The half matters: a folded group's chip is narrower than a
    *  tab, so after a move the pointer can still be over the same tab — on its
    *  near half now, which must not move the group straight back. */
+  const overLeftHalf = (e: React.DragEvent): boolean => {
+    const r = e.currentTarget.getBoundingClientRect()
+    return e.clientX < r.left + r.width / 2
+  }
+  /** Past the strip's last tab — over «+» and the rest of the row: last in
+   *  the strip and ungrouped, which is how a tab leaves a group at the end */
+  const dragOverRow = (e: React.DragEvent): void => {
+    if (!draggingId || (e.target as Element).closest('.tab, .tab-group-chip')) return
+    const lastEl = stripRef.current?.lastElementChild
+    if (!lastEl || e.clientX < lastEl.getBoundingClientRect().right) return
+    e.preventDefault()
+    onPlaceTab(draggingId, { kind: 'end' })
+  }
   const dragGroupOver = (e: React.DragEvent, targetId: string): void => {
     if (!draggingGroupId) return
     const runStart = tabs.findIndex((x) => x.groupId === draggingGroupId)
@@ -203,7 +225,40 @@ export default function TabBar({
   const dragPointer = useRef<{ type: string; buttons: number; mod: boolean } | null>(null)
   const modOf = (e: { ctrlKey: boolean; metaKey: boolean }): boolean => (isMac ? e.metaKey : e.ctrlKey)
   const menuPinned = menu ? tabs.find((x) => x.id === menu.tab.id)?.pinned === true : false
-  const menuGroupId = menu ? (tabs.find((x) => x.id === menu.tab.id)?.groupId ?? null) : null
+  /** Tabs picked with Ctrl+click (toggle) and Shift+click (a range from the
+   *  tab being read), so several are grouped in one step (Emil, 2026-10-29).
+   *  The browsers' gesture, and nothing on the tabs says it is there: the
+   *  strip stays clean. A plain click, Esc or another tab shown lets go. */
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
+  const multi = selected.size > 1
+  useEffect(() => {
+    // The selection holds the tab being read; showing one outside it, or a
+    // tab of it closing, ends it
+    setSelected((cur) =>
+      cur.size === 0 ||
+      (activeId !== null && cur.has(activeId) && [...cur].every((id) => tabs.some((x) => x.id === id)))
+        ? cur
+        : new Set()
+    )
+  }, [activeId, tabs])
+  useEffect(() => {
+    if (!multi) return undefined
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setSelected(new Set())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [multi])
+  /** What the tab menu acts on: the selection when it was opened on one of
+   *  its tabs, else that tab alone — in strip order */
+  const menuIds = menu
+    ? multi && selected.has(menu.tab.id)
+      ? tabs.filter((x) => selected.has(x.id)).map((x) => x.id)
+      : [menu.tab.id]
+    : []
+  const menuTabs = tabs.filter((x) => menuIds.includes(x.id))
+  const menuGroupable = menuTabs.some((x) => !x.pinned)
+  const menuN = menuIds.length
   /** The hover card (TabHoverCard.tsx) — none while a menu owns the strip */
   const hoverCard = useTabHoverCard(menu !== null || allOpen || draggingId !== null || draggingGroupId !== null)
 
@@ -352,7 +407,7 @@ export default function TabBar({
   // slides under the native window controls.
   return (
     <div className={`tab-bar${hidden ? ' tucked' : ''}`}>
-      <div className="tab-bar-inner">
+      <div className="tab-bar-inner" onDragOver={dragOverRow}>
       {tabs.length > 0 ? null : (
         <>
           <span className="tab-app-glyph" aria-hidden="true">
@@ -397,6 +452,13 @@ export default function TabBar({
               onDragEnd={() => setDraggingGroupId(null)}
               // Another group's chip stands for that group's run
               onDragOver={(e) => {
+                // A tab over the chip: before it is outside the group, after
+                // an open group's chip its first member
+                if (draggingId) {
+                  e.preventDefault()
+                  onPlaceTab(draggingId, { kind: overLeftHalf(e) ? 'chipBefore' : 'chipAfter', groupId: group.id })
+                  return
+                }
                 if (draggingGroupId && draggingGroupId !== group.id) {
                   const runStart = tabs.findIndex((x) => x.groupId === draggingGroupId)
                   const first = tabs.findIndex((x) => x.groupId === group.id)
@@ -415,7 +477,7 @@ export default function TabBar({
         <div
           key={tab.id}
           data-tab-id={tab.id}
-          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId || (draggingGroupId !== null && tab.groupId === draggingGroupId) ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}${group ? ' grouped' : ''}${last ? ' group-last' : ''}`}
+          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId || (draggingGroupId !== null && tab.groupId === draggingGroupId) ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}${group ? ' grouped' : ''}${last ? ' group-last' : ''}${multi && selected.has(tab.id) ? ' selected' : ''}`}
           style={group ? groupColorStyle(group.color) : undefined}
           draggable
           // The hover card says what the native title did (the path), and
@@ -475,9 +537,10 @@ export default function TabBar({
             }
             if (!draggingId || draggingId === tab.id) return
             e.preventDefault()
-            // Take the hovered tab's place. The dragged tab is spliced out before
-            // it is inserted, so this reads the same dragging either way.
-            onReorder(draggingId, index)
+            // Before or after the hovered tab, by the half the pointer is
+            // over — in the hovered tab's group either way, so a group is
+            // entered at its first or last member as well as between two
+            onPlaceTab(draggingId, { kind: overLeftHalf(e) ? 'before' : 'after', id: tab.id })
           }}
           onDragEnd={() => {
             // HTML5 path only — the native drag's cancelled dragstart has no dragend
@@ -492,10 +555,31 @@ export default function TabBar({
           }}
           onContextMenu={(e) => {
             e.preventDefault()
+            if (!selected.has(tab.id)) setSelected(new Set())
             setMenu({ x: e.clientX, y: e.clientY, tab })
           }}
         >
-          <button className="tab-label" onClick={() => onSelect(tab.id)}>
+          <button
+            className="tab-label"
+            onClick={(e) => {
+              // Ctrl+click (Cmd on macOS) picks a tab or lets it go; Shift+click
+              // picks the shown tabs from the one being read. Neither changes
+              // which document is shown.
+              if (activeId !== null && (modOf(e) || e.shiftKey)) {
+                if (e.shiftKey) setSelected(new Set(tabRange(tabs, groups, activeId, tab.id)))
+                else
+                  setSelected((cur) => {
+                    const next = new Set(cur.size > 0 ? cur : [activeId])
+                    if (tab.id !== activeId && next.has(tab.id)) next.delete(tab.id)
+                    else next.add(tab.id)
+                    return next
+                  })
+                return
+              }
+              setSelected(new Set())
+              onSelect(tab.id)
+            }}
+          >
             {tab.pinned && <IconPin size={12} className="tab-pin" />}
             {tab.dirty && <span className="tab-dirty-dot">•</span>}
             {/* Head + tail is the whole name; a name that only begins like a
@@ -630,42 +714,52 @@ export default function TabBar({
           </button>
           {/* Groups: a pinned tab is never in one (the pinned run is the
               strip's start), so it is offered none */}
-          {!menuPinned && (
+          {menuGroupable && (
             <>
               <button
                 className="menu-item"
                 onClick={() => {
-                  onGroupNew(menu.tab.id)
+                  onGroupNew(menuIds)
+                  setSelected(new Set())
                   setMenu(null)
                 }}
               >
-                {t('tabs.groupNew')}
+                {menuN > 1 ? t('tabs.groupNewMany', { n: menuN }) : t('tabs.groupNew')}
               </button>
               {groups
-                .filter((g) => g.id !== menuGroupId)
+                // A group every one of these tabs is in already has nothing to take
+                .filter((g) => !menuTabs.every((x) => x.groupId === g.id))
                 .map((g) => (
                   <button
                     key={g.id}
                     className="menu-item tab-menu-group"
                     style={groupColorStyle(g.color)}
                     onClick={() => {
-                      onGroupAdd(menu.tab.id, g.id)
+                      onGroupAdd(menuIds, g.id)
+                      setSelected(new Set())
                       setMenu(null)
                     }}
                   >
                     <span className="tab-group-dot" aria-hidden="true" />
-                    {g.name ? t('tabs.groupAddTo', { name: g.name }) : t('tabs.groupAddToUnnamed')}
+                    {menuN > 1
+                      ? g.name
+                        ? t('tabs.groupAddToMany', { n: menuN, name: g.name })
+                        : t('tabs.groupAddToUnnamedMany', { n: menuN })
+                      : g.name
+                        ? t('tabs.groupAddTo', { name: g.name })
+                        : t('tabs.groupAddToUnnamed')}
                   </button>
                 ))}
-              {menuGroupId !== null && (
+              {menuTabs.some((x) => x.groupId) && (
                 <button
                   className="menu-item"
                   onClick={() => {
-                    onGroupRemove(menu.tab.id)
+                    onGroupRemove(menuIds)
+                    setSelected(new Set())
                     setMenu(null)
                   }}
                 >
-                  {t('tabs.groupRemove')}
+                  {menuN > 1 ? t('tabs.groupRemoveMany', { n: menuN }) : t('tabs.groupRemove')}
                 </button>
               )}
               <div className="menu-sep" />
@@ -761,11 +855,13 @@ export default function TabBar({
           <button
             className="menu-item"
             onClick={() => {
-              onClose(menu.tab.id)
+              if (menuN > 1) onCloseMany(menuIds)
+              else onClose(menu.tab.id)
+              setSelected(new Set())
               setMenu(null)
             }}
           >
-            {t('tabs.closeTab')}
+            {menuN > 1 ? t('tabs.closeMany', { n: menuN }) : t('tabs.closeTab')}
           </button>
           {/* The bulk closes leave pinned tabs standing — the browsers' rule,
               and the point of pinning one */}
