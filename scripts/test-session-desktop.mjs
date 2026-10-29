@@ -124,7 +124,7 @@ async function run() {
       },
       async ([send], exited) => {
         const tabs = await waitFor(() => strip(send), (s) => s.length === 4 && s.some((t) => t.active), 'the restored strip')
-        check('the session\'s tabs plus the launch file, the gone file left out', label(tabs).replace('<', '') === '*pinned.pdf,shown.pdf,never.pdf,launch.pdf', label(tabs))
+        check('the session\'s tabs plus the launch file, the gone file left out', label(tabs).replace('<', '') === '*pinned,shown,never,launch', label(tabs))
         check('the launch file is the one in front', tabs[3].active)
         check('a pinned tab has no close cross', tabs[0].pinned && !tabs[0].close && tabs[1].close)
         await waitFor(() => evaluate(send, `return !!document.querySelector('.tab-view.active .pdf-page')`), (v) => v, 'the launch file to render')
@@ -134,8 +134,8 @@ async function run() {
         check('only the launch file was read', recents1.join() === 'launch.pdf', recents1.join())
 
         // Showing a restored tab reads it — and only it
-        await evaluate(send, `[...document.querySelectorAll('.tab-label')].find((b) => b.textContent === 'shown.pdf').click()`)
-        await waitFor(() => evaluate(send, `return document.querySelector('.tab.active .tab-label')?.textContent === 'shown.pdf' && !!document.querySelector('.tab-view.active .pdf-page')`), (v) => v, 'shown.pdf to render')
+        await evaluate(send, `[...document.querySelectorAll('.tab-label')].find((b) => b.textContent === 'shown').click()`)
+        await waitFor(() => evaluate(send, `return document.querySelector('.tab.active .tab-label')?.textContent === 'shown' && !!document.querySelector('.tab-view.active .pdf-page')`), (v) => v, 'shown.pdf to render')
         check('a restored tab reads its file when shown', true)
         const recents2 = (await evaluate(send, 'return window.api.getRecents()')).map((r) => r.name)
         check('…and only that one: never.pdf is still unread', recents2.join() === 'shown.pdf,launch.pdf', recents2.join())
@@ -157,12 +157,12 @@ async function run() {
              item.click();`
           )
         }
-        await menu('launch.pdf', 'Fest fanen')
-        const pinned = await waitFor(() => strip(send), (s) => s[1]?.name === 'launch.pdf', 'launch.pdf to join the pinned group')
-        check('a pinned tab joins the end of the pinned group', label(pinned).replace(/</g, '') === '*pinned.pdf,*launch.pdf,shown.pdf,never.pdf', label(pinned))
-        await menu('shown.pdf', 'Lukk andre faner')
+        await menu('launch', 'Fest fanen')
+        const pinned = await waitFor(() => strip(send), (s) => s[1]?.name === 'launch', 'launch.pdf to join the pinned group')
+        check('a pinned tab joins the end of the pinned group', label(pinned).replace(/</g, '') === '*pinned,*launch,shown,never', label(pinned))
+        await menu('shown', 'Lukk andre faner')
         const closed = await waitFor(() => strip(send), (s) => s.length === 3, '«Lukk andre faner»')
-        check('«Lukk andre faner» leaves the pinned tabs standing', label(closed).replace(/</g, '') === '*pinned.pdf,*launch.pdf,shown.pdf', label(closed))
+        check('«Lukk andre faner» leaves the pinned tabs standing', label(closed).replace(/</g, '') === '*pinned,*launch,shown', label(closed))
         // Moving a tab stops at the pinned group's border (Ctrl+Shift+PageUp
         // on the first unpinned tab, which is the one showing)
         await evaluate(
@@ -171,7 +171,7 @@ async function run() {
         )
         await sleep(200)
         const moved = await strip(send)
-        check('a tab moved left stops at the pinned group', label(moved).replace(/</g, '') === '*pinned.pdf,*launch.pdf,shown.pdf', label(moved))
+        check('a tab moved left stops at the pinned group', label(moved).replace(/</g, '') === '*pinned,*launch,shown', label(moved))
 
         // ---------- 3. Closing the last window writes the session ----------
         console.log('\n3. closing the last window')
@@ -194,7 +194,7 @@ async function run() {
     console.log('\n3b. relaunching from it')
     await withApp({ state: { ...after, recents: [] } }, async ([send]) => {
       const tabs = await waitFor(() => strip(send), (s) => s.length === 3 && s.some((t) => t.active), 'the strip from the written session')
-      check('the relaunch reopens the strip', label(tabs) === '*pinned.pdf,*launch.pdf,shown.pdf<', label(tabs))
+      check('the relaunch reopens the strip', label(tabs) === '*pinned,*launch,shown<', label(tabs))
       await waitFor(() => evaluate(send, `return !!document.querySelector('.tab-view.active .pdf-page')`), (v) => v, 'the showing tab to render')
       check('the showing tab renders', true)
     })
@@ -205,7 +205,7 @@ async function run() {
       await waitFor(() => strip(send), (s) => s.length >= 2, 'the pinned tabs')
       await sleep(500)
       const settled = await strip(send)
-      check('only the pinned tabs come back', label(settled).replace(/</g, '') === '*pinned.pdf,*launch.pdf', label(settled))
+      check('only the pinned tabs come back', label(settled).replace(/</g, '') === '*pinned,*launch', label(settled))
     })
 
     // ---------- 5. Two windows ----------
@@ -229,8 +229,69 @@ async function run() {
           sends.map((send) => waitFor(() => strip(send), (s) => s.length > 0 && s.some((t) => t.active), 'a window strip'))
         )
         const labels = strips.map(label).sort()
-        check('each window reopens with its own tabs', labels.join(' | ') === 'pinned.pdf< | shown.pdf,never.pdf<', labels.join(' | '))
+        check('each window reopens with its own tabs', labels.join(' | ') === 'pinned< | shown,never<', labels.join(' | '))
       }
+    )
+
+    // ---------- 6. Tab groups through a relaunch ----------
+    // A stored group comes back folded with its tabs; unfolding it and
+    // closing the window writes it back open (src/shared/tab-groups.ts)
+    console.log('\n6. tab groups through a relaunch')
+    const chips = (send) =>
+      evaluate(
+        send,
+        `return [...document.querySelectorAll('.tab-group-chip')].map((c) => ({ text: c.textContent, collapsed: c.classList.contains('collapsed') }))`
+      )
+    const grouped = await withApp(
+      {
+        state: {
+          recents: [],
+          settings: { language: 'nb' },
+          session: {
+            windows: [
+              {
+                tabs: [{ path: SHOWN, group: 'g1' }, { path: NEVER, group: 'g1' }, { path: PINNED }],
+                active: 2,
+                groups: [{ id: 'g1', name: 'Disputas', color: 'red', collapsed: true }]
+              }
+            ]
+          }
+        }
+      },
+      async ([send], exited) => {
+        const tabs = await waitFor(() => strip(send), (s) => s.some((t) => t.active), 'the grouped strip')
+        const c = await chips(send)
+        check('a stored group comes back folded, with its count', c.length === 1 && c[0].collapsed && c[0].text === 'Disputas2', JSON.stringify(c))
+        check('its tabs are folded away, the one outside it shows', label(tabs) === 'pinned<', label(tabs))
+        await evaluate(send, `document.querySelector('.tab-group-chip').click()`)
+        const open = await waitFor(() => strip(send), (s) => s.length === 3, 'the group to unfold')
+        check('a click on the chip unfolds it', label(open) === 'shown,never,pinned<', label(open))
+        // A new group from the tab menu, in the real app
+        await evaluate(
+          send,
+          `const t = [...document.querySelectorAll('.tab')].find((x) => x.querySelector('.tab-label').textContent === 'pinned');
+           const r = t.getBoundingClientRect();
+           t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.x + 20, clientY: r.y + 10 }))`
+        )
+        await sleep(200)
+        await evaluate(send, `[...document.querySelectorAll('.tab-menu .menu-item')].find((b) => b.textContent === 'Legg i ny gruppe').click()`)
+        const c2 = await waitFor(() => chips(send), (v) => v.length === 2, 'a second chip')
+        check('«Legg i ny gruppe» makes a second group', c2.length === 2, JSON.stringify(c2))
+        await sleep(700) // past the strip report's debounce
+        await send('Runtime.evaluate', { expression: 'window.close()' }).catch(() => {})
+        await Promise.race([exited, sleep(10_000)])
+      }
+    )
+    const gw = grouped?.session?.windows?.[0]
+    check(
+      'the written session keeps both groups, the first unfolded',
+      gw?.groups?.length === 2 && gw.groups.find((g) => g.id === 'g1')?.collapsed === false,
+      JSON.stringify(gw?.groups)
+    )
+    check(
+      '…and each tab its group',
+      gw && gw.tabs.slice(0, 2).every((t) => t.group === 'g1') && typeof gw.tabs[2].group === 'string' && gw.tabs[2].group !== 'g1',
+      JSON.stringify(gw?.tabs)
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
