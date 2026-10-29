@@ -3,8 +3,8 @@ import { OPS } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { detectDoi } from '../doi-detect'
 import { buildDocNotes, copyForAiMarkdown, metadataTitle } from '../doc-notes'
-import type { McpPolicy } from '../../../shared/mcp'
-import { excludedBy, withDocExcluded } from '../../../shared/mcp'
+import { excludedBy, sharesWithAny } from '../../../shared/mcp'
+import { openAiTools } from './AiToolsDialog'
 import { isPasswordException, openDocument } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { renderPagesAsImages as renderAiPageImages } from '../ai-page-images'
@@ -2124,15 +2124,16 @@ export default function PdfViewer({
   }, [pdf, annots, excerpts, doi, metaTitle, payload.path, payload.name])
 
   // Whether THIS document is kept out of the AI tools (shared/mcp.ts) — the
-  // Merknader tab's switch. undefined = no switch: not the desktop, or
-  // sharing is off, where a per-document choice would only be clutter. Read
-  // again whenever the window is focused, since the settings change it too.
+  // Merknader tab's line, whose «Endre» opens the dialog on this document.
+  // undefined = no line: not the desktop, or no tool may read, where it would
+  // only be clutter. Read again whenever the window is focused, since the
+  // dialog changes it.
   const [aiToolsKeptOut, setAiToolsKeptOut] = useState<'doc' | 'folder' | null | undefined>(undefined)
-  const aiPolicyRef = useRef<McpPolicy | null>(null)
   const readAiPolicy = useCallback(() => {
     void bridge.mcpPolicy().then((policy) => {
-      aiPolicyRef.current = policy
-      setAiToolsKeptOut(policy?.sharing ? excludedBy(payload.path, policy, !/Linux/.test(navigator.platform)) : undefined)
+      setAiToolsKeptOut(
+        policy && sharesWithAny(policy) ? excludedBy(payload.path, policy, !/Linux/.test(navigator.platform)) : undefined
+      )
     })
   }, [payload.path])
   useEffect(() => {
@@ -2140,13 +2141,6 @@ export default function PdfViewer({
     window.addEventListener('focus', readAiPolicy)
     return () => window.removeEventListener('focus', readAiPolicy)
   }, [readAiPolicy])
-  const toggleAiToolsKeptOut = useCallback(() => {
-    const policy = aiPolicyRef.current
-    if (!policy) return
-    void bridge
-      .mcpSetPolicy(withDocExcluded(policy, payload.path, !policy.excludedDocs.includes(payload.path)))
-      .then(() => readAiPolicy())
-  }, [payload.path, readAiPolicy])
 
   // Track container width (for fit-width zoom and horizontal layout).
   // Fall back to the window width so layout never deadlocks if the element
@@ -7981,7 +7975,7 @@ export default function PdfViewer({
           onExport={exportAnnotations}
           onCopyForAi={() => void copyNotesForAi()}
           aiToolsKeptOut={aiToolsKeptOut}
-          onToggleAiToolsKeptOut={toggleAiToolsKeptOut}
+          onChangeAiTools={() => openAiTools(payload.path)}
           onAskAi={askAnnotations}
           docName={payload.name}
           docPath={payload.path}

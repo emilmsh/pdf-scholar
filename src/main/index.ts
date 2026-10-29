@@ -100,7 +100,8 @@ import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import { createRecentThumbStore } from './recent-thumbs'
 import { createChatHistoryStore } from './chat-history'
 import type { StoredConversation } from '../shared/chat-history'
-import { sanitizeConversations, searchConversations, toMeta, withoutImages } from '../shared/chat-history'
+import { docNameFromPath, sanitizeConversations, searchConversations, toMeta, withoutImages } from '../shared/chat-history'
+import { excludedBy, sharesWithAny, type McpDocument } from '../shared/mcp'
 import { rebindIdentity, validFingerprint } from '../shared/doc-identity'
 import { createNotesStore } from './notes-store'
 import { sanitizeDocNotes } from '../shared/research-notes'
@@ -1320,12 +1321,81 @@ function registerIpc(): void {
   // conversations. A document unlocked this session is recorded as locked
   // whatever the renderer sent: its words do not go on disk in the clear.
   const notes = createNotesStore(join(app.getPath('userData'), 'notes'))
+  /** The file a record is built from, as `mtime:size` — null when unreadable */
+  const fileStamp = async (path: string): Promise<string | null> => {
+    try {
+      const info = await stat(readPathFor(path))
+      return info.isFile() ? `${info.mtimeMs}:${info.size}` : null
+    } catch {
+      return null
+    }
+  }
   ipcMain.handle('notes:set', async (_e, record: unknown): Promise<void> => {
     const doc = sanitizeDocNotes(record)
     // An attachment opened from a filing is our own temp copy — its notes
     // would name a file the reader never kept
     if (!doc || doc.path.startsWith(attachmentTempRoot())) return
     await notes.set(passwordFor(doc.path) !== undefined ? { ...doc, locked: true, notes: [] } : doc)
+    const stamp = await fileStamp(doc.path)
+    if (stamp) {
+      getState().notesScanned[doc.path] = stamp
+      saveState()
+    }
+  })
+
+  // The quiet pass over the recents (src/renderer/src/notes-backfill.ts): a
+  // document read before notes were kept, or changed since its record was
+  // built, has its marks read once from the file — only while some tool may
+  // read, never one kept out, each handed out once per session so two
+  // windows never read the same file
+  const backfillHandedOut = new Set<string>()
+  ipcMain.handle('notes:backfill-targets', async (): Promise<{ path: string; name: string }[]> => {
+    const state = getState()
+    if (!sharesWithAny(state.mcp)) return []
+    const foldCase = process.platform !== 'linux'
+    const recentPaths = new Set(state.recents.map((r) => r.path))
+    // Stamps of documents that have left the recents are not kept
+    for (const p of Object.keys(state.notesScanned)) if (!recentPaths.has(p)) delete state.notesScanned[p]
+    const out: { path: string; name: string }[] = []
+    for (const r of state.recents) {
+      if (backfillHandedOut.has(r.path) || excludedBy(r.path, state.mcp, foldCase)) continue
+      if (r.path.startsWith(attachmentTempRoot())) continue
+      const stamp = await fileStamp(r.path)
+      if (!stamp || state.notesScanned[r.path] === stamp) continue
+      backfillHandedOut.add(r.path)
+      out.push({ path: r.path, name: r.name })
+    }
+    return out
+  })
+
+  // The panel's list of what may be shared: every document with notes or
+  // conversations, and whether it is kept out. The paths stay in the app.
+  ipcMain.handle('mcp:documents', async (): Promise<McpDocument[]> => {
+    const policy = getState().mcp
+    const foldCase = process.platform !== 'linux'
+    const [records, summaries] = await Promise.all([notes.all(), chats.list()])
+    const byPath = new Map<string, McpDocument>()
+    const docOf = (path: string, name: string): McpDocument => {
+      let d = byPath.get(path)
+      if (!d) {
+        d = { path, name, notes: 0, conversations: 0, updatedAt: 0, locked: false, excluded: excludedBy(path, policy, foldCase) }
+        byPath.set(path, d)
+      }
+      return d
+    }
+    for (const n of records) {
+      const d = docOf(n.path, n.name)
+      d.notes = n.notes.length
+      d.locked = n.locked === true
+      d.updatedAt = Math.max(d.updatedAt, n.updatedAt)
+      if (n.title) d.title = n.title
+    }
+    for (const s of summaries) {
+      const d = docOf(s.docPath, s.docName || docNameFromPath(s.docPath))
+      d.conversations++
+      d.updatedAt = Math.max(d.updatedAt, s.updatedAt)
+    }
+    return [...byPath.values()].sort((a, b) => b.updatedAt - a.updatedAt)
   })
 
   // A document's identity across a move (issue #46; shared/doc-identity.ts):

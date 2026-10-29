@@ -124,23 +124,15 @@ try {
 
   const settings = await evaluate(send, `
     const g = compatGroup()
-    // The provider groups — the «KI-verktøy på maskinen» group (.ai-mcp) is
-    // checked on its own below
-    const groupNames = [...document.querySelectorAll('.ai-field-group:not(.ai-mcp) > .ai-field > span')]
+    const groupNames = [...document.querySelectorAll('.ai-field-group > .ai-field > span')]
       .map((s) => s.textContent)
-    // Its rows fill in once main has looked for the tools
-    for (let i = 0; i < 50 && !document.querySelector('.ai-mcp .ai-field'); i++) await sleep(200)
-    const mcp = document.querySelector('.ai-mcp')
     return {
       settingsShown: !!document.querySelector('.ai-settings'),
-      groups: document.querySelectorAll('.ai-field-group:not(.ai-mcp)').length,
+      groups: document.querySelectorAll('.ai-field-group').length,
       groupNames,
-      mcpRows: mcp ? [...mcp.querySelectorAll('.ai-field > span:first-child')].map((s) => s.textContent) : null,
-      mcpAfterAccess: !!mcp && mcp.previousElementSibling?.querySelector('select') !== null,
-      mcpSwitch: (() => {
-        const box = mcp?.querySelector('.ai-mcp-switch input')
-        return box ? { checked: box.checked } : null
-      })(),
+      // The AI tools on this machine have their own dialog (AiToolsDialog.tsx)
+      // since 2026-10-29 — nothing of them here among the keys
+      mcpHere: !!document.querySelector('.ai-settings .ai-mcp, .ai-settings .ai-tools-row'),
       hasCompatGroup: !!g,
       presets: g ? [...g.querySelectorAll('select option')].map((o) => o.textContent) : [],
       keyPlaceholder: g?.querySelector('input[type="password"]')?.placeholder ?? '',
@@ -160,17 +152,7 @@ try {
   // KI-tilgang (the access switch) sits first, then the ten provider groups —
   // the ChatGPT-plan sign-in right under the OpenAI key it is the keyless twin of
   ok(settings.groups === 11, `access group + ten provider groups render (got ${settings.groups})`)
-  // The AI tools on this machine (MCP): right under the switch that governs
-  // them, a row per tool, one for the rest and what is kept out — whatever
-  // is installed here
-  ok(
-    settings.mcpAfterAccess &&
-      settings.mcpRows?.[0] === 'Claude Code' &&
-      settings.mcpRows?.[1] === 'Claude Desktop' &&
-      settings.mcpRows?.length === 4,
-    `«AI tools on this computer» sits under AI access with its four rows (got ${JSON.stringify(settings.mcpRows)})`
-  )
-  ok(settings.mcpSwitch?.checked === false, `sharing with AI tools is OFF in a fresh profile (got ${JSON.stringify(settings.mcpSwitch)})`)
+  ok(!settings.mcpHere, '«AI tools on this computer» is not among the keys and providers (its own dialog)')
   ok(
     /KI-tilgang|AI access/.test(settings.groupNames[0] ?? '') &&
       settings.groupNames[1] === 'OpenAI' &&

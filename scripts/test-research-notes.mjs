@@ -272,10 +272,11 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mcp-data-'))
   await notes.set({ path: 'C:\\Clients\\Firma Xtra.pdf', name: 'Firma Xtra.pdf', updatedAt: 700, notes: [entry(1, 'highlight', 'merger guidelines', '')] })
 }
 
-// Sharing is OFF until a tool is connected; the app writes the switch here
+// Every tool's switch is OFF until the reader turns it on; the app writes them here
 const setState = (state) => writeFileSync(join(dataDir, 'pdfx-state.json'), JSON.stringify(state))
-setState({ mcp: { sharing: true } })
-const server = createMcpServer({ dataDir, version: '9.9.9', foldCase: true })
+const ON = { claude: true, codex: false, other: true }
+setState({ mcp: { clients: ON } })
+const server = createMcpServer({ dataDir, version: '9.9.9', client: 'claude', foldCase: true })
 const { docIdOf } = await bundle(src('main/mcp-server.ts'), 'server2.mjs')
 const ID = { ck: docIdOf('C:\\Papers\\Card Krueger 1994.pdf'), ap: docIdOf('C:\\Papers\\Angrist Pischke.pdf'), secret: docIdOf('C:\\Papers\\Secret.pdf') }
 let nextId = 1
@@ -352,7 +353,7 @@ console.log('\n9. the tools')
 
 console.log('\n9b. what is kept out, and the master switch')
 {
-  setState({ mcp: { sharing: true, excludedFolders: ['c:/clients/firma x/'], excludedDocs: ['C:\\Papers\\Angrist Pischke.pdf'] } })
+  setState({ mcp: { clients: ON, excludedFolders: ['c:/clients/firma x/'], excludedDocs: ['C:\\Papers\\Angrist Pischke.pdf'] } })
   const list = await call('list_documents', {})
   check('a document kept out is not listed', !list.text.includes('Angrist'))
   check('a folder kept out takes what lies under it (separators and case folded)', !list.text.includes('report.pdf'))
@@ -363,39 +364,45 @@ console.log('\n9b. what is kept out, and the master switch')
   check('…nor its conversation', (await call('get_conversation', { id: 'conv-client' })).text.startsWith('No conversation'))
   const citing = await call('get_conversation', { id: 'conv-only' })
   check('another conversation citing one kept out does not name it', citing.text.includes('As in the merger case. [Conversation]') && !citing.text.includes('report.pdf'))
-  setState({ mcp: { sharing: true } })
+  setState({ mcp: { clients: ON } })
   check('let back in, it is listed again', (await call('list_documents', {})).text.includes('Angrist'))
   check('…and a citation of it names it again', (await call('get_conversation', { id: 'conv-only' })).text.includes('[Conversation: report.pdf]'))
-
-  setState({ mcp: { sharing: false } })
-  const off = await call('list_documents', {})
-  check('the master switch OFF refuses every tool call', off.isError && /Sharing with AI tools is switched off/.test(off.text))
-  setState({})
-  check('no switch stored at all = off (sharing is never on by default)', (await call('search_notes', { query: 'x' })).isError)
-  setState({ mcp: { sharing: 'yes' } })
-  check('a switch that is not `true` is off', (await call('list_documents', {})).isError)
-  setState({ mcp: { sharing: true } })
 }
 
-console.log('\n10. KI-tilgang «Av» closes this door too')
+console.log('\n10. one switch per tool')
 {
-  setState({ ai: { access: 'off' }, mcp: { sharing: true } })
-  const off = await call('search_notes', { query: 'identification' })
-  check('a tool call is refused while access is off, even with sharing on', off.isError && /AI access is switched off/.test(off.text) && !off.text.includes('conv-ck-1'))
+  setState({ mcp: { clients: { ...ON, claude: false } } })
+  const off = await call('list_documents', {})
+  check('a tool whose switch is off has every call refused', off.isError && /not sharing with this tool/.test(off.text) && !off.text.includes('Card'))
   check('…tools/list still answers (nothing in it is the reader’s)', (await rpc('tools/list')).result.tools.length === 4)
-  setState({ ai: { access: 'confirm' }, mcp: { sharing: true } })
-  check('«Bekreft» lets it through (connecting the tool was the go-ahead)', !(await call('list_documents', {})).isError)
+  setState({ mcp: { clients: { claude: false, codex: true, other: true } } })
+  check('another tool’s switch does not let this one in', (await call('list_documents', {})).isError)
+  const codex = createMcpServer({ dataDir, version: '9.9.9', client: 'codex', foldCase: true })
+  const asCodex = await codex.handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'list_documents', arguments: {} } })
+  check('…while that tool is answered', !asCodex.result.isError && asCodex.result.content[0].text.includes('Card'))
+  setState({})
+  check('nothing stored = every switch off (never on by default)', (await call('search_notes', { query: 'x' })).isError)
+  setState({ mcp: { clients: { claude: 'yes' } } })
+  check('a switch that is not `true` is off', (await call('list_documents', {})).isError)
+  // KI-tilgang governs the app's own assistant; this door has its switches
+  setState({ ai: { access: 'off' }, mcp: { clients: ON } })
+  check('KI-tilgang «Av» does not close it (the panel has switches of its own)', !(await call('list_documents', {})).isError)
   writeFileSync(join(dataDir, 'pdfx-state.json'), '{ broken')
   check('an unreadable state file shares nothing', (await call('list_documents', {})).isError)
-  setState({ mcp: { sharing: true } })
+  setState({ mcp: { clients: ON } })
 }
 
 console.log('\n10b. the policy as stored')
 {
-  const p = M.sanitizeMcpPolicy({ sharing: 1, excludedDocs: ['/a.pdf', '/a.pdf', 7, '', null], excludedFolders: 'nope' })
-  check('junk sanitizes to sharing off, lists cleaned and deduplicated', p.sharing === false && p.excludedDocs.join() === '/a.pdf' && p.excludedFolders.length === 0)
-  check('not an object → the default (off)', M.sanitizeMcpPolicy('x').sharing === false && M.sanitizeMcpPolicy(null).excludedDocs.length === 0)
-  const pol = { sharing: true, excludedDocs: ['C:\\A\\one.pdf'], excludedFolders: ['C:\\Clients\\'] }
+  const p = M.sanitizeMcpPolicy({ clients: { claude: 1, codex: 'true' }, excludedDocs: ['/a.pdf', '/a.pdf', 7, '', null], excludedFolders: 'nope' })
+  check('junk sanitizes to every switch off, lists cleaned and deduplicated', !M.sharesWithAny(p) && p.excludedDocs.join() === '/a.pdf' && p.excludedFolders.length === 0)
+  check('not an object → the default (off)', !M.sharesWithAny(M.sanitizeMcpPolicy('x')) && M.sanitizeMcpPolicy(null).excludedDocs.length === 0)
+  const legacy = M.sanitizeMcpPolicy({ sharing: true, excludedDocs: ['/k.pdf'] })
+  check('v0.79.0’s master switch ON becomes Claude and «other» (its untagged entries) — never Codex', legacy.clients.claude && legacy.clients.other && !legacy.clients.codex && legacy.excludedDocs[0] === '/k.pdf')
+  check('…and OFF stays off', !M.sharesWithAny(M.sanitizeMcpPolicy({ sharing: false })))
+  check('stored switches win over a leftover `sharing`', !M.sanitizeMcpPolicy({ sharing: true, clients: {} }).clients.claude)
+  check('the default object is not shared between calls', M.sanitizeMcpPolicy(null).clients !== M.sanitizeMcpPolicy(null).clients)
+  const pol = { clients: ON, excludedDocs: ['C:\\A\\one.pdf'], excludedFolders: ['C:\\Clients\\'] }
   check('a document by itself', M.excludedBy('c:/a/ONE.pdf', pol, true) === 'doc' && M.excludedBy('c:/a/ONE.pdf', pol, false) === null)
   check('under a folder, any depth', M.excludedBy('C:\\Clients\\X\\Y\\z.pdf', pol, true) === 'folder')
   check('the folder itself, or a sibling sharing its prefix, is not under it', M.excludedBy('C:\\ClientsOld\\z.pdf', pol, true) === null)
@@ -406,8 +413,10 @@ console.log('\n10b. the policy as stored')
 
 console.log('\n11. connecting a tool: the config merge')
 {
-  const e = M.serverEntry('C:\\Program Files\\PDF Scholar\\PDF Scholar.exe', 'C:\\Users\\ø\\AppData\\Roaming\\PDF Scholar\\mcp\\pdf-scholar-mcp.cjs')
-  check('the entry runs the app in Node mode', e.env.ELECTRON_RUN_AS_NODE === '1' && e.args.length === 1)
+  const e = M.serverEntry('C:\\Program Files\\PDF Scholar\\PDF Scholar.exe', 'C:\\Users\\ø\\AppData\\Roaming\\PDF Scholar\\mcp\\pdf-scholar-mcp.cjs', 'claude')
+  check('the entry runs the app in Node mode, naming its tool', e.env.ELECTRON_RUN_AS_NODE === '1' && e.args.join(' ').endsWith('--client claude'))
+  check('the tool named in the arguments', M.clientFromArgv(['node', 's.cjs', '--client', 'codex']) === 'codex' && M.clientFromArgv(e.args) === 'claude')
+  check('…none, or one we do not know, is «other»', M.clientFromArgv(['node', 's.cjs']) === 'other' && M.clientFromArgv(['--client', 'evil']) === 'other' && M.clientFromArgv(['--client']) === 'other')
   const theirs = JSON.stringify({ mcpServers: { github: { command: 'gh-mcp' } }, globalShortcut: 'Ctrl+Space' })
   const merged = JSON.parse(M.mergeServerInto(theirs, e))
   check('merge keeps the other servers and settings', merged.mcpServers.github.command === 'gh-mcp' && merged.globalShortcut === 'Ctrl+Space')
@@ -426,6 +435,52 @@ console.log('\n11. connecting a tool: the config merge')
   check('POSIX quoting', M.shellQuote("it's here", false) === `'it'\\''s here'`)
   check('the snippet is an mcpServers block', JSON.parse(M.configSnippet(e)).mcpServers['pdf-scholar'].args[0] === e.args[0])
   check('mcp- error codes', M.isMcpErrorCode('mcp-client-missing') && !M.isMcpErrorCode('file-icon-registry'))
+}
+
+console.log('\n11b. Codex: our one table in config.toml')
+{
+  const e = M.serverEntry('C:\\Program Files\\PDF Scholar\\PDF Scholar.exe', 'C:\\Users\\ø\\mcp\\pdf-scholar-mcp.cjs', 'codex')
+  const block = M.codexBlock(e)
+  check('a basic-string table: backslashes escaped, the tool named', block.startsWith('[mcp_servers.pdf-scholar]\n') && block.includes('command = "C:\\\\Program Files\\\\PDF Scholar\\\\PDF Scholar.exe"') && block.includes('"--client", "codex"') && block.includes('env = { ELECTRON_RUN_AS_NODE = "1" }'))
+  const theirs = [
+    'model = "gpt-5"',
+    '',
+    '# my servers',
+    '[mcp_servers.github]',
+    'command = "gh-mcp"',
+    '',
+    '[profiles.work]',
+    'model = "o3"',
+    ''
+  ].join('\n')
+  const added = M.mergeCodexToml(theirs, e)
+  check('added at the end, every line of theirs kept byte for byte', added.startsWith(theirs.trimEnd()) && added.trimEnd().endsWith(block) && M.hasCodexServer(added))
+  check('adding again replaces, never duplicates', M.mergeCodexToml(added, e) === added)
+  check('taking it back restores their file exactly', M.mergeCodexToml(added, null) === theirs)
+  // Ours in the middle, with a hand-made sub-table and the next table's comment
+  const middle = [
+    'model = "gpt-5"',
+    '',
+    "[mcp_servers.'pdf-scholar']",
+    'command = "old.exe"',
+    '',
+    '[mcp_servers.pdf-scholar.env]',
+    'X = "1"',
+    '',
+    '# the GitHub one',
+    '[mcp_servers.github]',
+    'command = "gh-mcp"',
+    ''
+  ].join('\n')
+  const removed = M.mergeCodexToml(middle, null)
+  check('our table AND its sub-table go, the next table keeps its comment', removed === 'model = "gpt-5"\n\n# the GitHub one\n[mcp_servers.github]\ncommand = "gh-mcp"\n', JSON.stringify(removed))
+  const replaced = M.mergeCodexToml(middle, e)
+  check('replaced where it stood', replaced.indexOf('[mcp_servers.pdf-scholar]') < replaced.indexOf('# the GitHub one') && !replaced.includes('old.exe') && !replaced.includes('X = "1"'))
+  check('a missing or empty file gets just our table', M.mergeCodexToml(null, e) === `${block}\n` && M.mergeCodexToml('', e) === `${block}\n`)
+  check('removing from a file without it changes nothing', M.mergeCodexToml(theirs, null) === theirs)
+  check('Windows line endings are kept', M.mergeCodexToml('a = 1\r\n', e).includes('a = 1\r\n\r\n[mcp_servers.pdf-scholar]\r\n'))
+  check('a server merely NAMED like ours is not ours', !M.hasCodexServer('[mcp_servers.pdf-scholar-old]\ncommand = "x"') && M.mergeCodexToml('[mcp_servers.pdf-scholar-old]\ncommand = "x"\n', null) === '[mcp_servers.pdf-scholar-old]\ncommand = "x"\n')
+  check('hasCodexServer', M.hasCodexServer(added) && !M.hasCodexServer(theirs) && !M.hasCodexServer(null))
 }
 
 // ---------- The script itself, the way a tool starts it ----------
@@ -505,9 +560,12 @@ console.log('\n12. the bundled script over stdio')
   writeFileSync(join(home, 'mcp', 'pdf-scholar-mcp.cjs'), bundled)
   mkdirSync(join(home, 'notes'))
   for (const f of readdirSync(join(dataDir, 'notes'))) writeFileSync(join(home, 'notes', f), readFileSync(join(dataDir, 'notes', f)))
+  // v0.79.0's state file: its master switch let in the untagged entry
   writeFileSync(join(home, 'pdfx-state.json'), JSON.stringify({ mcp: { sharing: true } }))
   const own = await talk(process.execPath, [join(home, 'mcp', 'pdf-scholar-mcp.cjs')], {}, conversation)
-  check('without --data it reads the folder above its own', own.replies[1]?.result?.content?.[0]?.text.includes('Page 4'), own.err)
+  check('without --data it reads the folder above its own (and a v0.79.0 entry keeps working)', own.replies[1]?.result?.content?.[0]?.text.includes('Page 4'), own.err)
+  const codex = await talk(process.execPath, [join(home, 'mcp', 'pdf-scholar-mcp.cjs'), '--client', 'codex'], {}, conversation)
+  check('started for a tool whose switch is off, it refuses', codex.replies[1]?.result?.isError === true, codex.err)
 }
 
 console.log('\n13. …started as a tool starts it: the app’s executable in Node mode')
