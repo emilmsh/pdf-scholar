@@ -61,6 +61,7 @@ import {
   inFootnotes,
   LINK_RECORDS,
   linkKind,
+  linkKindFromText,
   growInPlace,
   placePreview,
   previewScale,
@@ -339,8 +340,12 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     const rec = LINK_RECORDS.get(anchor)
     if (!rec || !anchor.isConnected) return
     const mine = ++seq.current
-    const target = await resolvePreviewTarget(rec.pdf, rec.dest)
-    if (!target || mine !== seq.current) return
+    const resolved = await resolvePreviewTarget(rec.pdf, rec.dest)
+    if (!resolved || mine !== seq.current) return
+    // A destination whose name says nothing: the link's own words («Table 1»)
+    // may, and then the table is cut out like a named one
+    const target =
+      resolved.kind === 'other' ? { ...resolved, kind: linkKindFromText(linkText(anchor)) ?? 'other' } : resolved
     if (target.kind === 'citation' && target.y !== null && target.name) {
       const card = await citationCard(anchor, rec, target).catch(() => null)
       if (mine !== seq.current || !anchor.isConnected) return
@@ -532,8 +537,12 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
       scroll = previewScroll(target.kind, vx, vy, box, { w: img.w, h: img.h }, captionAbove)
       // …but never so far right that the lines' ends fall outside it
       if (block) {
-        const edge = viewportBox(img.viewport, block).r
-        scroll.left = Math.max(0, Math.min(scroll.left, Math.ceil(edge) + 12 - box.w))
+        const b = viewportBox(img.viewport, block)
+        scroll.left = Math.max(0, Math.min(scroll.left, Math.ceil(b.r) + 12 - box.w))
+        // …and a destination naming no point in the text (none at all, or a
+        // page-wide /FitR starting left of the paper) starts at the text, not
+        // at the paper's edge
+        if (vx === null || vx < b.l) scroll.left = Math.max(0, Math.min(Math.floor(b.l) - 12, Math.ceil(img.w) - box.w))
       }
     }
     const r = anchor.getBoundingClientRect()
@@ -1078,8 +1087,11 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     )
   }
 
+  // No mark where the window's top IS the anchor (a footnote, a reference
+  // entry — previewScroll starts them there): it only covered the footnote's
+  // number (Emil, 2026-10-29)
   const markTop =
-    open.vy !== null && !open.entry && open.kind !== 'figure' && open.kind !== 'table' ? open.vy : null
+    open.vy !== null && !open.entry && !['figure', 'table', 'footnote', 'citation'].includes(open.kind) ? open.vy : null
   const pageH = size?.h ?? liveBox?.h ?? open.box.h
   const clip = open.clip
   // A cut-out: the content is the target's own box, the page slid under it —

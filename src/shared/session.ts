@@ -11,7 +11,11 @@
 //     pin means — gathered into one window
 //   - a tab whose file is gone, or a temp copy, is left out rather than
 //     reopened into an error; a window left with no tabs is not reopened
-import type { SessionTab, SessionWindow } from './types'
+//   - tab groups (tab-groups.ts) come back with their tabs: a tab names a
+//     group the window lists, its members one unbroken run, never a pinned
+//     tab; a group left with no tab is dropped
+import { normalizeGroups, sanitizeGroups } from './tab-groups'
+import type { SessionTab, SessionWindow, TabGroup } from './types'
 
 /** Where a window stood, so several windows come back where they were */
 export interface SessionBounds {
@@ -62,17 +66,42 @@ export function sanitizeSessionWindow(raw: unknown): StoredSessionWindow | null 
   let activePath: string | null = null
   w.tabs.slice(0, SESSION_MAX_TABS).forEach((t, i) => {
     if (!t || typeof t !== 'object') return
-    const { path, pinned } = t as Record<string, unknown>
+    const { path, pinned, group } = t as Record<string, unknown>
     if (typeof path !== 'string' || path === '' || seen.has(path)) return
     seen.add(path)
-    tabs.push(pinned === true ? { path, pinned: true } : { path })
+    if (pinned === true) tabs.push({ path, pinned: true })
+    else tabs.push(typeof group === 'string' && group !== '' ? { path, group } : { path })
     if (i === w.active) activePath = path
   })
   if (tabs.length === 0) return null
   const ordered = [...tabs.filter((t) => t.pinned), ...tabs.filter((t) => !t.pinned)]
-  const active = Math.max(0, ordered.findIndex((t) => t.path === activePath))
+  const grouped = withGroups(ordered, sanitizeGroups(w.groups))
+  const active = Math.max(0, grouped.tabs.findIndex((t) => t.path === activePath))
   const bounds = sanitizeBounds(w.bounds)
-  return bounds ? { tabs: ordered, active, bounds } : { tabs: ordered, active }
+  return {
+    tabs: grouped.tabs,
+    active,
+    ...(grouped.groups.length > 0 ? { groups: grouped.groups } : {}),
+    ...(bounds ? { bounds } : {})
+  }
+}
+
+/** The tabs' group references mended against the window's group list (see
+ *  normalizeGroups): unknown, pinned or cut-off references dropped, groups
+ *  with no tab left dropped */
+function withGroups(tabs: SessionTab[], groups: TabGroup[]): { tabs: SessionTab[]; groups: TabGroup[] } {
+  const norm = normalizeGroups(
+    tabs.map((t) => ({ id: t.path, pinned: t.pinned === true, groupId: t.group ?? null })),
+    groups
+  )
+  return {
+    tabs: tabs.map((t, i): SessionTab => {
+      const g = norm.tabs[i].groupId ?? null
+      if (g === (t.group ?? null)) return t
+      return g === null ? { path: t.path, ...(t.pinned ? { pinned: true } : {}) } : { ...t, group: g }
+    }),
+    groups: norm.groups
+  }
 }
 
 export function sanitizeSession(raw: unknown): StoredSession {
@@ -91,10 +120,16 @@ export function sanitizeSession(raw: unknown): StoredSession {
  *  falls to the first tab when its own was dropped */
 function filterWindow(w: StoredSessionWindow, keep: (path: string) => boolean): StoredSessionWindow | null {
   const activePath = w.tabs[w.active]?.path
-  const tabs = w.tabs.filter((t) => keep(t.path))
-  if (tabs.length === 0) return null
+  const kept = w.tabs.filter((t) => keep(t.path))
+  if (kept.length === 0) return null
+  const { tabs, groups } = withGroups(kept, w.groups ?? [])
   const active = Math.max(0, tabs.findIndex((t) => t.path === activePath))
-  return w.bounds ? { tabs, active, bounds: w.bounds } : { tabs, active }
+  return {
+    tabs,
+    active,
+    ...(groups.length > 0 ? { groups } : {}),
+    ...(w.bounds ? { bounds: w.bounds } : {})
+  }
 }
 
 /** The windows to open at launch, first one first. `restoreAll` is the

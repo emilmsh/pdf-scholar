@@ -453,6 +453,9 @@ interface Props {
    *  #46). Undefined where there is no tab strip to open it in — the
    *  document then opens in a new window or tab. */
   onOpenPath?(path: string): Promise<void> | void
+  /** This document is about to open another as a tab of its own (a PDF
+   *  attachment), so the host can put that tab in this tab's group */
+  onOpeningFromHere?(): void
   /** A DIFFERENT file for the second split column (App-owned; «Åpne i delt
    *  visning»). null/undefined = the split shows this document, as always.
    *  All five are optional so single-document hosts (the extension) need not
@@ -566,6 +569,7 @@ export default function PdfViewer({
   onLeaveDocument,
   onOpenFile,
   onOpenPath,
+  onOpeningFromHere,
   splitDoc,
   onSplitDirtyChange,
   onRequestCloseSplitDoc,
@@ -4950,6 +4954,7 @@ export default function PdfViewer({
     async (att: DocAttachment, docKey: string): Promise<boolean> => {
       const data = await attachmentBytes(att, docKey, 'attach.openFailed')
       if (!data) return false
+      onOpeningFromHere?.()
       const res = await bridge.openAttachment(att.name, data, docKey)
       if ('error' in res) {
         showToast(t('attach.openFailed', { error: errorText(res) }))
@@ -4957,7 +4962,7 @@ export default function PdfViewer({
       }
       return true
     },
-    [attachmentBytes, showToast]
+    [attachmentBytes, showToast, onOpeningFromHere]
   )
 
   /** «Lagre …» (desktop) / «Last ned» (browser): false on a cancelled dialog,

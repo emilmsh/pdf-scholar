@@ -8,6 +8,10 @@
 // column must never try to open THAT as a file.
 export const TAB_DRAG_MIME = 'application/x-pdf-scholar-tab'
 
+/** A tab group's chip being dragged along the strip. Its own type, so no
+ *  pages column reads it as a document to open. */
+export const TAB_GROUP_DRAG_MIME = 'application/x-pdf-scholar-tab-group'
+
 /** Does this drag carry a tab? Cheap enough to run on every dragover. */
 export function dragCarriesTab(dt: DataTransfer | null): boolean {
   return !!dt && Array.from(dt.types).includes(TAB_DRAG_MIME)

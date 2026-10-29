@@ -7,8 +7,25 @@ import type {
   RecentFile,
   SessionWindow,
   Settings,
+  TabGroup,
   ThemeName
 } from '../../shared/types'
+import {
+  activeAfterClose,
+  activeAfterCollapse,
+  addToGroup,
+  groupTab,
+  insertOpened,
+  isHidden,
+  moveGroup,
+  moveTab as moveTabInStrip,
+  nextGroupColor,
+  normalizeGroups,
+  removeFromGroup,
+  stepTab,
+  ungroup,
+  visibleTabs
+} from '../../shared/tab-groups'
 import { BREW_UPGRADE_COMMAND, RELEASES_PAGE_URL } from '../../shared/update-channel'
 import { bridge, isElectron } from './bridge'
 import { movedFromLabel, positionFor, reportIdentity } from './doc-identity'
@@ -59,7 +76,13 @@ interface OpenTab {
    *  file is read — so a long session costs a row of names at launch, not a
    *  row of parsed documents. See takeLazy for how it stops being lazy. */
   lazy: boolean
+  /** The tab group it belongs to (src/shared/tab-groups.ts), if any */
+  groupId?: string | null
 }
+
+let groupCounter = 0
+/** How long a noted opener stays the opener of the next new tab */
+const OPENER_WINDOW_MS = 5000
 
 /** The file name a restored tab shows before its file is read — what
  *  readFile will name it too */
@@ -209,6 +232,33 @@ export default function App(): React.JSX.Element {
 
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
+  /** The window's tab groups (src/shared/tab-groups.ts). The members are the
+   *  tabs carrying a group's id; the group's place in the strip is theirs. */
+  const [tabGroups, setTabGroups] = useState<TabGroup[]>([])
+  const tabGroupsRef = useRef(tabGroups)
+  tabGroupsRef.current = tabGroups
+  /** The tab that is about to open a document as a tab of its own (an
+   *  attachment: main stages the copy and sends the path back as an ordinary
+   *  open), so the new tab can join its group. Stale after a few seconds — a
+   *  file opened from Explorer later is not the opener's. */
+  const openerRef = useRef<{ tabId: string; at: number } | null>(null)
+  // Every path that changes the strip — a close, a pin, a drop from another
+  // window — is mended here rather than taught the group rules one by one: a
+  // pinned tab or a member cut off from its run leaves its group, an empty
+  // group goes
+  useEffect(() => {
+    const norm = normalizeGroups(tabs, tabGroups)
+    if (norm.tabs !== tabs) setTabs(norm.tabs)
+    if (norm.groups !== tabGroups) setTabGroups(norm.groups)
+  }, [tabs, tabGroups])
+  // The tab being read is never folded away: reaching one in a folded group —
+  // from «Alle faner», a citation chip, a file opened again — unfolds it
+  useEffect(() => {
+    if (atLibrary) return
+    const tab = tabs.find((x) => x.id === activeId)
+    if (!tab || !isHidden(tab, tabGroups)) return
+    setTabGroups((prev) => prev.map((g) => (g.id === tab.groupId ? { ...g, collapsed: false } : g)))
+  }, [tabs, tabGroups, activeId, atLibrary])
   /** Every tab showing `path` — since «Dupliser fane» (issue #53) there can
    *  be more than one, and whatever happens to the document (fresh bytes
    *  from Explorer, a change on disk, a retired draft) happens to all of
@@ -366,7 +416,8 @@ export default function App(): React.JSX.Element {
       const next = prev.filter((t) => t.id !== id)
       setActiveId((current) => {
         if (current !== id) return current
-        return next[Math.min(index, next.length - 1)]?.id ?? null
+        // Its neighbour — passing over tabs folded away in a group
+        return activeAfterClose(next, tabGroupsRef.current, index)
       })
       return next
     })
@@ -517,7 +568,11 @@ export default function App(): React.JSX.Element {
         lazy: false
       }
       docRegistry.acquire(payload.path)
-      setTabs((prev) => [...prev, tab])
+      // Opened from a tab a moment ago (an attachment): into that tab's group
+      const opener = openerRef.current
+      openerRef.current = null
+      const openerId = opener && Date.now() - opener.at < OPENER_WINDOW_MS ? opener.tabId : null
+      setTabs((prev) => insertOpened(prev, tab, openerId))
       goToTab(tab.id)
       setError(null)
     },
@@ -757,35 +812,65 @@ export default function App(): React.JSX.Element {
     [closeTabAwait]
   )
 
-  /** Drag a tab to a new position (also Ctrl+Shift+PageUp/PageDown). Pinned
-   *  tabs move among themselves and the rest among themselves: the pinned
-   *  group is always the strip's start, so a drag across the border stops at
-   *  it rather than mixing the two. */
+  /** Drag a tab to a new position. Pinned tabs move among themselves and the
+   *  rest among themselves: the pinned run is always the strip's start, so a
+   *  drag across the border stops at it rather than mixing the two. Where it
+   *  lands decides its group (moveTab in tab-groups.ts). */
   const moveTab = useCallback((id: string, toIndex: number) => {
-    setTabs((prev) => {
-      const from = prev.findIndex((t) => t.id === id)
-      if (from === -1) return prev
-      const pinnedCount = prev.filter((t) => t.pinned).length
-      const [lo, hi] = prev[from].pinned ? [0, pinnedCount - 1] : [pinnedCount, prev.length - 1]
-      const to = Math.max(lo, Math.min(hi, toIndex))
-      if (from === to) return prev
-      const next = [...prev]
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
-      return next
-    })
+    setTabs((prev) => moveTabInStrip(prev, id, toIndex))
   }, [])
 
-  /** Pin a tab (it joins the end of the pinned group) or let it go (it heads
-   *  the rest) — browsers' rule, so the tab moves as little as it can */
+  /** Pin a tab (it joins the end of the pinned run, leaving any group) or let
+   *  it go (it heads the rest) — browsers' rule, so the tab moves as little
+   *  as it can */
   const pinTab = useCallback((id: string, pinned: boolean) => {
     setTabs((prev) => {
       const tab = prev.find((t) => t.id === id)
       if (!tab || tab.pinned === pinned) return prev
       const rest = prev.filter((t) => t.id !== id)
       const at = rest.filter((t) => t.pinned).length
-      return [...rest.slice(0, at), { ...tab, pinned }, ...rest.slice(at)]
+      return [...rest.slice(0, at), { ...tab, pinned, groupId: null }, ...rest.slice(at)]
     })
+  }, [])
+
+  /** Tab groups, from the tab menu and the group's chip. A new group opens
+   *  its chip's editor so it can be named at once (`editGroupSignal`). */
+  const [editGroupSignal, setEditGroupSignal] = useState<{ id: string; n: number } | null>(null)
+  const newTabGroup = useCallback((tabId: string) => {
+    // Unique past a restart too: a restored session brings its own ids
+    const id = `group-${Date.now().toString(36)}-${++groupCounter}`
+    setTabGroups((prev) => [...prev, { id, name: '', color: nextGroupColor(prev), collapsed: false }])
+    setTabs((prev) => groupTab(prev, tabId, id))
+    setEditGroupSignal((s) => ({ id, n: (s?.n ?? 0) + 1 }))
+  }, [])
+  const addTabToGroup = useCallback((tabId: string, groupId: string) => {
+    setTabs((prev) => addToGroup(prev, tabId, groupId))
+  }, [])
+  const removeTabFromGroup = useCallback((tabId: string) => {
+    setTabs((prev) => removeFromGroup(prev, tabId))
+  }, [])
+  const updateTabGroup = useCallback((groupId: string, patch: Partial<Pick<TabGroup, 'name' | 'color'>>) => {
+    setTabGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, ...patch } : g)))
+  }, [])
+  /** Fold a group away, or open it. Folding the group being read shows the
+   *  nearest tab outside it — the library when there is none. */
+  const toggleTabGroup = useCallback((groupId: string) => {
+    const groups = tabGroupsRef.current
+    const group = groups.find((g) => g.id === groupId)
+    if (!group) return
+    if (!group.collapsed && !atLibraryRef.current) {
+      const next = activeAfterCollapse(tabsRef.current, groups, groupId, activeIdRef.current)
+      if (next === null) setAtLibrary(true)
+      else if (next !== activeIdRef.current) setActiveId(next)
+    }
+    setTabGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g)))
+  }, [])
+  const ungroupTabs = useCallback((groupId: string) => {
+    setTabs((prev) => ungroup(prev, groupId))
+  }, [])
+  /** A group's chip dragged over a tab: the whole group moves past it */
+  const moveTabGroup = useCallback((groupId: string, targetId: string) => {
+    setTabs((prev) => moveGroup(prev, groupId, targetId))
   }, [])
 
   /** The path of the tab this window is dragging right now, if any. The native
@@ -976,7 +1061,8 @@ export default function App(): React.JSX.Element {
     // early return below would otherwise make the key do nothing at all.
     if (tabsRef.current.length > 0) setAtLibrary(false)
     setActiveId((current) => {
-      const list = tabsRef.current
+      // The tabs the strip shows: a folded group is passed over
+      const list = visibleTabs(tabsRef.current, tabGroupsRef.current)
       if (list.length < 2) return current
       const index = list.findIndex((t) => t.id === current)
       return list[(index + delta + list.length) % list.length].id
@@ -1048,7 +1134,9 @@ export default function App(): React.JSX.Element {
         sameSplitNonce: 0,
         pinned: false,
         lazy: false,
-        draftOnScreen: true
+        draftOnScreen: true,
+        // Beside its source, so in its source's group
+        groupId: source.pinned ? null : (source.groupId ?? null)
       }
       docRegistry.acquire(path)
       setTabs((prev) => {
@@ -1111,10 +1199,16 @@ export default function App(): React.JSX.Element {
           splitDoc: null,
           sameSplitNonce: 0,
           pinned: s.pinned === true,
-          lazy: true
+          lazy: true,
+          groupId: s.group ?? null
         }
       })
       if (restored.length === 0) return
+      // The session's groups beside any this window has already
+      if (session.groups?.length) {
+        const have = new Set(tabGroupsRef.current.map((g) => g.id))
+        setTabGroups((prev) => [...prev, ...session.groups!.filter((g) => !have.has(g.id))])
+      }
       // Mirrored into the ref at once: a file named on the command line is
       // opened right after this, and openPayload must see these tabs to reuse
       // one rather than open the same document twice
@@ -1179,8 +1273,15 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     if (!isElectron || !sessionTaken) return
     const snapshot = (): SessionWindow => ({
-      tabs: tabs.map((x) => (x.pinned ? { path: x.payload.path, pinned: true } : { path: x.payload.path })),
-      active: Math.max(0, tabs.findIndex((x) => x.id === activeId))
+      tabs: tabs.map((x) =>
+        x.pinned
+          ? { path: x.payload.path, pinned: true }
+          : x.groupId
+            ? { path: x.payload.path, group: x.groupId }
+            : { path: x.payload.path }
+      ),
+      active: Math.max(0, tabs.findIndex((x) => x.id === activeId)),
+      ...(tabGroups.length > 0 ? { groups: tabGroups } : {})
     })
     const timer = window.setTimeout(() => bridge.setSessionTabs(snapshot()), 300)
     const flush = (): void => bridge.setSessionTabs(snapshot())
@@ -1189,7 +1290,7 @@ export default function App(): React.JSX.Element {
       window.clearTimeout(timer)
       window.removeEventListener('beforeunload', flush)
     }
-  }, [tabs, activeId, sessionTaken])
+  }, [tabs, tabGroups, activeId, sessionTaken])
 
   // A detached assistant asked for a citation in one of our documents: bring
   // that document's tab forward (and leave the library). The mounted viewer's
@@ -1225,13 +1326,12 @@ export default function App(): React.JSX.Element {
       const typing = tag === 'INPUT' || tag === 'TEXTAREA'
       const command = commandForEvent(e, typing)
       if (!command) return
-      const moveActiveTab = (delta: number): void => {
+      const moveActiveTab = (delta: -1 | 1): void => {
         const id = activeIdRef.current
-        if (!id) return
-        const at = tabsRef.current.findIndex((t) => t.id === id)
-        if (at === -1) return
+        if (!id || !tabsRef.current.some((t) => t.id === id)) return
         e.preventDefault()
-        moveTab(id, at + delta)
+        // One step, into and out of groups as the browsers do (stepTab)
+        setTabs((prev) => stepTab(prev, tabGroupsRef.current, id, delta))
       }
       switch (command) {
         case 'tab.next':
@@ -1353,8 +1453,9 @@ export default function App(): React.JSX.Element {
         case 'tab.goto7':
         case 'tab.goto8':
         case 'tab.last': {
-          // A number past the last tab does nothing, as in the browsers
-          const list = tabsRef.current
+          // A number past the last tab does nothing, as in the browsers. The
+          // numbers count the tabs the strip shows.
+          const list = visibleTabs(tabsRef.current, tabGroupsRef.current)
           const target = command === 'tab.last' ? list[list.length - 1] : list[Number(command.slice('tab.goto'.length)) - 1]
           if (!target) break
           e.preventDefault()
@@ -1431,8 +1532,21 @@ export default function App(): React.JSX.Element {
           // Either document in the tab (its own, or the split column's other
           // file) having unsaved changes lights the dot
           dirty: dirtyTabs.has(t.id) || splitDirtyTabs.has(t.id),
-          pinned: t.pinned
+          pinned: t.pinned,
+          groupId: t.groupId ?? null
         }))}
+        groups={tabGroups}
+        editGroupSignal={editGroupSignal}
+        onGroupNew={newTabGroup}
+        onGroupAdd={addTabToGroup}
+        onGroupRemove={removeTabFromGroup}
+        onGroupUpdate={updateTabGroup}
+        onGroupToggle={toggleTabGroup}
+        onGroupUngroup={ungroupTabs}
+        onReorderGroup={moveTabGroup}
+        onGroupClose={(groupId) =>
+          void closeTabs(tabsRef.current.filter((x) => x.groupId === groupId).map((x) => x.id))
+        }
         // No tab is the current one while the library is showing — the strip
         // stays, so the open documents are visible and one click away from
         // there, but none of them is what you are looking at.
@@ -1541,6 +1655,9 @@ export default function App(): React.JSX.Element {
                 }
                 onRequestOpenOtherInSplit={isElectron ? () => void openOtherInSplit(tab.id) : undefined}
                 onOpenPath={openPath}
+                onOpeningFromHere={() => {
+                  openerRef.current = { tabId: tab.id, at: Date.now() }
+                }}
               />
             </div>
           )

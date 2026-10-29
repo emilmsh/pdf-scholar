@@ -62,6 +62,18 @@ export function linkKind(destName: string | null): LinkKind {
   return 'other'
 }
 
+/** What a link's own words say it points at, for a destination whose name
+ *  says nothing — an explicit one has none at all (the AEA journals' InDesign
+ *  links «Table 1» to a page-wide /FitR rectangle, Emil 2026-10-29): «Table
+ *  1», «Fig. 3a», «Figures 2 and 3», «Tabell A.1». Null when the words do not
+ *  name a figure or table (a link on the number alone, «1», included). */
+export function linkKindFromText(text: string): LinkKind | null {
+  const t = text.replace(/\s+/g, ' ').trim()
+  if (/^(figures?|figs?\.?|figur(?:en|er)?|abbildung(?:en)?|abb\.?)\s*[A-Z]?\.?\d/i.test(t)) return 'figure'
+  if (/^(tables?|tabs?\.?|tabell(?:en|er)?|tabellen?)\s*[A-Z]?\.?\d/i.test(t)) return 'table'
+  return null
+}
+
 /** A destination resolved to a point on a page. x/y are PDF user space
  *  (bottom-up y), either may be null when the destination does not name it
  *  (`/Fit` names neither, `/FitH` only a top). */
@@ -1577,15 +1589,19 @@ export function floatBox(
   lines = withoutFolio(lines)
   const L = layoutOf(lines, page.w)
   const { cols, full, body } = L
-  const col = columnAt(cols, dest.x)
+  // An anchor off the text block names no column: a page-wide /FitR starts
+  // left of the paper (InDesign's, at x = -130), and its caption is looked
+  // for in either column
+  const vague = dest.x === null || dest.x < full.left - 12 || dest.x > full.right + 12
   const isCap = kind === 'figure' ? isFigureCaption : isTableCaption
   // The caption: the nearest one under the anchor (at it, or under the
   // float the anchor heads), in the anchor's column or across the page
   const caps = lines
-    .filter((l) => isCap(l.text) && l.y <= dest.y + body.size && inSpan(l, col))
+    .filter((l) => isCap(l.text) && l.y <= dest.y + body.size && inSpan(l, vague ? full : columnAt(cols, dest.x)))
     .sort((a, b) => b.y - a.y)
   const cap = caps.find((l) => markedCaption(l.text)) ?? caps[0]
   if (!cap) return null
+  const col = columnAt(cols, vague ? cap.x0 + 1 : dest.x)
   const capLines = captionBlock(lines, cap)
   const capBox = entryBox(capLines)!
   const mid = page.w / 2
