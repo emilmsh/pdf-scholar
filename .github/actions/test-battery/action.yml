@@ -205,6 +205,13 @@ runs:
     # write, two writes of one document queue (EPERM on Windows otherwise)
     - run: npm run test:chat-history
       shell: bash
+    # The notes an outside AI tool reads (MCP): what counts as a note, a
+    # locked document giving neither notes nor conversations, «Av» refusing
+    # every tool call, no image data in an answer, another tool's servers
+    # kept when Claude Desktop's config is merged — and the bundled server
+    # script spoken to over stdio, by Node and by Electron in Node mode
+    - run: npm run test:research-notes
+      shell: bash
     # A moved/renamed file's records follow it (issue #46): /ID[0] read from
     # the bytes, a copy never steals its original's history, and /ID[0]
     # survives both of our save paths (the real engine, both bundles)

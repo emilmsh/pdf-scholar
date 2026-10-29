@@ -1,6 +1,6 @@
 # PDF Scholar — Privacy Policy
 
-_Last updated: 2026-10-10_
+_Last updated: 2026-10-29_
 
 PDF Scholar (the desktop app and the browser extension) is a local-first PDF
 reader and annotator. **It collects no data about you.**
@@ -99,6 +99,35 @@ in the transport layer, not just in the interface, so a stored key cannot leak
 content by accident). If your licence to a document does not permit sharing it
 with an AI service, use Confirm or Off — the app cannot know what your
 subscriptions and licences allow.
+
+**AI tools on your computer (desktop app only).** So that an AI tool you run
+yourself — Claude Code, Claude Desktop, Codex and the like — can find what you
+noted, the desktop app keeps a small record per document of your annotations
+(the words each highlight marks, your comments, notes and text boxes, the
+document's title, DOI and page count) next to its other local data. It is
+written on your device whenever a document's annotations change, never
+transmitted by the app, and removed when the document has none. **A
+password-protected document's record holds nothing but the fact that it is
+locked.** Nothing reads this record unless you connect a tool under "AI tools on
+this computer" in the AI settings; **sharing with AI tools is off until you
+do**. A connected tool starts PDF Scholar's own read-only server on your machine
+— no network port is opened — and can then read those records and your AI
+conversations (their text and the passages the answers cited). It never gets
+images, the PDFs themselves, where a file lives (no path or folder name — a
+document is named by its file name and a short id), who wrote a mark, or
+anything at all about a password-protected document or one you chose to keep
+out — single documents from the Annotations tab, whole folders from the
+settings. **What the tool reads goes to whichever AI provider that tool uses,
+under that tool's terms** — that is the point of connecting it, and it is
+outside this app's control. Text from a PDF (the words you highlighted, a
+passage an answer cited) reaches that tool's model too; the server marks it as
+data rather than instructions, which lowers but does not remove the chance
+that a document written to manipulate an AI tool does so. Turning **Share with
+AI tools** off — or the AI access switch to **Off** — makes the server refuse
+every request at once, for every tool; "Disconnect" removes PDF Scholar from a
+tool's configuration. The Annotations tab's "Copy for AI"
+puts the same kind of text for the open document on your clipboard, for you to
+paste wherever you choose; nothing is sent by the copy itself.
 
 How the key is protected where it is stored depends on what the platform offers,
 and the app uses the strongest option available on each. The assistant's key

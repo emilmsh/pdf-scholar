@@ -662,6 +662,38 @@ regressions are treated as bugs, not as acceptable platform lag.
     «Bekreft før deling» counts an attached conversation's document like
     the open one and names each attached file.
 
+33. **AI tools outside the app (MCP) reach the desktop's notes only; every
+    platform has «Kopier for KI».** (2026-10-29) The MCP server
+    (`src/main/mcp-server.ts`, setup in `docs/MCP.md`) is a process an AI
+    tool starts on its own — the app's executable with
+    `ELECTRON_RUN_AS_NODE=1` on a script main keeps in `userData/mcp` — and
+    reads two stores in userData: the conversations and each document's
+    notes (`userData/notes`, written by the viewer as marks settle,
+    `src/shared/research-notes.ts`). An extension has no process another
+    program could start and no such folder, so `setDocNotes` is a no-op
+    there and in dev:web, `mcpStatus`/`mcpPolicy` answer null and neither
+    the settings group nor the Merknader tab's «Hold utenfor KI-verktøy»
+    is drawn. What may be shared — the master switch, off until a tool is
+    connected, and the documents and folders kept out — lives in the state
+    file's own `mcp` key (`shared/mcp.ts`), which the server reads on every
+    call; a folder kept out compares without case on Windows and macOS and
+    with it on Linux, as their file systems do. The Merknader tab's «Kopier for KI» is renderer code and
+    identical everywhere (the extension reads its conversations from
+    IndexedDB like the panel does). Within the desktop: Windows (installer
+    and portable zip), macOS and Linux connect alike — on Linux the
+    AppImage's own path is what a tool is told to start (`APPIMAGE`), since
+    the mount it runs from moves on every launch. The **Microsoft Store
+    build cannot connect**: an MSIX app has no execution alias another
+    program could start, and its userData is virtualized away from the path
+    the entry would name; the group says so instead (`mcp-unsupported`).
+    Claude Desktop is found at `%APPDATA%\Claude` and in an MSIX install's
+    virtualized copy, `~/Library/Application Support/Claude` on macOS and
+    `~/.config/Claude` on Linux. Covered by `npm run test:research-notes`
+    (rules, store, the four tools, the config merge, the bundled script
+    over stdio by Node and by Electron in Node mode) and
+    `test:notes-desktop` (the real app writing a record the shipped script
+    then finds).
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

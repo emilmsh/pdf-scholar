@@ -3,6 +3,8 @@ import type { PdfStandardFont } from '@embedpdf/models'
 import type { CitationStyleId } from './citation-style'
 import type { ConversationHit, ConversationMeta, StoredConversation } from './chat-history'
 import type { FileIconChoice, FileIconErrorCode, FileIconResult } from './file-icon'
+import type { DocNotes } from './research-notes'
+import type { McpErrorCode, McpPolicy, McpResult, McpStatus, McpTarget } from './mcp'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
  *  'custom' is the user-toned light mode (paper tone from `customTone`) */
@@ -437,6 +439,7 @@ export interface FileError {
     | AbstractErrorCode
     | AttachmentErrorCode
     | FileIconErrorCode
+    | McpErrorCode
     | undefined
 }
 
@@ -1082,6 +1085,22 @@ export interface PdfxApi {
    *  «Dokumenter som ikke finnes lenger»; refuses nothing, so the caller
    *  passes only what goneDocuments named. */
   forgetDocuments(paths: string[]): Promise<void>
+  // ---------- Notes for AI tools outside the app (shared/research-notes.ts, shared/mcp.ts) ----------
+  /** Desktop: keep this document's notes where the MCP server reads them
+   *  (userData/notes). A no-op elsewhere — neither the extension nor a
+   *  browser tab has a process another program could start. */
+  setDocNotes(record: DocNotes): Promise<void>
+  /** Desktop: which AI tools are here and connected; null where none can be */
+  mcpStatus(): Promise<McpStatus | null>
+  /** Desktop: connect (on) or disconnect one tool. Connecting turns the
+   *  master switch on. */
+  mcpConnect(target: McpTarget, on: boolean): Promise<McpResult>
+  /** Desktop: the master switch and what is kept out; null where no tool can
+   *  be connected */
+  mcpPolicy(): Promise<McpPolicy | null>
+  mcpSetPolicy(patch: Partial<McpPolicy>): Promise<McpPolicy | null>
+  /** Desktop: a folder to keep out, from the system's folder picker */
+  mcpPickFolder(): Promise<string | null>
   setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
    *  goes through src/main/incremental-appender.ts instead) */
