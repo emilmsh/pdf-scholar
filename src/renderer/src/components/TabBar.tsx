@@ -419,6 +419,12 @@ export default function TabBar({
       <div
         ref={stripRef}
         className={`tab-strip${fade.start ? ' fade-start' : ''}${fade.end ? ' fade-end' : ''}`}
+        // The strip scrolls sideways, so a middle press would start
+        // Chromium's autoscroll on it; the middle button closes a tab here
+        // (onAuxClick), as in Edge
+        onMouseDown={(e) => {
+          if (e.button === 1) e.preventDefault()
+        }}
       >
       {items.map((item) => {
         if (item.kind === 'group') {
