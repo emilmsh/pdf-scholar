@@ -483,8 +483,11 @@ that.)*
   their own — Claude and Codex, whose config the app writes itself — and
   call the rest «other tools that support MCP» (Emil, 2026-10-29: there are
   many tools, and none is named that we have not checked can use it). Never
-  "integrates with ChatGPT". The extension listing names no tool and claims
-  only the copy.)*
+  "integrates with ChatGPT": in the ChatGPT app only Codex reaches it, an
+  ordinary chat runs in OpenAI's cloud and cannot start a local server
+  (checked 2026-10-29 — re-check in the monthly audit; the README and
+  MCP.md say so, the dialog's Codex line reads «Codex (ikke chat)»). The
+  extension listing names no tool and claims only the copy.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
