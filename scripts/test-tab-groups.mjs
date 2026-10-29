@@ -96,35 +96,72 @@ eq(
 
 // --- making and leaving groups ---------------------------------------------------------
 eq(show(G.groupTab(strip('a b c'), 'b', 'N')), 'a b:N c', 'a new group holds the tab where it stands')
-eq(show(G.groupTab(strip('a:G b:G c:G d'), 'a', 'N')), 'b:G c:G a:N d', 'a grouped tab steps out of its run first')
+eq(show(G.groupTab(strip('a:G b:G c:G d'), 'a', 'N')), 'a:N b:G c:G d', 'a grouped tab at its run\'s edge leaves where it stands')
+eq(show(G.groupTab(strip('a:G b:G c:G d'), 'b', 'N')), 'a:G c:G b:N d', 'from inside a run: just past it, so the run stays whole')
 eq(show(G.groupTab(strip('*a b'), 'a', 'N')), '*a b', 'a pinned tab gets no group')
 eq(show(G.addToGroup(strip('a:G b:G c d'), 'd', 'G')), 'a:G b:G d:G c', 'added: joins the END of the run')
 eq(show(G.addToGroup(strip('a:H b:G c:G'), 'a', 'G')), 'b:G c:G a:G', 'from another group: leaves it and joins the end')
 eq(show(G.addToGroup(strip('*a b:G'), 'a', 'G')), '*a b:G', 'a pinned tab is not added')
-eq(show(G.removeFromGroup(strip('a:G b:G c:G d'), 'a')), 'b:G c:G a d', 'removed: to just after the run, so it stays whole')
-eq(show(G.removeFromGroup(strip('a:G b:G c'), 'b')), 'a:G b c', 'the last member is removed where it stands')
+eq(show(G.removeFromGroup(strip('a:G b:G c:G d'), 'a')), 'a b:G c:G d', 'the first member is let go where it stands')
+eq(show(G.removeFromGroup(strip('a:G b:G c:G d'), 'b')), 'a:G c:G b d', 'one from inside: just past the run, so it stays whole')
+eq(show(G.removeFromGroup(strip('a:G b:G c'), 'b')), 'a:G b c', 'the last member is let go where it stands')
 eq(show(G.ungroup(strip('a:G b:G c:H'), 'G')), 'a b c:H', 'ungroup lets every member go, in place')
 
-// --- drag (moveTab) -------------------------------------------------------------------------
-eq(show(G.moveTab(strip('x a:G b:G y'), 'y', 2)), 'x a:G y:G b:G', 'dropped between two members: joins their group')
-eq(show(G.moveTab(strip('a:G b:G c:G y'), 'a', 2)), 'b:G c:G a:G y', 'moved inside its group: stays')
-eq(show(G.moveTab(strip('a:G b:G x y'), 'b', 3)), 'a:G x y b', 'dragged away from its group: leaves')
-eq(show(G.moveTab(strip('x a:G b:G'), 'x', 2)), 'a:G b:G x', 'past the end of a group: does not join')
-eq(show(G.moveTab(strip('*p *q a b'), 'a', 0)), '*p *q a b', 'an unpinned tab stops at the pinned run')
-eq(show(G.moveTab(strip('*p *q a b'), 'p', 3)), '*q *p a b', 'a pinned tab stays in the pinned run')
+// --- several tabs in one step (Ctrl/Shift+click) -------------------------------------------
+eq(show(G.groupTabs(strip('a b c d e'), ['b', 'd'], 'N')), 'a b:N d:N c e', 'grouped together: gathered where the first stood')
+eq(show(G.groupTabs(strip('a:G b:G c d'), ['b', 'd'], 'N')), 'a:G b:N d:N c', 'one from a group\'s edge: the new group starts there')
+eq(show(G.groupTabs(strip('a:G b:G c:G d'), ['b', 'd'], 'N')), 'a:G c:G b:N d:N', 'one from inside a group: gathered past that run')
+eq(show(G.groupTabs(strip('*p a b'), ['p', 'a', 'b'], 'N')), '*p a:N b:N', 'pinned tabs are left out')
+{
+  const tabs = strip('*p a')
+  eq(G.groupTabs(tabs, ['p'], 'N') === tabs, true, 'only pinned picked: nothing')
+}
+eq(show(G.addTabsToGroup(strip('a b:G c d'), ['a', 'd'], 'G')), 'b:G a:G d:G c', 'added together: the end of the run, in strip order')
+eq(show(G.addTabsToGroup(strip('a:G b c:H'), ['a', 'b', 'c'], 'G')), 'a:G b:G c:G', 'a member already in it stays; the rest join after it')
+eq(show(G.removeTabsFromGroups(strip('a:G b:G c:G d:H e:H'), ['a', 'b', 'd'])), 'a b c:G d e:H', 'let go together, from two groups, order kept')
+eq(show(G.removeTabsFromGroups(strip('a:G b:G c:G d:G'), ['b', 'c'])), 'a:G d:G b c', 'from inside: past the run, in their order')
 {
   const tabs = strip('a b')
-  eq(G.moveTab(tabs, 'a', 0) === tabs, true, 'no move: the same array')
+  eq(G.removeTabsFromGroups(tabs, ['a']) === tabs, true, 'none grouped: the same array')
 }
-// Every drag keeps every group one run
+eq(G.tabRange(strip('a b:F c:F d e'), [group('F', true)], 'a', 'e'), ['a', 'd', 'e'], 'Shift+click: the shown tabs between, a folded group skipped')
+eq(G.tabRange(strip('a b c'), [], 'c', 'a'), ['a', 'b', 'c'], 'either direction, in strip order')
+eq(G.tabRange(strip('a b'), [], 'gone', 'b'), ['b'], 'no anchor: the tab alone')
+
+// --- drag (placeTab) ------------------------------------------------------------------------
 {
-  const base = strip('*p a:G b:G c d:H e:H f')
+  const gs = [group('G'), group('F', true)]
+  const p = (s, id, target) => show(G.placeTab(strip(s), gs, id, target))
+  eq(p('x a:G b:G y', 'y', { kind: 'after', id: 'a' }), 'x a:G y:G b:G', 'beside a member: in its group')
+  eq(p('x a:G b:G y', 'y', { kind: 'after', id: 'b' }), 'x a:G b:G y:G', 'after the LAST member: in the group (the old rule could not)')
+  eq(p('x a:G b:G y', 'x', { kind: 'before', id: 'a' }), 'x:G a:G b:G y', 'before the FIRST member: in the group, after its chip')
+  eq(p('x a:G b:G y', 'x', { kind: 'chipAfter', groupId: 'G' }), 'x:G a:G b:G y', 'after an open group\'s chip: its first member')
+  eq(p('a:G b:G y', 'a', { kind: 'chipBefore', groupId: 'G' }), 'a b:G y', 'before the chip: out of the group, at its front')
+  eq(p('a:G b:G y', 'b', { kind: 'before', id: 'y' }), 'a:G b y', 'before the next ungrouped tab: out, at its back')
+  eq(p('a:G b:G', 'a', { kind: 'end' }), 'b:G a', 'past the last tab: last and ungrouped')
+  eq(p('x a:F b:F y', 'x', { kind: 'chipAfter', groupId: 'F' }), 'a:F b:F x y', 'after a FOLDED group\'s chip: past the group, not into it')
+  eq(p('*p *q a b', 'a', { kind: 'before', id: 'p' }), '*p *q a b', 'an unpinned tab stops at the pinned run')
+  eq(p('*p *q a:G', 'p', { kind: 'after', id: 'a' }), '*q *p a:G', 'a pinned tab stays in the pinned run, ungrouped')
+  {
+    const tabs = strip('a b')
+    eq(G.placeTab(tabs, gs, 'a', { kind: 'before', id: 'b' }) === tabs, true, 'no change: the same array')
+    eq(G.placeTab(tabs, gs, 'a', { kind: 'after', id: 'a' }) === tabs, true, 'over itself: nothing')
+  }
+}
+// Every drag keeps every group one run and the pinned run first
+{
+  const base = strip('*p a:G b:G c d:H e:H f g:F')
+  const gs = [group('G'), group('H'), group('F', true)]
+  const targets = [
+    ...base.flatMap((t) => [{ kind: 'before', id: t.id }, { kind: 'after', id: t.id }]),
+    ...['G', 'H', 'F'].flatMap((g) => [{ kind: 'chipBefore', groupId: g }, { kind: 'chipAfter', groupId: g }]),
+    { kind: 'end' }
+  ]
   let broken = 0
   for (const t of base) {
-    for (let to = 0; to < base.length; to++) {
-      const moved = G.moveTab(base, t.id, to)
-      const n = G.normalizeGroups(moved, [group('G'), group('H')])
-      if (n.tabs !== moved) broken++
+    for (const target of targets) {
+      const moved = G.placeTab(base, gs, t.id, target)
+      if (G.normalizeGroups(moved, gs).tabs !== moved || !moved[0].pinned) broken++
     }
   }
   eq(broken, 0, 'no drag anywhere breaks a run or puts a pinned tab in a group')
