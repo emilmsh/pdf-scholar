@@ -374,21 +374,19 @@ came from.
 
 ![Explain a figure — the region you marked sits in the chat above the answer describing it](docs/screenshots/assistant_figure.png)
 
-### Your notes in Claude Code and other AI tools
+### Your notes in Claude, Codex and other AI tools
 
 The desktop app can let an AI tool on your computer search what you noted across every
 paper: highlights with the words they mark, comments, notes, and your assistant
-conversations with the passages each answer cited. While you write, ask Claude Code what
+conversations with the passages each answer cited. While you write, ask the tool what
 you noted about a method, and it looks it up without opening a PDF.
 
-- **Nothing to download.** The MCP server is part of the desktop app. In the settings
-  menu, "AI tools" has one switch for **Claude** (Claude Code and Claude Desktop) and one
-  for **Codex** (in the ChatGPT desktop app, and the Codex CLI); turning it on writes PDF
-  Scholar into that tool's own settings
-- **opencode, Cursor, VS Code, Gemini CLI** and other MCP tools take one config entry,
-  which "Copy setup" fills in with your paths. Each tool's format is in
-  [docs/MCP.md](docs/MCP.md)
-- **ChatGPT on the web** (and any other chat): "Copy for AI" in the Annotations tab copies the open
+- **Nothing to download.** The MCP server is part of the desktop app. "AI tools" in the
+  settings menu has one switch for **Claude** and one for **Codex**; turning it on writes
+  PDF Scholar into that tool's own settings
+- **Other tools that support MCP** take one config entry, which "Copy setup" fills in
+  with your paths ([docs/MCP.md](docs/MCP.md))
+- **A tool that cannot connect**: "Copy for AI" in the Annotations tab copies the open
   document's notes and conversations as text, ready to paste. This also works in the
   browser extension
 - Read-only: four tools (search, list papers, one paper's notes, one conversation).
