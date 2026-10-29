@@ -137,6 +137,10 @@ try {
       groupNames,
       mcpRows: mcp ? [...mcp.querySelectorAll('.ai-field > span:first-child')].map((s) => s.textContent) : null,
       mcpAfterAccess: !!mcp && mcp.previousElementSibling?.querySelector('select') !== null,
+      mcpSwitch: (() => {
+        const box = mcp?.querySelector('.ai-mcp-switch input')
+        return box ? { checked: box.checked } : null
+      })(),
       hasCompatGroup: !!g,
       presets: g ? [...g.querySelectorAll('select option')].map((o) => o.textContent) : [],
       keyPlaceholder: g?.querySelector('input[type="password"]')?.placeholder ?? '',
@@ -157,14 +161,16 @@ try {
   // the ChatGPT-plan sign-in right under the OpenAI key it is the keyless twin of
   ok(settings.groups === 11, `access group + ten provider groups render (got ${settings.groups})`)
   // The AI tools on this machine (MCP): right under the switch that governs
-  // them, a row per tool and one for the rest — whatever is installed here
+  // them, a row per tool, one for the rest and what is kept out — whatever
+  // is installed here
   ok(
     settings.mcpAfterAccess &&
       settings.mcpRows?.[0] === 'Claude Code' &&
       settings.mcpRows?.[1] === 'Claude Desktop' &&
-      settings.mcpRows?.length === 3,
-    `«AI tools on this computer» sits under AI access with its three rows (got ${JSON.stringify(settings.mcpRows)})`
+      settings.mcpRows?.length === 4,
+    `«AI tools on this computer» sits under AI access with its four rows (got ${JSON.stringify(settings.mcpRows)})`
   )
+  ok(settings.mcpSwitch?.checked === false, `sharing with AI tools is OFF in a fresh profile (got ${JSON.stringify(settings.mcpSwitch)})`)
   ok(
     /KI-tilgang|AI access/.test(settings.groupNames[0] ?? '') &&
       settings.groupNames[1] === 'OpenAI' &&

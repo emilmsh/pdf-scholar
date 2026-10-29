@@ -117,6 +117,11 @@ interface Props {
   onExport(format: ExportFormat): void
   /** «Kopier for KI»: the marks and this document's conversations as text */
   onCopyForAi(): void
+  /** Whether AI tools outside the app are kept from this document (shared/
+   *  mcp.ts): by itself, by its folder, or not. undefined = no switch —
+   *  not the desktop, or sharing is off. */
+  aiToolsKeptOut?: 'doc' | 'folder' | null | undefined
+  onToggleAiToolsKeptOut?: (() => void) | undefined
   /** Open the AI panel with the "summarize my annotations" question */
   onAskAi(): void
   /** Browser/extension only: the open document's display name + source path,
@@ -184,6 +189,8 @@ function Sidebar({
   onToggleBookmarkCollapsed,
   onExport,
   onCopyForAi,
+  aiToolsKeptOut,
+  onToggleAiToolsKeptOut,
   onAskAi,
   docName,
   docPath,
@@ -465,6 +472,8 @@ function Sidebar({
           onDeleteAll={onDeleteAllAnnots}
           onExport={onExport}
           onCopyForAi={onCopyForAi}
+          aiToolsKeptOut={aiToolsKeptOut}
+          onToggleAiToolsKeptOut={onToggleAiToolsKeptOut}
           onAskAi={onAskAi}
           selectedAnnotId={selectedAnnotId}
           onCommentChange={onCommentChange}
@@ -653,6 +662,8 @@ function AnnotationList({
   onDeleteAll,
   onExport,
   onCopyForAi,
+  aiToolsKeptOut,
+  onToggleAiToolsKeptOut,
   onAskAi,
   selectedAnnotId,
   onCommentChange,
@@ -669,6 +680,8 @@ function AnnotationList({
   onDeleteAll(): void
   onExport(format: ExportFormat): void
   onCopyForAi(): void
+  aiToolsKeptOut?: 'doc' | 'folder' | null | undefined
+  onToggleAiToolsKeptOut?: (() => void) | undefined
   onAskAi(): void
   selectedAnnotId: string | null
   onCommentChange(pageNumber: number, localId: string, text: string): void
@@ -837,6 +850,23 @@ function AnnotationList({
             {t('side.copyForAi')}
           </button>
         </div>
+        {/* Only while sharing with AI tools is on: one switch per document,
+            beside the copy that is its other door. A folder kept out holds
+            the switch on — let the folder back in from the settings. */}
+        {aiToolsKeptOut !== undefined && onToggleAiToolsKeptOut && (
+          <label
+            className="theme-menu-toggle annot-ai-keep-out"
+            title={aiToolsKeptOut === 'folder' ? t('side.keptOutByFolder') : t('side.keepOutOfAiTip')}
+          >
+            <input
+              type="checkbox"
+              checked={aiToolsKeptOut !== null}
+              disabled={aiToolsKeptOut === 'folder'}
+              onChange={onToggleAiToolsKeptOut}
+            />
+            {t('side.keepOutOfAi')}
+          </label>
+        )}
         <button className="annot-ask-ai" disabled={empty} onClick={onAskAi} title={t('side.askAiTip')}>
           <span className="annot-ask-ai-glyph">✦</span>
           {t('ai.annotsBtn')}

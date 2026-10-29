@@ -472,7 +472,10 @@ that.)*
   tools take one config entry the app copies for you
   ([`MCP.md`](MCP.md)). They can then search your highlights (with the words
   marked), comments and assistant conversations across every paper — never
-  the PDFs, never images, nothing of a password-protected document. «Copy
+  the PDFs, never images, never where a file lives, nothing of a
+  password-protected document. Sharing is off until you connect a tool, one
+  switch turns it off for all of them, and a document or a whole folder can
+  be kept out. «Copy
   for AI» in the Annotations tab puts one document's notes and conversations
   on the clipboard for ChatGPT or any other chat. *(Nothing to download: the
   server is the desktop app itself — say so, it is the first question. The
@@ -554,8 +557,9 @@ app looks like.)*
 - An AI tool you connect (Claude Code, Claude Desktop, …) reads your notes and
   conversations through a read-only server on your own machine, and what it
   reads goes to that tool's provider under its terms; nothing is shared until
-  you connect one, and AI access **Off** closes this door too *(PRIVACY.md,
-  «AI tools on your computer»)*
+  you connect one, one switch takes it back from every tool at once, a
+  document or folder can be kept out, no file path ever leaves, and AI access
+  **Off** closes this door too *(PRIVACY.md, «AI tools on your computer»)*
 - The key is stored in the platform's own key store; the exact mode differs per
   platform and the settings panel names the one in force. See "Wording we do not
   use" below before writing anything shorter than that

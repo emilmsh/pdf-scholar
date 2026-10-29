@@ -391,8 +391,12 @@ you noted about a method, and it looks it up without opening a PDF.
   document's notes and conversations as text, ready to paste. This also works in the
   browser extension
 - Read-only: four tools (search, list papers, one paper's notes, one conversation).
-  Tools never see the PDFs or images, and nothing from a password-protected document. The
-  notes are kept up to date in the background as you annotate. AI access "Off" closes it
+  Tools never see the PDFs, images, file paths or folder names, and nothing from a
+  password-protected document. The notes are kept up to date in the background as you
+  annotate
+- Off until you connect a tool. One switch, "Share with AI tools", shuts every tool out
+  at once. A document can be kept out from its Annotations tab, and a whole folder (a
+  client's, say) from the settings
 
 ### Shortcuts you can rebind
 

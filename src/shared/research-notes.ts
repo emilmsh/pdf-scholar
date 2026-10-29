@@ -34,9 +34,9 @@ export interface NoteEntry {
   type: AnnotationType
   /** The text the mark covers ('' for a note, a text box or a shape) */
   excerpt: string
-  /** The reader's comment; a text box's own text */
+  /** The reader's comment; a text box's own text. No author: a mark's
+   *  author is a person's name, and nothing here needs it. */
   comment: string
-  author?: string | undefined
   /** '#rrggbb' — a reader's colour code («yellow = method») is meaning too */
   color?: string | undefined
 }
@@ -98,16 +98,8 @@ function sanitizeEntry(e: unknown): NoteEntry | null {
   const excerpt = str(e.excerpt, MAX_EXCERPT)
   const comment = str(e.comment, MAX_COMMENT)
   if (!noteWorthy(e.type, excerpt, comment)) return null
-  const author = str(e.author, 200).trim()
   const color = typeof e.color === 'string' && /^#[0-9a-f]{6}$/.test(e.color) ? e.color : undefined
-  return {
-    page,
-    type: e.type as AnnotationType,
-    excerpt,
-    comment,
-    ...(author ? { author } : {}),
-    ...(color ? { color } : {})
-  }
+  return { page, type: e.type as AnnotationType, excerpt, comment, ...(color ? { color } : {}) }
 }
 
 export function sanitizeDocNotes(input: unknown): DocNotes | null {
@@ -160,7 +152,6 @@ export interface NotesLabels {
   page(n: number): string
   title: string
   doi: string
-  file: string
   pages: string
   annotations(count: number): string
 }
@@ -183,7 +174,6 @@ export const ENGLISH_NOTES_LABELS: NotesLabels = {
   page: (n) => `Page ${n}`,
   title: 'Title',
   doi: 'DOI',
-  file: 'File',
   pages: 'Pages',
   annotations: (count) => `Annotations (${count})`
 }
@@ -196,18 +186,19 @@ export function noteLine(e: NoteEntry, labels: NotesLabels): string {
   if (excerpt) line += `: «${excerpt}»`
   // A comment over several lines stays one list item: its line breaks indent
   if (comment) line += `${excerpt ? ' — ' : ': '}${comment.replace(/\n+/g, '\n  ')}`
-  if (e.author) line += ` *(${e.author})*`
   return line
 }
 
 /** The document's facts as the head of its Markdown: the lines after the
- *  heading. `missing` = the file is no longer where it was. */
-export function docFactsMarkdown(doc: Pick<DocNotes, 'path' | 'title' | 'doi' | 'pages'>, labels: NotesLabels, missing = false): string[] {
+ *  heading. Never its path — a folder's name can be a client's, and nothing
+ *  outside the app needs to know where a file lives (Emil, 2026-10-29) — and
+ *  never who wrote a mark. `id` = the handle an outside tool asks by. */
+export function docFactsMarkdown(doc: Pick<DocNotes, 'title' | 'doi' | 'pages'>, labels: NotesLabels, id?: string): string[] {
   const out: string[] = []
   if (doc.title) out.push(`${labels.title}: ${doc.title}`)
   if (doc.doi) out.push(`${labels.doi}: ${doc.doi}`)
   if (doc.pages) out.push(`${labels.pages}: ${doc.pages}`)
-  out.push(`${labels.file}: \`${doc.path}\`${missing ? ' (missing)' : ''}`)
+  if (id) out.push(`id: ${id}`)
   return out
 }
 
@@ -234,8 +225,8 @@ export interface DocumentMarkdownOptions {
   date(ms: number): string
   /** The citation marker; plainCitationMarker when absent */
   marker?: ((c: AiCitation) => string) | undefined
-  /** The file is no longer where the record says */
-  missing?: boolean | undefined
+  /** The document's id for an outside tool (get_document_notes takes it) */
+  docId?: string | undefined
   /** A conversation's id beside its heading — what an outside tool asks
    *  get_conversation for */
   ids?: boolean | undefined
@@ -253,7 +244,8 @@ export function documentMarkdown(
   conversations: StoredConversation[],
   o: DocumentMarkdownOptions
 ): string {
-  const parts: string[] = [`# ${doc.name}`, docFactsMarkdown(doc, o.notes, o.missing).join('\n')]
+  const facts = docFactsMarkdown(doc, o.notes, o.docId).join('\n')
+  const parts: string[] = [`# ${doc.name}`, ...(facts ? [facts] : [])]
   const notes = notesMarkdown(doc.notes, o.notes)
   if (notes) parts.push(notes)
   if (conversations.length > 0) {

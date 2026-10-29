@@ -14,6 +14,7 @@ app keeps your notes up to date for it in the background.
 - [Claude Code and Claude Desktop: one click](#claude-code-and-claude-desktop)
 - [Codex, opencode, Cursor, VS Code, Gemini CLI: one config entry](#other-tools)
 - [ChatGPT: copy and paste](#chatgpt)
+- [Turning it off, and keeping things out](#turning-it-off-and-keeping-things-out)
 - [What a tool can read](#what-a-tool-can-read) · [Troubleshooting](#troubleshooting)
 
 ## Claude Code and Claude Desktop
@@ -21,12 +22,28 @@ app keeps your notes up to date for it in the background.
 1. In PDF Scholar, open the assistant (**Assistant**, top right) and click
    the model name at the top of the panel, then **API keys & providers**.
    The section is **AI tools on this computer**, just under **AI access**.
-2. Click **Connect** next to Claude Code or Claude Desktop.
+2. Click **Connect** next to Claude Code or Claude Desktop. This also turns on
+   **Share with AI tools**, which is off until you connect something.
 3. For Claude Desktop, restart it. Claude Code picks the server up the next
    time a session starts.
 
 **Disconnect** removes PDF Scholar from that tool's configuration again. The app
 changes nothing in the tool's configuration except its own `pdf-scholar` entry.
+
+## Turning it off, and keeping things out
+
+- **Share with AI tools** (the switch at the top of the section) shuts every
+  tool out at once when turned off, including tools you set up by hand. No
+  tool's configuration is touched, and switching it on again is the same click.
+- **One document:** in the sidebar's **Annotations** tab, **Keep out of AI
+  tools** (shown while sharing is on). One click lets it back in.
+- **A whole folder:** **Keep a folder out …** under **Kept out** in the
+  settings. Everything in it is covered, including files added later. Each
+  kept-out folder and document is listed there with a × to let it back in.
+
+A document kept out gives a tool neither its notes nor its conversations.
+Another conversation that drew on it shows it only as "a conversation", without
+its name.
 
 Claude Code is connected at user scope, so the server is there in every
 project. If PDF Scholar cannot find the `claude` command (it looks in
@@ -54,7 +71,9 @@ common `mcpServers` form, with the real paths of your installation filled in:
 The server is PDF Scholar's own executable running a small script in Node
 mode (`ELECTRON_RUN_AS_NODE=1`). It opens no window and no network port, and
 it does not need PDF Scholar to be open. **Copy setup** also puts the script
-in place, so press it once even if you write the entry by hand.
+in place and turns on **Share with AI tools**, so press it once even if you
+write the entry by hand. A tool set up this way is removed from its own
+configuration by hand. Turning the switch off shuts it out at once.
 
 Where each tool wants the entry:
 
@@ -121,17 +140,20 @@ The server is read-only and offers four tools:
 | Tool | What it answers |
 | --- | --- |
 | `search_notes` | Every highlight, comment, note and AI conversation containing all the words searched for, across all papers, grouped by paper with page numbers |
-| `list_documents` | The papers you have annotated or discussed, newest first, with title, DOI and counts |
-| `get_document_notes` | Everything about one paper: its annotations by page and its conversations in full |
+| `list_documents` | The papers you have annotated or discussed, newest first, with title, DOI, counts and a short id |
+| `get_document_notes` | Everything about one paper, by its id or words from its name: its annotations by page and its conversations in full |
 | `get_conversation` | One conversation, by the id the other tools give |
 
 - **Never the PDFs themselves.** What a tool gets is what you marked, wrote and
   asked, plus the passages the answers cited.
 - **Never images.** Pictures attached to a conversation are mentioned, not sent.
-- **Nothing about a password-protected document**: neither notes nor
-  conversations.
-- **AI access → Off** in PDF Scholar's AI settings makes the server refuse every
-  request, at once.
+- **Never where a file lives.** A document is named by its file name and a short
+  id. No path and no folder name is sent, since a folder can be named after a
+  client. A mark's author is not sent either.
+- **Nothing about a password-protected document or one you kept out**: neither
+  notes nor conversations.
+- **Share with AI tools off**, or **AI access → Off**, makes the server refuse
+  every request, at once.
 - What a tool reads goes to **the AI provider that tool uses**, under that
   tool's terms. That is what connecting it means. See [PRIVACY.md](PRIVACY.md).
 
@@ -145,6 +167,8 @@ the file has been opened in PDF Scholar.
 - **The tool says the server failed to start.** Press **Copy setup** (or
   **Connect**) once in PDF Scholar. That puts the script in place. Then check that
   both paths in the entry exist.
+- **"Sharing with AI tools is switched off in PDF Scholar".** Turn on **Share
+  with AI tools** in the AI settings.
 - **"AI access is switched off in PDF Scholar".** Turn AI access back on in
   PDF Scholar's AI settings.
 - **Claude Desktop shows no PDF Scholar tools.** Restart Claude Desktop after

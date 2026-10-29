@@ -1,12 +1,18 @@
-// «KI-verktøy på maskinen» in the AI settings: Claude Code and Claude Desktop
-// connected to the MCP server with one click each (src/main/mcp-connect.ts),
-// and the entry to paste for any other tool. Desktop only — the bridge
-// answers null on the web and in the extension, and the group is not drawn.
-// Each row works like the ChatGPT sign-in above it: an action that takes
-// effect at once, not a field the Save button commits.
+// «KI-verktøy på maskinen» in the AI settings: the master switch, Claude Code
+// and Claude Desktop connected with one click each (src/main/mcp-connect.ts),
+// the entry to paste for any other tool, and what is kept out (shared/mcp.ts).
+// Desktop only — the bridge answers null on the web and in the extension, and
+// the group is not drawn. Everything here takes effect at once, like the
+// ChatGPT sign-in above it; the Save button commits none of it.
+//
+// Giving and taking back cost the same (Emil, 2026-10-29): «Koble til» and
+// «Koble fra» are the same kind of button in the same place, and the switch
+// shuts every tool out in one click — those set up by hand too, which the
+// app cannot disconnect for the reader.
 import { useEffect, useState } from 'react'
 import type { FileError } from '../../../shared/types'
-import type { McpClientState, McpStatus, McpTarget } from '../../../shared/mcp'
+import type { McpClientState, McpPolicy, McpStatus, McpTarget } from '../../../shared/mcp'
+import { docNameFromPath } from '../../../shared/chat-history'
 import { bridge } from '../bridge'
 import { errorText, t, useLang } from '../i18n'
 
@@ -23,6 +29,7 @@ export function McpSettings(): React.JSX.Element | null {
   useLang()
   /** undefined = still looking; null = no tool can be connected here */
   const [status, setStatus] = useState<McpStatus | null | undefined>(undefined)
+  const [policy, setPolicy] = useState<McpPolicy | null>(null)
   const [busy, setBusy] = useState<McpTarget | null>(null)
   const [error, setError] = useState<FileError | null>(null)
   const [restartNote, setRestartNote] = useState(false)
@@ -30,6 +37,9 @@ export function McpSettings(): React.JSX.Element | null {
 
   useEffect(() => {
     let live = true
+    void bridge.mcpPolicy().then((p) => {
+      if (live) setPolicy(p)
+    })
     void bridge.mcpStatus().then((s) => {
       if (live) setStatus(s)
     })
@@ -39,6 +49,11 @@ export function McpSettings(): React.JSX.Element | null {
   }, [])
 
   if (status === null) return null
+
+  const update = async (patch: Partial<McpPolicy>): Promise<void> => {
+    const next = await bridge.mcpSetPolicy(patch)
+    if (next) setPolicy(next)
+  }
 
   const toggle = async (target: McpTarget, on: boolean): Promise<void> => {
     setError(null)
@@ -50,7 +65,9 @@ export function McpSettings(): React.JSX.Element | null {
       return
     }
     setStatus(result.status)
-    if (target === 'claude-desktop') setRestartNote(true)
+    // Connecting turned the switch on in main; show it
+    setPolicy(await bridge.mcpPolicy())
+    if (target === 'claude-desktop') setRestartNote(on)
   }
 
   /** Copy an entry for a tool set up by hand — after putting the script it
@@ -62,6 +79,7 @@ export function McpSettings(): React.JSX.Element | null {
       setError(ready)
       return
     }
+    setPolicy(await bridge.mcpPolicy())
     navigator.clipboard?.writeText(text).then(
       () => {
         setCopied(what)
@@ -72,23 +90,6 @@ export function McpSettings(): React.JSX.Element | null {
   }
 
   const control = (target: McpTarget, state: McpClientState, s: McpStatus): React.JSX.Element => {
-    if (state === 'connected') {
-      return (
-        <span className="ai-chatgpt-account">
-          {t('mcp.connected')}
-          {' · '}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault()
-              if (!busy) void toggle(target, false)
-            }}
-          >
-            {t('mcp.disconnect')}
-          </a>
-        </span>
-      )
-    }
     if (state === 'absent') {
       return (
         <span className="ai-field-hint">
@@ -112,12 +113,18 @@ export function McpSettings(): React.JSX.Element | null {
         </span>
       )
     }
+    const connected = state === 'connected'
     return (
-      <button className="btn-secondary" disabled={busy !== null} onClick={() => void toggle(target, true)}>
-        {t('mcp.connect')}
-      </button>
+      <span className="ai-mcp-row">
+        {connected && <span className="ai-chatgpt-account">{t('mcp.connected')}</span>}
+        <button className="btn-secondary" disabled={busy !== null} onClick={() => void toggle(target, !connected)}>
+          {connected ? t('mcp.disconnect') : t('mcp.connect')}
+        </button>
+      </span>
     )
   }
+
+  const keptOut = policy ? [...policy.excludedFolders.map((p) => ({ p, folder: true })), ...policy.excludedDocs.map((p) => ({ p, folder: false }))] : []
 
   return (
     <div className="ai-field-group ai-mcp">
@@ -129,6 +136,19 @@ export function McpSettings(): React.JSX.Element | null {
         <p className="ai-field-hint">{t(status.unsupported === 'store' ? 'mcp.store' : 'mcp.noScript')}</p>
       ) : (
         <>
+          {policy && (
+            <>
+              <label className="theme-menu-toggle ai-mcp-switch">
+                <input
+                  type="checkbox"
+                  checked={policy.sharing}
+                  onChange={(e) => void update({ sharing: e.target.checked })}
+                />
+                {t('mcp.sharing')}
+              </label>
+              {!policy.sharing && <p className="ai-field-hint">{t('mcp.sharingOffHint')}</p>}
+            </>
+          )}
           {ROWS.map(({ target, name, key }) => (
             <div className="ai-field" key={target}>
               <span>{name}</span>
@@ -154,6 +174,49 @@ export function McpSettings(): React.JSX.Element | null {
           </div>
           {restartNote && status.claudeDesktop === 'connected' && (
             <p className="ai-field-hint">{t('mcp.restartDesktop')}</p>
+          )}
+          {policy && (
+            <div className="ai-field">
+              <span>{t('mcp.keptOut')}</span>
+              {keptOut.length > 0 && (
+                <ul className="ai-mcp-kept">
+                  {keptOut.map(({ p, folder }) => (
+                    <li key={`${folder ? 'f' : 'd'}:${p}`} title={p}>
+                      <span className="ai-mcp-kept-name">
+                        {folder ? `${docNameFromPath(p)}/` : docNameFromPath(p)}
+                      </span>
+                      <button
+                        className="ai-mcp-kept-remove"
+                        aria-label={t('mcp.letBackIn')}
+                        title={t('mcp.letBackIn')}
+                        onClick={() =>
+                          void update(
+                            folder
+                              ? { excludedFolders: policy.excludedFolders.filter((f) => f !== p) }
+                              : { excludedDocs: policy.excludedDocs.filter((d) => d !== p) }
+                          )
+                        }
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                className="btn-secondary"
+                onClick={() =>
+                  void bridge.mcpPickFolder().then((folder) => {
+                    if (folder && !policy.excludedFolders.includes(folder)) {
+                      void update({ excludedFolders: [...policy.excludedFolders, folder] })
+                    }
+                  })
+                }
+              >
+                {t('mcp.addFolder')}
+              </button>
+              <p className="ai-field-hint">{t('mcp.keptOutHint')}</p>
+            </div>
           )}
         </>
       )}

@@ -12,6 +12,7 @@ import type {
   Settings
 } from '../shared/types'
 import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
+import { DEFAULT_MCP_POLICY, sanitizeMcpPolicy, type McpPolicy } from '../shared/mcp'
 import { normalizeRecents, pinRecent, recordRecent, removeRecent, restoreRecent } from '../shared/recents'
 import { sanitizeSession, type StoredSession } from '../shared/session'
 import { sanitizeFingerprints } from '../shared/doc-identity'
@@ -50,6 +51,11 @@ export interface AppState {
    *  Written by main as the renderers report their strips; read once at
    *  launch. Shape-checked on load like the recents. */
   session?: StoredSession
+  /** What AI tools outside the app may read (shared/mcp.ts): the master
+   *  switch and what is kept out. Its own key, not in `settings` — resetting
+   *  the preferences must not let a document the reader kept out back in.
+   *  The MCP server reads it from this file on every call. */
+  mcp: McpPolicy
 }
 
 const DEFAULT_AI: StoredAiConfig = {
@@ -82,7 +88,8 @@ const DEFAULTS: AppState = {
   fingerprints: {},
   settings: { ...DEFAULT_SETTINGS },
   ai: DEFAULT_AI,
-  modelCatalog: {}
+  modelCatalog: {},
+  mcp: { ...DEFAULT_MCP_POLICY }
 }
 
 export function mergeAiConfig(
@@ -121,7 +128,8 @@ export function getState(): AppState {
       fingerprints: sanitizeFingerprints(parsed.fingerprints),
       session: sanitizeSession(parsed.session),
       settings: mergeSettings(DEFAULTS.settings, parsed.settings ?? {}),
-      ai: mergeAiConfig(DEFAULT_AI, parsed.ai ?? {})
+      ai: mergeAiConfig(DEFAULT_AI, parsed.ai ?? {}),
+      mcp: sanitizeMcpPolicy(parsed.mcp)
     }
   } catch (err) {
     // A file that exists but won't parse holds data (encrypted API keys!)

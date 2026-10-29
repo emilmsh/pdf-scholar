@@ -89,6 +89,7 @@ console.log('\n3. a stored record is untrusted input')
   check('junk and non-notes dropped', doc.notes.length === 3, String(doc.notes.length))
   check('page order, the order within a page kept', doc.notes.map((e) => `${e.page}:${e.type}`).join(',') === '1:note,3:highlight,3:underline')
   check('a colour must be #rrggbb', doc.notes[0].color === undefined && doc.notes[1].color === '#ffd54a')
+  check('a mark’s author is never kept (a person’s name)', doc.notes.every((e) => !('author' in e)))
   check('facts kept', doc.title === 'Minimum Wages and Employment' && doc.doi === '10.1257/aer.90.5.1397' && doc.pages === 22)
   const locked = N.sanitizeDocNotes({ path: '/l.pdf', name: 'l.pdf', locked: true, notes: [entry(1, 'highlight', 'secret')] })
   check('a locked record keeps NO notes', locked.locked === true && locked.notes.length === 0)
@@ -251,11 +252,32 @@ const dataDir = mkdtempSync(join(tmpdir(), 'mcp-data-'))
     { id: 'conv-secret', title: 'Merger', createdAt: 1, updatedAt: 3100, messages: [{ role: 'user', text: 'Summarise the identification of the merger' }] }
   ])
   chat('C:\\Elsewhere\\Only chats.pdf', 'Only chats.pdf', [
-    { id: 'conv-only', title: 'Questions', createdAt: 1, updatedAt: 900, messages: [{ role: 'user', text: 'What does identification mean here?' }] }
+    {
+      id: 'conv-only',
+      title: 'Questions',
+      createdAt: 1,
+      updatedAt: 900,
+      messages: [
+        { role: 'user', text: 'What does identification mean here?' },
+        // An answer that drew on a conversation about a client's report
+        { role: 'assistant', parts: [{ text: 'As in the merger case.', citations: [{ kind: 'conversation', docPath: 'C:\\Clients\\Firma X\\report.pdf', id: 'conv-client', docName: 'report.pdf', title: 'Merger' }] }] }
+      ]
+    }
   ])
+  // A client's folder, and a file beside it whose name merely begins the same
+  await notes.set({ path: 'C:\\Clients\\Firma X\\report.pdf', name: 'report.pdf', updatedAt: 800, notes: [entry(2, 'highlight', 'merger simulation for the client', '')] })
+  chat('C:\\Clients\\Firma X\\report.pdf', 'report.pdf', [
+    { id: 'conv-client', title: 'Merger', createdAt: 1, updatedAt: 850, messages: [{ role: 'user', text: 'Is the merger simulation sound?' }] }
+  ])
+  await notes.set({ path: 'C:\\Clients\\Firma Xtra.pdf', name: 'Firma Xtra.pdf', updatedAt: 700, notes: [entry(1, 'highlight', 'merger guidelines', '')] })
 }
 
-const server = createMcpServer({ dataDir, version: '9.9.9', exists: async (p) => !p.includes('Elsewhere') })
+// Sharing is OFF until a tool is connected; the app writes the switch here
+const setState = (state) => writeFileSync(join(dataDir, 'pdfx-state.json'), JSON.stringify(state))
+setState({ mcp: { sharing: true } })
+const server = createMcpServer({ dataDir, version: '9.9.9', foldCase: true })
+const { docIdOf } = await bundle(src('main/mcp-server.ts'), 'server2.mjs')
+const ID = { ck: docIdOf('C:\\Papers\\Card Krueger 1994.pdf'), ap: docIdOf('C:\\Papers\\Angrist Pischke.pdf'), secret: docIdOf('C:\\Papers\\Secret.pdf') }
 let nextId = 1
 const rpc = (method, params) => server.handle({ jsonrpc: '2.0', id: nextId++, method, ...(params ? { params } : {}) })
 const call = async (name, args) => {
@@ -286,7 +308,7 @@ console.log('\n9. the tools')
   check('list_documents: notes-only, chats-only and both', list.text.includes('Card Krueger 1994.pdf') && list.text.includes('Angrist Pischke.pdf') && list.text.includes('Only chats.pdf'))
   check('…a LOCKED document is not listed at all', !list.text.includes('Secret'))
   check('…newest activity first', list.text.indexOf('Card Krueger') < list.text.indexOf('Angrist') && list.text.indexOf('Angrist') < list.text.indexOf('Only chats'))
-  check('…with its facts', list.text.includes('DOI: 10.1257/aer.90.5.1397') && list.text.includes('2 annotations · 1 conversation'))
+  check('…with its facts and its id', list.text.includes('DOI: 10.1257/aer.90.5.1397') && list.text.includes('2 annotations · 1 conversation') && list.text.includes(`id: ${ID.ck}`))
   check('list_documents filter', (await call('list_documents', { filter: 'angrist' })).text.includes('1 paper'))
 
   const search = await call('search_notes', { query: 'identification' })
@@ -304,28 +326,82 @@ console.log('\n9. the tools')
   check('…its conversation whole, with the cited passage', doc.text.includes('How is the effect identified?') && doc.text.includes('«eastern Pennsylvania as a control group»'))
   check('…NO image data', !doc.text.includes('iVBOR') && doc.text.includes('*Image*'))
   check('…a conversation id to ask for', doc.text.includes('id: conv-ck-1'))
-  check('by exact path', (await call('get_document_notes', { document: 'C:\\Papers\\Angrist Pischke.pdf' })).text.includes('### Page 12'))
+  check('by its id', (await call('get_document_notes', { document: ID.ap })).text.includes('### Page 12'))
   check('by title words', (await call('get_document_notes', { document: 'fast-food industry' })).text.startsWith('# Card Krueger'))
-  check('a missing file says so', (await call('get_document_notes', { document: 'only chats' })).text.includes('(missing)'))
-  check('several matches ask back', (await call('get_document_notes', { document: 'papers' })).text.startsWith('Several papers match'))
-  check('a locked document cannot be fetched', (await call('get_document_notes', { document: 'C:\\Papers\\Secret.pdf' })).text.startsWith('No paper'))
+  check('a path is not a handle (a folder name is not searched either)', (await call('get_document_notes', { document: 'C:\\Papers\\Angrist Pischke.pdf' })).text.startsWith('No paper') && (await call('list_documents', { filter: 'papers' })).text.startsWith('No paper'))
+  check('several matches ask back', (await call('get_document_notes', { document: 'pdf' })).text.startsWith('Several papers match'))
+  check('a locked document cannot be fetched', (await call('get_document_notes', { document: ID.secret })).text.startsWith('No paper'))
   check('nothing matching says so', (await call('get_document_notes', { document: 'nonexistent words' })).text.startsWith('No paper'))
 
   const conv = await call('get_conversation', { id: 'conv-ck-1' })
   check('get_conversation: the paper and the conversation', conv.text.startsWith('# Card Krueger 1994.pdf') && conv.text.includes('By comparing New Jersey'))
   check('get_conversation: a locked document’s is refused', (await call('get_conversation', { id: 'conv-secret' })).text.startsWith('No conversation'))
+
+  // No answer from any tool carries a path or a folder name
+  const all = [
+    list.text,
+    search.text,
+    s2.text,
+    doc.text,
+    conv.text,
+    (await call('get_document_notes', { document: 'only chats' })).text,
+    (await call('search_notes', { query: 'merger' })).text
+  ].join('\n')
+  check('no answer carries a path or a folder name', !/[A-Z]:\\|Papers|Elsewhere|Clients/.test(all), (/.{0,30}([A-Z]:\\|Papers|Elsewhere|Clients).{0,30}/.exec(all) ?? [''])[0])
+}
+
+console.log('\n9b. what is kept out, and the master switch')
+{
+  setState({ mcp: { sharing: true, excludedFolders: ['c:/clients/firma x/'], excludedDocs: ['C:\\Papers\\Angrist Pischke.pdf'] } })
+  const list = await call('list_documents', {})
+  check('a document kept out is not listed', !list.text.includes('Angrist'))
+  check('a folder kept out takes what lies under it (separators and case folded)', !list.text.includes('report.pdf'))
+  check('…but not a file whose name merely begins the same', list.text.includes('Firma Xtra.pdf'))
+  const merger = await call('search_notes', { query: 'merger' })
+  check('search never reaches into a folder kept out', !merger.text.includes('merger simulation') && !merger.text.includes('conv-client') && merger.text.includes('merger guidelines'))
+  check('a document kept out cannot be fetched by id', (await call('get_document_notes', { document: ID.ap })).text.startsWith('No paper'))
+  check('…nor its conversation', (await call('get_conversation', { id: 'conv-client' })).text.startsWith('No conversation'))
+  const citing = await call('get_conversation', { id: 'conv-only' })
+  check('another conversation citing one kept out does not name it', citing.text.includes('As in the merger case. [Conversation]') && !citing.text.includes('report.pdf'))
+  setState({ mcp: { sharing: true } })
+  check('let back in, it is listed again', (await call('list_documents', {})).text.includes('Angrist'))
+  check('…and a citation of it names it again', (await call('get_conversation', { id: 'conv-only' })).text.includes('[Conversation: report.pdf]'))
+
+  setState({ mcp: { sharing: false } })
+  const off = await call('list_documents', {})
+  check('the master switch OFF refuses every tool call', off.isError && /Sharing with AI tools is switched off/.test(off.text))
+  setState({})
+  check('no switch stored at all = off (sharing is never on by default)', (await call('search_notes', { query: 'x' })).isError)
+  setState({ mcp: { sharing: 'yes' } })
+  check('a switch that is not `true` is off', (await call('list_documents', {})).isError)
+  setState({ mcp: { sharing: true } })
 }
 
 console.log('\n10. KI-tilgang «Av» closes this door too')
 {
-  writeFileSync(join(dataDir, 'pdfx-state.json'), JSON.stringify({ ai: { access: 'off' } }))
+  setState({ ai: { access: 'off' }, mcp: { sharing: true } })
   const off = await call('search_notes', { query: 'identification' })
-  check('a tool call is refused while access is off', off.isError && /switched off/.test(off.text) && !off.text.includes('conv-ck-1'))
+  check('a tool call is refused while access is off, even with sharing on', off.isError && /AI access is switched off/.test(off.text) && !off.text.includes('conv-ck-1'))
   check('…tools/list still answers (nothing in it is the reader’s)', (await rpc('tools/list')).result.tools.length === 4)
-  writeFileSync(join(dataDir, 'pdfx-state.json'), JSON.stringify({ ai: { access: 'confirm' } }))
+  setState({ ai: { access: 'confirm' }, mcp: { sharing: true } })
   check('«Bekreft» lets it through (connecting the tool was the go-ahead)', !(await call('list_documents', {})).isError)
   writeFileSync(join(dataDir, 'pdfx-state.json'), '{ broken')
-  check('an unreadable state file is not «off»', !(await call('list_documents', {})).isError)
+  check('an unreadable state file shares nothing', (await call('list_documents', {})).isError)
+  setState({ mcp: { sharing: true } })
+}
+
+console.log('\n10b. the policy as stored')
+{
+  const p = M.sanitizeMcpPolicy({ sharing: 1, excludedDocs: ['/a.pdf', '/a.pdf', 7, '', null], excludedFolders: 'nope' })
+  check('junk sanitizes to sharing off, lists cleaned and deduplicated', p.sharing === false && p.excludedDocs.join() === '/a.pdf' && p.excludedFolders.length === 0)
+  check('not an object → the default (off)', M.sanitizeMcpPolicy('x').sharing === false && M.sanitizeMcpPolicy(null).excludedDocs.length === 0)
+  const pol = { sharing: true, excludedDocs: ['C:\\A\\one.pdf'], excludedFolders: ['C:\\Clients\\'] }
+  check('a document by itself', M.excludedBy('c:/a/ONE.pdf', pol, true) === 'doc' && M.excludedBy('c:/a/ONE.pdf', pol, false) === null)
+  check('under a folder, any depth', M.excludedBy('C:\\Clients\\X\\Y\\z.pdf', pol, true) === 'folder')
+  check('the folder itself, or a sibling sharing its prefix, is not under it', M.excludedBy('C:\\ClientsOld\\z.pdf', pol, true) === null)
+  const added = M.withDocExcluded(pol, 'C:\\B.pdf', true)
+  check('keep a document out, and let it back in', added.excludedDocs.includes('C:\\B.pdf') && !M.withDocExcluded(added, 'C:\\B.pdf', false).excludedDocs.includes('C:\\B.pdf'))
+  check('keeping it out twice lists it once', M.withDocExcluded(added, 'C:\\B.pdf', true).excludedDocs.filter((d) => d === 'C:\\B.pdf').length === 1)
 }
 
 console.log('\n11. connecting a tool: the config merge')
@@ -429,6 +505,7 @@ console.log('\n12. the bundled script over stdio')
   writeFileSync(join(home, 'mcp', 'pdf-scholar-mcp.cjs'), bundled)
   mkdirSync(join(home, 'notes'))
   for (const f of readdirSync(join(dataDir, 'notes'))) writeFileSync(join(home, 'notes', f), readFileSync(join(dataDir, 'notes', f)))
+  writeFileSync(join(home, 'pdfx-state.json'), JSON.stringify({ mcp: { sharing: true } }))
   const own = await talk(process.execPath, [join(home, 'mcp', 'pdf-scholar-mcp.cjs')], {}, conversation)
   check('without --data it reads the folder above its own', own.replies[1]?.result?.content?.[0]?.text.includes('Page 4'), own.err)
 }

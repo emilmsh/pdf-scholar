@@ -1,9 +1,9 @@
 // The notes an outside AI tool reads, end to end in the REAL app (Emil,
 // 2026-10-29): opening a document writes its record into userData/notes
-// without anyone asking — the marks with the words they mark, read off the
-// viewer's own excerpts — and the MCP server script the build ships finds
+// without anyone asking â€” the marks with the words they mark, read off the
+// viewer's own excerpts â€” and the MCP server script the build ships finds
 // them when started the way Claude Code starts it: the app's executable in
-// Node mode. Also the Merknader tab's «Kopier for KI», which carries the same
+// Node mode. Also the Merknader tab's Â«Kopier for KIÂ», which carries the same
 // notes AND the document's conversations to a tool no server can reach.
 //
 // sample.pdf carries one highlight and one sticky note of its own.
@@ -77,7 +77,7 @@ const label = (b) => b.title || b.getAttribute('aria-label') || '';
 `
 
 async function main() {
-  if (!existsSync(MAIN) || !existsSync(SCRIPT)) throw new Error('out/ is missing the app or the MCP script — run npm run build first')
+  if (!existsSync(MAIN) || !existsSync(SCRIPT)) throw new Error('out/ is missing the app or the MCP script â€” run npm run build first')
   const dir = mkdtempSync(join(tmpdir(), 'pdfx-notes-'))
   const DOC = join(dir, 'Notes paper.pdf')
   copyFileSync(SAMPLE, DOC)
@@ -88,7 +88,7 @@ async function main() {
     args: [DOC],
     port: PORT,
     prepareProfile: (p) => {
-      // A conversation about the document, so «Kopier for KI» has one to carry
+      // A conversation about the document, so Â«Kopier for KIÂ» has one to carry
       mkdirSync(join(p, 'chats'))
       writeFileSync(
         join(p, 'chats', `${sha1(DOC)}.json`),
@@ -123,21 +123,25 @@ async function main() {
       (r) => r !== null && r.notes.length > 0,
       'the notes record'
     )
-    check('one record, under the path’s hash, naming the path', record.path === DOC && record.name === 'Notes paper.pdf')
+    check('one record, under the pathâ€™s hash, naming the path', record.path === DOC && record.name === 'Notes paper.pdf')
     check('its page count', record.pages > 0, String(record.pages))
     const hl = record.notes.find((n) => n.type === 'highlight')
     check('the highlight carries the words it marks', !!hl && hl.excerpt.trim().length > 3, hl?.excerpt)
     check('every entry has a page and a colour', record.notes.every((n) => n.page >= 1 && /^#[0-9a-f]{6}$/.test(n.color)))
 
-    console.log('\n2. the shipped server script finds them')
+    console.log('\n2. the shipped server script: off until switched on, then it finds them')
     const word = hl.excerpt.split(/\s+/).find((w) => w.replace(/\W/g, '').length >= 5) ?? hl.excerpt.split(/\s+/)[0]
+    const offAnswer = await ask(process.execPath, {}, app.profile, 'search_notes', { query: word })
+    check('a fresh profile shares nothing (the switch is off by default)', !!offAnswer && /Sharing with AI tools is switched off/.test(offAnswer), offAnswer?.slice(0, 80))
+    check('â€¦and the Merknader tab shows no per-document switch while it is off', await evaluate(send, `return !document.querySelector('.annot-ai-keep-out')`))
+    await evaluate(send, `await window.api.mcpSetPolicy({ sharing: true }); window.dispatchEvent(new Event('focus'))`)
     const viaNode = await ask(process.execPath, {}, app.profile, 'search_notes', { query: word })
-    check(`Node: search_notes finds «${word}» in the paper`, !!viaNode && viaNode.includes('Notes paper.pdf'), viaNode?.slice(0, 120))
+    check(`Node: search_notes finds Â«${word}Â» in the paper`, !!viaNode && viaNode.includes('Notes paper.pdf'), viaNode?.slice(0, 120))
     // How Claude Code and Claude Desktop actually start it
     const viaApp = await ask(electronBinary(ROOT), { ELECTRON_RUN_AS_NODE: '1' }, app.profile, 'get_document_notes', { document: 'notes paper' })
-    check('the app’s executable in Node mode: get_document_notes', !!viaApp && viaApp.includes(`Page ${hl.page}`) && viaApp.includes('Typografi'), viaApp?.slice(0, 120))
+    check('the appâ€™s executable in Node mode: get_document_notes', !!viaApp && viaApp.includes(`Page ${hl.page}`) && viaApp.includes('Typografi'), viaApp?.slice(0, 120))
 
-    console.log('\n3. «Kopier for KI» in the Merknader tab')
+    console.log('\n3. Â«Kopier for KIÂ» in the Merknader tab')
     const copied = await evaluate(
       send,
       `
@@ -156,12 +160,34 @@ async function main() {
       PRELUDE
     )
     check('the button is there', !copied.error, copied.error)
-    check('it copies the paper’s name and its marks by page', !!copied.text && copied.text.startsWith('# Notes paper.pdf') && copied.text.includes(hl.excerpt.replace(/\s+/g, ' ').trim()))
-    check('…and the paper’s conversation', !!copied.text && copied.text.includes('Hva sier den om lesestunder?') && copied.text.includes('Rolige farger hjelper.'))
+    check('it copies the paperâ€™s name and its marks by page', !!copied.text && copied.text.startsWith('# Notes paper.pdf') && copied.text.includes(hl.excerpt.replace(/\s+/g, ' ').trim()))
+    check('â€¦and the paperâ€™s conversation', !!copied.text && copied.text.includes('Hva sier den om lesestunder?') && copied.text.includes('Rolige farger hjelper.'))
+    check('â€¦and no file path', !!copied.text && !copied.text.includes(dir))
+
+    console.log('\n3b. Â«Hold utenfor KI-verktÃ¸yÂ» in the same tab')
+    const keep = await evaluate(
+      send,
+      `
+      const box = document.querySelector('.annot-ai-keep-out input')
+      if (!box) return 'no switch'
+      if (box.checked) return 'already on'
+      box.click(); await settle(600)
+      return 'ok'
+      `,
+      PRELUDE
+    )
+    check('with sharing on, the tab has the switch, off', keep === 'ok', keep)
+    const kept = await ask(process.execPath, {}, app.profile, 'search_notes', { query: word })
+    check('switched on, the server no longer finds the paper', !!kept && !kept.includes('Notes paper.pdf'), kept?.slice(0, 80))
+    const policy = await evaluate(send, `return await window.api.mcpPolicy()`)
+    check('â€¦and the state says so', policy.sharing === true && policy.excludedDocs.includes(DOC))
+    await evaluate(send, `document.querySelector('.annot-ai-keep-out input').click(); await settle(600)`, PRELUDE)
+    const back = await ask(process.execPath, {}, app.profile, 'search_notes', { query: word })
+    check('one click lets it back in', !!back && back.includes('Notes paper.pdf'))
 
     console.log('\n4. a second change rewrites the record')
     const before = readFileSync(file, 'utf-8')
-    // Delete every mark through the tab's own «clear all» — the record must
+    // Delete every mark through the tab's own Â«clear allÂ» â€” the record must
     // follow and go, the file gone with nothing left to keep
     const cleared = await evaluate(
       send,
@@ -179,7 +205,7 @@ async function main() {
     if (cleared !== 'ok') console.log(`SKIP  could not clear the marks from the tab (${cleared})`)
     else {
       await waitFor(() => existsSync(file), (e) => !e, 'the record to go once nothing is noted', 15_000).catch(() => null)
-      check('no marks left → no record', !existsSync(file), existsSync(file) && readFileSync(file, 'utf-8') === before ? 'unchanged' : '')
+      check('no marks left â†’ no record', !existsSync(file), existsSync(file) && readFileSync(file, 'utf-8') === before ? 'unchanged' : '')
     }
   } finally {
     await app.cleanup()

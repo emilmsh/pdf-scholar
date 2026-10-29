@@ -45,14 +45,7 @@ export function buildDocNotes(d: DocNotesInput): DocNotes {
       const excerpt = r.type === 'note' ? '' : (d.excerpts.get(r.id) ?? '')
       const comment = r.contents ?? ''
       if (!noteWorthy(r.type, excerpt, comment)) continue
-      notes.push({
-        page,
-        type: r.type,
-        excerpt,
-        comment,
-        ...(r.author?.trim() ? { author: r.author.trim() } : {}),
-        color: hex(r.color)
-      })
+      notes.push({ page, type: r.type, excerpt, comment, color: hex(r.color) })
     }
   }
   return { ...base, notes }
@@ -74,7 +67,6 @@ function notesLabels(): NotesLabels {
     page: (n) => t('export.page', { page: n }),
     title: t('notes.title'),
     doi: 'DOI',
-    file: t('notes.file'),
     pages: t('notes.pages'),
     annotations: (count) => t('notes.annotations', { count: String(count) })
   }

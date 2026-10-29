@@ -195,6 +195,9 @@ export const webApi: PdfxApi = {
   setDocNotes: async () => {},
   mcpStatus: async () => null,
   mcpConnect: async () => ({ ok: false, code: 'mcp-unsupported', error: 'web' }),
+  mcpPolicy: async () => null,
+  mcpSetPolicy: async () => null,
+  mcpPickFolder: async () => null,
   // `storage` fires in OTHER tabs only, and names no document — the listener
   // refreshes whatever it shows
   onConversationsChanged: (cb) => {

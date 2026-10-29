@@ -21,7 +21,7 @@
 // The Microsoft Store build cannot be run by another program (no execution
 // alias) and its userData is virtualized away from the path the script would
 // name, so it says so instead (`mcp-unsupported`, docs/PLATFORMS.md).
-import { app, ipcMain } from 'electron'
+import { app, dialog, ipcMain, type BrowserWindow } from 'electron'
 import { execFile, spawn } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { copyFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
@@ -35,14 +35,17 @@ import {
   hasServer,
   MCP_KEY,
   mergeServerInto,
+  sanitizeMcpPolicy,
   serverEntry,
   shellQuote,
   type McpClientState,
+  type McpPolicy,
   type McpResult,
   type McpServerEntry,
   type McpStatus,
   type McpTarget
 } from '../shared/mcp'
+import { getState, saveState } from './storage'
 
 const SCRIPT_NAME = 'pdf-scholar-mcp.cjs'
 
@@ -222,11 +225,41 @@ async function connect(target: McpTarget, on: boolean): Promise<McpResult> {
       if (added.code !== 0) return { ok: false, code: 'mcp-client-failed', error: added.out || `exit ${added.code}` }
     }
   }
+  // Connecting IS the go-ahead: the master switch follows it, once the tool
+  // has taken the entry. Disconnecting one tool leaves the switch as it is —
+  // another may still be connected, and the switch is the one place that
+  // shuts them all out.
+  if (on) setPolicy({ sharing: true })
   return { ok: true, status: await status() }
 }
 
-export function registerMcpIpc(): void {
+/** The master switch and what is kept out (shared/mcp.ts) — written to the
+ *  state file at once, since the server reads it from there on every call */
+function setPolicy(patch: Partial<McpPolicy>): McpPolicy {
+  const state = getState()
+  state.mcp = sanitizeMcpPolicy({ ...state.mcp, ...patch })
+  saveState()
+  return state.mcp
+}
+
+export function registerMcpIpc(windowFor: (e?: { sender: Electron.WebContents }) => BrowserWindow | null): void {
   ipcMain.handle('mcp:status', () => status())
+  ipcMain.handle('mcp:policy', () => getState().mcp)
+  ipcMain.handle('mcp:set-policy', (_e, patch: unknown) => {
+    if (!patch || typeof patch !== 'object') return getState().mcp
+    const p = patch as Record<string, unknown>
+    return setPolicy({
+      ...(typeof p.sharing === 'boolean' ? { sharing: p.sharing } : {}),
+      ...(Array.isArray(p.excludedDocs) ? { excludedDocs: p.excludedDocs as string[] } : {}),
+      ...(Array.isArray(p.excludedFolders) ? { excludedFolders: p.excludedFolders as string[] } : {})
+    })
+  })
+  ipcMain.handle('mcp:pick-folder', async (e): Promise<string | null> => {
+    const parent = windowFor(e)
+    const opts = { properties: ['openDirectory' as const] }
+    const result = parent ? await dialog.showOpenDialog(parent, opts) : await dialog.showOpenDialog(opts)
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  })
   ipcMain.handle('mcp:connect', (_e, target: unknown, on: unknown) =>
     target === 'claude-code' || target === 'claude-desktop' || target === 'other'
       ? connect(target, on !== false)

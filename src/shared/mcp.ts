@@ -23,6 +23,68 @@ export function serverEntry(command: string, script: string): McpServerEntry {
   return { command, args: [script], env: { ELECTRON_RUN_AS_NODE: '1' } }
 }
 
+// ---------- What may be shared (Emil, 2026-10-29) ----------
+//
+// One switch over everything, OFF until the reader connects a tool: turning
+// it off shuts every tool out at once — those set up by hand too — without
+// touching any tool's config, and turning it on again is the same click.
+// Then what stays out: single documents, and whole folders (a client's folder
+// once, and every file that lands in it later). Kept in the state file beside
+// the settings, not in them: «Tilbakestill innstillinger» resets preferences,
+// and a document the reader chose to keep out is not a preference.
+
+export interface McpPolicy {
+  /** The master switch; false = the server refuses every tool call */
+  sharing: boolean
+  /** Documents kept out, by path */
+  excludedDocs: string[]
+  /** Folders kept out, with everything under them */
+  excludedFolders: string[]
+}
+
+export const DEFAULT_MCP_POLICY: McpPolicy = { sharing: false, excludedDocs: [], excludedFolders: [] }
+
+const MAX_EXCLUDED_DOCS = 5000
+const MAX_EXCLUDED_FOLDERS = 200
+
+const pathList = (v: unknown, max: number): string[] =>
+  Array.isArray(v)
+    ? [...new Set(v.filter((p): p is string => typeof p === 'string' && p.trim().length > 0 && p.length < 4096))].slice(0, max)
+    : []
+
+/** A stored policy is untrusted input: anything unreadable shares nothing */
+export function sanitizeMcpPolicy(input: unknown): McpPolicy {
+  if (!isObj(input)) return { ...DEFAULT_MCP_POLICY }
+  return {
+    sharing: input.sharing === true,
+    excludedDocs: pathList(input.excludedDocs, MAX_EXCLUDED_DOCS),
+    excludedFolders: pathList(input.excludedFolders, MAX_EXCLUDED_FOLDERS)
+  }
+}
+
+/** A path as compared: one kind of separator, no trailing one, and case
+ *  folded where the file system folds it (Windows, macOS by default) */
+function comparable(path: string, foldCase: boolean): string {
+  const p = path.replace(/[\\/]+/g, '/').replace(/\/$/, '')
+  return foldCase ? p.toLowerCase() : p
+}
+
+/** Why a document is kept out — itself, or a folder it lies under — or null */
+export function excludedBy(path: string, policy: McpPolicy, foldCase: boolean): 'doc' | 'folder' | null {
+  const p = comparable(path, foldCase)
+  if (policy.excludedDocs.some((d) => comparable(d, foldCase) === p)) return 'doc'
+  // A folder covers what lies UNDER it: «C:/a/b» keeps out «C:/a/b/x.pdf»,
+  // never «C:/a/bc.pdf»
+  if (policy.excludedFolders.some((f) => p.startsWith(`${comparable(f, foldCase)}/`))) return 'folder'
+  return null
+}
+
+/** Keep a document out (or let it back in) */
+export function withDocExcluded(policy: McpPolicy, path: string, excluded: boolean): McpPolicy {
+  const rest = policy.excludedDocs.filter((d) => d !== path)
+  return { ...policy, excludedDocs: excluded ? [...rest, path] : rest }
+}
+
 export type McpClientState =
   /** Our server is in the tool's config */
   | 'connected'

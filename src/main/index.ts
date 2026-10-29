@@ -1241,7 +1241,7 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => getState().settings)
 
   registerFileIconIpc(windowFor)
-  registerMcpIpc()
+  registerMcpIpc(windowFor)
 
   ipcMain.handle('app:version', () => app.getVersion())
 
