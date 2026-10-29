@@ -21,7 +21,7 @@ import { bridge } from '../bridge'
 import { errorText, t, useLang } from '../i18n'
 import { runNotesBackfill } from '../notes-backfill'
 
-/** The setup for each tool's own config format (Cursor, opencode, …) */
+/** How to paste the entry into a tool set up by hand */
 const MCP_GUIDE_URL = 'https://github.com/emilmsh/pdf-scholar/blob/master/docs/MCP.md'
 
 const OPEN_EVENT = 'pdfx:ai-tools'
@@ -220,7 +220,7 @@ export default function AiToolsDialog({
           ),
           true
         )}
-        <p className="ai-tools-note">{t('mcp.chatgpt')}</p>
+        <p className="ai-tools-note">{t('mcp.copyHint')}</p>
       </>
     )
   }

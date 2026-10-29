@@ -1,4 +1,4 @@
-# Your notes in Claude Code, Claude Desktop, Codex and other AI tools
+# Your notes in Claude, Codex and other AI tools
 
 PDF Scholar can let an AI tool on your computer search what you have noted
 in your papers: your highlights (with the words they mark), comments, notes
@@ -14,8 +14,8 @@ of the PDF Scholar desktop app (Windows, macOS and Linux), and PDF Scholar
 writes that line for you when you turn a tool on.
 
 - [Turning a tool on: Claude and Codex](#turning-a-tool-on)
-- [Other tools: Cursor, opencode, VS Code, Gemini CLI](#other-tools)
-- [ChatGPT: copy and paste](#chatgpt)
+- [Other tools that support MCP](#other-tools)
+- [A tool that cannot connect: copy and paste](#a-tool-that-cannot-connect)
 - [Turning it off, and keeping things out](#turning-it-off-and-keeping-things-out)
 - [What a tool can read](#what-a-tool-can-read) · [Troubleshooting](#troubleshooting)
 
@@ -28,9 +28,8 @@ writes that line for you when you turn a tool on.
      told through its own `claude mcp add` command, at user scope, so the
      server is there in every project. Claude Desktop's
      `claude_desktop_config.json` gets the entry.
-   - **Codex** covers Codex in the ChatGPT desktop app (the Codex app became
-     part of it in July 2026), the Codex CLI and the VS Code extension. All
-     of them read `~/.codex/config.toml`.
+   - **Codex** covers the Codex CLI and Codex in the ChatGPT desktop app,
+     which both read `~/.codex/config.toml`.
 3. Start a new session in the tool. Claude Desktop needs a restart.
 
 PDF Scholar changes nothing in a tool's configuration except its own
@@ -93,38 +92,12 @@ it does not need PDF Scholar to be open. A tool set up by hand is removed from
 its own configuration by hand, but turning **Other tools** off shuts it out at
 once.
 
-Where each tool wants the entry:
+Where the entry goes, and in what shape, is up to each tool. Look in its own
+documentation for how it adds an MCP server. Many take the `mcpServers` block
+above as it is; a tool with a form of its own needs the same three things:
+the command, the arguments and the environment variable.
 
-| Tool | Where | Shape |
-| --- | --- | --- |
-| **Cursor** | `~/.cursor/mcp.json` | the `mcpServers` block above, as is |
-| **Gemini CLI** | `~/.gemini/settings.json` | the `mcpServers` block above, as is |
-| **Windsurf** | `~/.codeium/windsurf/mcp_config.json` | the `mcpServers` block above, as is |
-| **VS Code** (Copilot) | `MCP: Open User Configuration` | `"servers"` instead of `"mcpServers"`, and `"type": "stdio"` in the entry |
-| **opencode** | `~/.config/opencode/opencode.json` | its own `mcp` block, below |
-
-**opencode** (`~/.config/opencode/opencode.json`):
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "pdf-scholar": {
-      "type": "local",
-      "command": [
-        "C:\\Users\\you\\AppData\\Local\\Programs\\PDF Scholar\\PDF Scholar.exe",
-        "C:\\Users\\you\\AppData\\Roaming\\PDF Scholar\\mcp\\pdf-scholar-mcp.cjs",
-        "--client",
-        "other"
-      ],
-      "environment": { "ELECTRON_RUN_AS_NODE": "1" },
-      "enabled": true
-    }
-  }
-}
-```
-
-Take the two paths from **Copy setup**. For reference, they are:
+The paths in the entry, for reference:
 
 | Installation | Executable | Script |
 | --- | --- | --- |
@@ -134,16 +107,13 @@ Take the two paths from **Copy setup**. For reference, they are:
 | Linux, AppImage | the `.AppImage` file itself | `~/.config/PDF Scholar/mcp/pdf-scholar-mcp.cjs` |
 | Linux, .deb | `/opt/PDF Scholar/pdf-scholar` | `~/.config/PDF Scholar/mcp/pdf-scholar-mcp.cjs` |
 
-## ChatGPT
+## A tool that cannot connect
 
-In the **ChatGPT desktop app**, Codex is the part that can read your notes.
-Turn on the **Codex** switch and use Codex in the app. ChatGPT on the web
-(chatgpt.com) connects only to MCP servers on the internet, not to a program on
-your own computer. There, use **Copy for AI** instead. It is in the
-**Annotations** tab of the sidebar, under the export buttons. It copies the
-open document's highlights, comments and AI conversations as text, ready to
-paste into ChatGPT or any other chat. This also works in the browser
-extension.
+A chat in the browser cannot start a program on your computer, and neither
+can a tool that does not support MCP. Use **Copy for AI** instead. It is in
+the **Annotations** tab of the sidebar, under the export buttons. It copies
+the open document's highlights, comments and AI conversations as text, ready
+to paste into any chat. This also works in the browser extension.
 
 ## What a tool can read
 
