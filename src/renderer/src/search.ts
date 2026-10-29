@@ -103,7 +103,10 @@ export function dedupeTextContent(content: TextContent): TextContent {
     const t = item.transform as number[]
     const size = Math.hypot(t[0], t[1])
     const near = Math.min(SAME_PLACE_PT, size * 0.1)
-    const earlier = kept.get(item.str)
+    // A trailing blank does not make it another text: the AEA's footnote
+    // markers are drawn as «2» and then «2 », which read as «22»
+    const key = item.str.trimEnd() || item.str
+    const earlier = kept.get(key)
     let same = -1
     if (earlier) {
       for (const idx of earlier) {
@@ -125,11 +128,16 @@ export function dedupeTextContent(content: TextContent): TextContent {
     }
     if (same >= 0) {
       dropped = true
-      if (item.hasEOL && !(out[same] as typeof item).hasEOL) out[same] = { ...(out[same] as typeof item), hasEOL: true }
+      const prev = out[same] as typeof item
+      // The copy that carries the blank is kept, so the word after it does
+      // not run on; either one's line end stays
+      const keep = item.str.length > prev.str.length ? item : prev
+      const eol = !!(item.hasEOL || prev.hasEOL)
+      if (keep !== prev || eol !== prev.hasEOL) out[same] = { ...keep, hasEOL: eol }
       continue
     }
     if (earlier) earlier.push(out.length)
-    else kept.set(item.str, [out.length])
+    else kept.set(key, [out.length])
     out.push(item)
   }
   return dropped ? { ...content, items: out } : content

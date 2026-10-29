@@ -30,6 +30,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { OPS } from 'pdfjs-dist'
 import type { PageViewport, PDFDocumentProxy } from 'pdfjs-dist'
 import { useEdgeFade } from '../edge-fade'
+import { dedupeTextContent } from '../search'
 import { pageImageRects, pagePathRects } from '../image-regions'
 import type { OpsTable } from '../image-regions'
 import { useDismissable } from '../useDismissable'
@@ -59,6 +60,7 @@ import {
   footnoteLines,
   groupDests,
   inFootnotes,
+  footnoteByMarker,
   LINK_RECORDS,
   linkKind,
   linkKindFromText,
@@ -344,7 +346,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     if (!resolved || mine !== seq.current) return
     // A destination whose name says nothing: the link's own words («Table 1»)
     // may, and then the table is cut out like a named one
-    const target =
+    let target =
       resolved.kind === 'other' ? { ...resolved, kind: linkKindFromText(linkText(anchor)) ?? 'other' } : resolved
     if (target.kind === 'citation' && target.y !== null && target.name) {
       const card = await citationCard(anchor, rec, target).catch(() => null)
@@ -424,7 +426,11 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     // window a keyhole with a sideways bar (Emil, 2026-10-13)
     const base = dstPage?.getViewport({ scale: 1, rotation: (dstPage.rotate + rec.rotation) % 360 })
     if (dstPage && base) {
-      const content = await dstPage.getTextContent().catch(() => null)
+      // Read once, like the text layer: Atypon's PDFs draw every line twice
+      const content = await dstPage
+        .getTextContent()
+        .then(dedupeTextContent)
+        .catch(() => null)
       const pageWidth = (dstPage.view[2] ?? 612) - (dstPage.view[0] ?? 0)
       const pageHeight = (dstPage.view[3] ?? 792) - (dstPage.view[1] ?? 0)
       const lines = content ? textLines(content.items) : []
@@ -449,6 +455,16 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
         scale = previewScale(columnPx, box.w, columnPx + 24 > box.w ? 0.75 : 1)
         // A two-column page: the window is one column wide, not two
         if (twoColumn) box.w = Math.max(200, Math.min(box.w, Math.ceil(columnPx * scale) + 36))
+      }
+      // A raised marker whose destination lands in the body of its own page:
+      // the destination does not say (the AEA journals point every footnote
+      // link at the same height), the footnote opening on the marker does. A
+      // destination already among the footnotes keeps its word.
+      if (content && target.kind === 'other' && base.rotation % 180 === 0 && target.pageIndex === pageOf(anchor)) {
+        const marker = raisedMarker(anchor)
+        const lost = target.y === null || !inFootnotes(lines, { x: target.x, y: target.y }, pageWidth)
+        const at = marker && lost ? footnoteByMarker(lines, marker, pageWidth) : null
+        if (at) target = { ...target, kind: 'footnote', x: at.x, y: at.y, siblings: at.siblings }
       }
       if (target.kind === 'citation' && target.y !== null) {
         const siblings = await familySiblings(rec.pdf, target, dstPage)
@@ -1309,7 +1325,7 @@ async function targetBox(
   const ops = OPS as unknown as OpsTable
   if (target.kind === 'footnote' || (target.kind === 'other' && inFootnotes(lines, dest, f.w))) {
     const [siblings, rules] = await Promise.all([
-      target.name ? familySiblings(pdf, target, page) : Promise.resolve([]),
+      target.name ? familySiblings(pdf, target, page) : Promise.resolve(target.siblings ?? []),
       pagePathRects(page, ops)
     ])
     const own = footnoteLines(lines, dest, siblings.map(f.point), f.w)
@@ -1387,4 +1403,37 @@ function linkText(anchor: HTMLElement): string {
     }
   }
   return out
+}
+
+/** The page an anchor sits on, 0-based (its .pdf-page's data-page is 1-based) */
+function pageOf(anchor: HTMLElement): number {
+  return Number(anchor.closest('.pdf-page')?.getAttribute('data-page') ?? 0) - 1
+}
+
+/** A footnote marker the link sits on: a number or a dagger, alone under the
+ *  link and set smaller than the words on its line — what keeps an equation's
+ *  «(3)» or a «Section 2» off the footnotes. Null for anything else. */
+function raisedMarker(anchor: HTMLElement): string | null {
+  const marker = linkText(anchor).trim()
+  if (!/^(\d{1,3}|[*†‡§¶]{1,3})$/.test(marker)) return null
+  const page = anchor.closest('.pdf-page')
+  if (!page) return null
+  const box = anchor.getBoundingClientRect()
+  const midY = (box.top + box.bottom) / 2
+  let own = 0
+  const others: number[] = []
+  for (const span of page.querySelectorAll<HTMLElement>('.text-host .textLayer > span')) {
+    const r = span.getBoundingClientRect()
+    if (r.width === 0 || midY < r.top - 4 || midY > r.bottom + 4) continue
+    // Under the link by most of the narrower one: the word before a marker
+    // often ends a hair inside the link's box
+    const overlap = Math.min(r.right, box.right) - Math.max(r.left, box.left)
+    const under = overlap > Math.min(r.width, box.width) * 0.5
+    if (under) own = Math.max(own, r.height)
+    else if (/\p{L}/u.test(span.textContent ?? '')) others.push(r.height)
+  }
+  if (!own || !others.length) return null
+  others.sort((a, b) => a - b)
+  const median = others[Math.floor(others.length / 2)]!
+  return own < median * 0.85 ? marker : null
 }
