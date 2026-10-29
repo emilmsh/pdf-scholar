@@ -108,8 +108,14 @@ const ui = {
     pages.dispatchEvent(new MouseEvent('mouseup', {
       bubbles: true, button: 0, clientX: Math.round(r.right), clientY: Math.round(r.bottom)
     }));
-    await settle(400);
-    const menu = document.querySelector('.selection-menu');
+    // Poll for the menu instead of one fixed sleep: it opens a tick after the
+    // mouseup and paints on the next frame, which on a loaded machine (or a
+    // window busy re-reading the other one's mark) can run past any guess
+    let menu = null;
+    for (const deadline = Date.now() + 3000; !menu && Date.now() < deadline; ) {
+      await settle(50);
+      menu = document.querySelector('.selection-menu');
+    }
     if (!menu) {
       throw new Error('selection menu did not open (selection ' +
         JSON.stringify(sel.toString().slice(0, 30)) + ', span connected=' + span.isConnected + ')');
