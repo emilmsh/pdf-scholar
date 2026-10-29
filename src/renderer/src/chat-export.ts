@@ -3,96 +3,38 @@
 // citation chips become inline "[s. 6]" markers (web sources become links),
 // resolved through the same citationPage the rendered chips use. Renderer-only
 // by design, like chat-store: works identically in Electron, dev:web and the
-// extension.
-import type { AiCitation, AiContentPart } from '../../shared/types'
+// extension. The turns themselves are written by shared/chat-markdown.ts,
+// which the MCP server in main shares; this file supplies the words.
+import type { AiCitation } from '../../shared/types'
 import type { AiDocument } from './ai'
 import { citationPage } from './ai'
 import type { ChatMessage } from './chat-store'
 import type { ConversationDoc } from '../../shared/chat-history'
+import type { ChatMarkdownLabels } from '../../shared/chat-markdown'
+import { messagesMarkdown as sharedMessages, plainCitationMarker } from '../../shared/chat-markdown'
 import { errorText, locale, t } from './i18n'
 
-function citationMarker(citation: AiCitation, doc: AiDocument | null): string {
-  if (citation.kind === 'web') {
-    let host = ''
-    try {
-      host = new URL(citation.url).hostname.replace(/^www\./, '')
-    } catch {
-      /* malformed URL — fall back to the generic label */
-    }
-    return `[${host || t('ai.sourceChip')}](${citation.url})`
+/** The labels in the interface's language — read per call, so a language
+ *  switch is followed */
+export function chatLabels(): ChatMarkdownLabels {
+  return {
+    you: t('ai.exportYou'),
+    assistant: t('ai.exportAssistant'),
+    imageAlt: t('ai.imageAlt'),
+    imagesWithheld: (count) => t('ai.imagesWithheld', { count: String(count) }),
+    passages: t('ai.exportPassages'),
+    passage: (marker, text) => t('ai.exportPassage', { marker, text }),
+    sourceChip: t('ai.sourceChip'),
+    conversationChip: t('ai.conversationChip'),
+    pageAbbrev: t('app.pageAbbrev'),
+    failed: (m) => errorText({ error: m.error ?? '', code: m.errorCode })
   }
-  if (citation.kind === 'conversation') {
-    return `[${t('ai.conversationChip')}: ${citation.docName || citation.title}]`
-  }
-  const page = citationPage(citation, doc)
-  return page !== null ? `[${t('app.pageAbbrev')} ${page}]` : `[${t('ai.sourceChip')}]`
-}
-
-function assistantMarkdown(parts: AiContentPart[], doc: AiDocument | null): string {
-  // Same merge as AssistantBody: each part's citations are glued to the end
-  // of the sentence that carries them, before the part's trailing whitespace.
-  let md = ''
-  for (const part of parts) {
-    const trailing = /\s*$/.exec(part.text)?.[0] ?? ''
-    md += trailing ? part.text.slice(0, part.text.length - trailing.length) : part.text
-    const seen = new Set<string>()
-    for (const c of part.citations) {
-      const marker = citationMarker(c, doc)
-      if (seen.has(marker)) continue // two chips, same page — one marker reads better
-      seen.add(marker)
-      md += ` ${marker}`
-    }
-    md += trailing
-  }
-  return md.trim()
-}
-
-/** Longest passage the list shows; a model may quote a whole paragraph */
-const PASSAGE_MAX = 600
-
-/** The passages an answer cites, word for word, listed under it. A «[s. 6]»
- *  alone sends the reader back to the PDF to learn what the sentence stood
- *  on, and an export is read without the PDF (issue #46). Each line opens
- *  with the marker the text carries, so the two can be matched; web sources
- *  and conversations are a link and a name already, with no passage to show. */
-function passagesMarkdown(parts: AiContentPart[], doc: AiDocument | null): string {
-  const seen = new Set<string>()
-  const lines: string[] = []
-  for (const part of parts) {
-    for (const c of part.citations) {
-      if (c.kind !== 'quote' && c.kind !== 'char') continue
-      const text = (c.kind === 'quote' ? c.quote : c.citedText).replace(/\s+/g, ' ').trim()
-      if (!text) continue
-      const marker = citationMarker(c, doc)
-      const key = `${marker}\n${text}`
-      if (seen.has(key)) continue
-      seen.add(key)
-      const shown = text.length > PASSAGE_MAX ? `${text.slice(0, PASSAGE_MAX).trimEnd()} …` : text
-      lines.push(`- ${t('ai.exportPassage', { marker, text: shown })}`)
-    }
-  }
-  return lines.length ? `*${t('ai.exportPassages')}*\n\n${lines.join('\n')}` : ''
 }
 
 /** One conversation's turns, as the copy button and the library export share them */
-function messagesMarkdown(messages: ChatMessage[], doc: AiDocument | null): string[] {
-  const out: string[] = []
-  for (const m of messages) {
-    if (m.role === 'user') {
-      const lines = [`**${t('ai.exportYou')}:**`]
-      lines.push(...(m.images ?? []).map(() => `*${t('ai.imageAlt')}*`))
-      if (m.imagesWithheld) lines.push(`*${t('ai.imagesWithheld', { count: String(m.imagesWithheld) })}*`)
-      lines.push((m.display ?? m.text).trim())
-      out.push(lines.join('\n\n'))
-    } else {
-      const body = m.error
-        ? `*${errorText({ error: m.error, code: m.errorCode })}*`
-        : assistantMarkdown(m.parts, doc)
-      const passages = m.error ? '' : passagesMarkdown(m.parts, doc)
-      out.push(`**${t('ai.exportAssistant')}:**\n\n${body}${passages ? `\n\n${passages}` : ''}`)
-    }
-  }
-  return out
+export function messagesMarkdown(messages: ChatMessage[], doc: AiDocument | null): string[] {
+  const labels = chatLabels()
+  return sharedMessages(messages, labels, (c: AiCitation) => plainCitationMarker(c, labels, citationPage(c, doc)))
 }
 
 export function conversationMarkdown(

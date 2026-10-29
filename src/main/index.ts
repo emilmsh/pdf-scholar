@@ -102,6 +102,9 @@ import { createChatHistoryStore } from './chat-history'
 import type { StoredConversation } from '../shared/chat-history'
 import { sanitizeConversations, searchConversations, toMeta, withoutImages } from '../shared/chat-history'
 import { rebindIdentity, validFingerprint } from '../shared/doc-identity'
+import { createNotesStore } from './notes-store'
+import { sanitizeDocNotes } from '../shared/research-notes'
+import { refreshMcpScriptAtStartup, registerMcpIpc } from './mcp-connect'
 
 // The portable zip keeps its state beside the exe. Before ANY path is read —
 // the migration below, the single-instance lock, the state file, drafts.
@@ -436,6 +439,9 @@ if (!gotLock) {
     // The installer rewrites the .pdf DefaultIcon on every upgrade — put a
     // non-default choice back (compares first, so a quiet start stays quiet)
     reapplyFileIconAtStartup()
+    // A connected AI tool runs the MCP script from userData — keep it the
+    // version of the app that is running
+    refreshMcpScriptAtStartup()
     // The last session's windows (issue #29). The extra windows open first so
     // the one holding a file from the command line ends up in front.
     const plan = await sessionRestorePlan().catch((err) => {
@@ -1235,6 +1241,7 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => getState().settings)
 
   registerFileIconIpc(windowFor)
+  registerMcpIpc(windowFor)
 
   ipcMain.handle('app:version', () => app.getVersion())
 
@@ -1308,6 +1315,19 @@ function registerIpc(): void {
     searchConversations(await chats.list(), typeof query === 'string' ? query.slice(0, 500) : '')
   )
 
+  // Each document's notes, written by the viewer once its marks settle
+  // (shared/research-notes.ts) — what the MCP server reads besides the
+  // conversations. A document unlocked this session is recorded as locked
+  // whatever the renderer sent: its words do not go on disk in the clear.
+  const notes = createNotesStore(join(app.getPath('userData'), 'notes'))
+  ipcMain.handle('notes:set', async (_e, record: unknown): Promise<void> => {
+    const doc = sanitizeDocNotes(record)
+    // An attachment opened from a filing is our own temp copy — its notes
+    // would name a file the reader never kept
+    if (!doc || doc.path.startsWith(attachmentTempRoot())) return
+    await notes.set(passwordFor(doc.path) !== undefined ? { ...doc, locked: true, notes: [] } : doc)
+  })
+
   // A document's identity across a move (issue #46; shared/doc-identity.ts):
   // the renderer reports the /ID[0] it read from the bytes, main records it
   // and carries over the records of any other path with the same fingerprint
@@ -1350,6 +1370,9 @@ function registerIpc(): void {
       })
       state.fingerprints = result.map
       saveState()
+      // The notes are the file's own marks, which the viewer writes again
+      // under the new path — the old path's record only names a file gone
+      for (const from of result.from) await notes.remove(from)
       if (result.from.length > 0) {
         for (const w of BrowserWindow.getAllWindows()) {
           if (!w.isDestroyed() && !w.webContents.isDestroyed()) w.webContents.send('chats:changed', path)
@@ -1406,6 +1429,7 @@ function registerIpc(): void {
     for (const p of paths) {
       if (typeof p !== 'string' || !p) continue
       await chats.set(p, '', [])
+      await notes.remove(p)
       delete state.positions[p]
       delete state.fingerprints[p]
       if (p in state.bookmarks) setBookmarks(p, [])

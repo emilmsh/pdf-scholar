@@ -17,6 +17,7 @@ import type {
   ZoteroErrorCode
 } from '../../shared/types'
 import type { FileIconErrorCode } from '../../shared/file-icon'
+import type { McpErrorCode } from '../../shared/mcp'
 
 export type Lang = 'nb' | 'en' | 'zh'
 /** User's choice — 'auto' follows the OS/browser language */
@@ -442,6 +443,47 @@ const nb = {
   'iconerr.file-icon-not-square': 'Bildet må være kvadratisk – like bredt som høyt.',
   'iconerr.file-icon-too-small': 'Bildet må være minst 48 × 48 px; 256 × 256 anbefales.',
   'iconerr.file-icon-registry': 'Windows avviste endringen av filikonet.',
+  // AI tools on this machine (MCP, shared/mcp.ts) — the AI settings' own
+  // group, and the Merknader tab's «Kopier for KI»
+  'mcp.title': 'KI-verktøy på maskinen',
+  'mcp.hint':
+    'Lar Claude Code og Claude Desktop søke i markeringene, kommentarene og KI-samtalene dine – aldri i selve PDF-ene, og aldri i passordbeskyttede dokumenter. Det verktøyet leser, går til leverandøren det bruker. Når KI-tilgang er «Av», deles ingenting.',
+  'mcp.sharing': 'Del med KI-verktøy',
+  'mcp.sharingOffHint': 'Av: ingen verktøy får lese noe, heller ikke de som er koblet til.',
+  'mcp.keptOut': 'Holdes utenfor',
+  'mcp.addFolder': 'Hold en mappe utenfor …',
+  'mcp.keptOutHint':
+    'Alt i en mappe du legger til her, også filer som kommer senere. Enkeltdokumenter holdes utenfor fra Merknader-fanen.',
+  'mcp.letBackIn': 'Ta inn igjen',
+  'side.keepOutOfAi': 'Hold utenfor KI-verktøy',
+  'side.keepOutOfAiTip': 'Claude Code og andre tilkoblede verktøy får ikke se notatene eller samtalene om dette dokumentet',
+  'side.keptOutByFolder': 'Mappen dokumentet ligger i holdes utenfor – ta den inn igjen i KI-innstillingene',
+  'mcp.connect': 'Koble til',
+  'mcp.disconnect': 'Koble fra',
+  'mcp.connected': 'Tilkoblet',
+  'mcp.absent': 'Ikke installert',
+  'mcp.checking': 'Ser etter verktøy …',
+  'mcp.restartDesktop': 'Start Claude Desktop på nytt for å ta det i bruk.',
+  'mcp.other': 'Andre verktøy (Codex, Cursor …)',
+  'mcp.copyConfig': 'Kopier oppsett',
+  'mcp.copyCommand': 'Kopier kommando',
+  'mcp.guide': 'Oppsett for Codex, opencode, Cursor og andre',
+  'mcp.copied': 'Kopiert',
+  'mcp.store': 'Microsoft Store-utgaven kan ikke kobles til KI-verktøy. Installasjonsprogrammet fra nettsiden kan.',
+  'mcp.noScript': 'MCP-skriptet er ikke bygget (npm run build:mcp).',
+  'mcperr.mcp-unsupported': 'Denne utgaven av appen kan ikke kobles til KI-verktøy.',
+  'mcperr.mcp-client-missing': 'Fant ikke verktøyet på denne maskinen.',
+  'mcperr.mcp-config-unreadable': 'Verktøyets innstillingsfil kunne ikke leses, så den ble ikke endret.',
+  'mcperr.mcp-client-failed': 'Verktøyet avviste tilkoblingen.',
+  'side.copyForAi': 'Kopier for KI',
+  'side.copyForAiTip':
+    'Kopierer markeringene, kommentarene og KI-samtalene om dokumentet som tekst – til å lime inn i ChatGPT eller et annet verktøy',
+  'viewer.copiedForAi': 'Notatene er kopiert',
+  'viewer.nothingToCopy': 'Ingen markeringer eller samtaler å kopiere',
+  'notes.title': 'Tittel',
+  'notes.pages': 'Sider',
+  'notes.annotations': 'Markeringer og kommentarer ({count})',
+  'notes.conversations': 'KI-samtaler ({count})',
   'settings.tabIcon': 'Ikon på fanen',
   'settings.tabIconTip': 'Ikonet nettleseren viser på fanen et dokument er åpent i.',
   'settings.tabIconCustomTip':
@@ -1676,6 +1718,45 @@ const en: Dict = {
   'iconerr.file-icon-not-square': 'The image must be square — as wide as it is tall.',
   'iconerr.file-icon-too-small': 'The image must be at least 48 × 48 px; 256 × 256 is recommended.',
   'iconerr.file-icon-registry': 'Windows refused the file icon change.',
+  'mcp.title': 'AI tools on this computer',
+  'mcp.hint':
+    'Lets Claude Code and Claude Desktop search your highlights, comments and AI conversations — never the PDFs themselves, and never password-protected documents. What the tool reads goes to the provider it uses. With AI access off, nothing is shared.',
+  'mcp.sharing': 'Share with AI tools',
+  'mcp.sharingOffHint': 'Off: no tool can read anything, not even connected ones.',
+  'mcp.keptOut': 'Kept out',
+  'mcp.addFolder': 'Keep a folder out …',
+  'mcp.keptOutHint':
+    'Everything in a folder added here, including files added later. Single documents are kept out from the Annotations tab.',
+  'mcp.letBackIn': 'Let back in',
+  'side.keepOutOfAi': 'Keep out of AI tools',
+  'side.keepOutOfAiTip': "Claude Code and other connected tools don't see this document's notes or conversations",
+  'side.keptOutByFolder': 'The folder this document is in is kept out — let it back in from the AI settings',
+  'mcp.connect': 'Connect',
+  'mcp.disconnect': 'Disconnect',
+  'mcp.connected': 'Connected',
+  'mcp.absent': 'Not installed',
+  'mcp.checking': 'Looking for tools …',
+  'mcp.restartDesktop': 'Restart Claude Desktop to use it.',
+  'mcp.other': 'Other tools (Codex, Cursor …)',
+  'mcp.copyConfig': 'Copy setup',
+  'mcp.copyCommand': 'Copy command',
+  'mcp.guide': 'Setup for Codex, opencode, Cursor and others',
+  'mcp.copied': 'Copied',
+  'mcp.store': 'The Microsoft Store edition cannot be connected to AI tools. The installer from the website can.',
+  'mcp.noScript': 'The MCP script is not built (npm run build:mcp).',
+  'mcperr.mcp-unsupported': 'This edition of the app cannot be connected to AI tools.',
+  'mcperr.mcp-client-missing': 'The tool was not found on this computer.',
+  'mcperr.mcp-config-unreadable': "The tool's settings file could not be read, so it was left as it was.",
+  'mcperr.mcp-client-failed': 'The tool refused the connection.',
+  'side.copyForAi': 'Copy for AI',
+  'side.copyForAiTip':
+    "Copies the document's highlights, comments and AI conversations as text — to paste into ChatGPT or another tool",
+  'viewer.copiedForAi': 'Notes copied',
+  'viewer.nothingToCopy': 'No annotations or conversations to copy',
+  'notes.title': 'Title',
+  'notes.pages': 'Pages',
+  'notes.annotations': 'Annotations ({count})',
+  'notes.conversations': 'AI conversations ({count})',
   'settings.tabIcon': 'Tab icon',
   'settings.tabIconTip': 'The icon the browser shows on the tab a document is open in.',
   'settings.tabIconCustomTip':
@@ -2551,6 +2632,7 @@ export function errorText(e: FileError): string {
   if (isAbstractErrorCode(e.code)) return t(`abserr.${e.code}`)
   if (isAttachmentErrorCode(e.code)) return t(`atterr.${e.code}`)
   if (isFileIconErrorCode(e.code)) return t(`iconerr.${e.code}`)
+  if (isMcpErrorCode(e.code)) return t(`mcperr.${e.code}`)
   return t(`engine.${e.code}`)
 }
 
@@ -2596,6 +2678,8 @@ const isAiErrorCode = (code: NonNullable<FileError['code']>): code is AiErrorCod
 const isFileIconErrorCode = (
   code: NonNullable<FileError['code']>
 ): code is FileIconErrorCode => code.startsWith('file-icon-')
+
+const isMcpErrorCode = (code: NonNullable<FileError['code']>): code is McpErrorCode => code.startsWith('mcp-')
 
 const isExtensionErrorCode = (
   code: NonNullable<FileError['code']>

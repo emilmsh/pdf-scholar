@@ -5285,6 +5285,18 @@ html.pen-near .draw-layer {
   gap: 5px;
 }
 
+/* «Hold utenfor KI-verktøy» under «Kopier for KI»: the label first, the
+   switch at the row's end, as the margin switch above it */
+.annot-ai-keep-out {
+  justify-content: space-between;
+  padding: 6px 4px 0;
+}
+
+.annot-ai-keep-out:has(input:disabled) {
+  cursor: default;
+  color: var(--text-secondary);
+}
+
 .annot-export-row button {
   flex: 1;
   font-size: 10.5px;
@@ -7168,6 +7180,69 @@ button.bookmark-fold:hover {
 .ai-chatgpt-account a {
   color: var(--accent);
   cursor: pointer;
+}
+
+/* «KI-verktøy på maskinen» (McpSettings.tsx). A connected tool's row: the
+   state and «Koble fra» side by side — the same button «Koble til» is, so
+   taking access back costs what giving it did. */
+.ai-mcp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-mcp-row .btn-secondary {
+  font-weight: 400;
+}
+
+.ai-mcp-switch {
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ai-mcp-kept {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-mcp-kept li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.ai-mcp-kept-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-mcp-kept-remove {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ai-mcp-kept-remove:hover {
+  background: var(--hover);
+  color: var(--text);
 }
 
 .ai-settings-note {
