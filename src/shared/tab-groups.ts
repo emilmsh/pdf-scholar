@@ -18,7 +18,11 @@
 //    By keyboard (Ctrl+Shift+PageUp/PageDown) one step at a time, as the
 //    browsers do: a tab at its group's edge first steps OUT of the group where
 //    it stands, a tab beside an open group first steps IN, a folded group is
-//    stepped over whole.
+//    stepped over whole. A group's chip drags the whole group, folded or not.
+//  - A tab opened from a grouped tab (an attachment) joins that group; one
+//    opened from outside — Explorer, the library — goes last, ungrouped.
+//  - Grouping lives in the right-click menus only (Emil, 2026-10-29: the
+//    strip stays clean — no extra buttons on the tabs or the chip).
 //  - A stored group list is untrusted input (sanitizeGroups).
 import type { TabGroup, TabGroupColor } from './types'
 
@@ -192,6 +196,42 @@ export function moveTab<T extends GroupableTab>(tabs: readonly T[], id: string, 
   const g = left !== null && left === right ? left : own !== null && (left === own || right === own) ? own : null
   if (g !== own) next[to] = { ...moved, groupId: g }
   return next
+}
+
+/** A drag of a group's chip (Emil, 2026-10-29: a folded group must move as
+ *  one): the whole run goes past `targetId` — after it when the run started
+ *  left of it, before it otherwise. It never lands inside another group's
+ *  run (it goes to that run's far edge instead) nor in the pinned run. */
+export function moveGroup<T extends GroupableTab>(tabs: readonly T[], groupId: string, targetId: string): T[] {
+  const run = runOf(tabs, groupId)
+  const target = tabs.findIndex((t) => t.id === targetId)
+  if (!run || target === -1 || groupOf(tabs[target]) === groupId) return tabs as T[]
+  const members = tabs.slice(run[0], run[1] + 1)
+  const rest = [...tabs.slice(0, run[0]), ...tabs.slice(run[1] + 1)]
+  const rightward = run[0] < target
+  const j = rest.findIndex((t) => t.id === targetId)
+  let at = rightward ? j + 1 : j
+  // Not inside another group: to its far edge in the direction of travel
+  const there = groupOf(rest[at])
+  if (there !== null && groupOf(rest[at - 1]) === there) {
+    const [first, last] = runOf(rest, there)!
+    at = rightward ? last + 1 : first
+  }
+  at = Math.max(at, rest.filter((t) => t.pinned).length)
+  const next = [...rest.slice(0, at), ...members, ...rest.slice(at)]
+  return next.every((t, i) => t === tabs[i]) ? (tabs as T[]) : next
+}
+
+/** Where a tab opened FROM another tab goes (an attachment opened from a
+ *  filing): into the opener's group, at the end of its run. Opened from an
+ *  ungrouped or pinned tab, or from nowhere — the library, Explorer — it
+ *  goes last in the strip, outside any group. */
+export function insertOpened<T extends GroupableTab>(tabs: readonly T[], tab: T, openerId: string | null): T[] {
+  const opener = openerId === null ? undefined : tabs.find((t) => t.id === openerId)
+  const g = opener && !opener.pinned ? groupOf(opener) : null
+  if (g === null) return [...tabs, { ...tab, groupId: null }]
+  const [, last] = runOf(tabs, g)!
+  return [...tabs.slice(0, last + 1), { ...tab, groupId: g }, ...tabs.slice(last + 1)]
 }
 
 /** One keyboard step left (-1) or right (+1) — see the rules at the top */

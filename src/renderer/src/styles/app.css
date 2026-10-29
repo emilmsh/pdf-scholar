@@ -523,6 +523,11 @@ html.touch-ui .tab:not(.pinned) .tab-label {
   padding: 0 8px;
 }
 
+/* Being dragged along the strip, with its tabs (.tab.dragging) */
+.tab-group-chip.dragging {
+  opacity: 0.5;
+}
+
 .tab-group-chip.collapsed {
   background: var(--group-color);
   color: #fff;

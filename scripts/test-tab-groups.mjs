@@ -130,6 +130,36 @@ eq(show(G.moveTab(strip('*p *q a b'), 'p', 3)), '*q *p a b', 'a pinned tab stays
   eq(broken, 0, 'no drag anywhere breaks a run or puts a pinned tab in a group')
 }
 
+// --- dragging a whole group (moveGroup) ---------------------------------------------------------
+eq(show(G.moveGroup(strip('a:G b:G x y'), 'G', 'x')), 'x a:G b:G y', 'rightward: the run goes after the target')
+eq(show(G.moveGroup(strip('x y a:G b:G'), 'G', 'x')), 'a:G b:G x y', 'leftward: the run goes before the target')
+eq(show(G.moveGroup(strip('a:G b:G c:H d:H e'), 'G', 'c')), 'c:H d:H a:G b:G e', 'never inside another group: past its far edge (rightward)')
+eq(show(G.moveGroup(strip('c:H d:H a:G b:G'), 'G', 'd')), 'a:G b:G c:H d:H', 'never inside another group: before its start (leftward)')
+eq(show(G.moveGroup(strip('*p x a:G'), 'G', 'p')), '*p a:G x', 'never into the pinned run')
+{
+  const tabs = strip('a:G b:G x')
+  eq(G.moveGroup(tabs, 'G', 'a') === tabs, true, 'onto its own member: nothing')
+  eq(G.moveGroup(strip('x a:G'), 'G', 'nope').length, 2, 'an unknown target: nothing')
+}
+{
+  // Every group drag keeps every run whole and the pinned run first
+  const base = strip('*p a:G b:G c d:H e:H f')
+  let broken = 0
+  for (const g of ['G', 'H']) {
+    for (const t of base) {
+      const moved = G.moveGroup(base, g, t.id)
+      if (G.normalizeGroups(moved, [group('G'), group('H')]).tabs !== moved || !moved[0].pinned) broken++
+    }
+  }
+  eq(broken, 0, 'no group drag breaks a run or passes the pinned run')
+}
+
+// --- a tab opened from a tab (insertOpened) ------------------------------------------------------
+eq(show(G.insertOpened(strip('a b:G c:G d'), { id: 'n' }, 'b')), 'a b:G c:G n:G d', 'from a grouped tab: the end of its group')
+eq(show(G.insertOpened(strip('a b:G'), { id: 'n' }, 'a')), 'a b:G n', 'from an ungrouped tab: last, ungrouped')
+eq(show(G.insertOpened(strip('a b:G'), { id: 'n' }, null)), 'a b:G n', 'from outside: last, ungrouped')
+eq(show(G.insertOpened(strip('a b:G'), { id: 'n' }, 'gone')), 'a b:G n', 'an opener that has closed: last')
+
 // --- keyboard step (stepTab) ------------------------------------------------------------------
 {
   const gs = [group('G'), group('F', true)]

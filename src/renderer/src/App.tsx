@@ -15,7 +15,9 @@ import {
   activeAfterCollapse,
   addToGroup,
   groupTab,
+  insertOpened,
   isHidden,
+  moveGroup,
   moveTab as moveTabInStrip,
   nextGroupColor,
   normalizeGroups,
@@ -79,6 +81,8 @@ interface OpenTab {
 }
 
 let groupCounter = 0
+/** How long a noted opener stays the opener of the next new tab */
+const OPENER_WINDOW_MS = 5000
 
 /** The file name a restored tab shows before its file is read — what
  *  readFile will name it too */
@@ -233,6 +237,11 @@ export default function App(): React.JSX.Element {
   const [tabGroups, setTabGroups] = useState<TabGroup[]>([])
   const tabGroupsRef = useRef(tabGroups)
   tabGroupsRef.current = tabGroups
+  /** The tab that is about to open a document as a tab of its own (an
+   *  attachment: main stages the copy and sends the path back as an ordinary
+   *  open), so the new tab can join its group. Stale after a few seconds — a
+   *  file opened from Explorer later is not the opener's. */
+  const openerRef = useRef<{ tabId: string; at: number } | null>(null)
   // Every path that changes the strip — a close, a pin, a drop from another
   // window — is mended here rather than taught the group rules one by one: a
   // pinned tab or a member cut off from its run leaves its group, an empty
@@ -559,7 +568,11 @@ export default function App(): React.JSX.Element {
         lazy: false
       }
       docRegistry.acquire(payload.path)
-      setTabs((prev) => [...prev, tab])
+      // Opened from a tab a moment ago (an attachment): into that tab's group
+      const opener = openerRef.current
+      openerRef.current = null
+      const openerId = opener && Date.now() - opener.at < OPENER_WINDOW_MS ? opener.tabId : null
+      setTabs((prev) => insertOpened(prev, tab, openerId))
       goToTab(tab.id)
       setError(null)
     },
@@ -854,6 +867,10 @@ export default function App(): React.JSX.Element {
   }, [])
   const ungroupTabs = useCallback((groupId: string) => {
     setTabs((prev) => ungroup(prev, groupId))
+  }, [])
+  /** A group's chip dragged over a tab: the whole group moves past it */
+  const moveTabGroup = useCallback((groupId: string, targetId: string) => {
+    setTabs((prev) => moveGroup(prev, groupId, targetId))
   }, [])
 
   /** The path of the tab this window is dragging right now, if any. The native
@@ -1526,6 +1543,7 @@ export default function App(): React.JSX.Element {
         onGroupUpdate={updateTabGroup}
         onGroupToggle={toggleTabGroup}
         onGroupUngroup={ungroupTabs}
+        onReorderGroup={moveTabGroup}
         onGroupClose={(groupId) =>
           void closeTabs(tabsRef.current.filter((x) => x.groupId === groupId).map((x) => x.id))
         }
@@ -1637,6 +1655,9 @@ export default function App(): React.JSX.Element {
                 }
                 onRequestOpenOtherInSplit={isElectron ? () => void openOtherInSplit(tab.id) : undefined}
                 onOpenPath={openPath}
+                onOpeningFromHere={() => {
+                  openerRef.current = { tabId: tab.id, at: Date.now() }
+                }}
               />
             </div>
           )

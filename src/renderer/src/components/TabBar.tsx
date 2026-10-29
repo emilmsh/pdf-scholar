@@ -4,7 +4,7 @@ import { stripItems, TAB_GROUP_COLORS, TAB_GROUP_NAME_MAX } from '../../../share
 import type { TabGroup, TabGroupColor } from '../../../shared/types'
 import { zoteroKeyFromPath } from '../../../shared/zotero'
 import { bridge, isElectron } from '../bridge'
-import { TAB_DRAG_MIME } from '../drag-types'
+import { TAB_DRAG_MIME, TAB_GROUP_DRAG_MIME } from '../drag-types'
 import { t, useLang } from '../i18n'
 import { isMac } from '../platform'
 import { withShortcut } from '../keymap'
@@ -41,6 +41,8 @@ interface Props {
   onGroupUngroup(groupId: string): void
   /** Close every tab in the group (one at a time, as «Lukk andre faner») */
   onGroupClose(groupId: string): void
+  /** The group's chip was dragged over this tab: the whole group moves past it */
+  onReorderGroup(groupId: string, targetTabId: string): void
   activeId: string | null
   /** Bumped by Ctrl+Shift+A (tab.search): open «Alle faner», or close it */
   listSignal: number
@@ -108,6 +110,7 @@ export default function TabBar({
   onGroupToggle,
   onGroupUngroup,
   onGroupClose,
+  onReorderGroup,
   activeId,
   listSignal,
   hidden,
@@ -164,6 +167,23 @@ export default function TabBar({
     if (listSignal > 0) setAllOpen((o) => !o)
   }, [listSignal])
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  /** The group whose chip is being dragged — the whole group moves (Emil,
+   *  2026-10-29). Always the in-window HTML5 drag: a group is no file. */
+  const [draggingGroupId, setDraggingGroupId] = useState<string | null>(null)
+  /** Move the dragged group past `targetId` once the pointer is over the far
+   *  half of it. The half matters: a folded group's chip is narrower than a
+   *  tab, so after a move the pointer can still be over the same tab — on its
+   *  near half now, which must not move the group straight back. */
+  const dragGroupOver = (e: React.DragEvent, targetId: string): void => {
+    if (!draggingGroupId) return
+    const runStart = tabs.findIndex((x) => x.groupId === draggingGroupId)
+    const target = tabs.findIndex((x) => x.id === targetId)
+    if (runStart === -1 || target === -1 || tabs[target].groupId === draggingGroupId) return
+    e.preventDefault()
+    const r = e.currentTarget.getBoundingClientRect()
+    const mid = r.left + r.width / 2
+    if (runStart < target ? e.clientX > mid : e.clientX < mid) onReorderGroup(draggingGroupId, targetId)
+  }
   /** How the pointer that is about to drag a tab touched it. The native file
    *  drag is for a MOUSE drag only (see PdfxApi.dragTabFile — the OS drag loop
    *  waits for a mouse button's release and never returns without one), and a
@@ -185,7 +205,7 @@ export default function TabBar({
   const menuPinned = menu ? tabs.find((x) => x.id === menu.tab.id)?.pinned === true : false
   const menuGroupId = menu ? (tabs.find((x) => x.id === menu.tab.id)?.groupId ?? null) : null
   /** The hover card (TabHoverCard.tsx) — none while a menu owns the strip */
-  const hoverCard = useTabHoverCard(menu !== null || allOpen || draggingId !== null)
+  const hoverCard = useTabHoverCard(menu !== null || allOpen || draggingId !== null || draggingGroupId !== null)
 
   useEffect(() => {
     if (!menu) return
@@ -355,7 +375,7 @@ export default function TabBar({
             <button
               key={`group-${group.id}`}
               data-group-id={group.id}
-              className={`tab-group-chip${group.collapsed ? ' collapsed' : ''}${group.name ? '' : ' unnamed'}`}
+              className={`tab-group-chip${group.collapsed ? ' collapsed' : ''}${group.name ? '' : ' unnamed'}${draggingGroupId === group.id ? ' dragging' : ''}`}
               style={groupColorStyle(group.color)}
               title={t('tabs.groupChipTip', { n: members.length })}
               aria-expanded={!group.collapsed}
@@ -364,6 +384,24 @@ export default function TabBar({
               onContextMenu={(e) => {
                 e.preventDefault()
                 openGroupEdit(group.id)
+              }}
+              // Dragging the chip moves the whole group, folded or open. Our
+              // own type only: neither a document drop nor text for another app.
+              draggable
+              onDragStart={(e) => {
+                setDraggingGroupId(group.id)
+                setGroupEdit(null)
+                e.dataTransfer.effectAllowed = 'move'
+                e.dataTransfer.setData(TAB_GROUP_DRAG_MIME, group.id)
+              }}
+              onDragEnd={() => setDraggingGroupId(null)}
+              // Another group's chip stands for that group's run
+              onDragOver={(e) => {
+                if (draggingGroupId && draggingGroupId !== group.id) {
+                  const runStart = tabs.findIndex((x) => x.groupId === draggingGroupId)
+                  const first = tabs.findIndex((x) => x.groupId === group.id)
+                  dragGroupOver(e, (runStart < first ? members[members.length - 1] : members[0]).id)
+                }
               }}
             >
               <span className="tab-group-dot" aria-hidden="true" />
@@ -377,7 +415,7 @@ export default function TabBar({
         <div
           key={tab.id}
           data-tab-id={tab.id}
-          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}${group ? ' grouped' : ''}${last ? ' group-last' : ''}`}
+          className={`tab${tab.id === activeId ? ' active' : ''}${tab.id === draggingId || (draggingGroupId !== null && tab.groupId === draggingGroupId) ? ' dragging' : ''}${tab.pinned ? ' pinned' : ''}${group ? ' grouped' : ''}${last ? ' group-last' : ''}`}
           style={group ? groupColorStyle(group.color) : undefined}
           draggable
           // The hover card says what the native title did (the path), and
@@ -431,6 +469,10 @@ export default function TabBar({
           // app); a release over this window answers 'same', so the two
           // gestures cannot collide.
           onDragOver={(e) => {
+            if (draggingGroupId) {
+              dragGroupOver(e, tab.id)
+              return
+            }
             if (!draggingId || draggingId === tab.id) return
             e.preventDefault()
             // Take the hovered tab's place. The dragged tab is spliced out before
