@@ -20,6 +20,8 @@ import type {
   Settings
 } from '../shared/types'
 import type { StoredConversation } from '../shared/chat-history'
+import type { DocNotes } from '../shared/research-notes'
+import type { McpTarget } from '../shared/mcp'
 
 const api: PdfxApi = {
   openFileDialog: () => ipcRenderer.invoke('dialog:open'),
@@ -52,6 +54,9 @@ const api: PdfxApi = {
     ipcRenderer.invoke('identity:report', path, name, fingerprint),
   goneDocuments: () => ipcRenderer.invoke('library:gone'),
   forgetDocuments: (paths: string[]) => ipcRenderer.invoke('library:forget', paths),
+  setDocNotes: (record: DocNotes) => ipcRenderer.invoke('notes:set', record),
+  mcpStatus: () => ipcRenderer.invoke('mcp:status'),
+  mcpConnect: (target: McpTarget, on: boolean) => ipcRenderer.invoke('mcp:connect', target, on),
   onConversationsChanged: (cb: (path: string | null) => void) => {
     const listener = (_e: unknown, path: string): void => cb(path)
     ipcRenderer.on('chats:changed', listener)

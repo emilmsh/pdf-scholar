@@ -1,6 +1,6 @@
 # PDF Scholar — Privacy Policy
 
-_Last updated: 2026-10-10_
+_Last updated: 2026-10-29_
 
 PDF Scholar (the desktop app and the browser extension) is a local-first PDF
 reader and annotator. **It collects no data about you.**
@@ -99,6 +99,27 @@ in the transport layer, not just in the interface, so a stored key cannot leak
 content by accident). If your licence to a document does not permit sharing it
 with an AI service, use Confirm or Off — the app cannot know what your
 subscriptions and licences allow.
+
+**AI tools on your computer (desktop app only).** So that an AI tool you run
+yourself — Claude Code, Claude Desktop, Codex and the like — can find what you
+noted, the desktop app keeps a small record per document of your annotations
+(the words each highlight marks, your comments, notes and text boxes, the
+document's title, DOI and page count) next to its other local data. It is
+written on your device whenever a document's annotations change, never
+transmitted by the app, and removed when the document has none. **A
+password-protected document's record holds nothing but the fact that it is
+locked.** Nothing reads this record unless you connect a tool under "AI tools on
+this computer" in the AI settings. A connected tool starts PDF Scholar's own
+read-only server on your machine — no network port is opened — and can then
+read those records and your AI conversations (their text and the passages the
+answers cited; never images, never the PDFs themselves, and nothing at all about
+a password-protected document). **What the tool reads goes to whichever AI
+provider that tool uses, under that tool's terms** — that is the point of
+connecting it, and it is outside this app's control. With the AI access switch
+set to **Off**, the server refuses every request. "Disconnect" removes PDF
+Scholar from the tool's configuration again. The Annotations tab's "Copy for AI"
+puts the same kind of text for the open document on your clipboard, for you to
+paste wherever you choose; nothing is sent by the copy itself.
 
 How the key is protected where it is stored depends on what the platform offers,
 and the app uses the strongest option available on each. The assistant's key

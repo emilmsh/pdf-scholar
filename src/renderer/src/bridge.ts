@@ -190,6 +190,11 @@ export const webApi: PdfxApi = {
     }
     saveWebState(state)
   },
+  // No other program can start anything a browser tab holds: nothing to keep
+  // for one, nothing to connect
+  setDocNotes: async () => {},
+  mcpStatus: async () => null,
+  mcpConnect: async () => ({ ok: false, code: 'mcp-unsupported', error: 'web' }),
   // `storage` fires in OTHER tabs only, and names no document — the listener
   // refreshes whatever it shows
   onConversationsChanged: (cb) => {

@@ -465,6 +465,21 @@ that.)*
   only source the assistant cites *(a file's text rides in the same system
   block as conversations, capped, and «Bekreft før deling» names it before
   it leaves; PRIVACY.md states this)*
+- Your notes reach the AI tools you work in *(2026-10-29, Emil: Claude Code
+  and ChatGPT should find what was noted and asked about a paper without
+  reading it again)*: Claude Code and Claude Desktop connect with one click
+  under «AI tools on this computer»; Codex, opencode, Cursor and other MCP
+  tools take one config entry the app copies for you
+  ([`MCP.md`](MCP.md)). They can then search your highlights (with the words
+  marked), comments and assistant conversations across every paper — never
+  the PDFs, never images, nothing of a password-protected document. «Copy
+  for AI» in the Annotations tab puts one document's notes and conversations
+  on the clipboard for ChatGPT or any other chat. *(Nothing to download: the
+  server is the desktop app itself — say so, it is the first question. The
+  connection is desktop-only and not in the Microsoft Store build, PLATFORMS
+  §33; the copy works everywhere. Never "integrates with ChatGPT" — ChatGPT
+  gets the copy, not the server. The extension listing names no tool and
+  claims only the copy.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
@@ -536,6 +551,11 @@ app looks like.)*
   blocks every AI request in the transport layer, so a stored key cannot leak
   content by accident
 - With a local model (Ollama, LM Studio), questions also stay on the machine
+- An AI tool you connect (Claude Code, Claude Desktop, …) reads your notes and
+  conversations through a read-only server on your own machine, and what it
+  reads goes to that tool's provider under its terms; nothing is shared until
+  you connect one, and AI access **Off** closes this door too *(PRIVACY.md,
+  «AI tools on your computer»)*
 - The key is stored in the platform's own key store; the exact mode differs per
   platform and the settings panel names the one in force. See "Wording we do not
   use" below before writing anything shorter than that

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { OPS } from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { detectDoi } from '../doi-detect'
+import { buildDocNotes, copyForAiMarkdown, metadataTitle } from '../doc-notes'
 import { isPasswordException, openDocument } from '../pdf-doc'
 import type { DocResources } from '../pdf-doc'
 import { renderPagesAsImages as renderAiPageImages } from '../ai-page-images'
@@ -2077,6 +2078,48 @@ export default function PdfViewer({
       resources.port.terminate()
     }
   }, [payload.path])
+
+  // ---------- Notes for AI tools outside the app (shared/research-notes.ts) ----------
+  // What the reader marked here, kept where the MCP server reads it (desktop:
+  // userData/notes), written quietly once the marks settle — at open, and
+  // after every change. Nothing is read for it that the Merknader tab has not
+  // already read: the excerpts are its own. A locked document records only
+  // that it is locked, which also keeps its conversations from the server.
+  const [metaTitle, setMetaTitle] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    setMetaTitle(undefined)
+    if (!pdf) return undefined
+    let stale = false
+    void metadataTitle(pdf).then((title) => {
+      if (!stale) setMetaTitle(title)
+    })
+    return () => {
+      stale = true
+    }
+  }, [pdf])
+  const notesWrittenRef = useRef('')
+  useEffect(() => {
+    if (!isElectron || !pdf) return undefined
+    const timer = window.setTimeout(() => {
+      const record = buildDocNotes({
+        path: payload.path,
+        name: payload.name,
+        annots,
+        excerpts,
+        pages: pdf.numPages,
+        doi,
+        title: metaTitle,
+        locked: docPasswordRef.current !== undefined
+      })
+      // The same record again (a reload after this window's own write, an
+      // excerpt that came back unchanged) is not written again
+      const key = JSON.stringify({ ...record, updatedAt: 0 })
+      if (key === notesWrittenRef.current) return
+      notesWrittenRef.current = key
+      void bridge.setDocNotes(record)
+    }, 2000)
+    return () => window.clearTimeout(timer)
+  }, [pdf, annots, excerpts, doi, metaTitle, payload.path, payload.name])
 
   // Track container width (for fit-width zoom and horizontal layout).
   // Fall back to the window width so layout never deadlocks if the element
@@ -6398,6 +6441,32 @@ export default function PdfViewer({
     [pdf, payload.name, showToast]
   )
 
+  /** «Kopier for KI»: this document's marks and conversations as one text for
+   *  a tool that cannot reach the MCP server (ChatGPT in a browser). The
+   *  reader's own act, so a locked document copies too — like the export. */
+  const copyNotesForAi = useCallback(async () => {
+    if (!pdf) return
+    const record = buildDocNotes({
+      path: payload.path,
+      name: payload.name,
+      annots: annotsRef.current,
+      excerpts: await computeExcerpts(pdf, annotsRef.current),
+      pages: pdf.numPages,
+      doi,
+      title: metaTitle,
+      locked: false
+    })
+    const md = copyForAiMarkdown(record, await bridge.getConversations(payload.path))
+    if (!md) {
+      showToast(t('viewer.nothingToCopy'))
+      return
+    }
+    navigator.clipboard?.writeText(md).then(
+      () => showToast(t('viewer.copiedForAi')),
+      () => {} // clipboard denied — nothing sensible to do
+    )
+  }, [pdf, payload.path, payload.name, doi, metaTitle, showToast])
+
   const jumpToAnnotIn = useCallback((pane: PaneId, pageNumber: number, record: PageAnnotation) => {
     const handle = handleForRef.current(pane)
     const el = handle?.el()
@@ -7883,6 +7952,7 @@ export default function PdfViewer({
           onOutdentBookmark={outdentBookmarkAt}
           onToggleBookmarkCollapsed={toggleBookmarkCollapsed}
           onExport={exportAnnotations}
+          onCopyForAi={() => void copyNotesForAi()}
           onAskAi={askAnnotations}
           docName={payload.name}
           docPath={payload.path}

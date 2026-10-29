@@ -115,6 +115,8 @@ interface Props {
   onOutdentBookmark(page: number): void
   onToggleBookmarkCollapsed(page: number): void
   onExport(format: ExportFormat): void
+  /** «Kopier for KI»: the marks and this document's conversations as text */
+  onCopyForAi(): void
   /** Open the AI panel with the "summarize my annotations" question */
   onAskAi(): void
   /** Browser/extension only: the open document's display name + source path,
@@ -181,6 +183,7 @@ function Sidebar({
   onOutdentBookmark,
   onToggleBookmarkCollapsed,
   onExport,
+  onCopyForAi,
   onAskAi,
   docName,
   docPath,
@@ -461,6 +464,7 @@ function Sidebar({
           onDelete={onDeleteAnnot}
           onDeleteAll={onDeleteAllAnnots}
           onExport={onExport}
+          onCopyForAi={onCopyForAi}
           onAskAi={onAskAi}
           selectedAnnotId={selectedAnnotId}
           onCommentChange={onCommentChange}
@@ -648,6 +652,7 @@ function AnnotationList({
   onDelete,
   onDeleteAll,
   onExport,
+  onCopyForAi,
   onAskAi,
   selectedAnnotId,
   onCommentChange,
@@ -663,6 +668,7 @@ function AnnotationList({
   onDelete(pageNumber: number, record: PageAnnotation): void
   onDeleteAll(): void
   onExport(format: ExportFormat): void
+  onCopyForAi(): void
   onAskAi(): void
   selectedAnnotId: string | null
   onCommentChange(pageNumber: number, localId: string, text: string): void
@@ -824,6 +830,11 @@ function AnnotationList({
         <div className="annot-export-row">
           <button disabled={empty} onClick={onExportMargin}>
             {t('side.exportMarginBtn')}
+          </button>
+          {/* Enabled with no marks too: the document's conversations come
+              along, and a document may have only those */}
+          <button onClick={onCopyForAi} title={t('side.copyForAiTip')}>
+            {t('side.copyForAi')}
           </button>
         </div>
         <button className="annot-ask-ai" disabled={empty} onClick={onAskAi} title={t('side.askAiTip')}>

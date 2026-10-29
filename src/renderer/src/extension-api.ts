@@ -355,6 +355,12 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     // process boundary to keep the text from crossing
     searchConversations: async (query) => searchConversations(await listConversationDocs(), query),
     onConversationsChanged: subscribeConversationChanges,
+    // The MCP server is a process an AI tool starts on its own; an extension
+    // has nothing it could start (docs/PLATFORMS.md). «Kopier for KI» works
+    // here as on the desktop — it needs no store.
+    setDocNotes: async () => {},
+    mcpStatus: async () => null,
+    mcpConnect: async () => ({ ok: false, code: 'mcp-unsupported', error: 'extension' }),
 
     // A document's identity across a move (issue #46; shared/doc-identity.ts).
     // Only a file:// URL can be known to be GONE here, and only with file

@@ -12,6 +12,7 @@ import type { AiAccessMode, AiConfigView, AiProviderId, FileError } from '../../
 import { bridge } from '../bridge'
 import { errorText, t, useLang } from '../i18n'
 import { DEFAULT_AZURE_API_VERSION } from '../../../shared/defaults'
+import { McpSettings } from './McpSettings'
 
 /** The compat service menu's row for a URL that is no preset: a marker for
  *  the select, never stored */
@@ -183,6 +184,9 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
         </label>
         <p className="ai-field-hint">{t('ai.accessHint')}</p>
       </div>
+      {/* Right under the switch it obeys: «Av» shares nothing with these
+          either (src/main/mcp-server.ts) */}
+      <McpSettings />
       <div className="ai-settings-heading">{t('ai.keysTitle')}</div>
       <p className="ai-field-hint">
         {t('ai.keyCapHint')}{' '}

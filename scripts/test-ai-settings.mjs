@@ -124,12 +124,19 @@ try {
 
   const settings = await evaluate(send, `
     const g = compatGroup()
-    const groupNames = [...document.querySelectorAll('.ai-field-group > .ai-field > span')]
+    // The provider groups — the «KI-verktøy på maskinen» group (.ai-mcp) is
+    // checked on its own below
+    const groupNames = [...document.querySelectorAll('.ai-field-group:not(.ai-mcp) > .ai-field > span')]
       .map((s) => s.textContent)
+    // Its rows fill in once main has looked for the tools
+    for (let i = 0; i < 50 && !document.querySelector('.ai-mcp .ai-field'); i++) await sleep(200)
+    const mcp = document.querySelector('.ai-mcp')
     return {
       settingsShown: !!document.querySelector('.ai-settings'),
-      groups: document.querySelectorAll('.ai-field-group').length,
+      groups: document.querySelectorAll('.ai-field-group:not(.ai-mcp)').length,
       groupNames,
+      mcpRows: mcp ? [...mcp.querySelectorAll('.ai-field > span:first-child')].map((s) => s.textContent) : null,
+      mcpAfterAccess: !!mcp && mcp.previousElementSibling?.querySelector('select') !== null,
       hasCompatGroup: !!g,
       presets: g ? [...g.querySelectorAll('select option')].map((o) => o.textContent) : [],
       keyPlaceholder: g?.querySelector('input[type="password"]')?.placeholder ?? '',
@@ -149,6 +156,15 @@ try {
   // KI-tilgang (the access switch) sits first, then the ten provider groups —
   // the ChatGPT-plan sign-in right under the OpenAI key it is the keyless twin of
   ok(settings.groups === 11, `access group + ten provider groups render (got ${settings.groups})`)
+  // The AI tools on this machine (MCP): right under the switch that governs
+  // them, a row per tool and one for the rest — whatever is installed here
+  ok(
+    settings.mcpAfterAccess &&
+      settings.mcpRows?.[0] === 'Claude Code' &&
+      settings.mcpRows?.[1] === 'Claude Desktop' &&
+      settings.mcpRows?.length === 3,
+    `«AI tools on this computer» sits under AI access with its three rows (got ${JSON.stringify(settings.mcpRows)})`
+  )
   ok(
     /KI-tilgang|AI access/.test(settings.groupNames[0] ?? '') &&
       settings.groupNames[1] === 'OpenAI' &&
