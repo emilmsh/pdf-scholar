@@ -342,8 +342,15 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
     const rec = LINK_RECORDS.get(anchor)
     if (!rec || !anchor.isConnected) return
     const mine = ++seq.current
-    const resolved = await resolvePreviewTarget(rec.pdf, rec.dest)
-    if (!resolved || mine !== seq.current) return
+    let resolved = await resolvePreviewTarget(rec.pdf, rec.dest)
+    if (mine !== seq.current) return
+    // A footnote link naming a destination the file does not hold (hyperref
+    // run through Distiller lost every one: Ellickson et al. 2020, Emil
+    // 2026-10-29): the footnote is on the marker's own page, found by the
+    // marker below — or there is no window, as before
+    const dangling = !resolved && typeof rec.dest === 'string' && linkKind(rec.dest) === 'footnote'
+    if (dangling && pageOf(anchor) >= 0) resolved = { pageIndex: pageOf(anchor), x: null, y: null, kind: 'other', name: null }
+    if (!resolved) return
     // A destination whose name says nothing: the link's own words («Table 1»)
     // may, and then the table is cut out like a named one
     let target =
@@ -499,7 +506,7 @@ export default function LinkPreview({ hostRef, enabled, delayMs }: Props): React
         }
       }
     }
-    if (mine !== seq.current) return
+    if (mine !== seq.current || (dangling && target.kind !== 'footnote')) return
     const [img, captionAbove] = await Promise.all([
       renderPage(rec.pdf, target.pageIndex, scale, rec.rotation),
       target.kind === 'figure' && target.y !== null
@@ -1412,15 +1419,17 @@ function pageOf(anchor: HTMLElement): number {
 
 /** A footnote marker the link sits on: a number or a dagger, alone under the
  *  link and set smaller than the words on its line — what keeps an equation's
- *  «(3)» or a «Section 2» off the footnotes. Null for anything else. */
+ *  «(3)» or a «Section 2» off the footnotes. The words are the spans under
+ *  the link, not every character its box touches: hyperref's box often
+ *  takes in the full stop before the marker («.1», Ellickson et al. 2020).
+ *  Null for anything else. */
 function raisedMarker(anchor: HTMLElement): string | null {
-  const marker = linkText(anchor).trim()
-  if (!/^(\d{1,3}|[*†‡§¶]{1,3})$/.test(marker)) return null
   const page = anchor.closest('.pdf-page')
   if (!page) return null
   const box = anchor.getBoundingClientRect()
   const midY = (box.top + box.bottom) / 2
   let own = 0
+  let marker = ''
   const others: number[] = []
   for (const span of page.querySelectorAll<HTMLElement>('.text-host .textLayer > span')) {
     const r = span.getBoundingClientRect()
@@ -1429,9 +1438,13 @@ function raisedMarker(anchor: HTMLElement): string | null {
     // often ends a hair inside the link's box
     const overlap = Math.min(r.right, box.right) - Math.max(r.left, box.left)
     const under = overlap > Math.min(r.width, box.width) * 0.5
-    if (under) own = Math.max(own, r.height)
-    else if (/\p{L}/u.test(span.textContent ?? '')) others.push(r.height)
+    if (under) {
+      own = Math.max(own, r.height)
+      marker += span.textContent ?? ''
+    } else if (/\p{L}/u.test(span.textContent ?? '')) others.push(r.height)
   }
+  marker = marker.trim()
+  if (!/^(\d{1,3}|[*†‡§¶]{1,3})$/.test(marker)) return null
   if (!own || !others.length) return null
   others.sort((a, b) => a - b)
   const median = others[Math.floor(others.length / 2)]!
