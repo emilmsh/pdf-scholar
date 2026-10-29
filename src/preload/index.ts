@@ -58,8 +58,11 @@ const api: PdfxApi = {
   mcpStatus: () => ipcRenderer.invoke('mcp:status'),
   mcpConnect: (target: McpTarget, on: boolean) => ipcRenderer.invoke('mcp:connect', target, on),
   mcpPolicy: () => ipcRenderer.invoke('mcp:policy'),
-  mcpSetPolicy: (patch: Partial<McpPolicy>) => ipcRenderer.invoke('mcp:set-policy', patch),
+  mcpSetPolicy: (patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders'>>) =>
+    ipcRenderer.invoke('mcp:set-policy', patch),
   mcpPickFolder: () => ipcRenderer.invoke('mcp:pick-folder'),
+  mcpDocuments: () => ipcRenderer.invoke('mcp:documents'),
+  notesBackfillTargets: () => ipcRenderer.invoke('notes:backfill-targets'),
   onConversationsChanged: (cb: (path: string | null) => void) => {
     const listener = (_e: unknown, path: string): void => cb(path)
     ipcRenderer.on('chats:changed', listener)

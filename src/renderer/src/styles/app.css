@@ -5285,15 +5285,15 @@ html.pen-near .draw-layer {
   gap: 5px;
 }
 
-/* «Hold utenfor KI-verktøy» under «Kopier for KI»: the label first, the
-   switch at the row's end, as the margin switch above it */
-.annot-ai-keep-out {
+/* «Deles med KI-verktøy · Endre» under «Kopier for KI»: a quiet state line,
+   the choice itself in the dialog (AiToolsDialog.tsx) */
+.annot-ai-tools {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 6px 4px 0;
-}
-
-.annot-ai-keep-out:has(input:disabled) {
-  cursor: default;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
@@ -7182,24 +7182,99 @@ button.bookmark-fold:hover {
   cursor: pointer;
 }
 
-/* «KI-verktøy på maskinen» (McpSettings.tsx). A connected tool's row: the
-   state and «Koble fra» side by side — the same button «Koble til» is, so
-   taking access back costs what giving it did. */
-.ai-mcp-row {
+/* «KI-verktøy på maskinen» (AiToolsDialog.tsx): the keyboard map's plate,
+   narrowed to one column — a switch per tool and per document, each a name
+   with a quiet line under it and the switch at the row's end. Giving and
+   taking back are the same switch. Doubled class: the plate's own rules come
+   later in this file. */
+.shortcuts-dialog.ai-tools-dialog {
+  width: min(560px, calc(100vw - 48px));
+}
+
+.shortcuts-body.ai-tools-body {
+  column-count: 1;
+  padding-bottom: 16px;
+}
+
+.ai-tools-sub a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.ai-tools-sub a:hover {
+  text-decoration: underline;
+}
+
+.ai-tools-intro {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ai-tools-row {
+  gap: 12px;
+  min-height: 44px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-tools-row:last-child {
+  border-bottom: none;
+}
+
+.ai-tools-row:has(input:disabled) {
+  cursor: default;
+}
+
+.ai-tools-text {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
 }
 
-.ai-mcp-row .btn-secondary {
-  font-weight: 400;
-}
-
-.ai-mcp-switch {
-  justify-content: space-between;
+.ai-tools-name {
   font-size: 13px;
-  font-weight: 600;
   color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-tools-sub {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-tools-note {
+  margin: 6px 0 4px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.ai-tools-filter {
+  display: block;
+  width: 100%;
+  margin: 6px 0 4px;
+}
+
+/* The document the Merknader tab's «Endre» opened the dialog on */
+.ai-tools-doc.is-focused {
+  margin: 0 -8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.ai-tools-add-folder {
+  margin-top: 6px;
+  padding: 5px 12px;
+  font-size: 12.5px;
 }
 
 .ai-mcp-kept {

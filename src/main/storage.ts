@@ -12,7 +12,7 @@ import type {
   Settings
 } from '../shared/types'
 import { DEFAULT_AI_MODELS, DEFAULT_SETTINGS } from '../shared/defaults'
-import { DEFAULT_MCP_POLICY, sanitizeMcpPolicy, type McpPolicy } from '../shared/mcp'
+import { sanitizeMcpPolicy, type McpPolicy } from '../shared/mcp'
 import { normalizeRecents, pinRecent, recordRecent, removeRecent, restoreRecent } from '../shared/recents'
 import { sanitizeSession, type StoredSession } from '../shared/session'
 import { sanitizeFingerprints } from '../shared/doc-identity'
@@ -51,11 +51,15 @@ export interface AppState {
    *  Written by main as the renderers report their strips; read once at
    *  launch. Shape-checked on load like the recents. */
   session?: StoredSession
-  /** What AI tools outside the app may read (shared/mcp.ts): the master
+  /** What AI tools outside the app may read (shared/mcp.ts): each tool's
    *  switch and what is kept out. Its own key, not in `settings` — resetting
    *  the preferences must not let a document the reader kept out back in.
    *  The MCP server reads it from this file on every call. */
   mcp: McpPolicy
+  /** The file each notes record was last built from, as `mtime:size` by path
+   *  — so the library's quiet pass over the recents reads a document again
+   *  only once it has changed (src/renderer/src/notes-backfill.ts) */
+  notesScanned: Record<string, string>
 }
 
 const DEFAULT_AI: StoredAiConfig = {
@@ -89,7 +93,17 @@ const DEFAULTS: AppState = {
   settings: { ...DEFAULT_SETTINGS },
   ai: DEFAULT_AI,
   modelCatalog: {},
-  mcp: { ...DEFAULT_MCP_POLICY }
+  mcp: sanitizeMcpPolicy(null),
+  notesScanned: {}
+}
+
+const sanitizeScanned = (v: unknown): Record<string, string> => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, string> = {}
+  for (const [k, s] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof s === 'string' && /^\d+(\.\d+)?:\d+$/.test(s)) out[k] = s
+  }
+  return out
 }
 
 export function mergeAiConfig(
@@ -129,7 +143,8 @@ export function getState(): AppState {
       session: sanitizeSession(parsed.session),
       settings: mergeSettings(DEFAULTS.settings, parsed.settings ?? {}),
       ai: mergeAiConfig(DEFAULT_AI, parsed.ai ?? {}),
-      mcp: sanitizeMcpPolicy(parsed.mcp)
+      mcp: sanitizeMcpPolicy(parsed.mcp),
+      notesScanned: sanitizeScanned(parsed.notesScanned)
     }
   } catch (err) {
     // A file that exists but won't parse holds data (encrypted API keys!)

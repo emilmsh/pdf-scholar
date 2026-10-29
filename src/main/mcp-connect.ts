@@ -11,12 +11,18 @@
 // ELECTRON_RUN_AS_NODE=1 (VS Code's `code` command works the same way): no
 // Node install, no window, no port.
 //
+// One switch per tool (shared/mcp.ts); «Claude» is both of Anthropic's:
 // - Claude Desktop: its claude_desktop_config.json, merged (our one key,
 //   nothing else touched; an unreadable file refused, never replaced).
 // - Claude Code: its own CLI (`claude mcp add … --scope user`) — its config
 //   file is rewritten by every running session, and a merge from outside
 //   could be lost under one.
-// - Anything else (Codex, Cursor, …): the settings show the entry to paste.
+// - Codex: its config.toml (CLI, app and editor extension share it), our
+//   one table written or taken out and every other line left as it was.
+// - Anything else (Cursor, opencode, …): the panel copies the entry to paste.
+// Every entry names its tool (`--client`), and the switch is written to the
+// policy FIRST when turning off — so a tool is shut out even if taking its
+// entry back fails.
 //
 // The Microsoft Store build cannot be run by another program (no execution
 // alias) and its userData is virtualized away from the path the script would
@@ -32,12 +38,15 @@ import {
   claudeCodeCommand,
   claudeCodeRemoveArgs,
   configSnippet,
+  hasCodexServer,
   hasServer,
   MCP_KEY,
+  mergeCodexToml,
   mergeServerInto,
   sanitizeMcpPolicy,
   serverEntry,
   shellQuote,
+  type McpClient,
   type McpClientState,
   type McpPolicy,
   type McpResult,
@@ -81,7 +90,7 @@ export function refreshMcpScriptAtStartup(): void {
  *  binary in its mount, which moves on every launch */
 const appCommand = (): string => process.env.APPIMAGE || process.execPath
 
-const entry = (): McpServerEntry => serverEntry(appCommand(), installedScript())
+const entry = (client: McpClient): McpServerEntry => serverEntry(appCommand(), installedScript(), client)
 
 // ---------- Claude Desktop ----------
 
@@ -127,7 +136,7 @@ async function setClaudeDesktop(on: boolean): Promise<{ code: 'mcp-client-missin
   for (const d of dirs) {
     const file = desktopConfig(d)
     const text = await readFile(file, 'utf-8').catch(() => null)
-    const next = mergeServerInto(text, on ? entry() : null)
+    const next = mergeServerInto(text, on ? entry('claude') : null)
     if (next === null) return { code: 'mcp-config-unreadable', error: file }
     if (text !== null || on) planned.push({ file, text: next })
   }
@@ -191,50 +200,113 @@ async function claudeCodeState(bin: string | null): Promise<McpClientState> {
   return code === 0 ? 'connected' : 'available'
 }
 
-// ---------- Both ----------
+// ---------- Codex ----------
 
-async function status(): Promise<McpStatus> {
-  const e = entry()
-  const base = { config: configSnippet(e), command: claudeCodeCommand(e, process.platform === 'win32') }
-  if (process.windowsStore) {
-    return { unsupported: 'store', claudeCode: 'absent', claudeDesktop: 'absent', ...base }
-  }
-  if (!existsSync(bundledScript())) {
-    return { unsupported: 'no-script', claudeCode: 'absent', claudeDesktop: 'absent', ...base }
-  }
-  const [claudeCode, claudeDesktop] = await Promise.all([findClaude().then(claudeCodeState), claudeDesktopState()])
-  return { unsupported: null, claudeCode, claudeDesktop, ...base }
+/** Codex's home: CODEX_HOME when set, else ~/.codex */
+const codexHome = (): string => process.env.CODEX_HOME || join(homedir(), '.codex')
+const codexConfig = (): string => join(codexHome(), 'config.toml')
+
+/** Whether a command is on the PATH */
+function onPath(name: string): Promise<boolean> {
+  return new Promise((done) => {
+    execFile(process.platform === 'win32' ? 'where.exe' : 'which', [name], { windowsHide: true, timeout: 5000 }, (err) =>
+      done(!err)
+    )
+  })
 }
 
+async function codexState(): Promise<McpClientState> {
+  // Its home exists once any of the three has run; the CLI may be installed
+  // and never started
+  if (!existsSync(codexHome()) && !(await onPath('codex'))) return 'absent'
+  return hasCodexServer(await readFile(codexConfig(), 'utf-8').catch(() => null)) ? 'connected' : 'available'
+}
+
+async function setCodex(on: boolean): Promise<{ code: 'mcp-client-missing' | 'mcp-config-unreadable'; error: string } | null> {
+  const file = codexConfig()
+  let text: string | null = null
+  try {
+    text = await readFile(file, 'utf-8')
+  } catch (err) {
+    // Missing is fine — an empty config; anything else is not ours to replace
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') return { code: 'mcp-config-unreadable', error: file }
+  }
+  if (text === null && !on) return null
+  if (on && (await codexState()) === 'absent') return { code: 'mcp-client-missing', error: 'Codex' }
+  const next = mergeCodexToml(text, on ? entry('codex') : null)
+  if (next === (text ?? '')) return null
+  await mkdir(dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.tmp`
+  await writeFile(tmp, next)
+  await rename(tmp, file)
+  return null
+}
+
+// ---------- All of them ----------
+
+async function status(): Promise<McpStatus> {
+  const other = entry('other')
+  const base = {
+    config: configSnippet(other),
+    command: claudeCodeCommand(entry('claude'), process.platform === 'win32')
+  }
+  const none = { claudeCode: 'absent', claudeDesktop: 'absent', codex: 'absent' } as const
+  if (process.windowsStore) return { unsupported: 'store', ...none, ...base }
+  if (!existsSync(bundledScript())) return { unsupported: 'no-script', ...none, ...base }
+  const [claudeCode, claudeDesktop, codex] = await Promise.all([
+    findClaude().then(claudeCodeState),
+    claudeDesktopState(),
+    codexState()
+  ])
+  return { unsupported: null, claudeCode, claudeDesktop, codex, ...base }
+}
+
+async function setClaudeCode(on: boolean): Promise<McpResult | null> {
+  const bin = await findClaude()
+  if (!bin) return null
+  // Removed first, so a connect after a move (another exe path) replaces
+  // the old entry; a remove of nothing fails harmlessly
+  await runClaude(bin, claudeCodeRemoveArgs())
+  if (on) {
+    const added = await runClaude(bin, claudeCodeAddArgs(entry('claude')))
+    if (added.code !== 0) return { ok: false, code: 'mcp-client-failed', error: added.out || `exit ${added.code}` }
+  }
+  return null
+}
+
+/** Turn one tool's switch on or off: the policy and the tool's own entry */
 async function connect(target: McpTarget, on: boolean): Promise<McpResult> {
   if (process.windowsStore) return { ok: false, code: 'mcp-unsupported', error: 'store' }
+  // Off is the policy first: the server refuses from this moment, whatever
+  // happens to the entries after it
+  if (!on) setClient(target, false)
   if (on && !(await installScript())) return { ok: false, code: 'mcp-unsupported', error: 'no-script' }
-  if (target === 'other') {
-    // Set up by hand from the copied entry: the script in place is all
-  } else if (target === 'claude-desktop') {
-    const failed = await setClaudeDesktop(on)
-    if (failed) return { ok: false, ...failed }
-  } else {
-    const bin = await findClaude()
-    if (!bin) return { ok: false, code: 'mcp-client-missing', error: 'Claude Code' }
-    // Removed first, so a connect after a move (another exe path) replaces
-    // the old entry; a remove of nothing fails harmlessly
-    await runClaude(bin, claudeCodeRemoveArgs())
-    if (on) {
-      const added = await runClaude(bin, claudeCodeAddArgs(entry()))
-      if (added.code !== 0) return { ok: false, code: 'mcp-client-failed', error: added.out || `exit ${added.code}` }
+  if (target === 'claude') {
+    const before = await status()
+    if (on && before.claudeCode === 'absent' && before.claudeDesktop === 'absent') {
+      return { ok: false, code: 'mcp-client-missing', error: 'Claude' }
     }
+    const desktop = before.claudeDesktop === 'absent' ? null : await setClaudeDesktop(on)
+    if (desktop) return { ok: false, ...desktop }
+    const code = await setClaudeCode(on)
+    if (code) return code
+  } else if (target === 'codex') {
+    const failed = await setCodex(on)
+    if (failed) return { ok: false, ...failed }
   }
-  // Connecting IS the go-ahead: the master switch follows it, once the tool
-  // has taken the entry. Disconnecting one tool leaves the switch as it is —
-  // another may still be connected, and the switch is the one place that
-  // shuts them all out.
-  if (on) setPolicy({ sharing: true })
+  // 'other': set up by hand from the copied entry — the script in place and
+  // the switch are all there is to it
+  if (on) setClient(target, true)
   return { ok: true, status: await status() }
 }
 
-/** The master switch and what is kept out (shared/mcp.ts) — written to the
- *  state file at once, since the server reads it from there on every call */
+function setClient(client: McpClient, on: boolean): void {
+  const state = getState()
+  setPolicy({ clients: { ...state.mcp.clients, [client]: on } })
+}
+
+/** The switches and what is kept out (shared/mcp.ts) — written to the state
+ *  file at once, since the server reads it from there on every call */
 function setPolicy(patch: Partial<McpPolicy>): McpPolicy {
   const state = getState()
   state.mcp = sanitizeMcpPolicy({ ...state.mcp, ...patch })
@@ -248,8 +320,9 @@ export function registerMcpIpc(windowFor: (e?: { sender: Electron.WebContents })
   ipcMain.handle('mcp:set-policy', (_e, patch: unknown) => {
     if (!patch || typeof patch !== 'object') return getState().mcp
     const p = patch as Record<string, unknown>
+    // The switches are turned only through mcp:connect, which also writes or
+    // takes back the tool's entry — never on their own from here
     return setPolicy({
-      ...(typeof p.sharing === 'boolean' ? { sharing: p.sharing } : {}),
       ...(Array.isArray(p.excludedDocs) ? { excludedDocs: p.excludedDocs as string[] } : {}),
       ...(Array.isArray(p.excludedFolders) ? { excludedFolders: p.excludedFolders as string[] } : {})
     })
@@ -261,7 +334,7 @@ export function registerMcpIpc(windowFor: (e?: { sender: Electron.WebContents })
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
   ipcMain.handle('mcp:connect', (_e, target: unknown, on: unknown) =>
-    target === 'claude-code' || target === 'claude-desktop' || target === 'other'
+    target === 'claude' || target === 'codex' || target === 'other'
       ? connect(target, on !== false)
       : { ok: false, code: 'mcp-client-missing', error: String(target) }
   )

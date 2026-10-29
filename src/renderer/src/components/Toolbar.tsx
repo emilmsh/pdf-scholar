@@ -100,6 +100,7 @@ import { READ_ALOUD } from '../flags'
 import { useDismissable } from '../useDismissable'
 import { updateOutcomeText } from './Welcome'
 import ShortcutsDialog from './ShortcutsDialog'
+import { openAiTools } from './AiToolsDialog'
 import {
   bubblesWhileTyping,
   commandForEvent,
@@ -3078,6 +3079,22 @@ export default function Toolbar({
                 <IconSparkle size={15} />
                 {t('ai.keysTitle')}
               </button>
+              {/* Its own entry, not part of the keys and providers: those are
+                  the app's own assistant, this is what OTHER tools may read
+                  (Emil, 2026-10-29). Desktop only — nothing else has a process
+                  another program could start. */}
+              {isElectron && (
+                <button
+                  className="menu-action"
+                  onClick={() => {
+                    setSettingsMenuOpen(false)
+                    openAiTools()
+                  }}
+                >
+                  <IconBook size={15} />
+                  {t('mcp.menu')}
+                </button>
+              )}
               <button
                 className="menu-action"
                 title={t('keys.openTip')}

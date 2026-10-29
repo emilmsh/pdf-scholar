@@ -7,53 +7,71 @@ with the passages each answer cited. Ask Claude Code "what did I note about
 identification in the minimum-wage papers?" while you write, and it looks it
 up across every paper you have read in PDF Scholar, without opening a PDF.
 
-**Nothing has to be downloaded or installed.** The server is part of the
-desktop app (Windows, macOS and Linux). You connect each tool once, and the
-app keeps your notes up to date for it in the background.
+**Nothing has to be downloaded or installed.** MCP, the standard these tools
+use to reach other programs, is built into them. What a tool needs is a line
+in its own settings that names a program to start. Here the program is part
+of the PDF Scholar desktop app (Windows, macOS and Linux), and PDF Scholar
+writes that line for you when you turn a tool on.
 
-- [Claude Code and Claude Desktop: one click](#claude-code-and-claude-desktop)
-- [Codex, opencode, Cursor, VS Code, Gemini CLI: one config entry](#other-tools)
+- [Turning a tool on: Claude and Codex](#turning-a-tool-on)
+- [Other tools: Cursor, opencode, VS Code, Gemini CLI](#other-tools)
 - [ChatGPT: copy and paste](#chatgpt)
 - [Turning it off, and keeping things out](#turning-it-off-and-keeping-things-out)
 - [What a tool can read](#what-a-tool-can-read) · [Troubleshooting](#troubleshooting)
 
-## Claude Code and Claude Desktop
+## Turning a tool on
 
-1. In PDF Scholar, open the assistant (**Assistant**, top right) and click
-   the model name at the top of the panel, then **API keys & providers**.
-   The section is **AI tools on this computer**, just under **AI access**.
-2. Click **Connect** next to Claude Code or Claude Desktop. This also turns on
-   **Share with AI tools**, which is off until you connect something.
-3. For Claude Desktop, restart it. Claude Code picks the server up the next
-   time a session starts.
+1. In PDF Scholar, open the settings menu (the gear at the top right) and
+   choose **AI tools (Claude, Codex …)**.
+2. Turn on the switch for the tool:
+   - **Claude** covers Claude Code and Claude Desktop together. Claude Code is
+     told through its own `claude mcp add` command, at user scope, so the
+     server is there in every project. Claude Desktop's
+     `claude_desktop_config.json` gets the entry.
+   - **Codex** covers the Codex app, CLI and VS Code extension, which share
+     `~/.codex/config.toml`.
+3. Start a new session in the tool. Claude Desktop needs a restart.
 
-**Disconnect** removes PDF Scholar from that tool's configuration again. The app
-changes nothing in the tool's configuration except its own `pdf-scholar` entry.
+PDF Scholar changes nothing in a tool's configuration except its own
+`pdf-scholar` entry, and refuses to touch a configuration file it cannot
+read. Then ask the tool something that needs your notes. Mentioning
+"PDF Scholar" or "my notes" helps it pick the right tool. In Claude Code,
+`/mcp` (or `claude mcp list` in a terminal) shows `pdf-scholar` as connected.
+
+All switches are off until you turn one on. When a switch goes on, PDF
+Scholar also reads, in the background, the annotations of the papers in your
+recent list that it has not read since they last changed. That way, papers
+you marked up before the tools existed come in too, without being opened
+again.
 
 ## Turning it off, and keeping things out
 
-- **Share with AI tools** (the switch at the top of the section) shuts every
-  tool out at once when turned off, including tools you set up by hand. No
-  tool's configuration is touched, and switching it on again is the same click.
-- **One document:** in the sidebar's **Annotations** tab, **Keep out of AI
-  tools** (shown while sharing is on). One click lets it back in.
-- **A whole folder:** **Keep a folder out …** under **Kept out** in the
-  settings. Everything in it is covered, including files added later. Each
-  kept-out folder and document is listed there with a × to let it back in.
+Everything is in the same dialog.
+
+- **A tool:** turn its switch off. That removes PDF Scholar from the tool's
+  configuration, and the server refuses that tool from the same moment, even
+  if the entry is still somewhere. Each entry PDF Scholar writes names the
+  tool it is for (`--client claude`), so one switch never lets another tool in.
+- **One document:** each document with notes or conversations has its own
+  switch under **What the tools may read**. In the sidebar's **Annotations**
+  tab, **Change** next to "Shared with AI tools" opens the dialog on that
+  document.
+- **A whole folder:** **Keep a folder out …** under **Folders kept out**.
+  Everything in it is covered, including files added later. Each folder is
+  listed with a × to let it back in.
 
 A document kept out gives a tool neither its notes nor its conversations.
-Another conversation that drew on it shows it only as "a conversation", without
-its name.
+Another conversation that drew on it shows it only as "a conversation",
+without its name.
 
-Claude Code is connected at user scope, so the server is there in every
-project. If PDF Scholar cannot find the `claude` command (it looks in
-`~/.local/bin` and on the PATH), the row offers **Copy command** instead; run
-that line in a terminal.
+If PDF Scholar cannot find the `claude` command (it looks in `~/.local/bin`
+and on the PATH), the Claude row offers **Copy command** instead. Run that
+line in a terminal.
 
 ## Other tools
 
-Any tool that runs local (stdio) MCP servers can use it. In **AI tools on this
-computer**, click **Copy setup**. It puts the server on your clipboard in the
+Any tool that runs local (stdio) MCP servers can use it. Turn on **Other
+tools**, then click **Copy setup**. It puts the server on your clipboard in the
 common `mcpServers` form, with the real paths of your installation filled in:
 
 ```json
@@ -61,7 +79,7 @@ common `mcpServers` form, with the real paths of your installation filled in:
   "mcpServers": {
     "pdf-scholar": {
       "command": "C:\\Users\\you\\AppData\\Local\\Programs\\PDF Scholar\\PDF Scholar.exe",
-      "args": ["C:\\Users\\you\\AppData\\Roaming\\PDF Scholar\\mcp\\pdf-scholar-mcp.cjs"],
+      "args": ["C:\\Users\\you\\AppData\\Roaming\\PDF Scholar\\mcp\\pdf-scholar-mcp.cjs", "--client", "other"],
       "env": { "ELECTRON_RUN_AS_NODE": "1" }
     }
   }
@@ -70,10 +88,9 @@ common `mcpServers` form, with the real paths of your installation filled in:
 
 The server is PDF Scholar's own executable running a small script in Node
 mode (`ELECTRON_RUN_AS_NODE=1`). It opens no window and no network port, and
-it does not need PDF Scholar to be open. **Copy setup** also puts the script
-in place and turns on **Share with AI tools**, so press it once even if you
-write the entry by hand. A tool set up this way is removed from its own
-configuration by hand. Turning the switch off shuts it out at once.
+it does not need PDF Scholar to be open. A tool set up by hand is removed from
+its own configuration by hand, but turning **Other tools** off shuts it out at
+once.
 
 Where each tool wants the entry:
 
@@ -83,17 +100,7 @@ Where each tool wants the entry:
 | **Gemini CLI** | `~/.gemini/settings.json` | the `mcpServers` block above, as is |
 | **Windsurf** | `~/.codeium/windsurf/mcp_config.json` | the `mcpServers` block above, as is |
 | **VS Code** (Copilot) | `MCP: Open User Configuration` | `"servers"` instead of `"mcpServers"`, and `"type": "stdio"` in the entry |
-| **Codex** | `~/.codex/config.toml` | TOML, below |
 | **opencode** | `~/.config/opencode/opencode.json` | its own `mcp` block, below |
-
-**Codex** (`~/.codex/config.toml`):
-
-```toml
-[mcp_servers.pdf-scholar]
-command = 'C:\Users\you\AppData\Local\Programs\PDF Scholar\PDF Scholar.exe'
-args = ['C:\Users\you\AppData\Roaming\PDF Scholar\mcp\pdf-scholar-mcp.cjs']
-env = { ELECTRON_RUN_AS_NODE = "1" }
-```
 
 **opencode** (`~/.config/opencode/opencode.json`):
 
@@ -105,7 +112,9 @@ env = { ELECTRON_RUN_AS_NODE = "1" }
       "type": "local",
       "command": [
         "C:\\Users\\you\\AppData\\Local\\Programs\\PDF Scholar\\PDF Scholar.exe",
-        "C:\\Users\\you\\AppData\\Roaming\\PDF Scholar\\mcp\\pdf-scholar-mcp.cjs"
+        "C:\\Users\\you\\AppData\\Roaming\\PDF Scholar\\mcp\\pdf-scholar-mcp.cjs",
+        "--client",
+        "other"
       ],
       "environment": { "ELECTRON_RUN_AS_NODE": "1" },
       "enabled": true
@@ -126,12 +135,12 @@ Take the two paths from **Copy setup**. For reference, they are:
 
 ## ChatGPT
 
-ChatGPT (on the web and in its desktop app) only connects to MCP servers on
-the internet, not to a program on your own computer. Use **Copy for AI**
-instead. It is in the **Annotations** tab of the sidebar, under the export
-buttons. It copies the open document's highlights, comments and AI
-conversations as text, ready to paste into ChatGPT or any other chat. This also
-works in the browser extension.
+ChatGPT, on the web, connects only to MCP servers on the internet, not to a
+program on your own computer. Use **Copy for AI** instead. It is in the
+**Annotations** tab of the sidebar, under the export buttons. It copies the
+open document's highlights, comments and AI conversations as text, ready to
+paste into ChatGPT or any other chat. This also works in the browser
+extension.
 
 ## What a tool can read
 
@@ -152,27 +161,27 @@ The server is read-only and offers four tools:
   client. A mark's author is not sent either.
 - **Nothing about a password-protected document or one you kept out**: neither
   notes nor conversations.
-- **Share with AI tools off**, or **AI access → Off**, makes the server refuse
-  every request, at once.
+- **A tool whose switch is off** has every request refused, at once. The
+  switches are separate from **AI access** in the assistant's settings, which
+  governs PDF Scholar's own assistant.
 - What a tool reads goes to **the AI provider that tool uses**, under that
-  tool's terms. That is what connecting it means. See [PRIVACY.md](PRIVACY.md).
+  tool's terms. That is what turning it on means. See [PRIVACY.md](PRIVACY.md).
 
 A document's notes are recorded when you open it in PDF Scholar and whenever
-its annotations change. A paper annotated before this version comes in the
-first time you open it again. Annotations made in another program appear once
-the file has been opened in PDF Scholar.
+its annotations change. Papers in your recent list are also read in the
+background while a tool is on, as described above. Older papers outside the
+recent list come in the first time you open them again.
 
 ## Troubleshooting
 
-- **The tool says the server failed to start.** Press **Copy setup** (or
-  **Connect**) once in PDF Scholar. That puts the script in place. Then check that
-  both paths in the entry exist.
-- **"Sharing with AI tools is switched off in PDF Scholar".** Turn on **Share
-  with AI tools** in the AI settings.
-- **"AI access is switched off in PDF Scholar".** Turn AI access back on in
-  PDF Scholar's AI settings.
+- **The tool says the server failed to start.** Turn its switch off and on
+  again in PDF Scholar. That puts the script back in place. For a tool set up
+  by hand, check that both paths in the entry exist.
+- **"PDF Scholar is not sharing with this tool".** Turn on its switch under
+  **AI tools** in PDF Scholar's settings menu. A hand-made entry without
+  `--client` answers to **Other tools**.
 - **Claude Desktop shows no PDF Scholar tools.** Restart Claude Desktop after
-  connecting.
+  turning Claude on.
 - **Check from Claude Code:** `claude mcp list` should list `pdf-scholar` as
   connected.
 - **Microsoft Store version.** A Store app cannot be started by another program,

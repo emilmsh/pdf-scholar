@@ -1829,7 +1829,15 @@ const ui = {
       if (!(r.width > 0 && r.top > box.top + 40 && r.bottom < box.top + box.height * 0.5)) return false;
       return spans.some((s) => over(r, s.getBoundingClientRect()));
     });
-    if (links.length === 0) throw new Error('no internal link over «[2, …]» in the upper half of the page');
+    if (links.length === 0) {
+      // Say what WAS there: whether the text is missing, the link is, or
+      // both are just lower on the page than the frame expects
+      const all = [...page.querySelectorAll('a.pdf-link.internal')].map((a) => a.getBoundingClientRect())
+      const at = (r) => Math.round(r.top - box.top) + '..' + Math.round(r.bottom - box.top)
+      throw new Error('no internal link over «[2, …]» in the upper half of the page — spans with «[2,»: ' +
+        JSON.stringify(spans.map((s) => (s.textContent || '').slice(0, 40) + ' @' + at(s.getBoundingClientRect()))) +
+        '; internal links: ' + all.length + ' (first at ' + (all[0] ? at(all[0]) : '-') + '); visible height ' + Math.round(box.height));
+    }
     links.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
     const a = links[0];
     const r = a.getBoundingClientRect();

@@ -671,13 +671,16 @@ regressions are treated as bugs, not as acceptable platform lag.
     notes (`userData/notes`, written by the viewer as marks settle,
     `src/shared/research-notes.ts`). An extension has no process another
     program could start and no such folder, so `setDocNotes` is a no-op
-    there and in dev:web, `mcpStatus`/`mcpPolicy` answer null and neither
-    the settings group nor the Merknader tab's «Hold utenfor KI-verktøy»
-    is drawn. What may be shared — the master switch, off until a tool is
-    connected, and the documents and folders kept out — lives in the state
+    there and in dev:web, `mcpStatus`/`mcpPolicy` answer null, the
+    settings menu offers no «KI-verktøy» entry and the Merknader tab draws
+    no «Deles med KI-verktøy» line; nor is the quiet pass over the recents
+    run (`notesBackfillTargets` answers []). What may be shared — one
+    switch per tool (Claude, Codex, other), all off until the reader turns
+    one on, and the documents and folders kept out — lives in the state
     file's own `mcp` key (`shared/mcp.ts`), which the server reads on every
     call; a folder kept out compares without case on Windows and macOS and
-    with it on Linux, as their file systems do. The Merknader tab's «Kopier for KI» is renderer code and
+    with it on Linux, as their file systems do. Codex's config.toml lives
+    under `CODEX_HOME` or `~/.codex` on every OS alike. The Merknader tab's «Kopier for KI» is renderer code and
     identical everywhere (the extension reads its conversations from
     IndexedDB like the panel does). Within the desktop: Windows (installer
     and portable zip), macOS and Linux connect alike — on Linux the

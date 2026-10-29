@@ -15,9 +15,11 @@
 //
 // The rules that hold here and nowhere else, read from the state file on
 // EVERY call so a change in the app takes effect at once:
-// - The master switch (shared/mcp.ts, `mcp.sharing`, off until a tool is
-//   connected) and KI-tilgang «Av» each answer every tool call with a
-//   refusal.
+// - Each tool's switch (shared/mcp.ts, `mcp.clients`, all off until the
+//   reader turns one on): the entry the app wrote names its tool
+//   (`--client`), and a tool whose switch is off has every call refused.
+//   KI-tilgang is not read here — it governs the app's own assistant, and
+//   this panel has switches of its own (Emil, 2026-10-29).
 // - A document kept out — by itself or by a folder it lies under — and a
 //   password-protected one (its notes record says `locked`) give neither
 //   notes nor conversations, and are not listed. Where another conversation
@@ -37,7 +39,7 @@ import type { AiCitation } from '../shared/types'
 import type { ConversationSummary, StoredConversation } from '../shared/chat-history'
 import { docNameFromPath, searchConversations } from '../shared/chat-history'
 import { ENGLISH_CHAT_LABELS, plainCitationMarker } from '../shared/chat-markdown'
-import type { McpPolicy } from '../shared/mcp'
+import type { McpClient, McpPolicy } from '../shared/mcp'
 import { excludedBy, sanitizeMcpPolicy } from '../shared/mcp'
 import type { DocNotes } from '../shared/research-notes'
 import { ENGLISH_NOTES_LABELS, documentMarkdown, searchNotes } from '../shared/research-notes'
@@ -141,6 +143,8 @@ export interface McpServerOptions {
   /** userData: pdfx-state.json, chats/ and notes/ */
   dataDir: string
   version: string
+  /** The tool this process serves — the switch it answers to */
+  client: McpClient
   /** Whether paths compare without case (Windows and macOS); the platform's
    *  by default — injected so a test can check both */
   foldCase?: boolean
@@ -159,28 +163,19 @@ const day = (ms: number): string => new Date(ms).toISOString().slice(0, 10)
  *  about where the file lives */
 export const docIdOf = (path: string): string => createHash('sha1').update(path).digest('hex').slice(0, 10)
 
-/** What the state file says about sharing, read fresh: an unreadable file
- *  shares nothing (its policy sanitizes to the default, which is off) */
-interface Gate {
-  aiOff: boolean
-  policy: McpPolicy
-}
-
 export function createMcpServer(opts: McpServerOptions): McpServer {
   const chats = createChatHistoryStore(join(opts.dataDir, 'chats'))
   const notesStore = createNotesStore(join(opts.dataDir, 'notes'))
   const foldCase = opts.foldCase ?? process.platform !== 'linux'
 
-  async function gate(): Promise<Gate> {
+  /** What the state file says about sharing, read fresh: an unreadable file
+   *  shares nothing (its policy sanitizes to the default, which is off) */
+  async function policyNow(): Promise<McpPolicy> {
     try {
       const state = JSON.parse(await readFile(join(opts.dataDir, 'pdfx-state.json'), 'utf-8')) as unknown
-      if (!isObj(state)) return { aiOff: false, policy: sanitizeMcpPolicy(null) }
-      return {
-        aiOff: isObj(state.ai) && state.ai.access === 'off',
-        policy: sanitizeMcpPolicy(state.mcp)
-      }
+      return sanitizeMcpPolicy(isObj(state) ? state.mcp : null)
     } catch {
-      return { aiOff: false, policy: sanitizeMcpPolicy(null) }
+      return sanitizeMcpPolicy(null)
     }
   }
 
@@ -402,21 +397,15 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
           const name = typeof params.name === 'string' ? params.name : ''
           const run = toolsByName[name]
           if (!run) return failure(id, -32602, `Unknown tool: ${name}`)
-          const g = await gate()
-          if (g.aiOff) {
+          const policy = await policyNow()
+          if (!policy.clients[opts.client]) {
             return refusal(
               id,
-              'AI access is switched off in PDF Scholar (AI settings → AI access), so it shares nothing with AI tools. The user can turn it back on there.'
-            )
-          }
-          if (!g.policy.sharing) {
-            return refusal(
-              id,
-              'Sharing with AI tools is switched off in PDF Scholar (AI settings → AI tools on this computer). The user can turn it on there.'
+              'PDF Scholar is not sharing with this tool: its switch is off in PDF Scholar (Settings → AI tools on this computer). The user can turn it on there.'
             )
           }
           try {
-            const text = await run(isObj(params.arguments) ? params.arguments : {}, g.policy)
+            const text = await run(isObj(params.arguments) ? params.arguments : {}, policy)
             return reply(id, { content: [{ type: 'text', text }] })
           } catch (err) {
             return refusal(id, err instanceof Error ? err.message : String(err))
