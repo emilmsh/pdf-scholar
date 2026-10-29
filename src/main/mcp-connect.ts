@@ -17,7 +17,9 @@
 // - Claude Code: its own CLI (`claude mcp add … --scope user`) — its config
 //   file is rewritten by every running session, and a merge from outside
 //   could be lost under one.
-// - Codex: its config.toml (CLI, app and editor extension share it), our
+// - Codex: its config.toml (the CLI, Codex in the ChatGPT desktop app —
+//   the Codex app merged into it in July 2026 — and the editor extension
+//   share it; the app keeps its own plugins and MCP servers there), our
 //   one table written or taken out and every other line left as it was.
 // - Anything else (Cursor, opencode, …): the panel copies the entry to paste.
 // Every entry names its tool (`--client`), and the switch is written to the

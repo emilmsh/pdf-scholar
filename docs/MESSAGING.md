@@ -480,9 +480,12 @@ that.)*
   on the clipboard for ChatGPT or any other chat. *(Nothing to download: the
   server is the desktop app itself — say so, it is the first question. The
   connection is desktop-only and not in the Microsoft Store build, PLATFORMS
-  §33; the copy works everywhere. Never "integrates with ChatGPT" — ChatGPT
-  gets the copy, not the server. The extension listing names no tool and
-  claims only the copy.)*
+  §33; the copy works everywhere. Never "integrates with ChatGPT": in the
+  ChatGPT desktop app it is CODEX that reads the notes (the Codex app became
+  part of ChatGPT's desktop app in July 2026, Emil, 2026-10-29 — say «Codex
+  in the ChatGPT app», never «the Codex app»); chatgpt.com and the chat
+  itself get the copy, not the server. The extension listing names no tool
+  and claims only the copy.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
