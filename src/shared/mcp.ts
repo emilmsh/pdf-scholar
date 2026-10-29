@@ -241,7 +241,8 @@ export function claudeCodeCommand(entry: McpServerEntry, windows: boolean): stri
 
 // ---------- Codex (~/.codex/config.toml) ----------
 //
-// Codex — its CLI, its app and its editor extension — reads one TOML file.
+// Codex — its CLI, Codex in the ChatGPT desktop app and the editor
+// extension — reads one TOML file.
 // No TOML parser here (the house rule on dependencies), and none is needed:
 // we write and remove exactly one table of our own, `[mcp_servers.pdf-scholar]`,
 // and every other line of the file is left byte for byte as it was. Our table
