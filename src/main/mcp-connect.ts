@@ -21,7 +21,8 @@
 //   the Codex app merged into it in July 2026 — and the editor extension
 //   share it; the app keeps its own plugins and MCP servers there), our
 //   one table written or taken out and every other line left as it was.
-// - Anything else (Cursor, opencode, …): the panel copies the entry to paste.
+// - Any other tool that speaks MCP: the panel copies the entry to paste.
+//   Only tools we have checked get a switch of their own (Emil, 2026-10-29).
 // Every entry names its tool (`--client`), and the switch is written to the
 // policy FIRST when turning off — so a tool is shut out even if taking its
 // entry back fails.
