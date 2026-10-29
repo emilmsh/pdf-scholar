@@ -364,6 +364,8 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     mcpPolicy: async () => null,
     mcpSetPolicy: async () => null,
     mcpPickFolder: async () => null,
+    mcpDocuments: async () => [],
+    notesBackfillTargets: async () => [],
 
     // A document's identity across a move (issue #46; shared/doc-identity.ts).
     // Only a file:// URL can be known to be GONE here, and only with file

@@ -381,11 +381,11 @@ paper: highlights with the words they mark, comments, notes, and your assistant
 conversations with the passages each answer cited. While you write, ask Claude Code what
 you noted about a method, and it looks it up without opening a PDF.
 
-- **Nothing to download.** The MCP server is part of the desktop app. In the assistant's
-  settings, under "AI tools on this computer", **Claude Code** and **Claude Desktop**
-  connect with one click
-- **Codex, opencode, Cursor, VS Code, Gemini CLI** and other MCP tools take one config
-  entry, which "Copy setup" fills in with your paths. Each tool's format is in
+- **Nothing to download.** The MCP server is part of the desktop app. In the settings
+  menu, "AI tools" has one switch for **Claude** (Claude Code and Claude Desktop) and one
+  for **Codex**; turning it on writes PDF Scholar into that tool's own settings
+- **opencode, Cursor, VS Code, Gemini CLI** and other MCP tools take one config entry,
+  which "Copy setup" fills in with your paths. Each tool's format is in
   [docs/MCP.md](docs/MCP.md)
 - **ChatGPT** (and any other chat): "Copy for AI" in the Annotations tab copies the open
   document's notes and conversations as text, ready to paste. This also works in the
@@ -393,10 +393,9 @@ you noted about a method, and it looks it up without opening a PDF.
 - Read-only: four tools (search, list papers, one paper's notes, one conversation).
   Tools never see the PDFs, images, file paths or folder names, and nothing from a
   password-protected document. The notes are kept up to date in the background as you
-  annotate
-- Off until you connect a tool. One switch, "Share with AI tools", shuts every tool out
-  at once. A document can be kept out from its Annotations tab, and a whole folder (a
-  client's, say) from the settings
+  annotate, and papers you marked up earlier are read in quietly once a tool is on
+- Off until you turn a tool on, and the same switch takes it back. In the same dialog,
+  each document has its own switch, and a whole folder (a client's, say) can be kept out
 
 ### Shortcuts you can rebind
 
@@ -422,9 +421,9 @@ assistant's settings decides how far that goes. "Confirm before sharing" pauses 
 first request that takes a document to a provider in a session, naming the model and
 what is about to be attached, and lets follow-up questions about the same document pass;
 a new document or a new provider asks again. "Off" blocks every AI request in the
-transport layer, so a stored key cannot leak content by accident. It also makes the
-server for outside AI tools refuse every request. A tool you connect reads your notes and
-conversations, and what it reads goes to that tool's provider, under that tool's terms.
+transport layer, so a stored key cannot leak content by accident. An outside AI tool you
+turn on under "AI tools" reads your notes and conversations, and what it reads goes to
+that tool's provider, under that tool's terms. Its own switch takes that back.
 
 The key is pasted once, in the assistant's settings, and goes into the platform's key
 store: DPAPI on Windows, Keychain on macOS, the system keyring on Linux. The browser

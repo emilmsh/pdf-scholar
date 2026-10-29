@@ -467,15 +467,15 @@ that.)*
   it leaves; PRIVACY.md states this)*
 - Your notes reach the AI tools you work in *(2026-10-29, Emil: Claude Code
   and ChatGPT should find what was noted and asked about a paper without
-  reading it again)*: Claude Code and Claude Desktop connect with one click
-  under «AI tools on this computer»; Codex, opencode, Cursor and other MCP
-  tools take one config entry the app copies for you
+  reading it again)*: Claude (Code and Desktop) and Codex are each one
+  switch under «AI tools» in the settings menu; opencode, Cursor and other
+  MCP tools take one config entry the app copies for you
   ([`MCP.md`](MCP.md)). They can then search your highlights (with the words
   marked), comments and assistant conversations across every paper — never
   the PDFs, never images, never where a file lives, nothing of a
-  password-protected document. Sharing is off until you connect a tool, one
-  switch turns it off for all of them, and a document or a whole folder can
-  be kept out. «Copy
+  password-protected document. Every switch is off until you turn it on,
+  the same switch takes it back, and a document or a whole folder can be
+  kept out in the same place. «Copy
   for AI» in the Annotations tab puts one document's notes and conversations
   on the clipboard for ChatGPT or any other chat. *(Nothing to download: the
   server is the desktop app itself — say so, it is the first question. The
@@ -554,12 +554,13 @@ app looks like.)*
   blocks every AI request in the transport layer, so a stored key cannot leak
   content by accident
 - With a local model (Ollama, LM Studio), questions also stay on the machine
-- An AI tool you connect (Claude Code, Claude Desktop, …) reads your notes and
-  conversations through a read-only server on your own machine, and what it
-  reads goes to that tool's provider under its terms; nothing is shared until
-  you connect one, one switch takes it back from every tool at once, a
-  document or folder can be kept out, no file path ever leaves, and AI access
-  **Off** closes this door too *(PRIVACY.md, «AI tools on your computer»)*
+- An AI tool you turn on (Claude Code, Claude Desktop, Codex, …) reads your
+  notes and conversations through a read-only server on your own machine, and
+  what it reads goes to that tool's provider under its terms; nothing is
+  shared until you turn a tool on, its switch takes it back at once, a
+  document or folder can be kept out, and no file path ever leaves
+  *(PRIVACY.md, «AI tools on your computer»; the switches are separate from
+  AI access, which governs the app's own assistant — Emil, 2026-10-29)*
 - The key is stored in the platform's own key store; the exact mode differs per
   platform and the settings panel names the one in force. See "Wording we do not
   use" below before writing anything shorter than that

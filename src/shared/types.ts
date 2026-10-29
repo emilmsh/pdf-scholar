@@ -4,7 +4,7 @@ import type { CitationStyleId } from './citation-style'
 import type { ConversationHit, ConversationMeta, StoredConversation } from './chat-history'
 import type { FileIconChoice, FileIconErrorCode, FileIconResult } from './file-icon'
 import type { DocNotes } from './research-notes'
-import type { McpErrorCode, McpPolicy, McpResult, McpStatus, McpTarget } from './mcp'
+import type { McpDocument, McpErrorCode, McpPolicy, McpResult, McpStatus, McpTarget } from './mcp'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
  *  'custom' is the user-toned light mode (paper tone from `customTone`) */
@@ -1090,15 +1090,23 @@ export interface PdfxApi {
    *  (userData/notes). A no-op elsewhere — neither the extension nor a
    *  browser tab has a process another program could start. */
   setDocNotes(record: DocNotes): Promise<void>
+  /** Desktop: the recents whose marks have not been read into a notes record
+   *  since their file last changed — each handed out once per session, and
+   *  only while some tool may read. [] elsewhere. */
+  notesBackfillTargets(): Promise<{ path: string; name: string }[]>
   /** Desktop: which AI tools are here and connected; null where none can be */
   mcpStatus(): Promise<McpStatus | null>
-  /** Desktop: connect (on) or disconnect one tool. Connecting turns the
-   *  master switch on. */
+  /** Desktop: turn one tool's switch on or off — its entry in the tool's own
+   *  config written or taken back, and the server's answer to it with it */
   mcpConnect(target: McpTarget, on: boolean): Promise<McpResult>
-  /** Desktop: the master switch and what is kept out; null where no tool can
-   *  be connected */
+  /** Desktop: the switches and what is kept out; null where no tool can be
+   *  connected */
   mcpPolicy(): Promise<McpPolicy | null>
-  mcpSetPolicy(patch: Partial<McpPolicy>): Promise<McpPolicy | null>
+  /** Desktop: what is kept out (the switches turn only through mcpConnect) */
+  mcpSetPolicy(patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders'>>): Promise<McpPolicy | null>
+  /** Desktop: every document with notes or conversations, as the panel lists
+   *  them; [] elsewhere */
+  mcpDocuments(): Promise<McpDocument[]>
   /** Desktop: a folder to keep out, from the system's folder picker */
   mcpPickFolder(): Promise<string | null>
   setSettings(patch: Partial<Settings>): void

@@ -118,10 +118,11 @@ interface Props {
   /** «Kopier for KI»: the marks and this document's conversations as text */
   onCopyForAi(): void
   /** Whether AI tools outside the app are kept from this document (shared/
-   *  mcp.ts): by itself, by its folder, or not. undefined = no switch —
-   *  not the desktop, or sharing is off. */
+   *  mcp.ts): by itself, by its folder, or not. undefined = no line — not
+   *  the desktop, or no tool may read. */
   aiToolsKeptOut?: 'doc' | 'folder' | null | undefined
-  onToggleAiToolsKeptOut?: (() => void) | undefined
+  /** Open «KI-verktøy på maskinen» on this document */
+  onChangeAiTools?: (() => void) | undefined
   /** Open the AI panel with the "summarize my annotations" question */
   onAskAi(): void
   /** Browser/extension only: the open document's display name + source path,
@@ -190,7 +191,7 @@ function Sidebar({
   onExport,
   onCopyForAi,
   aiToolsKeptOut,
-  onToggleAiToolsKeptOut,
+  onChangeAiTools,
   onAskAi,
   docName,
   docPath,
@@ -473,7 +474,7 @@ function Sidebar({
           onExport={onExport}
           onCopyForAi={onCopyForAi}
           aiToolsKeptOut={aiToolsKeptOut}
-          onToggleAiToolsKeptOut={onToggleAiToolsKeptOut}
+          onChangeAiTools={onChangeAiTools}
           onAskAi={onAskAi}
           selectedAnnotId={selectedAnnotId}
           onCommentChange={onCommentChange}
@@ -663,7 +664,7 @@ function AnnotationList({
   onExport,
   onCopyForAi,
   aiToolsKeptOut,
-  onToggleAiToolsKeptOut,
+  onChangeAiTools,
   onAskAi,
   selectedAnnotId,
   onCommentChange,
@@ -681,7 +682,8 @@ function AnnotationList({
   onExport(format: ExportFormat): void
   onCopyForAi(): void
   aiToolsKeptOut?: 'doc' | 'folder' | null | undefined
-  onToggleAiToolsKeptOut?: (() => void) | undefined
+  /** Open «KI-verktøy på maskinen» on this document */
+  onChangeAiTools?: (() => void) | undefined
   onAskAi(): void
   selectedAnnotId: string | null
   onCommentChange(pageNumber: number, localId: string, text: string): void
@@ -850,22 +852,17 @@ function AnnotationList({
             {t('side.copyForAi')}
           </button>
         </div>
-        {/* Only while sharing with AI tools is on: one switch per document,
-            beside the copy that is its other door. A folder kept out holds
-            the switch on — let the folder back in from the settings. */}
-        {aiToolsKeptOut !== undefined && onToggleAiToolsKeptOut && (
-          <label
-            className="theme-menu-toggle annot-ai-keep-out"
-            title={aiToolsKeptOut === 'folder' ? t('side.keptOutByFolder') : t('side.keepOutOfAiTip')}
-          >
-            <input
-              type="checkbox"
-              checked={aiToolsKeptOut !== null}
-              disabled={aiToolsKeptOut === 'folder'}
-              onChange={onToggleAiToolsKeptOut}
-            />
-            {t('side.keepOutOfAi')}
-          </label>
+        {/* Only while some AI tool may read: whether this document is
+            shared, beside the copy that is its other door. The choice
+            itself lives in one place with every other document and the
+            tools (AiToolsDialog.tsx) — «Endre» opens it on this one. */}
+        {aiToolsKeptOut !== undefined && onChangeAiTools && (
+          <div className="annot-ai-tools">
+            <span>{aiToolsKeptOut === null ? t('side.aiShared') : t('side.aiKeptOut')}</span>
+            <button className="menu-link" onClick={onChangeAiTools} title={t('side.aiChangeTip')}>
+              {t('side.aiChange')}
+            </button>
+          </div>
         )}
         <button className="annot-ask-ai" disabled={empty} onClick={onAskAi} title={t('side.askAiTip')}>
           <span className="annot-ask-ai-glyph">✦</span>

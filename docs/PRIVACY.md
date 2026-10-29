@@ -106,26 +106,29 @@ noted, the desktop app keeps a small record per document of your annotations
 (the words each highlight marks, your comments, notes and text boxes, the
 document's title, DOI and page count) next to its other local data. It is
 written on your device whenever a document's annotations change, never
-transmitted by the app, and removed when the document has none. **A
-password-protected document's record holds nothing but the fact that it is
-locked.** Nothing reads this record unless you connect a tool under "AI tools on
-this computer" in the AI settings; **sharing with AI tools is off until you
-do**. A connected tool starts PDF Scholar's own read-only server on your machine
-— no network port is opened — and can then read those records and your AI
-conversations (their text and the passages the answers cited). It never gets
-images, the PDFs themselves, where a file lives (no path or folder name — a
-document is named by its file name and a short id), who wrote a mark, or
-anything at all about a password-protected document or one you chose to keep
-out — single documents from the Annotations tab, whole folders from the
-settings. **What the tool reads goes to whichever AI provider that tool uses,
-under that tool's terms** — that is the point of connecting it, and it is
+transmitted by the app, and removed when the document has none. While a tool is
+switched on, the app also reads the annotations of the documents in your recent
+list that it has not read since they last changed, on your device, to keep the
+same record for them. **A password-protected document's record holds nothing
+but the fact that it is locked.** Nothing reads this record unless you turn a
+tool on under "AI tools" in the settings menu; **every tool's switch is off
+until you do**. A tool switched on starts PDF Scholar's own read-only server on
+your machine, which opens no network port. The tool can then read those records
+and your AI conversations (their text and the passages the answers cited). It
+never gets images, the PDFs themselves, or where a file lives: there is no path
+or folder name, and a document is named by its file name and a short id. It
+never gets who wrote a mark, or anything at all about a password-protected
+document or one you chose to keep out (single documents or whole folders, in
+the same dialog). **What the tool reads goes to whichever AI provider that tool
+uses, under that tool's terms.** That is the point of turning it on, and it is
 outside this app's control. Text from a PDF (the words you highlighted, a
-passage an answer cited) reaches that tool's model too; the server marks it as
+passage an answer cited) reaches that tool's model too. The server marks it as
 data rather than instructions, which lowers but does not remove the chance
-that a document written to manipulate an AI tool does so. Turning **Share with
-AI tools** off — or the AI access switch to **Off** — makes the server refuse
-every request at once, for every tool; "Disconnect" removes PDF Scholar from a
-tool's configuration. The Annotations tab's "Copy for AI"
+that a document written to manipulate an AI tool does so. Turning a tool's
+switch off removes PDF Scholar from that tool's configuration and makes the
+server refuse that tool at once, even where its entry was set up by hand. The
+switches are separate from the AI access switch above, which governs the app's
+own assistant. The Annotations tab's "Copy for AI"
 puts the same kind of text for the open document on your clipboard, for you to
 paste wherever you choose; nothing is sent by the copy itself.
 

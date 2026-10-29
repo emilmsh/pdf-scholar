@@ -39,6 +39,8 @@ import { createDocRegistry } from './doc-registry'
 import { emitLocalDocEvent } from './local-doc-events'
 import { browserCurrentBytes } from './annotation-engine-browser'
 import PdfViewer from './components/PdfViewer'
+import AiToolsDialog, { onOpenAiTools } from './components/AiToolsDialog'
+import { runNotesBackfill } from './notes-backfill'
 import TabBar from './components/TabBar'
 import Welcome from './components/Welcome'
 import { DEFAULT_SETTINGS as FALLBACK_SETTINGS } from '../../shared/defaults'
@@ -1509,8 +1511,21 @@ export default function App(): React.JSX.Element {
     [openPath, openPayload]
   )
 
+  // «KI-verktøy på maskinen» — one dialog per window, opened from any tab's
+  // gear menu or Merknader tab (AiToolsDialog.tsx)
+  const [aiTools, setAiTools] = useState<{ path: string | undefined } | null>(null)
+  useEffect(() => onOpenAiTools((path) => setAiTools({ path })), [])
+  // Marks of papers not opened since notes were kept, read quietly once the
+  // window has settled — main hands out nothing while no tool may read
+  useEffect(() => {
+    if (!isElectron) return undefined
+    const id = window.setTimeout(() => void runNotesBackfill(), 15_000)
+    return () => window.clearTimeout(id)
+  }, [])
+
   return (
     <div className="app" onDragOver={(e) => e.preventDefault()} onDrop={onDrop}>
+      {aiTools && <AiToolsDialog focusPath={aiTools.path} onClose={() => setAiTools(null)} />}
       {error && (
         <div className="error-banner" role="alert">
           <span>{error}</span>

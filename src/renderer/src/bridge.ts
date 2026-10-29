@@ -198,6 +198,8 @@ export const webApi: PdfxApi = {
   mcpPolicy: async () => null,
   mcpSetPolicy: async () => null,
   mcpPickFolder: async () => null,
+  mcpDocuments: async () => [],
+  notesBackfillTargets: async () => [],
   // `storage` fires in OTHER tabs only, and names no document — the listener
   // refreshes whatever it shows
   onConversationsChanged: (cb) => {
