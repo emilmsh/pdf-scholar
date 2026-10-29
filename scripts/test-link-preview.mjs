@@ -72,6 +72,28 @@ const check = (label, cond, detail = '') => {
     check(`linkKind(${name}) = ${kind}`, M.linkKind(name) === kind, M.linkKind(name))
   }
   check('linkKind(null) = other (an explicit destination has no name)', M.linkKind(null) === 'other')
+  // No name to read: the link's own words (the AEA journals' InDesign links
+  // «Table 1» to a page-wide /FitR, 2026-10-29)
+  const words = {
+    'Table 1': 'table',
+    'Table 1': 'table',
+    'Tables 2 and 3': 'table',
+    'Table A.1': 'table',
+    'Tab. 4': 'table',
+    'Tabell 2': 'table',
+    'Figure 3': 'figure',
+    'Fig. 3a': 'figure',
+    'Figures 1–2': 'figure',
+    'figur 5': 'figure',
+    'Abb. 2': 'figure',
+    '1': null,
+    'Section 3': null,
+    'tables are useful': null,
+    '': null
+  }
+  for (const [text, kind] of Object.entries(words)) {
+    check(`linkKindFromText(${JSON.stringify(text)}) = ${kind}`, M.linkKindFromText(text) === kind, String(M.linkKindFromText(text)))
+  }
 }
 {
   const ref = { num: 4, gen: 0 }
@@ -520,6 +542,19 @@ const near = (a, b, tol = 1.5) => Math.abs(a - b) <= tol
   const graphics = [{ x0: 60, y0: 380, x1: 290, y1: 540 }, { x0: 0, y0: 760, x1: 612, y1: 761 }]
   const box = M.floatBox('figure', { x: 56, y: 377 }, lines, graphics, { w: 612, h: 792 })
   check('a figure beside body text in the other column: in its column only', box && box.x0 >= 55 && box.x1 <= 297 && near(box.top, 540) && near(box.bottom, 365 - 3.5), JSON.stringify(box))
+}
+{
+  // A page-wide /FitR (InDesign's: it starts at x = -130, left of the paper)
+  // names no column: the table is found under it in the RIGHT one, ruled,
+  // cells in it, body text below — and the box keeps to that column
+  const lines = []
+  for (let i = 0; i < 50; i++) lines.push(T(56, 296, 700 - i * 12, PROSE))
+  lines.push(T(316, 360, 690, 'Table 2'), T(316, 520, 679, 'Shares by product category, 2013'))
+  for (let i = 0; i < 5; i++) lines.push(T(316, 380, 655 - i * 10, 'Category ' + i, 8), T(440, 470, 655 - i * 10, '12.' + i + '%', 8), T(500, 530, 655 - i * 10, '$1' + i + ' B', 8))
+  for (let i = 0; i < 30; i++) lines.push(T(316, 556, 590 - i * 12, PROSE))
+  const rules = [{ x0: 316, y0: 668, x1: 556, y1: 668 }, { x0: 316, y0: 610, x1: 556, y1: 610 }]
+  const box = M.floatBox('table', { x: -130, y: 712 }, lines, rules, { w: 612, h: 792 })
+  check('page-wide FitR (x off the paper): the table in the right column, its column only', box && box.x0 >= 315 && box.x1 <= 557 && near(box.top, 690 + 9.5) && near(box.bottom, 610), JSON.stringify(box))
 }
 {
   // Two columns whose floats run across the middle (a results page): too
