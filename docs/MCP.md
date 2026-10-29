@@ -29,7 +29,10 @@ writes that line for you when you turn a tool on.
      server is there in every project. Claude Desktop's
      `claude_desktop_config.json` gets the entry.
    - **Codex** covers the Codex CLI and Codex in the ChatGPT desktop app,
-     which both read `~/.codex/config.toml`.
+     which both read `~/.codex/config.toml`. In the ChatGPT app, switch to
+     Codex: an ordinary ChatGPT chat runs in OpenAI's cloud and cannot start
+     a program on your computer, so it never sees PDF Scholar (checked
+     2026-10-29).
 3. Start a new session in the tool. Claude Desktop needs a restart.
 
 PDF Scholar changes nothing in a tool's configuration except its own
