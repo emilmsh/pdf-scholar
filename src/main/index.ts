@@ -34,6 +34,7 @@ import type {
   SessionTab,
   SessionWindow,
   SetFormFieldRequest,
+  TabGroup,
   Settings,
   TabDropResult
 } from '../shared/types'
@@ -150,7 +151,7 @@ const pendingSessions = new Map<number, SessionWindow>()
 /** webContents.id → that window's strip as its renderer last reported it */
 const sessionWindows = new Map<
   number,
-  { win: BrowserWindow; tabs: SessionTab[]; active: number; bounds?: SessionBounds }
+  { win: BrowserWindow; tabs: SessionTab[]; active: number; groups?: TabGroup[]; bounds?: SessionBounds }
 >()
 /** Set when the app quits with windows still open: the session was written
  *  whole at that moment, and the windows closing after it must not shrink it.
@@ -170,7 +171,12 @@ function writeSession(): void {
   for (const w of sessionWindows.values()) {
     if (w.tabs.length === 0) continue
     const bounds = boundsOf(w.win) ?? w.bounds
-    windows.push(bounds ? { tabs: w.tabs, active: w.active, bounds } : { tabs: w.tabs, active: w.active })
+    windows.push({
+      tabs: w.tabs,
+      active: w.active,
+      ...(w.groups?.length ? { groups: w.groups } : {}),
+      ...(bounds ? { bounds } : {})
+    })
   }
   getState().session = { windows }
   saveState()
@@ -581,7 +587,13 @@ function createWindow(openPath?: string | null, restore?: StoredSessionWindow): 
   // when read inside the 'closed' handler
   const wcId = win.webContents.id
   if (openPath) pendingPaths.set(wcId, openPath)
-  if (restore) pendingSessions.set(wcId, { tabs: restore.tabs, active: restore.active })
+  if (restore) {
+    pendingSessions.set(wcId, {
+      tabs: restore.tabs,
+      active: restore.active,
+      ...(restore.groups ? { groups: restore.groups } : {})
+    })
+  }
 
   // Guard: the window can be closed before ready-to-show ever fires
   win.once('ready-to-show', () => {
@@ -1254,6 +1266,7 @@ function registerIpc(): void {
       win,
       tabs: clean?.tabs ?? [],
       active: clean?.active ?? 0,
+      ...(clean?.groups ? { groups: clean.groups } : {}),
       ...(prev?.bounds ? { bounds: prev.bounds } : {})
     })
     if (!sessionQuitting) scheduleSessionWrite()

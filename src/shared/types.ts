@@ -143,6 +143,22 @@ export interface SessionTab {
   /** Pinned tabs stay at the strip's start, lose their close button, and
    *  come back at every launch even with restoreSession off */
   pinned?: boolean
+  /** The id of the tab group it belongs to (src/shared/tab-groups.ts) */
+  group?: string
+}
+
+/** The colours a tab group can carry — a fixed set, as in the browsers */
+export type TabGroupColor = 'blue' | 'green' | 'yellow' | 'red' | 'purple' | 'grey'
+
+/** A named, coloured run of tabs in the strip that folds away to one chip
+ *  (src/shared/tab-groups.ts) */
+export interface TabGroup {
+  id: string
+  /** '' = unnamed: the chip shows its colour alone */
+  name: string
+  color: TabGroupColor
+  /** Folded: the strip shows the chip, not the tabs */
+  collapsed: boolean
 }
 
 /** A window's tabs in strip order (pinned first) and which one was showing */
@@ -150,6 +166,8 @@ export interface SessionWindow {
   tabs: SessionTab[]
   /** Index into `tabs` of the tab that was showing */
   active: number
+  /** The groups `tabs` refer to; absent when there are none */
+  groups?: TabGroup[]
 }
 
 export interface RecentFile {

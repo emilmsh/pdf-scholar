@@ -156,6 +156,12 @@ runs:
     # the «Alle faner» search
     - run: npm run test:tab-labels
       shell: bash
+    # Tab groups: each group one unbroken run with its chip in front, no
+    # pinned tab in one, the tab being read never folded away, Ctrl+Tab and
+    # the keyboard move passing over a folded group, and the groups through
+    # the stored session as untrusted input
+    - run: npm run test:tab-groups
+      shell: bash
     # Windows 8.3 aliases ("EFFECT~1.pdf") never become a document's identity:
     # Save renamed a temp file onto the alias and the long-named paper came
     # back with an eight-character name (issue #24). Logic everywhere; the

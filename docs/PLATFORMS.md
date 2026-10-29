@@ -580,7 +580,10 @@ regressions are treated as bugs, not as acceptable platform lag.
     search and numbered tabs on the very same chords. Ctrl+Shift+C (copy the
     document's path) is desktop-only too: in Edge and Chrome it is the
     browser's element picker, and the extension's document menu carries
-    «Kopier sti» instead. Covered by `npm run test:session` and
+    «Kopier sti» instead. Tab groups (2026-10-29, `src/shared/tab-groups.ts`)
+    are the strip's too: Edge and Chrome group their own tabs, and an
+    extension document is one of those. Covered by `npm run test:session`,
+    `test:tab-groups` and
     `test:recent-thumbs` (CI), and by `test:session-desktop`, `test:recents-grid`
     and `test:paged` (desktop session).
 30. **A document that changes on disk follows the file on the desktop only.**
