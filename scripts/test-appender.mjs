@@ -20,6 +20,14 @@ import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { PDFDocument, StandardFonts } from 'pdf-lib'
 import * as mupdf from 'mupdf'
+import { apLines, loadFreetextLayout, wrapLines } from './lib/freetext-check.mjs'
+
+/** PdfStandardFont 0–11, the twelve faces the text tool offers */
+const FACE_NAMES = [
+  'Courier', 'Courier-Bold', 'Courier-BoldOblique', 'Courier-Oblique',
+  'Helvetica', 'Helvetica-Bold', 'Helvetica-BoldOblique', 'Helvetica-Oblique',
+  'Times-Roman', 'Times-Bold', 'Times-BoldItalic', 'Times-Italic'
+]
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -394,6 +402,89 @@ for (const objectStreams of [false, true]) {
     }
     pdf.destroy()
   }
+}
+
+// =============================================================================
+// (b2) A text box is set here exactly as PDFium sets it (issue #66). A new box
+// hugs its text — its longest line plus 2 pt — so a file past 150 MB must put
+// the words where the normal save does and break them in the same places:
+// no inset, first baseline one ascent down, one step per line, the word that
+// would overrun moved down with its space, at each face's own Standard-14
+// widths. Before, this writer inset the text 2 pt, used Helvetica's widths for
+// every non-Courier face (a Times box hugging its text would have wrapped its
+// last word) and led the lines at 1.18 em whatever the face.
+// =============================================================================
+console.log('\n===== text box layout (appender) =====')
+{
+  const layout = await loadFreetextLayout()
+  // The width table IS the Standard-14 AFM: every entry, every face, against
+  // the base-14 fonts mupdf carries
+  let tableOff = 0
+  const firstOff = []
+  FACE_NAMES.forEach((name, font) => {
+    const f = new mupdf.Font(name)
+    for (const ch of layout.STANDARD_WIDTH_CHARS) {
+      const want = Math.round(f.advanceGlyph(f.encodeCharacter(ch.codePointAt(0)), false) * 1000)
+      const got = Math.round(layout.standardTextWidth(ch, 1000, font))
+      if (want !== got) {
+        tableOff++
+        if (firstOff.length < 3) firstOff.push(`${name} ${JSON.stringify(ch)} ${got} vs ${want}`)
+      }
+    }
+  })
+  check('layout: the width tables are the Standard-14 widths (12 faces × every WinAnsi character)',
+    tableOff === 0, tableOff ? `${tableOff} off: ${firstOff.join('; ')}` : `${layout.STANDARD_WIDTH_CHARS.length} characters`)
+
+  const FILE = path.join(TMP, 'run-layout.pdf')
+  fs.copyFileSync(await smallCorpus(false), FILE)
+  const SENTENCE = 'Hugging boxes wrap where the screen wraps them, word for word.'
+  const PARAGRAPH = 'A longer note that has to wrap: several lines of ordinary words, ' +
+    'some short and some rather longer, set in a box of a fixed width.'
+  const cases = []
+  for (let font = 0; font < 12; font++) {
+    const size = 13
+    const width = (s) => layout.standardTextWidth(s, size, font)
+    cases.push({ kind: 'lines', font, size, w: 300, contents: 'Ab\nCd\nEf' })
+    cases.push({ kind: 'hug', font, size, w: width(SENTENCE) + layout.FREETEXT_HUG_SLACK, contents: SENTENCE })
+    cases.push({ kind: 'wrap', font, size, w: 163, contents: PARAGRAPH })
+  }
+  for (const [i, c] of cases.entries()) {
+    c.rect = { x: 40, y: 40 + (i % 18) * 40, w: c.w, h: 120 }
+    const res = await applyAnnotation({
+      path: FILE, pageIndex: 0, color: [0, 0, 0], opacity: 1, type: 'freetext',
+      quads: [c.rect], contents: c.contents, fontSize: c.size, font: c.font
+    })
+    c.id = 'ok' in res ? res.id : null
+  }
+  check('layout: every probe box was appended', cases.every((c) => c.id !== null),
+    `${cases.filter((c) => c.id === null).length} failed`)
+  const { pdf, out } = mupdfAnnots(FILE, 0)
+  const pageH = pdf.loadPage(0).getBounds()[3]
+  const byId = new Map(out.map((a) => [a.id, a]))
+  const bad = { inset: [], ascent: [], step: [], hug: [], wrap: [] }
+  for (const c of cases) {
+    const lines = apLines(noteApText(byId.get(c.id)))
+    const label = `${FACE_NAMES[c.font]}`
+    const m = layout.freetextFaceMetrics(c.font)
+    if (c.kind === 'lines') {
+      if (lines.length !== 3 || lines.some((l) => Math.abs(l.x - c.rect.x) > 0.01)) bad.inset.push(`${label}: x ${lines.map((l) => l.x).join(',')}`)
+      const ascent = (pageH - c.rect.y - (lines[0]?.y ?? NaN)) / c.size
+      if (!(Math.abs(ascent - m.ascent) <= 0.002)) bad.ascent.push(`${label}: ${ascent.toFixed(4)} vs ${m.ascent}`)
+      const steps = lines.slice(1).map((l, i) => (lines[i].y - l.y) / c.size)
+      if (steps.length !== 2 || steps.some((s) => Math.abs(s - m.step) > 0.002)) bad.step.push(`${label}: ${steps.map((s) => s.toFixed(4)).join(',')}`)
+    } else {
+      const got = lines.map((l) => l.text.trim())
+      const want = wrapLines(c.contents, c.w, (s) => layout.standardTextWidth(s, c.size, c.font))
+      if (c.kind === 'hug' && got.length !== 1) bad.hug.push(`${label}: ${got.length} lines`)
+      if (c.kind === 'wrap' && JSON.stringify(got) !== JSON.stringify(want)) bad.wrap.push(`${label}: ${JSON.stringify(got)} vs ${JSON.stringify(want)}`)
+    }
+  }
+  pdf.destroy()
+  check('layout: no inset — the words start on the box\'s left edge (12 faces)', bad.inset.length === 0, bad.inset.join('; '))
+  check('layout: first baseline one ascent down, as PDFium sets it', bad.ascent.length === 0, bad.ascent.join('; '))
+  check('layout: one step per line, as PDFium sets it', bad.step.length === 0, bad.step.join('; '))
+  check('layout: a box its line + the hug slack wide keeps that line whole', bad.hug.length === 0, bad.hug.join('; '))
+  check('layout: a paragraph breaks where the renderer (and PDFium) break it', bad.wrap.length === 0, bad.wrap.slice(0, 3).join('; '))
 }
 
 // =============================================================================

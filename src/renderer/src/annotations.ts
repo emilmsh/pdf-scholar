@@ -18,6 +18,7 @@ import {
 import { pagePointToView, pageRectToView } from './rotation'
 import { t } from './i18n'
 import { forgetColor, parseCustomColors, rememberColor } from '../../shared/custom-colors'
+import { FREETEXT_EDGE_MARGIN, FREETEXT_HUG_SLACK, freetextFaceMetrics } from '../../shared/freetext-layout'
 
 export interface PageAnnotation {
   /** Local key for React state */
@@ -822,12 +823,107 @@ export const MIN_SHAPE_SIZE = 8
 
 let freetextMeasureCtx: CanvasRenderingContext2D | null = null
 
+/** A canvas set in `font` at `sizePx`, measuring as the text box sets its
+ *  words: no kerning and no ligatures, because the appearance stream PDFium
+ *  writes has neither (a `Tj` string advances glyph by glyph), and an «fi»
+ *  or a kerned «AV» on screen would be narrower than the same words in the
+ *  file. The editor and the overlay switch both off in CSS for the same
+ *  reason (.freetext-editor, .annot-freetext). */
+function freetextCtx(
+  font: PdfStandardFont | undefined,
+  sizePx: number
+): CanvasRenderingContext2D | null {
+  const ctx = (freetextMeasureCtx ??= document.createElement('canvas').getContext('2d'))
+  if (!ctx) return null
+  ctx.font = textFontCanvas(font, sizePx)
+  ctx.fontKerning = 'none'
+  return ctx
+}
+
+/** The first baseline's offset from where the browser puts it, in ems, per
+ *  face — see freetextLineCss */
+const freetextShiftEm = new Map<string, number>()
+
+/** The line box a FreeText is set in ON SCREEN — the editor's and the
+ *  overlay's — matched to the one the saved appearance uses (shared/
+ *  freetext-layout.ts): one STEP per line, the first baseline one ASCENT
+ *  below the box's top. CSS cannot place a baseline directly; it centres the
+ *  face's own ascent + descent in the line box. `shift` is how far the text
+ *  must move down (negative: up) for that baseline to land where PDFium puts
+ *  it — measured from the screen font's own metrics, since Arial, Times New
+ *  Roman and Courier New each carry their own. Under a third of a point at
+ *  12 pt for every face, but it is the difference between a box that stays
+ *  put when the file takes over from the overlay and one that twitches. */
+export function freetextLineCss(
+  font: PdfStandardFont | undefined,
+  sizePx: number
+): { lineHeight: number; shift: number } {
+  const m = freetextFaceMetrics(font)
+  const key = textFontCanvas(font, 100)
+  let shiftEm = freetextShiftEm.get(key)
+  if (shiftEm === undefined) {
+    shiftEm = 0
+    const ctx = freetextCtx(font, 100)
+    const tm = ctx?.measureText('H')
+    const asc = (tm?.fontBoundingBoxAscent ?? NaN) / 100
+    const desc = (tm?.fontBoundingBoxDescent ?? NaN) / 100
+    if (Number.isFinite(asc) && Number.isFinite(desc) && asc > 0) {
+      const cssBaseline = (m.step - asc - desc) / 2 + asc
+      shiftEm = m.ascent - cssBaseline
+    }
+    freetextShiftEm.set(key, shiftEm)
+  }
+  return { lineHeight: m.step * sizePx, shift: shiftEm * sizePx }
+}
+
+/** Where a new box goes for a click at (x, y) in page points (issue #66): the
+ *  text starts AT the click — no inset, the file has none — and the first
+ *  line is centred on it vertically, as the I-beam's hot spot is. Before, the
+ *  click was the box's top-left corner, so the line landed a half line below
+ *  the pointer: wrong exactly when writing between two printed lines. */
+export function freetextAnchor(
+  x: number,
+  y: number,
+  fontSize: number,
+  font: PdfStandardFont | undefined
+): { x: number; y: number } {
+  const half = (freetextFaceMetrics(font).step * fontSize) / 2
+  return { x: Math.max(0, x), y: Math.max(0, y - half) }
+}
+
+/** The size of a box being written that has NOT been sized by hand (issue
+ *  #66): as wide as its longest line plus FREETEXT_HUG_SLACK, until it would
+ *  come within FREETEXT_EDGE_MARGIN of the page's right edge — from there it
+ *  keeps that width and wraps — and as tall as its lines. An empty box is
+ *  sized for the placeholder, which is what it shows. `pageW` and `x` are
+ *  page points: the box's left edge and the page's width. */
+export function freetextAutoSize(
+  text: string,
+  placeholder: string,
+  fontSize: number,
+  font: PdfStandardFont | undefined,
+  x: number,
+  pageW: number
+): { w: number; h: number } {
+  const shown = text.length > 0 ? text : placeholder
+  const ctx = freetextCtx(font, fontSize)
+  let natural = 0
+  if (ctx) for (const line of shown.split('\n')) natural = Math.max(natural, ctx.measureText(line).width)
+  // Never narrower than a few letters: a box clicked in right at the edge
+  // still wraps its words one per line rather than a letter per line
+  const maxW = Math.max(pageW - x - FREETEXT_EDGE_MARGIN, fontSize * 3)
+  const w = Math.min(natural + FREETEXT_HUG_SLACK, maxW)
+  const min = freetextMinSize(shown, fontSize, w, font)
+  return { w: Math.max(w, min.w), h: min.h }
+}
+
 /** The smallest box that shows EVERY letter of a FreeText at (or near) the
  *  candidate width: the width floor is the widest unbreakable word, the
- *  height is the greedy-wrapped line count at the effective width. Mirrors
- *  .annot-freetext exactly — line-height 1.35, pre-wrap, no padding — so what
- *  the clamp allows is what the overlay shows. A resize (or an editor commit)
- *  below this clips letters, which reads as data loss.
+ *  height is the greedy-wrapped line count at the effective width, one line
+ *  STEP each — the step the saved appearance uses, which the overlay and the
+ *  editor share (freetextLineCss) — so what the clamp allows is what the
+ *  overlay and the file show. A resize (or an editor commit) below this clips
+ *  letters, which reads as data loss.
  *
  *  `font` is not optional in spirit: Courier is far wider than Helvetica at the
  *  same size, so measuring every box in one face would let a monospaced box be
@@ -839,11 +935,10 @@ export function freetextMinSize(
   font?: PdfStandardFont | undefined
 ): { w: number; h: number } {
   const content = text.length > 0 ? text : ' '
-  const ctx = (freetextMeasureCtx ??= document.createElement('canvas').getContext('2d'))
+  const ctx = freetextCtx(font, fontSize)
   if (!ctx) return { w: MIN_SHAPE_SIZE, h: MIN_SHAPE_SIZE }
-  ctx.font = textFontCanvas(font, fontSize)
   const measure = (s: string): number => ctx.measureText(s).width
-  // pre-wrap keeps words whole: the widest word is the honest width floor
+  // Words are never split: the widest word is the honest width floor
   let maxWord = 0
   for (const word of content.split(/\s+/)) maxWord = Math.max(maxWord, measure(word))
   const w = Math.max(MIN_SHAPE_SIZE, maxWord + 1)
@@ -857,9 +952,15 @@ export function freetextMinSize(
     }
     let current = ''
     let paragraphLines = 1
-    for (const word of words) {
+    for (const [i, word] of words.entries()) {
       const next = current === '' ? word : `${current} ${word}`
-      if (measure(next) > effW && current !== '') {
+      // A word moves down once it — WITH the space after it, when another
+      // word follows — would overrun the box. That is PDFium's rule (the
+      // file's lines; test:engine reads them back) and `break-spaces`'s (the
+      // editor's and the overlay's), where pre-wrap let the space hang and
+      // kept a word on a line the file had already broken (issue #66).
+      const room = i < words.length - 1 ? `${next} ` : next
+      if (measure(room) > effW && current !== '') {
         paragraphLines += 1
         current = word
       } else {
@@ -868,7 +969,7 @@ export function freetextMinSize(
     }
     lines += paragraphLines
   }
-  return { w, h: Math.max(MIN_SHAPE_SIZE, lines * fontSize * 1.35 + 1) }
+  return { w, h: Math.max(MIN_SHAPE_SIZE, lines * fontSize * freetextFaceMetrics(font).step + 1) }
 }
 
 /** The four corners, named as in the selection frame's CSS classes */

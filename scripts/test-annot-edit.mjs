@@ -17,7 +17,19 @@ import { existsSync, copyFileSync, unlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import * as mupdf from 'mupdf'
+import { standardFontCssProperties } from '@embedpdf/models'
 import { cdp, openSocket, waitForPageTargets, launchApp, evaluate, sleep } from './lib/cdp.mjs'
+import { wrapLines } from './lib/freetext-check.mjs'
+
+/** PdfStandardFont 0–11, the twelve faces the text tool offers */
+const FACE_NAMES = [
+  'Courier', 'Courier-Bold', 'Courier-BoldOblique', 'Courier-Oblique',
+  'Helvetica', 'Helvetica-Bold', 'Helvetica-BoldOblique', 'Helvetica-Oblique',
+  'Times-Roman', 'Times-Bold', 'Times-BoldItalic', 'Times-Italic'
+]
+/** The renderer's textFontCss (annotations.ts) — EmbedPDF's own mapping */
+const textFontCss = (font) => standardFontCssProperties(font)
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..')
@@ -265,6 +277,127 @@ const ui = {
   undo() {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
     return settle(900);
+  },
+  /** Arm the text tool (a committed box disarms it) */
+  async armText() {
+    const b = btn('Tekst');
+    if (!b) throw new Error('no text tool button');
+    if (!b.classList.contains('is-active')) click(b);
+    await settle(300);
+    if (!this.page().querySelector('.draw-layer')) throw new Error('the text tool did not arm');
+  },
+  /** Press the page with the text tool at (fx, fy) of it; the click point */
+  async placeDraft(fx, fy) {
+    const page = this.page();
+    const r = page.getBoundingClientRect();
+    const x = Math.round(r.left + r.width * fx);
+    const y = Math.round(r.top + r.height * fy);
+    page.querySelector('.draw-layer').dispatchEvent(new PointerEvent('pointerdown', {
+      bubbles: true, pointerId: 63, isPrimary: true, button: 0, buttons: 1, clientX: x, clientY: y
+    }));
+    await settle(500);
+    if (!document.querySelector('.freetext-editor')) throw new Error('the text editor did not open');
+    return { x, y };
+  },
+  /** The open draft as the screen shows it */
+  draft() {
+    const ed = document.querySelector('.freetext-editor');
+    if (!ed) return null;
+    const r = ed.getBoundingClientRect();
+    const cs = getComputedStyle(ed);
+    return {
+      left: r.left, top: r.top, right: r.right, w: r.width, h: r.height,
+      lineH: parseFloat(cs.lineHeight), sizePx: parseFloat(cs.fontSize),
+      placeholder: ed.placeholder, value: ed.value,
+      focused: document.activeElement === ed,
+      padding: cs.paddingLeft + ' ' + cs.paddingTop, border: cs.borderLeftWidth
+    };
+  },
+  /** Type into the draft as an input event delivers it */
+  async type(text) {
+    const ed = document.querySelector('.freetext-editor');
+    ed.value = text;
+    ed.dispatchEvent(new Event('input', { bubbles: true }));
+    await settle(200);
+  },
+  async commitDraft() {
+    document.querySelector('.freetext-editor').dispatchEvent(new KeyboardEvent('keydown', {
+      key: 'Enter', ctrlKey: true, bubbles: true
+    }));
+    await settle(1600);
+  },
+  /** A line's width in the draft's own face, measured as the app measures */
+  measure(text) {
+    const cs = getComputedStyle(document.querySelector('.freetext-editor'));
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+    c.fontKerning = 'none';
+    return c.measureText(text).width;
+  },
+  /** Drag something that is not on the page (the draft's grips) */
+  async dragEl(selector, dx, dy) {
+    const el = document.querySelector(selector);
+    if (!el) throw new Error('nothing matching ' + selector);
+    const r = el.getBoundingClientRect();
+    const x = Math.round(r.left + r.width / 2);
+    const y = Math.round(r.top + r.height / 2);
+    const opt = (cx, cy, buttons) => ({
+      bubbles: true, cancelable: true, pointerId: 64, isPrimary: true, pointerType: 'mouse',
+      button: 0, buttons, clientX: cx, clientY: cy
+    });
+    const down = new PointerEvent('pointerdown', opt(x, y, 1));
+    el.dispatchEvent(down);
+    // The press must be TAKEN — that is what keeps the textarea focused
+    const taken = down.defaultPrevented;
+    await settle(80);
+    window.dispatchEvent(new PointerEvent('pointermove', opt(x + dx / 2, y + dy / 2, 1)));
+    await settle(80);
+    window.dispatchEvent(new PointerEvent('pointermove', opt(x + dx, y + dy, 1)));
+    await settle(80);
+    window.dispatchEvent(new PointerEvent('pointerup', opt(x + dx, y + dy, 0)));
+    await settle(300);
+    return taken;
+  },
+  /** Is it the topmost thing under its own centre? (see hitTest) */
+  reachable(selector) {
+    const el = document.querySelector(selector);
+    if (!el) return { found: false };
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+    return {
+      found: true, reachable: top === el || el.contains(top),
+      covering: top ? (top.tagName.toLowerCase() + '.' + String(top.className || '')).slice(0, 70) : 'nothing'
+    };
+  },
+  /** The lines a committed box shows, as the screen broke them */
+  shownLines(el) {
+    const node = el.firstChild;
+    const lines = [];
+    let top = null;
+    let i = 0;
+    for (const word of node.textContent.split(' ')) {
+      if (word.length > 0) {
+        const range = document.createRange();
+        range.setStart(node, i);
+        range.setEnd(node, i + word.length);
+        const r = range.getClientRects()[0];
+        if (top === null || Math.abs(r.top - top) > 2) {
+          lines.push([]);
+          top = r.top;
+        }
+        lines[lines.length - 1].push(word);
+      }
+      i += word.length + 1;
+    }
+    return lines.map((l) => l.join(' '));
+  },
+  /** A committed box's first line, where the screen draws its first letter */
+  firstLine(el) {
+    const range = document.createRange();
+    range.setStart(el.firstChild, 0);
+    range.setEnd(el.firstChild, 1);
+    const r = range.getBoundingClientRect();
+    return { left: r.left, mid: (r.top + r.bottom) / 2 };
   }
 };
 `
@@ -531,6 +664,245 @@ try {
   check('with the text tool armed, a click on the box opens the editor on its text',
     armed.editor && armed.text === 'Tekst i valgt skrift', JSON.stringify(armed))
   check('…and the box menu beside it, size slider included', armed.menu && armed.slider, JSON.stringify(armed))
+
+  // ---- 6. WRITING a text box (issue #66) ----
+  //
+  // The reporter's four wishes, each as the hand meets it: the text lands
+  // where the pointer clicked, an empty box shows a placeholder and hugs it,
+  // the box grows with its text and wraps at the page edge, a box sized by
+  // hand keeps its width, and a grip moves the box before anything is typed.
+  const boxesBefore = await evalIn(A, `return ui.textBoxes().length`)
+  const fresh = await evalIn(A, `
+    await ui.armText();
+    const at = await ui.placeDraft(0.12, 0.62);
+    return { at, d: ui.draft(), ph: ui.measure(ui.draft().placeholder) };
+  `)
+  check('an empty box shows a short placeholder', /^(Tekst|Text|文本)$/.test(fresh.d.placeholder),
+    JSON.stringify(fresh.d.placeholder))
+  check('…and hugs it: a few characters wide, not 200 pt',
+    fresh.d.w >= fresh.ph && fresh.d.w <= fresh.ph + 6, `${Math.round(fresh.d.w)} px for a ${Math.round(fresh.ph)} px placeholder`)
+  check('the text starts AT the click (no inset, no border)',
+    Math.abs(fresh.d.left - fresh.at.x) <= 1 && fresh.d.padding === '0px 0px' && fresh.d.border === '0px',
+    `editor left ${fresh.d.left.toFixed(1)} vs click ${fresh.at.x}; padding ${fresh.d.padding}, border ${fresh.d.border}`)
+  check('…and its first line is centred on the click',
+    Math.abs(fresh.d.top + fresh.d.lineH / 2 - fresh.at.y) <= 2,
+    `line centre ${(fresh.d.top + fresh.d.lineH / 2).toFixed(1)} vs click ${fresh.at.y}`)
+  const reach = await evalIn(A, `
+    return { move: ui.reachable('.freetext-move'), size: ui.reachable('.freetext-resize') };
+  `)
+  check('a real pointer reaches the move grip', reach.move.reachable === true,
+    reach.move.found ? `topmost element there: ${reach.move.covering}` : 'no grip')
+  check('a real pointer reaches the resize corner', reach.size.reachable === true,
+    reach.size.found ? `topmost element there: ${reach.size.covering}` : 'no handle')
+
+  // Move it BEFORE typing — the misplaced click. The empty draft must survive
+  // (an empty draft that loses focus is discarded) and keep the keyboard.
+  const moved6 = await evalIn(A, `
+    const taken = await ui.dragEl('.freetext-move', 40, 25);
+    return { taken, d: ui.draft() };
+  `)
+  check('the grip moves the empty box', !!moved6.d &&
+    Math.abs(moved6.d.left - (fresh.d.left + 40)) <= 2 && Math.abs(moved6.d.top - (fresh.d.top + 25)) <= 2,
+    moved6.d ? `(${Math.round(fresh.d.left)}, ${Math.round(fresh.d.top)}) -> (${Math.round(moved6.d.left)}, ${Math.round(moved6.d.top)})` : 'the draft is gone')
+  check('…without taking the focus from the text', moved6.taken === true && moved6.d?.focused === true,
+    `press taken: ${moved6.taken}, focused: ${moved6.d?.focused}`)
+
+  // Grows with what is typed, and shrinks back with it
+  const grow = await evalIn(A, `
+    await ui.type('Kort');
+    const short = ui.draft();
+    const shortText = ui.measure('Kort');
+    await ui.type('Litt lengre tekst her');
+    const longer = ui.draft();
+    const longerText = ui.measure('Litt lengre tekst her');
+    return { short, shortText, longer, longerText };
+  `)
+  check('the box hugs its text as it is typed',
+    grow.short.w >= grow.shortText && grow.short.w <= grow.shortText + 6 &&
+      grow.longer.w >= grow.longerText && grow.longer.w <= grow.longerText + 6 &&
+      Math.abs(grow.longer.h - grow.short.h) < 1,
+    `${Math.round(grow.short.w)} px for ${Math.round(grow.shortText)}, ${Math.round(grow.longer.w)} px for ${Math.round(grow.longerText)}, one line each`)
+
+  // Commit: the mark lands exactly where the editor showed it
+  const landed = await evalIn(A, `
+    const before = ui.draft();
+    const prior = new Set(ui.page().querySelectorAll('.annot-freetext'));
+    await ui.commitDraft();
+    const el = [...ui.page().querySelectorAll('.annot-freetext')].find((e) => !prior.has(e));
+    if (!el) return { before, el: null };
+    const r = el.getBoundingClientRect();
+    return {
+      before, el: { left: r.left, top: r.top, w: r.width, lineH: parseFloat(getComputedStyle(el).lineHeight) },
+      first: ui.firstLine(el), text: el.textContent
+    };
+  `)
+  check('the box commits', !!landed.el && landed.text === 'Litt lengre tekst her', JSON.stringify(landed.text ?? null))
+  if (landed.el) {
+    check('…exactly where and as wide as the editor showed it',
+      Math.abs(landed.el.left - landed.before.left) <= 1 && Math.abs(landed.el.top - landed.before.top) <= 1 &&
+        Math.abs(landed.el.w - landed.before.w) <= 1 && Math.abs(landed.el.lineH - landed.before.lineH) < 0.1,
+      `editor (${landed.before.left.toFixed(1)}, ${landed.before.top.toFixed(1)}) ${landed.before.w.toFixed(1)} px, line ${landed.before.lineH.toFixed(2)} -> ` +
+        `mark (${landed.el.left.toFixed(1)}, ${landed.el.top.toFixed(1)}) ${landed.el.w.toFixed(1)} px, line ${landed.el.lineH.toFixed(2)}`)
+    check('…its first letter starts at the (moved) click and its line is centred there',
+      Math.abs(landed.first.left - (fresh.at.x + 40)) <= 2 && Math.abs(landed.first.mid - (fresh.at.y + 25)) <= 2,
+      `letter at (${landed.first.left.toFixed(1)}, ${landed.first.mid.toFixed(1)}) vs (${fresh.at.x + 40}, ${fresh.at.y + 25})`)
+  }
+
+  // An untouched placeholder never becomes a mark
+  const untouched = await evalIn(A, `
+    await ui.armText();
+    const n = ui.textBoxes().length;
+    await ui.placeDraft(0.12, 0.78);
+    // A press elsewhere on the page closes the draft (the editor's blur)
+    await ui.placeDraft(0.5, 0.9).catch(() => null);
+    await settle(400);
+    const open = !!document.querySelector('.freetext-editor');
+    if (open) document.querySelector('.freetext-editor').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle(300);
+    return { before: n, after: ui.textBoxes().length };
+  `)
+  check('an empty box, left alone, is never saved', untouched.after === untouched.before,
+    `${untouched.before} -> ${untouched.after} box(es)`)
+
+  // Near the right edge it stops widening and wraps
+  const edge = await evalIn(A, `
+    await ui.armText();
+    await ui.placeDraft(0.62, 0.70);
+    await ui.type('Denne setningen er altfor lang til å få plass på resten av linjen ut til sidekanten');
+    const d = ui.draft();
+    const page = ui.page().getBoundingClientRect();
+    const out = { d, pageRight: page.right };
+    document.querySelector('.freetext-editor').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await settle(300);
+    return out;
+  `)
+  check('a long line wraps short of the page edge',
+    edge.d.right <= edge.pageRight - 4 && edge.d.right >= edge.pageRight - 120 && edge.d.h >= 1.9 * edge.d.lineH,
+    `box right ${Math.round(edge.d.right)} vs page right ${Math.round(edge.pageRight)}, ${(edge.d.h / edge.d.lineH).toFixed(1)} lines`)
+
+  // A width set by hand is the reader's: more text adds lines, not width
+  const pinned = await evalIn(A, `
+    await ui.armText();
+    await ui.placeDraft(0.12, 0.84);
+    await ui.type('Noen ord');
+    const start = ui.draft();
+    const taken = await ui.dragEl('.freetext-resize', 70, 0);
+    const sized = ui.draft();
+    await ui.type('Noen ord, og så mange flere ord at de ikke lenger får plass på én linje');
+    const typed = ui.draft();
+    const prior = new Set(ui.page().querySelectorAll('.annot-freetext'));
+    await ui.commitDraft();
+    const el = [...ui.page().querySelectorAll('.annot-freetext')].find((e) => !prior.has(e));
+    const cs = el ? getComputedStyle(el) : null;
+    return {
+      start, taken, sized, typed, committedW: el ? el.getBoundingClientRect().width : null,
+      shown: el ? ui.shownLines(el) : [], text: el ? el.textContent : '',
+      sizePx: cs ? parseFloat(cs.fontSize) : 0, face: cs ? cs.fontFamily + ' ' + cs.fontWeight + ' ' + cs.fontStyle : ''
+    };
+  `)
+  check('the corner widens the box', pinned.taken === true && Math.abs(pinned.sized.w - (pinned.start.w + 70)) <= 2 &&
+    pinned.sized.focused === true, `${Math.round(pinned.start.w)} -> ${Math.round(pinned.sized.w)} px, focused: ${pinned.sized.focused}`)
+  check('…and from then on the width holds while the height grows',
+    Math.abs(pinned.typed.w - pinned.sized.w) <= 1 && pinned.typed.h >= 1.9 * pinned.typed.lineH,
+    `${Math.round(pinned.sized.w)} -> ${Math.round(pinned.typed.w)} px wide, ${(pinned.typed.h / pinned.typed.lineH).toFixed(1)} lines`)
+  check('…and the committed box keeps that width',
+    pinned.committedW !== null && Math.abs(pinned.committedW - pinned.typed.w) <= 1,
+    `${pinned.committedW === null ? 'no box' : Math.round(pinned.committedW)} vs ${Math.round(pinned.typed.w)} px`)
+  // The lines the screen shows are the lines the FILE will show: the same
+  // words on the same lines as PDFium's rule (lib/freetext-check.mjs, which
+  // test:engine holds against PDFium's own appearance streams) breaks them
+  // at this box's width in the Standard-14 face. The box is set in the face
+  // section 3 chose, Times bold, at the tool's 12 pt.
+  if (pinned.committedW !== null) {
+    const timesBold = new mupdf.Font('Times-Bold')
+    const afm = (s) => {
+      let w = 0
+      for (const ch of s) w += timesBold.advanceGlyph(timesBold.encodeCharacter(ch.codePointAt(0)), false)
+      return w * 12
+    }
+    const wPt = pinned.committedW / (pinned.sizePx / 12)
+    const fileLines = wrapLines(pinned.text, wPt, afm)
+    check('…and its lines break where the file\'s will',
+      /Times/.test(pinned.face) && /700/.test(pinned.face) && JSON.stringify(pinned.shown) === JSON.stringify(fileLines),
+      `screen ${JSON.stringify(pinned.shown)} vs file ${JSON.stringify(fileLines)} (${pinned.face})`)
+  }
+  const boxesAfter = await evalIn(A, `return ui.textBoxes().length`)
+  check('two boxes written in this section, no more', boxesAfter === boxesBefore + 2, `${boxesBefore} -> ${boxesAfter}`)
+
+  // ---- 7. the screen's faces are as wide as the file's ----
+  //
+  // A box that hugs its text is only its longest line plus 2 pt wide, so the
+  // face the screen sets a line in must be as wide as the Standard-14 face the
+  // file sets it in (PDFium wraps by those widths), or the file wraps the last
+  // word where the screen did not. Measured as the app measures (canvas, no
+  // kerning) in the CSS the app gives each face (textFontCss).
+  const SAMPLE_LINE = 'Fri tekst – med ÆØÅ, æøå og «sitat»: 123,45 % (Q.E.D.)'
+  const faces = FACE_NAMES.map((name, font) => ({ name, ...textFontCss(font) }))
+  const screenWidths = await evalIn(A, `
+    const faces = ${JSON.stringify(faces)};
+    const c = document.createElement('canvas').getContext('2d');
+    c.fontKerning = 'none';
+    return faces.map((f) => {
+      c.font = f.fontStyle + ' ' + f.fontWeight + ' 100px ' + f.fontFamily;
+      return c.measureText(${JSON.stringify(SAMPLE_LINE)}).width;
+    });
+  `)
+  const rows = FACE_NAMES.map((name, i) => {
+    const f = new mupdf.Font(name)
+    let w = 0
+    for (const ch of SAMPLE_LINE) w += f.advanceGlyph(f.encodeCharacter(ch.codePointAt(0)), false)
+    return { name, file: w * 100, screen: screenWidths[i] }
+  })
+  // 0.1 %: a 500 pt line may differ by half a point, well inside the 2 pt the
+  // box keeps past its longest line. (Courier New is 600.1 per mille, a
+  // rounding in the font, where Courier is 600.)
+  const off = rows.filter((r) => Math.abs(r.screen - r.file) > r.file * 0.001)
+  const worst = Math.max(...rows.map((r) => Math.abs(r.screen - r.file) / r.file))
+  check('every face measures on screen as wide as in the file (within 0.1 %)', off.length === 0,
+    off.length
+      ? off.map((r) => `${r.name} ${r.screen.toFixed(1)} vs ${r.file.toFixed(1)}`).join('; ')
+      : `12 faces, worst ${(worst * 100).toFixed(3)} %`)
+
+  // …and the screen breaks a line by the file's rule. PDFium moves a word
+  // down once it WITH its following space overruns the box; CSS pre-wrap let
+  // that space hang and kept the word up. In a box exactly wide enough for
+  // «aaa aaa» but not «aaa aaa », the file reads «aaa» / «aaa» / «aaa aaa»
+  // where pre-wrap showed two lines of «aaa aaa».
+  const PROBE = 'aaa aaa aaa aaa'
+  const PROBE_LINES = ['aaa', 'aaa', 'aaa aaa']
+  const breaking = await evalIn(A, `
+    const probe = (tag) => {
+      const el = document.createElement(tag);
+      el.className = tag === 'textarea' ? 'freetext-editor' : 'annot annot-freetext';
+      Object.assign(el.style, { position: 'fixed', left: '10px', top: '10px', height: '120px', inset: 'auto',
+        font: 'bold 100px "Times New Roman", Times, serif', lineHeight: '120px', padding: '0', border: '0' });
+      const c = document.createElement('canvas').getContext('2d');
+      c.font = el.style.font;
+      c.fontKerning = 'none';
+      el.style.width = (c.measureText('aaa aaa').width + 1) + 'px';
+      document.body.append(el);
+      let out;
+      if (tag === 'textarea') {
+        el.value = ${JSON.stringify(PROBE)};
+        // a textarea's lines: the height of its content at this width
+        out = Math.round(el.scrollHeight / 120);
+      } else {
+        el.textContent = ${JSON.stringify(PROBE)};
+        out = ui.shownLines(el);
+      }
+      el.remove();
+      return out;
+    };
+    return { overlay: probe('div'), editor: probe('textarea') };
+  `)
+  // (The rule's own verdict on the probe, at the Times-Bold widths)
+  const tb = new mupdf.Font('Times-Bold')
+  const tb100 = (s) => [...s].reduce((w, ch) => w + tb.advanceGlyph(tb.encodeCharacter(ch.codePointAt(0)), false), 0) * 100
+  const ruled = wrapLines(PROBE, tb100('aaa aaa') + 1, tb100)
+  check('the overlay breaks a line where the file does (the space goes down with its word)',
+    JSON.stringify(breaking.overlay) === JSON.stringify(PROBE_LINES) && JSON.stringify(ruled) === JSON.stringify(PROBE_LINES),
+    `screen ${JSON.stringify(breaking.overlay)}, file rule ${JSON.stringify(ruled)}`)
+  check('…and so does the editor', breaking.editor === PROBE_LINES.length, `${breaking.editor} line(s)`)
 } catch (err) {
   check('the run completed', false, err instanceof Error ? err.message : String(err))
   const log = app.log()
