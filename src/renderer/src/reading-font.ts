@@ -125,8 +125,52 @@ export function clearReadingFont(): void {
   }
 }
 
-// ---- Suggestions as the name is typed (TYPOGRAPHY.md § 6; Emil, 2026-10-27:
-// the installed faces should start showing as the name is typed) ----
+// ---- The machine's faces (TYPOGRAPHY.md § 5 «Font picker» and § 6): ONE
+// list behind two offers — chips under the field as the name is typed, and
+// the whole list behind «Velg …». Chromium's Local Font Access API where the
+// browser allows it without asking, or from the button the reader pressed
+// for it; otherwise the common faces that measure as installed. Both fill
+// the same field through the same commit path, so the typed name stays the
+// baseline and works alone wherever no list comes.
+
+/** A listing is untrusted input too: a runaway one is cut here. */
+export const READING_FONT_LIST_MAX = 1000
+
+const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
+
+/** The family names in a `queryLocalFonts()` listing: a non-array or an item
+ *  that is not an object gives nothing; `family` is read (`fullName` behind
+ *  it, which carries the cut — «Libertinus Serif Bold»); every name is
+ *  normalised like a typed one; the cuts of one family fold to one entry,
+ *  case-insensitively; sorted the way a reader reads them (base letters,
+ *  numbers in number order); capped. */
+export function familiesFromListing(listing: unknown): string[] {
+  if (!Array.isArray(listing)) return []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const item of listing) {
+    if (!item || typeof item !== 'object') continue
+    const { family, fullName } = item as { family?: unknown; fullName?: unknown }
+    const name = normalizeReadingFont(family) || normalizeReadingFont(fullName)
+    if (!name) continue
+    const key = name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(name)
+    if (out.length >= READING_FONT_LIST_MAX) break
+  }
+  return out.sort(collator.compare)
+}
+
+/** The list as the menu shows it: the current face first when the machine
+ *  has it, the rest in listing order. */
+export function orderFamilies(families: readonly string[], current: string): string[] {
+  const cur = normalizeReadingFont(current).toLowerCase()
+  if (!cur) return [...families]
+  const i = families.findIndex((f) => f.toLowerCase() === cur)
+  if (i < 0) return [...families]
+  return [families[i], ...families.slice(0, i), ...families.slice(i + 1)]
+}
 
 /** Faces common enough to be worth measuring for when the machine cannot be
  *  asked for its list (`queryLocalFonts` is Chromium's, behind a permission
@@ -236,28 +280,116 @@ export function matchFontNames(query: string, names: readonly string[], limit = 
   return tiers.flat().slice(0, Math.max(0, limit))
 }
 
-let installedList: Promise<readonly string[]> | null = null
+/** The open list as the typed text narrows it: an empty query keeps
+ *  everything; otherwise the name the query IS (the current face must stay
+ *  in the list it opened), then the rest by the chips' own rule — names the
+ *  query opens, then a word of them, then anywhere in them — with no cap. */
+export function filterFamilies(families: readonly string[], query: string): string[] {
+  const q = normalizeReadingFont(query).toLowerCase()
+  if (!q) return [...families]
+  const exact = families.filter((f) => f.toLowerCase() === q)
+  return [...exact, ...matchFontNames(q, families, Number.POSITIVE_INFINITY)]
+}
 
-/** The faces the machine has, asked for once per session: Chromium's own
- *  list where the platform offers it and allows it (it wants a user gesture,
- *  which the keystroke in the field is), else the common faces that measure
- *  as installed. Never rejects — a refusal is the measured list, and with
- *  nothing found the field simply offers nothing. */
-export function listInstalledFonts(): Promise<readonly string[]> {
-  if (installedList) return installedList
-  installedList = (async () => {
-    const local = (globalThis as { queryLocalFonts?: () => Promise<ReadonlyArray<{ family: string }>> })
-      .queryLocalFonts
-    if (local) {
-      try {
-        const faces = await local.call(globalThis)
-        const names = [...new Set(faces.map((f) => normalizeReadingFont(f.family)).filter(Boolean))]
-        if (names.length > 0) return names.sort((a, b) => a.localeCompare(b))
-      } catch {
-        /* no permission or no gesture: measure the common faces instead */
-      }
+type LocalFontsWindow = { queryLocalFonts?: () => Promise<unknown> }
+
+/** Whether this browser offers the listing at all — Chromium in a secure
+ *  context: Electron, the extension, dev:web on localhost. Another engine, or
+ *  a plain http origin, has no such function, and the field stands with the
+ *  measured chips alone. */
+export const localFontsAvailable = (): boolean =>
+  typeof (window as unknown as LocalFontsWindow).queryLocalFonts === 'function'
+
+export type LocalFontsResult =
+  | { kind: 'list'; families: string[] }
+  /** no API, or it failed with something other than a refusal */
+  | { kind: 'unavailable' }
+  /** the browser's setting for this origin says no */
+  | { kind: 'denied' }
+  /** the browser's prompt was closed without an answer */
+  | { kind: 'dismissed' }
+  /** the browser would have to ask, and this was not a click made for that */
+  | { kind: 'unasked' }
+
+async function localFontsPermission(): Promise<string> {
+  try {
+    const status = await navigator.permissions.query({ name: 'local-fonts' as PermissionName })
+    return status.state
+  } catch {
+    return 'unknown'
+  }
+}
+
+/** Ask for the machine's faces. Measured 2026-10-27 (TYPOGRAPHY.md § 5):
+ *  Electron answers with no handler in main and no gesture (about 2 s the
+ *  first time, at once after) and its permission state reads «granted»; the
+ *  extension needs a user gesture and shows the browser's one prompt, and a
+ *  Block there resolves with an EMPTY list rather than an error, which is
+ *  why an empty list is checked against the permission state before it is
+ *  believed. `mayPrompt` false — the keystroke path — asks only where the
+ *  state already reads «granted», so typing never raises a dialog. */
+export async function queryLocalFontFamilies(mayPrompt = true): Promise<LocalFontsResult> {
+  const w = window as unknown as LocalFontsWindow
+  if (typeof w.queryLocalFonts !== 'function') return { kind: 'unavailable' }
+  if (!mayPrompt) {
+    const state = await localFontsPermission()
+    if (state === 'denied') return { kind: 'denied' }
+    if (state !== 'granted') return { kind: 'unasked' }
+  }
+  let listing: unknown
+  try {
+    listing = await w.queryLocalFonts()
+  } catch (e) {
+    const name = (e as { name?: unknown } | null)?.name
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return (await localFontsPermission()) === 'denied' ? { kind: 'denied' } : { kind: 'dismissed' }
     }
-    return COMMON_FONT_FAMILIES.filter((name) => isFontInstalled(name) === true)
-  })()
-  return installedList
+    return { kind: 'unavailable' }
+  }
+  const families = familiesFromListing(listing)
+  if (families.length === 0 && (await localFontsPermission()) === 'denied') return { kind: 'denied' }
+  return { kind: 'list', families }
+}
+
+export type InstalledFonts = {
+  families: string[]
+  /** `local`: Chromium's own listing; `measured`: the common faces that measure as installed */
+  source: 'local' | 'measured'
+  /** the browser's setting for this origin said no — the list says so */
+  refused: boolean
+}
+
+let installed: InstalledFonts | null = null
+const pending: { quiet?: Promise<InstalledFonts>; asking?: Promise<InstalledFonts> } = {}
+
+/** The faces the machine has, remembered for the session; never a rejection,
+ *  so the field always has something to offer. Chromium's own list where it
+ *  comes, else the common faces that measure as installed. `mayPrompt` is
+ *  the «Velg …» click — the one place the browser's prompt may be raised —
+ *  and a measured list made while the browser would still ask is replaced
+ *  by Chromium's once that click allows it. */
+export function listInstalledFonts(mayPrompt = false): Promise<InstalledFonts> {
+  if (installed && (installed.source === 'local' || installed.refused || !mayPrompt)) {
+    return Promise.resolve(installed)
+  }
+  const slot = mayPrompt ? 'asking' : 'quiet'
+  const running = pending[slot]
+  if (running) return running
+  const run = (async (): Promise<InstalledFonts> => {
+    const result = await queryLocalFontFamilies(mayPrompt)
+    const found: InstalledFonts =
+      result.kind === 'list'
+        ? { families: result.families, source: 'local', refused: false }
+        : {
+            families: COMMON_FONT_FAMILIES.filter((name) => isFontInstalled(name) === true),
+            source: 'measured',
+            refused: result.kind === 'denied'
+          }
+    if (!installed || installed.source !== 'local') installed = found
+    return installed
+  })().finally(() => {
+    delete pending[slot]
+  })
+  pending[slot] = run
+  return run
 }

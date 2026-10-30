@@ -152,11 +152,56 @@ system stack, so any glyph the chosen face lacks — a Chinese interface, æøå
 in a font without them — falls through per glyph instead of breaking the
 line.
 
-**Font picker.** Chromium has a Local Font Access API (`queryLocalFonts`)
-that could list the installed faces in a menu. Whether Electron passes it
-through without a permission handler, and whether the extension's permission
-prompt is acceptable, is untested — try it during implementation, but the
-text field is the baseline and must work alone.
+**Font picker.** Chromium's Local Font Access API (`queryLocalFonts`) lists
+the installed faces. Tried 2026-10-27 on both platforms, the text field kept
+as the baseline:
+
+- *Desktop* (Electron 43.8.3 / Chromium 150, the `file://` renderer, and
+  `src/main/index.ts` sets no permission handler at all): the call resolves
+  with every face — 456 on this machine — with no gesture and no dialog.
+  Electron has no permission UI, and `navigator.permissions.query({ name:
+  'local-fonts' })` reads «granted». A `session.setPermissionCheckHandler`
+  IS consulted (as `local-fonts`; the request handler never fires), and a
+  handler that says no gives an EMPTY list, not an error — so the app must
+  never grow a blanket deny-all check handler without an exception for it.
+  The first call takes about 2 s (Chromium enumerates the fonts once per
+  process), every later one answers at once; the button reads «Henter …»
+  meanwhile.
+- *Extension* (Edge 155, a `chrome-extension://` page): the call needs a
+  user gesture («SecurityError: User activation is required» without one)
+  and raises the browser's own prompt, anchored to the address bar and
+  named after the extension — «PDF Scholar ønsker å: Bruk skriftene på
+  datamaskinen, slik at du kan opprette innhold med nøyaktig gjengivelse»,
+  Blokker / Tillat. Allow and Block are remembered per origin (site
+  settings → Fonts); the prompt's × leaves it to be asked again. A Block
+  resolves with an EMPTY list, never an error, so an empty list is read
+  against the permission state before it is believed. Acceptable: the
+  prompt says what is asked, is asked once, and comes only from a button
+  the reader pressed; a refusal costs one hint line and the field works
+  as before.
+- *dev:web* (`http://localhost`): localhost is a secure context, so the
+  browser's prompt as in the extension. On a plain-http origin, or an
+  engine without the API, `window.queryLocalFonts` is undefined and the
+  button is not drawn — the field alone, as everywhere else.
+
+So the menu ships (§ 7 step 4): a «Velg …» button beside the field asks the
+API on that click — the one place the browser's prompt may be raised, never
+at start — and the list it opens fills the same field through the same
+commit path: the current face first, the rest sorted, typing in the field
+narrows it (the chips' rule of § 6 with no cap, the exact name kept at the
+top), Enter or a click commits, Escape or leaving the field closes it, and
+the sample line follows the hovered row. Where the browser said no, the
+list holds the common faces that measure as installed (§ 6) and says so in
+one hint line. The pure half (one entry per family across its cuts, every
+name normalised like a typed one, the sort, the order, the filter, a junk
+or runaway listing) is in `reading-font.ts` and `test:reading-font`.
+
+The chips of § 6 and this list share ONE list per session
+(`listInstalledFonts`): the keystroke path asks Chromium only where the
+permission state already reads «granted» — the desktop, and the extension
+once allowed — and otherwise takes the measured common faces, so typing
+never raises a dialog; the «Velg …» click asks with the prompt allowed, and
+Chromium's list then replaces a measured one.
 
 ## 6. The setting
 
@@ -186,13 +231,15 @@ text field is the baseline and must work alone.
   click commits that face (the chip keeps the focus in the field, or the blur
   would commit the half-typed name first). The list of faces is asked for
   once per session, on the first keystroke: Chromium's own
-  `queryLocalFonts()` where the platform offers and allows it — it wants a
-  user gesture, which the keystroke is — and otherwise a curated list of
-  common faces (`COMMON_FONT_FAMILIES`: the Windows, macOS and Linux sets
-  plus the reading faces people install on purpose) filtered by the measured
-  installed rule. Nothing leaves the machine either way; the extension, where
-  the browser would prompt, takes the measured list. The matching rule is
-  `matchFontNames`, proved by `test:reading-font`.
+  `queryLocalFonts()` where the platform offers it and the permission state
+  already reads «granted» (the desktop; the extension once the reader has
+  allowed it from «Velg …», § 5), and otherwise a curated list of common
+  faces (`COMMON_FONT_FAMILIES`: the Windows, macOS and Linux sets plus the
+  reading faces people install on purpose) filtered by the measured
+  installed rule. Nothing leaves the machine either way, and typing never
+  raises the browser's prompt — the «Velg …» button is where it may come.
+  While that list is open the chips step aside (the list narrows itself).
+  The matching rule is `matchFontNames`, proved by `test:reading-font`.
 - **The stored value is untrusted input.** The name goes into a CSS custom
   property, so the pure half (`src/renderer/src/reading-font.ts`) normalises
   it: trim, cap the length, drop quotes, semicolons, braces, backslashes and
@@ -229,6 +276,11 @@ text field is the baseline and must work alone.
    lacks says so, reset clears everything.
 4. **Try `queryLocalFonts`** on desktop and in the extension; keep the menu
    only if it works on both without a dialog the reader would not expect.
+   Done 2026-10-27: it does — no dialog on the desktop, the browser's one
+   named prompt in the extension, from a «Velg …» button the reader
+   pressed (§ 5 has the measurements). The list fills the field; the field
+   stays the baseline; the chips of § 6 (same day) share the list and never
+   prompt. `docs/PLATFORMS.md` divergence 35 records the prompt.
 5. Only on request, and on the same roles: an interface-font field, or
    shipped families (option 2).
 
