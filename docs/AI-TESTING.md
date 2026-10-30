@@ -59,7 +59,14 @@ then shown one 2×2 red PNG. Per model it asserts:
   «Leser dokumentet …» with nothing behind it;
 - **the degrade net did not fire.** One question that costs two HTTP requests
   means a parameter we send was refused and silently dropped: the user still
-  gets an answer, but a worse one, and this is the only place that shows up.
+  gets an answer, but a worse one, and this is the only place that shows up;
+- **the answer is in the reader's language** (issue #75), with the app's own
+  prompts from `ai.ts` in the language state a request would be built in: a
+  question in Spanish, in a NORWEGIAN interface, about the Norwegian test
+  document, is answered in Spanish (the reader's words win), and «Explain» on
+  a Spanish system — where the interface is English for want of a dictionary —
+  answers in Spanish (a chip takes the system's language). The verdict is a
+  majority of function words, since a quote stays verbatim in Norwegian.
 
 It is not in CI on purpose: it needs keys, it spends tokens, and a provider
 outage is not a broken build. Cost is a few øre per full run — `--dry-run` and
@@ -177,14 +184,11 @@ Worth writing down so nobody mistakes a green run for a guarantee:
   what it took from it, or keeps the document as its only source. A model
   that ignores the instruction degrades to an answer without the chip, never
   to a wrong source — the tag cannot parse as one.
-- **Whether real models answer in the reader's language.** The rule (issue
-  #75: the reader's own words decide, a chip takes the default) is tested for
-  what we SEND — `test:answer-language` for the prompts and the default,
-  `test:ai-chat` for the rule closing the system prompt on every path — but
-  no live case asks a question in Spanish about an English paper and checks
-  the answer's language. The rule is stated last in the system prompt
-  because that is what weaker models keep; whether a given model does is
-  unverified.
+- **The answer language beyond two cases.** The live run checks a Spanish
+  question and a Spanish-system chip; the other chips, «Ask …», the
+  structured summary and a too-short message that must fall back to the
+  default are tested only for what we SEND (`test:answer-language`,
+  `test:ai-chat`).
 - **Multi-turn drift.** Every live case is a single question. Context handling
   across ten turns with images in earlier turns is untested.
 - **Answer quality.** We test that a citation parses, not that it is the right

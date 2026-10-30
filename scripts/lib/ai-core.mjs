@@ -44,6 +44,34 @@ export async function loadAiCore() {
   return cached
 }
 
+let cachedPrompts = null
+
+/** The renderer's prompt builders (src/renderer/src/ai.ts) with the i18n
+ *  setters beside them in ONE bundle, so a run can put the app in a language
+ *  state and read the exact system prompt and language rule a request would
+ *  carry. i18n resolves «auto» from navigator.language — the caller pins it. */
+export async function loadAppPrompts() {
+  if (cachedPrompts) return cachedPrompts
+  const outfile = join(ROOT, 'scripts', '.ai-prompts-bundle.mjs')
+  await build({
+    stdin: {
+      contents: [
+        `export * from './src/renderer/src/ai'`,
+        `export { setLanguage, getLanguage, setSystemLanguages } from './src/renderer/src/i18n'`
+      ].join('\n'),
+      resolveDir: ROOT,
+      loader: 'ts'
+    },
+    bundle: true,
+    platform: 'node',
+    format: 'esm',
+    outfile,
+    logLevel: 'silent'
+  })
+  cachedPrompts = await import(pathToFileURL(outfile).href)
+  return cachedPrompts
+}
+
 /** The curated model ids for a provider, parsed out of ai-models.ts.
  *
  *  Regex rather than import, for the same reason check-models.mjs does it:
