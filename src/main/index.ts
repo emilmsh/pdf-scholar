@@ -1246,6 +1246,19 @@ function registerIpc(): void {
 
   ipcMain.handle('app:version', () => app.getVersion())
 
+  // The OS's own language list, not app.getLocale(): Chromium falls back to
+  // en-US for a language it ships no translation for, and the AI's default
+  // answer language (shared/answer-language.ts) is meant to see past that
+  ipcMain.handle('app:system-languages', (): string[] => {
+    try {
+      const preferred = app.getPreferredSystemLanguages()
+      if (preferred.length) return preferred
+    } catch {
+      // fall through to the app locale
+    }
+    return [app.getLocale()]
+  })
+
   ipcMain.handle('position:get', (_e, path: string) => getState().positions[path] ?? null)
 
   ipcMain.handle('bookmarks:get', (_e, path: string) => getBookmarks(path))

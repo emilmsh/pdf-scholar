@@ -177,6 +177,14 @@ Worth writing down so nobody mistakes a green run for a guarantee:
   what it took from it, or keeps the document as its only source. A model
   that ignores the instruction degrades to an answer without the chip, never
   to a wrong source — the tag cannot parse as one.
+- **Whether real models answer in the reader's language.** The rule (issue
+  #75: the reader's own words decide, a chip takes the default) is tested for
+  what we SEND — `test:answer-language` for the prompts and the default,
+  `test:ai-chat` for the rule closing the system prompt on every path — but
+  no live case asks a question in Spanish about an English paper and checks
+  the answer's language. The rule is stated last in the system prompt
+  because that is what weaker models keep; whether a given model does is
+  unverified.
 - **Multi-turn drift.** Every live case is a single question. Context handling
   across ten turns with images in earlier turns is untested.
 - **Answer quality.** We test that a citation parses, not that it is the right

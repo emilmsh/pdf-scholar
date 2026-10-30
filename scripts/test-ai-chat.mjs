@@ -1355,6 +1355,81 @@ section('catalog: plain /v1 server vs Ollama enrichment')
   )
 }
 
+// ---------- the answer-language rule closes the system prompt ----------
+//
+// Issue #75: the rule saying which language to answer in rides on the request
+// as `languageRule`, and every path puts it LAST — after the web-search hint
+// and the quote contract — since an English document, English scaffolding and
+// English citation rules all pull toward English, and the last rule read is
+// the one a weaker model keeps. Absent, the prompt is what it always was.
+
+section('answer-language rule: last in the system prompt on every path')
+{
+  const RULE = '\n\nANSWER LANGUAGE\n- Answer in the language the user writes in; default Spanish.'
+  const paths = [
+    {
+      name: 'anthropic',
+      overrides: {},
+      respond: () => anthropicSse({ deltas: ['Hola'] }),
+      system: (b) => b?.system
+    },
+    {
+      name: 'openai (Responses)',
+      overrides: { provider: 'openai' },
+      respond: () =>
+        openAiSse({
+          deltas: ['Hola'],
+          response: { model: 'gpt-6-sol', usage: { input_tokens: 1, output_tokens: 1 }, output: [] }
+        }),
+      system: (b) => b?.instructions
+    },
+    {
+      name: 'chatgpt (Responses)',
+      overrides: { provider: 'chatgpt', key: 'tok', chatgptAccountId: 'acct-1' },
+      respond: () =>
+        openAiSse({
+          deltas: ['Hola'],
+          response: { model: 'gpt-6-sol', usage: { input_tokens: 1, output_tokens: 1 }, output: [] }
+        }),
+      system: (b) => b?.instructions
+    },
+    {
+      name: 'azure (Chat Completions)',
+      overrides: { provider: 'azure' },
+      respond: () => chatCompletionsSse({ deltas: ['Hola'] }),
+      system: (b) => b?.messages?.[0]?.content
+    },
+    {
+      name: 'compat (Chat Completions)',
+      overrides: { provider: 'compat', key: '' },
+      respond: () => chatCompletionsSse({ deltas: ['Hola'] }),
+      system: (b) => b?.messages?.[0]?.content
+    }
+  ]
+  for (const p of paths) {
+    responder = p.respond
+    const withRule = baseParams(p.overrides).req
+    await run({ ...p.overrides, req: { ...withRule, languageRule: RULE } })
+    const sys = p.system(calls[0]?.body) ?? ''
+    ok(sys.startsWith('SYSTEM PROMPT'), `${p.name}: the system prompt still opens the request's system text`)
+    ok(sys.endsWith(RULE), `${p.name}: the language rule is the very last thing in it`)
+    const contract = sys.indexOf('CITATION RULES')
+    const web = sys.indexOf('WEB SEARCH')
+    const rule = sys.indexOf('ANSWER LANGUAGE')
+    ok(contract < rule && web < rule, `${p.name}: after the quote contract and the web hint (whichever the path sends)`)
+    ok(sys.split('ANSWER LANGUAGE').length === 2, `${p.name}: stated once`)
+    // The document hand-off and the messages carry no copy of it
+    const body = JSON.stringify(calls[0]?.body ?? {})
+    ok(body.split('ANSWER LANGUAGE').length === 2, `${p.name}: nowhere else in the request`)
+
+    responder = p.respond
+    await run({ ...p.overrides, req: withRule })
+    const plain = p.system(calls[0]?.body) ?? ''
+    ok(!/ANSWER LANGUAGE/.test(plain) && plain === sys.slice(0, sys.length - RULE.length),
+      `${p.name}: without a rule the system text is exactly what it was`)
+  }
+}
+
 // ---------- profile conformance ----------
 
 section('profile ↔ path agreement (PROVIDER_PROFILES is a tested contract)')

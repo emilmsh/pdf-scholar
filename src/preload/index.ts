@@ -157,6 +157,7 @@ const api: PdfxApi = {
     }
   },
   getVersion: () => ipcRenderer.invoke('app:version'),
+  systemLanguages: () => ipcRenderer.invoke('app:system-languages'),
   onUpdateAvailable: (cb: (version: string) => void) => {
     const listener = (_e: unknown, version: string): void => cb(version)
     ipcRenderer.on('update:available', listener)

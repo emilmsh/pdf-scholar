@@ -57,6 +57,7 @@
     "test:bookmarks": "node scripts/test-bookmarks.mjs",
     "test:retrieval": "node scripts/test-ai-retrieval.mjs",
     "test:ai-chat": "node scripts/test-ai-chat.mjs",
+    "test:answer-language": "node scripts/test-answer-language.mjs",
     "test:model-curation": "node scripts/test-model-curation.mjs",
     "test:streams": "node scripts/test-stream-replay.mjs",
     "test:live": "node scripts/test-live.mjs",
