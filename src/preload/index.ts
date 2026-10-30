@@ -6,6 +6,7 @@ import type {
   AiConfig,
   AiDeltaKind,
   AiProviderId,
+  AiSpeechRequest,
   AnnotateRequest,
   DeleteAnnotationRequest,
   ManualUpdateChannel,
@@ -199,6 +200,7 @@ const api: PdfxApi = {
   aiChatgptLogin: () => ipcRenderer.invoke('ai:chatgpt-login'),
   aiChatgptLogout: () => ipcRenderer.invoke('ai:chatgpt-logout'),
   aiChat: (request: AiChatRequest) => ipcRenderer.invoke('ai:chat', request),
+  aiSpeak: (request: AiSpeechRequest) => ipcRenderer.invoke('ai:speak', request),
   aiAbort: (requestId: number) => ipcRenderer.send('ai:abort', requestId),
   onAiDelta: (
     cb: (requestId: number, text: string, kind?: AiDeltaKind, citation?: AiCitation) => void

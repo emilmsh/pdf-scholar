@@ -17,11 +17,14 @@ import type {
   AiConfigView,
   AiDeltaKind,
   AiProviderId,
+  AiSpeechRequest,
+  AiSpeechResult,
   ChatgptLoginResult,
   FileError,
   KeyStorageMode
 } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
+import { runProviderSpeech } from '../shared/ai-speech'
 import { partsAsDeltas } from '../shared/ai-stream'
 import { PROVIDER_PROFILES } from '../shared/ai-provider-profile'
 import { AI_ERRORS } from '../shared/engine-errors'
@@ -430,6 +433,18 @@ export function registerAiIpc(): void {
     } finally {
       activeRequests.delete(requestKey)
     }
+  })
+
+  // Read-aloud's voice. The same switch, checked first, and the same keys —
+  // but the provider is the one with a voice, not the chat provider.
+  ipcMain.handle('ai:speak', async (_e, req: AiSpeechRequest): Promise<AiSpeechResult> => {
+    if (getState().ai.access === 'off') return AI_ERRORS.disabled
+    const key = keyFor(req.provider)
+    if (!key) {
+      if ((getState().ai.keys[req.provider] ?? '') !== '') return AI_ERRORS.keyUndecryptable
+      return keyStorageMode() === 'session-only' ? AI_ERRORS.keySessionOnly : AI_ERRORS.keyMissing
+    }
+    return runProviderSpeech({ key, req })
   })
 
   // The browser sign-in. On success the provider switches to 'chatgpt' — the

@@ -72,6 +72,7 @@
     "test:update-channel": "node scripts/test-update-channel.mjs",
     "test:custom-colors": "node scripts/test-custom-colors.mjs",
     "test:tab-labels": "node scripts/test-tab-labels.mjs",
+    "test:speech": "node scripts/test-speech.mjs",
     "test:tab-groups": "node scripts/test-tab-groups.mjs",
     "test:long-path": "node scripts/test-long-path.mjs",
     "test:xfa": "node scripts/test-xfa.mjs",

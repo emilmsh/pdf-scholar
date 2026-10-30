@@ -25,9 +25,12 @@ import type {
   AiDeltaKind,
   AiModelCatalog,
   AiProviderId,
+  AiSpeechRequest,
+  AiSpeechResult,
   PdfxApi
 } from '../../shared/types'
 import { runProviderChat } from '../../shared/ai-chat'
+import { runProviderSpeech } from '../../shared/ai-speech'
 import { PROVIDER_PROFILES } from '../../shared/ai-provider-profile'
 import { AI_ERRORS } from '../../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../../shared/ai-model-catalog'
@@ -152,7 +155,7 @@ const activeControllers = new Map<number, AbortController>()
 
 export function createExtensionAi(): Pick<
   PdfxApi,
-  'aiGetConfig' | 'aiSetConfig' | 'aiRefreshModels' | 'aiChat' | 'aiAbort' | 'onAiDelta'
+  'aiGetConfig' | 'aiSetConfig' | 'aiRefreshModels' | 'aiChat' | 'aiSpeak' | 'aiAbort' | 'onAiDelta'
 > {
   return {
     aiGetConfig: async () => {
@@ -264,6 +267,16 @@ export function createExtensionAi(): Pick<
       } finally {
         activeControllers.delete(request.requestId)
       }
+    },
+
+    // Read-aloud's voice: the same switch and the same sealed keys as aiChat,
+    // for the provider that has a voice rather than the chat provider.
+    aiSpeak: async (request: AiSpeechRequest): Promise<AiSpeechResult> => {
+      const [config, stored] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {})])
+      if (config.access === 'off') return AI_ERRORS.disabled
+      const key = (await usableKeys(stored))[request.provider]?.trim() ?? ''
+      if (!key) return stored[request.provider] ? AI_ERRORS.keyUndecryptable : AI_ERRORS.keyMissing
+      return runProviderSpeech({ key, req: request })
     },
 
     aiAbort: (requestId: number) => {

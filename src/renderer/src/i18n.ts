@@ -900,6 +900,13 @@ const nb = {
   'ra.stop': 'Stopp høytlesing',
   'ra.rate': 'Hastighet',
   'ra.voice': 'Stemme',
+  'ra.cloudVoices': 'Gemini-stemmer',
+  'ra.systemVoices': 'Systemstemmer',
+  'ra.loading': 'Henter lyd …',
+  'ra.consent': 'Høytlesingen sender teksten til Google ({model}) med Gemini-nøkkelen din.',
+  'ra.consentSend': 'Les opp med Gemini',
+  'ra.consentSystem': 'Bruk systemstemme',
+  'ra.rateLimited': 'Gemini-kvoten er brukt opp akkurat nå – vent litt og trykk spill av.',
 
   // Export documents
   'export.title': 'Merknader – {name}',
@@ -2151,6 +2158,13 @@ const en: Dict = {
   'ra.stop': 'Stop reading aloud',
   'ra.rate': 'Speed',
   'ra.voice': 'Voice',
+  'ra.cloudVoices': 'Gemini voices',
+  'ra.systemVoices': 'System voices',
+  'ra.loading': 'Fetching audio …',
+  'ra.consent': 'Reading aloud sends the text to Google ({model}) with your Gemini key.',
+  'ra.consentSend': 'Read with Gemini',
+  'ra.consentSystem': 'Use system voice',
+  'ra.rateLimited': 'The Gemini quota is used up for now — wait a moment and press play.',
 
   'export.title': 'Annotations — {name}',
   'export.byline': 'Exported {date} from PDF Scholar',

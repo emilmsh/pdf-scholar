@@ -381,8 +381,10 @@ const IMAGE_UNSUPPORTED_RE =
  *  while `error` keeps the provider's own sentence, which names the token
  *  counts and is the only part worth reading in a log. Anything else travels
  *  as its own text for the same reason: no invented translation could carry
- *  that detail. */
-function providerFailure(
+ *  that detail. Shared with the voice transport (ai-speech.ts): a key with no
+ *  credit or a rate limit reads the same whether the request was a question
+ *  or a paragraph to speak. */
+export function providerFailure(
   message: string,
   ctx?: { model?: string | null; hadImages?: boolean; headers?: unknown }
 ): FileError & { tokenLimit?: number } {

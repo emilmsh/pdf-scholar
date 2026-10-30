@@ -156,6 +156,11 @@ runs:
     # the «Alle faner» search
     - run: npm run test:tab-labels
       shell: bash
+    # Read-aloud's provider voice: what is spoken (citations, hyphens and the
+    # reference list left out), the paragraph chunks a voice is asked for, and
+    # the Gemini request and its failures against a mocked fetch
+    - run: npm run test:speech
+      shell: bash
     # Tab groups: each group one unbroken run with its chip in front, no
     # pinned tab in one, the tab being read never folded away, Ctrl+Tab and
     # the keyboard move passing over a folded group, and the groups through

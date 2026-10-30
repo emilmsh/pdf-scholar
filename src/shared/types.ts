@@ -948,6 +948,18 @@ export type AiChatResult =
     }
   | (FileError & { tokenLimit?: number })
 
+/** One piece of read-aloud spoken by a provider's voice (src/shared/ai-speech.ts).
+ *  The provider is not the chat provider: it is whichever provider with a
+ *  voice the reader holds a key for, named by the renderer and checked again
+ *  by the transport. */
+export interface AiSpeechRequest {
+  provider: 'gemini'
+  text: string
+  voice: string
+}
+
+export type AiSpeechResult = { ok: true; audio: Uint8Array; mime: string; model: string } | FileError
+
 /** Where a clicked citation should land in the document: a page plus a char
  *  range within that page's extracted text (start === end means "just the
  *  page"). This is the payload the detached assistant sends to whichever
@@ -1349,6 +1361,9 @@ export interface PdfxApi {
   aiChatgptLogout(): Promise<AiConfigView>
   /** Streams deltas via onAiDelta; resolves with the final result */
   aiChat(request: AiChatRequest): Promise<AiChatResult>
+  /** Speak a piece of text with a provider's voice (read-aloud). Same keys and
+   *  the same KI-tilgang «Av» guarantee as aiChat; no streaming. */
+  aiSpeak(request: AiSpeechRequest): Promise<AiSpeechResult>
   aiAbort(requestId: number): void
   /** `kind` absent = answer text to append; 'thinking' = the model's reasoning
    *  stream, forwarded as a liveness signal only (never rendered as answer);

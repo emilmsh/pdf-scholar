@@ -383,6 +383,9 @@ export const webApi: PdfxApi = {
   // The ChatGPT sign-in needs main's localhost listener (src/main/chatgpt-auth.ts)
   aiChatgptLogin: async () => CHATGPT_LOGIN_ERRORS.unsupported,
   aiChatgptLogout: async () => webApi.aiGetConfig(),
+  // The plain-web preview holds no keys, so no voice: read-aloud falls back
+  // to the browser's own speech synthesis.
+  aiSpeak: async () => AI_ERRORS.keyMissing,
   aiChat: async (request): Promise<AiChatResult> => {
     const config = loadWebAiConfig()
     // Dead-man switch: the mock sends nothing anywhere, but honouring the mode

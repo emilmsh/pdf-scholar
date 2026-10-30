@@ -8291,6 +8291,37 @@ button.bookmark-fold:hover {
   max-width: 190px;
 }
 
+.readaloud-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+}
+
+.readaloud-error {
+  color: var(--danger);
+}
+
+/* The consent strip: a sentence and two answers, smaller than a dialog's */
+.readaloud-consent {
+  max-width: calc(100vw - 32px);
+}
+
+.readaloud-consent .readaloud-note {
+  white-space: normal;
+  max-width: 360px;
+}
+
+.readaloud-consent .btn-primary,
+.readaloud-consent .btn-secondary {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 /* Zoom: click the percentage to type an exact value */
 
 .zoom-label {

@@ -7009,12 +7009,19 @@ export default function PdfViewer({
     readVoice,
     setReadVoice,
     voices,
+    cloudVoices,
+    consent: readConsent,
+    approveCloud,
+    declineCloud,
+    readLoading,
+    readError,
     voiceManualRef,
     startReadAloud,
     stopReadAloud,
     toggleReadPause
   } = useReadAloud({
     pdf,
+    docPath: payload.path,
     active,
     currentPage,
     containerRef,
@@ -8598,7 +8605,23 @@ export default function PdfViewer({
           onCancel={discardNote}
         />
       )}
-      {readAloud !== 'closed' && (
+      {readAloud !== 'closed' && readConsent && (
+        // «Bekreft før deling»: the first send of this document to the voice
+        // waits here, naming who receives the text
+        <div className="readaloud-bar readaloud-consent">
+          <span className="readaloud-note">{t('ra.consent', { model: readConsent.model })}</span>
+          <button className="btn-primary" onClick={approveCloud}>
+            {t('ra.consentSend')}
+          </button>
+          <button className="btn-secondary" onClick={declineCloud}>
+            {t('ra.consentSystem')}
+          </button>
+          <button className="tb-btn" onClick={stopReadAloud} title={t('ra.stop')}>
+            <IconStop size={16} />
+          </button>
+        </div>
+      )}
+      {readAloud !== 'closed' && !readConsent && (
         <div className="readaloud-bar">
           <button className="tb-btn" onClick={toggleReadPause} title={t('ra.playPause')}>
             {readAloud === 'playing' ? <IconPause size={16} /> : <IconPlay size={16} />}
@@ -8606,6 +8629,12 @@ export default function PdfViewer({
           <button className="tb-btn" onClick={stopReadAloud} title={t('ra.stop')}>
             <IconStop size={16} />
           </button>
+          {readLoading && <span className="readaloud-note">{t('ra.loading')}</span>}
+          {readError && (
+            <span className="readaloud-note readaloud-error" title={readError}>
+              {readError}
+            </span>
+          )}
           <select
             className="readaloud-rate"
             value={readRate}
@@ -8627,11 +8656,30 @@ export default function PdfViewer({
               setReadVoice(e.target.value)
             }}
           >
-            {voices.map((v) => (
-              <option key={v.voiceURI} value={v.voiceURI}>
-                {v.name}
-              </option>
-            ))}
+            {cloudVoices.length > 0 && (
+              <optgroup label={t('ra.cloudVoices')}>
+                {cloudVoices.map((v) => (
+                  <option key={v} value={v}>
+                    {v.slice(v.indexOf(':') + 1)}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {cloudVoices.length > 0 ? (
+              <optgroup label={t('ra.systemVoices')}>
+                {voices.map((v) => (
+                  <option key={v.voiceURI} value={v.voiceURI}>
+                    {v.name}
+                  </option>
+                ))}
+              </optgroup>
+            ) : (
+              voices.map((v) => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name}
+                </option>
+              ))
+            )}
           </select>
         </div>
       )}
