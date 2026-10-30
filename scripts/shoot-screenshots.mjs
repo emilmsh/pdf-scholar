@@ -2144,10 +2144,26 @@ const ui = {
     await settle(450);
     const ta = document.querySelector('.freetext-editor');
     if (!ta) throw new Error('the text editor did not open');
-    // The committed box is the EDITOR's box (saveFreeText reads offsetWidth),
-    // so narrowing it here is how the note is told to wrap inside the margin
-    // rather than run across the page.
-    if (width > 0) ta.style.width = Math.round(width) + 'px';
+    // The committed box is the EDITOR's box, so sizing it here is how the
+    // note is told to wrap inside the margin rather than run across the page:
+    // the corner handle, as a hand sizes it, which fixes the width (a box
+    // left alone grows with its text up to the page edge, issue #66).
+    if (width > 0) {
+      const grip = document.querySelector('.freetext-resize');
+      if (!grip) throw new Error('the text editor has no resize handle');
+      const g = grip.getBoundingClientRect();
+      const gx = Math.round(g.left + g.width / 2);
+      const gy = Math.round(g.top + g.height / 2);
+      const dx = Math.round(width - ta.getBoundingClientRect().width);
+      const ev = (type, cx, buttons) => new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 48, isPrimary: true, pointerType: 'mouse',
+        button: 0, buttons, clientX: cx, clientY: gy
+      });
+      grip.dispatchEvent(ev('pointerdown', gx, 1));
+      window.dispatchEvent(ev('pointermove', gx + dx, 1));
+      window.dispatchEvent(ev('pointerup', gx + dx, 0));
+      await settle(150);
+    }
     const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
     setter.call(ta, text);
     ta.dispatchEvent(new Event('input', { bubbles: true }));
