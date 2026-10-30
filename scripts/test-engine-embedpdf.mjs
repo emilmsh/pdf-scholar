@@ -10,6 +10,7 @@ import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as mupdf from 'mupdf'
 import { signaturePng } from './lib/tiny-png.mjs'
+import { apLines, loadFreetextLayout, wrapLines } from './lib/freetext-check.mjs'
 import { applyAnnotation, updateAnnotation, deleteAnnotation, flushAnnotations, setFormField } from './.engine-test-bundle.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -24,6 +25,12 @@ const check = (label, cond, detail = '') => {
 }
 
 const q = (x, y, w, h) => [{ x, y, w, h }]
+/** PdfStandardFont 0–11, the twelve faces the text tool offers */
+const FACE_NAMES = [
+  'Courier', 'Courier-Bold', 'Courier-BoldOblique', 'Courier-Oblique',
+  'Helvetica', 'Helvetica-Bold', 'Helvetica-BoldOblique', 'Helvetica-Oblique',
+  'Times-Roman', 'Times-Bold', 'Times-BoldItalic', 'Times-Italic'
+]
 const SIGNATURE = new Uint8Array(signaturePng())
 const base = { path: FILE, pageIndex: 1, opacity: 1, color: [0.89, 0.29, 0.29], author: 'test' }
 
@@ -978,6 +985,95 @@ const foreignNote = (() => {
     pdf.destroy()
   }
   fs.rmSync(NFILE, { force: true })
+}
+
+// 15. WHERE a text box's words sit in the file (issue #66). A new box hugs its
+// text — its longest line plus FREETEXT_HUG_SLACK — and its first line is
+// centred on the click, so the screen has to know exactly where PDFium puts
+// the words and where it breaks the lines. shared/freetext-layout.ts holds
+// that as numbers; this reads them back out of the appearance streams PDFium
+// writes, for all twelve faces at two sizes: no inset, the first baseline one
+// ascent down, one step per line, and lines broken exactly where the
+// renderer's wrap (at the Standard-14 widths) breaks them. An EmbedPDF update
+// that moves the text fails here, not in a reader's file.
+{
+  const layout = await loadFreetextLayout()
+  const LFILE = path.join(os.tmpdir(), 'pdfx-freetext-layout-test.pdf')
+  fs.copyFileSync(SAMPLE, LFILE)
+  const SENTENCE = 'Hugging boxes wrap where the screen wraps them, word for word.'
+  const PARAGRAPH = 'A longer note that has to wrap: several lines of ordinary words, ' +
+    'some short and some rather longer, set in a box of a fixed width.'
+  const cases = []
+  for (let font = 0; font < 12; font++) {
+    for (const size of [12, 17]) {
+      const width = (s) => layout.standardTextWidth(s, size, font)
+      cases.push({ kind: 'lines', font, size, w: 300, contents: 'Ab\nCd\nEf' })
+      cases.push({ kind: 'hug', font, size, w: width(SENTENCE) + layout.FREETEXT_HUG_SLACK, contents: SENTENCE })
+      cases.push({ kind: 'tight', font, size, w: width(SENTENCE) - 0.5, contents: SENTENCE })
+      cases.push({ kind: 'wrap', font, size, w: 150 + size, contents: PARAGRAPH })
+    }
+  }
+  let y = 30
+  let pageIndex = 0
+  for (const c of cases) {
+    c.rect = { x: 30, y, w: c.w, h: 120 }
+    c.pageIndex = pageIndex
+    const res = await applyAnnotation({
+      path: LFILE, pageIndex, color: [0, 0, 0], opacity: 1, type: 'freetext',
+      quads: [c.rect], contents: c.contents, fontSize: c.size, font: c.font
+    })
+    c.id = 'ok' in res ? res.id : null
+    // Boxes may overlap — only their appearance streams are read
+    y += 40
+    if (y > 650) {
+      y = 30
+      pageIndex = (pageIndex + 1) % 6
+    }
+  }
+  check('layout: every probe box was written', cases.every((c) => c.id !== null),
+    `${cases.filter((c) => c.id === null).length} failed`)
+  await flushAnnotations(LFILE)
+
+  const doc = mupdf.Document.openDocument(fs.readFileSync(LFILE), 'application/pdf')
+  const byPage = new Map()
+  const objOf = (c) => {
+    if (!byPage.has(c.pageIndex)) {
+      const page = doc.loadPage(c.pageIndex)
+      byPage.set(c.pageIndex, { h: page.getBounds()[3], annots: new Map(page.getAnnotations().map((a) => [a.getObject().asIndirect(), a.getObject()])) })
+    }
+    return byPage.get(c.pageIndex)
+  }
+  const bad = { inset: [], ascent: [], step: [], hug: [], tight: [], wrap: [] }
+  for (const c of cases) {
+    const { h: pageH, annots } = objOf(c)
+    const o = annots.get(c.id)
+    const ap = o?.get('AP')?.get('N')
+    const lines = ap && !ap.isNull() ? apLines(ap.readStream().asString()) : []
+    const label = `${FACE_NAMES[c.font]} ${c.size}`
+    const m = layout.freetextFaceMetrics(c.font)
+    const top = pageH - c.rect.y
+    if (c.kind === 'lines') {
+      if (lines.length !== 3 || lines.some((l) => Math.abs(l.x - c.rect.x) > 0.01)) bad.inset.push(`${label}: x ${lines.map((l) => l.x).join(',')}`)
+      const ascent = (top - (lines[0]?.y ?? NaN)) / c.size
+      if (!(Math.abs(ascent - m.ascent) <= 0.002)) bad.ascent.push(`${label}: ${ascent.toFixed(4)} vs ${m.ascent}`)
+      const steps = lines.slice(1).map((l, i) => (lines[i].y - l.y) / c.size)
+      if (steps.length !== 2 || steps.some((s) => Math.abs(s - m.step) > 0.002)) bad.step.push(`${label}: ${steps.map((s) => s.toFixed(4)).join(',')} vs ${m.step}`)
+    } else {
+      const want = c.kind === 'tight' ? null : wrapLines(c.contents, c.w, (s) => layout.standardTextWidth(s, c.size, c.font))
+      const got = lines.map((l) => l.text.trim())
+      if (c.kind === 'hug' && got.length !== 1) bad.hug.push(`${label}: ${got.length} lines`)
+      if (c.kind === 'tight' && got.length < 2) bad.tight.push(`${label}: ${got.length} line`)
+      if (c.kind === 'wrap' && JSON.stringify(got) !== JSON.stringify(want)) bad.wrap.push(`${label}: ${JSON.stringify(got)} vs ${JSON.stringify(want)}`)
+    }
+  }
+  doc.destroy()
+  fs.rmSync(LFILE, { force: true })
+  check('layout: the words start on the box\'s left edge — no inset (12 faces × 2 sizes)', bad.inset.length === 0, bad.inset.join('; '))
+  check('layout: the first baseline is one ascent below the top, as freetext-layout says', bad.ascent.length === 0, bad.ascent.join('; '))
+  check('layout: each further line is one step lower, as freetext-layout says', bad.step.length === 0, bad.step.join('; '))
+  check('layout: a box its line + the hug slack wide keeps that line whole', bad.hug.length === 0, bad.hug.join('; '))
+  check('layout: …and half a point narrower than the line wraps it (the widths are PDFium\'s)', bad.tight.length === 0, bad.tight.join('; '))
+  check('layout: a paragraph breaks exactly where the renderer\'s wrap breaks it', bad.wrap.length === 0, bad.wrap.slice(0, 3).join('; '))
 }
 
 console.log(failures === 0 ? '\nALL PASS' : `\n${failures} FAILURE(S)`)
