@@ -24,6 +24,7 @@ import { shell } from 'electron'
 import type { FileError } from '../shared/types'
 import { CHATGPT_ORIGINATOR } from '../shared/ai-chat'
 import { CHATGPT_LOGIN_ERRORS } from '../shared/engine-errors'
+import { dialogLanguage } from './dialog-language'
 
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 const ISSUER = 'https://auth.openai.com'
@@ -126,10 +127,43 @@ export async function refreshChatgpt(
   return { ok: true, tokens: toBundle((await res.json()) as TokenResponse, current) }
 }
 
-const page = (title: string, body: string): string =>
-  `<!doctype html><meta charset="utf-8"><title>${title}</title>` +
-  `<body style="font:16px system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1rem;color:#222">` +
-  `<h1 style="font-size:1.25rem">${title}</h1><p>${body}</p></body>`
+type CallbackPage = 'cancelled' | 'invalid' | 'signedIn'
+
+/** The pages the browser lands on after the sign-in, in the app's language
+ *  (the same setting main's native dialogs follow) */
+function callbackStrings(lang: 'nb' | 'en' | 'zh'): Record<CallbackPage, { title: string; body: string }> {
+  if (lang === 'nb') {
+    return {
+      cancelled: { title: 'Innloggingen ble avbrutt', body: 'Du kan lukke denne fanen og prøve igjen fra PDF Scholar.' },
+      invalid: { title: 'Ugyldig innlogging', body: 'Svaret fra OpenAI hørte ikke til denne innloggingen.' },
+      signedIn: { title: 'Logget inn', body: 'Du kan lukke denne fanen og gå tilbake til PDF Scholar.' }
+    }
+  }
+  if (lang === 'zh') {
+    return {
+      cancelled: { title: '登录已取消', body: '您可以关闭此标签页，然后在 PDF Scholar 中重试。' },
+      invalid: { title: '登录无效', body: '来自 OpenAI 的响应不属于此次登录。' },
+      signedIn: { title: '已登录', body: '您可以关闭此标签页并返回 PDF Scholar。' }
+    }
+  }
+  return {
+    cancelled: { title: 'Sign-in cancelled', body: 'You can close this tab and try again from PDF Scholar.' },
+    invalid: { title: 'Invalid sign-in', body: 'The response from OpenAI did not belong to this sign-in.' },
+    signedIn: { title: 'Signed in', body: 'You can close this tab and return to PDF Scholar.' }
+  }
+}
+
+const HTML_LANG = { nb: 'nb', en: 'en', zh: 'zh-Hans' } as const
+
+const page = (kind: CallbackPage): string => {
+  const lang = dialogLanguage()
+  const { title, body } = callbackStrings(lang)[kind]
+  return (
+    `<!doctype html><html lang="${HTML_LANG[lang]}"><meta charset="utf-8"><title>${title}</title>` +
+    `<body style="font:16px system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1rem;color:#222">` +
+    `<h1 style="font-size:1.25rem">${title}</h1><p>${body}</p></body></html>`
+  )
+}
 
 /** The pending sign-in, so a second click restarts instead of colliding */
 let pending: { cancel(): void } | null = null
@@ -162,12 +196,12 @@ export async function loginChatgpt(): Promise<{ ok: true; tokens: ChatgptTokens 
         res.writeHead(404).end()
         return
       }
-      const html = (status: number, title: string, body: string): void => {
-        res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }).end(page(title, body))
+      const html = (status: number, kind: CallbackPage): void => {
+        res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' }).end(page(kind))
       }
       const error = url.searchParams.get('error')
       if (error) {
-        html(200, 'Innloggingen ble avbrutt', 'Du kan lukke denne fanen og prøve igjen fra PDF Scholar.')
+        html(200, 'cancelled')
         finish(error === 'access_denied' ? CHATGPT_LOGIN_ERRORS.cancelled : CHATGPT_LOGIN_ERRORS.failed(url.searchParams.get('error_description') ?? error))
         return
       }
@@ -175,10 +209,10 @@ export async function loginChatgpt(): Promise<{ ok: true; tokens: ChatgptTokens 
       // A callback that does not carry OUR state is not our sign-in — anyone
       // on this machine can hit a localhost port
       if (!code || url.searchParams.get('state') !== state) {
-        html(400, 'Ugyldig innlogging', 'Svaret fra OpenAI hørte ikke til denne innloggingen.')
+        html(400, 'invalid')
         return
       }
-      html(200, 'Logget inn', 'Du kan lukke denne fanen og gå tilbake til PDF Scholar.')
+      html(200, 'signedIn')
       tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier })
         .then(async (r) => {
           if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text().catch(() => '')).slice(0, 200)}`)
