@@ -27,7 +27,7 @@
 // test-stream-replay.mjs (which DOES run in CI) replays them keylessly forever
 // after. That is the point of the whole exercise: one paid run turns a live
 // discovery into a permanent regression test.
-import { curatedIds, instrumentFetch, loadAiCore, saveRecording } from './ai-core.mjs'
+import { curatedIds, instrumentFetch, loadAiCore, loadAppPrompts, saveRecording } from './ai-core.mjs'
 import { startFakeProvider, SCENARIOS } from './fake-provider.mjs'
 import { encodePng } from './tiny-png.mjs'
 
@@ -107,6 +107,33 @@ export async function runLiveSuite({ keys = {}, args = [], chatgptAccountId = ''
   // of a 2×2 after that. 64×64 is still a rounding error in tokens and
   // impossible to misread.
   const RED_PNG = Buffer.from(encodePng(64, 64, () => [220, 30, 30, 255])).toString('base64')
+
+  // The answer language (issue #75): the app's OWN prompts, from ai.ts, in the
+  // language state a request would be built in. The document stays Norwegian,
+  // so English is never the easy way out and Norwegian is the pull to resist.
+  const P = await loadAppPrompts()
+  /** Put the app in a language state: the interface preference, and the
+   *  system's languages (what «auto» and the answer default both read) */
+  function languageState(pref, system) {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: { language: system[0], languages: system },
+      configurable: true,
+      writable: true
+    })
+    P.setSystemLanguages(system)
+    P.setLanguage(pref)
+  }
+  const PAGE_3 = 'Resultatet var at papirgruppen brukte 12 prosent lengre tid.'
+  const SPANISH_QUESTION = '¿Cuánto tiempo más tardó el grupo que leyó en papel? Responde brevemente.'
+  /** Spanish, not Norwegian: Spanish function words outnumber Norwegian ones.
+   *  A quote may stay Norwegian (the quote contract keeps it verbatim), so the
+   *  verdict is a majority, never «no Norwegian word at all». */
+  const readsSpanish = (text) => {
+    const count = (re) => (text.match(re) ?? []).length
+    const es = count(/(?<![\p{L}])(el|la|los|las|del|que|un|una|más|tiempo|grupo|papel|tardó|leyó|lectura|según|página|por|con|es|fue)(?![\p{L}])/giu)
+    const nb = count(/(?<![\p{L}])(og|det|som|brukte|lengre|tid|gruppen|papirgruppen|av|på|ble|var|er|siden)(?![\p{L}])/giu)
+    return es > nb
+  }
 
   /** Provider or account states that say nothing about whether the APP works:
    *  no credit, an exhausted quota, a model saturated right now. The app naming
@@ -285,6 +312,58 @@ export async function runLiveSuite({ keys = {}, args = [], chatgptAccountId = ''
       if (profile.vision) ok(/rød|red/i.test(seen), `the model saw the image (said "${seen.trim().slice(0, 40)}")`)
     }
     record(`${provider}-${model.replace(/[^a-z0-9.]+/gi, '-')}-image`, provider, model, img)
+
+    // 3. A question in Spanish is answered in Spanish — in a NORWEGIAN
+    // interface, about a Norwegian document, with the chat panel's own prompt.
+    // The language the reader writes in wins over everything around it.
+    languageState('nb', ['nb-NO'])
+    const chat = await ask({
+      provider,
+      model,
+      compatBaseUrl,
+      req: {
+        requestId: 3,
+        system: P.chatSystem(),
+        messages: [{ role: 'user', text: SPANISH_QUESTION }],
+        document: DOC,
+        webSearch: 'off',
+        languageRule: P.chatLanguageRule()
+      }
+    })
+    if (!('error' in chat.result)) {
+      const said = answerText(chat.result)
+      ok(readsSpanish(said), `a Spanish question is answered in Spanish (said "${said.trim().slice(0, 60)}")`)
+    } else if (NOT_OUR_FAULT.has(chat.result.code)) {
+      console.log(`    ⊘ Spanish question skipped — ${chat.result.code}`)
+    } else {
+      ok(false, `answered the Spanish question (got ${chat.result.code ?? 'error'})`)
+    }
+
+    // 4. A chip sends no words of the reader's: on a Spanish system, where the
+    // interface is English for want of a dictionary, «Explain» answers in
+    // Spanish — not in the interface's English, not in the document's Norwegian.
+    languageState('auto', ['es-ES', 'en'])
+    const chip = await ask({
+      provider,
+      model,
+      compatBaseUrl,
+      req: {
+        requestId: 4,
+        system: P.explainSystem('explain'),
+        messages: [{ role: 'user', text: P.explainUserMessage(PAGE_3, 3, PAGE_3) }],
+        document: DOC,
+        webSearch: 'off',
+        languageRule: P.quickLanguageRule('explain')
+      }
+    })
+    if (!('error' in chip.result)) {
+      const said = answerText(chip.result)
+      ok(readsSpanish(said), `«Explain» on a Spanish system answers in Spanish (said "${said.trim().slice(0, 60)}")`)
+    } else if (NOT_OUR_FAULT.has(chip.result.code)) {
+      console.log(`    ⊘ «Explain» skipped — ${chip.result.code}`)
+    } else {
+      ok(false, `answered «Explain» (got ${chip.result.code ?? 'error'})`)
+    }
   }
 
   // ---------- self-check: the same harness, no keys ----------
