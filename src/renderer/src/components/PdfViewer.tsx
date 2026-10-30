@@ -127,6 +127,7 @@ import type { MarginViewConfig } from './MarginNotes'
 import { registerPdfiumDoc, releasePdfiumDoc } from '../pdfium-renderer'
 import {
   buildAiDocument,
+  chatLanguageRule,
   chatSystem,
   citationPage,
   excerptSystemNote,
@@ -6931,6 +6932,8 @@ export default function PdfViewer({
       system: chatSystem() + (prep.excerpt ? excerptSystemNote() : ''),
       messages: [{ role: 'user', text: semanticSearchPrompt(query) }],
       document: { title: payload.name, text: prep.doc.text },
+      // The chat's rule, for the same cache; the prompt names the language
+      languageRule: chatLanguageRule(),
       purpose: 'search'
     })
     if (semanticReqRef.current !== requestId) return // superseded/aborted

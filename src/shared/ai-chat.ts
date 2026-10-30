@@ -241,9 +241,9 @@ function anthropicWebSearchTool(model: string): Record<string, unknown> {
 // Azure take it as a user turn plus a synthetic acknowledgement, so the model
 // treats the pages as material rather than as an instruction. English on
 // purpose — same rule as WEB_HINT_* and QUOTE_CONTRACT below: model-facing text
-// stays English for both UI languages, and the answer's language is set by the
-// system prompt (chatSystem() in src/renderer/src/ai.ts, which tells the model
-// to answer in the language the user writes in). These two used to be
+// stays English for every UI language, and the answer's language is set by the
+// request's languageRule, which closes the system prompt (built in
+// src/renderer/src/ai.ts: the language the user writes in). These two used to be
 // Norwegian, which pulled answers toward Norwegian on English papers.
 const DOC_PREAMBLE = 'DOCUMENT — answer based on this'
 const DOC_ACK = 'I have read the document and am ready.'
@@ -260,6 +260,17 @@ CITATION RULES (important):
 - Write the literal word KILDE — never the document's filename or title in its place.
 - The excerpt MUST be an exact, verbatim substring of the document text (10–200 characters), and N is the page number where it appears (pages are marked "[Side N]" or "[Page N]" in the document).
 - Never invent quotes. If you cannot support a claim with a verbatim excerpt, say so explicitly.`
+
+/** The request's answer-language rule, which closes the system prompt on every
+ *  path: after the web-search hint and the quote contract, so the last thing
+ *  the model reads before the document and the question is which language to
+ *  answer in (issue #75 — an English paper, English scaffolding and the
+ *  English rules above all pull an answer toward English). Built by the
+ *  renderer (src/renderer/src/ai.ts), which knows the reader's language;
+ *  absent = the system prompt is exactly what it was before the rule. */
+function languageRule(req: AiChatRequest): string {
+  return req.languageRule ?? ''
+}
 
 // ---------- Providers ----------
 
@@ -523,7 +534,7 @@ async function chatAnthropic(
   const params: Record<string, unknown> = {
     model,
     max_tokens: tuning.maxTokens,
-    system: req.system + webSearchHint(req),
+    system: req.system + webSearchHint(req) + languageRule(req),
     messages
   }
   if (tuning.thinking) params.thinking = tuning.thinking
@@ -795,7 +806,8 @@ async function chatOpenAiResponses(
 
   const body: Record<string, unknown> = {
     model,
-    instructions: req.system + webSearchHint(req) + (req.document ? QUOTE_CONTRACT : ''),
+    instructions:
+      req.system + webSearchHint(req) + (req.document ? QUOTE_CONTRACT : '') + languageRule(req),
     input,
     stream: true
   }
@@ -985,7 +997,10 @@ async function chatOpenAiCompatible(
     | { type: 'text'; text: string }
     | { type: 'image_url'; image_url: { url: string } }
   const messages: { role: string; content: string | OpenAiPart[] }[] = [
-    { role: 'system', content: req.system + (req.document ? QUOTE_CONTRACT : '') }
+    {
+      role: 'system',
+      content: req.system + (req.document ? QUOTE_CONTRACT : '') + languageRule(req)
+    }
   ]
   if (req.document) {
     messages.push({

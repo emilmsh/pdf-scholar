@@ -93,6 +93,12 @@ runs:
     # matches its capability-profile row (no keys, no network)
     - run: npm run test:ai-chat
       shell: bash
+    # Which language an AI answer is in (issue #75): the reader's own words
+    # where they typed, else the interface language — or the system's when
+    # the interface is English only for want of a dictionary — and the real
+    # prompts saying so in English and Norwegian
+    - run: npm run test:answer-language
+      shell: bash
     # The selection that turns a 409-model live listing into a menu: what it
     # drops (image/music generators, :batch twins, last year's models) and the
     # gates that stop it emptying a small or silent endpoint
