@@ -254,6 +254,30 @@ og ett på flere hundre).
 pekerdrevet. Håndsjekk: følelsen av at kortet «venter» på deg (220 ms), og at
 tilpasningen aldri flytter en boble du selv har dratt.
 
+## 14. Tekstboks som vokser mens du skriver (issue #66)
+
+**Gjør:** Velg tekstverktøyet (T) og klikk MELLOM to trykte linjer. Ikke skriv
+– dra det prikkete grepet til venstre for boksen litt ned. Skriv et par ord,
+så en lang setning. Klikk utenfor. Lag en boks til, dra hjørnet bredere før du
+skriver, og skriv et avsnitt. Lag en tredje helt ute ved høyre marg. Gjør det
+samme med fingeren på Surface (grepet og hjørnet), og med pennen.
+
+**Se:** Den grå «Tekst» står akkurat der første bokstav kommer, midt på
+høyden du klikket – ikke en halv linje under. Grepet flytter den tomme boksen
+uten at den forsvinner, og markøren blinker fortsatt i den. Boksen er bare så
+bred som teksten og vokser mens du skriver; ved høyre marg slutter den å vokse
+og bryter linja. Etter at du har dratt hjørnet står bredden fast, og boksen
+vokser bare nedover. Klikk utenfor: teksten flytter seg ikke en piksel, og en
+boks du aldri skrev i blir borte. Lagre, åpne i Edge og Acrobat: samme
+linjeskift, samme plass.
+
+**Dekket av maskin:** `test:annot-edit` § 6–7 (plassering ved klikket,
+plassholder, grep og hjørne nåbare med ekte peker, vokser/bryter/låst bredde,
+skjermens linjeskift = filens, skriftbredder = Standard 14), `test:engine` §
+15 og `test:appender` (PDFiums og vår egen skriver setter teksten likt).
+Håndsjekk: følelsen med finger og penn, og at grepet ikke står i veien for
+teksten til venstre.
+
 ## Står igjen fra RELEASE.md steg 1 (alltid)
 
 - Skriv ut én gang – bare når Electrons hovedversjon endres (se RELEASE.md).
