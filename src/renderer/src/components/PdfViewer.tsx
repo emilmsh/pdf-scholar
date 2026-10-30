@@ -30,7 +30,7 @@ import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { useDropTarget } from './useDropTarget'
 import { useDocumentDrag } from './useDocumentDrag'
 import { prettyModelName } from './ai-models'
-import { bubblesWhileTyping, commandForEvent, isKeyboardCaptured, shortcutLabel } from '../keymap'
+import { commandForEvent, isKeyboardCaptured, shortcutLabel } from '../keymap'
 import type { CommandId } from '../keymap'
 import { READ_ALOUD } from '../flags'
 import {
@@ -43,6 +43,7 @@ import {
   annotationAtPoint,
   annotationHitTest,
   clearCustomColors,
+  freetextAnchor,
   freetextMinSize,
   inkHitTest,
   inkPad,
@@ -52,11 +53,9 @@ import {
   lineQuad,
   nextAnnotationId,
   quadsUnion,
-  rgbCss,
   selectionRectsForPage,
   strokesBox,
-  TEXT_FONT_DEFAULT,
-  textFontCss
+  TEXT_FONT_DEFAULT
 } from '../annotations'
 import {
   clearToolPrefs,
@@ -171,6 +170,7 @@ import {
 import type { SavedSignature } from '../signatures'
 import { IconPanelLeft, IconPanelRight, IconPause, IconPlay, IconStop } from './icons'
 import { OverlayScrollbars } from './OverlayScrollbars'
+import FreeTextEditor from './FreeTextEditor'
 import PdfPage from './PdfPage'
 import PresentationMode from './PresentationMode'
 import Sidebar from './Sidebar'
@@ -1446,18 +1446,20 @@ export default function PdfViewer({
   const resetTextPref = useCallback(() => {
     setPrefs((p) => ({ ...p, text: { ...DEFAULT_TOOL_PREFS.text } }))
   }, [])
-  /** The floating text-box editor. Carries its own box size (page points) so it
-   *  is drag-resizable before commit; `editingId` is set when re-opening an
-   *  existing FreeText annotation (double-click) so commit resizes/edits it in
-   *  place rather than creating a new one. */
+  /** The floating text-box editor (FreeTextEditor). Where it starts, in page
+   *  points; it sizes, grows and moves itself from there and hands the box
+   *  back on commit. `w`/`h` are set for a re-opened box only — a new one
+   *  grows with its text until the reader sizes it (issue #66). `editingId`
+   *  is set when re-opening an existing FreeText annotation (double-click) so
+   *  commit resizes/edits it in place rather than creating a new one. */
   const [freeTextDraft, setFreeTextDraft] = useState<{
     pageNumber: number
     x: number
     y: number
     clientX: number
     clientY: number
-    w: number
-    h: number
+    w?: number
+    h?: number
     editingId?: string
     text?: string
     /** Set when editing an existing box, so the editor shows ITS colour/size
@@ -4201,30 +4203,31 @@ export default function PdfViewer({
         })
         return
       }
+      // The text starts at the click and its first line is centred on it
+      // (issue #66) — the click is no longer the box's top-left corner
+      const pref = prefsRef.current.text
+      const at = freetextAnchor(x, y, pref.fontSize, pref.font)
       setFreeTextDraft({
         pageNumber,
-        x,
-        y,
+        x: at.x,
+        y: at.y,
         clientX,
         clientY,
-        w: 200,
-        h: 48,
         pane: activePaneRef.current
       })
     },
     [openFreeTextEditor, docCtxFor, docOf]
   )
 
-  // Commit the editor. `wPt`/`hPt` are the editor's drag-resized box in page
-  // points; editing an existing box resizes/edits it in place, otherwise a new
-  // FreeText is created at the drawn box size.
+  // Commit the editor with the box it hands back (page points); editing an
+  // existing box resizes/edits it in place, otherwise a new FreeText is
+  // created at that box.
   const saveFreeText = useCallback(
-    async (text: string, wPt?: number, hPt?: number) => {
+    async (text: string, box: PageRect) => {
       if (!freeTextDraft) return
-      const wDrag = wPt && wPt > 24 ? wPt : freeTextDraft.w
-      const hDrag = hPt && hPt > 14 ? hPt : freeTextDraft.h
-      // The editor can be drag-shrunk below its own text — commit a box that
-      // shows every letter instead (same floor the resize handles enforce)
+      // The editor sizes itself to its text, but the box it hands back is
+      // floored here too — never narrower than a word, never shorter than
+      // the lines (the same floor the resize handles enforce)
       const fontSize = freeTextDraft.editingId
         ? freeTextDraft.fontSize ?? FREETEXT_SIZE
         : prefsRef.current.text.fontSize
@@ -4232,10 +4235,8 @@ export default function PdfViewer({
       // the same size, so measuring every box in one font would let a
       // monospaced one commit narrower than its own words.
       const font = freeTextDraft.editingId ? freeTextDraft.font : prefsRef.current.text.font
-      const min = freetextMinSize(text, fontSize, wDrag, font)
-      const w = Math.max(wDrag, min.w)
-      const h = Math.max(hDrag, min.h)
-      const rect = { x: freeTextDraft.x, y: freeTextDraft.y, w, h }
+      const min = freetextMinSize(text, fontSize, box.w, font)
+      const rect = { x: box.x, y: box.y, w: Math.max(box.w, min.w), h: Math.max(box.h, min.h) }
       // The draft carries its pane — the document is whatever that pane shows
       const doc = docOf(freeTextDraft.pane)
       if (freeTextDraft.editingId) {
@@ -7613,51 +7614,38 @@ export default function PdfViewer({
     paneRotation: ViewRotation
   ): React.JSX.Element | null => (
     <>
-      {freeTextDraft && freeTextDraft.pane === pane && (
-        <textarea
-          className="freetext-editor"
-          autoFocus
-          spellCheck={false}
-          defaultValue={freeTextDraft.text ?? ''}
-          style={{
-            left: lay.lefts[freeTextDraft.pageNumber - 1] + freeTextDraft.x * paneScale,
-            top: lay.tops[freeTextDraft.pageNumber - 1] + freeTextDraft.y * paneScale,
-            width: freeTextDraft.w * paneScale,
-            height: freeTextDraft.h * paneScale,
-            // An edited box previews in ITS stored look; a new draft follows
-            // the tool preference live, so what you type is what commits
-            color: rgbCss(freeTextDraft.color ?? textPref.color, 1),
-            fontSize: (freeTextDraft.fontSize ?? textPref.fontSize) * paneScale,
-            // …and that includes the TYPEFACE. Typing in one face and watching
-            // it change on commit is not a preview, and it is not only
-            // cosmetic: the commit's minimum box is measured in the committed
-            // face, so an editor set in another one wraps somewhere else than
-            // the mark ends up wrapping (Emil, 2026-08-08).
-            ...textFontCss(editorFont),
-            ...(freeTextDraft.editingId ? { background: 'rgba(255, 255, 255, 0.96)' } : {})
-          }}
-          onKeyDown={(e) => {
-            // App shortcuts bubble to the window handler (find steals focus and
-            // the onBlur below commits, or discards, an empty draft)
-            if (bubblesWhileTyping(e)) return
-            e.stopPropagation()
-            if (e.key === 'Escape') setFreeTextDraft(null)
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              const el = e.target as HTMLTextAreaElement
-              const value = el.value.trim()
-              if (value) saveFreeText(value, el.offsetWidth / paneScale, el.offsetHeight / paneScale)
-              else setFreeTextDraft(null)
-            }
-          }}
-          onBlur={(e) => {
-            const el = e.target
-            const value = el.value.trim()
-            if (value) saveFreeText(value, el.offsetWidth / paneScale, el.offsetHeight / paneScale)
-            else setFreeTextDraft(null)
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-        />
-      )}
+      {freeTextDraft &&
+        freeTextDraft.pane === pane &&
+        (() => {
+          // The page the box is on, in points — from the document the pane
+          // SHOWS — so a growing box knows where the page's right edge is
+          const page = (pane === 'b' && sessionB ? sessionB.sizes : sizes)[freeTextDraft.pageNumber - 1]
+          return (
+            <FreeTextEditor
+              // A new draft is a new editor: its size and position state
+              // start over rather than carrying the last box's along
+              key={`${freeTextDraft.pageNumber}:${freeTextDraft.x}:${freeTextDraft.y}:${freeTextDraft.editingId ?? ''}`}
+              pageLeft={lay.lefts[freeTextDraft.pageNumber - 1]}
+              pageTop={lay.tops[freeTextDraft.pageNumber - 1]}
+              scale={paneScale}
+              pageW={page?.w ?? 612}
+              pageH={page?.h ?? 792}
+              x={freeTextDraft.x}
+              y={freeTextDraft.y}
+              w={freeTextDraft.w}
+              h={freeTextDraft.h}
+              text={freeTextDraft.text ?? ''}
+              // An edited box previews in ITS stored look; a new draft follows
+              // the tool preference live, so what you type is what commits
+              color={freeTextDraft.color ?? textPref.color}
+              fontSize={freeTextDraft.fontSize ?? textPref.fontSize}
+              font={editorFont}
+              opaque={!!freeTextDraft.editingId}
+              onCommit={(text, box) => void saveFreeText(text, box)}
+              onCancel={() => setFreeTextDraft(null)}
+            />
+          )
+        })()}
       {dragGhost &&
         dragGhost.pane === pane &&
         (() => {

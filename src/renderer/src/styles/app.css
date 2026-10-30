@@ -2283,8 +2283,17 @@ html.touch-ui .convs-row {
 .annot-freetext {
   position: absolute;
   font-family: Helvetica, Arial, sans-serif;
-  line-height: 1.35;
-  white-space: pre-wrap;
+  /* Fallback only — PdfPage sets the line box the saved appearance uses
+     (freetextLineCss). No kerning, no ligatures: a Tj string has neither, so
+     either would set the words narrower here than in the file. */
+  line-height: 1.17;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  /* A word goes down with the space after it, as PDFium breaks the file's
+     lines — pre-wrap let that space hang and kept the word up here; and no
+     emergency break inside a word, which the file never makes either */
+  white-space: break-spaces;
+  overflow-wrap: normal;
   overflow: hidden;
   pointer-events: none;
 }
@@ -8199,26 +8208,109 @@ button.bookmark-fold:hover {
   overflow: visible;
 }
 
-/* Free text typed directly on the page, WYSIWYG */
+/* Free text typed directly on the page, WYSIWYG (FreeTextEditor.tsx). The
+   box IS the text box that commits: its content edge is the saved box's edge
+   and the words start on it, as the appearance stream sets them (no inset).
+   So no padding and no border — the dashed frame is an outline drawn OUTSIDE
+   the box, the backing a spread shadow out to it — and the size comes from
+   the component, never from the native resize grip (a drag on that could not
+   be told apart from the box growing as it is typed into, issue #66). */
+
+.freetext-draft {
+  position: absolute;
+  z-index: 26;
+}
 
 .freetext-editor {
   position: absolute;
-  z-index: 26;
-  min-width: 60px;
-  min-height: 24px;
-  resize: both;
-  overflow: auto;
-  padding: 2px 4px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  resize: none;
+  overflow: hidden;
   font-family: Helvetica, Arial, sans-serif;
-  line-height: 1.35;
-  /* Fallback only — PdfViewer sets the real colour inline, from the draft's
-     own colour or the tool preference. Kept in step with INK_BLACK. */
+  /* Fallback only — FreeTextEditor sets the saved appearance's line box */
+  line-height: 1.17;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  /* Fallback only — FreeTextEditor sets the real colour inline, from the
+     draft's own colour or the tool preference. Kept in step with INK_BLACK. */
   color: #000000;
   background: rgba(255, 255, 255, 0.55);
-  border: 1.5px dashed var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55);
+  outline: 1.5px dashed var(--accent);
+  outline-offset: 3px;
+  border-radius: 1px;
+  /* The file's line breaking — see .annot-freetext */
+  white-space: break-spaces;
+  overflow-wrap: normal;
+}
+
+/* Grey, short, and exactly where the first typed letter will land; gone with
+   the first keystroke. currentColor so it reads in the ink's own hue. */
+.freetext-editor::placeholder {
+  color: currentColor;
+  opacity: 0.4;
+}
+
+/* Handles on the draft: they take the press with preventDefault, so the
+   textarea keeps the focus (and the draft) through a drag. The ::before is an
+   invisible finger-sized target around the small visible mark. */
+.freetext-grip {
+  position: absolute;
+  touch-action: none;
+}
+
+.freetext-grip::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* Move: a dotted tab beside the first line, outside the outline */
+.freetext-move {
+  right: calc(100% + 7px);
+  width: 10px;
   border-radius: 3px;
-  outline: none;
-  white-space: pre-wrap;
+  background-color: var(--accent);
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.95) 1px, transparent 1.4px);
+  background-size: 5px 5px;
+  background-position: 0 1px;
+  cursor: move;
+  opacity: 0.85;
+}
+
+.freetext-move::before {
+  inset: -6px -8px -6px -10px;
+}
+
+/* Resize: the 7px dot every other box corner has, on the outline's corner */
+.freetext-resize {
+  right: -8px;
+  bottom: -8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.9);
+  cursor: nwse-resize;
+}
+
+.freetext-move:hover,
+.freetext-move:active {
+  opacity: 1;
+}
+
+.freetext-resize:hover,
+.freetext-resize:active {
+  transform: scale(1.25);
+}
+
+html.touch-ui .freetext-grip::before {
+  inset: -14px;
 }
 
 /* Reading HUD fades in distraction-free mode after idle */

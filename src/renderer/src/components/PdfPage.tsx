@@ -3,7 +3,7 @@ import { AnnotationMode, OPS, TextLayer } from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import type { PageRect, ViewRotation } from '../../../shared/types'
 import type { DrawTool, PageAnnotation, ResizeHandle, ShapeToolType } from '../annotations'
-import { annotationCss, arrowHeadPoints, arrowShaftEnd, isTextMarkup, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData, textFontCss } from '../annotations'
+import { annotationCss, arrowHeadPoints, arrowShaftEnd, isTextMarkup, quadsUnion, resizeKindOf, rgbCss, squigglyPathData, strokePathData, freetextLineCss, textFontCss } from '../annotations'
 import { pagePointToView, pageRectToView, svgRotationTransform, viewSize } from '../rotation'
 import { pageImageRects } from '../image-regions'
 import type { OpsTable } from '../image-regions'
@@ -1550,6 +1550,10 @@ function AnnotationMarks({
   }
   if (annotation.type === 'freetext') {
     const css = annotationCss(annotation, annotation.quads[0], scale, { w: pageW, h: pageH }, rotation)
+    const sizePx = (annotation.fontSize ?? 12) * scale
+    // …and on the lines the appearance stream sets them on (issue #66), so
+    // the words do not jump when the file takes over from this overlay
+    const lines = freetextLineCss(annotation.font, sizePx)
     return (
       <div
         className="annot annot-freetext"
@@ -1558,7 +1562,9 @@ function AnnotationMarks({
           // The face the appearance stream will be built in, so the overlay
           // and the saved page show the same letters at the same widths.
           ...textFontCss(annotation.font),
-          fontSize: (annotation.fontSize ?? 12) * scale
+          fontSize: sizePx,
+          lineHeight: `${lines.lineHeight}px`,
+          marginTop: lines.shift
         }}
       >
         {annotation.contents}
