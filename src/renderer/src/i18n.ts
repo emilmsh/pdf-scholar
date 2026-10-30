@@ -2584,9 +2584,11 @@ export function resolveLanguage(pref: LanguagePreference): Lang {
 }
 
 let current: Lang = 'nb'
+let currentPreference: LanguagePreference = 'auto'
 const listeners = new Set<() => void>()
 
 export function setLanguage(pref: LanguagePreference): void {
+  currentPreference = pref
   const next = resolveLanguage(pref)
   if (next === current) return
   current = next
@@ -2595,6 +2597,36 @@ export function setLanguage(pref: LanguagePreference): void {
 
 export function getLanguage(): Lang {
   return current
+}
+
+/** The language SETTING behind getLanguage(): whether the interface language
+ *  was chosen or followed the system («auto»). The AI's default answer
+ *  language tells the two apart (shared/answer-language.ts). */
+export function getLanguagePreference(): LanguagePreference {
+  return currentPreference
+}
+
+// The system's preferred languages, most preferred first. The browser's list
+// until the platform says otherwise: main.tsx hands over
+// bridge.systemLanguages(), which on desktop is the OS's own list — it names a
+// language Chromium has no translation for, where navigator.language already
+// reads en-US. The extension keeps the browser's list, which is all its
+// bridge could answer. Only the AI's default answer language reads it.
+let systemLanguageList: readonly string[] =
+  typeof navigator === 'undefined'
+    ? []
+    : navigator.languages?.length
+      ? [...navigator.languages]
+      : navigator.language
+        ? [navigator.language]
+        : []
+
+export function setSystemLanguages(list: readonly string[]): void {
+  if (Array.isArray(list) && list.length) systemLanguageList = [...list]
+}
+
+export function getSystemLanguages(): readonly string[] {
+  return systemLanguageList
 }
 
 /** Subscribe a component to language changes (needed because several

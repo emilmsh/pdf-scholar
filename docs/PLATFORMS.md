@@ -697,6 +697,22 @@ regressions are treated as bugs, not as acceptable platform lag.
     `test:notes-desktop` (the real app writing a record the shipped script
     then finds).
 
+34. **The AI's default answer language reads the OS's language list on the
+    desktop and the browser's in the extension.** (2026-10-30, issue #75)
+    The answer-language rule itself is renderer code and identical
+    everywhere (`src/renderer/src/ai.ts`): the reader's own words decide
+    where they typed, and a chip, the summary or the passage search fall
+    back to a default (`src/shared/answer-language.ts`) — the interface
+    language, or the system's first language when the interface is English
+    only because we have no dictionary for it. «The system» is
+    `app.getPreferredSystemLanguages()` on the desktop (`systemLanguages` in
+    `PdfxApi`), which also names a language Chromium ships no translation
+    for, where `navigator.language` already reads en-US; a page cannot ask
+    the OS, so the extension and dev:web read `navigator.languages` — the
+    list the reader set in Edge or Chrome, whose first entry is the
+    browser's own interface language. Covered by
+    `npm run test:answer-language`.
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

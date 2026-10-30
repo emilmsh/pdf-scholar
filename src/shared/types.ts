@@ -885,6 +885,12 @@ export interface AiChatRequest {
   /** Web-search mode (server-side provider tool). Only honored by providers
    *  that support it (Anthropic, OpenAI); others ignore it. Absent = 'off'. */
   webSearch?: AiWebSearchMode
+  /** Which language to answer in (src/renderer/src/ai.ts, issue #75). Every
+   *  provider path puts it LAST in the system prompt — after the web-search
+   *  hint and the quote contract — because the rule a model read last is the
+   *  one a weaker model keeps, and an English document, English scaffolding
+   *  and English citation rules all pull the other way. */
+  languageRule?: string
   /** What the request is for, when it is not the chat panel. No provider ever
    *  sees this — it exists so the screenshot fixture layer (src/main/ai.ts)
    *  can tell a semantic-search request from a chat question; the two are
@@ -1304,6 +1310,10 @@ export interface PdfxApi {
   onOpenPath(cb: (path: string) => void): () => void
   /** App version for the About/settings surface (package.json / manifest) */
   getVersion(): Promise<string>
+  /** The system's preferred languages, most preferred first (BCP 47 tags):
+   *  the OS's own list on desktop, navigator.languages in a browser. Only the
+   *  AI's default answer language reads it (shared/answer-language.ts). */
+  systemLanguages(): Promise<string[]>
   // ---------- Auto-update (Electron only; no-ops elsewhere) ----------
   // Policy: checks are quiet and automatic, but DOWNLOADING an update is
   // always the user's decision — nothing is fetched or installed silently.

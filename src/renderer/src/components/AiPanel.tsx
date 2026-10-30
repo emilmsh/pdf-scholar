@@ -27,6 +27,7 @@ import { isSharedWith, markSharedWith } from '../ai-sharing'
 import {
   annotationsDefaultQuestion,
   annotationsQuestion,
+  chatLanguageRule,
   chatSystem,
   scannedPagesNote,
   citationPage,
@@ -739,7 +740,8 @@ export default function AiPanel({
           (filesBlock?.text ?? ''),
         messages: history,
         document: imagesOnly || !prep ? null : { title: docTitle, text: prep.doc.text },
-        webSearch: webSearchRef.current
+        webSearch: webSearchRef.current,
+        languageRule: chatLanguageRule()
       })
       currentIdRef.current = null
       setStreamParts([])

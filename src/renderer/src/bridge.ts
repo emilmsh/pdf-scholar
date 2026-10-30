@@ -331,6 +331,10 @@ export const webApi: PdfxApi = {
   getPathForFile: () => null,
   onOpenPath: () => () => {},
   getVersion: async () => appVersion,
+  // The browser's language list — in the extension the one the reader set in
+  // Edge/Chrome, which is as close to the system's as a page can get
+  systemLanguages: async () =>
+    navigator.languages?.length ? [...navigator.languages] : [navigator.language || 'en'],
   // Auto-update is a desktop concern — the browser/extension just no-ops
   onUpdateAvailable: () => () => {},
   onUpdateProgress: () => () => {},
