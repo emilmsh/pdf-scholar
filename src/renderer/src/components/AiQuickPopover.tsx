@@ -41,6 +41,7 @@ import {
   figureUserMessage,
   nextAiRequestId,
   prepareDocumentForRequest,
+  quickLanguageRule,
   referenceSystem,
   referenceUserMessage,
   streamedAnswer,
@@ -265,7 +266,10 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         // Context-menu actions have no globe toggle — always instruction-gated:
         // «sjekk denne referansen på nettet» in a free-form question just works,
         // but nothing is searched unless the user asked for it.
-        webSearch: 'ask'
+        webSearch: 'ask',
+        // A typed «Spør …» question answers in its own language; a chip, which
+        // sends no words of the reader's, in the default one (ai.ts)
+        languageRule: quickLanguageRule(state.mode)
       })
       if (stale) return
       if (askedOf) rememberRequestTokenLimit(askedOf.provider, askedOf.model, result.tokenLimit)

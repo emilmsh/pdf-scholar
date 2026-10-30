@@ -451,7 +451,7 @@ const nb = {
     'Slå på et verktøy, så kan det søke i markeringene, kommentarene og KI-samtalene dine når du spør det om noe. Det leser aldri selve PDF-ene. Det verktøyet leser, går til leverandøren det bruker.',
   'mcp.tools': 'Verktøy',
   'mcp.claudeBoth': 'Claude Code og Claude Desktop',
-  'mcp.codexSub': 'Codex-CLI-en og Codex i ChatGPT-appen',
+  'mcp.codexSub': 'Codex-CLI-en, og Codex (ikke chat) i ChatGPT-appen',
   'mcp.notFound': 'Ikke funnet på maskinen',
   'mcp.other': 'Andre verktøy',
   'mcp.otherSub': 'Andre verktøy som støtter MCP – du limer inn oppsettet selv',
@@ -1736,7 +1736,7 @@ const en: Dict = {
     'Turn a tool on and it can search your highlights, comments and AI conversations when you ask it something. It never reads the PDFs themselves. What the tool reads goes to the provider it uses.',
   'mcp.tools': 'Tools',
   'mcp.claudeBoth': 'Claude Code and Claude Desktop',
-  'mcp.codexSub': 'The Codex CLI and Codex in the ChatGPT app',
+  'mcp.codexSub': 'The Codex CLI, and Codex (not chat) in the ChatGPT app',
   'mcp.notFound': 'Not found on this computer',
   'mcp.other': 'Other tools',
   'mcp.otherSub': 'Any other tool that supports MCP — you paste the setup in yourself',
@@ -2594,9 +2594,11 @@ export function resolveLanguage(pref: LanguagePreference): Lang {
 }
 
 let current: Lang = 'nb'
+let currentPreference: LanguagePreference = 'auto'
 const listeners = new Set<() => void>()
 
 export function setLanguage(pref: LanguagePreference): void {
+  currentPreference = pref
   const next = resolveLanguage(pref)
   if (next === current) return
   current = next
@@ -2605,6 +2607,36 @@ export function setLanguage(pref: LanguagePreference): void {
 
 export function getLanguage(): Lang {
   return current
+}
+
+/** The language SETTING behind getLanguage(): whether the interface language
+ *  was chosen or followed the system («auto»). The AI's default answer
+ *  language tells the two apart (shared/answer-language.ts). */
+export function getLanguagePreference(): LanguagePreference {
+  return currentPreference
+}
+
+// The system's preferred languages, most preferred first. The browser's list
+// until the platform says otherwise: main.tsx hands over
+// bridge.systemLanguages(), which on desktop is the OS's own list — it names a
+// language Chromium has no translation for, where navigator.language already
+// reads en-US. The extension keeps the browser's list, which is all its
+// bridge could answer. Only the AI's default answer language reads it.
+let systemLanguageList: readonly string[] =
+  typeof navigator === 'undefined'
+    ? []
+    : navigator.languages?.length
+      ? [...navigator.languages]
+      : navigator.language
+        ? [navigator.language]
+        : []
+
+export function setSystemLanguages(list: readonly string[]): void {
+  if (Array.isArray(list) && list.length) systemLanguageList = [...list]
+}
+
+export function getSystemLanguages(): readonly string[] {
+  return systemLanguageList
 }
 
 /** Subscribe a component to language changes (needed because several

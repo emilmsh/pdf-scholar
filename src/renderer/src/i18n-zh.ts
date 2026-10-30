@@ -391,7 +391,7 @@ export const zh: Dict = {
     '开启某个工具后，当您向它提问时，它可以搜索您的高亮、评论和 AI 对话。它绝不读取 PDF 本身。工具读取的内容会发送给它所使用的服务商。',
   'mcp.tools': '工具',
   'mcp.claudeBoth': 'Claude Code 和 Claude Desktop',
-  'mcp.codexSub': 'Codex CLI 和 ChatGPT 应用中的 Codex',
+  'mcp.codexSub': 'Codex CLI，以及 ChatGPT 应用中的 Codex（非聊天）',
   'mcp.notFound': '在这台电脑上未找到',
   'mcp.other': '其他工具',
   'mcp.otherSub': '其他支持 MCP 的工具——需自行粘贴配置',

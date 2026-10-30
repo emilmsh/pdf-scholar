@@ -383,7 +383,8 @@ you noted about a method, and it looks it up without opening a PDF.
 
 - **Nothing to download.** The MCP server is part of the desktop app. "AI tools" in the
   settings menu has one switch for **Claude** and one for **Codex**; turning it on writes
-  PDF Scholar into that tool's own settings
+  PDF Scholar into that tool's own settings. In the ChatGPT app, ask in Codex: an
+  ordinary ChatGPT chat runs in OpenAI's cloud and cannot reach a program on your computer
 - **Other tools that support MCP** take one config entry, which "Copy setup" fills in
   with your paths ([docs/MCP.md](docs/MCP.md))
 - **A tool that cannot connect**: "Copy for AI" in the Annotations tab copies the open

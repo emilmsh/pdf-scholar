@@ -280,7 +280,7 @@ Chromium's list then replaces a measured one.
    named prompt in the extension, from a «Velg …» button the reader
    pressed (§ 5 has the measurements). The list fills the field; the field
    stays the baseline; the chips of § 6 (same day) share the list and never
-   prompt. `docs/PLATFORMS.md` divergence 34 records the prompt.
+   prompt. `docs/PLATFORMS.md` divergence 35 records the prompt.
 5. Only on request, and on the same roles: an interface-font field, or
    shipped families (option 2).
 

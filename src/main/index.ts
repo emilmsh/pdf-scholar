@@ -89,6 +89,7 @@ import {
   setPosition
 } from './storage'
 import { initUpdater } from './updater'
+import { dialogLanguage } from './dialog-language'
 import { toLongPath } from './long-path'
 import { applyPortableUserData } from './portable'
 import { reapplyFileIconAtStartup, registerFileIconIpc } from './file-icon'
@@ -227,17 +228,6 @@ async function sessionRestorePlan(): Promise<StoredSessionWindow[]> {
   if (paths.length === 0) return []
   const exists = await existingFiles(paths)
   return restorePlan(stored, state.settings.restoreSession !== false, (p) => exists.has(p))
-}
-
-/** The language native dialogs speak. The renderer's i18n cannot be reached
- *  from main, so the handful of native strings below resolve the same language
- *  setting themselves — this is the one place that decision is made (mirrors
- *  resolveLanguage in the renderer's i18n.ts). */
-function dialogLanguage(): 'nb' | 'en' | 'zh' {
-  const pref = getState().settings.language
-  if (pref !== 'auto') return pref
-  const sys = app.getLocale().toLowerCase()
-  return sys.startsWith('n') ? 'nb' : sys.startsWith('zh') ? 'zh' : 'en'
 }
 
 /** Native-dialog strings following the app language setting */
@@ -1245,6 +1235,19 @@ function registerIpc(): void {
   registerMcpIpc(windowFor)
 
   ipcMain.handle('app:version', () => app.getVersion())
+
+  // The OS's own language list, not app.getLocale(): Chromium falls back to
+  // en-US for a language it ships no translation for, and the AI's default
+  // answer language (shared/answer-language.ts) is meant to see past that
+  ipcMain.handle('app:system-languages', (): string[] => {
+    try {
+      const preferred = app.getPreferredSystemLanguages()
+      if (preferred.length) return preferred
+    } catch {
+      // fall through to the app locale
+    }
+    return [app.getLocale()]
+  })
 
   ipcMain.handle('position:get', (_e, path: string) => getState().positions[path] ?? null)
 
