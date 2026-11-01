@@ -899,6 +899,16 @@ section('provider state: overloaded, out of credit, rate limited')
   const dry = await run({ provider: 'openai' })
   ok(dry.result.code === 'ai-no-credit', `429 insufficient_quota → ai-no-credit (got ${dry.result.code})`)
 
+  // OpenAI's newer wording (seen 2026-11-01), which carries no type to go by
+  responder = fail(429, {
+    error: {
+      message:
+        'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.'
+    }
+  })
+  const empty = await run({ provider: 'openai' })
+  ok(empty.result.code === 'ai-no-credit', `"no credits remaining" → ai-no-credit (got ${empty.result.code})`)
+
   // …but a plain quota exhaustion with no billing language is a free tier
   // resetting, and must stay a rate limit: waiting IS the remedy there.
   responder = fail(429, { error: { code: 429, message: 'You exceeded your current quota. Please retry in 41 seconds.' } })
