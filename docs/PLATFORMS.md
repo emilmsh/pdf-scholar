@@ -475,24 +475,57 @@ regressions are treated as bugs, not as acceptable platform lag.
     download under the same name (the extension inherits the base bridge here —
     the File System Access picker is reserved for the PDF itself). Nothing
     about the picture changes between them.
-25. **The ChatGPT-plan sign-in is desktop-only (experimental).** Provider
-    `chatgpt` runs the assistant on a Plus/Pro subscription's allowance through
-    the sign-in Codex CLI uses — its public OAuth client and the
-    `chatgpt.com/backend-api/codex/responses` backend (`src/main/chatgpt-auth.ts`,
-    `chatgptTarget` in `src/shared/ai-chat.ts`). That client's redirect is
-    registered to `http://localhost:1455/auth/callback`, and only a process
-    that can listen on a local port can receive it; an extension page cannot,
-    and `chrome.identity`'s redirect is not one the Codex client accepts. So the
-    extension and the web preview report `chatgpt.supported: false`: the
-    settings row reads «Bare i skrivebordsappen», the model menu leaves the
-    group out, and `aiChatgptLogin` answers `ai-chatgpt-login-unsupported`.
-    Every other surface — request shaping, the quote contract, citations — is
-    the OpenAI Responses path unchanged, so nothing else differs. OpenAI runs
-    no sign-in program for third-party apps; this rides a door OpenAI keeps
-    open by policy, and it can close. The API-key provider stays the supported
-    route on every platform. Covered by `npm run test:ai-chat` (address,
-    headers, `store: false`, the named 401/429 failures); a signed-in plan
-    joins `npm run test:live`.
+25. **The ChatGPT-plan sign-in happens on the desktop; the extension borrows
+    it (experimental).** Provider `chatgpt` runs the assistant on a Plus/Pro
+    subscription's allowance through the sign-in Codex CLI uses — its public
+    OAuth client and the `chatgpt.com/backend-api/codex/responses` backend
+    (`src/main/chatgpt-auth.ts`, `chatgptTarget` in `src/shared/ai-chat.ts`).
+    That client's redirect is registered to `http://localhost:1455/auth/callback`,
+    and only a process that can listen on a local port can receive it; an
+    extension page cannot, and `chrome.identity`'s redirect is not one the
+    Codex client accepts. So the extension never signs in itself: it uses the
+    INSTALLED desktop app's sign-in through Chrome/Edge native messaging
+    (`src/shared/native-host.ts` has the design, 2026-11-01). The browser starts
+    the app on demand — it need not be open — as a windowless host that runs
+    the request with the same `runProviderChat` and streams the deltas back
+    (`src/main/native-host.ts`); no token, refresh or access, reaches the
+    extension. Two steps, because Electron writes `\r\n` on stdout before any
+    code runs and the browser reads the first four bytes as a length: the
+    manifest names a launcher (resources\native-host\pdf-scholar-host.cmd on
+    Windows; a shell script in userData/native-host on macOS/Linux) that runs
+    the app in Node mode on a relay (`src/main/native-host-relay.ts`), which
+    starts the app again as the host and drops everything before its ready
+    marker. The sign-in bundle moved out of the state file into
+    userData/chatgpt-signin.bin (`src/main/chatgpt-store.ts`), and both
+    processes renew it under one file lock (`src/main/chatgpt-renew.ts`,
+    `file-lock.ts`) — the refresh token rotates, and two renewals from one
+    bundle would leave the loser with a spent token that reads as signed out.
+    The installed app writes the manifest and, on Windows, one HKCU key per
+    browser at every start (`src/main/native-host-register.ts`; the NSIS
+    uninstaller takes the keys back). It admits the two store IDs and any ID in
+    userData/native-host-origins.json, where `npm run ext:local` puts the
+    unpacked build's. The extension asks for `nativeMessaging` as an OPTIONAL
+    permission from the «Bruk innloggingen fra skrivebordsappen» click, so no
+    install-time warning changed; «Koble fra» gives it back and leaves the
+    desktop's sign-in alone. What does not work, by name: no app or the
+    **Microsoft Store build** (its registry writes are virtualized and its
+    executable cannot be started by another program — `ai-chatgpt-host-missing`,
+    as for the MCP server), an unpackaged dev run (not registered), Linux
+    without a keyring (the bundle lives in the app's memory only — the host
+    finds none, `ai-chatgpt-desktop-signed-out`), a desktop not signed in
+    (same code), the permission refused (`ai-chatgpt-host-denied`), versions
+    that disagree on the protocol (`ai-chatgpt-host-outdated`). The web
+    preview still reports `chatgpt.supported: false` and answers
+    `ai-chatgpt-login-unsupported`. Every other surface — request shaping, the
+    quote contract, citations — is the OpenAI Responses path unchanged, so
+    nothing else differs. OpenAI runs no sign-in program for third-party apps;
+    this rides a door OpenAI keeps open by policy, and it can close. The
+    API-key provider stays the supported route on every platform. Covered by
+    `npm run test:ai-chat` (address, headers, `store: false`, the named
+    401/429 failures) and `npm run test:native-host` (framing, the relay, the
+    manifest/registry/launchers, two processes renewing one bundle); a
+    signed-in plan joins `npm run test:live`. The extension end to end in
+    Edge is a hand check (docs/BROWSER-EXTENSION.md).
 26. **A document's attachments open on the desktop; the browser targets
     download them.** Files embedded in a PDF — the catalog's `/EmbeddedFiles`
     and FileAttachment paperclips — are listed identically everywhere (the top

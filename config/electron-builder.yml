@@ -36,6 +36,11 @@ extraResources:
   - from: build/file-icons
     to: file-icons
     filter: ['*.ico']
+  # The relay the browser starts for the extension's ChatGPT plan, and
+  # Windows' launcher for it (scripts/build-native-host.mjs) — on disk, since
+  # the browser runs the launcher by path (src/main/native-host-register.ts)
+  - from: out/native-host
+    to: native-host
 # Updater/release metadata (latest*.yml) for electron-updater. CI builds with
 # --publish never and uploads assets itself; nothing publishes from dev machines.
 publish:
@@ -55,6 +60,8 @@ nsis:
   oneClick: true
   perMachine: false
   deleteAppDataOnUninstall: false
+  # The extension's native-host registry keys go with a real uninstall
+  include: build/installer.nsh
   artifactName: PDF-Scholar-Setup-${version}.${ext}
 mac:
   # No Apple Developer membership (deliberate, zero recurring cost): CI has no

@@ -370,6 +370,48 @@ native messaging host** as the annotation write-back above, which would own the
 keys and make the calls — mirroring how keys never leave the Electron main
 process today.
 
+### 3. The ChatGPT plan — through the desktop app's native host (2026-11-01)
+The first provider that does go through such a host. The extension cannot sign
+in with ChatGPT itself (the Codex client's redirect is a localhost port), so it
+borrows the installed desktop app's sign-in: the browser starts the app —
+windowless, through a Node-mode relay — and the app runs the request and
+streams the answer back. The tokens never reach the extension. Design, the
+relay's reason to exist, the lock and what fails by which name:
+docs/PLATFORMS.md pt. 25 and `src/shared/native-host.ts`. The permission
+(`nativeMessaging`) is OPTIONAL, asked for from the settings button «Bruk
+innloggingen fra skrivebordsappen» and given back by «Koble fra».
+
+The same host is the natural place for the gaps above (silent overwrite, keys
+in the OS key store) if they are ever closed — it exists now, registered by
+every installed desktop app.
+
+**Hand check before a release that touches it** (CI has no browser and no
+signed-in plan; `npm run test:native-host` covers everything up to the pipes):
+
+1. Install the desktop build (NSIS, not the Store), start it once, sign in with
+   ChatGPT in its KI-innstillinger, and quit it.
+   `reg query HKCU\Software\Microsoft\Edge\NativeMessagingHosts\no.emil.pdfscholar /ve`
+   names `%APPDATA%\PDF Scholar\native-host\no.emil.pdfscholar.json`, whose
+   `path` is `…\resources\native-host\pdf-scholar-host.cmd`.
+2. For the unpacked build: `npm run ext:local` (it adds the unpacked ID to
+   `native-host-origins.json`), start and quit the desktop app once more so
+   the manifest admits it, then reload the extension in `edge://extensions`.
+3. In the extension's KI-innstillinger, ChatGPT-abonnement → «Bruk
+   innloggingen fra skrivebordsappen»: Edge asks once for permission to
+   communicate with cooperating native applications; allow → the row reads
+   «Logget inn som … via skrivebordsappen», and the model menu offers the
+   ChatGPT group.
+4. Ask a question on a document: the answer streams with citation chips, and
+   no PDF Scholar window opens. Stop a long answer half-way: it stops, and
+   Task Manager shows no PDF Scholar process left behind after a few seconds.
+5. With the desktop app OPEN at the same time, ask again after the access
+   token has expired (about an hour after the last use, or delete
+   `chatgpt-signin.bin`'s neighbour lock if one is left): both the app's and
+   the extension's next question work — one renewal, nobody signed out.
+6. «Koble fra» → the row offers the button again, and the desktop app is
+   still signed in. Uninstall the desktop app → the extension's question says
+   «Fant ikke PDF Scholar for skrivebordet …».
+
 ## Known limitations / watch-list
 
 - The `file://` takeover fights the browser's built-in PDF viewer; this is the
