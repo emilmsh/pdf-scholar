@@ -116,9 +116,16 @@ export const MODELS: Record<
   // Codex with a ChatGPT account.» gpt-5.5 answers too but is last
   // generation — out of the menu by the current-generation-only rule, and a
   // stored 5.5 selection stays pickable (the menu keeps stored ids).
+  // GPT-6.1 Sol and GPT-6.1 Terra added 2026-11-01, each 9/9 live against
+  // Emil's signed-in plan (one early report had Sol refused on a ChatGPT
+  // account right after launch, hence the live check before listing). Terra
+  // is not in the API list above: the API account had no credit to verify it.
+  // The default stays gpt-6-sol (Emil's call), so «Anbefalt» stays there too.
   chatgpt: [
     { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', short: 'GPT-6.1 Sol', hint: 'ai.modelHintCapable' },
     { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', short: 'GPT-6.1 Terra', hint: 'ai.modelHintValue' },
     { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
   ],
   azure: [],
