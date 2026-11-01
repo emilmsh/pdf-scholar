@@ -28,8 +28,9 @@
 //                              declines to push a feature branch's build into
 //                              the browser's folder unless asked explicitly
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { createHash } from 'node:crypto'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 
 const args = process.argv.slice(2)
@@ -98,6 +99,49 @@ const dst = resolve(
 // CI builds the extension too (release.yml → pack:ext); it has no browser to
 // serve, and writing outside the checkout there is pure noise.
 if (auto && process.env.CI) process.exit(0)
+
+/** The ID Chromium gives an extension loaded unpacked from `folder`: the first
+ *  128 bits of SHA-256 over the path (UTF-16LE on Windows, drive letter upper-
+ *  cased), each hex digit mapped 0–f → a–p. Checked 2026-11-01 against the ID
+ *  Edge shows for the main checkout's dist-extension/. */
+function unpackedExtensionId(folder) {
+  const path = process.platform === 'win32' ? folder.replace(/^[a-z]:/, (d) => d.toUpperCase()) : folder
+  const bytes = Buffer.from(path, process.platform === 'win32' ? 'utf16le' : 'utf8')
+  const hex = createHash('sha256').update(bytes).digest('hex').slice(0, 32)
+  return [...hex].map((c) => String.fromCharCode(97 + parseInt(c, 16))).join('')
+}
+
+/** Let the desktop app's native host admit this unpacked build too, so the
+ *  extension's ChatGPT plan works from it (src/shared/native-host.ts — the
+ *  store builds are admitted by ID already). Only where the app keeps its data;
+ *  the app writes the manifest at its next start. */
+function admitToNativeHost(folder) {
+  const home = homedir()
+  const userData =
+    process.platform === 'win32'
+      ? join(process.env.APPDATA ?? join(home, 'AppData', 'Roaming'), 'PDF Scholar')
+      : process.platform === 'darwin'
+        ? join(home, 'Library', 'Application Support', 'PDF Scholar')
+        : join(process.env.XDG_CONFIG_HOME || join(home, '.config'), 'PDF Scholar')
+  if (!existsSync(userData)) return
+  const file = join(userData, 'native-host-origins.json')
+  let ids = []
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8'))
+    ids = Array.isArray(raw?.ids) ? raw.ids.filter((x) => typeof x === 'string' && /^[a-p]{32}$/.test(x)) : []
+  } catch {
+    /* none yet */
+  }
+  const id = unpackedExtensionId(folder)
+  if (ids.includes(id)) return
+  writeFileSync(file, JSON.stringify({ ids: [id, ...ids].slice(0, 8) }, null, 2) + '\n')
+  console.log(`(native host: admitted the unpacked build ${id} — the desktop app writes its manifest at its next start)`)
+}
+try {
+  admitToNativeHost(dst)
+} catch {
+  /* best-effort — without it the unpacked build reads «app not found» */
+}
 
 if (!existsSync(join(src, 'manifest.json'))) {
   if (auto) process.exit(0)

@@ -26,7 +26,8 @@ import { partsAsDeltas } from '../shared/ai-stream'
 import { PROVIDER_PROFILES } from '../shared/ai-provider-profile'
 import { AI_ERRORS } from '../shared/engine-errors'
 import { loginChatgpt, refreshChatgpt } from './chatgpt-auth'
-import type { ChatgptTokens } from './chatgpt-auth'
+import { freshChatgptTokens, storeChatgptLocked, type ChatgptTokens } from './chatgpt-renew'
+import { chatgptIo, chatgptLockPath, loadChatgpt, migrateChatgptBundle } from './chatgpt-store'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../shared/ai-model-catalog'
 import { getState, mergeAiConfig, saveState } from './storage'
 
@@ -214,56 +215,23 @@ function migrateLegacyPlaintextKeys(): void {
 
 // ---------- ChatGPT sign-in ----------
 //
-// The token bundle is stored exactly like an API key — sealed with safeStorage
-// under keys.chatgpt, or held for the session where there is no key store —
-// so everything said above about key storage holds for it too. It is JSON,
-// never shown, and never settable from the renderer (ai:set-config skips it).
+// The token bundle is sealed with safeStorage like an API key, but in a file
+// of its own (chatgpt-store.ts) — the native host the extension borrows the
+// sign-in through reads and renews it too, under a lock both take
+// (chatgpt-renew.ts). It is never shown, and never settable from the renderer
+// (ai:set-config skips it).
 
-function loadChatgpt(): ChatgptTokens | null {
-  const raw = keyFor('chatgpt')
-  if (!raw) return null
-  try {
-    const t = JSON.parse(raw) as ChatgptTokens
-    return t.refresh ? t : null
-  } catch {
-    return null
-  }
-}
-
-function storeChatgpt(tokens: ChatgptTokens | null): void {
-  const state = getState()
-  const plain = tokens ? JSON.stringify(tokens) : ''
-  const sealed = encryptKey(plain)
-  if (sealed === null) {
-    sessionKeys.set('chatgpt', plain)
-    state.ai = mergeAiConfig(state.ai, { keys: { chatgpt: '' } })
-  } else {
-    sessionKeys.delete('chatgpt')
-    state.ai = mergeAiConfig(state.ai, { keys: { chatgpt: sealed } })
-  }
-  saveState()
-}
-
-/** One refresh at a time: the refresh token ROTATES, so two requests racing
- *  to renew would leave the loser holding a spent token — and a spent token
- *  reads as "signed out", which would wipe a perfectly good sign-in. */
+/** One renewal at a time in THIS process, so concurrent requests share one
+ *  wait instead of queueing on the file lock one by one */
 let refreshing: Promise<ChatgptTokens | FileError> | null = null
 
 /** A usable access token, renewed first when it is (nearly) out of date */
 async function chatgptAccess(): Promise<ChatgptTokens | FileError> {
-  const current = loadChatgpt()
-  if (!current) return AI_ERRORS.chatgptSignedOut
-  if (current.access && current.expires > Date.now() + 60_000) return current
-  return (refreshing ??= refreshChatgpt(current)
-    .then((r) => {
-      if (r.ok) {
-        storeChatgpt(r.tokens)
-        return r.tokens
-      }
-      if (r.expired) {
-        storeChatgpt(null)
-        return AI_ERRORS.chatgptSessionExpired
-      }
+  return (refreshing ??= freshChatgptTokens(chatgptIo, refreshChatgpt, chatgptLockPath())
+    .then((r): ChatgptTokens | FileError => {
+      if (r.ok) return r.tokens
+      if (r.reason === 'signed-out') return AI_ERRORS.chatgptSignedOut
+      if (r.reason === 'expired') return AI_ERRORS.chatgptSessionExpired
       return AI_ERRORS.endpointUnreachable('auth.openai.com', r.detail)
     })
     .finally(() => {
@@ -295,7 +263,7 @@ function configView(): AiConfigView {
     keyStorage: keyStorageMode(),
     keysSupported: true,
     catalog: getState().modelCatalog,
-    chatgpt: { supported: true, account: chatgpt ? chatgpt.email || chatgpt.accountId : '' }
+    chatgpt: { supported: true, account: chatgpt ? chatgpt.email || chatgpt.accountId : '', borrowed: false }
   }
 }
 
@@ -310,6 +278,7 @@ const activeRequests = new Map<string, AbortController>()
 export function registerAiIpc(): void {
   // Before anything can read a key: get any legacy plaintext off disk.
   migrateLegacyPlaintextKeys()
+  migrateChatgptBundle()
 
   ipcMain.handle('ai:get-config', () => configView())
 
@@ -437,15 +406,15 @@ export function registerAiIpc(): void {
   ipcMain.handle('ai:chatgpt-login', async (): Promise<ChatgptLoginResult> => {
     const result = await loginChatgpt()
     if (!('ok' in result)) return result
-    storeChatgpt(result.tokens)
+    await storeChatgptLocked(chatgptIo, result.tokens, chatgptLockPath())
     const state = getState()
     state.ai = mergeAiConfig(state.ai, { provider: 'chatgpt' })
     saveState()
     return { ok: true, config: configView() }
   })
 
-  ipcMain.handle('ai:chatgpt-logout', () => {
-    storeChatgpt(null)
+  ipcMain.handle('ai:chatgpt-logout', async () => {
+    await storeChatgptLocked(chatgptIo, null, chatgptLockPath())
     return configView()
   })
 

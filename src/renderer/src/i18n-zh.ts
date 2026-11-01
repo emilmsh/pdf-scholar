@@ -100,6 +100,11 @@ export const zh: Dict = {
   'aierr.ai-aborted': '已停止',
   'aierr.ai-disabled': 'AI 功能已在 AI 设置中关闭，因此未发送任何请求。',
   'aierr.ai-chatgpt-signed-out': '您尚未使用 ChatGPT 登录。请从 AI 设置登录。',
+  'aierr.ai-chatgpt-desktop-signed-out': '桌面版 PDF Scholar 尚未使用 ChatGPT 登录。请在应用的 AI 设置中登录，此处即可使用。',
+  'aierr.ai-chatgpt-host-missing': '在此电脑上找不到桌面版 PDF Scholar。请安装该应用（非 Microsoft Store 版本）并启动一次。',
+  'aierr.ai-chatgpt-host-outdated': '桌面应用与扩展的版本不一致。请同时更新两者。',
+  'aierr.ai-chatgpt-host-failed': '桌面版 PDF Scholar 已启动，但没有响应。',
+  'aierr.ai-chatgpt-host-denied': '浏览器未获准启动桌面版 PDF Scholar，因此无法借用其登录。',
   'aierr.ai-chatgpt-session-expired':
     'ChatGPT 登录已过期或已被撤销。请从 AI 设置重新登录。',
   'aierr.ai-subscription-limit':
@@ -875,6 +880,11 @@ export const zh: Dict = {
   'ai.chatgptHintTip':
     '与 Codex 和 opencode 使用的是同一种登录方式。OpenAI 目前允许，但没有相关协议，随时可能关闭。您发送的内容按 ChatGPT 的条款（而非 API 条款）处理，因此您 ChatGPT 账户的模型训练设置适用。',
   'ai.chatgptDesktopOnly': '仅限桌面应用。',
+  'ai.chatgptBorrow': '使用桌面应用的登录',
+  'ai.chatgptBorrowed': '已通过桌面应用以 {account} 登录',
+  'ai.chatgptDisconnect': '断开连接',
+  'ai.chatgptBorrowTip':
+    '借用此电脑上 PDF Scholar 的 ChatGPT 登录。应用必须已安装并已登录，但无需打开。浏览器会请求一次启动它的权限。',
   'ai.localTag': '本地',
   'ai.keySaved': '••••••••（已保存）',
   'ai.keyNew': '粘贴您的密钥',

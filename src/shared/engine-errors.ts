@@ -167,6 +167,32 @@ export const AI_ERRORS = {
     code: 'ai-chatgpt-session-expired',
     error: 'ChatGPT-innloggingen er utløpt. Logg inn på nytt i KI-innstillingene.'
   },
+  /** The extension's ChatGPT plan (borrowed through the desktop app, see
+   *  shared/native-host.ts): the desktop app holds no sign-in, or its sign-in
+   *  was refused — the remedy is signing in THERE, the extension cannot */
+  chatgptDesktopSignedOut: {
+    code: 'ai-chatgpt-desktop-signed-out',
+    error: 'PDF Scholar på denne maskinen er ikke logget inn med ChatGPT. Logg inn i appens KI-innstillinger.'
+  },
+  /** No native host registered for this browser — the desktop app is not
+   *  installed, has not been started since it was, or is the Store build */
+  chatgptHostMissing: {
+    code: 'ai-chatgpt-host-missing',
+    error: 'Fant ikke PDF Scholar for skrivebordet på denne maskinen.'
+  },
+  /** The installed app speaks another version of the host protocol */
+  chatgptHostOutdated: {
+    code: 'ai-chatgpt-host-outdated',
+    error: 'PDF Scholar for skrivebordet og utvidelsen har ulike versjoner. Oppdater begge.'
+  },
+  /** The host started and then failed — the detail rides along for the log */
+  chatgptHostFailed: (detail: string): FileError => ({ code: 'ai-chatgpt-host-failed', error: detail }),
+  /** The reader turned the plan on but did not allow the browser to start the
+   *  desktop app (the optional nativeMessaging permission) */
+  chatgptHostDenied: {
+    code: 'ai-chatgpt-host-denied',
+    error: 'Nettleseren fikk ikke lov til å kontakte PDF Scholar for skrivebordet.'
+  },
   /** The plan's usage window is spent (the Codex backend's usage_limit_reached).
    *  Unlike an API rate limit this is the SUBSCRIPTION's allowance — waiting
    *  until the window resets is the remedy; the provider wording rides along. */

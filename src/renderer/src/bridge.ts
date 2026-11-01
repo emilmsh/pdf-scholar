@@ -360,7 +360,7 @@ export const webApi: PdfxApi = {
     keyStorage: 'session-only' as const,
     keysSupported: false,
     catalog: {},
-    chatgpt: { supported: false, account: '' }
+    chatgpt: { supported: false, account: '', borrowed: false }
   }),
   aiSetConfig: async (patch) => {
     const current = loadWebAiConfig()
@@ -379,7 +379,7 @@ export const webApi: PdfxApi = {
       keyStorage: 'session-only' as const,
       keysSupported: false,
       catalog: {},
-      chatgpt: { supported: false, account: '' }
+      chatgpt: { supported: false, account: '', borrowed: false }
     }
   },
   // No keys in the preview → nothing to fetch; hand back the current view

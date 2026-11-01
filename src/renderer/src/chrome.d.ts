@@ -21,6 +21,13 @@ interface ChromeEvent<T extends (...args: never[]) => void> {
   removeListener(cb: T): void
 }
 
+interface ChromeNativePort {
+  postMessage(message: unknown): void
+  disconnect(): void
+  onMessage: ChromeEvent<(message: unknown) => void>
+  onDisconnect: ChromeEvent<() => void>
+}
+
 interface DnrRule {
   id: number
   priority: number
@@ -51,6 +58,15 @@ interface ChromeApi {
     getManifest(): { version: string }
     onInstalled: ChromeEvent<(details: { reason: string }) => void>
     lastError?: { message?: string }
+    /** Present only while the optional `nativeMessaging` permission is held
+     *  (the ChatGPT plan borrowed from the desktop app, shared/native-host.ts) */
+    connectNative?(application: string): ChromeNativePort
+  }
+  // Optional permissions: asked for from a click, never at install
+  permissions?: {
+    contains(p: { permissions?: string[] }): Promise<boolean>
+    request(p: { permissions?: string[] }): Promise<boolean>
+    remove(p: { permissions?: string[] }): Promise<boolean>
   }
   // The last survivor of the MV2 chrome.extension namespace we need: whether the
   // user has granted "Allow access to file URLs". Callable without any

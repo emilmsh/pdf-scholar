@@ -8,15 +8,16 @@
 // contract — Anthropic and Google closed the same door in 2026 — so this
 // provider sits BESIDE the API-key one, never in place of it.
 //
-// Desktop only. The client's redirect is registered to http://localhost:1455,
-// and only a process that can listen on a local port can receive it — the
-// extension cannot (docs/PLATFORMS.md lists the divergence).
+// The sign-in is desktop only. The client's redirect is registered to
+// http://localhost:1455, and only a process that can listen on a local port
+// can receive it — the extension cannot; it borrows this sign-in through the
+// native host instead (src/main/native-host.ts, docs/PLATFORMS.md §25).
 //
 // Flow (mirrors opencode's packages/opencode/src/plugin/openai/codex.ts, read
 // 2026-09-27): PKCE authorize in the system browser → callback on :1455 →
 // code exchange → { access, refresh, id_token }. The access token lives about
-// an hour; `refresh` renews it. Tokens never reach the renderer — ai.ts seals
-// the bundle with safeStorage exactly like an API key.
+// an hour; `refresh` renews it. Tokens never reach the renderer —
+// chatgpt-store.ts seals the bundle with safeStorage exactly like an API key.
 import { createServer } from 'node:http'
 import type { Server } from 'node:http'
 import { createHash, randomBytes } from 'node:crypto'
@@ -25,23 +26,14 @@ import type { FileError } from '../shared/types'
 import { CHATGPT_ORIGINATOR } from '../shared/ai-chat'
 import { CHATGPT_LOGIN_ERRORS } from '../shared/engine-errors'
 import { dialogLanguage } from './dialog-language'
+import type { ChatgptTokens, RefreshResult } from './chatgpt-renew'
+export type { ChatgptTokens }
 
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann'
 const ISSUER = 'https://auth.openai.com'
 const PORT = 1455
 const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000
-
-/** What ai.ts seals and stores under keys.chatgpt */
-export interface ChatgptTokens {
-  access: string
-  refresh: string
-  /** Epoch ms when `access` stops working */
-  expires: number
-  accountId: string
-  /** For the settings row («Logget inn som …»); '' when the token has none */
-  email: string
-}
 
 interface TokenResponse {
   id_token?: string
@@ -100,23 +92,23 @@ function toBundle(tokens: TokenResponse, previous?: ChatgptTokens): ChatgptToken
   }
 }
 
-async function tokenRequest(params: Record<string, string>): Promise<Response> {
+async function tokenRequest(params: Record<string, string>, signal?: AbortSignal): Promise<Response> {
   return fetch(`${ISSUER}/oauth/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: CLIENT_ID, ...params }).toString()
+    body: new URLSearchParams({ client_id: CLIENT_ID, ...params }).toString(),
+    signal: signal ?? null
   })
 }
 
 /** Renew the access token. `expired` = the refresh token itself was refused
  *  (revoked, signed out elsewhere) and only a new sign-in helps; any other
  *  failure (offline) leaves the stored bundle alone. */
-export async function refreshChatgpt(
-  current: ChatgptTokens
-): Promise<{ ok: true; tokens: ChatgptTokens } | { ok: false; expired: boolean; detail: string }> {
+export async function refreshChatgpt(current: ChatgptTokens): Promise<RefreshResult> {
   let res: Response
   try {
-    res = await tokenRequest({ grant_type: 'refresh_token', refresh_token: current.refresh })
+    // Bounded: it runs holding the lock the native host shares (chatgpt-renew.ts)
+    res = await tokenRequest({ grant_type: 'refresh_token', refresh_token: current.refresh }, AbortSignal.timeout(20_000))
   } catch (err) {
     return { ok: false, expired: false, detail: err instanceof Error ? err.message : String(err) }
   }

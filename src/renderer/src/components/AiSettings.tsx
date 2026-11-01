@@ -214,7 +214,7 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
                 <span className="ai-field-hint">{t('ai.chatgptDesktopOnly')}</span>
               ) : chatgptAccount ? (
                 <span className="ai-chatgpt-account">
-                  {t('ai.chatgptSignedIn', { account: chatgptAccount })}
+                  {t(config.chatgpt.borrowed ? 'ai.chatgptBorrowed' : 'ai.chatgptSignedIn', { account: chatgptAccount })}
                   {' · '}
                   <a
                     href="#"
@@ -223,17 +223,21 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
                       void chatgptLogout()
                     }}
                   >
-                    {t('ai.chatgptLogout')}
+                    {t(config.chatgpt.borrowed ? 'ai.chatgptDisconnect' : 'ai.chatgptLogout')}
                   </a>
                 </span>
               ) : (
                 <button
                   className="btn-secondary"
                   disabled={chatgptWaiting || saving}
-                  title={t('ai.chatgptHintTip')}
+                  // The extension borrows the desktop app's sign-in
+                  // (shared/native-host.ts); what that asks for is on hover
+                  title={t(config.chatgpt.borrowed ? 'ai.chatgptBorrowTip' : 'ai.chatgptHintTip')}
                   onClick={() => void chatgptLogin()}
                 >
-                  {chatgptWaiting ? t('ai.chatgptWaiting') : t('ai.chatgptLogin')}
+                  {chatgptWaiting
+                    ? t('ai.chatgptWaiting')
+                    : t(config.chatgpt.borrowed ? 'ai.chatgptBorrow' : 'ai.chatgptLogin')}
                 </button>
               )}
             </div>

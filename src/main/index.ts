@@ -107,6 +107,9 @@ import { rebindIdentity, validFingerprint } from '../shared/doc-identity'
 import { createNotesStore } from './notes-store'
 import { sanitizeDocNotes } from '../shared/research-notes'
 import { refreshMcpScriptAtStartup, registerMcpIpc } from './mcp-connect'
+import { isNativeHostChild } from '../shared/native-host'
+import { runNativeHost } from './native-host'
+import { registerNativeHostAtStartup } from './native-host-register'
 
 // The portable zip keeps its state beside the exe. Before ANY path is read —
 // the migration below, the single-instance lock, the state file, drafts.
@@ -346,8 +349,14 @@ function windowFor(e?: { sender: Electron.WebContents }): BrowserWindow | null {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? null
 }
 
-const gotLock = app.requestSingleInstanceLock()
-if (!gotLock) {
+// Started as the extension's native host (native-host.ts, through the relay
+// the browser runs): before the single-instance lock, so a running app is
+// never asked, and nothing below — windows, updater, session — runs
+const hostLaunch = isNativeHostChild(process.argv)
+const gotLock = !hostLaunch && app.requestSingleInstanceLock()
+if (hostLaunch) {
+  runNativeHost()
+} else if (!gotLock) {
   app.quit()
 } else {
   // A second launch (e.g. "Open with" from Explorer) opens the document as a
@@ -433,6 +442,9 @@ if (!gotLock) {
     // A connected AI tool runs the MCP script from userData — keep it the
     // version of the app that is running
     refreshMcpScriptAtStartup()
+    // Where Chrome/Edge find the host the extension borrows the ChatGPT
+    // sign-in through — compared first, so a quiet start writes nothing
+    registerNativeHostAtStartup()
     // The last session's windows (issue #29). The extra windows open first so
     // the one holding a file from the command line ends up in front.
     const plan = await sessionRestorePlan().catch((err) => {

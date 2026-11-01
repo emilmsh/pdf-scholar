@@ -362,8 +362,9 @@ came from.
   key. One menu holds every provider's models: a curated, verified list each, strongest
   first, with the provider's full live listing reachable by search. Requests go directly
   to the provider, with no server in between
-- **Your ChatGPT plan instead of a key** (desktop app): sign in with ChatGPT Plus or Pro
-  and the assistant runs on the plan's allowance — GPT-6 Astra, Sol and Luna, no API
+- **Your ChatGPT plan instead of a key**: sign in with ChatGPT Plus or Pro in the desktop
+  app (the browser extension uses that sign-in when the app is installed) and the assistant
+  runs on the plan's allowance — GPT-6 Astra, Sol and Luna, no API
   bill. It is an unofficial route (the same sign-in Codex and opencode use, which OpenAI
   allows today but can close), and ChatGPT's terms apply rather than the API's, so your
   account's model-training setting decides. The API-key provider stays alongside
