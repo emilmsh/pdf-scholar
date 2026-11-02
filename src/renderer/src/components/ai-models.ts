@@ -294,12 +294,17 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
   // (claude-opus-4-8, claude-haiku-4-5-20251001): «Claude Opus 4.8», never
   // «Claude Opus 4 8» — the fallback chip names models nobody curated
   if (/^claude-/i.test(id)) id = id.replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, '-$1.$2')
-  return id
-    .replace(/^claude-/i, 'Claude ')
-    .replace(/^gpt-/i, 'GPT-')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase())
-    .trim()
+  return (
+    id
+      .replace(/^claude-/i, 'Claude ')
+      .replace(/^gpt-/i, 'GPT-')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase())
+      // The curated names keep OpenAI's own dash («GPT-6.1 Sol»); a typed
+      // gpt-6.2-sol should read the same, not «GPT 6.2 Sol»
+      .replace(/^GPT (\d)/, 'GPT-$1')
+      .trim()
+  )
 }
 
 // Context-window floors (tokens): what decides when a document is too large

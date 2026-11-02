@@ -1009,16 +1009,20 @@ const nb = {
   'ai.compatModelHint': 'f.eks. llama3.1 eller mistral-medium-latest',
   'ai.compatHint':
     'For lokale modeller (Ollama og LM Studio kjører uten nøkkel – velg dem i listen) og alle andre OpenAI-kompatible endepunkter – velg «Annet» og skriv inn base-URL-en. Modellisten hentes fra endepunktet når du lagrer.',
-  'ai.modelFilter': 'Filtrer modeller …',
+  'ai.modelFilter': 'Filtrer modeller, eller skriv en modell-id …',
   // The filter searches past the selection the menu offers — say so, or the
   // models curateRemoteModels leaves out look gone rather than unlisted
-  'ai.modelFilterAll': 'Søk i alle modeller …',
+  'ai.modelFilterAll': 'Søk i alle modeller, eller skriv en modell-id …',
   'ai.modelCount': '{models} modeller · {vendors} leverandører',
   'ai.modelCountShort': '{models} modeller',
   'ai.notConfigured': 'ikke satt opp',
   'ai.noModelsListed': 'ingen modeller',
   'ai.modelNoHits': 'Ingen modeller matcher søket.',
   'ai.modelMoreHits': '+{n} treff til – skriv mer for å snevre inn.',
+  'ai.modelUseTyped': 'Bruk «{id}»',
+  'ai.modelTypedDetail': '{provider} – ikke utprøvd her, kan svare annerledes',
+  'ai.modelTypedHint':
+    'Modellen står ikke i den kuraterte lista. Id-en sendes som den er til {provider}; en id leverandøren ikke kjenner gir en feilmelding.',
   'ai.ollamaDetected': 'Ollama kjører på denne maskinen – klikk for å fylle inn adressen',
   'ai.noVisionTip': 'Valgt modell ({model}) kan ikke lese bilder',
   'ai.keyCapHint': 'Sett et utgiftstak på nøkkelen – samme sted viser leverandøren hva du faktisk har brukt. Appen teller tokens, men bare leverandøren vet prisen.',
@@ -2275,14 +2279,18 @@ const en: Dict = {
   'ai.compatModelHint': 'e.g. llama3.1 or mistral-medium-latest',
   'ai.compatHint':
     'For local models (Ollama and LM Studio run without a key — pick them in the list) and any other OpenAI-compatible endpoint — pick "Other" and enter its base URL. The model list is fetched from the endpoint when you save.',
-  'ai.modelFilter': 'Filter models …',
-  'ai.modelFilterAll': 'Search all models …',
+  'ai.modelFilter': 'Filter models, or type a model id …',
+  'ai.modelFilterAll': 'Search all models, or type a model id …',
   'ai.modelCount': '{models} models · {vendors} vendors',
   'ai.modelCountShort': '{models} models',
   'ai.notConfigured': 'not set up',
   'ai.noModelsListed': 'no models listed',
   'ai.modelNoHits': 'No models match the search.',
   'ai.modelMoreHits': '+{n} more matches — type more to narrow it down.',
+  'ai.modelUseTyped': 'Use “{id}”',
+  'ai.modelTypedDetail': '{provider} — untested here, may answer differently',
+  'ai.modelTypedHint':
+    'This model is not on the curated list. The id is sent as typed to {provider}; an id the provider does not know gives an error.',
   'ai.ollamaDetected': 'Ollama is running on this machine — click to fill in the address',
   'ai.noVisionTip': 'The selected model ({model}) cannot read images',
   'ai.keyCapHint': 'Set a spending cap on the key — the same page shows what you have actually used. This app counts tokens; only the provider knows the price.',
