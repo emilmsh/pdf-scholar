@@ -22,6 +22,7 @@ import {
 } from '../ai-text-scale'
 import { useDismissable } from '../useDismissable'
 import { keyProviders, MODELS, modelOptions, THINKING_LEVELS } from './ai-models'
+import { typedModelOffers, type TypedModelOffer } from '../../../shared/typed-model'
 
 /** Show the filter field once the combined list gets this big (an OpenRouter
  *  key alone brings hundreds of models) */
@@ -275,9 +276,21 @@ export function ModelQuickMenu({
 
   const groups = buildGroups(false)
   const totalOptions = groups.reduce((n, g) => n + g.entries.length, 0)
-  // The filter field appears only once the combined list is big enough to
-  // drown in (an OpenRouter key alone brings hundreds of models)
-  const showFilter = searching || totalOptions > FILTER_THRESHOLD
+  // The curated providers the reader holds a key for: an id typed into the
+  // field is offered at each of them (shared/typed-model.ts) — the menu is
+  // curated-only, and a model launched before the list caught up must still
+  // be reachable (Emil, 2026-11-02). Keyless and live-list providers get none:
+  // the live list already IS everything the endpoint serves.
+  const typedProviders = keyProviders().map(({ id }) => ({
+    id,
+    keyed: Boolean(config.hasKey[id]),
+    curated: (MODELS[id]?.length ?? 0) > 0
+  }))
+  const acceptsTyped = typedProviders.some((p) => p.keyed && p.curated)
+  // The filter field appears once the combined list is big enough to drown in
+  // (an OpenRouter key alone brings hundreds of models) — and whenever a typed
+  // id has somewhere to go, since the field is the only way to type one
+  const showFilter = searching || totalOptions > FILTER_THRESHOLD || acceptsTyped
   // Does a live list hold more than the menu offers? Then the field is a search
   // across everything rather than a narrowing of what is on screen, and its
   // placeholder has to say so — otherwise the models the selection leaves out
@@ -307,13 +320,18 @@ export function ModelQuickMenu({
 
   // Flat search results across every provider, from the UNFILTERED lists
   const f = filter.trim().toLowerCase()
-  const hits = searching
-    ? buildGroups(true).flatMap((g) =>
-        g.entries
-          .filter((e) => e.label.toLowerCase().includes(f) || e.value.toLowerCase().includes(f))
-          .map((e) => ({ ...e, group: g }))
-      )
+  const allGroups = searching ? buildGroups(true) : []
+  const hits = allGroups.flatMap((g) =>
+    g.entries
+      .filter((e) => e.label.toLowerCase().includes(f) || e.value.toLowerCase().includes(f))
+      .map((e) => ({ ...e, group: g }))
+  )
+  // The text as an id of its own, under the hits: a provider that already
+  // lists it is among the hits and gets no second row
+  const offers = searching
+    ? typedModelOffers(filter, typedProviders, new Set(allGroups.flatMap((g) => g.entries.map((e) => e.value))))
     : []
+  const providerName = (id: AiProviderId): string => keyProviders().find((p) => p.id === id)?.name ?? id
 
   /** One selectable model. The check mark is the only state a row carries —
    *  picking returns to the root rather than closing, so the choice is visible
@@ -342,6 +360,38 @@ export function ModelQuickMenu({
       </span>
     </button>
   )
+
+  /** The typed id at one provider. Stacked like a provider row: the id on one
+   *  line, the provider and the caveat underneath — nothing here is verified,
+   *  and the row says so rather than looking like a curated entry. Picking it
+   *  stores the id like any pick; buildGroups then keeps it listed (a stored id
+   *  outside today's list stays pickable), with the ⚠ marker when the live
+   *  listing does not carry it. */
+  const typedRow = (o: TypedModelOffer): React.JSX.Element => {
+    const v = `${o.provider}:${o.id}`
+    return (
+      <button
+        key={v}
+        className={`ai-menu-item is-typed${v === value ? ' is-picked' : ''}`}
+        role="menuitemradio"
+        aria-checked={v === value}
+        data-menuitem
+        data-value={v}
+        title={t('ai.modelTypedHint', { provider: providerName(o.provider) })}
+        onClick={() => {
+          pick(v)
+          setFilter('')
+          setView({ level: 'root' })
+        }}
+      >
+        <span className="ai-menu-check">{v === value ? '✓' : ''}</span>
+        <span className="ai-menu-stack">
+          <span className="ai-menu-label">{t('ai.modelUseTyped', { id: o.id })}</span>
+          <span className="ai-menu-detail">{t('ai.modelTypedDetail', { provider: providerName(o.provider) })}</span>
+        </span>
+      </button>
+    )
+  }
 
   /** A provider row: what it is on one line, what state it is in underneath.
    *  Stacked rather than side by side because both halves can be long —
@@ -379,11 +429,14 @@ export function ModelQuickMenu({
     if (searching)
       return (
         <div className="ai-menu-list" role="menu" ref={listRef}>
-          {hits.length === 0 && <p className="ai-menu-empty">{t('ai.modelNoHits')}</p>}
+          {hits.length === 0 && offers.length === 0 && (
+            <p className="ai-menu-empty">{t('ai.modelNoHits')}</p>
+          )}
           {hits.slice(0, RESULT_CAP).map((h) => modelRow(h, `${h.group.name} · `))}
           {hits.length > RESULT_CAP && (
             <p className="ai-menu-empty">{t('ai.modelMoreHits', { n: hits.length - RESULT_CAP })}</p>
           )}
+          {offers.map((o) => typedRow(o))}
         </div>
       )
     if (view.level === 'vendors') {

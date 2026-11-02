@@ -104,6 +104,8 @@ runs:
     # gates that stop it emptying a small or silent endpoint
     - run: npm run test:model-curation
       shell: bash
+    - run: npm run test:typed-model
+      shell: bash
     # Real provider streams, recorded once by `npm run test:live --record` and
     # replayed here keylessly forever after — including the shapes nobody
     # would have thought to mock (reasoning-only streams, errors inside an
