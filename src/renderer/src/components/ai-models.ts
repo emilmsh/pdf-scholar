@@ -179,9 +179,17 @@ export const MODELS: Record<
   // test:live with Emil's key — the image read «Rød», which is exactly where
   // Large 3 fell. No reasoning_effort is sent (undocumented for it; Large 3
   // rejected the parameter with a 400), it reasons on its own before answering.
+  // Mistral Medium 3.5 (`mistral-medium-2604`) removed from the curated list
+  // 2026-11-02: docs.mistral.ai/models/mistral-medium-3-5-26-04 now carries
+  // «This model is deprecated. Use Mistral Large 4 for new integrations.»
+  // (deprecation date 10/31/2026 — already past — retirement 4/30/2027; the
+  // lifecycle page, docs.mistral.ai/inference/model-lifecycle, confirms a
+  // deprecated model keeps answering until retirement). Kept in the
+  // context-floor table further down, and in MISTRAL_REASONING_RE/
+  // MISTRAL_BLIND_WHEN_REASONING_RE, for a stored selection — same pattern as
+  // every other same-slot replacement in this file.
   mistral: [
     { id: 'mistral-large-4', label: 'Mistral Large 4', short: 'Mistral Large 4', hint: 'ai.modelHintCapable' },
-    { id: 'mistral-medium-2604', label: 'Mistral Medium 3.5', short: 'Mistral Medium', hint: 'ai.modelHintRecommended' },
     { id: 'ministral-14b-2512', label: 'Ministral 3 14B', short: 'Ministral 14B', hint: 'ai.modelHintFast' }
   ],
   // Groq's PRODUCTION tier only (their own designation) — the Llama pair was
@@ -385,6 +393,9 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // corrected 2026-10-05; Ministral 3 14B read 2026-10-05): 256k each. The old
   // slug ids are NOT kept here — they never reached the API, so no stored
   // selection ever worked under them.
+  // mistral-medium-2604 kept here though no longer curated (deprecated
+  // 2026-11-02, see MODELS.mistral) — a stored selection from before the swap
+  // must not regress to the 32k provider floor
   'mistral-medium-2604': 256_000,
   'ministral-14b-2512': 256_000,
   // Mistral Large 4 (2026-11-02): the model card says 1M, OpenRouter's listing
