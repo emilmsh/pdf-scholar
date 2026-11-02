@@ -507,7 +507,15 @@ regressions are treated as bugs, not as acceptable platform lag.
     unpacked build's. The extension asks for `nativeMessaging` as an OPTIONAL
     permission from the «Bruk innloggingen fra skrivebordsappen» click, so no
     install-time warning changed; «Koble fra» gives it back and leaves the
-    desktop's sign-in alone. What does not work, by name: no app or the
+    desktop's sign-in alone. One Chromium rule bit v0.82.0 the day it shipped:
+    a context's `chrome.runtime` is built once, from the permissions held
+    then, so the page that asks never gains `connectNative` — the request
+    resolves true and the method stays undefined until a reload, which the
+    extension read as «denied» right after the reader had allowed it (measured
+    in Edge 2026-11-02). `extension-ai.ts` therefore reaches the method
+    through a hidden frame of our own origin (`host-frame.html`), opened after
+    the grant and kept for the page's life; a reloaded page has it directly.
+    What does not work, by name: no app or the
     **Microsoft Store build** (its registry writes are virtualized and its
     executable cannot be started by another program — `ai-chatgpt-host-missing`,
     as for the MCP server), an unpackaged dev run (not registered), Linux
