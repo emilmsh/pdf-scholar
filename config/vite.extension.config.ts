@@ -85,6 +85,9 @@ export default defineConfig({
     rollupOptions: {
       input: {
         viewer: resolve(extensionDir, 'viewer.html'),
+        // The empty frame extension-ai.ts opens to reach connectNative once
+        // the optional permission is granted (see that file)
+        'host-frame': resolve(extensionDir, 'host-frame.html'),
         background: resolve(extensionDir, 'background.ts')
       },
       output: {

@@ -120,21 +120,59 @@ async function mayStartHost(): Promise<boolean> {
   }
 }
 
+type NativeRuntime = NonNullable<typeof chrome>['runtime'] & {
+  connectNative(application: string): ChromeNativePort
+}
+
+/** The `chrome.runtime` that carries `connectNative`. Chromium builds a
+ *  context's `chrome.runtime` ONCE, from the permissions held at that moment,
+ *  so the page that asks for the optional `nativeMessaging` permission never
+ *  gains the method — `permissions.request` resolves true, `contains` says
+ *  true, and `chrome.runtime.connectNative` stays undefined until the page is
+ *  reloaded (measured in Edge, 2026-11-02; v0.82.0 read that as «denied»
+ *  right after the reader had allowed it). A frame of our own origin created
+ *  AFTER the grant is a new context and has it, so one hidden frame is opened
+ *  on demand and kept for the page's life. Null = the permission is not held. */
+let hostFrame: Promise<NativeRuntime | null> | null = null
+
+function nativeRuntime(): Promise<NativeRuntime | null> {
+  const own = chrome?.runtime
+  if (own?.connectNative) return Promise.resolve(own as NativeRuntime)
+  if (!own?.getURL) return Promise.resolve(null)
+  return (hostFrame ??= new Promise<NativeRuntime | null>((resolve) => {
+    const frame = document.createElement('iframe')
+    frame.src = own.getURL('host-frame.html')
+    frame.style.display = 'none'
+    frame.setAttribute('aria-hidden', 'true')
+    const done = (): void => {
+      const runtime = (frame.contentWindow as unknown as { chrome?: typeof chrome } | null)?.chrome?.runtime
+      if (runtime?.connectNative) {
+        resolve(runtime as NativeRuntime)
+      } else {
+        // Not granted after all (or the frame failed): try again next time
+        frame.remove()
+        hostFrame = null
+        resolve(null)
+      }
+    }
+    frame.addEventListener('load', done, { once: true })
+    frame.addEventListener('error', done, { once: true })
+    document.body.appendChild(frame)
+  }))
+}
+
 /** One exchange with a host the browser starts for it: post `request`, hand
  *  each message to `onMessage` until it returns the final value. The port
  *  closing first is a failure named by what the browser says; an abort
  *  closes the port, which is what stops the host's request. */
-function hostExchange<T>(
+async function hostExchange<T>(
   request: HostRequest,
   onMessage: (m: HostMessage) => T | undefined,
   signal?: AbortSignal
 ): Promise<T | FileError> {
+  const runtime = await nativeRuntime()
+  if (!runtime) return AI_ERRORS.chatgptHostDenied
   return new Promise((resolve) => {
-    const runtime = chrome?.runtime
-    if (!runtime?.connectNative) {
-      resolve(AI_ERRORS.chatgptHostDenied)
-      return
-    }
     let settled = false
     let port: ChromeNativePort | null = null
     const finish = (value: T | FileError): void => {
@@ -453,6 +491,11 @@ export function createExtensionAi(): Pick<
       } catch {
         /* nothing held */
       }
+      // The frame's runtime would keep connectNative after the permission is
+      // gone (the same staleness the other way) — drop it, so the next ask
+      // reads the permission afresh
+      hostFrame = null
+      document.querySelectorAll('iframe[src$="host-frame.html"]').forEach((f) => f.remove())
       statusCache = null
       const [config, keys, catalog] = await Promise.all([loadConfig(), store.get<Keys>(K_AI_KEYS, {}), loadCatalog()])
       return toView(config, keys, catalog)
