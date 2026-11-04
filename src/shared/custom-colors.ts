@@ -18,16 +18,9 @@ export function normalizeHex(value: unknown): string | null {
   return HEX_RE.test(v) ? v.toLowerCase() : null
 }
 
-/** The stored JSON → a clean list: valid hexes only, lower-cased, deduped
- *  (first occurrence wins), capped. Anything unreadable is an empty list. */
-export function parseCustomColors(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return []
-  }
+/** A stored value → a clean list: valid hexes only, lower-cased, deduped
+ *  (first occurrence wins), capped. Anything else is an empty list. */
+export function cleanCustomColors(parsed: unknown): string[] {
   if (!Array.isArray(parsed)) return []
   const out: string[] = []
   for (const item of parsed) {
@@ -36,6 +29,16 @@ export function parseCustomColors(raw: string | null | undefined): string[] {
     if (out.length === CUSTOM_COLORS_MAX) break
   }
   return out
+}
+
+/** The stored JSON → a clean list, see cleanCustomColors */
+export function parseCustomColors(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    return cleanCustomColors(JSON.parse(raw))
+  } catch {
+    return []
+  }
 }
 
 /** A new pick goes first; a repeat moves to the front; the oldest falls off */

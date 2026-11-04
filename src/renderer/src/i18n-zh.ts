@@ -515,6 +515,7 @@ export const zh: Dict = {
   'tb.tuneBrightness': '亮度',
   'tb.tuneBrightnessTip': '夜间模式下页面的亮度——100 % 为标准外观。',
   'tb.customTone': '纸张色调',
+  'tb.customTints': '自定义',
   'tb.toneWarm': '默认',
   'tb.toneGray': '灰色',
   'tb.toneGreen': '绿色',

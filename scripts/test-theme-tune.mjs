@@ -206,6 +206,59 @@ for (const theme of ['day', 'sepia', 'custom']) eq(T.isPageInverted(theme, 'warm
 eq(T.pageTuneCss('night', TUNE({}), 'gray', 'warm'), null, 'warm @1 still → null')
 eq(T.nightTuneCss(1, 'blue').blend, 'screen', 'blue still screens')
 
+console.log('10) a picked tint is held to the readability the curated tones have')
+const WHEEL = ['#000000', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#808080', '#c8a060', '#ffffff']
+for (const pick of WHEEL) {
+  const light = T.lightTint(pick)
+  ok(luminance(light) >= 0.75, `light ${pick}: paper ${light} over the floor`)
+  eq(T.lightTint(light), light, `light ${pick}: pulling in twice changes nothing`)
+  eq(T.customToneCss(light, 1).bg, light, `light ${pick}: the chip IS the paper at 100 %`)
+  for (const t of [0, 1, 2]) {
+    const bg = T.customToneCss(pick, t).bg
+    ok(luminance(bg) >= 0.75, `light ${pick} @${t}: ${bg} over the floor`)
+    ok(contrast(bg, '#1d1d1f') >= 7, `light ${pick} @${t}: page ink reads`)
+  }
+  eq(T.customToneCss(pick, 0).bg, '#ffffff', `light ${pick} @0 → white`)
+  const chrome = T.customChromeCss(pick)
+  ok(contrast(chrome['--bg-chrome'], chrome['--text']) >= 7, `light ${pick}: chrome ink reads`)
+  ok(contrast(chrome['--bg-elevated'], chrome['--text']) >= 7, `light ${pick}: menu ink reads`)
+
+  const dark = T.nightTint(pick)
+  eq(T.nightTint(dark), dark, `night ${pick}: pulling in twice changes nothing`)
+  for (const t of [0.5, 1, 1.5]) {
+    const css = T.nightTuneCss(t, pick)
+    eq(css.blend, 'screen', `night ${pick}: tints through screen`)
+    ok(!css.filter.includes('NaN') && /^#[0-9a-f]{6}$/.test(css.bg), `night ${pick} @${t}: well-formed`)
+  }
+  const nc = T.nightChromeCss(pick)
+  ok(contrast(T.nightTuneCss(1, pick).bg, nc['--text']) >= 7, `night ${pick}: paper vs ink`)
+  ok(contrast(nc['--bg-chrome'], nc['--text']) >= 7, `night ${pick}: chrome vs ink`)
+  // The menus sit a step up from the chrome; the curated tones reach 5.9 there
+  ok(contrast(nc['--bg-elevated'], nc['--text']) >= 5.5, `night ${pick}: menu vs ink`)
+  eq(T.isPageInverted('night', pick), true, `night ${pick} inverts`)
+}
+// The whole cube, not just the corners: the worst night tint is a mid hue
+for (let r = 0; r < 256; r += 15) for (let g = 0; g < 256; g += 15) for (let b = 0; b < 256; b += 15) {
+  const pick = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')
+  const lc = T.customChromeCss(pick)
+  ok(contrast(lc['--bg-elevated'], lc['--text']) >= 7, `light ${pick}: menu ink reads`)
+  const nc = T.nightChromeCss(pick)
+  ok(contrast(nc['--bg-chrome'], nc['--text']) >= 7, `night ${pick}: chrome vs ink`)
+  ok(contrast(nc['--bg-elevated'], nc['--text']) >= 5.5, `night ${pick}: menu vs ink`)
+}
+// The curated tones lie inside the bounds, so a picked twin looks the same
+eq(T.customToneCss('#e7efe4', 1).bg, T.customToneCss('green', 1).bg, 'the green tone picked by hand is the green tone')
+eq(T.nightTint('#182846'), '#182846', 'the blue night tone picked by hand is untouched')
+// A picked tint overrides at strength 1, and carries its chrome to the title bar
+ok(T.pageTuneCss('custom', TUNE({}), '#c8e0f0', 'warm') !== null, 'a tint always overrides')
+ok(T.tuneTitleBar('custom', '#c8e0f0', 'warm') !== null, 'the title bar follows a tint')
+ok(T.tuneTitleBar('night', 'sepia', '#102030') !== null, 'the title bar follows a night tint')
+// A stored tint that is not one reads as the default tone
+for (const junk of ['#12', '#gggggg', '#12345678', 'url(x)']) {
+  eq(T.customToneCss(junk, 1).bg, '#f5efe3', `light ${junk} → sepia`)
+  eq(T.nightChromeCss(junk), null, `night ${junk} → warm`)
+}
+
 if (failures > 0) {
   console.error(`\n${failures} failure(s)`)
   process.exit(1)

@@ -42,7 +42,7 @@ Free and open source (MIT). No account, no sign-in, no tracking, no ads. Nothing
 
 READING
 • Smooth scrolling; zoom centres on the cursor or pinch point; fit width or page
-• Four reading modes — Day, Tint (a light paper tone: sepia, gray, green, blue or sand), Night and Night+ — plus Auto; Night has its own dark tones or shows the document as printed inside the dark chrome, a slider sets the strength, and Night can keep pictures in their original colours
+• Four reading modes — Day, Tint (a light paper tone: sepia, gray, green, blue, sand or your own colour), Night and Night+ — plus Auto; Night has its own dark tones or shows the document as printed inside the dark chrome, a slider sets the strength, and Night can keep pictures in their original colours
 • Page rotation, two-page spread, page by page (one page or spread at a time, turned instead of scrolled), and a full-screen presentation mode
 • Table of contents, thumbnails and bookmarks
 • Rest the pointer on a citation, a figure or an equation to preview it beside the text; on a citation, one click fetches the cited paper's abstract from free scholarly databases (arXiv, Europe PMC, Crossref, OpenAlex)
@@ -102,7 +102,7 @@ Gratis og åpen kildekode (MIT). Ingen konto, ingen innlogging, ingen sporing, i
 
 LESING
 • Jevn rulling; zoom sentreres om pekeren eller knipepunktet; tilpass bredde eller side
-• Fire lesemoduser — Dag, Farge (en lys papirtone: sepia, grå, grønn, blå eller sand), Natt og Natt+ — pluss Auto; natt har egne mørke toner eller viser dokumentet som trykt i den mørke rammen, en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
+• Fire lesemoduser — Dag, Farge (en lys papirtone: sepia, grå, grønn, blå, sand eller din egen farge), Natt og Natt+ — pluss Auto; natt har egne mørke toner eller viser dokumentet som trykt i den mørke rammen, en glidebryter setter styrken, og natt kan beholde bildenes originalfarger
 • Siderotasjon, tosiders oppslag, side for side (én side eller ett oppslag om gangen, bladd i stedet for rullet) og fullskjerms presentasjonsmodus
 • Innholdsfortegnelse, miniatyrer og bokmerker
 • Hold pekeren over en henvisning, en figur eller en ligning for å forhåndsvise den ved siden av teksten; på en henvisning henter ett klikk sammendraget til den siterte artikkelen fra åpne fagdatabaser (arXiv, Europe PMC, Crossref, OpenAlex)

@@ -3056,6 +3056,23 @@ html.pen-near .draw-layer {
   border-color: var(--accent);
 }
 
+/* The row of picked tints under the curated tones: a chip has no name to show,
+   so it is the size of the «+» beside it. */
+.tone-tints {
+  margin-top: 8px;
+}
+
+.tone-tints .theme-auto-choices {
+  align-items: center;
+}
+
+.tone-chip-tint {
+  flex: none;
+  width: 34px;
+  height: 23px;
+  padding: 0;
+}
+
 /* Intensity slider block (sepia/night/custom themes). The reset is the shared
    ResetLink (.tool-reset) — rendered only while the tune ≠ 100 %. */
 .theme-tune {
