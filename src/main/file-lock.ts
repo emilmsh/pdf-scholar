@@ -51,6 +51,12 @@ export async function withFileLock<T>(
   fn: () => Promise<T>,
   { staleMs = 60_000, pollMs = 100 }: FileLockOptions = {}
 ): Promise<T> {
+  // Windows: a file the holder has just unlinked stays on disk, delete
+  // pending, until the last handle on it closes (a scanner's included), and
+  // creating it again in that window is refused with EPERM, not EEXIST. That
+  // is a lock still letting go, so it is waited for like a held one — for at
+  // most staleMs, after which the EPERM is what it says.
+  let refusedSince = 0
   for (;;) {
     try {
       const handle = await open(lockPath, 'wx')
@@ -61,7 +67,15 @@ export async function withFileLock<T>(
       }
       break
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err
+      const code = (err as NodeJS.ErrnoException).code
+      if (code === 'EPERM' || code === 'EBUSY') {
+        refusedSince ||= Date.now()
+        if (Date.now() - refusedSince > staleMs) throw err
+        await new Promise((r) => setTimeout(r, pollMs))
+        continue
+      }
+      if (code !== 'EEXIST') throw err
+      refusedSince = 0
       if (await isStale(lockPath, staleMs)) {
         await rm(lockPath, { force: true })
         continue
