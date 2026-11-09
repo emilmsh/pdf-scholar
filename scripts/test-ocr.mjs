@@ -164,7 +164,14 @@ const tsvRow = (level, block, par, line, word, left, top, width, height, conf, t
 
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href
-const STANDARD_FONTS = pathToFileURL(join(require.resolve('pdfjs-dist/package.json'), '../standard_fonts/')).href
+// A plain path with a trailing slash, NOT a file:// href: in Node pdf.js reads
+// standardFontDataUrl + name with fs.readFile, which takes a file:// STRING
+// for a relative path and fails — silently at verbosity 0 — and the page is
+// then drawn with whatever fontconfig gives «sans-serif». The ubuntu-26.04
+// runner image of 2026-11-01 gives it nothing readable, and the scan below
+// came out with 2 of 43 words (2026-11-09); with its own LiberationSans the
+// render is the same on every OS.
+const STANDARD_FONTS = join(require.resolve('pdfjs-dist/package.json'), '../standard_fonts') + '/'
 const { createCanvas } = require('@napi-rs/canvas')
 // pdf.js transfers the buffer to its worker — always hand it a copy
 const open = (data) => pdfjs.getDocument({ data: data.slice(), standardFontDataUrl: STANDARD_FONTS, verbosity: 0 }).promise
@@ -222,7 +229,14 @@ async function scanOf(textBytes, { sideways = false } = {}) {
   const page = await doc.getPage(1)
   const { rgba, width, height } = await raster(page, 300 / 72)
   const grey = Buffer.alloc(width * height)
-  for (let i = 0, j = 0; j < grey.length; i += 4, j++) grey[j] = (rgba[i] * 77 + rgba[i + 1] * 150 + rgba[i + 2] * 29) >> 8
+  let ink = 0
+  for (let i = 0, j = 0; j < grey.length; i += 4, j++) {
+    grey[j] = (rgba[i] * 77 + rgba[i + 1] * 150 + rgba[i + 2] * 29) >> 8
+    if (grey[j] < 128) ink++
+  }
+  // A blank raster names itself: without this, a font pdf.js could not draw
+  // with read as «OCR finds 2 of 43 words» and sent the search to Tesseract
+  check('the scan carries the page’s ink (pdf.js drew it with a font it could load)', ink > width * height / 1000)
   const [wPt, hPt] = [page.view[2], page.view[3]]
   await doc.loadingTask.destroy()
   const image = deflateSync(grey)
