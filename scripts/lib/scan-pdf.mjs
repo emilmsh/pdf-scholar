@@ -16,8 +16,10 @@ import { deflateSync } from 'node:zlib'
 const require = createRequire(import.meta.url)
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href
-// A plain path, not a file:// URL — pdf.js reads it with fs.readFile in Node (see test-ocr.mjs)
-const STANDARD_FONTS = join(require.resolve('pdfjs-dist/package.json'), '../standard_fonts').replaceAll('\\', '/') + '/'
+// A plain path, not a file:// href: pdf.js in Node reads it with fs.readFile
+// (see test-ocr.mjs), and a scan rendered with the system fallback font is
+// not the same scan on every OS
+const STANDARD_FONTS = join(require.resolve('pdfjs-dist/package.json'), '../standard_fonts') + '/'
 const { createCanvas } = require('@napi-rs/canvas')
 
 /** A PDF of the given objects (1-based, object 1 the catalog) */

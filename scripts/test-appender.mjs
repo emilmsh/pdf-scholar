@@ -93,9 +93,11 @@ async function embedpdfCount(file, pageIndex) {
   return n
 }
 
-// NOTE: pdf.js may warn "Unable to load font data ... LiberationSans" while
-// preparing the FreeText fallback font — pdfjs-dist v6 no longer ships that
-// ttf. Cosmetic only; getAnnotations() is unaffected.
+// The standard fonts are a plain path with a trailing slash: in Node pdf.js
+// reads them with fs.readFile, which takes a file:// STRING for a relative
+// path — that is what the "Unable to load font data ... LiberationSans"
+// warning in CI was (the ttf ships), not a missing file. getAnnotations()
+// never needed it; test:ocr's render does.
 async function pdfjsAnnotIds(file, pageIndex) {
   const require = createRequire(import.meta.url)
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
@@ -105,8 +107,7 @@ async function pdfjsAnnotIds(file, pageIndex) {
   const task = pdfjs.getDocument({
     data,
     isEvalSupported: false,
-    // a plain path, not a file:// URL — pdf.js reads it with fs.readFile in Node (see test-ocr.mjs)
-    standardFontDataUrl: fontDir.replaceAll('\\', '/') + '/'
+    standardFontDataUrl: fontDir + '/'
   })
   const doc = await task.promise
   const page = await doc.getPage(pageIndex + 1)
