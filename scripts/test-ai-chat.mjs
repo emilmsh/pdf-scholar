@@ -1162,8 +1162,7 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
 
   // grok-4.7 (curated), grok-4.6 and grok-4.5 (retired from the menu, kept in
   // the regex for stored selections) all document reasoning_effort (low/
-  // medium/high/xhigh) — grok-4.3 stays out until someone verifies it (fewer
-  // models that work beats more that might, 2026-08-12/13)
+  // medium/high/xhigh)
   const xaiModel = (id) => ({ anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: id, mistral: '', groq: '', compat: '', mock: '' })
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
   await run({ provider: 'xai', models: xaiModel('grok-4.7') })
@@ -1183,9 +1182,15 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
     models: { anthropic: '', openai: '', azure: '', openrouter: '', gemini: '', xai: 'grok-4.5', mistral: '', groq: '', compat: '', mock: '' }
   })
   ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.5 (retired, still stored) gets reasoning_effort')
+  // grok-4.3's own model page (docs.x.ai/developers/models/grok-4.3, verified
+  // 2026-11-09) documents "none, low, medium, high, xhigh" — unlike 4.5–4.7 it
+  // accepts `none`, so «Av» sends `none` directly, not the lowest effort
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
   await run({ provider: 'xai' })
-  ok(calls[0]?.body?.reasoning_effort === undefined, 'grok-4.3 sends no reasoning_effort (unverified)')
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'grok-4.3 gets reasoning_effort')
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'xai', thinking: 'off' })
+  ok(calls[0]?.body?.reasoning_effort === 'none', `grok-4.3 off → none (got ${calls[0]?.body?.reasoning_effort})`)
 
   // Gemini 4 Argon documents reasoning_effort minimal/low/medium/high mapped
   // to thinking_level (ai.google.dev/gemini-api/docs/openai, verified

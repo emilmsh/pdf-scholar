@@ -47,9 +47,15 @@ export interface AiProviderProfile {
  *  reasoning_effort low/medium/high/xhigh for all three (docs/agent-notes/
  *  modeller-api.md, verified 2026-08-12, 2026-08-13 and 2026-09-26); 4.5 and
  *  4.6 stay in the regex even though the curated menu now offers 4.7, so a
- *  stored selection from before either switch keeps working. The match is
- *  deliberately narrow — other grok ids (4.3) stay out until someone
- *  verifies them, per the fewer-models-that-work rule.
+ *  stored selection from before either switch keeps working.
+ *
+ *  grok-4.3 is included because its own model page (docs.x.ai/developers/
+ *  models/grok-4.3, verified 2026-11-09) documents "Reasoning efforts
+ *  (supported): none, low, medium, high, xhigh" — the generic xAI reasoning
+ *  capabilities page still doesn't name 4.3 at all (only 4.5/4.6/4.7 and the
+ *  multi-agent variant), which is why this stayed an open question for three
+ *  months; the model's own page settles it. Unlike 4.5–4.7, 4.3 documents
+ *  `none`, so it does NOT go in `OPENAI_ALWAYS_REASONS_RE` below.
  *
  *  gpt-oss (Groq's openai/gpt-oss-120b and openai/gpt-oss-20b) is included
  *  because Groq documents reasoning_effort low/medium/high for both
@@ -62,7 +68,7 @@ export interface AiProviderProfile {
  *  not a `gemini-4` family pattern, since the same table's other three
  *  columns (3.1 Flash-Lite, 3 Flash, 2.5) don't correspond to any of our
  *  curated Gemini ids (docs/agent-notes/modeller-api.md). */
-export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[5-7]|gpt-oss|gemini-4-argon/i
+export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[3567]|gpt-oss|gemini-4-argon/i
 
 /** Models whose reasoning cannot be switched off, so «Av» maps to the lowest
  *  effort instead of `none` — the same honest mapping the Anthropic path uses
