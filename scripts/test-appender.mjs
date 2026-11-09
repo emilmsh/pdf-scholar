@@ -105,7 +105,8 @@ async function pdfjsAnnotIds(file, pageIndex) {
   const task = pdfjs.getDocument({
     data,
     isEvalSupported: false,
-    standardFontDataUrl: pathToFileURL(fontDir).href + '/'
+    // a plain path, not a file:// URL — pdf.js reads it with fs.readFile in Node (see test-ocr.mjs)
+    standardFontDataUrl: fontDir.replaceAll('\\', '/') + '/'
   })
   const doc = await task.promise
   const page = await doc.getPage(pageIndex + 1)

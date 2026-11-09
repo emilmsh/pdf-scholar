@@ -164,7 +164,10 @@ const tsvRow = (level, block, par, line, word, left, top, width, height, conf, t
 
 const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href
-const STANDARD_FONTS = pathToFileURL(join(require.resolve('pdfjs-dist/package.json'), '../standard_fonts/')).href
+// A plain path with forward slashes, NOT a file:// URL: in Node pdf.js reads it
+// with fs.readFile, which refuses a URL string — the fonts then silently fell
+// back to the system's, and a runner image without them drew no letters
+const STANDARD_FONTS = join(require.resolve('pdfjs-dist/package.json'), '../standard_fonts').replaceAll('\\', '/') + '/'
 const { createCanvas } = require('@napi-rs/canvas')
 // pdf.js transfers the buffer to its worker — always hand it a copy
 const open = (data) => pdfjs.getDocument({ data: data.slice(), standardFontDataUrl: STANDARD_FONTS, verbosity: 0 }).promise
