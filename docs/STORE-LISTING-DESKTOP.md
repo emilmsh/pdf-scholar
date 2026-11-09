@@ -156,15 +156,16 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.83.0
+## What's new in this version (≤ 1 500 chars) — v0.84.0
 
-*(The Store last carried v0.73.0's notes, so this covers v0.74.0–v0.83.0:
+*(The Store last carried v0.73.0's notes, so this covers v0.74.0–v0.84.0:
 the headline items, not every release. MCP for outside AI tools is left out
 on purpose — the Store build cannot connect, PLATFORMS §33 — and «Copy for
 AI», which works everywhere, stands in for it.)*
 
 **EN:**
 ```
+• Paper tints of your own: a «+» under the tones in Tint and Night takes any colour off the wheel, held readable
 • The assistant answers in the language you write in, whatever language the document or the interface is in
 • Many documents open: the tab strip scrolls instead of squeezing, «All open tabs» searches them, and Ctrl+1–9 jumps between them
 • Tab groups: put tabs in a group from the right-click menu and fold it out of the strip while you work on something else
@@ -180,6 +181,7 @@ AI», which works everywhere, stands in for it.)*
 
 **NO:**
 ```
+• Egne papirtoner: en «+» under tonene i Farge og Natt tar enhver farge fra hjulet, holdt lesbar
 • Assistenten svarer på språket du skriver på, uansett hvilket språk dokumentet eller grensesnittet har
 • Mange dokumenter åpne: fanelisten ruller i stedet for å klemmes, «Alle åpne faner» søker i dem, og Ctrl+1–9 hopper mellom dem
 • Fanegrupper: legg faner i en gruppe fra høyreklikkmenyen, og fold den ut av listen mens du jobber med noe annet
