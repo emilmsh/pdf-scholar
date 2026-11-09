@@ -3071,6 +3071,16 @@ html.pen-near .draw-layer {
   width: 34px;
   height: 23px;
   padding: 0;
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+}
+
+/* A filled chip has no text to colour, so the accent border the named chips
+   use is lost on it: the chosen tint wears the markup swatches' ring instead */
+.tone-chip-tint.selected {
+  border-color: color-mix(in srgb, var(--text) 22%, transparent);
+  box-shadow:
+    0 0 0 2px var(--bg-elevated),
+    0 0 0 3.5px var(--accent);
 }
 
 /* Intensity slider block (sepia/night/custom themes). The reset is the shared

@@ -221,11 +221,52 @@ function lightToneRgb(tone: CustomToneChoice): readonly [number, number, number]
   return tintHex(safe) ? lightAt(hexChannels(safe), 1) : CUSTOM_TONES[safe as CustomTone].bg
 }
 
-/** A night tone's colour, a picked tint scaled down under the ceiling */
+/** HSL saturation of 0–255 channels: how far a colour is from the grey of its
+ *  own lightness, 0 for grey, 1 for a pure hue at any lightness. The measure
+ *  for the night cap because it is what survives the luminance scaling (every
+ *  channel scaled by one factor keeps it) — so the cap and the ceiling cannot
+ *  fight each other. */
+function hslSaturation([r, g, b]: readonly [number, number, number]): number {
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  if (max === min) return 0
+  const sum = max + min
+  return (max - min) / (sum <= 255 ? sum : 510 - sum)
+}
+
+/** The most saturated curated night tone sets the cap for a picked one: the
+ *  chrome is derived a step above the paper with the paper's saturation
+ *  intact, so a pure hue off the wheel — darkened under the ceiling to a page
+ *  that is nearly black — still framed the page in a blood-red toolbar (seen
+ *  2026-11-09 with #ff0000). Pulled toward its own grey to the blue tone's
+ *  saturation it gives the muted family the curated tones have. */
+const NIGHT_SATURATION_CAP = Math.max(
+  ...(['gray', 'blue', 'green'] as const).map((t) => hslSaturation(NIGHT_TONES[t].bg))
+)
+
+/** A night tone's colour: a picked tint pulled toward its own grey to the cap
+ *  and scaled down under the ceiling, in that order (the scaling keeps the
+ *  saturation, so both bounds hold on the result and the result is a fixed
+ *  point — a stored tint comes back unchanged) */
 function nightToneRgb(tone: NightToneChoice): readonly [number, number, number] {
   const safe = safeNightTone(tone)
   if (!tintHex(safe)) return NIGHT_TONES[safe as NightTone].bg
-  const [r, g, b] = hexChannels(safe)
+  let [r, g, b] = hexChannels(safe)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const sat = hslSaturation([r, g, b])
+  // Judged in channel units with two of slack: a tint stored at the cap is
+  // rounded to 0–255, which can put its spread a unit or two over the exact
+  // cap, and on a dark colour (a spread over a sum of 60) that reads as 3 %
+  // — enough for a second pass to move it again. Two units cover the
+  // rounding of both the spread and the sum.
+  const spread = max - min
+  const capSpread = NIGHT_SATURATION_CAP * (sat === 0 ? 0 : spread / sat)
+  if (spread > capSpread + 2) {
+    const grey = (max + min) / 2
+    const k = capSpread / spread
+    ;[r, g, b] = [grey + (r - grey) * k, grey + (g - grey) * k, grey + (b - grey) * k]
+  }
   const at = (s: number): [number, number, number] => [channel(r * s), channel(g * s), channel(b * s)]
   return at(largestFit(1, (s) => relativeLuminance(...at(s)) <= NIGHT_LUMINANCE_CEILING))
 }

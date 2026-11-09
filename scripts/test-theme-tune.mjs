@@ -53,6 +53,18 @@ const contrast = (bgHex, fgHex) => {
   const [hi, lo] = [luminance(bgHex), luminance(fgHex)].sort((a, b) => b - a)
   return (hi + 0.05) / (lo + 0.05)
 }
+// HSL saturation, independently again: 0 for a grey, 1 for a pure hue
+function saturation(hexStr) {
+  const v = hexStr.replace('#', '')
+  const c = [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16))
+  const max = Math.max(...c)
+  const min = Math.min(...c)
+  if (max === min) return 0
+  const sum = max + min
+  return (max - min) / (sum <= 255 ? sum : 510 - sum)
+}
+// The most saturated curated night tone — the cap a picked one is held to
+const NIGHT_SAT_CAP = Math.max(...['gray', 'blue', 'green'].map((t) => saturation(T.nightTint(t))))
 
 console.log('1) untouched defaults produce NO override')
 eq(T.pageTuneCss('sepia', TUNE({}), 'gray', 'warm'), null, 'sepia @1 → null')
@@ -225,6 +237,10 @@ for (const pick of WHEEL) {
 
   const dark = T.nightTint(pick)
   eq(T.nightTint(dark), dark, `night ${pick}: pulling in twice changes nothing`)
+  // A pure hue is pulled toward its own grey: the chrome is a step above the
+  // paper with the paper's saturation, and #ff0000 framed a near-black page
+  // in a blood-red toolbar before the cap (2026-11-09)
+  ok(saturation(dark) <= NIGHT_SAT_CAP + 0.04, `night ${pick}: ${dark} no more saturated than the curated tones`)
   for (const t of [0.5, 1, 1.5]) {
     const css = T.nightTuneCss(t, pick)
     eq(css.blend, 'screen', `night ${pick}: tints through screen`)
@@ -245,6 +261,14 @@ for (let r = 0; r < 256; r += 15) for (let g = 0; g < 256; g += 15) for (let b =
   const nc = T.nightChromeCss(pick)
   ok(contrast(nc['--bg-chrome'], nc['--text']) >= 7, `night ${pick}: chrome vs ink`)
   ok(contrast(nc['--bg-elevated'], nc['--text']) >= 5.5, `night ${pick}: menu vs ink`)
+  ok(saturation(nc["--bg-chrome"]) <= NIGHT_SAT_CAP + 0.04, `night ${pick}: chrome within the curated saturation`)
+  ok(saturation(T.nightTint(T.nightTint(pick))) <= NIGHT_SAT_CAP + 0.04 && T.nightTint(T.nightTint(pick)) === T.nightTint(pick), `night ${pick}: a fixed point`)
+}
+// A pure hue still has SOME of its hue: the cap mutes, it does not grey out
+{
+  const red = T.nightTint('#ff0000')
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(red.slice(i, i + 2), 16))
+  ok(saturation(red) > 0.3 && r > g && g === b, `pure red stays a red: ${red}`)
 }
 // The curated tones lie inside the bounds, so a picked twin looks the same
 eq(T.customToneCss('#e7efe4', 1).bg, T.customToneCss('green', 1).bg, 'the green tone picked by hand is the green tone')

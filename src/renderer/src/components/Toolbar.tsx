@@ -80,9 +80,8 @@ import {
   UNDERLINE_COLORS
 } from '../annotations'
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
-import { renderSwatches, useCustomColors, withCustomColors } from './ColorSwatches'
+import { CustomSwatch, renderSwatches, useCustomColors, withCustomColors } from './ColorSwatches'
 import { CustomColorPicker } from './SelectionMenu'
-import { CustomSwatch } from './ColorSwatches'
 import { cleanCustomColors, forgetColor, rememberColor } from '../../../shared/custom-colors'
 import {
   FONT_SIZE_MAX,
