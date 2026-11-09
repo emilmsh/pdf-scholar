@@ -34,7 +34,8 @@ import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const SAMPLE = path.join(__dirname, '..', 'src', 'renderer', 'public', 'sample.pdf')
-const STANDARD_FONTS = new URL('../node_modules/pdfjs-dist/standard_fonts/', import.meta.url).href
+// A plain path, not a file:// URL — pdf.js reads it with fs.readFile in Node (see test-ocr.mjs)
+const STANDARD_FONTS = path.join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'standard_fonts').replaceAll('\\', '/') + '/'
 
 let failures = 0
 const check = (label, cond, detail = '') => {
