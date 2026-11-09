@@ -81,6 +81,15 @@ app.whenReady().then(async () => {
       return finish(2)
     }
     const stored = JSON.parse(readFileSync(stateFile, 'utf8')).ai?.keys ?? {}
+    // Since v0.82.0 the ChatGPT sign-in lives in its own sealed file
+    // (src/main/chatgpt-store.ts), not under keys.chatgpt — read it from there
+    // first, the state file only for a profile the app has not migrated yet
+    try {
+      const sealed = readFileSync(join(real, 'chatgpt-signin.bin'), 'utf8').trim()
+      if (sealed) stored.chatgpt = sealed
+    } catch {
+      /* no file: an older profile, or never signed in */
+    }
     const keys = {}
     let chatgptAccountId = ''
     for (const provider of Object.keys(KEY_ENV)) {

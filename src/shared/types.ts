@@ -332,6 +332,11 @@ export type AiErrorCode =
   | 'ai-disabled'
   | 'ai-chatgpt-signed-out'
   | 'ai-chatgpt-session-expired'
+  | 'ai-chatgpt-desktop-signed-out'
+  | 'ai-chatgpt-host-missing'
+  | 'ai-chatgpt-host-outdated'
+  | 'ai-chatgpt-host-failed'
+  | 'ai-chatgpt-host-denied'
   | 'ai-subscription-limit'
   | 'ai-chatgpt-login-unsupported'
   | 'ai-chatgpt-login-port-busy'
@@ -694,8 +699,10 @@ export type AiProviderId =
   | 'anthropic'
   | 'openai'
   // OpenAI through the user's ChatGPT PLAN instead of an API key: the Codex
-  // sign-in (OAuth) and its chatgpt.com backend. Desktop only — see
-  // src/main/chatgpt-auth.ts for why, and docs/PLATFORMS.md for the divergence.
+  // sign-in (OAuth) and its chatgpt.com backend. Signed in on the desktop
+  // only; the extension borrows that sign-in through the app's native host —
+  // see src/main/chatgpt-auth.ts and src/shared/native-host.ts, and
+  // docs/PLATFORMS.md §25 for the divergence.
   | 'chatgpt'
   | 'azure'
   // First-class hosted OpenAI-compatible services (one key each; base URLs in
@@ -855,10 +862,12 @@ export interface AiConfigView extends AiConfig {
   /** Live model lists as last fetched from the providers ({} until a key
    *  exists and a refresh has succeeded) */
   catalog: AiModelCatalog
-  /** The ChatGPT-plan sign-in. `supported` is false where the OAuth flow
-   *  cannot run (extension, web preview); `account` is the signed-in email,
-   *  '' when signed out. The tokens themselves never leave main. */
-  chatgpt: { supported: boolean; account: string }
+  /** The ChatGPT-plan sign-in. `supported` is false where it cannot run at
+   *  all (the web preview); `account` is the signed-in email, '' when signed
+   *  out. `borrowed`: the extension, which cannot sign in itself and runs on
+   *  the installed desktop app's sign-in through its native host
+   *  (shared/native-host.ts). The tokens themselves never leave main. */
+  chatgpt: { supported: boolean; account: string; borrowed: boolean }
 }
 
 /** Outcome of the ChatGPT sign-in: the new view, or a named failure */
@@ -1363,7 +1372,9 @@ export interface PdfxApi {
    *  Fetch failures keep the previous snapshot — this never makes things worse. */
   aiRefreshModels(force?: boolean): Promise<AiConfigView>
   /** Sign in with a ChatGPT plan (opens the browser, waits for the callback).
-   *  Desktop only — elsewhere resolves with `ai-chatgpt-login-unsupported`. */
+   *  On the desktop the browser sign-in; in the extension, permission to
+   *  start the desktop app's native host and a look at its sign-in; in the
+   *  web preview `ai-chatgpt-login-unsupported`. */
   aiChatgptLogin(): Promise<ChatgptLoginResult>
   /** Forget the ChatGPT tokens */
   aiChatgptLogout(): Promise<AiConfigView>

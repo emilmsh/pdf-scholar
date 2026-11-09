@@ -123,6 +123,14 @@ const nb = {
   'aierr.ai-disabled':
     'KI-funksjonene er slått av i KI-innstillingene, så ingen forespørsel ble sendt.',
   'aierr.ai-chatgpt-signed-out': 'Du er ikke logget inn med ChatGPT. Logg inn i KI-innstillingene.',
+  'aierr.ai-chatgpt-desktop-signed-out':
+    'PDF Scholar for skrivebordet er ikke logget inn med ChatGPT. Logg inn i appens KI-innstillinger, så virker det her også.',
+  'aierr.ai-chatgpt-host-missing':
+    'Fant ikke PDF Scholar for skrivebordet på denne maskinen. Installer appen (ikke Microsoft Store-utgaven) og start den én gang.',
+  'aierr.ai-chatgpt-host-outdated': 'Skrivebordsappen og utvidelsen har ulike versjoner. Oppdater begge.',
+  'aierr.ai-chatgpt-host-failed': 'PDF Scholar for skrivebordet startet, men svarte ikke.',
+  'aierr.ai-chatgpt-host-denied':
+    'Nettleseren fikk ikke lov til å starte PDF Scholar for skrivebordet, så innloggingen kan ikke lånes.',
   'aierr.ai-chatgpt-session-expired':
     'ChatGPT-innloggingen er utløpt eller trukket tilbake. Logg inn på nytt i KI-innstillingene.',
   'aierr.ai-subscription-limit':
@@ -985,6 +993,11 @@ const nb = {
   'ai.chatgptHintTip':
     'Samme innlogging som Codex og opencode bruker. OpenAI tillater den i dag, men har ingen avtale om den og kan stenge den. Det du sender behandles etter ChatGPT-vilkårene (ikke API-vilkårene), så innstillingen for modelltrening på ChatGPT-kontoen din gjelder.',
   'ai.chatgptDesktopOnly': 'Bare i skrivebordsappen.',
+  'ai.chatgptBorrow': 'Bruk innloggingen fra skrivebordsappen',
+  'ai.chatgptBorrowed': 'Logget inn som {account} via skrivebordsappen',
+  'ai.chatgptDisconnect': 'Koble fra',
+  'ai.chatgptBorrowTip':
+    'Låner ChatGPT-innloggingen fra PDF Scholar på denne maskinen. Appen må være installert og logget inn, men trenger ikke være åpen. Nettleseren spør én gang om lov til å starte den.',
   'ai.localTag': 'lokal',
   'ai.keySaved': '•••••••• (lagret)',
   'ai.keyNew': 'Lim inn nøkkelen din',
@@ -997,16 +1010,20 @@ const nb = {
   'ai.compatModelHint': 'f.eks. llama3.1 eller mistral-medium-latest',
   'ai.compatHint':
     'For lokale modeller (Ollama og LM Studio kjører uten nøkkel – velg dem i listen) og alle andre OpenAI-kompatible endepunkter – velg «Annet» og skriv inn base-URL-en. Modellisten hentes fra endepunktet når du lagrer.',
-  'ai.modelFilter': 'Filtrer modeller …',
+  'ai.modelFilter': 'Filtrer modeller, eller skriv en modell-id …',
   // The filter searches past the selection the menu offers — say so, or the
   // models curateRemoteModels leaves out look gone rather than unlisted
-  'ai.modelFilterAll': 'Søk i alle modeller …',
+  'ai.modelFilterAll': 'Søk i alle modeller, eller skriv en modell-id …',
   'ai.modelCount': '{models} modeller · {vendors} leverandører',
   'ai.modelCountShort': '{models} modeller',
   'ai.notConfigured': 'ikke satt opp',
   'ai.noModelsListed': 'ingen modeller',
   'ai.modelNoHits': 'Ingen modeller matcher søket.',
   'ai.modelMoreHits': '+{n} treff til – skriv mer for å snevre inn.',
+  'ai.modelUseTyped': 'Bruk «{id}»',
+  'ai.modelTypedDetail': '{provider} – ikke utprøvd her, kan svare annerledes',
+  'ai.modelTypedHint':
+    'Modellen står ikke i den kuraterte lista. Id-en sendes som den er til {provider}; en id leverandøren ikke kjenner gir en feilmelding.',
   'ai.ollamaDetected': 'Ollama kjører på denne maskinen – klikk for å fylle inn adressen',
   'ai.noVisionTip': 'Valgt modell ({model}) kan ikke lese bilder',
   'ai.keyCapHint': 'Sett et utgiftstak på nøkkelen – samme sted viser leverandøren hva du faktisk har brukt. Appen teller tokens, men bare leverandøren vet prisen.',
@@ -1444,6 +1461,14 @@ const en: Dict = {
   'aierr.ai-aborted': 'Stopped',
   'aierr.ai-disabled': 'AI features are switched off in the AI settings, so no request was sent.',
   'aierr.ai-chatgpt-signed-out': 'You are not signed in with ChatGPT. Sign in from the AI settings.',
+  'aierr.ai-chatgpt-desktop-signed-out':
+    'PDF Scholar for desktop is not signed in with ChatGPT. Sign in from the app’s AI settings and it works here too.',
+  'aierr.ai-chatgpt-host-missing':
+    'Couldn’t find PDF Scholar for desktop on this computer. Install the app (not the Microsoft Store edition) and start it once.',
+  'aierr.ai-chatgpt-host-outdated': 'The desktop app and the extension are on different versions. Update both.',
+  'aierr.ai-chatgpt-host-failed': 'PDF Scholar for desktop started but did not answer.',
+  'aierr.ai-chatgpt-host-denied':
+    'The browser was not allowed to start PDF Scholar for desktop, so its sign-in can’t be borrowed.',
   'aierr.ai-chatgpt-session-expired':
     'The ChatGPT sign-in has expired or was revoked. Sign in again from the AI settings.',
   'aierr.ai-subscription-limit':
@@ -2239,6 +2264,11 @@ const en: Dict = {
   'ai.chatgptHintTip':
     'The same sign-in Codex and opencode use. OpenAI allows it today but has no agreement covering it and can close it. What you send is handled under ChatGPT’s terms (not the API’s), so your ChatGPT account’s model-training setting applies.',
   'ai.chatgptDesktopOnly': 'Desktop app only.',
+  'ai.chatgptBorrow': 'Use the desktop app’s sign-in',
+  'ai.chatgptBorrowed': 'Signed in as {account} via the desktop app',
+  'ai.chatgptDisconnect': 'Disconnect',
+  'ai.chatgptBorrowTip':
+    'Borrows the ChatGPT sign-in from PDF Scholar on this computer. The app must be installed and signed in, but need not be open. The browser asks once for permission to start it.',
   'ai.localTag': 'local',
   'ai.keySaved': '•••••••• (saved)',
   'ai.keyNew': 'Paste your key',
@@ -2251,14 +2281,18 @@ const en: Dict = {
   'ai.compatModelHint': 'e.g. llama3.1 or mistral-medium-latest',
   'ai.compatHint':
     'For local models (Ollama and LM Studio run without a key — pick them in the list) and any other OpenAI-compatible endpoint — pick "Other" and enter its base URL. The model list is fetched from the endpoint when you save.',
-  'ai.modelFilter': 'Filter models …',
-  'ai.modelFilterAll': 'Search all models …',
+  'ai.modelFilter': 'Filter models, or type a model id …',
+  'ai.modelFilterAll': 'Search all models, or type a model id …',
   'ai.modelCount': '{models} models · {vendors} vendors',
   'ai.modelCountShort': '{models} models',
   'ai.notConfigured': 'not set up',
   'ai.noModelsListed': 'no models listed',
   'ai.modelNoHits': 'No models match the search.',
   'ai.modelMoreHits': '+{n} more matches — type more to narrow it down.',
+  'ai.modelUseTyped': 'Use “{id}”',
+  'ai.modelTypedDetail': '{provider} — untested here, may answer differently',
+  'ai.modelTypedHint':
+    'This model is not on the curated list. The id is sent as typed to {provider}; an id the provider does not know gives an error.',
   'ai.ollamaDetected': 'Ollama is running on this machine — click to fill in the address',
   'ai.noVisionTip': 'The selected model ({model}) cannot read images',
   'ai.keyCapHint': 'Set a spending cap on the key — the same page shows what you have actually used. This app counts tokens; only the provider knows the price.',
@@ -2712,7 +2746,8 @@ const PROVIDER_SENTENCE_CODES = new Set<string>([
   'ai-model-overloaded',
   'ai-no-credit',
   'ai-subscription-limit',
-  'ai-chatgpt-login-failed'
+  'ai-chatgpt-login-failed',
+  'ai-chatgpt-host-failed'
 ])
 
 /** The provider's raw sentence for a failure, when there is one worth reading

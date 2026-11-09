@@ -511,7 +511,8 @@ section('openai: gpt-6 (Astra curated 2026-09-05, Sol/Luna 2026-09-26)')
   ok(calls[0]?.body?.reasoning?.effort === 'none', 'gpt-5.6 off → none unchanged')
   // GPT-6 Sol and Luna DO document `none` (their model pages, 2026-09-26) —
   // the always-reasons list names Astra, not the whole 6-series
-  for (const id of ['gpt-6-sol', 'gpt-6-luna']) {
+  // …and GPT-6.1 Terra (curated 2026-11-02) documents none..max as well
+  for (const id of ['gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-terra']) {
     responder = () => openAiSse({ deltas: ['ok'], response: { model: id, output: [] } })
     await run({ provider: 'openai', models: { anthropic: '', openai: id, azure: '', mock: '' }, thinking: 'off' })
     ok(calls[0]?.body?.reasoning?.effort === 'none', `${id} off → none (got ${calls[0]?.body?.reasoning?.effort})`)
@@ -898,6 +899,16 @@ section('provider state: overloaded, out of credit, rate limited')
   responder = fail(429, { error: { type: 'insufficient_quota', message: 'You exceeded your current quota, please check your plan and billing details.' } })
   const dry = await run({ provider: 'openai' })
   ok(dry.result.code === 'ai-no-credit', `429 insufficient_quota → ai-no-credit (got ${dry.result.code})`)
+
+  // OpenAI's newer wording (seen 2026-11-01), which carries no type to go by
+  responder = fail(429, {
+    error: {
+      message:
+        'You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.'
+    }
+  })
+  const empty = await run({ provider: 'openai' })
+  ok(empty.result.code === 'ai-no-credit', `"no credits remaining" → ai-no-credit (got ${empty.result.code})`)
 
   // …but a plain quota exhaustion with no billing language is a free tier
   // resetting, and must stay a rate limit: waiting IS the remedy there.

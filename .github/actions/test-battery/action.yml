@@ -104,11 +104,19 @@ runs:
     # gates that stop it emptying a small or silent endpoint
     - run: npm run test:model-curation
       shell: bash
+    - run: npm run test:typed-model
+      shell: bash
     # Real provider streams, recorded once by `npm run test:live --record` and
     # replayed here keylessly forever after — including the shapes nobody
     # would have thought to mock (reasoning-only streams, errors inside an
     # HTTP 200, a JSON frame split across two TCP writes)
     - run: npm run test:streams
+      shell: bash
+    # The extension borrowing the desktop's ChatGPT sign-in over native
+    # messaging: the stdio framing, the relay dropping Electron's stray line
+    # break, the manifest/registry/launchers, and the cross-process lock — two
+    # real processes renewing one rotating refresh token, one renewal
+    - run: npm run test:native-host
       shell: bash
     # The extension's redirect-rule → viewer-page URL handoff: a regression is
     # invisible until one specific kind of link (signed, tracker-tagged) breaks

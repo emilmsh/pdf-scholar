@@ -107,6 +107,13 @@ export const MODELS: Record<
     // stays there too.
     { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', short: 'GPT-6.1 Sol', hint: 'ai.modelHintCapable' },
     { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    // GPT-6.1 Terra added 2026-11-02: between Sol and Luna ($1/$5 against
+    // $2/$10 and $0.10/$0.50, developers.openai.com/api/docs/models/
+    // gpt-6.1-terra), text+image in, text out, `reasoning.effort` none..max.
+    // Not dominated by either neighbour, so it earns the seat. Verified 9/9
+    // through the ChatGPT plan's Codex backend (the same Responses request
+    // shaping); the API account had no credit for a live run of its own.
+    { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', short: 'GPT-6.1 Terra', hint: 'ai.modelHintValue' },
     { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
   ],
   // The ChatGPT plan's Codex backend serves a narrower set than the API.
@@ -116,9 +123,16 @@ export const MODELS: Record<
   // Codex with a ChatGPT account.» gpt-5.5 answers too but is last
   // generation — out of the menu by the current-generation-only rule, and a
   // stored 5.5 selection stays pickable (the menu keeps stored ids).
+  // GPT-6.1 Sol and GPT-6.1 Terra added 2026-11-01, each 9/9 live against
+  // Emil's signed-in plan (one early report had Sol refused on a ChatGPT
+  // account right after launch, hence the live check before listing). Terra
+  // is not in the API list above: the API account had no credit to verify it.
+  // The default stays gpt-6-sol (Emil's call), so «Anbefalt» stays there too.
   chatgpt: [
     { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', short: 'GPT-6.1 Sol', hint: 'ai.modelHintCapable' },
     { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', short: 'GPT-6.1 Terra', hint: 'ai.modelHintValue' },
     { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
   ],
   azure: [],
@@ -158,8 +172,24 @@ export const MODELS: Record<
   // absent from that tier's listing), and Mistral Small 4 (`mistral-small-2603`)
   // goes blind to images while it reasons and called a red square «a blank
   // document» under the assistant's prompt even with reasoning off — 6/7 twice.
+  // Mistral Large 4 added 2026-11-02 (Public Preview since 2026-10-06, model
+  // card docs.mistral.ai/models/mistral-large-4-0.md: text+image in, reasoning
+  // and text out, $0.70/$2.10). The id the live /v1/models lists and that
+  // answered is `mistral-large-4` (`mistral-large-4-0` is listed too). 9/9 in
+  // test:live with Emil's key — the image read «Rød», which is exactly where
+  // Large 3 fell. No reasoning_effort is sent (undocumented for it; Large 3
+  // rejected the parameter with a 400), it reasons on its own before answering.
+  // Mistral Medium 3.5 (`mistral-medium-2604`) removed from the curated list
+  // 2026-11-02: docs.mistral.ai/models/mistral-medium-3-5-26-04 now carries
+  // «This model is deprecated. Use Mistral Large 4 for new integrations.»
+  // (deprecation date 10/31/2026 — already past — retirement 4/30/2027; the
+  // lifecycle page, docs.mistral.ai/inference/model-lifecycle, confirms a
+  // deprecated model keeps answering until retirement). Kept in the
+  // context-floor table further down, and in MISTRAL_REASONING_RE/
+  // MISTRAL_BLIND_WHEN_REASONING_RE, for a stored selection — same pattern as
+  // every other same-slot replacement in this file.
   mistral: [
-    { id: 'mistral-medium-2604', label: 'Mistral Medium 3.5', short: 'Mistral Medium', hint: 'ai.modelHintRecommended' },
+    { id: 'mistral-large-4', label: 'Mistral Large 4', short: 'Mistral Large 4', hint: 'ai.modelHintCapable' },
     { id: 'ministral-14b-2512', label: 'Ministral 3 14B', short: 'Ministral 14B', hint: 'ai.modelHintFast' }
   ],
   // Groq's PRODUCTION tier only (their own designation) — the Llama pair was
@@ -272,12 +302,17 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
   // (claude-opus-4-8, claude-haiku-4-5-20251001): «Claude Opus 4.8», never
   // «Claude Opus 4 8» — the fallback chip names models nobody curated
   if (/^claude-/i.test(id)) id = id.replace(/-\d{8}$/, '').replace(/-(\d+)-(\d+)$/, '-$1.$2')
-  return id
-    .replace(/^claude-/i, 'Claude ')
-    .replace(/^gpt-/i, 'GPT-')
-    .replace(/[-_]+/g, ' ')
-    .replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase())
-    .trim()
+  return (
+    id
+      .replace(/^claude-/i, 'Claude ')
+      .replace(/^gpt-/i, 'GPT-')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase())
+      // The curated names keep OpenAI's own dash («GPT-6.1 Sol»); a typed
+      // gpt-6.2-sol should read the same, not «GPT 6.2 Sol»
+      .replace(/^GPT (\d)/, 'GPT-$1')
+      .trim()
+  )
 }
 
 // Context-window floors (tokens): what decides when a document is too large
@@ -317,6 +352,8 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // selections.
   'gpt-6-astra': 900_000,
   'gpt-6.1-sol': 900_000,
+  // GPT-6.1 Terra 2026-11-02: same 1.05M total / 922K input / 128K output
+  'gpt-6.1-terra': 900_000,
   'gpt-6-sol': 900_000,
   'gpt-6-luna': 900_000,
   'gpt-5.6-sol': 900_000,
@@ -356,8 +393,15 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // corrected 2026-10-05; Ministral 3 14B read 2026-10-05): 256k each. The old
   // slug ids are NOT kept here — they never reached the API, so no stored
   // selection ever worked under them.
+  // mistral-medium-2604 kept here though no longer curated (deprecated
+  // 2026-11-02, see MODELS.mistral) — a stored selection from before the swap
+  // must not regress to the 32k provider floor
   'mistral-medium-2604': 256_000,
-  'ministral-14b-2512': 256_000
+  'ministral-14b-2512': 256_000,
+  // Mistral Large 4 (2026-11-02): the model card says 1M, OpenRouter's listing
+  // 524 288, and neither is /v1/models or a changelog — floored to 500K, the
+  // cheap direction (an early excerpt) rather than a mid-question refusal
+  'mistral-large-4': 500_000
 }
 
 const PROVIDER_CONTEXT_FLOOR: Record<AiProviderId, number> = {

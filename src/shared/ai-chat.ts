@@ -299,15 +299,15 @@ const CONTEXT_OVERFLOW_RE =
 // per provider phrasing; if a state is not worth a sentence of advice in the
 // UI, it is not worth a code.
 
-// The account has nothing to spend: OpenAI's insufficient_quota, Anthropic's
-// "credit balance is too low", xAI's "your team doesn't have any credits",
-// OpenRouter's 402. Checked BEFORE the rate limit, because two of these arrive
+// The account has nothing to spend: OpenAI's insufficient_quota (and, seen
+// 2026-11-01, "You have no credits remaining"), Anthropic's "credit balance is
+// too low", xAI's "your team doesn't have any credits", OpenRouter's 402. Checked BEFORE the rate limit, because two of these arrive
 // as a 429 and the advice is opposite — waiting fixes a rate limit and does
 // nothing at all for an empty account. Deliberately narrow: only phrasings that
 // mean "no money", never a plain "you exceeded your quota", which is a free
 // tier resetting tomorrow and belongs with the rate limits.
 const NO_CREDIT_RE =
-  /insufficient[_ ]quota|insufficient credits|credit balance (is )?too low|(does ?n[o']t|do not) have any credits|no credits (or|left)|requires more credits|HTTP 402/i
+  /insufficient[_ ]quota|insufficient credits|credit balance (is )?too low|(does ?n[o']t|do not) have any credits|no credits (or|left|remaining)|requires more credits|HTTP 402/i
 
 // The model itself is saturated, provider-side: Gemini 503 "currently
 // experiencing high demand", Anthropic 529 overloaded_error, a plain 503. The

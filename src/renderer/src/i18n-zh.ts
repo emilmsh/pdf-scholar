@@ -100,6 +100,11 @@ export const zh: Dict = {
   'aierr.ai-aborted': '已停止',
   'aierr.ai-disabled': 'AI 功能已在 AI 设置中关闭，因此未发送任何请求。',
   'aierr.ai-chatgpt-signed-out': '您尚未使用 ChatGPT 登录。请从 AI 设置登录。',
+  'aierr.ai-chatgpt-desktop-signed-out': '桌面版 PDF Scholar 尚未使用 ChatGPT 登录。请在应用的 AI 设置中登录，此处即可使用。',
+  'aierr.ai-chatgpt-host-missing': '在此电脑上找不到桌面版 PDF Scholar。请安装该应用（非 Microsoft Store 版本）并启动一次。',
+  'aierr.ai-chatgpt-host-outdated': '桌面应用与扩展的版本不一致。请同时更新两者。',
+  'aierr.ai-chatgpt-host-failed': '桌面版 PDF Scholar 已启动，但没有响应。',
+  'aierr.ai-chatgpt-host-denied': '浏览器未获准启动桌面版 PDF Scholar，因此无法借用其登录。',
   'aierr.ai-chatgpt-session-expired':
     'ChatGPT 登录已过期或已被撤销。请从 AI 设置重新登录。',
   'aierr.ai-subscription-limit':
@@ -876,6 +881,11 @@ export const zh: Dict = {
   'ai.chatgptHintTip':
     '与 Codex 和 opencode 使用的是同一种登录方式。OpenAI 目前允许，但没有相关协议，随时可能关闭。您发送的内容按 ChatGPT 的条款（而非 API 条款）处理，因此您 ChatGPT 账户的模型训练设置适用。',
   'ai.chatgptDesktopOnly': '仅限桌面应用。',
+  'ai.chatgptBorrow': '使用桌面应用的登录',
+  'ai.chatgptBorrowed': '已通过桌面应用以 {account} 登录',
+  'ai.chatgptDisconnect': '断开连接',
+  'ai.chatgptBorrowTip':
+    '借用此电脑上 PDF Scholar 的 ChatGPT 登录。应用必须已安装并已登录，但无需打开。浏览器会请求一次启动它的权限。',
   'ai.localTag': '本地',
   'ai.keySaved': '••••••••（已保存）',
   'ai.keyNew': '粘贴您的密钥',
@@ -888,14 +898,17 @@ export const zh: Dict = {
   'ai.compatModelHint': '例如 llama3.1 或 mistral-medium-latest',
   'ai.compatHint':
     '用于本地模型（Ollama 和 LM Studio 无需密钥——在列表中选择即可）以及任何其他 OpenAI 兼容端点。保存时会从端点获取模型列表。',
-  'ai.modelFilter': '筛选模型…',
-  'ai.modelFilterAll': '搜索所有模型…',
+  'ai.modelFilter': '筛选模型，或输入模型 ID…',
+  'ai.modelFilterAll': '搜索所有模型，或输入模型 ID…',
   'ai.modelCount': '{models} 个模型 · {vendors} 家供应商',
   'ai.modelCountShort': '{models} 个模型',
   'ai.notConfigured': '未设置',
   'ai.noModelsListed': '未列出模型',
   'ai.modelNoHits': '没有与搜索匹配的模型。',
   'ai.modelMoreHits': '还有 {n} 个匹配——继续输入以缩小范围。',
+  'ai.modelUseTyped': '使用“{id}”',
+  'ai.modelTypedDetail': '{provider}——未在此测试，回答可能不同',
+  'ai.modelTypedHint': '此模型不在精选列表中。ID 将按原样发送给 {provider}；服务商不认识的 ID 会返回错误。',
   'ai.ollamaDetected': 'Ollama 正在本机运行——点击填入地址',
   'ai.noVisionTip': '所选模型（{model}）无法读取图片',
   'ai.keyCapHint': '为密钥设置消费上限——同一页面会显示您的实际用量。本应用只统计令牌，价格只有服务商知道。',
