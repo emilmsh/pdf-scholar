@@ -156,38 +156,40 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.75.0
+## What's new in this version (≤ 1 500 chars) — v0.84.0
 
-*(The Store last carried v0.61.0's notes — v0.73.0 went into certification
-with this block — so it covers what landed between: the headline items, not
-every release.)*
+*(The Store last carried v0.73.0's notes — it went into certification
+2026-10-25 with the v0.75.0 block — so this covers what landed between
+v0.74 and v0.84: the headline items, not every release.)*
 
 **EN:**
 ```
-• Hovering a note or a comment shows the whole text: the card stays while the pointer is on it, fades at the edge where more follows, and scrolls
-• The comment bubble opens at the height of its text, wider for a long one; a double-click on the grip switches to all of it
-• Reading font: the fonts your computer has are offered as you type the name, and your own messages in the assistant are set in it too
-• Margin view: «m» toggles the comments in the margin, and so does a switch in the reading-mode menu, with the side choice folding out under it
-• Margin comments taller than their page overhang it instead of overlapping, and the next page's comments start under them
-• Reading font: name any font your computer has, and the assistant's answers, comments and notes are set in it – the menus keep the interface face, and nothing is written into the file
-• Margin export: comments taller than their page continue on the next page instead of printing over each other
-• Presentation mode fills the screen edge to edge, as in Acrobat
-• Journal PDFs that draw every line twice (JSTOR, the AEA journals) now search, select and copy as one text
-• Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere or written into the file
+• Paper tints of your own: a «+» under the tones in Tint and Night takes any colour off the wheel, held readable – pure red, black or white cannot make the page or the menus unreadable
+• A tab strip for many documents: it scrolls, searches, Ctrl+1–9, a hover card – and tab groups that fold away, dragged in and out at either end
+• Your notes and AI conversations in Claude Code, Claude Desktop and Codex (MCP): off by default, one switch per tool, documents and folders kept out, never a file path – and «Copy for AI» in the notes panel
+• The text box grows as you type, and answers come in the language you ask in
+• Hovering a note or a comment shows the whole text; the comment bubble opens at the height of its text
+• Reading font: name any font your computer has – answers, comments and notes are set in it, nothing is written into the file
+• Margin view: «m» toggles the comments in the margin; comments taller than their page overhang it on screen and continue on the next page in the export
+• Presentation mode fills the screen edge to edge
+• Journal PDFs that draw every line twice (JSTOR, the AEA journals) search, select and copy as one text
+• Scanned pages have text: read on your own computer, searchable, markable, askable – nothing is sent anywhere or written into the file
+• A model id you type in the model menu is offered as a choice before the curated list catches up
 ```
 
 **NO:**
 ```
-• Hold pekeren over et notat eller en kommentar, og hele teksten vises: kortet blir stående så lenge pekeren er på det, tones ut i kanten der mer følger, og ruller
-• Kommentarboblen åpnes i tekstens høyde, bredere for en lang; et dobbeltklikk på gripet veksler til hele teksten
-• Leseskrift: skriftene maskinen har, foreslås etter hvert som du skriver navnet, og dine egne meldinger i assistenten settes også i den
-• Margvisning: «m» slår kommentarene i margen av og på, og det samme gjør en bryter i lesemodusmenyen, med sidevalget foldet ut under
-• Margkommentarer som er høyere enn siden henger ut over kanten i stedet for å overlappe, og neste sides kommentarer begynner under dem
-• Leseskrift: nevn en skrift maskinen har, og assistentens svar, kommentarer og notater settes i den – menyene beholder grensesnittets skrift, og ingenting skrives inn i filen
-• Margeksport: kommentarer som er høyere enn siden fortsetter på neste side i stedet for å skrives over hverandre
-• Presentasjonsmodus fyller skjermen kant til kant, som i Acrobat
-• Tidsskrift-PDF-er som tegner hver linje dobbelt (JSTOR, AEA-tidsskriftene) søkes, merkes og kopieres nå som én tekst
-• Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted eller skrives inn i filen
+• Egne papirtoner: en «+» under tonene i Farge og Natt tar enhver farge fra hjulet, holdt lesbar – rent rødt, svart eller hvitt kan ikke gjøre siden eller menyene uleselige
+• Fanelinje for mange dokumenter: den ruller, søker, Ctrl+1–9, et svevekort – og fanegrupper som foldes bort, dratt inn og ut i begge ender
+• Notatene og KI-samtalene dine i Claude Code, Claude Desktop og Codex (MCP): av som standard, én bryter per verktøy, dokumenter og mapper som holdes utenfor, aldri en filsti – og «Kopier for KI» i merknadspanelet
+• Tekstboksen vokser mens du skriver, og svarene kommer på språket du spør på
+• Hold pekeren over et notat eller en kommentar, og hele teksten vises; kommentarboblen åpnes i tekstens høyde
+• Leseskrift: nevn en skrift maskinen har – svar, kommentarer og notater settes i den, ingenting skrives inn i filen
+• Margvisning: «m» slår kommentarene i margen av og på; kommentarer høyere enn siden henger ut over kanten på skjermen og fortsetter på neste side i eksporten
+• Presentasjonsmodus fyller skjermen kant til kant
+• Tidsskrift-PDF-er som tegner hver linje dobbelt (JSTOR, AEA-tidsskriftene) søkes, merkes og kopieres som én tekst
+• Skannede sider har tekst: lest på din egen maskin, søkbar, merkbar, spørbar – ingenting sendes noe sted eller skrives inn i filen
+• En modell-id du skriver i modellmenyen tilbys som valg før den kuraterte lista rekker å ta den inn
 ```
 
 ---
