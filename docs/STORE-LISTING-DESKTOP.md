@@ -156,38 +156,41 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.75.0
+## What's new in this version (≤ 1 500 chars) — v0.83.0
 
-*(The Store last carried v0.61.0's notes — v0.73.0 went into certification
-with this block — so it covers what landed between: the headline items, not
-every release.)*
+*(The Store last carried v0.73.0's notes, so this covers v0.74.0–v0.83.0:
+the headline items, not every release. MCP for outside AI tools is left out
+on purpose — the Store build cannot connect, PLATFORMS §33 — and «Copy for
+AI», which works everywhere, stands in for it.)*
 
 **EN:**
 ```
-• Hovering a note or a comment shows the whole text: the card stays while the pointer is on it, fades at the edge where more follows, and scrolls
-• The comment bubble opens at the height of its text, wider for a long one; a double-click on the grip switches to all of it
-• Reading font: the fonts your computer has are offered as you type the name, and your own messages in the assistant are set in it too
-• Margin view: «m» toggles the comments in the margin, and so does a switch in the reading-mode menu, with the side choice folding out under it
-• Margin comments taller than their page overhang it instead of overlapping, and the next page's comments start under them
-• Reading font: name any font your computer has, and the assistant's answers, comments and notes are set in it – the menus keep the interface face, and nothing is written into the file
-• Margin export: comments taller than their page continue on the next page instead of printing over each other
-• Presentation mode fills the screen edge to edge, as in Acrobat
-• Journal PDFs that draw every line twice (JSTOR, the AEA journals) now search, select and copy as one text
-• Scanned pages have text: a page that is only a picture is read on your own computer, and its words can be searched, selected, marked and asked about. Nothing is sent anywhere or written into the file
+• The assistant answers in the language you write in, whatever language the document or the interface is in
+• Many documents open: the tab strip scrolls instead of squeezing, «All open tabs» searches them, and Ctrl+1–9 jumps between them
+• Tab groups: put tabs in a group from the right-click menu and fold it out of the strip while you work on something else
+• Text boxes start where you click, grow as you type, and can be moved by their grip while you write
+• «Copy for AI» in the Annotations tab puts a paper's notes and assistant conversations on the clipboard, for use in another AI tool
+• Hovering a note or a comment shows the whole text, and the comment bubble opens at the height of its text
+• Margin view: «m» shows the comments in the margin; comments taller than their page run over its edge instead of overlapping
+• Reading font: choose any font your computer has for answers, comments and notes – nothing is written into the file
+• Link preview: a footnote is found by its marker even where the link points elsewhere on the page
+• Model menu: type a model's id to use one that is newer than the list
+• A middle click closes a tab
 ```
 
 **NO:**
 ```
-• Hold pekeren over et notat eller en kommentar, og hele teksten vises: kortet blir stående så lenge pekeren er på det, tones ut i kanten der mer følger, og ruller
-• Kommentarboblen åpnes i tekstens høyde, bredere for en lang; et dobbeltklikk på gripet veksler til hele teksten
-• Leseskrift: skriftene maskinen har, foreslås etter hvert som du skriver navnet, og dine egne meldinger i assistenten settes også i den
-• Margvisning: «m» slår kommentarene i margen av og på, og det samme gjør en bryter i lesemodusmenyen, med sidevalget foldet ut under
-• Margkommentarer som er høyere enn siden henger ut over kanten i stedet for å overlappe, og neste sides kommentarer begynner under dem
-• Leseskrift: nevn en skrift maskinen har, og assistentens svar, kommentarer og notater settes i den – menyene beholder grensesnittets skrift, og ingenting skrives inn i filen
-• Margeksport: kommentarer som er høyere enn siden fortsetter på neste side i stedet for å skrives over hverandre
-• Presentasjonsmodus fyller skjermen kant til kant, som i Acrobat
-• Tidsskrift-PDF-er som tegner hver linje dobbelt (JSTOR, AEA-tidsskriftene) søkes, merkes og kopieres nå som én tekst
-• Skannede sider har tekst: en side som bare er et bilde, leses på din egen maskin, og ordene kan søkes i, merkes og spørres om. Ingenting sendes noe sted eller skrives inn i filen
+• Assistenten svarer på språket du skriver på, uansett hvilket språk dokumentet eller grensesnittet har
+• Mange dokumenter åpne: fanelisten ruller i stedet for å klemmes, «Alle åpne faner» søker i dem, og Ctrl+1–9 hopper mellom dem
+• Fanegrupper: legg faner i en gruppe fra høyreklikkmenyen, og fold den ut av listen mens du jobber med noe annet
+• Tekstbokser begynner der du klikker, vokser mens du skriver, og kan flyttes i gripet underveis
+• «Kopier for KI» i Merknader-fanen legger notatene og assistentsamtalene til et dokument på utklippstavlen, til bruk i et annet KI-verktøy
+• Hold pekeren over et notat eller en kommentar, og hele teksten vises; kommentarboblen åpnes i tekstens høyde
+• Margvisning: «m» viser kommentarene i margen; kommentarer som er høyere enn siden, henger ut over kanten i stedet for å overlappe
+• Leseskrift: velg hvilken som helst skrift maskinen har, til svar, kommentarer og notater – ingenting skrives inn i filen
+• Lenkeforhåndsvisning: en fotnote finnes på merket sitt også der lenken peker et annet sted på siden
+• Modellmenyen: skriv inn ID-en til en modell for å bruke en som er nyere enn listen
+• Et klikk med midtknappen lukker en fane
 ```
 
 ---
