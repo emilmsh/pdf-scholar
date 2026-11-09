@@ -137,9 +137,11 @@ carries no picture of its own.)*
   before; an own picture is any square image of 16 px or more *(Emil,
   2026-10-09)*
 - Four reading modes — Day, «Farge» (a light paper tone: the classic Sepia
-  cream plus gray, green, blue and sand), Night and Night+ (higher contrast) —
+  cream plus gray, green, blue, sand or a tint of the reader's own), Night and
+  Night+ (higher contrast) —
   plus Auto, which follows the system setting. Night has its own dark tones
-  (the standard near-black, gray, blue, green) — and «Hvitt», which leaves the
+  (the standard near-black, gray, blue, green, or a tint of the reader's own,
+  held dark enough to read) — and «Hvitt», which leaves the
   document as printed: a white page inside the dark chrome, the way Edge's
   dark mode shows a PDF *(reader ask, 2026-10-04 — a PhD student who keeps
   every app dark and every document white)*. The tinted modes take a strength slider — tint

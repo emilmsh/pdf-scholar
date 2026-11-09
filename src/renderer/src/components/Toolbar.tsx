@@ -2,9 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type {
   CitedItem,
   CustomTone,
+  CustomToneChoice,
   DoiInfo,
   FileError,
   NightTone,
+  NightToneChoice,
   LanguagePreference,
   Settings,
   ThemeName,
@@ -53,6 +55,8 @@ import {
   CUSTOM_TONE_ORDER,
   customToneCss,
   isPageInverted,
+  lightTint,
+  nightTint,
   NIGHT_TONE_ORDER,
   NIGHT_TONES,
   TUNE_RANGE
@@ -76,8 +80,9 @@ import {
   UNDERLINE_COLORS
 } from '../annotations'
 import type { DrawToolType, MarkupToolType, ShapeToolType } from '../annotations'
-import { renderSwatches, useCustomColors, withCustomColors } from './ColorSwatches'
+import { CustomSwatch, renderSwatches, useCustomColors, withCustomColors } from './ColorSwatches'
 import { CustomColorPicker } from './SelectionMenu'
+import { cleanCustomColors, forgetColor, rememberColor } from '../../../shared/custom-colors'
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
@@ -2468,8 +2473,50 @@ export default function Toolbar({
                       ? settings.autoLight
                       : null
                 const showNightTones = settings.theme === 'night' || (inAuto && settings.autoDark === 'night')
-                const activeLightTone: CustomTone | null =
+                const activeLightTone: CustomToneChoice | null =
                   lightPick === 'sepia' ? 'sepia' : lightPick === 'custom' ? settings.customTone : null
+
+                /** The picked tints of one tone row and the «+» that adds
+                 *  one. A tint is chosen as it is picked; forgetting the tint
+                 *  in use goes back to that row's default tone. */
+                const tintsRow = (
+                  stored: string[],
+                  active: string | null,
+                  chipClass: string,
+                  choose: (tint: string, tints: string[]) => void,
+                  toTint: (hex: string) => string,
+                  forget: (tints: string[], wasActive: boolean) => void
+                ): React.JSX.Element => {
+                  const tints = cleanCustomColors(stored)
+                  return (
+                    <div className="theme-auto-row tone-tints">
+                      <span className="theme-auto-label">{t('tb.customTints')}</span>
+                      <div className="theme-auto-choices">
+                        {tints.map((tint) => (
+                          <CustomSwatch
+                            key={tint}
+                            hex={tint}
+                            onForget={(hex) => forget(forgetColor(tints, hex), hex === active)}
+                          >
+                            <button
+                              className={`tone-chip tone-chip-tint${chipClass}${active === tint ? ' selected' : ''}`}
+                              style={{ background: tint }}
+                              title={tint.toUpperCase()}
+                              aria-label={tint.toUpperCase()}
+                              onClick={() => choose(tint, tints)}
+                            />
+                          </CustomSwatch>
+                        ))}
+                        <CustomColorPicker
+                          onPick={(hex) => {
+                            const tint = toTint(hex)
+                            choose(tint, rememberColor(tints, tint))
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )
+                }
 
                 /** One strength slider. Live preview only while the axis is the
                  *  theme on screen; otherwise it just commits. */
@@ -2546,6 +2593,20 @@ export default function Toolbar({
                             ))}
                           </div>
                         </div>
+                        {tintsRow(
+                          settings.customTints,
+                          activeLightTone,
+                          '',
+                          (tint, customTints) =>
+                            onSettingsChange({
+                              ...(inAuto ? { autoLight: 'custom' } : { theme: 'custom' }),
+                              customTone: tint as CustomToneChoice,
+                              customTints
+                            }),
+                          lightTint,
+                          (customTints, wasActive) =>
+                            onSettingsChange({ customTints, ...(wasActive ? { customTone: 'sepia' } : {}) })
+                        )}
                       </div>
                     )}
                     {lightPick && slider(lightPick === 'sepia' ? 'sepia' : 'custom')}
@@ -2575,6 +2636,16 @@ export default function Toolbar({
                             })}
                           </div>
                         </div>
+                        {tintsRow(
+                          settings.nightTints,
+                          settings.nightTone,
+                          ' tone-chip-dark',
+                          (tint, nightTints) =>
+                            onSettingsChange({ nightTone: tint as NightToneChoice, nightTints }),
+                          nightTint,
+                          (nightTints, wasActive) =>
+                            onSettingsChange({ nightTints, ...(wasActive ? { nightTone: 'warm' } : {}) })
+                        )}
                       </div>
                     )}
                     {/* No brightness slider for «Hvitt»: nothing is inverted,

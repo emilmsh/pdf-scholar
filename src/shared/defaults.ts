@@ -21,7 +21,9 @@ export const DEFAULT_SETTINGS: Settings = {
   // untouched default costs nothing and renders bit-identically to before.
   themeTune: { sepia: 1, night: 1, custom: 1 },
   customTone: 'sepia',
+  customTints: [],
   nightTone: 'warm',
+  nightTints: [],
   nightKeepImages: false,
   selectionMenuTrigger: 'auto',
   selectionMenuCompact: false,

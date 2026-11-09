@@ -30,7 +30,16 @@ export function withCustomColors(palette: HighlightColor[], customs: HighlightCo
  *  reports as contextmenu (the right-click the issue asked for). The three
  *  slots were a one-way queue before; the only way out of a wrong pick was
  *  «Tilbakestill innstillinger». */
-export function CustomSwatch({ hex, children }: { hex: string; children: React.ReactNode }): React.JSX.Element {
+export function CustomSwatch({
+  hex,
+  onForget = removeCustomColor,
+  children
+}: {
+  hex: string
+  /** What forgetting does — the markup colours' list by default */
+  onForget?(hex: string): void
+  children: React.ReactNode
+}): React.JSX.Element {
   const [armed, setArmed] = useState(false)
   return (
     <span
@@ -48,7 +57,7 @@ export function CustomSwatch({ hex, children }: { hex: string; children: React.R
         aria-label={t('menu.forgetColor')}
         onClick={(e) => {
           e.stopPropagation()
-          removeCustomColor(hex)
+          onForget(hex)
         }}
       >
         ×

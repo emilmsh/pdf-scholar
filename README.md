@@ -147,7 +147,7 @@ Night and Night+ are the two dark modes, the second with higher contrast.
   logo, or your own .ico or square .png. In the extension the same menu sets the icon on
   the browser tab
 - Four reading modes — Day, Tint, Night and Night+ — plus Auto, which follows the
-  system setting. Tint is a light paper tone: Sepia cream, gray, green, blue or sand.
+  system setting. Tint is a light paper tone: Sepia cream, gray, green, blue, sand or a colour of your own.
   Night has its own dark tones, or «White»: the page as printed, inside the dark chrome.
   Both take a strength slider (tint strength, or brightness for Night; 100 % is the
   standard look), and the toolbar and panels follow the tone. D cycles the modes

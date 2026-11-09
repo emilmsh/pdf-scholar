@@ -9,9 +9,19 @@
 // The tone model (Emil, 2026-09-02): Sepia is not a separate theme button, it
 // is one of the LIGHT paper tones under «Farge» (theme id 'custom', kept for
 // stored settings); night mode has its own set of DARK tones with the shipped
-// warm near-black as the default. Both pickers are curated presets, never free
-// colour input — readability is guaranteed by curation plus the clamps below.
-import type { CustomTone, NightTone, ThemeName, ThemeTune } from '../../shared/types'
+// warm near-black as the default. Beside the curated presets a reader can pick
+// a tint of their own; readability then rests on the clamps below alone, which
+// is why a picked tint is pulled in BEFORE anything is derived from it.
+import { normalizeHex } from '../../shared/custom-colors'
+import type {
+  CustomTone,
+  CustomToneChoice,
+  NightTone,
+  NightToneChoice,
+  ThemeName,
+  ThemeTune,
+  ToneHex
+} from '../../shared/types'
 
 /** Slider bounds per tunable theme. The light tones dial the paper's distance
  *  from white (0 = plain white, 2 = double tone depth); night dials page
@@ -60,9 +70,9 @@ export const NIGHT_TONES: Record<NightTone, { bg: readonly [number, number, numb
  *  calibration note) becomes under the screen blend with a tone — the colour
  *  the reader actually sees as paper. The chrome derives from THIS, not from
  *  the tone itself, so UI and page land in the same family by construction. */
-export function nightPaper(tone: NightTone): [number, number, number] {
+export function nightPaper(tone: NightToneChoice): [number, number, number] {
   if (safeNightTone(tone) === 'paper') return [255, 255, 255]
-  const [r, g, b] = NIGHT_TONES[safeNightTone(tone)].bg
+  const [r, g, b] = nightToneRgb(tone)
   const base = 28 / 255
   const screen = (c: number): number => channel(255 * (1 - (1 - base) * (1 - c / 255)))
   return [screen(r), screen(g), screen(b)]
@@ -74,7 +84,7 @@ export const NIGHT_TONE_ORDER: readonly NightTone[] = ['warm', 'gray', 'blue', '
  *  «Behold bildefarger» and the brightness slider act on. Night+ always
  *  inverts; night inverts for every tone but 'paper', which leaves the
  *  document as printed. Day and the light tones never invert. */
-export function isPageInverted(theme: ThemeName, nightTone: NightTone): boolean {
+export function isPageInverted(theme: ThemeName, nightTone: NightToneChoice): boolean {
   if (theme === 'nightHc') return true
   return theme === 'night' && safeNightTone(nightTone) !== 'paper'
 }
@@ -86,8 +96,15 @@ function clampTune(v: unknown, min: number, max: number): number {
   return Math.min(max, Math.max(min, n))
 }
 
-const safeCustomTone = (tone: CustomTone): CustomTone => (tone in CUSTOM_TONES ? tone : 'sepia')
-const safeNightTone = (tone: NightTone): NightTone => (tone in NIGHT_TONES ? tone : 'warm')
+/** A picked tint as stored, or null for a curated name or anything else */
+function tintHex(tone: unknown): ToneHex | null {
+  return typeof tone === 'string' && tone.startsWith('#') ? (normalizeHex(tone) as ToneHex | null) : null
+}
+
+const safeCustomTone = (tone: CustomToneChoice): CustomToneChoice =>
+  (tintHex(tone) ?? (tone in CUSTOM_TONES ? tone : 'sepia'))
+const safeNightTone = (tone: NightToneChoice): NightToneChoice =>
+  (tintHex(tone) ?? (tone in NIGHT_TONES ? tone : 'warm'))
 
 /** CSS numbers without float noise: 0.04 stays "0.04", never "0.040". */
 const num = (v: number): string => String(Math.round(v * 1000) / 1000)
@@ -135,7 +152,7 @@ export function sepiaTuneCss(t: number): PageTuneCss {
  *  and the app.css comment documents how fragile the contrast/brightness pair
  *  is. Only that pair moves, and the canvas tone under the pages moves with
  *  the brightness so the paper never floats on a mismatched ground. */
-export function nightTuneCss(t: number, tone: NightTone = 'warm'): PageTuneCss {
+export function nightTuneCss(t: number, tone: NightToneChoice = 'warm'): PageTuneCss {
   // 'paper' ignores the strength entirely: there is no inversion to dial. No
   // blend either — the night block sets none, so the root's 'normal' applies
   // and the canvas paints its own white.
@@ -143,7 +160,7 @@ export function nightTuneCss(t: number, tone: NightTone = 'warm'): PageTuneCss {
   const brightness = 1.08 + 0.3 * (t - 1)
   const contrast = 1.02 + 0.1 * (t - 1)
   const k = brightness / 1.08
-  const [r, g, b] = NIGHT_TONES[safeNightTone(tone)].bg
+  const [r, g, b] = nightToneRgb(tone)
   const css: PageTuneCss = {
     filter: `invert(0.89) hue-rotate(180deg) contrast(${num(contrast)}) brightness(${num(brightness)})`,
     // the tone scaled with the brightness so page and filter agree
@@ -160,36 +177,122 @@ export function nightTuneCss(t: number, tone: NightTone = 'warm'): PageTuneCss {
  *  here instead of crossing it. */
 const CUSTOM_LUMINANCE_FLOOR = 0.75
 
-/** Light tone at strength t: each channel's distance from white scales by t,
- *  clamped so the result never drops under the luminance floor (the guardrail
- *  that makes a curated-preset picker safe without any runtime contrast UI).
- *  The sepia tone routes through sepiaTuneCss so «Farge → Sepia» is pixel-
- *  identical to the old standalone Sepia theme, warm filter tie included. */
-export function customToneCss(tone: CustomTone, t: number): PageTuneCss {
-  if (safeCustomTone(tone) === 'sepia') return sepiaTuneCss(t)
-  const [r, g, b] = CUSTOM_TONES[safeCustomTone(tone)].bg
-  // Rounded to the 0–255 channels that actually ship in the hex string, so the
-  // luminance floor is judged on the REAL colour — a clamp measured on float
-  // channels can land a rounding hair below the floor after quantisation.
+/** The luminance ceiling for a picked night tint: past it the screen blend
+ *  lifts the paper too far for light text to hold 7:1 (the curated tones sit
+ *  well under it). */
+const NIGHT_LUMINANCE_CEILING = 0.025
+
+/** The largest s in 0…hi that `fits`, which holds at 0 and stops holding once
+ *  for good as s grows. A short bisection is exact enough. */
+function largestFit(hi: number, fits: (s: number) => boolean): number {
+  if (fits(hi)) return hi
+  let lo = 0
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2
+    if (fits(mid)) lo = mid
+    else hi = mid
+  }
+  return lo
+}
+
+/** A light colour's channels at strength t, pulled toward white until it is
+ *  over the floor. Rounded to the 0–255 channels that actually ship in the hex
+ *  string, so the floor is judged on the REAL colour — a clamp measured on
+ *  float channels can land a rounding hair below it after quantisation. */
+function lightAt([r, g, b]: readonly [number, number, number], t: number): [number, number, number] {
   const at = (s: number): [number, number, number] => [
     channel(255 - (255 - r) * s),
     channel(255 - (255 - g) * s),
     channel(255 - (255 - b) * s)
   ]
-  let s = t
-  // Luminance falls monotonically with s, so a short bisection is exact enough
-  if (relativeLuminance(...at(s)) < CUSTOM_LUMINANCE_FLOOR) {
-    let lo = 0
-    let hi = s
-    for (let i = 0; i < 24; i++) {
-      const mid = (lo + hi) / 2
-      if (relativeLuminance(...at(mid)) >= CUSTOM_LUMINANCE_FLOOR) lo = mid
-      else hi = mid
-    }
-    s = lo
+  // Luminance falls monotonically with s
+  return at(largestFit(t, (s) => relativeLuminance(...at(s)) >= CUSTOM_LUMINANCE_FLOOR))
+}
+
+function hexChannels(value: string): [number, number, number] {
+  const n = parseInt(value.slice(1), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+/** A light tone's colour at strength 1: a picked tint as it can actually be
+ *  shown, so the chrome and the ink derive from the paper on screen */
+function lightToneRgb(tone: CustomToneChoice): readonly [number, number, number] {
+  const safe = safeCustomTone(tone)
+  return tintHex(safe) ? lightAt(hexChannels(safe), 1) : CUSTOM_TONES[safe as CustomTone].bg
+}
+
+/** HSL saturation of 0–255 channels: how far a colour is from the grey of its
+ *  own lightness, 0 for grey, 1 for a pure hue at any lightness. The measure
+ *  for the night cap because it is what survives the luminance scaling (every
+ *  channel scaled by one factor keeps it) — so the cap and the ceiling cannot
+ *  fight each other. */
+function hslSaturation([r, g, b]: readonly [number, number, number]): number {
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  if (max === min) return 0
+  const sum = max + min
+  return (max - min) / (sum <= 255 ? sum : 510 - sum)
+}
+
+/** The most saturated curated night tone sets the cap for a picked one: the
+ *  chrome is derived a step above the paper with the paper's saturation
+ *  intact, so a pure hue off the wheel — darkened under the ceiling to a page
+ *  that is nearly black — still framed the page in a blood-red toolbar (seen
+ *  2026-11-09 with #ff0000). Pulled toward its own grey to the blue tone's
+ *  saturation it gives the muted family the curated tones have. */
+const NIGHT_SATURATION_CAP = Math.max(
+  ...(['gray', 'blue', 'green'] as const).map((t) => hslSaturation(NIGHT_TONES[t].bg))
+)
+
+/** A night tone's colour: a picked tint pulled toward its own grey to the cap
+ *  and scaled down under the ceiling, in that order (the scaling keeps the
+ *  saturation, so both bounds hold on the result and the result is a fixed
+ *  point — a stored tint comes back unchanged) */
+function nightToneRgb(tone: NightToneChoice): readonly [number, number, number] {
+  const safe = safeNightTone(tone)
+  if (!tintHex(safe)) return NIGHT_TONES[safe as NightTone].bg
+  let [r, g, b] = hexChannels(safe)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const sat = hslSaturation([r, g, b])
+  // Judged in channel units with two of slack: a tint stored at the cap is
+  // rounded to 0–255, which can put its spread a unit or two over the exact
+  // cap, and on a dark colour (a spread over a sum of 60) that reads as 3 %
+  // — enough for a second pass to move it again. Two units cover the
+  // rounding of both the spread and the sum.
+  const spread = max - min
+  const capSpread = NIGHT_SATURATION_CAP * (sat === 0 ? 0 : spread / sat)
+  if (spread > capSpread + 2) {
+    const grey = (max + min) / 2
+    const k = capSpread / spread
+    ;[r, g, b] = [grey + (r - grey) * k, grey + (g - grey) * k, grey + (b - grey) * k]
   }
+  const at = (s: number): [number, number, number] => [channel(r * s), channel(g * s), channel(b * s)]
+  return at(largestFit(1, (s) => relativeLuminance(...at(s)) <= NIGHT_LUMINANCE_CEILING))
+}
+
+/** A colour off the wheel as the tint it becomes — what the row remembers, so
+ *  its chip shows the paper the reader will get and two picks that land on one
+ *  paper are one chip. */
+export function lightTint(hexValue: string): ToneHex {
+  const [r, g, b] = lightToneRgb(hexValue as ToneHex)
+  return hex(r, g, b) as ToneHex
+}
+
+export function nightTint(hexValue: string): ToneHex {
+  const [r, g, b] = nightToneRgb(hexValue as ToneHex)
+  return hex(r, g, b) as ToneHex
+}
+
+/** Light tone at strength t: each channel's distance from white scales by t,
+ *  clamped so the result never drops under the luminance floor (the guardrail
+ *  that makes a curated-preset picker safe without any runtime contrast UI).
+ *  The sepia tone routes through sepiaTuneCss so «Farge → Sepia» is pixel-
+ *  identical to the old standalone Sepia theme, warm filter tie included. */
+export function customToneCss(tone: CustomToneChoice, t: number): PageTuneCss {
+  if (safeCustomTone(tone) === 'sepia') return sepiaTuneCss(t)
   // The multiply blend does the tinting; no filter needed on top
-  return { filter: 'none', bg: hex(...at(s)) }
+  return { filter: 'none', bg: hex(...lightAt(lightToneRgb(tone), t)) }
 }
 
 /** The chrome variables a tone tints along with the paper (Emil, 2026-09-02:
@@ -203,7 +306,7 @@ export type ChromeCss = Record<string, string>
  *  again, titlebar darkest of the light surfaces, elevated pulled toward
  *  white, ink the tone scaled deep. Intensity deliberately does NOT move the
  *  chrome — sepia's never did; the slider is about the paper. */
-export function customChromeCss(tone: CustomTone): ChromeCss {
+export function customChromeCss(tone: CustomToneChoice): ChromeCss {
   if (safeCustomTone(tone) === 'sepia') {
     // Verbatim from :root[data-theme='sepia'] in app.css — keep in step.
     return {
@@ -218,7 +321,7 @@ export function customChromeCss(tone: CustomTone): ChromeCss {
       '--active': 'rgba(61, 57, 41, 0.11)'
     }
   }
-  const [r, g, b] = CUSTOM_TONES[safeCustomTone(tone)].bg
+  const [r, g, b] = lightToneRgb(tone)
   const scale = (k: number): string => hex(r * k, g * k, b * k)
   const towardWhite = (k: number): string =>
     hex(r + (255 - r) * k, g + (255 - g) * k, b + (255 - b) * k)
@@ -246,7 +349,7 @@ export function customChromeCss(tone: CustomTone): ChromeCss {
  *  chrome a step above the paper, canvas below it, elevated another step up,
  *  titlebar = the paper, text pulled almost to white through the tone (the
  *  warm block's #eeece2 is exactly that shape). */
-export function nightChromeCss(tone: NightTone): ChromeCss | null {
+export function nightChromeCss(tone: NightToneChoice): ChromeCss | null {
   // 'paper' keeps the shipped dark chrome too: the point of the tone is a
   // white page in the night UI, not a white UI
   if (safeNightTone(tone) === 'warm' || safeNightTone(tone) === 'paper') return null
@@ -274,8 +377,8 @@ export function nightChromeCss(tone: NightTone): ChromeCss | null {
  *  three host apps — they call this AFTER their static lookup). */
 export function tuneTitleBar(
   theme: ThemeName,
-  customTone: CustomTone,
-  nightTone: NightTone
+  customTone: CustomToneChoice,
+  nightTone: NightToneChoice
 ): [string, string] | null {
   const chrome =
     theme === 'custom'
@@ -312,8 +415,8 @@ const TUNE_VARS = [
 export function applyPageTune(
   theme: ThemeName,
   tune: ThemeTune,
-  customTone: CustomTone,
-  nightTone: NightTone
+  customTone: CustomToneChoice,
+  nightTone: NightToneChoice
 ): void {
   const style = document.documentElement.style
   for (const v of TUNE_VARS) style.removeProperty(v)
@@ -341,8 +444,8 @@ export function applyPageTune(
 export function pageTuneCss(
   theme: ThemeName,
   tune: ThemeTune,
-  customTone: CustomTone,
-  nightTone: NightTone
+  customTone: CustomToneChoice,
+  nightTone: NightToneChoice
 ): PageTuneCss | null {
   switch (theme) {
     case 'sepia': {

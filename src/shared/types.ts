@@ -12,20 +12,26 @@ export type ThemeName = 'day' | 'sepia' | 'night' | 'nightHc' | 'custom'
 /** User's theme choice — 'auto' follows the OS light/dark setting */
 export type ThemePreference = ThemeName | 'auto'
 
-/** Paper tone of the 'custom' («Farge») theme — a curated set, not a free
- *  colour picker, so every choice is readable by construction (the actual
- *  colours and the readability clamp live in the renderer's theme-tune.ts).
+/** A curated paper tone of the 'custom' («Farge») theme (the actual colours
+ *  and the readability clamp live in the renderer's theme-tune.ts).
  *  'sepia' is the classic cream and the default: the old standalone Sepia
  *  button folded into this picker (Emil, 2026-09-02) — the ThemeName 'sepia'
  *  still exists for stored settings and the auto-mode light choice. */
 export type CustomTone = 'sepia' | 'gray' | 'green' | 'blue' | 'sand'
 
+/** A tint the reader picked, `#rrggbb` — theme-tune.ts holds it to the same
+ *  readability bounds as the curated tones, whatever the file says */
+export type ToneHex = `#${string}`
+/** What the 'custom' theme's paper is: a curated tone or a picked tint */
+export type CustomToneChoice = CustomTone | ToneHex
+
 /** Dark paper tone of the night theme — 'warm' is the shipped near-black,
- *  the others tint the inverted page (curated in theme-tune.ts, same
- *  no-free-colour-input rule as CustomTone). 'paper' is the odd one out: the
+ *  the others tint the inverted page (curated in theme-tune.ts). 'paper' is the odd one out: the
  *  page is NOT inverted at all — white paper as printed under the dark chrome,
  *  the way Edge's dark mode shows a PDF (reader ask, 2026-10-04). */
 export type NightTone = 'warm' | 'gray' | 'blue' | 'green' | 'paper'
+/** What night mode's paper is: a curated tone or a picked tint */
+export type NightToneChoice = NightTone | ToneHex
 
 /** Per-theme intensity relative to the shipped look, 1 = exactly as shipped.
  *  Only the themes with an axis worth dialling are here: sepia (paper warmth),
@@ -49,9 +55,13 @@ export interface Settings {
   /** Intensity per tunable theme, 1 = the shipped look (see ThemeTune) */
   themeTune: ThemeTune
   /** Paper tone the 'custom' («Farge») theme uses */
-  customTone: CustomTone
+  customTone: CustomToneChoice
+  /** Remembered tints for the light tone row, newest first */
+  customTints: string[]
   /** Dark paper tone of the night theme ('warm' = the shipped look) */
-  nightTone: NightTone
+  nightTone: NightToneChoice
+  /** Remembered tints for the night tone row, newest first */
+  nightTints: string[]
   /** Night/Night+: keep raster images in their original colours (an unfiltered
    *  overlay over the picture regions) instead of inverting them with the page */
   nightKeepImages: boolean

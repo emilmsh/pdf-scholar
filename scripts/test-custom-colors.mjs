@@ -94,6 +94,11 @@ eq(C.forgetColor(['#111111'], 'garbage'), ['#111111'], 'an invalid hex forgets n
   eq(C.parseCustomColors(JSON.stringify(C.forgetColor(back, '#112233'))), ['#aa3366'], 'and a forgotten one stays forgotten')
 }
 
+// The stored form the settings file holds (a list, not JSON text): the paper tints
+eq(C.cleanCustomColors(['#AA3366', 'junk', '#aa3366', 7]), ['#aa3366'], 'a stored list is cleaned')
+eq(C.cleanCustomColors('#aa3366'), [], 'a non-list is empty')
+eq(C.cleanCustomColors(undefined), [], 'a missing list is empty')
+
 if (failures) {
   console.error(`\ntest:custom-colors — ${failures} failure(s)`)
   process.exit(1)
