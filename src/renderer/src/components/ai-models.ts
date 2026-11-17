@@ -73,10 +73,13 @@ export const MODELS: Record<
   { id: string; label: string; short: string; hint?: MsgKey }[]
 > = {
   anthropic: [
-    // Fable 5.1 replaced Fable 5 in the same slot 2026-09-05 (launched
-    // 2026-09-01; Fable 5 moved to Anthropic's "Legacy models" list, still
-    // served — a stored Fable 5 selection stays pickable)
-    { id: 'claude-fable-5-1', label: 'Claude Fable 5.1', short: 'Fable 5.1', hint: 'ai.modelHintHeaviest' },
+    // Fable 5.2 replaced Fable 5.1 in the same slot 2026-11-09 (launched
+    // 2026-11-09; Fable 5.1 moved to Anthropic's "Legacy models" list, still
+    // served — a stored Fable 5.1 selection stays pickable). Cheaper than 5.1
+    // ($8/$40 vs $10/$50), same 1M context, same always-on adaptive thinking
+    // and default effort `high` — the family regexes match on the bare
+    // "fable" substring, so no code change was needed for the swap itself.
+    { id: 'claude-fable-5-2', label: 'Claude Fable 5.2', short: 'Fable 5.2', hint: 'ai.modelHintHeaviest' },
     // Opus 5.5 replaced Opus 5 in the same slot 2026-09-26 (launched
     // 2026-09-22; Opus 5 moved to "Legacy models", still served) and became
     // the default 2026-09-27 (Emil) — the «Anbefalt» hint follows the default
@@ -139,11 +142,35 @@ export const MODELS: Record<
   // Hosted-service lineups verified against provider docs 2026-08-12/13
   // (docs/agent-notes/modeller-api.md has the sources and open questions)
   gemini: [
-    // Gemini 4 Argon added 2026-10-19 ("our flagship reasoning model",
-    // ai.google.dev/gemini-api/docs/models/gemini-4-argon) as a NEW top tier —
-    // gemini-3.1-pro-preview is still listed as Preview with no deprecation
-    // notice, so this is an addition, not a same-slot replacement
-    { id: 'gemini-4-argon', label: 'Gemini 4 Argon', short: 'Gemini 4 Argon', hint: 'ai.modelHintHeaviest' },
+    // Gemini 4 Carbon added 2026-11-16 ("most capable reasoning model",
+    // aistudio.google.com/docs/models/gemini-4-carbon) above Argon — Argon's
+    // own page now calls itself faster/cheaper "compared to Gemini 4 Carbon"
+    // with no deprecation notice, so this is a new top tier, not a
+    // replacement (same pattern as GPT-6 Astra above the Sol/Terra/Luna
+    // trio). Same unified 1,048,576 input+output budget as Argon — same
+    // 900_000 context floor further down this file. Text+image/video/audio/
+    // PDF in, text out (curated rule #2 met). `reasoning_effort` is NOT
+    // verified for this id — the OpenAI-compat mapping table
+    // (aistudio.google.com/docs/openai) still has no Carbon column, so no
+    // reasoning parameter is sent for it (see ai-provider-profile.ts); open
+    // question in modeller-api.md.
+    { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon', short: 'Gemini 4 Carbon', hint: 'ai.modelHintHeaviest' },
+    // Gemini 4 Argon (curated 2026-10-19) left the menu 2026-11-17 (Emil):
+    // it costs exactly what Carbon costs ($2/$10, $4/$20 from 2026-12-01) and
+    // Carbon is the more capable of the two, so no axis is left on which
+    // Argon earns a seat — the state-of-the-art rule. Still served, not
+    // deprecated: a stored selection stays pickable, and its context floor
+    // and reasoning rules stay in place further down / in
+    // ai-provider-profile.ts.
+    //
+    // Gemini 4 Hydrogen added 2026-11-16 alongside Carbon ("stable version
+    // for everyday coding and agentic workflows"), same unified budget as
+    // Argon/Carbon. Unlike Carbon, its `reasoning_effort` IS verified: the
+    // OpenAI-compat mapping table's "Gemini 4" column now covers Argon AND
+    // Hydrogen (renamed from an Argon-only column), with `xhigh` documented
+    // for Hydrogen specifically — see ai-provider-profile.ts. «Value»: the
+    // cheaper Gemini 4 ($1.50/$7.50 flat, with a free tier) under Carbon.
+    { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', short: 'Gemini 4 Hydrogen', hint: 'ai.modelHintValue' },
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', short: 'Gemini 3.1 Pro', hint: 'ai.modelHintCapable' },
     // Replaced gemini-3.7-flash this round (superseded 2026-09-04, same slot;
     // 3.7 itself had replaced 3.6 on 2026-08-13)
@@ -324,12 +351,15 @@ export function prettyModelName(provider: AiProviderId, id: string): string {
 // the base model). Maintained with the curated MODELS list (docs/MODEL-UPDATE.md).
 const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // Anthropic's own model table (platform.claude.com, verified 2026-08-13,
-  // Fable 5.1 added 2026-09-05) states 1M tokens for Fable 5.1, Opus 5 and
-  // Sonnet 5 — matches docs/agent-notes/modeller-api.md, which had recorded
-  // the same number since July; the two were out of sync here until this pass.
+  // Fable 5.1 added 2026-09-05, Fable 5.2 added 2026-11-16) states 1M tokens
+  // for Fable 5.1/5.2, Opus 5 and Sonnet 5 — matches docs/agent-notes/
+  // modeller-api.md, which had recorded the same number since July; the two
+  // were out of sync here until the first pass.
+  'claude-fable-5-2': 1_000_000,
+  // claude-fable-5-1 and claude-fable-5 kept here though no longer curated
+  // (see MODELS.anthropic) — a stored selection from before 5.2 must not
+  // regress to the 200k floor
   'claude-fable-5-1': 1_000_000,
-  // claude-fable-5 kept here though no longer curated (see MODELS.anthropic) —
-  // a stored selection from before 5.1 must not regress to the 200k floor
   'claude-fable-5': 1_000_000,
   // Opus 5.5 added 2026-09-26 (same 1M window); claude-opus-5 stays for
   // stored selections, like claude-fable-5 above
@@ -367,8 +397,15 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // to 900K, same margin as the GPT-6 family's analogous total-minus-output
   // situation, rather than the full 1,048,576 — using the whole figure here
   // would risk the dangerous direction (a code value OVER the real input
-  // ceiling) that MODEL-UPDATE.md warns against.
+  // ceiling) that MODEL-UPDATE.md warns against. No longer curated since
+  // 2026-11-17 (see MODELS.gemini) — kept for stored selections.
   'gemini-4-argon': 900_000,
+  // Gemini 4 Carbon and Gemini 4 Hydrogen (added 2026-11-16): same shared
+  // 1,048,576 input+output budget as Argon, same 900K floor for the same
+  // reason (aistudio.google.com/docs/models/gemini-4-carbon,
+  // /gemini-4-hydrogen, verified 2026-11-16)
+  'gemini-4-carbon': 900_000,
+  'gemini-4-hydrogen': 900_000,
   // Verified against provider docs 2026-08-12/13; entries missing here on
   // purpose (Gemini Flash-Lite) fall back to the provider floor because no
   // context number was documented — excerpting early is the cheap failure,

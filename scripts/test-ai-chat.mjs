@@ -290,6 +290,17 @@ section('anthropic: family rules (fable / haiku / caps override)')
     'fable 5.1: no thinking blocks replayed in history'
   )
 
+  // Fable 5.2 (curated since 2026-11-16, replacing 5.1 in the same slot)
+  // rides the same family rules — the regex matches on the bare "fable"
+  // substring, so this is a straight re-check, not a new rule
+  responder = () => anthropicSse({ model: 'claude-fable-5-2', deltas: ['ok'] })
+  await run({ models: { anthropic: 'claude-fable-5-2', openai: '', azure: '', mock: '' }, thinking: 'high' })
+  const fable52 = calls[0]
+  ok(fable52?.body?.thinking === undefined, 'fable 5.2: no thinking param')
+  ok(fable52?.body?.output_config?.effort === 'high', 'fable 5.2: effort travels')
+  ok(fable52?.body?.fallbacks === 'default', 'fable 5.2: fallbacks default')
+  ok(fable52?.body?.tool_choice === undefined, 'fable 5.2: no forced tool_choice')
+
   // Opus 5.5 (curated since 2026-09-26) cannot turn thinking off either —
   // thinking {type:'disabled'} is a 400 there, where Opus 5 accepted it. «Av»
   // is the lowest effort with no thinking field, also when a live capability
@@ -1208,6 +1219,20 @@ for (const [svc, info] of Object.entries(COMPAT_SERVICES)) {
   responder = () => chatCompletionsSse({ deltas: ['ok'] })
   await run({ provider: 'gemini', models: geminiModel('gemini-3.8-flash') })
   ok(calls[0]?.body?.reasoning_effort === undefined, 'gemini-3.8-flash sends no reasoning_effort (unverified)')
+
+  // Gemini 4 Hydrogen (curated since 2026-11-16): the mapping table's former
+  // Argon-only column was renamed to a generic "Gemini 4" column that now
+  // covers Hydrogen too, same off-behavior as Argon (no `none` row → lowest
+  // effort instead). Gemini 4 Carbon, added the same day, has no column at
+  // all — stays unverified, like gemini-3.8-flash above.
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'gemini', models: geminiModel('gemini-4-hydrogen') })
+  ok(calls[0]?.body?.reasoning_effort === 'medium', 'gemini-4-hydrogen gets reasoning_effort')
+  await run({ provider: 'gemini', models: geminiModel('gemini-4-hydrogen'), thinking: 'off' })
+  ok(calls[0]?.body?.reasoning_effort === 'low', `gemini-4-hydrogen off → low (got ${calls[0]?.body?.reasoning_effort})`)
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'gemini', models: geminiModel('gemini-4-carbon') })
+  ok(calls[0]?.body?.reasoning_effort === undefined, 'gemini-4-carbon sends no reasoning_effort (unverified)')
 
   // Mistral documents exactly two reasoning_effort values, high and none
   // (docs.mistral.ai/capabilities/reasoning, 2026-10-05): every «on» level is
