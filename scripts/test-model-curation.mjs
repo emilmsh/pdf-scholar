@@ -107,7 +107,25 @@ console.log('what is left out')
     // Current generation only — the same rule the curated lists follow
     chat('mistralai/mistral-medium-2', 800),
     // …and a model with no date keeps the benefit of the doubt
-    { id: 'moonshotai/kimi-k3', vision: true, emitsNonText: false }
+    { id: 'moonshotai/kimi-k3', vision: true, emitsNonText: false },
+    // The same model twice again: a `-pro` twin at its base's price. Every
+    // OpenAI model had one on 2026-11-17 and they pushed GPT-6 Astra and
+    // GPT-6 Sol out of the vendor's seven seats.
+    { ...chat('openai/gpt-6-sol', 10), outputPrice: 10 },
+    { ...chat('openai/gpt-6-sol-pro', 10), outputPrice: 10 },
+    // …but a `-pro` priced differently is a model of its own
+    { ...chat('openai/gpt-7', 10), outputPrice: 10 },
+    { ...chat('openai/gpt-7-pro', 10), outputPrice: 120 },
+    // …a twin we cannot price is not judged
+    chat('qwen/qwen4', 10),
+    chat('qwen/qwen4-pro', 10),
+    // …and neither is one whose base is not listed
+    { ...chat('moonshotai/kimi-k3.1-pro', 10), outputPrice: 8 },
+    // A safety classifier answers with a verdict, not with prose
+    chat('nvidia/nemotron-3.5-content-safety', 10),
+    chat('meta-llama/llama-guard-4-12b', 10),
+    // …a name that merely contains the word is a model like any other
+    chat('ibm/granite-guardian-4', 10)
   ])
   const kept = new Set(curateRemoteModels(list, NOW).map((m) => m.id))
   eq(kept.has('google/gemini-3.6-flash'), true, 'a current multimodal chat model stays')
@@ -120,6 +138,14 @@ console.log('what is left out')
   eq(kept.has('~anthropic/claude-sonnet-5'), false, 'a ~vendor routing alias is dropped')
   eq(kept.has('mistralai/mistral-medium-2'), false, 'a model over a year old is dropped')
   eq(kept.has('moonshotai/kimi-k3'), true, 'an undated model is kept')
+  eq(kept.has('openai/gpt-6-sol'), true, 'the base of a -pro twin stays')
+  eq(kept.has('openai/gpt-6-sol-pro'), false, 'a -pro twin at the same price is dropped')
+  eq(kept.has('openai/gpt-7-pro'), true, 'a -pro at another price is its own model')
+  eq(kept.has('qwen/qwen4-pro'), true, 'a -pro with no price to compare is kept')
+  eq(kept.has('moonshotai/kimi-k3.1-pro'), true, 'a -pro with no base id survives')
+  eq(kept.has('nvidia/nemotron-3.5-content-safety'), false, 'a content-safety classifier is dropped')
+  eq(kept.has('meta-llama/llama-guard-4-12b'), false, 'a guard model is dropped')
+  eq(kept.has('ibm/granite-guardian-4'), true, 'a name that only contains «guard» is kept')
 }
 
 // --- The per-vendor cap -------------------------------------------------------
