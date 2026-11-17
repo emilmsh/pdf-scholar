@@ -1204,6 +1204,23 @@ aistudio.google.com/docs/models, /docs/models/gemini-4-carbon, /docs/models/gemi
   tidlig i `MODELS`-objektet: ikke skriv ut `MODEL_CONTEXT_TOKENS` som
   ordrett tekst der, vis til «kontekst-gulvet lenger ned i filen» i stedet.
 
+**Rettelse 17.11.2026 (Emil, ved gjennomgang av PR #117) — erstatter det som
+står over om Argon og om seks id-er:** `gemini-4-argon` er TATT UT av den
+kuraterte listen. Den koster nøyaktig det samme som Carbon ($2/$10, $4/$20
+fra 1.12.2026), og Carbon er den sterkeste av de to — da er det ingen akse
+igjen der Argon fortjener plassen («state of the art»-regelen: en modell som
+en annen listet modell slår eller tangerer på hver akse, står ikke i menyen;
+«raskere, færre tokens per tur» på Argons egen side er ikke nok når
+tokenprisen er lik). Hintet «Verdi» er flyttet til `gemini-4-hydrogen`, som
+faktisk er billigere ($1.50/$7.50 flatt, med Free-tier). Argon er ikke
+pensjonert hos Google: id-en står igjen i kontekst-tabellen i `ai-models.ts`
+og i begge reasoning-regexene, så et lagret valg virker som før.
+Gemini-listen er dermed fem id-er (Carbon, Hydrogen, 3.1 Pro Preview, 3.8
+Flash, 3.5 Flash-Lite). **Lærdom for neste review:** et nytt toppsjikt til
+SAMME pris som det forrige er et bytte, ikke et tillegg. Om
+`gemini-3.1-pro-preview` fortsatt fortjener plassen ved siden av to Gemini
+4-modeller er ikke vurdert — ta det ved neste review, med prisen på bordet.
+
 ## Standardmodeller og fallback (Emil, 27.9.2026)
 
 - **Standard:** `claude-opus-5-5` for Anthropic og `gpt-6-sol` for OpenAI

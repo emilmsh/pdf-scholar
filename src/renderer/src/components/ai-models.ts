@@ -155,19 +155,22 @@ export const MODELS: Record<
     // reasoning parameter is sent for it (see ai-provider-profile.ts); open
     // question in modeller-api.md.
     { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon', short: 'Gemini 4 Carbon', hint: 'ai.modelHintHeaviest' },
-    // Argon demoted one slot by Carbon's launch (still current, not
-    // deprecated) — hint changed from Heaviest to Value, matching its own
-    // page's "faster responses and lower token spend… compared to Carbon"
-    { id: 'gemini-4-argon', label: 'Gemini 4 Argon', short: 'Gemini 4 Argon', hint: 'ai.modelHintValue' },
+    // Gemini 4 Argon (curated 2026-10-19) left the menu 2026-11-17 (Emil):
+    // it costs exactly what Carbon costs ($2/$10, $4/$20 from 2026-12-01) and
+    // Carbon is the more capable of the two, so no axis is left on which
+    // Argon earns a seat — the state-of-the-art rule. Still served, not
+    // deprecated: a stored selection stays pickable, and its context floor
+    // and reasoning rules stay in place further down / in
+    // ai-provider-profile.ts.
+    //
     // Gemini 4 Hydrogen added 2026-11-16 alongside Carbon ("stable version
     // for everyday coding and agentic workflows"), same unified budget as
     // Argon/Carbon. Unlike Carbon, its `reasoning_effort` IS verified: the
     // OpenAI-compat mapping table's "Gemini 4" column now covers Argon AND
     // Hydrogen (renamed from an Argon-only column), with `xhigh` documented
-    // for Hydrogen specifically — see ai-provider-profile.ts. No hint: none
-    // of the five categories fit (cheaper than Argon/Carbon, pricier than the
-    // Flash pair, and not the fastest/cheapest option in this list either).
-    { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', short: 'Gemini 4 Hydro' },
+    // for Hydrogen specifically — see ai-provider-profile.ts. «Value»: the
+    // cheaper Gemini 4 ($1.50/$7.50 flat, with a free tier) under Carbon.
+    { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen', short: 'Gemini 4 Hydrogen', hint: 'ai.modelHintValue' },
     { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', short: 'Gemini 3.1 Pro', hint: 'ai.modelHintCapable' },
     // Replaced gemini-3.7-flash this round (superseded 2026-09-04, same slot;
     // 3.7 itself had replaced 3.6 on 2026-08-13)
@@ -394,7 +397,8 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // to 900K, same margin as the GPT-6 family's analogous total-minus-output
   // situation, rather than the full 1,048,576 — using the whole figure here
   // would risk the dangerous direction (a code value OVER the real input
-  // ceiling) that MODEL-UPDATE.md warns against.
+  // ceiling) that MODEL-UPDATE.md warns against. No longer curated since
+  // 2026-11-17 (see MODELS.gemini) — kept for stored selections.
   'gemini-4-argon': 900_000,
   // Gemini 4 Carbon and Gemini 4 Hydrogen (added 2026-11-16): same shared
   // 1,048,576 input+output budget as Argon, same 900K floor for the same
