@@ -87,7 +87,11 @@ regressions are treated as bugs, not as acceptable platform lag.
    reintroduce it in any form — the divergence it would create is not worth
    having on any platform, and `shell:open-external` stays restricted to
    http(s).
-   macOS-only: Dock + app menu, app stays alive on window-all-closed.
+   macOS-only: Dock + app menu, app stays alive on window-all-closed. The native
+   Window menu (`windowMenu` role) lets macOS supply the window list and system
+   sizing/tiling commands available on that OS version. Document tabs remain
+   app-managed; the menu does not add native tab management or a Close command
+   that would take over Cmd+W.
 6. **Linux packaging reality**: the AppImage gets no menu entry / PDF
    association without AppImageLauncher, and Ubuntu 24.04+'s AppArmor default
    blocks the Chromium sandbox inside AppImages — the **deb is the recommended

@@ -418,7 +418,7 @@ if (hostLaunch) {
     // macOS: without an application menu the standard Cmd shortcuts
     // (copy/paste/quit/hide) are dead. Keep it minimal — File/tab shortcuts
     // (Cmd+O/W/T…) are handled by the renderer's keydown listeners, and the
-    // Window menu deliberately omits the Close role so Cmd+W keeps closing
+    // default Window menu omits the Close role on macOS so Cmd+W keeps closing
     // the active TAB, not the window. Windows/Linux keep the hidden default
     // menu (autoHideMenuBar) untouched.
     if (process.platform === 'darwin') {
@@ -426,10 +426,9 @@ if (hostLaunch) {
         Menu.buildFromTemplate([
           { role: 'appMenu' },
           { role: 'editMenu' },
-          {
-            label: 'Vindu',
-            submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }]
-          }
+          // Register the native Window menu so macOS supplies its window list
+          // and system sizing/tiling commands.
+          { role: 'windowMenu' }
         ])
       )
     }
