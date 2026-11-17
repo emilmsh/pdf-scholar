@@ -45,7 +45,10 @@ and they bound the live-fetched lists too (Emil, 2026-08-13).
 
    `curateRemoteModels` (`src/shared/ai-model-catalog.ts`) is the rule, in order:
    keep only models that take image input and answer in text *and nothing else*;
-   drop `:suffix` variants whose base id is also listed, and the `~vendor`
+   drop `:suffix` variants whose base id is also listed, a `-pro` twin listed at
+   its base's own price (2026-11-17: OpenAI's twins had pushed GPT-6 Astra and
+   GPT-6 Sol out of the seven seats), safety classifiers (`content-safety`,
+   `guard`, `moderation` as a word of the id) and the `~vendor`
    routing aliases; drop anything older than 12 months; keep at most 7 newest per
    vendor. Two gates keep it from ever emptying a menu — a short list and a list
    whose entries mostly say nothing about their modalities both pass through

@@ -429,6 +429,9 @@ export function rankByStrength(models: AiRemoteModel[]): AiRemoteModel[] {
 export const CURATE_MIN_LIST = 25
 export const CURATE_PER_VENDOR = 7
 const CURATE_MAX_AGE_S = 365 * 24 * 60 * 60
+/** Ids that name a classifier rather than a model to talk to. A whole word of
+ *  the id, so a model merely called «…guardian» is not caught. */
+const NOT_A_CHAT_MODEL_RE = /(?:^|[-/])(?:content-safety|guard|moderation)(?=$|[-:])/i
 
 export function curateRemoteModels(models: AiRemoteModel[], now = Date.now()): AiRemoteModel[] {
   if (models.length <= CURATE_MIN_LIST) return models
@@ -439,9 +442,24 @@ export function curateRemoteModels(models: AiRemoteModel[], now = Date.now()): A
   // Ids listed WITHOUT a suffix — an id that only ever appears as `x:free` has
   // no base to be a duplicate of, and dropping it would remove the vendor
   const baseIds = new Set(models.filter((m) => !m.id.includes(':')).map((m) => m.id))
+  const priceOf = new Map(models.map((m) => [m.id, m.outputPrice]))
   const nowS = now / 1000
 
   const kept = models.filter((m) => {
+    // A safety classifier is served as a chat completion like any other and
+    // describes itself as image-in, text-out, but it answers with a verdict,
+    // not with prose (`nvidia/nemotron-3.5-content-safety`, the Llama Guards).
+    if (NOT_A_CHAT_MODEL_RE.test(m.id)) return false
+    // `openai/gpt-6-sol-pro` next to `openai/gpt-6-sol` AT THE SAME PRICE is
+    // the same model twice, as `:batch` is below. On 2026-11-17 every OpenAI
+    // model had such a twin, and together they took half the vendor's seven
+    // seats — GPT-6 Astra and GPT-6 Sol were no longer offered at all. A
+    // `-pro` priced differently from its base is a model of its own and stays,
+    // and so does one whose base is not listed (`moonshotai/kimi-k3.1-pro`).
+    if (m.id.includes('/') && m.id.endsWith('-pro')) {
+      const base = m.id.slice(0, -'-pro'.length)
+      if (baseIds.has(base) && m.outputPrice !== undefined && m.outputPrice === priceOf.get(base)) return false
+    }
     // Reads a document's figures, answers in text. Unknown counts as "no" here
     // and only here: this branch is reached on a list that describes itself, so
     // a silent entry among talkative ones is the odd one out, not the norm.
