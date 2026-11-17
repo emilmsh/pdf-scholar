@@ -2491,6 +2491,35 @@ html.touch-ui .convs-row {
   gap: 6px;
 }
 
+/* Person chips: as many as the document has hands, so the row wraps and a
+   chip is only as wide as its name (a long one gives way with an ellipsis) */
+.annot-filter-authors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.annot-filter-authors .theme-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.annot-filter-author-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annot-filter-author-count {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .margin-note-card.is-selected {
   border-color: var(--accent);
   box-shadow: 0 1px 6px color-mix(in srgb, var(--accent) 25%, transparent);

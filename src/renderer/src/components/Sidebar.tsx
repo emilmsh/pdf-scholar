@@ -698,6 +698,8 @@ function AnnotationList({
   const [typeFilter, setTypeFilter] = useState<string | null>(null)
   /** null = everything; true = only rows with a comment; false = only without */
   const [withComment, setWithComment] = useState<boolean | null>(null)
+  /** null = everyone; '' = the marks that carry no name */
+  const [authorFilter, setAuthorFilter] = useState<string | null>(null)
   const [clearAsk, setClearAsk] = useState(false)
   const clearAskRef = useRef<HTMLDivElement | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -769,6 +771,27 @@ function AnnotationList({
     if (!docColors.some((c) => colorDistance(c.rgb, colorFilter) < 0.001)) setColorFilter(null)
   }, [docColors, colorFilter])
 
+  // Who has marked this document, from the marks' own author field (/T) — the
+  // names as the file carries them, in order of first appearance, with the
+  // unnamed marks ('' — ours with no name set, or another app's) as a group of
+  // their own, last. Derived like the colours: only what the document holds.
+  const docAuthors = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const { record } of flat) {
+      const name = (record.author ?? '').trim()
+      counts.set(name, (counts.get(name) ?? 0) + 1)
+    }
+    const out = [...counts].map(([name, count]) => ({ name, count }))
+    return [...out.filter((a) => a.name), ...out.filter((a) => !a.name)]
+  }, [flat])
+
+  // Same as the colour: a person whose last mark was deleted leaves no chip
+  // to unclick.
+  useEffect(() => {
+    if (authorFilter === null) return
+    if (!docAuthors.some((a) => a.name === authorFilter)) setAuthorFilter(null)
+  }, [docAuthors, authorFilter])
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     const typeGroup = TYPE_FILTERS.find((g) => g.key === typeFilter)
@@ -776,11 +799,13 @@ function AnnotationList({
       if (colorFilter && colorDistance(record.color, colorFilter) > 0.06) return false
       if (typeGroup && !typeGroup.types.has(record.type)) return false
       if (withComment !== null && !!(record.contents ?? '').trim() !== withComment) return false
+      if (authorFilter !== null && (record.author ?? '').trim() !== authorFilter) return false
       if (!needle) return true
-      const haystack = `${record.contents ?? ''} ${excerpts.get(record.id) ?? ''}`.toLowerCase()
+      const haystack =
+        `${record.contents ?? ''} ${excerpts.get(record.id) ?? ''} ${record.author ?? ''}`.toLowerCase()
       return haystack.includes(needle)
     })
-  }, [flat, query, colorFilter, typeFilter, withComment, excerpts])
+  }, [flat, query, colorFilter, typeFilter, withComment, authorFilter, excerpts])
 
   // The margin VIEW controls live HERE — the tab is the one home for
   // everything comment-related. Since 2026-10-27 the toolbar's view menu holds
@@ -929,6 +954,27 @@ function AnnotationList({
             </button>
           ))}
         </div>
+        {/* One chip per person — only when there is someone to tell apart.
+            A document marked by one hand (or all unnamed) gets no row. */}
+        {docAuthors.length > 1 && (
+          <div className="annot-filter-authors">
+            {docAuthors.map(({ name, count }) => (
+              <button
+                key={name}
+                className={`theme-chip${authorFilter === name ? ' selected' : ''}`}
+                title={
+                  name ? t('side.showOnlyAuthor', { name }) : t('side.showOnlyUnnamed')
+                }
+                onClick={() => setAuthorFilter((prev) => (prev === name ? null : name))}
+              >
+                <span className="annot-filter-author-name">
+                  {name || t('side.filterNoAuthor')}
+                </span>
+                <span className="annot-filter-author-count">{count}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {empty ? (
