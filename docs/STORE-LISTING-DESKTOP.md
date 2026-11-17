@@ -156,43 +156,25 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.84.0
+## What's new in this version (≤ 1 500 chars) — v0.85.0
 
-*(The Store last carried v0.73.0's notes, so this covers v0.74.0–v0.84.0:
-the headline items, not every release. MCP for outside AI tools is left out
-on purpose — the Store build cannot connect, PLATFORMS §33 — and «Copy for
-AI», which works everywhere, stands in for it.)*
+*(The Store last carried v0.84.0's notes, so this covers v0.84.1–v0.85.0.
+The native Window menu on macOS is left out — the Store build is Windows.)*
 
 **EN:**
 ```
-• Paper tints of your own: a «+» under the tones in Tint and Night takes any colour off the wheel, held readable
-• The assistant answers in the language you write in, whatever language the document or the interface is in
-• Many documents open: the tab strip scrolls instead of squeezing, «All open tabs» searches them, and Ctrl+1–9 jumps between them
-• Tab groups: put tabs in a group from the right-click menu and fold it out of the strip while you work on something else
-• Text boxes start where you click, grow as you type, and can be moved by their grip while you write
-• «Copy for AI» in the Annotations tab puts a paper's notes and assistant conversations on the clipboard, for use in another AI tool
-• Hovering a note or a comment shows the whole text, and the comment bubble opens at the height of its text
-• Margin view: «m» shows the comments in the margin; comments taller than their page run over its edge instead of overlapping
-• Reading font: choose any font your computer has for answers, comments and notes – nothing is written into the file
-• Link preview: a footnote is found by its marker even where the link points elsewhere on the page
-• Model menu: type a model's id to use one that is newer than the list
-• A middle click closes a tab
+• Annotations by person: when several people have commented on a PDF, the Annotations tab shows a chip per name with a count – click one to see only that person's annotations
+• The search field in the Annotations tab also finds a name
+• Model menu: Claude Fable 5.2 and Gemini 4 Carbon and Hydrogen added
+• OpenRouter: the model menu no longer lists same-price «pro» twins and safety classifiers
 ```
 
 **NO:**
 ```
-• Egne papirtoner: en «+» under tonene i Farge og Natt tar enhver farge fra hjulet, holdt lesbar
-• Assistenten svarer på språket du skriver på, uansett hvilket språk dokumentet eller grensesnittet har
-• Mange dokumenter åpne: fanelisten ruller i stedet for å klemmes, «Alle åpne faner» søker i dem, og Ctrl+1–9 hopper mellom dem
-• Fanegrupper: legg faner i en gruppe fra høyreklikkmenyen, og fold den ut av listen mens du jobber med noe annet
-• Tekstbokser begynner der du klikker, vokser mens du skriver, og kan flyttes i gripet underveis
-• «Kopier for KI» i Merknader-fanen legger notatene og assistentsamtalene til et dokument på utklippstavlen, til bruk i et annet KI-verktøy
-• Hold pekeren over et notat eller en kommentar, og hele teksten vises; kommentarboblen åpnes i tekstens høyde
-• Margvisning: «m» viser kommentarene i margen; kommentarer som er høyere enn siden, henger ut over kanten i stedet for å overlappe
-• Leseskrift: velg hvilken som helst skrift maskinen har, til svar, kommentarer og notater – ingenting skrives inn i filen
-• Lenkeforhåndsvisning: en fotnote finnes på merket sitt også der lenken peker et annet sted på siden
-• Modellmenyen: skriv inn ID-en til en modell for å bruke en som er nyere enn listen
-• Et klikk med midtknappen lukker en fane
+• Merknader per person: når flere har kommentert en PDF, viser Merknader-fanen en brikke per navn med antall – klikk på en for å se bare den personens merknader
+• Søkefeltet i Merknader-fanen finner også et navn
+• Modellmenyen: Claude Fable 5.2 og Gemini 4 Carbon og Hydrogen er lagt til
+• OpenRouter: modellmenyen viser ikke lenger «pro»-tvillinger til samme pris og sikkerhetsklassifiserere
 ```
 
 ---
