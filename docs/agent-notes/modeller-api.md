@@ -475,12 +475,13 @@ api/docs/models/gpt-6.2-astra og /gpt-6.2-sol, reasoning-guiden
   `gpt-6\.2-(astra|sol)` — «Av» sender `low` i ÉN forespørsel, pinnet i
   `test:ai-chat`. Om `minimal` godtas er ikke dokumentert; vi sender den aldri.
 - **Dominans (Emils regel):** 6.2 Astra er sterkere og billigere enn 6 Astra
-  ($8/$40 mot $10/$50) → 6 Astra ut. 6.2 Sol koster det samme som 6.1 Sol
-  ($2/$10) → 6.1 Sol ut. 6.2 Sol dominerer også **GPT-6 Sol** (samme pris),
-  men 6 Sol er standardmodellen (`DEFAULT_AI_MODELS.openai`/`.chatgpt`) og
-  blir stående til Emil bestemmer om standarden skal flyttes. Lagrede valg av
-  6 Astra / 6.1 Sol står fortsatt (stored-id-regelen); kontekstgulvene og
-  regexene beholdes for dem.
+  ($8/$40 mot $10/$50) → 6 Astra ut. 6.2 Sol koster det samme som 6.1 Sol og
+  6 Sol ($2/$10) → begge ut. **Standarden flyttet fra `gpt-6-sol` til
+  `gpt-6.2-sol` (Emil, 19.11.2026)** for både `openai` og `chatgpt`, med
+  «Anbefalt»-hinten. Lagrede valg av 6 Astra / 6.1 Sol / 6 Sol står fortsatt
+  (stored-id-regelen); kontekstgulvene og regexene beholdes for dem. Ingen
+  migrering: en bruker som har lagret innstillingene beholder 6 Sol til hen
+  velger noe annet, som ved forrige standardbytte (27.9.2026).
 - **Live-verifisert 19.11.2026, 9/9 hver:** `test:live --provider=openai` og
   `--provider=chatgpt` for begge id-ene (sitat, dokumentbruk, bildelesing,
   spansk svar, ingen degrade-retry).

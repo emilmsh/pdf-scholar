@@ -106,12 +106,11 @@ export const MODELS: Record<
     // is the stronger model at $8/$40 against 6 Astra's $10/$50, and 6.2 Sol
     // costs exactly what 6.1 Sol did ($2/$10). Text+image in, text out, 922K
     // input; both 400 on `reasoning.effort: "none"` (OPENAI_ALWAYS_REASONS_RE).
-    // Stored 6 Astra / 6.1 Sol selections stay pickable.
+    // 6.2 Sol dominates GPT-6 Sol at the same price too, and became the
+    // default the same day (Emil), so 6 Sol left the menu with it.
+    // Stored 6 Astra / 6.1 Sol / 6 Sol selections stay pickable.
     { id: 'gpt-6.2-astra', label: 'GPT-6.2 Astra', short: 'GPT-6.2 Astra', hint: 'ai.modelHintHeaviest' },
-    { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol', short: 'GPT-6.2 Sol', hint: 'ai.modelHintCapable' },
-    // GPT-6 Sol stays only because it is the default (Emil's call): 6.2 Sol
-    // dominates it at the same price, so the default is flagged for Emil.
-    { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol', short: 'GPT-6.2 Sol', hint: 'ai.modelHintRecommended' },
     // GPT-6.1 Terra added 2026-11-02: between Sol and Luna ($1/$5 against
     // $2/$10 and $0.10/$0.50, developers.openai.com/api/docs/models/
     // gpt-6.1-terra), text+image in, text out, `reasoning.effort` none..max.
@@ -132,13 +131,12 @@ export const MODELS: Record<
   // Emil's signed-in plan (one early report had Sol refused on a ChatGPT
   // account right after launch, hence the live check before listing). Terra
   // is not in the API list above: the API account had no credit to verify it.
-  // The default stays gpt-6-sol (Emil's call), so «Anbefalt» stays there too.
-  // GPT-6.2 Astra and Sol replaced 6 Astra and 6.1 Sol 2026-11-19, as in the
-  // API list above — each 9/9 live on Emil's signed-in plan AND on the API.
+  // GPT-6.2 Astra and Sol replaced 6 Astra, 6.1 Sol and 6 Sol 2026-11-19, as
+  // in the API list above — each 9/9 live on Emil's signed-in plan AND on the
+  // API — and 6.2 Sol became the default (Emil), so «Anbefalt» moved with it.
   chatgpt: [
     { id: 'gpt-6.2-astra', label: 'GPT-6.2 Astra', short: 'GPT-6.2 Astra', hint: 'ai.modelHintHeaviest' },
-    { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol', short: 'GPT-6.2 Sol', hint: 'ai.modelHintCapable' },
-    { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol', short: 'GPT-6.2 Sol', hint: 'ai.modelHintRecommended' },
     { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', short: 'GPT-6.1 Terra', hint: 'ai.modelHintValue' },
     { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
   ],
@@ -242,8 +240,8 @@ export const MODELS: Record<
  *  heaviest model, NOT the default. */
 export const DEFAULT_MODELS: Partial<Record<AiProviderId, string>> = {
   anthropic: 'claude-opus-5-5',
-  openai: 'gpt-6-sol',
-  chatgpt: 'gpt-6-sol'
+  openai: 'gpt-6.2-sol',
+  chatgpt: 'gpt-6.2-sol'
 }
 
 /** One entry in a model dropdown: the curated list merged with the live

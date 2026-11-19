@@ -64,9 +64,10 @@ export const RECENTS_MAX = 20
 export const DEFAULT_AI_MODELS: Record<AiProviderId, string> = {
   // Emil, 2026-09-27: Opus 5.5 and GPT-6 Sol (were Sonnet 5 and GPT-5.6 Terra)
   anthropic: 'claude-opus-5-5',
-  openai: 'gpt-6-sol',
-  // Emil's call 2026-09-27, verified live on a Pro plan that day
-  chatgpt: 'gpt-6-sol',
+  // Emil, 2026-11-19: GPT-6.2 Sol (was GPT-6 Sol) — same price, stronger;
+  // verified live 9/9 on the API and on the ChatGPT plan that day
+  openai: 'gpt-6.2-sol',
+  chatgpt: 'gpt-6.2-sol',
   azure: '',
   // The compat-family providers have no defaults: their model lists are
   // live-fetched, and picking one is a product decision the USER makes from
