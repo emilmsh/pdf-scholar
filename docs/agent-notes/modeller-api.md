@@ -457,6 +457,39 @@ ChatGPT-abonnementets Codex-backend (samme Responses-forming); API-kontoen
 hadde ingen kreditt for en egen live-kjøring. Lagt i begge listene (openai og
 chatgpt).
 
+**GPT-6.2 Astra og GPT-6.2 Sol inn 19.11.2026, erstatter GPT-6 Astra og
+GPT-6.1 Sol** (lansert 17.11.2026 — winbuzzer.com/2026/11/17/gpt-6-2-scores-
+higher-at-lower-cost-in-ai-tests-xcxwbn; modellsidene developers.openai.com/
+api/docs/models/gpt-6.2-astra og /gpt-6.2-sol, reasoning-guiden
+/api/docs/guides/reasoning og /api/docs/models/all, sjekket 19.11.2026).
+`/models/all` viser nå flaggskipene 6.2 Astra, 6.2 Sol, 6.1 Terra og 6 Luna;
+6 Astra, 6.1 Sol og 6 Sol står under «More models», ingen av dem pensjonert.
+
+- Begge: tekst + bilde inn → kun tekst ut (kuratert-regel #2 innfridd),
+  1,05M totalt / **922K input** / 128K output → 900_000 i
+  `MODEL_CONTEXT_TOKENS`. Responses og Chat Completions, web search som
+  Responses-verktøy. Ingen snapshot-id-er.
+- **Begge avviser `reasoning.effort: "none"`** — reasoning-guiden ordrett:
+  «GPT-6.2 Astra and GPT-6.2 Sol reject requests that set `reasoning.effort`
+  … to `none`». Lagt til `OPENAI_ALWAYS_REASONS_RE` som
+  `gpt-6\.2-(astra|sol)` — «Av» sender `low` i ÉN forespørsel, pinnet i
+  `test:ai-chat`. Om `minimal` godtas er ikke dokumentert; vi sender den aldri.
+- **Dominans (Emils regel):** 6.2 Astra er sterkere og billigere enn 6 Astra
+  ($8/$40 mot $10/$50) → 6 Astra ut. 6.2 Sol koster det samme som 6.1 Sol
+  ($2/$10) → 6.1 Sol ut. 6.2 Sol dominerer også **GPT-6 Sol** (samme pris),
+  men 6 Sol er standardmodellen (`DEFAULT_AI_MODELS.openai`/`.chatgpt`) og
+  blir stående til Emil bestemmer om standarden skal flyttes. Lagrede valg av
+  6 Astra / 6.1 Sol står fortsatt (stored-id-regelen); kontekstgulvene og
+  regexene beholdes for dem.
+- **Live-verifisert 19.11.2026, 9/9 hver:** `test:live --provider=openai` og
+  `--provider=chatgpt` for begge id-ene (sitat, dokumentbruk, bildelesing,
+  spansk svar, ingen degrade-retry).
+
+| Modell | ID | Kontekst (input) | Pris inn/ut | Cached inn |
+|---|---|---|---|---|
+| 6.2 Astra (tyngst) | `gpt-6.2-astra` | 922K (1,05M totalt inkl. 128K output) | $8/$40 | $0.40 |
+| 6.2 Sol | `gpt-6.2-sol` | 922K (1,05M totalt inkl. 128K output) | $2/$10 | $0.10 |
+
 ## Hostede kompat-tjenester (agentverifisert 12.8.2026, oppdatert 17.8.2026 og 31.8.2026 mot leverandørdocs)
 
 Kuratert i `ai-models.ts` etter kuratert-kun-regelen (færre modeller som

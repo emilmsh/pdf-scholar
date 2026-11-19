@@ -84,6 +84,9 @@ export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[3567]|gpt-oss|gemi
  *    gpt-6-astra (verified 2026-09-05) and /gpt-6.1-sol (verified 2026-10-05).
  *    NOT GPT-6 Sol or Luna: both document `none` (their model pages, verified
  *    2026-09-26).
+ *  - GPT-6.2 Astra and GPT-6.2 Sol 400 on `none` too: «GPT-6.2 Astra and
+ *    GPT-6.2 Sol reject requests that set `reasoning.effort` … to `none`»
+ *    (developers.openai.com/api/docs/guides/reasoning, verified 2026-11-19).
  *  - grok-4.5/4.6/4.7: «Reasoning cannot be disabled» (docs.x.ai/developers/
  *    model-capabilities/text/reasoning, verified 2026-09-26).
  *  - gpt-oss on Groq takes low/medium/high only; `none` is reserved for the
@@ -101,7 +104,7 @@ export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[3567]|gpt-oss|gemi
  *  Until 2026-09-26 «Av» sent `none` to the last two — a value neither
  *  documents — and leaned on the degrade-on-400 net when it was refused. */
 export const OPENAI_ALWAYS_REASONS_RE =
-  /gpt-6-astra|gpt-6\.1-sol|grok-4\.[5-7]|gpt-oss|gemini-4-(argon|hydrogen)/i
+  /gpt-6-astra|gpt-6\.1-sol|gpt-6\.2-(astra|sol)|grok-4\.[5-7]|gpt-oss|gemini-4-(argon|hydrogen)/i
 
 /** Mistral's reasoning switch is `reasoning_effort` too, but with a two-value
  *  domain: `"high"` (thinking on) or `"none"` (off — «the model thinks
