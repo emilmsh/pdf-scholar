@@ -538,6 +538,18 @@ section('openai: gpt-6 (Astra curated 2026-09-05, Sol/Luna 2026-09-26)')
     calls.length === 1 && calls[0]?.body?.reasoning?.effort === 'low',
     `gpt-6.1-sol off → effort low in ONE request (got ${calls.length}, ${calls[0]?.body?.reasoning?.effort})`
   )
+  // GPT-6.2 Astra and Sol (curated 2026-11-19) reject `none` as well
+  // (developers.openai.com/api/docs/guides/reasoning, verified 2026-11-19)
+  for (const id of ['gpt-6.2-astra', 'gpt-6.2-sol']) {
+    responder = () => openAiSse({ deltas: ['ok'], response: { model: id, output: [] } })
+    await run({ provider: 'openai', models: { anthropic: '', openai: id, azure: '', mock: '' }, thinking: 'off' })
+    ok(
+      calls.length === 1 && calls[0]?.body?.reasoning?.effort === 'low',
+      `${id} off → effort low in ONE request (got ${calls.length}, ${calls[0]?.body?.reasoning?.effort})`
+    )
+    await run({ provider: 'openai', models: { anthropic: '', openai: id, azure: '', mock: '' }, thinking: 'high' })
+    ok(calls[0]?.body?.reasoning?.effort === 'high', `${id} high → effort high`)
+  }
 }
 
 section('openai: degrade-on-400 + response.failed')

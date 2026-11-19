@@ -101,15 +101,16 @@ export const MODELS: Record<
     // became the default 2026-09-27 (Emil). There is no GPT-6 Terra; 5.6 Terra
     // left the menu with the default, being both older and pricier than 6 Sol
     // ($2/$12 against $2/$10) — a stored Terra selection stays pickable
-    { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
-    // GPT-6.1 Sol is a NEW mid tier added 2026-09-29 (DevDay), not a
-    // replacement — developers.openai.com/api/docs/models/all still lists
-    // gpt-6-sol as current, undeprecated, alongside it. Near-Astra quality at
-    // a fifth of Astra's price, same price as GPT-6 Sol ($2/$10). The default
-    // stays gpt-6-sol (Emil's call, untouched here), so the «Anbefalt» hint
-    // stays there too.
-    { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', short: 'GPT-6.1 Sol', hint: 'ai.modelHintCapable' },
-    { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    // GPT-6.2 Astra and GPT-6.2 Sol (launched 2026-11-17) replaced GPT-6
+    // Astra and GPT-6.1 Sol 2026-11-19. Each is dominated outright: 6.2 Astra
+    // is the stronger model at $8/$40 against 6 Astra's $10/$50, and 6.2 Sol
+    // costs exactly what 6.1 Sol did ($2/$10). Text+image in, text out, 922K
+    // input; both 400 on `reasoning.effort: "none"` (OPENAI_ALWAYS_REASONS_RE).
+    // 6.2 Sol dominates GPT-6 Sol at the same price too, and became the
+    // default the same day (Emil), so 6 Sol left the menu with it.
+    // Stored 6 Astra / 6.1 Sol / 6 Sol selections stay pickable.
+    { id: 'gpt-6.2-astra', label: 'GPT-6.2 Astra', short: 'GPT-6.2 Astra', hint: 'ai.modelHintHeaviest' },
+    { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol', short: 'GPT-6.2 Sol', hint: 'ai.modelHintRecommended' },
     // GPT-6.1 Terra added 2026-11-02: between Sol and Luna ($1/$5 against
     // $2/$10 and $0.10/$0.50, developers.openai.com/api/docs/models/
     // gpt-6.1-terra), text+image in, text out, `reasoning.effort` none..max.
@@ -130,11 +131,12 @@ export const MODELS: Record<
   // Emil's signed-in plan (one early report had Sol refused on a ChatGPT
   // account right after launch, hence the live check before listing). Terra
   // is not in the API list above: the API account had no credit to verify it.
-  // The default stays gpt-6-sol (Emil's call), so «Anbefalt» stays there too.
+  // GPT-6.2 Astra and Sol replaced 6 Astra, 6.1 Sol and 6 Sol 2026-11-19, as
+  // in the API list above — each 9/9 live on Emil's signed-in plan AND on the
+  // API — and 6.2 Sol became the default (Emil), so «Anbefalt» moved with it.
   chatgpt: [
-    { id: 'gpt-6-astra', label: 'GPT-6 Astra', short: 'GPT-6 Astra', hint: 'ai.modelHintHeaviest' },
-    { id: 'gpt-6.1-sol', label: 'GPT-6.1 Sol', short: 'GPT-6.1 Sol', hint: 'ai.modelHintCapable' },
-    { id: 'gpt-6-sol', label: 'GPT-6 Sol', short: 'GPT-6 Sol', hint: 'ai.modelHintRecommended' },
+    { id: 'gpt-6.2-astra', label: 'GPT-6.2 Astra', short: 'GPT-6.2 Astra', hint: 'ai.modelHintHeaviest' },
+    { id: 'gpt-6.2-sol', label: 'GPT-6.2 Sol', short: 'GPT-6.2 Sol', hint: 'ai.modelHintRecommended' },
     { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra', short: 'GPT-6.1 Terra', hint: 'ai.modelHintValue' },
     { id: 'gpt-6-luna', label: 'GPT-6 Luna', short: 'GPT-6 Luna', hint: 'ai.modelHintFast' }
   ],
@@ -238,8 +240,8 @@ export const MODELS: Record<
  *  heaviest model, NOT the default. */
 export const DEFAULT_MODELS: Partial<Record<AiProviderId, string>> = {
   anthropic: 'claude-opus-5-5',
-  openai: 'gpt-6-sol',
-  chatgpt: 'gpt-6-sol'
+  openai: 'gpt-6.2-sol',
+  chatgpt: 'gpt-6.2-sol'
 }
 
 /** One entry in a model dropdown: the curated list merged with the live
@@ -380,6 +382,11 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // Sol/Luna 2026-09-26, GPT-6.1 Sol 2026-10-05 — same numbers on their model
   // pages), see modeller-api.md. The 5.6 Sol/Luna entries stay for stored
   // selections.
+  // GPT-6.2 Astra and Sol 2026-11-19: same 1.05M total / 922K input / 128K
+  // output on their model pages. 6 Astra and 6.1 Sol stay for stored
+  // selections.
+  'gpt-6.2-astra': 900_000,
+  'gpt-6.2-sol': 900_000,
   'gpt-6-astra': 900_000,
   'gpt-6.1-sol': 900_000,
   // GPT-6.1 Terra 2026-11-02: same 1.05M total / 922K input / 128K output
