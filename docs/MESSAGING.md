@@ -14,7 +14,7 @@ store listing is a change three other places do not know about.
 
 | Surface | File | Notes |
 | --- | --- | --- |
-| README | `README.md` | The long form. Screenshots, download paths, feature list, development notes |
+| README | `README.md` | The landing page's longer twin (Emil, 2026-11-23: consolidate the two). Same lede, same four facts, the nine tiles as a table, the sections in the landing page's order and under its headings — with the install steps, the keyboard shortcuts and the detail the page leaves out. Then development notes |
 | Landing page | `docs/index.html` | Published by GitHub Pages from `master`. Version and download link come from the Releases API at load time — **never write a version number into it** |
 | Microsoft Store | `docs/STORE-LISTING-DESKTOP.md` | **Machine-parsed** by `scripts/lib/store-listing.ps1` and pushed by `store-publish.ps1`. Keep the heading shape and the `**EN:**` / `**NO:**` fenced blocks intact; `npm run test:listing` checks the parse offline |
 | Edge Add-ons / Chrome Web Store | `docs/STORE-LISTING.md` | Paste-ready. Neither store's API can set listing copy, so it is typed into the dashboards by hand |
@@ -96,9 +96,11 @@ et spørsmål.
 the audience, so the lede describes the window. Opening both with the same
 claim reads as a stutter, in either order.)*
 
-**Landing page variant** (Emil, 2026-11-23 — the page was revised to say more,
-sooner, in fewer words). The landing page's lede says what the app does, and
-the window claim moves into its Reading tile and section, still said once:
+**Landing page and README variant** (Emil, 2026-11-23 — the page was revised
+to say more, sooner, in fewer words, and the README consolidated with it the
+same day). Both lead with what the app does, and the window claim moves into
+the Reading tile and section, still said once. The store listings keep the
+lede above:
 
 **EN:** Read, annotate and search papers, with split view, link previews and
 an optional AI assistant that cites its sources.
