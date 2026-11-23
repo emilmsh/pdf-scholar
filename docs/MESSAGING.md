@@ -34,7 +34,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | | |
 | --- | --- |
 | Product name | **PDF Scholar** — always, in every language. Not "PDFX" (the repo's internal name), not "PDF Expert clone" |
-| One-line what | A PDF reader and annotator for Windows and macOS, for documents you work through rather than skim. A store listing names only its own platform |
+| One-line what | A PDF reader and annotator for Windows, macOS and Linux, for documents you work through rather than skim. A store listing names only its own platform |
 | Price | Free. No account, no sign-in, no trial, no ads, no tracking |
 | Licence | MIT. Every bundled runtime component is permissively licensed |
 | Repo | <https://github.com/emilmsh/pdf-scholar> |
@@ -42,7 +42,7 @@ When a claim here depends on a platform detail, PLATFORMS is the authority.
 | Privacy policy URL | `https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md` |
 | Windows | Tier 1. One installer carries x64 and native arm64; per-user install, no admin rights. Also on the **Microsoft Store**, `9N75CPC0G9M2` (live). A **portable zip** per arch ships with every GitHub release (issue #17, 2026-09-08) as a secondary offer: named in the release table, in small print in the README and on the landing page, never on the stores. Say what it costs — no «Åpne med» registration, updates are noticed but not installed, AI keys stay bound to the Windows account — and where its state lives (a `data` folder beside the exe) |
 | macOS | **Presented alongside Windows, no beta label** (Emil, 2026-08-11 — it has run on real Apple hardware since v0.34.0). Built in CI, feature-identical by construction. Tested on a tester's machine, not the owner's — say "tested", never "verified by the owner". The build is unsigned (Gatekeeper workaround in the README) and cannot *install* an update itself; it does **notice** one and tell you how to get it, which is not the same claim — never write that macOS auto-updates. The recommended install is the Homebrew tap — `brew install --cask emilmsh/tap/pdf-scholar` — which makes `brew upgrade` the update channel, and the in-app notice hands you that exact command. The Gatekeeper `xattr` step still applies after every install/upgrade (Homebrew ≥ 5 removed `--no-quarantine`) — never claim brew skips it |
-| Linux | **Beta.** Built in CI, feature-identical by construction, but it has not run on real hardware and no surface may imply otherwise. **Say why, and ask for help** (Emil, 2026-09-04): the author develops on Windows and has no Linux machine, so the build is untested there and reports from Linux users are wanted. State the reason plainly — it is the honest version of the beta label, not an apology — and pair it with the issue tracker. It carries no weight on the store surfaces (neither store sells the Linux build); the README says it in the Linux section, the landing page in the small print under the download buttons |
+| Linux | **Presented alongside Windows and macOS, no beta label** (Emil, 2026-11-23: nothing is called beta any more, every platform is presented alike). Built in CI, feature-identical by construction. The label went; the fact behind it did not: the author develops on Windows and has no Linux machine, so the build has not run on his hardware and no surface may call it tested or verified. Where the Linux download is described at length — the README's Linux section, the landing page's Linux card — say that once, plainly, and ask for reports through the issue tracker (Emil, 2026-09-04: say why, and ask for help). It carries no weight on the store surfaces (neither store sells the Linux build) |
 | Browser extension | **Presented alongside the desktop app, no beta label** (Emil, 2026-10-24 — it is his own daily route into PDFs, with Edge as the default handler, and has been in both stores since August). **Live in BOTH stores** (confirmed 2026-08-12). Edge Add-ons: `https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc`. Chrome Web Store: `https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd`. One click, self-updating — this is the install to lead with, and the Load-unpacked route is now only for running a build newer than the stores carry. **Both listings lag the current release** while their updates sit in review, so never name a version on a store surface |
 | Engine | pdf.js renders, PDFium (EmbedPDF) writes the annotations. Say this only where it earns its place — the README and the landing footer |
 | AI | Optional, bring your own key: Anthropic, OpenAI, Azure OpenAI, OpenRouter, Google Gemini, Grok (xAI), Mistral, Groq (one key field each) — or any OpenAI-compatible endpoint, including local models via Ollama/LM Studio (no key needed for local). Sign in with a ChatGPT Plus/Pro plan instead of a key, so the assistant runs on the plan's allowance with no API bill — the sign-in happens in the desktop app (v0.53.0), and the extension borrows it from an installed, signed-in desktop app (PLATFORMS §25; say «with the desktop app installed», never that the extension signs in). Always say it is **unofficial** — the same sign-in Codex and opencode use, which OpenAI allows today but runs no program for — and that **ChatGPT's terms** apply rather than the API's. Never in a store DESCRIPTION, the extension's included — a standing claim is no place to lean on a door OpenAI can close. The Microsoft Store's version-stamped «What's new» may name it, with both caveats, since that build carries it (v0.53.0). No server of ours in between |
@@ -118,8 +118,14 @@ account.
 **The landing page's shape** (Emil, 2026-11-23: more information higher up,
 shorter texts, grouped in tiles):
 
-1. Hero — one-liner, the landing lede, the download buttons, the opening frame
-   beside them.
+1. Hero — one-liner, the landing lede, the downloads, the opening frame beside
+   them. The downloads show every way in, in two groups: the desktop app
+   (Windows, macOS, Linux) and the browser extension (Edge, Chrome), all five
+   drawn alike. The visitor's own platform is the primary button. Windows downloads
+   the installer; a platform with a technical choice to make — the dmg per
+   chip, deb or AppImage — leads to its card at the foot of the page, where the
+   choices are *(Emil, 2026-11-23)*. The Microsoft Store is a line under the
+   buttons.
 2. A strip of four facts: free, local, the desktop platforms, the extension.
 3. Nine tiles, one per section below and linking to it: a topic label and one
    or two sentences. The tiles are the overview; a reader who stops here has
@@ -131,7 +137,9 @@ shorter texts, grouped in tiles):
 
 The header follows the scroll and carries a download button once the hero's
 own buttons have left the screen, so a download is one click from anywhere on
-the page.
+the page. It names the visitor's platform — «Download for macOS» on a Mac —
+and leads where that platform's hero button leads; a phone gets a plain
+«Download» to the cards.
 
 Three points is a ceiling, not a target (Emil, 2026-08-09: "vi holder ting
 skarpt og direkte"). The count has drifted twice — to eight and nine in August,
@@ -373,7 +381,7 @@ kommentarene satt i en utvidet marg.
   hold-to-straighten; shapes, sticky notes, free text, and text-anchored
   comments
 - With a stylus, the pen draws while a finger scrolls and zooms; pen pressure
-  varies the line width **(beta)** and is preserved in the saved file
+  varies the line width and is preserved in the saved file
 - The text tool uses the standard PDF typefaces — Helvetica, Times and Courier,
   with bold and italic — and a size, chosen before typing or changed on an
   existing box *(the size on an existing box since [issue #53](https://github.com/emilmsh/pdf-scholar/issues/53), 2026-10-23;
@@ -657,13 +665,16 @@ app looks like.)*
   exactly once", "the box can never be shrunk below its own words" — advertises
   the repair, not the capability, and dates the text. Evergreen surfaces state
   what the app does; a fix is named as a fix only in a "What's new" block.
-- **Claims about untested platforms.** Linux has not run on real hardware and no
-  surface may imply otherwise. macOS is presented alongside Windows without a
-  beta label (Emil, 2026-08-11) — it has been tested on Apple hardware since
-  v0.34.0, and "tested" remains the strongest word on offer; never "verified",
-  "stable" or anything that promises the owner stands behind the build day to
-  day. The browser extension lost its beta label on 2026-10-24 (Emil's call);
-  Linux is now the only beta platform.
+- **"Beta"** (Emil, 2026-11-23: "vi trenger ikke omtale ting som beta lenger —
+  la oss presentere alt likt"). No platform and no feature carries the label:
+  macOS lost it on 2026-08-11, the browser extension on 2026-10-24, Linux and
+  pen pressure on 2026-11-23. A badge on one of five download buttons says
+  "second-class" louder than it says anything useful.
+- **Claims about untested platforms.** Dropping the label is not a claim. Linux
+  has not run on the author's hardware and no surface may call it tested;
+  macOS has been tested on Apple hardware since v0.34.0, and "tested" remains
+  the strongest word on offer there — never "verified", "stable" or anything
+  that promises the owner stands behind the build day to day.
 - **Padding.** The README is the full account, not the long one: every claim
   it makes earns its place, but each is made once and in as few words as it
   takes (Emil, 2026-10-24: "say the same in somewhat fewer words", and write

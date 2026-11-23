@@ -63,7 +63,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes, free text and text-anchored comments
 • The notes panel lists every mark by page, with search and filters; comments are edited directly in the list; a summary exports to Word, Markdown or HTML
 • Comments in the margin: notes shown as visible text beside the page, and an export that sets them in a widened margin, numbered at their anchors — the original untouched
-• With a stylus, the pen draws while a finger scrolls and zooms; pen pressure varies the line width (beta) and is preserved in the saved file
+• With a stylus, the pen draws while a finger scrolls and zooms; pen pressure varies the line width and is preserved in the saved file
 • The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold and italic — so the text stays searchable in every reader
 • A signature can be drawn once — or added as an image — and stamped where needed. It is stored locally (placing a signature is not the same as digitally signing a document)
 • Password-protected documents open, can be annotated, and keep their protection when saved
@@ -123,7 +123,7 @@ ANNOTERING
 • Utheving, understreking, gjennomstreking og bølget strek; penn og tusj med hold-for-å-rette; former, gule lapper, fritekst og tekstforankrede kommentarer
 • Notatpanelet lister hvert merke per side, med søk og filtre; kommentarer redigeres direkte i lista; en oppsummering eksporteres til Word, Markdown eller HTML
 • Kommentarer i margen: notater vist som synlig tekst ved siden av siden, og en eksport som setter dem i en utvidet marg, nummerert ved ankrene — originalen urørt
-• Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykk varierer strekbredden (beta) og bevares i den lagrede filen
+• Med penn på berøringsskjerm tegner pennen mens fingeren blar og zoomer; pennetrykk varierer strekbredden og bevares i den lagrede filen
 • Tekstverktøyet bruker PDF-ens standardskrifter — Helvetica, Times eller Courier, fet og kursiv — så teksten forblir søkbar i enhver leser
 • Signaturen tegnes én gang — eller legges til som bilde — og stemples inn der den trengs. Den lagres lokalt (å plassere en signatur er ikke det samme som å signere digitalt)
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring
@@ -201,7 +201,7 @@ Comments in the margin, and a print-ready export with the comments set in a wide
 Highlight, underline, strikeout, squiggly, pen, marker, shapes, notes and free text
 Rest the pointer on a citation, figure or equation to preview it; fetch a cited paper's abstract with one click
 Recent files as a grid of first pages; pinned tabs, and your tabs back at the next launch
-Pressure-sensitive pen (beta); the pen draws while a finger scrolls
+Pressure-sensitive pen; the pen draws while a finger scrolls
 Existing marks can be adjusted rather than redrawn
 Standard PDF annotations that open correctly in Acrobat and other viewers
 Optional AI assistant that cites the passage each answer came from
@@ -222,7 +222,7 @@ Kommentarer i margen, og en utskriftsklar eksport med kommentarene satt i en utv
 Utheving, understreking, gjennomstreking, bølget strek, penn, tusj, former, notater og fritekst
 Hold pekeren over en henvisning, figur eller ligning for å forhåndsvise den; hent sammendraget til en sitert artikkel med ett klikk
 Nylige filer som et rutenett av forsider; festede faner, og fanene tilbake ved neste oppstart
-Trykkfølsom penn (beta); pennen tegner mens fingeren blar
+Trykkfølsom penn; pennen tegner mens fingeren blar
 Eksisterende merker kan justeres i stedet for å tegnes på nytt
 Standard PDF-annoteringer som åpnes riktig i Acrobat og andre lesere
 Valgfri AI-assistent som viser hvilket avsnitt hvert svar kom fra
