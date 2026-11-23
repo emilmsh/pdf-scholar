@@ -18,8 +18,7 @@ cited, and can be followed and returned from. The optional AI assistant answers 
 open document and cites the passage behind each claim. Free, MIT-licensed, and offline
 unless you ask a question.
 
-Runs on Windows and macOS, and as a browser extension for Edge and Chrome. A Linux build
-is in beta.
+Runs on Windows, macOS and Linux, and as a browser extension for Edge and Chrome.
 
 ![The same page in Day, Sepia and Night — one window, wiped across the three themes](docs/screenshots/tricolor.png)
 
@@ -86,7 +85,7 @@ Built in CI on every release and tested on Apple hardware. If something misbehav
 your Mac, [open an issue](https://github.com/emilmsh/pdf-scholar/issues) with what works
 and what breaks.
 
-### Desktop app (Linux) — beta
+### Desktop app (Linux)
 
 From the [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest):
 
@@ -97,9 +96,9 @@ From the [latest release](https://github.com/emilmsh/pdf-scholar/releases/latest
 Both auto-update in place.
 
 The build comes from the same sources as the Windows one, in CI, but has never been run
-on a Linux machine: I develop on Windows and have no Linux hardware. The beta label is
-literal. If you run it, [open an issue](https://github.com/emilmsh/pdf-scholar/issues)
-with your distro and what worked or broke.
+on a Linux machine: I develop on Windows and have no Linux hardware. If you run it,
+[open an issue](https://github.com/emilmsh/pdf-scholar/issues) with your distro and what
+worked or broke.
 
 ### Browser extension (Edge / Chrome)
 
@@ -264,7 +263,7 @@ document.
 - Shapes (rectangle, ellipse, line, arrow), draggable sticky notes, and free text typed
   on the page in the colour and size you pick
 - With a stylus, the pen draws while a finger scrolls and zooms; pen pressure varies the
-  line width *(beta)* and is kept in the saved file. A toggle in the tool menus hands
+  line width and is kept in the saved file. A toggle in the tool menus hands
   drawing back to the finger
 - The text tool uses the PDF standard typefaces — Helvetica, Times or Courier, bold and
   italic — and a size, chosen before typing or changed on an existing box. Nothing is

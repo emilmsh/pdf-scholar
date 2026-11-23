@@ -62,7 +62,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 • A notes panel lists every mark by page, with search and filters; comments are edited directly in the list — with export to Word, Markdown or HTML
 • Comments in the margin: notes shown as visible text beside the page, and an export that sets them in a widened margin, numbered at their anchors
 • Highlight, underline, strikeout and squiggly; pen and marker with hold-to-straighten; shapes, sticky notes and free text
-• With a stylus, the pen draws while a finger scrolls; pen pressure varies the line width (beta) and is preserved in the saved file
+• With a stylus, the pen draws while a finger scrolls; pen pressure varies the line width and is preserved in the saved file
 • The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold and italic
 • A signature can be drawn once and stamped where needed; it is stored locally (placing a signature is not the same as digitally signing a document)
 • Password-protected documents open, can be annotated, and keep their protection when saved
@@ -113,7 +113,7 @@ ANNOTERING
 • Notatpanelet lister hvert merke per side, med søk og filtre; kommentarer redigeres direkte i lista — med eksport til Word, Markdown eller HTML
 • Kommentarer i margen: notater vist som synlig tekst ved siden av siden, og en eksport som setter dem i en utvidet marg, nummerert ved ankrene
 • Utheving, understreking, gjennomstreking og bølget strek; penn og tusj med hold-for-å-rette; former, gule lapper og fritekst
-• Med penn på berøringsskjerm tegner pennen mens fingeren blar; pennetrykk varierer strekbredden (beta) og bevares i den lagrede filen
+• Med penn på berøringsskjerm tegner pennen mens fingeren blar; pennetrykk varierer strekbredden og bevares i den lagrede filen
 • Tekstverktøyet bruker PDF-ens standardskrifter — Helvetica, Times eller Courier, fet og kursiv
 • Signaturen tegnes én gang og stemples inn der den trengs; den lagres lokalt (å plassere en signatur er ikke det samme som å signere digitalt)
 • Passordbeskyttede dokumenter åpnes, kan annoteres, og beholder beskyttelsen ved lagring

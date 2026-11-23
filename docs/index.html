@@ -27,8 +27,8 @@
     * A download is one click from anywhere: the header follows the scroll and
       shows its own button once the hero's buttons have left the screen, named
       for the visitor's platform and leading where that platform's hero button
-      leads. Promoting a platform out of beta is a deliberate edit, not upkeep
-      (macOS graduated 2026-08-11, the extension 2026-10-24).
+      leads. Nothing is labelled beta (Emil, 2026-11-23): all five ways in are
+      drawn alike, and what is particular to a platform is said in its card.
 
   Colours are the app's own tokens from src/renderer/src/styles/app.css —
   the Day palette, with the Night palette under prefers-color-scheme: dark.
@@ -40,7 +40,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PDF Scholar — a PDF reader for research</title>
-<meta name="description" content="A PDF reader and annotator for research, on Windows and macOS: split view, link previews, text recognition for scans, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
+<meta name="description" content="A PDF reader and annotator for research, on Windows, macOS and Linux: split view, link previews, text recognition for scans, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
 <meta name="theme-color" content="#eeeef2" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1c1c1b" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="logo.png">
@@ -50,7 +50,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://emilmsh.github.io/pdf-scholar/">
 <meta property="og:title" content="PDF Scholar — a PDF reader for research">
-<meta property="og:description" content="A PDF reader and annotator for research, on Windows and macOS: split view, link previews, text recognition for scans, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
+<meta property="og:description" content="A PDF reader and annotator for research, on Windows, macOS and Linux: split view, link previews, text recognition for scans, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
 <!-- tricolor, not a plain page: this is the thumbnail LinkedIn and Slack draw
      under a shared link, and it is the app's most recognisable single frame. -->
 <meta property="og:image" content="https://emilmsh.github.io/pdf-scholar/screenshots/tricolor.png">
@@ -185,18 +185,6 @@
   .btn-small { padding: 7px 14px; font-size: 14.5px; border-radius: 8px; }
   .btn-small svg { width: 15px; height: 15px; }
 
-  .badge {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    padding: 1px 8px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    vertical-align: 2px;
-  }
-
   code {
     font-size: 13px;
     font-family: Consolas, 'SF Mono', Menlo, monospace;
@@ -232,7 +220,6 @@
   /* The arrow marks the one button that is the visitor's own platform. */
   .os-btn svg { display: none; }
   .os-btn.btn-primary svg { display: block; }
-  .btn-primary .badge { color: inherit; border-color: color-mix(in srgb, currentColor 45%, transparent); }
 
   /* ---------- four facts ---------- */
 
@@ -403,8 +390,7 @@
            drawn as the primary button (Windows until the script knows better).
            Windows downloads the installer, which is one file for everyone;
            macOS and Linux go to their cards in «Get it», where the per-arch
-           dmgs, the Homebrew line, the deb/AppImage choice and the beta note
-           live (Emil, 2026-11-23: where there is a technical choice to make,
+           dmgs, the Homebrew line and the deb/AppImage choice live (Emil, 2026-11-23: where there is a technical choice to make,
            the button leads to the choices). -->
       <div class="get-groups" id="hero-actions">
         <div>
@@ -422,7 +408,7 @@
             </a>
             <a class="btn btn-secondary os-btn" data-os="linux" href="#get-linux">
               <svg viewBox="0 0 16 16" aria-hidden="true"><use href="#i-dl"/></svg>
-              Linux <span class="badge">beta</span>
+              Linux
             </a>
           </div>
         </div>
@@ -448,7 +434,7 @@
   <dl class="facts">
     <div><dt>Free</dt><dd>MIT-licensed. No account, ads or tracking.</dd></div>
     <div><dt>Local</dt><dd>Reading and annotating work offline.</dd></div>
-    <div><dt>Windows and macOS</dt><dd>A <a href="#get-linux">Linux build</a> is in beta.</dd></div>
+    <div><dt>Windows, macOS, Linux</dt><dd>The same <a href="#get">desktop app</a> on all three.</dd></div>
     <div><dt>Edge and Chrome</dt><dd>The same reader as a <a href="#get-ext">browser extension</a>.</dd></div>
   </dl>
 
@@ -728,17 +714,16 @@
       </div>
 
       <div class="tile get-card" id="get-linux">
-        <h3>Linux <span class="badge">beta</span></h3>
+        <h3>Linux</h3>
         <div class="actions">
           <a class="btn btn-secondary btn-small" id="dl-linux" href="https://github.com/emilmsh/pdf-scholar/releases/latest">deb</a>
           <a class="btn btn-secondary btn-small" id="dl-linux-appimage" href="https://github.com/emilmsh/pdf-scholar/releases/latest">AppImage</a>
         </div>
         <p>The deb is for Ubuntu and Debian; other distros take the AppImage.</p>
         <p>
-          The build comes from the same sources but has never been run on a Linux
-          machine: I develop on Windows and have none to test on.
-          <a href="https://github.com/emilmsh/pdf-scholar/issues">A report</a> naming your
-          distro and what worked is useful.
+          Built from the same sources as the Windows app. I develop on Windows and have
+          no Linux machine, so <a href="https://github.com/emilmsh/pdf-scholar/issues">a
+          report</a> naming your distro and what worked is useful.
         </p>
       </div>
 
