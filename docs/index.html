@@ -31,9 +31,16 @@
       drawn alike, and what is particular to a platform is said in its card.
 
   Colours are the app's own tokens from src/renderer/src/styles/app.css —
-  the Day palette, with the Night palette under prefers-color-scheme: dark.
-  Keep them in sync by hand if the palette is retuned; nothing here derives
-  from the stylesheet at build time.
+  the Night palette under prefers-color-scheme: dark, and in light the Day
+  palette with the canvas warmed a step towards the Tint paper (Emil,
+  2026-11-23: "A, litt B" — the scholarly look comes from the type, the
+  paper only hints at it). Keep them in sync by hand if the palette is
+  retuned; nothing here derives from the stylesheet at build time.
+
+  Headings are set in Libertinus Serif, the wordmark's face, at its one
+  shipped weight (600); body text stays in the interface sans. Each feature
+  section opens with a § number and a hairline, the way a paper's sections
+  do.
 -->
 <html lang="en">
 <head>
@@ -41,7 +48,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PDF Scholar — a PDF reader for research</title>
 <meta name="description" content="A PDF reader and annotator for research, on Windows, macOS and Linux: split view, link previews, text recognition for scans, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
-<meta name="theme-color" content="#eeeef2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#f1efea" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1c1c1b" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="logo.png">
 <link rel="canonical" href="https://emilmsh.github.io/pdf-scholar/">
@@ -61,8 +68,9 @@
 <script>document.documentElement.classList.add('js');</script>
 
 <style>
-  /* The wordmark only, so it echoes the serif "S" in the logo (SIL OFL 1.1,
-     licence alongside the file). */
+  /* The wordmark and the headings, echoing the serif "S" in the logo (SIL OFL
+     1.1, licence alongside the file). One weight ships; nothing asks for
+     another, so the browser never synthesises one. */
   @font-face {
     font-family: 'Libertinus Serif';
     src: url('web/LibertinusSerif-Semibold.woff2') format('woff2');
@@ -71,10 +79,11 @@
   }
 
   :root {
-    --bg-chrome: #f7f7f9;
-    --bg-canvas: #eeeef2;
-    --bg-elevated: #ffffff;
-    --border: rgba(0, 0, 0, 0.08);
+    --bg-chrome: #f8f7f3;
+    --bg-canvas: #f1efea;
+    --bg-elevated: #fffefb;
+    --border: rgba(40, 30, 10, 0.09);
+    --font-serif: 'Libertinus Serif', 'Palatino Linotype', Palatino, Cambria, Georgia, serif;
     --text: #1d1d1f;
     --text-secondary: #6e6e73;
     --accent: #2f6f7b;
@@ -206,11 +215,11 @@
     align-items: center;
     padding: 48px 0 0;
   }
+  h1, h2, h3, .facts dt { font-family: var(--font-serif); font-weight: 600; }
   h1 {
-    font-size: clamp(32px, 4.2vw, 44px);
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    font-weight: 650;
+    font-size: clamp(36px, 4.8vw, 50px);
+    line-height: 1.1;
+    letter-spacing: -0.005em;
     margin: 0 0 16px;
   }
   .lede { font-size: 19px; color: var(--text-secondary); margin: 0 0 24px; }
@@ -238,7 +247,7 @@
     overflow: hidden;
   }
   .facts div { background: var(--bg-elevated); padding: 16px 20px; }
-  .facts dt { font-weight: 650; font-size: 16px; }
+  .facts dt { font-size: 18px; line-height: 1.3; }
   .facts dd { margin: 2px 0 0; font-size: 14.5px; color: var(--text-secondary); line-height: 1.45; }
 
   /* ---------- tiles ---------- */
@@ -259,7 +268,7 @@
     color: inherit;
     text-decoration: none;
   }
-  .tile h3 { font-size: 16.5px; font-weight: 650; margin-bottom: 5px; }
+  .tile h3 { font-size: 19px; line-height: 1.3; margin-bottom: 5px; }
   .tiles .tile h3 { display: flex; align-items: center; gap: 9px; }
   .tile-icon {
     width: 19px;
@@ -280,12 +289,25 @@
 
   section { scroll-margin-top: calc(var(--header-h) - 40px); }
 
+  /* A paper's section break: a hairline across the page, the § number above
+     the heading. */
+  main { counter-reset: feature; }
   section.feature {
+    counter-increment: feature;
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: 48px;
     align-items: center;
-    padding: 88px 0 0;
+    margin-top: 72px;
+    padding: 44px 0 0;
+    border-top: 1px solid var(--border);
+  }
+  section.feature h2::before {
+    content: '§\00a0' counter(feature);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 17px;
+    color: var(--accent);
   }
   section.feature.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
   section.feature.flip .body { order: 2; }
@@ -294,10 +316,8 @@
   section.feature.text ul.points { margin-top: 6px; }
 
   section h2 {
-    font-size: 26px;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
-    font-weight: 650;
+    font-size: 30px;
+    line-height: 1.2;
     margin-bottom: 12px;
   }
   section.feature .body p { margin-bottom: 14px; }
@@ -319,7 +339,7 @@
 
   /* ---------- privacy and downloads ---------- */
 
-  section.cards { padding: 96px 0 0; }
+  section.cards { margin-top: 72px; padding: 44px 0 0; border-top: 1px solid var(--border); }
   section.cards h2 { margin-bottom: 18px; }
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
   .after { margin-top: 16px; font-size: 15px; color: var(--text-secondary); max-width: 820px; }
@@ -346,9 +366,9 @@
   @media (max-width: 900px) {
     .hero { grid-template-columns: minmax(0, 1fr); gap: 36px; padding-top: 32px; }
     .facts, .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    section.feature { grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 72px; }
+    section.feature { grid-template-columns: minmax(0, 1fr); gap: 28px; margin-top: 56px; padding-top: 36px; }
     section.feature.flip .body { order: 0; }
-    section.cards { padding-top: 72px; }
+    section.cards { margin-top: 56px; padding-top: 36px; }
   }
   @media (max-width: 600px) {
     main, .bar, footer .inner { padding-left: 16px; padding-right: 16px; }
