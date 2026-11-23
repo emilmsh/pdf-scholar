@@ -5,22 +5,26 @@
 
   The copy here derives from docs/MESSAGING.md, which is the master for what we
   say about the product across the README, both store listings and this page.
-  Change the claim there first, or the four surfaces drift apart.
+  Change the claim there first, or the four surfaces drift apart. The page's
+  shape — hero, four facts, nine tiles, one short section per tile with at most
+  three points — is set there too («The landing page's shape»).
 
   Deliberately zero-maintenance:
 
-    * The download button, version, file size and release date come from the
+    * The download buttons, version, file size and release date come from the
       GitHub Releases API at load time (see the script at the bottom). Nothing
-      here names a version. The no-JS/API-down path still works: the button's
-      static href is /releases/latest, which GitHub redirects for us.
+      here names a version. The no-JS/API-down path still works: every
+      button's static href is /releases/latest, which GitHub redirects for us.
     * Screenshots are the shipped ones in docs/screenshots/, referenced
-      relatively — reshooting them updates this page too.
-    * Windows (installer + Microsoft Store) and macOS share the hero offer —
-      the hero macOS button anchors to "Get it", where the per-arch dmgs and
-      the Homebrew line live, resolved from the same API call. Linux stays
-      there too, labelled beta; the extension keeps its one footer line.
-      Promoting a platform out of beta is a deliberate edit, not upkeep
-      (macOS graduated 2026-08-11, the extension 2026-10-24).
+      relatively — reshooting them updates this page too. Each one links to
+      its own file, since beside the text it is shown at about a quarter of
+      its size.
+    * A download is one click from anywhere: the header follows the scroll and
+      shows its own button once the hero's buttons have left the screen. On
+      Windows it is the installer itself; elsewhere it goes to «Get it», where
+      the per-arch dmgs, the Homebrew line, the Linux beta and the extension
+      each have a card. Promoting a platform out of beta is a deliberate edit,
+      not upkeep (macOS graduated 2026-08-11, the extension 2026-10-24).
 
   Colours are the app's own tokens from src/renderer/src/styles/app.css —
   the Day palette, with the Night palette under prefers-color-scheme: dark.
@@ -32,9 +36,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PDF Scholar — a PDF reader for research</title>
-<meta name="description" content="A PDF reader and annotator for research, on Windows and macOS: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
-<meta name="theme-color" content="#f7f7f9" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<meta name="description" content="A PDF reader and annotator for research, on Windows and macOS: split view, link previews, text recognition for scans, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
+<meta name="theme-color" content="#eeeef2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1b" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="logo.png">
 <link rel="canonical" href="https://emilmsh.github.io/pdf-scholar/">
 
@@ -42,11 +46,15 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://emilmsh.github.io/pdf-scholar/">
 <meta property="og:title" content="PDF Scholar — a PDF reader for research">
-<meta property="og:description" content="A PDF reader and annotator for research, on Windows and macOS: one slim toolbar, annotation at the text you select, split view, four reading themes, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
+<meta property="og:description" content="A PDF reader and annotator for research, on Windows and macOS: split view, link previews, text recognition for scans, and an optional AI assistant that cites its sources. Free and MIT-licensed.">
 <!-- tricolor, not a plain page: this is the thumbnail LinkedIn and Slack draw
      under a shared link, and it is the app's most recognisable single frame. -->
 <meta property="og:image" content="https://emilmsh.github.io/pdf-scholar/screenshots/tricolor.png">
 <meta name="twitter:card" content="summary_large_image">
+
+<!-- Before first paint: with scripting on, the header's download button waits
+     for the hero's own buttons to scroll away. Without it, it is always there. -->
+<script>document.documentElement.classList.add('js');</script>
 
 <style>
   /* The wordmark only, so it echoes the serif "S" in the logo (SIL OFL 1.1,
@@ -68,8 +76,8 @@
     --accent: #2f6f7b;
     --accent-text: #ffffff;
     --hover: rgba(0, 0, 0, 0.055);
-    --shadow-page: 0 1px 2px rgba(0, 0, 0, 0.12), 0 4px 14px rgba(0, 0, 0, 0.1);
     --shadow-shot: 0 1px 2px rgba(0, 0, 0, 0.1), 0 12px 40px rgba(0, 0, 0, 0.12);
+    --header-h: 64px;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -89,22 +97,28 @@
 
   * { box-sizing: border-box; }
 
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+
   body {
     margin: 0;
     background: var(--bg-canvas);
     color: var(--text);
     font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, sans-serif;
     font-size: 17px;
-    line-height: 1.65;
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
 
-  main { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  main, .bar, footer .inner { max-width: 1160px; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
 
   a { color: var(--accent); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
   a:hover { text-decoration-color: var(--accent); }
 
   img { max-width: 100%; height: auto; display: block; }
+
+  h2, h3, p { margin: 0; }
 
   .shot {
     border-radius: 10px;
@@ -112,48 +126,46 @@
     box-shadow: var(--shadow-shot);
     background: var(--bg-elevated);
   }
+  a.shot-link { display: block; cursor: zoom-in; }
 
   /* ---------- header ---------- */
 
   header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    max-width: 1080px;
-    margin: 0 auto;
-    padding: 28px 24px 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: color-mix(in srgb, var(--bg-canvas) 86%, transparent);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid transparent;
+    transition: border-color 150ms ease;
   }
-  header img { width: 34px; height: 34px; }
+  header.stuck { border-bottom-color: var(--border); }
+  .bar { display: flex; align-items: center; gap: 12px; height: var(--header-h); }
+  .brand { display: flex; align-items: center; gap: 12px; color: inherit; text-decoration: none; }
+  .brand img { width: 32px; height: 32px; }
   .wordmark {
     font-family: 'Libertinus Serif', 'Palatino Linotype', Cambria, Georgia, serif;
     font-weight: 600;
-    font-size: 24px;
+    font-size: 23px;
     letter-spacing: 0.01em;
+    white-space: nowrap;
   }
-  header nav { margin-left: auto; font-size: 15px; }
-  header nav a { color: var(--text-secondary); text-decoration: none; }
-  header nav a:hover { color: var(--text); }
+  header nav { margin-left: auto; display: flex; align-items: center; gap: 22px; font-size: 15px; }
+  header nav a.link { color: var(--text-secondary); text-decoration: none; }
+  header nav a.link:hover { color: var(--text); }
+  .nav-dl { transition: opacity 150ms ease, visibility 150ms; }
+  html.js header:not(.stuck) .nav-dl { opacity: 0; visibility: hidden; }
 
-  /* ---------- hero ---------- */
+  /* ---------- buttons ---------- */
 
-  .hero { padding: 72px 0 8px; max-width: 640px; }
-  h1 {
-    font-size: clamp(32px, 5vw, 46px);
-    line-height: 1.18;
-    letter-spacing: -0.02em;
-    font-weight: 650;
-    margin: 0 0 20px;
-  }
-  .lede { font-size: 19px; color: var(--text-secondary); margin: 0 0 32px; }
-  .lede strong { color: var(--text); font-weight: 600; }
-
-  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
   .btn {
     display: inline-flex;
     align-items: center;
     gap: 9px;
-    padding: 12px 22px;
+    padding: 11px 16px;
     border-radius: 9px;
     font-size: 16px;
     font-weight: 600;
@@ -164,21 +176,11 @@
   .btn-primary { background: var(--accent); color: var(--accent-text); }
   .btn-primary:hover { background: color-mix(in srgb, var(--accent) 88%, black); }
   .btn-secondary { background: var(--bg-elevated); color: var(--text); border-color: var(--border); }
-  .btn-secondary:hover { background: var(--hover); }
+  .btn-secondary:hover { background: color-mix(in srgb, var(--bg-elevated) 92%, var(--text)); }
   .btn svg { width: 17px; height: 17px; flex: none; }
+  .btn-small { padding: 7px 14px; font-size: 14.5px; border-radius: 8px; }
+  .btn-small svg { width: 15px; height: 15px; }
 
-  .dl-meta { margin: 16px 0 0; font-size: 14.5px; color: var(--text-secondary); }
-  .dl-meta .sep { opacity: 0.45; margin: 0 7px; }
-
-  .actions-beta { margin-top: 14px; }
-  .dl-meta code {
-    font-size: 12.5px;
-    font-family: Consolas, monospace;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    padding: 1px 7px;
-  }
   .badge {
     font-size: 11px;
     font-weight: 600;
@@ -188,25 +190,111 @@
     border-radius: 999px;
     border: 1px solid var(--border);
     color: var(--text-secondary);
+    vertical-align: 2px;
   }
 
-  .hero-shot { margin: 52px 0 0; }
+  code {
+    font-size: 13px;
+    font-family: Consolas, 'SF Mono', Menlo, monospace;
+    background: var(--bg-canvas);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 7px;
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------- hero ---------- */
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px;
+    align-items: center;
+    padding: 48px 0 0;
+  }
+  h1 {
+    font-size: clamp(32px, 4.2vw, 44px);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-weight: 650;
+    margin: 0 0 16px;
+  }
+  .lede { font-size: 19px; color: var(--text-secondary); margin: 0 0 26px; }
+  .dl-meta { margin: 14px 0 0; font-size: 14px; color: var(--text-secondary); }
+  .dl-meta .sep { opacity: 0.45; margin: 0 6px; }
+
+  /* ---------- four facts ---------- */
+
+  /* One-pixel gaps over the border colour draw the dividers, so they stay
+     right whatever the column count. */
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1px;
+    margin: 48px 0 0;
+    background: color-mix(in srgb, var(--text) 10%, var(--bg-elevated));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .facts div { background: var(--bg-elevated); padding: 16px 20px; }
+  .facts dt { font-weight: 650; font-size: 16px; }
+  .facts dd { margin: 2px 0 0; font-size: 14.5px; color: var(--text-secondary); line-height: 1.45; }
+
+  /* ---------- tiles ---------- */
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin: 14px 0 0;
+    scroll-margin-top: calc(var(--header-h) + 14px);
+  }
+  .tile {
+    display: block;
+    padding: 18px 20px 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: inherit;
+    text-decoration: none;
+  }
+  .tile h3 { font-size: 16.5px; font-weight: 650; margin-bottom: 5px; }
+  .tile p { font-size: 15px; line-height: 1.5; color: var(--text-secondary); }
+  a.tile { transition: border-color 120ms ease; }
+  a.tile:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  a.tile:hover h3 { color: var(--accent); }
 
   /* ---------- feature sections ---------- */
 
-  section.feature { padding: 96px 0 0; }
-  section.feature h2 {
-    font-size: 27px;
+  section { scroll-margin-top: calc(var(--header-h) - 40px); }
+
+  section.feature {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    gap: 48px;
+    align-items: center;
+    padding: 88px 0 0;
+  }
+  section.feature.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
+  section.feature.flip .body { order: 2; }
+  /* No frame of its own: the heading stands left, the points right. */
+  section.feature.text { align-items: start; }
+  section.feature.text ul.points { margin-top: 6px; }
+
+  section h2 {
+    font-size: 26px;
+    line-height: 1.25;
     letter-spacing: -0.01em;
     font-weight: 650;
-    margin: 0 0 14px;
+    margin-bottom: 12px;
   }
-  section.feature .body { max-width: 640px; }
-  section.feature p { margin: 0 0 16px; }
-  section.feature img { margin-top: 32px; }
+  section.feature .body p { margin-bottom: 14px; }
+  section.feature .body > :last-child { margin-bottom: 0; }
 
-  ul.points { margin: 0; padding: 0; list-style: none; }
+  ul.points { margin: 0; padding: 0; list-style: none; font-size: 16px; }
   ul.points li { position: relative; padding-left: 20px; margin-bottom: 9px; }
+  ul.points li:last-child { margin-bottom: 0; }
   ul.points li::before {
     content: '';
     position: absolute;
@@ -217,334 +305,434 @@
     border-radius: 50%;
     background: var(--accent);
   }
-  ul.points b { font-weight: 600; }
 
+  /* ---------- privacy and downloads ---------- */
 
-  /* ---------- privacy note ---------- */
+  section.cards { padding: 96px 0 0; }
+  section.cards h2 { margin-bottom: 18px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .after { margin-top: 16px; font-size: 15px; color: var(--text-secondary); max-width: 820px; }
 
-  .note {
-    margin: 96px 0 0;
-    padding: 28px 32px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-  }
-  .note h2 { font-size: 20px; margin: 0 0 12px; font-weight: 650; }
-  .note p { margin: 0 0 12px; max-width: 700px; }
-  .note p:last-child { margin-bottom: 0; }
-
-  /* ---------- closing download ---------- */
-
-  .closing { padding: 96px 0 0; text-align: center; }
-  .closing h2 { font-size: 27px; font-weight: 650; margin: 0 0 22px; letter-spacing: -0.01em; }
-  .closing .actions { justify-content: center; }
+  .get-card h3 { margin-bottom: 12px; }
+  .get-card .actions { margin-bottom: 12px; }
+  .get-card p + p { margin-top: 8px; }
 
   /* ---------- footer ---------- */
 
   footer {
     margin-top: 88px;
     border-top: 1px solid var(--border);
-    padding: 32px 24px 56px;
+    padding: 32px 0 56px;
     font-size: 14.5px;
     color: var(--text-secondary);
   }
-  footer .inner { max-width: 1080px; margin: 0 auto; }
-  footer p { margin: 0 0 10px; max-width: 720px; }
+  footer p { margin: 0 0 10px; max-width: 760px; }
   footer p:last-child { margin-bottom: 0; }
+
+  /* ---------- narrower screens ---------- */
+
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: minmax(0, 1fr); gap: 36px; padding-top: 32px; }
+    .facts, .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    section.feature { grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 72px; }
+    section.feature.flip .body { order: 0; }
+    section.cards { padding-top: 72px; }
+  }
+  @media (max-width: 600px) {
+    main, .bar, footer .inner { padding-left: 16px; padding-right: 16px; }
+    .facts, .tiles, .grid2 { grid-template-columns: minmax(0, 1fr); }
+    header nav { gap: 14px; }
+    header nav a.link.wide { display: none; }
+    .brand { gap: 9px; }
+    .wordmark { font-size: 20px; }
+    code { font-size: 11.5px; padding: 1px 5px; }
+  }
 </style>
 </head>
 
-<header>
-  <img src="logo.png" alt="" width="34" height="34">
-  <span class="wordmark">PDF Scholar</span>
-  <nav><a href="https://github.com/emilmsh/pdf-scholar">GitHub</a></nav>
+<header id="top">
+  <div class="bar">
+    <a class="brand" href="#top">
+      <img src="logo.png" alt="" width="32" height="32">
+      <span class="wordmark">PDF Scholar</span>
+    </a>
+    <nav>
+      <a class="link wide" href="#features">Features</a>
+      <a class="link wide" href="#privacy">Privacy</a>
+      <a class="link" href="https://github.com/emilmsh/pdf-scholar">GitHub</a>
+      <!-- Static href is «Get it», right for every platform. The script below
+           makes it the installer itself on Windows. -->
+      <a class="btn btn-primary btn-small nav-dl" id="dl-top" href="#get">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></svg>
+        Download
+      </a>
+    </nav>
+  </div>
 </header>
 
 <main>
 
   <div class="hero">
-    <h1>A PDF reader for research.</h1>
-    <p class="lede">
-      The window is nearly all page: one slim toolbar carries the tools you use
-      frequently, and everything else — contents, notes, the assistant — stays out of
-      the way until you call it.
-      <strong>Free, MIT-licensed, and offline unless you ask a question.</strong>
-    </p>
+    <div>
+      <h1>A PDF reader for research.</h1>
+      <p class="lede">
+        Read, annotate and search papers, with split view, link previews and an
+        optional AI assistant that cites its sources.
+      </p>
 
-    <div class="actions">
-      <!-- href is the permanent GitHub redirect; the script below swaps in the
-           exact installer asset once the API answers. -->
-      <a class="btn btn-primary" id="dl" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></svg>
-        Download for Windows
-      </a>
-      <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.5 2.1 1 3v4.5h6.5V2.1Zm1 -.14V7.5H15V1l-6.5.96ZM1 8.5V13l6.5.9V8.5H1Zm7.5 0v5.54L15 15V8.5H8.5Z"/></svg>
-        Microsoft Store
-      </a>
-      <!-- Anchors to Get-it rather than downloading: the dmgs are per-arch and
-           the Homebrew line lives there — no one should get the wrong file
-           from the hero. -->
-      <a class="btn btn-secondary" href="#get">Download for macOS</a>
+      <div class="actions" id="hero-actions">
+        <!-- href is the permanent GitHub redirect; the script below swaps in the
+             exact installer asset once the API answers. -->
+        <a class="btn btn-primary" id="dl" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">
+          <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.5 2.1 1 3v4.5h6.5V2.1Zm1 -.14V7.5H15V1l-6.5.96ZM1 8.5V13l6.5.9V8.5H1Zm7.5 0v5.54L15 15V8.5H8.5Z"/></svg>
+          Microsoft Store
+        </a>
+        <!-- Anchors to Get-it rather than downloading: the dmgs are per-arch and
+             the Homebrew line lives there — no one should get the wrong file
+             from the hero. -->
+        <a class="btn btn-secondary" href="#get">macOS</a>
+      </div>
+
+      <p class="dl-meta" id="dl-meta">Windows 10 and 11 <span class="sep">·</span> x64 and arm64 in one installer <span class="sep">·</span> no admin rights needed</p>
     </div>
 
-    <p class="dl-meta" id="dl-meta">Windows 10 and 11 <span class="sep">·</span> x64 and arm64 in one installer <span class="sep">·</span> no admin rights needed <span class="sep">·</span> <a href="#get">Linux beta</a></p>
+    <!-- tricolor opens the page: one window shown in three themes, toolbar
+         kept, so the first frame reads as an application. -->
+    <a class="shot-link" href="screenshots/tricolor.png">
+      <img class="shot" src="screenshots/tricolor.png" alt="The same page in three themes at once: white paper on the left, warm ivory in the middle, near-black on the right, under one slim toolbar.">
+    </a>
   </div>
 
-  <img class="shot hero-shot" src="screenshots/tricolor.png" alt="The same page in three themes at once: white paper on the left, warm ivory in the middle, near-black on the right, under one slim toolbar.">
+  <dl class="facts">
+    <div><dt>Free</dt><dd>MIT-licensed. No account, ads or tracking.</dd></div>
+    <div><dt>Local</dt><dd>Reading and annotating work offline.</dd></div>
+    <div><dt>Windows and macOS</dt><dd>A <a href="#get">Linux build</a> is in beta.</dd></div>
+    <div><dt>Edge and Chrome</dt><dd>The same reader as a <a href="#get">browser extension</a>.</dd></div>
+  </dl>
 
-  <!-- Reading comes first, directly under the opening frame: tricolor IS what
-       opens this section (one window shown in three themes), so the section
-       carries no picture of its own. The keyboard map lives in its own small
-       section after the assistant (Emil, 2026-08-09) — never at the head of
-       the page: a settings dialog is a thing you go and find, not what the
-       app looks like. -->
-  <section class="feature">
+  <!-- The overview. Topic labels here, the pillars' headings on the sections
+       below; one tile per section, in the same order. -->
+  <div class="tiles" id="features">
+    <a class="tile" href="#reading">
+      <h3>Reading</h3>
+      <p>One slim toolbar; the rest of the window is the page. Four reading themes, tabs, and a library that reopens each file where you stopped.</p>
+    </a>
+    <a class="tile" href="#previews">
+      <h3>Link previews</h3>
+      <p>Hover a citation, figure, table or equation reference to see its target beside the text. One click fetches a cited paper's abstract.</p>
+    </a>
+    <a class="tile" href="#split">
+      <h3>Split view</h3>
+      <p>Two columns of one document, or two documents side by side, each with its own page and zoom.</p>
+    </a>
+    <a class="tile" href="#annotation">
+      <h3>Annotation</h3>
+      <p>Highlight, underline, comment, draw and type. Saved as standard PDF annotations that open in other readers.</p>
+    </a>
+    <a class="tile" href="#zotero">
+      <h3>Zotero</h3>
+      <p>Works as Zotero's external reader. Copy a citation, reference or BibTeX entry from the save menu.</p>
+    </a>
+    <a class="tile" href="#search">
+      <h3>Search</h3>
+      <p>By words, or by meaning: describe a topic and get the passages that discuss it.</p>
+    </a>
+    <a class="tile" href="#scans">
+      <h3>Scanned pages</h3>
+      <p>Text recognition runs on your computer and makes scans searchable and selectable.</p>
+    </a>
+    <a class="tile" href="#assistant">
+      <h3>Assistant</h3>
+      <p>Optional. Runs on your API key, a ChatGPT plan or a local model. Each claim links to the passage it came from.</p>
+    </a>
+    <a class="tile" href="#ai-tools">
+      <h3>Notes in AI tools</h3>
+      <p>Claude, Codex and other MCP tools can search your highlights, comments and conversations. Off by default.</p>
+    </a>
+  </div>
+
+  <!-- Reading has no frame of its own: tricolor in the hero is its
+       illustration. The keyboard map keeps its small section last (Emil,
+       2026-08-09) — a settings dialog is a thing you go and find, not what
+       the app looks like. -->
+  <section class="feature text" id="reading">
     <div class="body">
       <h2>Undistracted reading</h2>
       <p>
-        The frame above is one window shown in three of the four reading modes — Day,
-        Tint (a light paper tone: the classic Sepia cream, or gray, green, blue, sand or a colour of your own)
-        and two dark modes, the second with higher contrast — plus Auto, which follows
-        the system. Night has its own dark tones — or «White», the document as printed
-        inside the dark chrome — and can keep pictures in their original colours; a slider
-        sets the strength, and the toolbar follows the chosen tone.
+        One slim toolbar holds the tools you use often; contents, notes and the
+        assistant are side panels you open when needed. Unpinned, the toolbar hides
+        and the page fills the window.
       </p>
-      <ul class="points">
-        <li>Table of contents, thumbnails and bookmarks in one panel, a page field in the toolbar that jumps straight to a page number, and back/forward buttons that hold the navigation history.</li>
-        <li>Internal links can be previewed where they are cited — citations, figures, tables and equations alike (see below).</li>
-        <li>Zoom centres on the cursor or pinch point, and one button toggles fit-width and whole-page. Pages can be rotated, read as a two-page spread, turned one at a time instead of scrolled, or shown in full-screen presentation mode.</li>
-        <li>Documents open in tabs and separate windows; tabs can be pinned, and each window gets its tabs back at the next launch. A tab drags like a file — into another window, or into anything that takes a PDF, such as a browser's upload field or an e-mail. The library lists recent files, or shows their first pages with how far you read; every file reopens where you stopped, and going back to the library closes nothing.</li>
-        <li>The toolbar can be unpinned; the page then fills the window, and the toolbar and panels return on hover at the window edges.</li>
-        <li>The interface is in Norwegian, English or Simplified Chinese; the choice also applies to the AI prompts, exports and dates.</li>
-      </ul>
     </div>
+    <ul class="points">
+      <li>Four reading modes (Day, a tinted paper tone, two dark modes) and Auto, which follows the system. Night can keep figures in their original colours.</li>
+      <li>Contents, thumbnails and bookmarks in one panel, with back and forward through your navigation history. Pages can be shown as a two-page spread, turned one at a time, or presented full-screen.</li>
+      <li>Documents open in tabs or separate windows, and the tabs return at the next launch. Each file reopens on the page where you stopped.</li>
+    </ul>
   </section>
 
-  <section class="feature">
+  <section class="feature" id="previews">
     <div class="body">
       <h2>Previews where you read</h2>
       <p>
-        Rest the pointer on a citation, a figure, a table or an equation reference and a
-        preview of what it points to opens beside the text, without moving the page. A
-        citation shows its reference as text, the way Zotero's reader does — selectable,
-        its DOI and web links live — and a bracketed citation like «[3, 5–9]» lists every
-        reference in it, whichever of its numbers the pointer rests on, each with «Go to»
-        for its place in the list. A figure, a table or an equation gets a window
-        onto its page: scroll it, Ctrl+wheel to rescale it, drag the corner to make it
-        bigger. Click inside to go there, Ctrl+click to open it in the other column.
+        Rest the pointer on a citation, figure, table or equation reference, and its
+        target opens in a small window beside the text.
       </p>
       <ul class="points">
-        <li>On a citation, one click fetches the cited paper's abstract from free scholarly databases (arXiv, Europe PMC, Crossref, OpenAlex) — no key, no account, and only on that click; each reference in a bracket has its own. In the reference list itself, select an entry and choose “Abstract”.</li>
-        <li>Roughly two in three citations find an abstract; books, working papers and some paywalled journals often do not.</li>
-        <li>“Preview links” in the settings menu turns the previews off, or sets how long the pointer rests before one opens.</li>
+        <li>A citation shows its reference as selectable text with live DOI and web links. A bracket like «[3, 5–9]» lists every reference in it.</li>
+        <li>One click fetches the cited paper's abstract from arXiv, Europe PMC, Crossref or OpenAlex. Roughly two in three citations find one.</li>
+        <li>A figure, table or equation opens in a window you can scroll and resize. Click to go there, Ctrl+click to open it in the other column.</li>
       </ul>
     </div>
-    <img class="shot" src="screenshots/link_preview.png" alt="A citation previewed where it is cited: the reference entry beside the text, the abstract under it.">
+    <a class="shot-link" href="screenshots/link_preview.png">
+      <img class="shot" loading="lazy" src="screenshots/link_preview.png" alt="A citation previewed where it is cited: the reference entry beside the text, the abstract under it.">
+    </a>
   </section>
 
-  <section class="feature">
+  <section class="feature flip" id="split">
     <div class="body">
       <h2>Two pages at once</h2>
       <p>
-        A table or figure often sits on one page and the text that discusses it on
-        another. The S key opens a second column of the same document — or of another
-        one, so two papers can be read side by side.
+        The S key opens a second column, showing the same document or another one.
       </p>
       <ul class="points">
-        <li>Each column has its own page, zoom and rotation, so a landscape table can sit upright beside portrait text.</li>
-        <li>Ctrl+click on an internal link opens its target in the other column, keeping the current page in view.</li>
-        <li>The second column can hold another document — drag its tab into the view, or choose it under “Open in split view” in the view menu — and each column annotates its own file; with one document open, a mark appears in both columns.</li>
+        <li>Each column has its own page, zoom and rotation: a landscape table can sit upright beside the text that discusses it.</li>
+        <li>Ctrl+click on an internal link opens its target in the other column.</li>
+        <li>To read two papers side by side, drag a tab into the view. Each column annotates its own file.</li>
       </ul>
     </div>
-    <img class="shot" src="screenshots/dual-pane.png" alt="The same paper in two columns, each showing a different page.">
+    <a class="shot-link" href="screenshots/dual-pane.png">
+      <img class="shot" loading="lazy" src="screenshots/dual-pane.png" alt="The same paper in two columns, each showing a different page.">
+    </a>
   </section>
 
-  <section class="feature">
+  <section class="feature" id="annotation">
     <div class="body">
       <h2>Annotating while you read</h2>
       <p>
-        Selecting text opens the annotation menu at the selection — highlight,
-        underline, a comment, or a question for the assistant. The toolbar carries the
-        same tools, with colour, thickness and opacity set per tool and remembered
-        between sessions.
+        Selecting text opens the annotation menu at the selection: highlight,
+        underline, comment, or ask the assistant. The toolbar adds a pen, shapes, text
+        boxes and a signature stamp; with a stylus, the pen draws while a finger
+        scrolls.
       </p>
       <ul class="points">
-        <li>A notes panel lists every mark by page, with search and colour and type filters; comments are edited directly in the list, and a click goes to the mark. A summary — highlighted text included — exports to Word, Markdown or HTML.</li>
-        <li>Comments can be shown in the margin as visible text beside the page, each with a leader line to its passage. An export produces a print-ready copy with the comments set in a widened margin, numbered at their anchors.</li>
-        <li>Existing marks can be adjusted rather than redrawn: the ends of a highlight, the corner of a shape.</li>
-        <li>With a stylus, the pen draws while a finger scrolls; pen pressure varies the line width <i>(beta)</i> and is preserved in the saved file.</li>
-        <li>The text tool uses the PDF's standard typefaces — Helvetica, Times or Courier, bold and italic — so the text remains searchable in any reader. A signature can be drawn once and stamped where needed.</li>
-        <li>Edits are held in a draft until you save; what is saved is standard PDF annotations, which open correctly in other readers — Zotero included. A document from a Zotero library also gets a Zotero section in the save menu: show the item in Zotero, or copy its citation, reference or BibTeX entry.</li>
+        <li>A notes panel lists every mark by page, with search and filters, and exports a summary to Word, Markdown or HTML.</li>
+        <li>Comments can be shown in the margin beside the page, and exported as a print-ready copy with the comments set in a widened margin.</li>
+        <li>Edits are held in a draft until you save. What is saved is standard PDF annotations, which open in other readers.</li>
       </ul>
     </div>
-    <img class="shot" src="screenshots/annotations.png" alt="A highlight, an underline, a box around a paragraph and a sticky note on one page, with the selection menu open beside the selected text.">
+    <a class="shot-link" href="screenshots/annotations.png">
+      <img class="shot" loading="lazy" src="screenshots/annotations.png" alt="A highlight, an underline, a box around a paragraph and a sticky note on one page, with the selection menu open beside the selected text.">
+    </a>
   </section>
 
-  <section class="feature">
+  <section class="feature text" id="zotero">
+    <div class="body">
+      <h2>Works with Zotero</h2>
+      <p>
+        Set PDF Scholar as the external PDF reader in Zotero 7 or later, and
+        attachments open here.
+      </p>
+    </div>
+    <ul class="points">
+      <li>A document from a Zotero library gets a Zotero section in the save menu: show the item in Zotero, or copy its citation, reference or BibTeX entry in one of eight citation styles.</li>
+      <li>The data comes from Zotero's local API on the same computer, which you enable once in Zotero's settings.</li>
+      <li>Zotero's “Import Annotations…” picks up the highlights and underlines saved in the file.</li>
+    </ul>
+  </section>
+
+  <section class="feature flip" id="search">
     <div class="body">
       <h2>Search by words or by meaning</h2>
       <p>
-        Both modes live in one search bar, a tab apart.
+        One search bar with two modes.
       </p>
       <ul class="points">
-        <li>By words: match case, whole word, a results list with excerpts, and every match marked on the page. The list opens folded, so the bar never covers the hit it points at; unfold it and the choice is remembered.</li>
+        <li>By words: match case or whole word, a results list with excerpts, and every match marked on the page.</li>
         <li>By meaning: describe a topic in your own words and get the passages that discuss it, ranked. This mode uses the assistant's key.</li>
       </ul>
     </div>
-    <img class="shot" src="screenshots/search_ai.png" alt="The AI search: a question in plain words, the ranked passages that answer it, and the first one highlighted on the page.">
+    <a class="shot-link" href="screenshots/search_ai.png">
+      <img class="shot" loading="lazy" src="screenshots/search_ai.png" alt="The AI search: a question in plain words, the ranked passages that answer it, and the first one highlighted on the page.">
+    </a>
   </section>
 
-  <section class="feature">
+  <section class="feature" id="scans">
     <div class="body">
       <h2>Scanned pages have text</h2>
       <p>
-        A page that is only a picture of text — a scan, a reprint, a photocopied chapter —
-        is read by text recognition on your own computer. From then on its words can be
-        found, selected, copied, marked and asked about like any other page's.
+        Scans, reprints and photocopied chapters are read by text recognition on your
+        computer. Their words can then be searched, selected, copied, marked and asked
+        about.
       </p>
       <ul class="points">
         <li>The pages on screen are read first; a search reads the rest and shows the hits as they come.</li>
-        <li>Nothing is sent anywhere for this, and nothing is written into the file. The read is not perfect: now and then two short words come out joined.</li>
+        <li>The recognised text stays on your computer, and the file is left unchanged.</li>
+        <li>Models for English, Norwegian and Simplified Chinese. The read is not perfect: now and then two short words come out joined.</li>
       </ul>
     </div>
-    <img class="shot" src="screenshots/search_scan.png" alt="Search in a scanned document: the pages read on this computer, every hit marked on the scan.">
+    <a class="shot-link" href="screenshots/search_scan.png">
+      <img class="shot" loading="lazy" src="screenshots/search_scan.png" alt="Search in a scanned document: the pages read on this computer, every hit marked on the scan.">
+    </a>
   </section>
 
-  <section class="feature">
+  <section class="feature flip" id="assistant">
     <div class="body">
       <h2>An assistant that cites its sources</h2>
       <p>
-        Optional, and it runs on your own API key — or on your ChatGPT plan. Each claim carries a reference, and
-        following it goes to the passage the claim came from.
+        Optional. Each claim in an answer carries a reference, and clicking it goes to
+        the passage the claim came from.
       </p>
       <ul class="points">
-        <li>Structured article summaries: research question, method, data, findings, limitations.</li>
-        <li>A figure or table can be cropped into the chat and asked about.</li>
-        <li>Questions about your own annotations — <i>“summarize what I've highlighted”</i>.</li>
-        <li>A scanned document is read the same way: the assistant gets the text recognised on your computer, with clickable citations, instead of only pages attached as images.</li>
-        <li>Conversations are kept with their document and listed across documents in the library, searchable; an earlier conversation — about this paper or another — can be attached to a new question as context.</li>
-        <li>One paperclip in the composer attaches context to a question: an earlier conversation, an image, or a local file — a PDF or a text file — whose text goes along as notes beside the document, which stays the only source the assistant cites.</li>
-        <li>The assistant can open in its own window, so the document keeps the whole screen; a citation click still goes to the passage in the window showing the document.</li>
-        <li>Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq, one key field each — or any OpenAI-compatible endpoint and local models via Ollama or LM Studio, with no key. Each answer reports the provider's token count.</li>
-        <li>Sign in with ChatGPT Plus or Pro in the desktop app and use the plan's allowance instead of an API key — the browser extension uses that sign-in too when the app is installed. An unofficial route OpenAI allows today, under ChatGPT's terms.</li>
+        <li>Ask about the document, a cropped figure or table, or your own highlights. A structured summary covers research question, method, data, findings and limitations.</li>
+        <li>Conversations are kept with their document and searchable in the library. A paperclip attaches an earlier conversation, an image or a local file as context.</li>
+        <li>Providers: OpenAI, Claude (Anthropic), Google Gemini, Azure OpenAI, OpenRouter, Grok (xAI), Mistral and Groq with your own key, or any OpenAI-compatible endpoint, including local models through Ollama or LM Studio. Signing in with ChatGPT Plus or Pro in the desktop app is an unofficial route that OpenAI allows today, under ChatGPT's terms.</li>
       </ul>
     </div>
-    <img class="shot" src="screenshots/assistant.png" alt="The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip.">
+    <a class="shot-link" href="screenshots/assistant.png">
+      <img class="shot" loading="lazy" src="screenshots/assistant.png" alt="The assistant's answer beside the document, with the cited sentence highlighted on the page after clicking its chip.">
+    </a>
   </section>
 
-  <section class="feature">
+  <section class="feature text" id="ai-tools">
     <div class="body">
       <h2>Your notes in Claude, Codex and other AI tools</h2>
       <p>
-        The desktop app can let an AI tool on your computer search what you noted across
-        every paper: highlights with the words they mark, comments, and your assistant
-        conversations. Ask it while you write and it looks the notes up, without opening a PDF.
+        The desktop app can let an AI tool on your computer search what you noted
+        across every paper: highlights with the words they mark, comments, and your
+        assistant conversations.
       </p>
-      <ul class="points">
-        <li><b>Nothing to download.</b> The MCP server is part of the app. Claude and Codex are one switch each, under “AI tools” in the settings menu.</li>
-        <li>Other tools that support MCP take one config entry, which the app copies for you with your paths filled in. <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/MCP.md">How to set it up</a>.</li>
-        <li>For a tool that cannot connect, “Copy for AI” copies one document's notes and conversations as text to paste. This also works in the browser extension.</li>
-        <li>Off until you turn a tool on, and the same switch takes it back. Each document has its own switch and a whole folder can be kept out, and a tool never sees the PDFs, images, file paths or anything from a password-protected document.</li>
-      </ul>
     </div>
+    <ul class="points">
+      <li>The MCP server is part of the app. Claude and Codex each have a switch under “AI tools” in the settings menu; other tools that support MCP take one config entry, which the app copies for you. <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/MCP.md">How to set it up</a>.</li>
+      <li>Every switch is off until you turn it on. A document or a whole folder can be kept out, and a tool never sees the PDFs, images, file paths or anything from a password-protected document.</li>
+      <li>For a tool that cannot connect, “Copy for AI” copies one document's notes and conversations as text to paste. This also works in the browser extension.</li>
+    </ul>
   </section>
 
-  <section class="feature">
+  <section class="feature" id="shortcuts">
     <div class="body">
       <h2>Shortcuts you can rebind</h2>
       <p>
         Every command is listed in one map in settings, grouped by task, with its keys
-        beside it. Any shortcut can be rebound or reset — one key or all at once.
+        beside it. Any shortcut can be rebound or reset, one key or all at once.
       </p>
     </div>
-    <img class="shot" src="screenshots/shortcuts.png" alt="The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another.">
+    <a class="shot-link" href="screenshots/shortcuts.png">
+      <img class="shot" loading="lazy" src="screenshots/shortcuts.png" alt="The keyboard map: every command the app has, grouped by task in three columns, each with its keys beside it and a plus to add another.">
+    </a>
   </section>
 
-  <div class="note">
+  <section class="cards" id="privacy">
     <h2>Local by default</h2>
-    <p>
-      Reading, annotating and saving are entirely local; the app runs without network
-      access. Two lookups go online, each on a click: a document's reference from
-      doi.org, and a cited paper's abstract from free scholarly databases — only the
-      DOI, or the one reference entry, is sent.
-    </p>
-    <p>
-      Assistant requests go directly to the provider you chose — there is no
-      intermediary server — under your key and that provider's terms. The key is
-      stored in the platform's own key store: DPAPI on Windows, Keychain on macOS, the
-      system keyring on Linux.
+    <div class="grid2">
+      <div class="tile">
+        <h3>Reading and annotating</h3>
+        <p>Reading, annotating and saving are entirely local. The app runs without network access.</p>
+      </div>
+      <div class="tile">
+        <h3>Two lookups</h3>
+        <p>A document's reference from doi.org and a cited paper's abstract from free scholarly databases go online, each on a click. Only the DOI, or the one reference entry, is sent.</p>
+      </div>
+      <div class="tile">
+        <h3>The assistant</h3>
+        <p>Requests go directly to the provider you chose, under your key and that provider's terms, with no intermediary server. An AI action sends document content: normally the whole text, an excerpt for very long documents. A switch in settings can ask before a document is first shared with a provider, or block AI requests entirely.</p>
+      </div>
+      <div class="tile">
+        <h3>AI tools</h3>
+        <p>An AI tool you turn on reads your notes and conversations, and what it reads goes to that tool's provider. Its switch takes that back.</p>
+      </div>
+    </div>
+    <p class="after">
+      API keys are stored in the platform's own key store: DPAPI on Windows, Keychain on
+      macOS, the system keyring on Linux.
       <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PRIVACY.md">The
       privacy notes</a> have the per-platform detail.
     </p>
-    <p>
-      An AI action sends document content — normally the whole text, an excerpt for very
-      long documents — and some actions fire on one click. An AI access switch in
-      settings can ask before a document is first shared with a provider — naming the
-      model and what is about to be attached — or block AI requests entirely. An AI tool
-      you turn on reads your notes and conversations, and what it reads goes to that
-      tool's provider; its own switch takes that back.
-    </p>
-  </div>
+  </section>
 
-  <div class="closing" id="get">
+  <section class="cards" id="get">
     <h2>Get it</h2>
-    <div class="actions">
-      <a class="btn btn-primary" id="dl2" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
-        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></svg>
-        Download for Windows
-      </a>
-      <a class="btn btn-secondary" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">Microsoft Store</a>
-      <a class="btn btn-secondary" id="dl-mac" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
-        macOS
-      </a>
+    <div class="grid2">
+      <div class="tile get-card">
+        <h3>Windows</h3>
+        <div class="actions">
+          <a class="btn btn-primary btn-small" id="dl2" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
+            <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></svg>
+            Installer
+          </a>
+          <a class="btn btn-secondary btn-small" href="https://apps.microsoft.com/detail/9N75CPC0G9M2">Microsoft Store</a>
+        </div>
+        <p>Windows 10 and 11. One installer for x64 and arm64, no admin rights needed.</p>
+        <p>
+          Without an installer: a portable zip
+          (<a id="dl-win-portable" href="https://github.com/emilmsh/pdf-scholar/releases/latest">x64</a>,
+          <a id="dl-win-portable-arm64" href="https://github.com/emilmsh/pdf-scholar/releases/latest">arm64</a>)
+          that you extract and run, with its settings in a folder beside the exe.
+        </p>
+      </div>
+
+      <div class="tile get-card">
+        <h3>macOS</h3>
+        <div class="actions">
+          <a class="btn btn-secondary btn-small" id="dl-mac" href="https://github.com/emilmsh/pdf-scholar/releases/latest">Apple Silicon dmg</a>
+          <a class="btn btn-secondary btn-small" id="dl-mac-intel" href="https://github.com/emilmsh/pdf-scholar/releases/latest">Intel dmg</a>
+        </div>
+        <p>Homebrew installs and updates it too:<br><code>brew install --cask emilmsh/tap/pdf-scholar</code></p>
+        <p>
+          Either way the build is unsigned, so the first launch takes
+          <a href="https://github.com/emilmsh/pdf-scholar#desktop-app-macos">one Terminal command</a>.
+        </p>
+      </div>
+
+      <div class="tile get-card">
+        <h3>Linux <span class="badge">beta</span></h3>
+        <div class="actions">
+          <a class="btn btn-secondary btn-small" id="dl-linux" href="https://github.com/emilmsh/pdf-scholar/releases/latest">deb</a>
+          <a class="btn btn-secondary btn-small" id="dl-linux-appimage" href="https://github.com/emilmsh/pdf-scholar/releases/latest">AppImage</a>
+        </div>
+        <p>The deb is for Ubuntu and Debian; other distros take the AppImage.</p>
+        <p>
+          The build comes from the same sources but has never been run on a Linux
+          machine: I develop on Windows and have none to test on.
+          <a href="https://github.com/emilmsh/pdf-scholar/issues">A report</a> naming your
+          distro and what worked is useful.
+        </p>
+      </div>
+
+      <div class="tile get-card">
+        <h3>Edge and Chrome</h3>
+        <div class="actions">
+          <a class="btn btn-secondary btn-small" href="https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc">Edge Add-ons</a>
+          <a class="btn btn-secondary btn-small" href="https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd">Chrome Web Store</a>
+        </div>
+        <p>A browser extension with the same reader, annotator and assistant. PDFs from the web open in it in a browser tab.</p>
+      </div>
     </div>
-    <div class="actions actions-beta">
-      <a class="btn btn-secondary" id="dl-linux" href="https://github.com/emilmsh/pdf-scholar/releases/latest">
-        Linux <span class="badge">beta</span>
-      </a>
-    </div>
-    <p class="dl-meta">
-      macOS is the Apple Silicon dmg — Intel Macs take
-      <a id="dl-mac-intel" href="https://github.com/emilmsh/pdf-scholar/releases/latest">this one</a>.
-      Homebrew installs and updates it too:<br>
-      <code>brew install --cask emilmsh/tap/pdf-scholar</code><br>
-      Either way the build is unsigned, so the first launch takes
-      <a href="https://github.com/emilmsh/pdf-scholar#desktop-app-macos">one Terminal command</a>.<br>
-      Windows without an installer: a
-      <a id="dl-win-portable" href="https://github.com/emilmsh/pdf-scholar/releases/latest">portable zip</a>
-      (<a id="dl-win-portable-arm64" href="https://github.com/emilmsh/pdf-scholar/releases/latest">arm64</a>)
-      that you extract and run, with its settings in a folder beside the exe.<br>
-      Linux is the deb for Ubuntu and Debian; other distros take the
-      <a id="dl-linux-appimage" href="https://github.com/emilmsh/pdf-scholar/releases/latest">AppImage</a>.
-      It is built from the same sources but has never been run on a Linux machine —
-      I develop on Windows and have none to test on — so
-      <a href="https://github.com/emilmsh/pdf-scholar/issues">a report</a> naming your
-      distro and what worked is useful.
+    <p class="after">
+      What each platform supports today is in
+      <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PLATFORMS.md">the
+      platform notes</a>. The interface is in English, Norwegian and Simplified Chinese;
+      the Chinese is machine-translated, and corrections are welcome as pull requests.
     </p>
-  </div>
+  </section>
 
 </main>
 
 <footer>
   <div class="inner">
     <p>
-      <b>A browser extension</b> puts the same reader inside Edge or Chrome:
-      <a href="https://microsoftedge.microsoft.com/addons/detail/pdf-scholar/jdmemepojgjhflpeckiiciibnhmbdjcc">Edge
-      Add-ons</a>,
-      <a href="https://chromewebstore.google.com/detail/pdf-scholar/jhhlaaiegmdmjeeiopmdmoiidnbbhbmd">Chrome
-      Web Store</a>.
-      The macOS build and the Linux beta above are made in CI on every release; what
-      each platform supports today is in
-      <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/PLATFORMS.md">the
-      platform notes</a>.
-    </p>
-    <p>
       Built by <a href="https://emilmsh.github.io/">Emil Mathias Strøm Halseth</a>, who
       reads PDFs for a living, with assistance from
-      <a href="https://claude.com/claude-code">Claude Code</a>. Source, issues and the
-      road ahead on <a href="https://github.com/emilmsh/pdf-scholar">GitHub</a> —
-      <a href="https://github.com/emilmsh/pdf-scholar/blob/master/LICENSE">MIT-licensed</a>,
+      <a href="https://claude.com/claude-code">Claude Code</a>.
+    </p>
+    <p>
+      Source and issues are on <a href="https://github.com/emilmsh/pdf-scholar">GitHub</a>.
+      <a href="https://github.com/emilmsh/pdf-scholar/blob/master/LICENSE">MIT-licensed</a>;
       rendering by pdf.js, annotations written by PDFium. Logo by
       <a href="https://www.linkedin.com/in/elisabeth-walle-239028140/">Elisabeth Walle</a>.
     </p>
@@ -552,7 +740,23 @@
 </footer>
 
 <script>
-  // Fill the download button in from the newest published release. Everything
+  // The header's download button: hidden while the hero's own buttons are on
+  // screen, shown once they have scrolled away. Without IntersectionObserver
+  // it simply stays visible.
+  (() => {
+    const header = document.querySelector('header');
+    const heroActions = document.getElementById('hero-actions');
+    if (!header || !heroActions || !('IntersectionObserver' in window)) {
+      header?.classList.add('stuck');
+      return;
+    }
+    new IntersectionObserver(
+      ([entry]) => header.classList.toggle('stuck', !entry.isIntersecting),
+      { rootMargin: '-64px 0px 0px 0px' },
+    ).observe(heroActions);
+  })();
+
+  // Fill the download buttons in from the newest published release. Everything
   // this touches already reads correctly without it, so a rate-limited or
   // blocked API leaves a working page rather than a broken one — the static
   // href is /releases/latest, which lands on the same assets one click later.
@@ -578,6 +782,9 @@
       const exe = asset(/^PDF-Scholar-Setup-.*\.exe$/);
       point('dl', exe);
       point('dl2', exe);
+      // The header's button downloads outright only where the file is the
+      // right one. Everywhere else it keeps pointing at «Get it».
+      if (/Windows/.test(navigator.userAgent)) point('dl-top', exe);
       point('dl-win-portable', asset(/^PDF-Scholar-.*-portable-x64\.zip$/));
       point('dl-win-portable-arm64', asset(/^PDF-Scholar-.*-portable-arm64\.zip$/));
       point('dl-mac', asset(/^PDF-Scholar-.*-arm64\.dmg$/));
@@ -597,8 +804,7 @@
         const sep = '<span class="sep">·</span>';
         meta.innerHTML =
           `Version ${version}, released ${date} ${sep} ${mb} MB ${sep} ` +
-          `Windows 10 and 11, x64 and arm64 in one installer ${sep} no admin rights needed ` +
-          `${sep} <a href="#get">Linux beta</a>`;
+          `Windows 10 and 11, x64 and arm64 ${sep} no admin rights needed`;
       }
     } catch {
       /* offline, blocked or rate-limited — the static markup stands. */

@@ -96,19 +96,47 @@ et spørsmål.
 the audience, so the lede describes the window. Opening both with the same
 claim reads as a stutter, in either order.)*
 
+**Landing page variant** (Emil, 2026-11-23 — the page was revised to say more,
+sooner, in fewer words). The landing page's lede says what the app does, and
+the window claim moves into its Reading tile and section, still said once:
+
+**EN:** Read, annotate and search papers, with split view, link previews and
+an optional AI assistant that cites its sources.
+
+Price, licence, offline and platforms follow in a strip of four facts directly
+under the hero, so the lede does not repeat them.
+
 ---
 
 ## The pillars
 
 Seven, in this order — the fourth and sixth deliberately small. Every surface
-tells the same story at its own length: the landing page gives each a heading
-and **four to six** points, the store listings a block of bullets, the README
-the full account.
+tells the same story at its own length: the landing page gives each a tile and
+a short section, the store listings a block of bullets, the README the full
+account.
 
-The landing page's count is a ceiling, not a target (Emil, 2026-08-09: "vi
-holder ting skarpt og direkte"). It said "three or four" and had drifted to
-eight and nine — a section that lists everything sells nothing. When a pillar
-grows past six, the fix is to cut or merge, not to add a seventh: the README is
+**The landing page's shape** (Emil, 2026-11-23: more information higher up,
+shorter texts, grouped in tiles):
+
+1. Hero — one-liner, the landing lede, the download buttons, the opening frame
+   beside them.
+2. A strip of four facts: free, local, the desktop platforms, the extension.
+3. Nine tiles, one per section below and linking to it: a topic label and one
+   or two sentences. The tiles are the overview; a reader who stops here has
+   the whole product.
+4. One section per tile: the pillar's heading, one or two sentences, **at most
+   three points**, and its frame beside the text. Keyboard keeps its small
+   section without a tile.
+5. Privacy as four cards, then the downloads as one card per platform.
+
+The header follows the scroll and carries a download button once the hero's
+own buttons have left the screen, so a download is one click from anywhere on
+the page.
+
+Three points is a ceiling, not a target (Emil, 2026-08-09: "vi holder ting
+skarpt og direkte"). The count has drifted twice — to eight and nine in August,
+to nine again by November — and a section that lists everything sells nothing.
+When a section wants a fourth point, the fix is to cut or merge: the README is
 where the full account belongs, and a claim that only earns its place there is
 not a claim the landing page was missing.
 
@@ -381,9 +409,9 @@ kommentarene satt i en utvidet marg.
 - A document from a Zotero library gets a Zotero section in the save menu —
   show the item in Zotero, or copy its citation, full reference or BibTeX
   entry in one of eight citation styles, fetched from Zotero's local API on
-  the same machine *(landing page:
-  merged into the standard-annotations bullet, not a bullet of its own — the
-  pillar is at its six-point ceiling)*
+  the same machine *(landing page: a tile and a short section of its own
+  since 2026-11-23 — Zotero's users are this app's readers, and the claim sat
+  in the last bullet of the annotation section)*
 - A document outside Zotero that carries a DOI gets a Reference section in
   the same menu: one click fetches the APA reference and BibTeX from doi.org,
   no account, and nothing is sent until you click *(README only)*
@@ -616,6 +644,14 @@ app looks like.)*
   margin"), and validation by name-drop ("as Acrobat does"). The test for every
   sentence: would a colleague write it in a paper? State the capability and its
   consequence, then stop.
+- **Contrast sentences** (Emil, 2026-11-23). A feature described by what it is
+  not: "rather than redrawn", "instead of only pages attached as images",
+  "without moving the page", "offline unless you ask a question". Also the
+  scene-setting sentence that exists to be answered by the next one ("A table
+  often sits on one page and the text that discusses it on another"), the
+  dash-chained triad ("— no key, no account, and only on that click") and the
+  bold reassurance that opens a bullet ("Nothing to download."). Say what the
+  feature does, in one plain sentence.
 - **Bug history in evergreen copy.** A bullet that describes the absence of a
   former defect — "zoom that stays where you release it", "writes each mark
   exactly once", "the box can never be shrunk below its own words" — advertises
