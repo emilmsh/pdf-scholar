@@ -260,6 +260,17 @@
     text-decoration: none;
   }
   .tile h3 { font-size: 16.5px; font-weight: 650; margin-bottom: 5px; }
+  .tiles .tile h3 { display: flex; align-items: center; gap: 9px; }
+  .tile-icon {
+    width: 19px;
+    height: 19px;
+    flex: none;
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .tile p { font-size: 15px; line-height: 1.5; color: var(--text-secondary); }
   a.tile { transition: border-color 120ms ease; }
   a.tile:hover { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
@@ -353,6 +364,17 @@
 
 <!-- The download arrow, drawn once and used by every download button. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <!-- The tiles' line icons: drawn here, one stroke weight, coloured by the
+       tile. -->
+  <symbol id="i-reading" viewBox="0 0 24 24"><path d="M3 5.5c2.6-1.1 5.6-.8 9 1.2v13c-3.4-2-6.4-2.3-9-1.2zM21 5.5c-2.6-1.1-5.6-.8-9 1.2v13c3.4-2 6.4-2.3 9-1.2z"/></symbol>
+  <symbol id="i-previews" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></symbol>
+  <symbol id="i-split" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></symbol>
+  <symbol id="i-annotation" viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5a2.12 2.12 0 0 0-3-3L5 17zM13.5 8.5l2 2"/></symbol>
+  <symbol id="i-zotero" viewBox="0 0 24 24"><path d="M5 4h3v16H5zM10 4h3v16h-3zM15.4 5.2l2.9-.8 3.5 15.4-2.9.8z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.6-4.6"/></symbol>
+  <symbol id="i-scans" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M8 10h8M8 14h5"/></symbol>
+  <symbol id="i-assistant" viewBox="0 0 24 24"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4zM8 9h8M8 13h5"/></symbol>
+  <symbol id="i-ai-tools" viewBox="0 0 24 24"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5"/></symbol>
   <symbol id="i-dl" viewBox="0 0 16 16"><path fill="currentColor" d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></symbol>
 </svg>
 
@@ -451,39 +473,39 @@
        below; one tile per section, in the same order. -->
   <div class="tiles" id="features">
     <a class="tile" href="#reading">
-      <h3>Reading</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-reading"/></svg>Reading</h3>
       <p>One slim toolbar; the rest of the window is the page. Four reading themes, tabs, and a library that reopens each file where you stopped.</p>
     </a>
     <a class="tile" href="#previews">
-      <h3>Link previews</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-previews"/></svg>Link previews</h3>
       <p>Hover a citation, figure, table or equation reference to see its target beside the text. One click fetches a cited paper's abstract.</p>
     </a>
     <a class="tile" href="#split">
-      <h3>Split view</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-split"/></svg>Split view</h3>
       <p>Two columns of one document, or two documents side by side, each with its own page and zoom.</p>
     </a>
     <a class="tile" href="#annotation">
-      <h3>Annotation</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-annotation"/></svg>Annotation</h3>
       <p>Highlight, underline, comment, draw and type. Saved as standard PDF annotations that open in other readers.</p>
     </a>
     <a class="tile" href="#zotero">
-      <h3>Zotero</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-zotero"/></svg>Zotero</h3>
       <p>Works as Zotero's external reader. Copy a citation, reference or BibTeX entry from the save menu.</p>
     </a>
     <a class="tile" href="#search">
-      <h3>Search</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-search"/></svg>Search</h3>
       <p>By words, or by meaning: describe a topic and get the passages that discuss it.</p>
     </a>
     <a class="tile" href="#scans">
-      <h3>Scanned pages</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-scans"/></svg>Scanned pages</h3>
       <p>Text recognition runs on your computer and makes scans searchable and selectable.</p>
     </a>
     <a class="tile" href="#assistant">
-      <h3>Assistant</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-assistant"/></svg>Assistant</h3>
       <p>Optional. Runs on your API key, a ChatGPT plan or a local model. Each claim links to the passage it came from.</p>
     </a>
     <a class="tile" href="#ai-tools">
-      <h3>Notes in AI tools</h3>
+      <h3><svg class="tile-icon" aria-hidden="true"><use href="#i-ai-tools"/></svg>Notes in AI tools</h3>
       <p>Claude, Codex and other MCP tools can search your highlights, comments and conversations. Off by default.</p>
     </a>
   </div>
