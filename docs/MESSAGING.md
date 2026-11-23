@@ -118,8 +118,14 @@ account.
 **The landing page's shape** (Emil, 2026-11-23: more information higher up,
 shorter texts, grouped in tiles):
 
-1. Hero — one-liner, the landing lede, the download buttons, the opening frame
-   beside them.
+1. Hero — one-liner, the landing lede, the downloads, the opening frame beside
+   them. The downloads show every way in, in two groups: the desktop app
+   (Windows, macOS, Linux with its beta badge) and the browser extension (Edge,
+   Chrome). The visitor's own platform is the primary button. Windows downloads
+   the installer; a platform with a technical choice to make — the dmg per
+   chip, deb or AppImage — leads to its card at the foot of the page, where the
+   choices are *(Emil, 2026-11-23)*. The Microsoft Store is a line under the
+   buttons.
 2. A strip of four facts: free, local, the desktop platforms, the extension.
 3. Nine tiles, one per section below and linking to it: a topic label and one
    or two sentences. The tiles are the overview; a reader who stops here has
@@ -131,7 +137,9 @@ shorter texts, grouped in tiles):
 
 The header follows the scroll and carries a download button once the hero's
 own buttons have left the screen, so a download is one click from anywhere on
-the page.
+the page. It names the visitor's platform — «Download for macOS» on a Mac —
+and leads where that platform's hero button leads; a phone gets a plain
+«Download» to the cards.
 
 Three points is a ceiling, not a target (Emil, 2026-08-09: "vi holder ting
 skarpt og direkte"). The count has drifted twice — to eight and nine in August,
