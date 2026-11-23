@@ -158,6 +158,8 @@
   header nav { margin-left: auto; display: flex; align-items: center; gap: 22px; font-size: 15px; }
   header nav a.link { color: var(--text-secondary); text-decoration: none; }
   header nav a.link:hover { color: var(--text); }
+  .nav-btns { display: flex; align-items: center; gap: 8px; }
+  .btn[hidden] { display: none; }
   .nav-dl { transition: opacity 150ms ease, visibility 150ms; }
   html.js header:not(.stuck) .nav-dl { opacity: 0; visibility: hidden; }
 
@@ -341,7 +343,7 @@
     main, .bar, footer .inner { padding-left: 16px; padding-right: 16px; }
     .facts, .tiles, .grid2 { grid-template-columns: minmax(0, 1fr); }
     header nav { gap: 14px; }
-    header nav a.link.wide, .nav-dl .os { display: none; }
+    header nav a.link.wide, .nav-dl .os, #dl-all { display: none; }
     .brand { gap: 9px; }
     .wordmark { font-size: 20px; }
     code { font-size: 11.5px; padding: 1px 5px; }
@@ -368,10 +370,17 @@
            names the visitor's platform on it and points it at that platform:
            the installer on Windows, the macOS card on a Mac, the Linux card
            on Linux. A phone keeps the plain «Download». -->
-      <a class="btn btn-primary btn-small nav-dl" id="dl-top" href="#get">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><use href="#i-dl"/></svg>
-        <span>Download<span class="os" id="dl-top-os"></span></span>
-      </a>
+      <span class="nav-btns">
+        <!-- For everything the button beside it is not: the other platforms,
+             the extension, the Store, the portable zip. Shown only where that
+             button has become one platform's own; while it still says a plain
+             «Download» it goes to the same place, and one is enough. -->
+        <a class="btn btn-secondary btn-small nav-dl" id="dl-all" href="#get" hidden>All downloads</a>
+        <a class="btn btn-primary btn-small nav-dl" id="dl-top" href="#get">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><use href="#i-dl"/></svg>
+          <span>Download<span class="os" id="dl-top-os"></span></span>
+        </a>
+      </span>
     </nav>
   </div>
 </header>
@@ -806,6 +815,9 @@
     const topOs = document.getElementById('dl-top-os');
     if (top) top.setAttribute('href', `#get-${visitorOs}`);
     if (topOs) topOs.textContent = ` for ${name}`;
+    // That button is now one platform's own, so the way to all the others
+    // goes beside it.
+    document.getElementById('dl-all')?.removeAttribute('hidden');
   }
 
   // Fill the download buttons in from the newest published release. Everything

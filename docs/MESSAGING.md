@@ -139,7 +139,9 @@ The header follows the scroll and carries a download button once the hero's
 own buttons have left the screen, so a download is one click from anywhere on
 the page. It names the visitor's platform — «Download for macOS» on a Mac —
 and leads where that platform's hero button leads; a phone gets a plain
-«Download» to the cards.
+«Download» to the cards. Beside the named button sits «All downloads», which
+jumps to the cards: a visitor on Windows who wants the Mac build, the
+extension or the portable zip is one click away too *(Emil, 2026-11-23)*.
 
 Three points is a ceiling, not a target (Emil, 2026-08-09: "vi holder ting
 skarpt og direkte"). The count has drifted twice — to eight and nine in August,
