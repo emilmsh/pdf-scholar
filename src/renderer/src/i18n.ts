@@ -551,6 +551,7 @@ const nb = {
   'menu.abstractTip': 'Henter sammendraget til artikkelen referansen viser til – fra arXiv, Europe PMC, Crossref og OpenAlex',
   'settings.restoreSessionTip': 'Ved oppstart får hvert vindu tilbake fanene det hadde. Et dokument leses først når du viser fanen. Festede faner kommer alltid tilbake.',
   'settings.annotAuthor': 'Navn på merknader',
+  'annot.authorTip': 'Navnet ditt på nye merknader settes i innstillingene – klikk for å åpne',
   'settings.annotAuthorPlaceholder': 'F.eks. navnet ditt',
   'settings.annotAuthorHint':
     'Skrives inn i PDF-en som forfatter av nye merknader, og vises i eksporter og andre lesere. Tomt = usignert.',
@@ -1860,6 +1861,7 @@ const en: Dict = {
   'menu.abstractTip': 'Fetches the abstract of the paper this reference names — from arXiv, Europe PMC, Crossref and OpenAlex',
   'settings.restoreSessionTip': 'At startup, every window gets back the tabs it had. Each document is read only when you show its tab. Pinned tabs always come back.',
   'settings.annotAuthor': 'Name on annotations',
+  'annot.authorTip': 'Your name on new annotations is set in Settings — click to open',
   'settings.annotAuthorPlaceholder': 'E.g. your name',
   'settings.annotAuthorHint':
     'Written into the PDF as the author of new annotations; shown in exports and other readers. Empty = unsigned.',

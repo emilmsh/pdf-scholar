@@ -486,6 +486,7 @@ export const zh: Dict = {
   'menu.abstractTip': '获取此参考文献所指论文的摘要——来自 arXiv、Europe PMC、Crossref 和 OpenAlex',
   'settings.restoreSessionTip': '启动时，每个窗口恢复其原有的标签页。文档只在你显示其标签页时才会被读取。固定的标签页始终会恢复。',
   'settings.annotAuthor': '批注上的署名',
+  'annot.authorTip': '你在新批注上的署名在设置中更改——点击打开',
   'settings.annotAuthorPlaceholder': '例如你的姓名',
   'settings.annotAuthorHint':
     '作为新批注的作者写入 PDF；在导出和其他阅读器中显示。留空表示不署名。',

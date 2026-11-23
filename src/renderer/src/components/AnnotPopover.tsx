@@ -77,6 +77,11 @@ interface Props {
    *  default shape from the stylesheet */
   size: BoxSize | null
   onResize(size: BoxSize | null): void
+  /** The author's name is a way to the ONE place a name is set — the gear
+   *  menu's «Navn på merknader», opened with the field ready. Never an editor
+   *  of this mark's author (Emil, 2026-11-23: a reader has one identity, and
+   *  rewriting a colleague's name on their comment is not what a click asks) */
+  onAuthorClick?: (() => void) | undefined
 }
 
 export default function AnnotPopover({
@@ -92,7 +97,8 @@ export default function AnnotPopover({
   onDelete,
   onClose,
   size,
-  onResize
+  onResize,
+  onAuthorClick
 }: Props): React.JSX.Element {
   useLang()
   const [text, setText] = useState(annotation.contents ?? '')
@@ -193,7 +199,22 @@ export default function AnnotPopover({
     >
       <div className="annot-popover-head" {...handleProps}>
         <span>{annotTypeLabel(annotation.type)}</span>
-        {annotation.author && <span className="annot-popover-author">{annotation.author}</span>}
+        {annotation.author &&
+          (onAuthorClick ? (
+            // A button inside the drag handle: its press must not start a drag
+            // (the handle captures the pointer, and the click would land there)
+            <button
+              type="button"
+              className="annot-popover-author is-link"
+              title={t('annot.authorTip')}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={onAuthorClick}
+            >
+              {annotation.author}
+            </button>
+          ) : (
+            <span className="annot-popover-author">{annotation.author}</span>
+          ))}
       </div>
 
       {/* Recolouring a mark offers the palette the tool that MADE it offers,

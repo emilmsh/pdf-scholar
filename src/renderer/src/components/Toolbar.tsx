@@ -418,6 +418,9 @@ interface Props {
   onPaneFitPage(): void
   /** Restore every preference to its shipped default (gear menu, confirmed) */
   onResetApp(): void
+  /** Bumped to open the gear menu with «Navn på merknader» focused and
+   *  selected — the author's name in a comment popup leads here. 0 = never. */
+  authorFieldAsk?: number
 }
 
 // No standalone Sepia button: sepia is one of the light paper tones under
@@ -516,6 +519,7 @@ function ResetLink({ hidden, onClick }: { hidden: boolean; onClick(): void }): R
 const NO_ESCAPE = { escape: false } as const
 
 export default function Toolbar({
+  authorFieldAsk = 0,
   page,
   pageCount,
   zoomPercent,
@@ -918,6 +922,30 @@ export default function Toolbar({
   const closeViewMenu = useCallback(() => setViewMenuOpen(false), [])
   const closeSaveMenu = useCallback(() => setSaveMenuOpen(false), [])
   const closeSettingsMenu = useCallback(() => setSettingsMenuOpen(false), [])
+
+  // The author's name in a comment popup asks for the ONE place a name is set:
+  // the gear menu, every other menu closed, the field focused with its text
+  // selected so typing replaces it
+  const authorInputRef = useRef<HTMLInputElement>(null)
+  const authorFocusPending = useRef(false)
+  useEffect(() => {
+    if (!authorFieldAsk) return
+    setThemeMenuOpen(false)
+    setViewMenuOpen(false)
+    setSaveMenuOpen(false)
+    setOverflowMenuOpen(false)
+    setToolMenu(null)
+    setSettingsMenuOpen(true)
+    authorFocusPending.current = true
+  }, [authorFieldAsk])
+  useEffect(() => {
+    if (!settingsMenuOpen || !authorFocusPending.current) return
+    authorFocusPending.current = false
+    const input = authorInputRef.current
+    if (!input) return
+    input.focus()
+    input.select()
+  }, [settingsMenuOpen, authorFieldAsk])
   const closeOverflowMenu = useCallback(() => setOverflowMenuOpen(false), [])
 
   // Escape for all five toolbar menus is owned by the consolidated handler
@@ -2917,6 +2945,7 @@ export default function Toolbar({
               <label className="settings-row" title={t('settings.annotAuthorHint')}>
                 <span>{t('settings.annotAuthor')}</span>
                 <input
+                  ref={authorInputRef}
                   className="annot-author-input"
                   defaultValue={settings.annotAuthor}
                   placeholder={t('settings.annotAuthorPlaceholder')}
