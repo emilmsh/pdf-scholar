@@ -16,6 +16,7 @@ import { sanitizeMcpPolicy, type McpPolicy } from '../shared/mcp'
 import { normalizeRecents, pinRecent, recordRecent, removeRecent, restoreRecent } from '../shared/recents'
 import { sanitizeSession, type StoredSession } from '../shared/session'
 import { sanitizeFingerprints } from '../shared/doc-identity'
+import { seedAuthor } from '../shared/annot-author'
 export type { Settings }
 
 export interface StoredAiConfig extends AiConfig {
@@ -60,6 +61,10 @@ export interface AppState {
    *  — so the library's quiet pass over the recents reads a document again
    *  only once it has changed (src/renderer/src/notes-backfill.ts) */
   notesScanned: Record<string, string>
+  /** «Navn på merknader» has been filled in from the system once
+   *  (shared/annot-author.ts) — a reader who clears it afterwards stays
+   *  unsigned. Its own key, so «Tilbakestill» does not re-sign them either. */
+  annotAuthorSeeded?: boolean
 }
 
 const DEFAULT_AI: StoredAiConfig = {
@@ -222,5 +227,17 @@ export function setBookmarks(path: string, bookmarks: DocBookmark[]): void {
   const state = getState()
   if (bookmarks.length === 0) delete state.bookmarks[path]
   else state.bookmarks[path] = bookmarks
+  saveState()
+}
+
+/** Fill «Navn på merknader» from the system, once per profile (shared/annot-author.ts).
+ *  Runs before the first window, so every renderer reads the seeded name. */
+export async function seedAnnotAuthor(lookup: () => Promise<string>): Promise<void> {
+  const state = getState()
+  if (state.annotAuthorSeeded) return
+  const current = state.settings.annotAuthor ?? ''
+  const name = current.trim() ? '' : await lookup().catch(() => '')
+  state.settings = mergeSettings(state.settings, { annotAuthor: seedAuthor(current, false, name) })
+  state.annotAuthorSeeded = true
   saveState()
 }

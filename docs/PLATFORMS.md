@@ -774,6 +774,17 @@ regressions are treated as bugs, not as acceptable platform lag.
     the button is not drawn and the chips are the measured faces. The typed
     name — the baseline — is identical everywhere.
 
+36. **«Name on annotations» starts filled in on the desktop only** (Simen's
+    wish, 2026-11-23; `src/main/system-user-name.ts`, rules in
+    `src/shared/annot-author.ts`). On a profile's first start main asks the
+    system who is reading — on Windows the name Office signs Word comments
+    with, then the local account's full name, then the login name; macOS
+    `id -F`; Linux the GECOS field — and puts it in the field ONCE: a name
+    already typed is kept, and a field cleared afterwards stays empty. The
+    extension has no way to ask (no permission names the OS user) and dev:web
+    neither, so there the field starts empty as before. Typing a name works
+    identically everywhere.
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

@@ -85,9 +85,11 @@ import {
   removeRecentEntry,
   restoreRecentEntry,
   saveState,
+  seedAnnotAuthor,
   setBookmarks,
   setPosition
 } from './storage'
+import { systemUserName } from './system-user-name'
 import { initUpdater } from './updater'
 import { dialogLanguage } from './dialog-language'
 import { toLongPath } from './long-path'
@@ -446,10 +448,16 @@ if (hostLaunch) {
     registerNativeHostAtStartup()
     // The last session's windows (issue #29). The extra windows open first so
     // the one holding a file from the command line ends up in front.
-    const plan = await sessionRestorePlan().catch((err) => {
-      console.error('[pdfx] session not restored:', err)
-      return [] as StoredSessionWindow[]
-    })
+    // «Navn på merknader» filled from the system on a profile's first start
+    // (once — shared/annot-author.ts), beside the session plan so the first
+    // window already reads it. Every start after that skips it untouched.
+    const [plan] = await Promise.all([
+      sessionRestorePlan().catch((err) => {
+        console.error('[pdfx] session not restored:', err)
+        return [] as StoredSessionWindow[]
+      }),
+      seedAnnotAuthor(systemUserName).catch((err) => console.error('[pdfx] author not seeded:', err))
+    ])
     for (const extra of plan.slice(1)) createWindow(null, extra)
     createWindow(firstPending, plan[0])
     firstPending = null

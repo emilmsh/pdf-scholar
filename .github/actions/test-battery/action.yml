@@ -165,6 +165,11 @@ runs:
     # untrusted input that must read as a list every time
     - run: npm run test:custom-colors
       shell: bash
+    # «Navn på merknader» filled from the system once: the system's name is
+    # cleaned before it is stored, a cleared field is never re-signed, and the
+    # real lookup answers on every OS without hanging
+    - run: npm run test:annot-author
+      shell: bash
     # What a tab shows when its name does not tell it apart: names that begin
     # alike split where they part, identical names carry their folder, and
     # the «Alle faner» search

@@ -74,6 +74,7 @@
     "test:file-access": "node scripts/test-file-access.mjs",
     "test:update-channel": "node scripts/test-update-channel.mjs",
     "test:custom-colors": "node scripts/test-custom-colors.mjs",
+    "test:annot-author": "node scripts/test-annot-author.mjs",
     "test:tab-labels": "node scripts/test-tab-labels.mjs",
     "test:tab-groups": "node scripts/test-tab-groups.mjs",
     "test:long-path": "node scripts/test-long-path.mjs",
