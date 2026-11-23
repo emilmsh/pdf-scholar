@@ -39,8 +39,8 @@
 
   Headings are set in Libertinus Serif, the wordmark's face, at its one
   shipped weight (600); body text stays in the interface sans. Each feature
-  section opens with a § number and a hairline, the way a paper's sections
-  do.
+  section opens with a hairline, and its heading carries the icon of its tile
+  (Emil, 2026-11-23: the § numbers were tried and taken out).
 -->
 <html lang="en">
 <head>
@@ -289,11 +289,9 @@
 
   section { scroll-margin-top: calc(var(--header-h) - 40px); }
 
-  /* A paper's section break: a hairline across the page, the § number above
-     the heading. */
-  main { counter-reset: feature; }
+  /* A paper's section break: a hairline across the page. The heading carries
+     its tile's icon, so a section is found by the same mark as its tile. */
   section.feature {
-    counter-increment: feature;
     display: grid;
     grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: 48px;
@@ -302,13 +300,8 @@
     padding: 44px 0 0;
     border-top: 1px solid var(--border);
   }
-  section.feature h2::before {
-    content: '§\00a0' counter(feature);
-    display: block;
-    margin-bottom: 4px;
-    font-size: 17px;
-    color: var(--accent);
-  }
+  section.feature h2 { display: flex; align-items: flex-start; gap: 12px; }
+  section.feature h2 .tile-icon { width: 26px; height: 26px; margin-top: 0.18em; stroke-width: 1.5; }
   section.feature.flip { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }
   section.feature.flip .body { order: 2; }
   /* No frame of its own: the heading stands left, the points right. */
@@ -395,6 +388,7 @@
   <symbol id="i-scans" viewBox="0 0 24 24"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2M8 10h8M8 14h5"/></symbol>
   <symbol id="i-assistant" viewBox="0 0 24 24"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4zM8 9h8M8 13h5"/></symbol>
   <symbol id="i-ai-tools" viewBox="0 0 24 24"><path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0zM12 16v5"/></symbol>
+  <symbol id="i-shortcuts" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></symbol>
   <symbol id="i-dl" viewBox="0 0 16 16"><path fill="currentColor" d="M7.25 1.5v8.19L4.53 6.97a.75.75 0 1 0-1.06 1.06l4 4a.75.75 0 0 0 1.06 0l4-4a.75.75 0 1 0-1.06-1.06L8.75 9.69V1.5a.75.75 0 0 0-1.5 0ZM2.5 12.25a.75.75 0 0 0-1.5 0v1.25c0 .69.56 1.25 1.25 1.25h11.5c.69 0 1.25-.56 1.25-1.25v-1.25a.75.75 0 0 0-1.5 0v1H2.5v-1Z"/></symbol>
 </svg>
 
@@ -536,7 +530,7 @@
        the app looks like. -->
   <section class="feature text" id="reading">
     <div class="body">
-      <h2>Undistracted reading</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-reading"/></svg>Undistracted reading</h2>
       <p>
         One slim toolbar holds the tools you use often; contents, notes and the
         assistant are side panels you open when needed. Unpinned, the toolbar hides
@@ -552,7 +546,7 @@
 
   <section class="feature" id="previews">
     <div class="body">
-      <h2>Previews where you read</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-previews"/></svg>Previews where you read</h2>
       <p>
         Rest the pointer on a citation, figure, table or equation reference, and its
         target opens in a small window beside the text.
@@ -570,7 +564,7 @@
 
   <section class="feature flip" id="split">
     <div class="body">
-      <h2>Two pages at once</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-split"/></svg>Two pages at once</h2>
       <p>
         The S key opens a second column, showing the same document or another one.
       </p>
@@ -587,7 +581,7 @@
 
   <section class="feature" id="annotation">
     <div class="body">
-      <h2>Annotating while you read</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-annotation"/></svg>Annotating while you read</h2>
       <p>
         Selecting text opens the annotation menu at the selection: highlight,
         underline, comment, or ask the assistant. The toolbar adds a pen, shapes, text
@@ -607,7 +601,7 @@
 
   <section class="feature text" id="zotero">
     <div class="body">
-      <h2>Works with Zotero</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-zotero"/></svg>Works with Zotero</h2>
       <p>
         Set PDF Scholar as the external PDF reader in Zotero 7 or later, and
         attachments open here.
@@ -622,7 +616,7 @@
 
   <section class="feature flip" id="search">
     <div class="body">
-      <h2>Search by words or by meaning</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-search"/></svg>Search by words or by meaning</h2>
       <p>
         One search bar with two modes.
       </p>
@@ -638,7 +632,7 @@
 
   <section class="feature" id="scans">
     <div class="body">
-      <h2>Scanned pages have text</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-scans"/></svg>Scanned pages have text</h2>
       <p>
         Scans, reprints and photocopied chapters are read by text recognition on your
         computer. Their words can then be searched, selected, copied, marked and asked
@@ -657,7 +651,7 @@
 
   <section class="feature flip" id="assistant">
     <div class="body">
-      <h2>An assistant that cites its sources</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-assistant"/></svg>An assistant that cites its sources</h2>
       <p>
         Optional. Each claim in an answer carries a reference, and clicking it goes to
         the passage the claim came from.
@@ -675,7 +669,7 @@
 
   <section class="feature text" id="ai-tools">
     <div class="body">
-      <h2>Your notes in Claude, Codex and other AI tools</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-ai-tools"/></svg>Your notes in Claude, Codex and other AI tools</h2>
       <p>
         The desktop app can let an AI tool on your computer search what you noted
         across every paper: highlights with the words they mark, comments, and your
@@ -691,7 +685,7 @@
 
   <section class="feature" id="shortcuts">
     <div class="body">
-      <h2>Shortcuts you can rebind</h2>
+      <h2><svg class="tile-icon" aria-hidden="true"><use href="#i-shortcuts"/></svg>Shortcuts you can rebind</h2>
       <p>
         Every command is listed in one map in settings, grouped by task, with its keys
         beside it. Any shortcut can be rebound or reset, one key or all at once.
