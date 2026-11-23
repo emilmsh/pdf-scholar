@@ -68,13 +68,16 @@ export interface AiProviderProfile {
  *  low/low/medium/high for this model BY NAME. gemini-4-hydrogen is included
  *  for the same reason: the mapping table's former Argon-only column was
  *  renamed to a generic "Gemini 4" column on 2026-11-16 and now covers both
- *  ids, with `xhigh` documented for Hydrogen specifically. Both are literal
- *  ids, not a `gemini-4` family pattern — gemini-4-carbon, added the same
- *  day, has NO column in that table and so stays unverified (open question
- *  in docs/agent-notes/modeller-api.md), and the table's other columns (3.1
- *  Flash-Lite, 3 Flash, 2.5) still don't correspond to any of our curated
- *  Gemini ids either. */
-export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[3567]|gpt-oss|gemini-4-(argon|hydrogen)/i
+ *  ids, with `xhigh` documented for Hydrogen specifically. gemini-4-neon
+ *  (added 2026-11-23, same table re-checked that day) is included the same
+ *  way: the `xhigh` cell now names BOTH `gemini-4-neon` and `gemini-4-hydrogen`
+ *  — so Neon is treated as covered by the rest of that column too. All three
+ *  are literal ids, not a `gemini-4` family pattern — gemini-4-carbon, added
+ *  2026-11-16, still has NO column in that table and so stays unverified
+ *  (open question in docs/agent-notes/modeller-api.md), and the table's other
+ *  columns (3.1 Flash-Lite, 3 Flash, 2.5) still don't correspond to any of our
+ *  curated Gemini ids either. */
+export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[3567]|gpt-oss|gemini-4-(argon|hydrogen|neon)/i
 
 /** Models whose reasoning cannot be switched off, so «Av» maps to the lowest
  *  effort instead of `none` — the same honest mapping the Anthropic path uses
@@ -92,19 +95,21 @@ export const OPENAI_REASONING_RE = /gpt-[5-9]|o[0-9]|grok-4\.[3567]|gpt-oss|gemi
  *  - gpt-oss on Groq takes low/medium/high only; `none` is reserved for the
  *    Qwen models Groq also hosts (console.groq.com/docs/reasoning, verified
  *    2026-08-31).
- *  - gemini-4-argon and gemini-4-hydrogen: the reasoning_effort mapping table
- *    (aistudio.google.com/docs/openai, verified 2026-11-16) has no `none`/off
- *    row for either model's column, and the page states reasoning "cannot be
- *    turned off for Gemini 2.5 Pro or 3 models" — both are newer reasoning
- *    models in the same mandatory-thinking family, with no documented off
- *    switch. Treated like Fable/Astra: «Av» sends the lowest effort instead
- *    of guessing at an undocumented `none`. gemini-4-carbon is deliberately
- *    NOT here: it has no column in that table at all, so no reasoning
- *    parameter is sent for it in the first place (see OPENAI_REASONING_RE).
+ *  - gemini-4-argon, gemini-4-hydrogen and gemini-4-neon: the reasoning_effort
+ *    mapping table (aistudio.google.com/docs/openai, verified 2026-11-16,
+ *    re-checked 2026-11-23 for Neon) has no `none`/off row for any of the
+ *    three models' shared column, and the page states reasoning "cannot be
+ *    turned off for Gemini 2.5 Pro, Gemini 3, or Gemini 4 models" — all three
+ *    are newer reasoning models in the same mandatory-thinking family, with no
+ *    documented off switch. Treated like Fable/Astra: «Av» sends the lowest
+ *    effort instead of guessing at an undocumented `none`. gemini-4-carbon is
+ *    deliberately NOT here: it has no column in that table at all, so no
+ *    reasoning parameter is sent for it in the first place (see
+ *    OPENAI_REASONING_RE).
  *  Until 2026-09-26 «Av» sent `none` to the last two — a value neither
  *  documents — and leaned on the degrade-on-400 net when it was refused. */
 export const OPENAI_ALWAYS_REASONS_RE =
-  /gpt-6-astra|gpt-6\.1-sol|gpt-6\.2-(astra|sol)|grok-4\.[5-7]|gpt-oss|gemini-4-(argon|hydrogen)/i
+  /gpt-6-astra|gpt-6\.1-sol|gpt-6\.2-(astra|sol)|grok-4\.[5-7]|gpt-oss|gemini-4-(argon|hydrogen|neon)/i
 
 /** Mistral's reasoning switch is `reasoning_effort` too, but with a two-value
  *  domain: `"high"` (thinking on) or `"none"` (off — «the model thinks

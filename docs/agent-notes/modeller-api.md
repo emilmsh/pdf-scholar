@@ -503,6 +503,7 @@ console.groq.com/docs/models, /docs/reasoning og /docs/deprecations.
 | Leverandør | Kuratert id | Kontekst | Notat |
 |---|---|---|---|
 | Gemini | `gemini-4-carbon` | 900K (DELT inn+ut-budsjett, som Argon) | **Inn 16.11.2026** øverst, NY toppmodell — Google kaller den «most capable reasoning model» (aistudio.google.com/docs/models/gemini-4-carbon, sjekket 16.11.2026), rettet mot «complex software engineering, math and science, factual accuracy, multi-step agents, and long outputs». Argons egen side nevner Carbon flere ganger og posisjonerer seg som raskere/billigere «compared to Gemini 4 Carbon», uten pensjonerings-merknad — altså et NYTT toppsjikt, ikke et bytte (samme mønster som GPT-6 Astra over Sol/Terra/Luna-trioen). Samme DELTE 1 048 576-budsjett som Argon → 900K gulv, samme begrunnelse. Tekst/bilde/video/lyd/PDF inn, KUN tekst ut (kuratert-regel #2 innfridd). Pris identisk med Argon i lanseringsvinduet: $2/$10 per MTok ut t.o.m. 30.11.2026, $4/$20 fra 1.12.2026 (aistudio.google.com/docs/pricing, sjekket 16.11.2026) — ingen Free-tier. **`reasoning_effort` IKKE verifisert**: OpenAI-kompat-mappingtabellen (aistudio.google.com/docs/openai) har INGEN egen kolonne for Carbon (kun en generisk «Gemini 4»-kolonne som dekker Argon og Hydrogen, se Hydrogen-raden), så ingen reasoning-parameter sendes for denne id-en — `OPENAI_REASONING_RE`/`OPENAI_ALWAYS_REASONS_RE` i `ai-provider-profile.ts` utelater den bevisst. Modellsiden nevner thinking low/medium/high via den NATIVE Gemini-APIens `thinkingLevel`-felt, men det svarer ikke på OpenAI-kompat-spørsmålet — se åpent spørsmål under. **Live spørsmål med ekte nøkkel gjenstår (Emil).** |
+| Gemini | `gemini-4-neon` | 900K (DELT inn+ut-budsjett, som Carbon/Argon/Hydrogen) | **Inn 23.11.2026**, ved siden av Carbon og Hydrogen. Googles egen side (aistudio.google.com/docs/models/gemini-4-neon, sjekket 23.11.2026) kaller den «frontier-level intelligence with fast end-to-end task completion» — ingen «most capable»-superlativ som Carbons egen side bruker om seg selv, så rangert UNDER Carbon i den kuraterte listen. Pris $3/$15 per MTok FLAT (ingen 1.12.2026-økning nevnt), «Ikke tilgjengelig på gratis-nivå»; mellom Hydrogens $1.50/$7.50 og Carbons $2/$10 (→$4/$20 fra 1.12.2026) — verken dominert av Carbon (billigere enn Neon fra 1.12.2026) eller av Hydrogen (antatt sterkere, basert på «frontier-level»-ordlyden) på pris alene, samme mønster som GPT-6.1 Terra mellom Sol og Luna. Samme delte 1 048 576-budsjett som Carbon/Argon/Hydrogen → 900K gulv. Tekst/bilde/video/lyd/PDF inn, KUN tekst ut (kuratert-regel #2 innfridd). **`reasoning_effort` VERIFISERT samme vei som Hydrogen**: OpenAI-kompat-mappingtabellen (aistudio.google.com/docs/openai, sjekket 23.11.2026) har fortsatt en generisk «Gemini 4»-kolonne (low/low/medium/high), og `xhigh`-cellen navngir nå BÅDE `gemini-4-neon` og `gemini-4-hydrogen` — samme bevisstandard som felte Hydrogen inn 16.11.2026. Lagt til `OPENAI_REASONING_RE` og `OPENAI_ALWAYS_REASONS_RE` (`src/shared/ai-provider-profile.ts`) som literal id, ingen `none` (siden: reasoning «cannot be turned off for ... Gemini 4 models»), testet i `test:ai-chat`. **Live spørsmål med ekte nøkkel gjenstår (Emil).** |
 | Gemini | `gemini-4-argon` | 900K (DELT inn+ut-budsjett, se merknad) | **Inn 19.10.2026** som NY toppmodell, ikke erstatning — `gemini-3.1-pro-preview` står fortsatt som Preview uten pensjonerings-merknad (ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview, sjekket 19.10.2026). Google kaller den «our flagship reasoning model» (ai.google.dev/gemini-api/docs/models/gemini-4-argon, sjekket 19.10.2026): tekst/bilde/video/lyd/PDF inn, KUN tekst ut (bilde- og lydgenerering eksplisitt «not supported») — kuratert-regel #2 innfridd. Kontekst er OPPGITT som «unified input and output token limit»: 1 048 576 totalt, synkron ut 65 536 som standard, inntil 1 048 576 med «long decode» — ANNERLEDES enn resten av Gemini-lineupen, der tallet er ren inn-kapasitet atskilt fra ut. Siden budsjettet er DELT (mer ut spiser av det som er igjen til inn), gulvet til 900K i stedet for å bruke hele 1 048 576 — samme sikkerhetsmargin som GPT-6-familiens inn/ut-situasjon, for å unngå den farlige retningen (kode-verdi OVER reell inn-kapasitet). Pris $2/$10 per MTok ut 30.11.2026, stiger til $4/$20 fra 1.12.2026 (ai.google.dev/gemini-api/docs/pricing, sjekket 19.10.2026); ingen gratis-tier. **`reasoning_effort` VERIFISERT** for akkurat denne id-en: OpenAI-kompat-siden (ai.google.dev/gemini-api/docs/openai, sjekket 19.10.2026) har en mappingtabell med egen kolonne «thinking\_level (Gemini 4 Argon)» — minimal/low→low, medium→medium, high→high, toppnivå-felt i request-body. Ingen `none`-rad for denne kolonnen, og siden sier reasoning «cannot be turned off for Gemini 2.5 Pro or 3 models» — lest som at Argon (en nyere reasoning-modell i samme familie) heller ikke kan slå av. Lagt til i `OPENAI_REASONING_RE` og `OPENAI_ALWAYS_REASONS_RE` (`src/shared/ai-provider-profile.ts`), testet i `test:ai-chat`. De tre andre kolonnene i mappingtabellen («Gemini 3.1 Flash-Lite», «Gemini 3 Flash», «Gemini 2.5») svarer FORTSATT ikke på spørsmålet for `gemini-3.1-pro-preview`/`gemini-3.8-flash`/`gemini-3.5-flash-lite` — ingen av radene er en eksakt match, se åpne spørsmål under. **16.11.2026:** demotert ett hakk av Carbon (se raden over), men FORTSATT aktuell, ingen pensjonering — egen side (aistudio.google.com/docs/models/gemini-4-argon) kaller seg nå «faster responses and lower token spend per turn compared to» Carbon; hint i `ai-models.ts` endret fra «Tyngst» til «Verdi» for å matche. Mappingtabellens Argon-spesifikke kolonne er samtidig BYTTET UT med en generisk «Gemini 4»-kolonne som dekker Argon OG Hydrogen (se Hydrogen-raden) — ingen funksjonell endring for Argon selv (samme low/low/medium/high-mapping, fortsatt intet `none`), kun en kildeombygging; regex-dekningen i koden er uendret for Argon. **Live spørsmål med ekte nøkkel gjenstår (Emil).** |
 | Gemini | `gemini-4-hydrogen` | 900K (DELT inn+ut-budsjett, som Argon) | **Inn 16.11.2026** sammen med Carbon — «a stable-version model for everyday coding and agentic workflows» (aistudio.google.com/docs/models/gemini-4-hydrogen, sjekket 16.11.2026). Samme delte 1 048 576-budsjett som Argon/Carbon → 900K gulv. Tekst/bilde/video/lyd/PDF inn, KUN tekst ut (kuratert-regel #2 innfridd). Pris $1.50/$7.50 per MTok inn/ut, FLAT (ingen prisøkning 1.12.2026 nevnt) — billigere enn Argon/Carbons lanseringspris, og med en Free-tier (Argon/Carbon har ingen). **`reasoning_effort` VERIFISERT:** OpenAI-kompat-mappingtabellen (aistudio.google.com/docs/openai, sjekket 16.11.2026) har byttet Argons gamle egen-kolonne ut med en generisk «Gemini 4»-kolonne som dekker BÅDE Argon og Hydrogen — minimal/low→low, medium→medium, high→high, og `xhigh` eksplisitt merket «gemini-4-hydrogen only» (Argon har altså ikke xhigh, men det endrer ikke Argons eksisterende on/off-kode). Ingen `none`-rad, samme «cannot be turned off»-tekst som før → lagt til `OPENAI_REASONING_RE` OG `OPENAI_ALWAYS_REASONS_RE` (`ai-provider-profile.ts`, literal id som Argon, ikke et `gemini-4`-familiemønster — Carbon har ingen kolonne i det hele tatt, se raden over), testet i `test:ai-chat`. **Live spørsmål med ekte nøkkel gjenstår (Emil).** |
 | Gemini | `gemini-3.1-pro-preview` | 1M | Flaggskip (Preview — id-en KAN rotere ved GA, sjekk ved neste review; fortsatt Preview 31.8.2026 (ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview: 1 048 576 inn / 65 536 ut, text+image+video+audio+PDF → text), «Gemini 3.5 Pro»-lansering fortsatt forsinket ifølge presseomtale 13.8.2026) |
@@ -568,6 +569,35 @@ Flash.
   — sjekk mappingtabellen på nytt ved neste review, og legg til en literal
   `gemini-4-carbon`-oppføring i begge regex-ene i `ai-provider-profile.ts`
   først når den får sin egen kolonne eller et eksplisitt navngitt avsnitt.
+  **Gjensjekket 23.11.2026** (aistudio.google.com/docs/openai, samme dag som
+  Gemini 4 Neon ble lagt til — se tabellen over): FORTSATT ingen kolonne eller
+  navngitt avsnitt for `gemini-4-carbon` noe sted på siden; prosaen rundt
+  tabellen navngir ingen modell-id-er i det hele tatt (kun kolonneoverskrifter
+  og tabellcellene selv), og `xhigh`-cellen navngir nå to id-er
+  (`gemini-4-neon`, `gemini-4-hydrogen`) men fortsatt ikke Carbon. Ingen
+  fremgang; fortsatt utenfor `OPENAI_REASONING_RE`/`OPENAI_ALWAYS_REASONS_RE`.
+- **Gemini 3.1 Pro Preview, fortjener den fortsatt plassen ved siden av tre
+  Gemini 4-modeller? Prisen er nå på bordet (etterspurt av Emil 17.11.2026).**
+  aistudio.google.com/docs/pricing (sjekket 23.11.2026): `gemini-3.1-pro-preview`
+  koster $2/$12 per MTok inn/ut for prompter opptil 200K, $4/$18 over — dyrere
+  enn Carbons $2/$10 (→$4/$20 fra 1.12.2026) på UTGANG ved enhver promptlengde,
+  og Carbons egen side kaller seg «most capable reasoning model» uten at
+  3.1 Pro Previews side (aistudio.google.com/docs/models/gemini-3.1-pro-preview,
+  sjekket samme dag) hevder noe tilsvarende om seg selv («Built to refine the
+  performance and reliability of the Gemini 3 Pro series») — på pris og
+  markedsført styrke alene ser den ut til å være dominert av Carbon, samme
+  mønster som felte Argon 17.11.2026. **Men:** 3.1 Pro Preview har et
+  ATSKILT inn/ut-budsjett (1 048 576 inn / 65 536 ut hver for seg, bekreftet på
+  modellsiden) der Carbon/Neon/Hydrogen deler ett 1 048 576-budsjett mellom inn
+  og ut — en reell forskjell for et langt dokument med et langt svar, der
+  Carbons DELTE budsjett (900K-gulvet) kan bli trangere enn 3.1 Pro Previews
+  rendyrkede 1M inn-kapasitet. Det er ikke en akse «state of the art»-regelen
+  («slått eller tangert på HVER akse») uten videre kan avgjøre uten å gjette på
+  hvor mye den atskilte budsjett-strukturen faktisk er verdt i praksis — en
+  produktavveining, ikke en korrekthetsrettelse. **Ikke fjernet denne runden;
+  lagt fram for Emil med tallene over** i stedet for å gjette, slik
+  kuratert-kun-regelen krever for judgment-kall av denne typen (samme
+  tilbakeholdenhet som Mistral Large 4s manglende «Anbefalt»-hint 2.11.2026).
 - ~~Groq: nevner reasoning_effort for gpt-oss-120b/20b i det hele tatt?~~
   **Lukket 31.8.2026** (delvis lukket 17.8.2026) — console.groq.com/docs/reasoning
   bekrefter low/medium/high for begge (se tabellen over); lagt til
@@ -1254,6 +1284,65 @@ Flash, 3.5 Flash-Lite). **Lærdom for neste review:** et nytt toppsjikt til
 SAMME pris som det forrige er et bytte, ikke et tillegg. Om
 `gemini-3.1-pro-preview` fortsatt fortjener plassen ved siden av to Gemini
 4-modeller er ikke vurdert — ta det ved neste review, med prisen på bordet.
+
+Ukentlig review 2026-11-23 (scheduled agent, ingen leverandørnøkler —
+platform.claude.com/docs/en/docs/about-claude/models (→ /docs/en/models/overview),
+developers.openai.com/api/docs/models, aistudio.google.com/docs/models,
+/docs/models/gemini-4-neon, /docs/models/gemini-3.1-pro-preview, /docs/openai,
+/docs/pricing, docs.x.ai/developers/models, /developers/models/grok-4.20-0309-reasoning,
+docs.mistral.ai/getting-started/models, console.groq.com/docs/models, alle sjekket
+samme dag; `npm run check:models` keyless):
+
+- **Anthropic:** modelloversikten stemmer ord for ord med tabellen i §
+  Anthropic — Fable 5.2/Opus 5.5/Sonnet 5.5/Haiku 5.5 current, samme
+  priser/kontekst/retirement-datoer. «All models»-listen bekrefter Fable
+  5.1/5/Mythos 5/5.1/5.2/Opus 5/4.8/4.7/4.6/4.5/Sonnet 5/4.6/4.5/Haiku 4.5
+  alle fortsatt tilgjengelige (ingen hard pensjonering), som forventet for
+  lagrede valg. Mythos 5.2 fortsatt kun «limited availability» (Cyber
+  Verification Program) — samme status som alle tidligere runder, fortsatt
+  utenfor kuratert-kun-regelen. Ingen endring i den kuraterte listen.
+- **OpenAI:** modellsiden lister nøyaktig de fire kuraterte id-ene (Astra,
+  Sol, Terra, Luna) med samme kontekst (1,05M), pris og `reasoning.effort`-
+  verdiliste som forrige runde; ingen retirement-merknad for noen av de fire,
+  ingen femte flaggskip-modell. Ingen endring.
+- **Gemini — DRIFT: Gemini 4 Neon (`gemini-4-neon`) lagt til.** Se tabellen i
+  § Hostede kompat-tjenester over for full verifisering (modaliteter,
+  kontekst, pris, `reasoning_effort`-kilde). Kort versjon: ny modell ved siden
+  av Carbon og Hydrogen (ikke en erstatning — ingen av de to andre fikk en
+  pensjonerings-merknad), priset mellom dem ($3/$15 flatt), samme delte
+  1 048 576-budsjett → 900K gulv, `reasoning_effort` verifisert samme vei som
+  Hydrogen (navngitt i mappingtabellens `xhigh`-celle) → lagt til
+  `OPENAI_REASONING_RE`/`OPENAI_ALWAYS_REASONS_RE`
+  (`src/shared/ai-provider-profile.ts`), testet i `test:ai-chat`. Gemini-
+  listen har nå seks id-er (Carbon, Neon, Hydrogen, 3.1 Pro Preview, 3.8
+  Flash, 3.5 Flash-Lite) — under 7-taket. `gemini-4-carbon` fortsatt UTEN
+  egen kolonne i mappingtabellen (gjensjekket samme dag) — åpent spørsmål
+  uendret, se under. **Gemini 3.1 Pro Preview-spørsmålet fra 17.11.2026
+  (fortjener den plassen ved siden av Gemini 4-modellene?) er undersøkt med
+  prisen på bordet, men IKKE avgjort denne runden** — se eget åpent spørsmål
+  under for tallene og hvorfor den ikke er fjernet uten videre.
+- **xAI:** `grok-4.7`/`grok-4.3` uendret (samme kontekst/pris/`reasoning_effort`-
+  verdier). Grok 4.20 fortsatt IKKE lagt til — `-0309-reasoning`s egen side
+  dokumenterer fortsatt ingen `reasoning_effort`-verdiliste (kun
+  «Reasoning: Yes»), fortsatt ingen eksplisitt beta-merking av selve id-en
+  (kun beta/experimental-alias-varianter ved siden av). Ingen fremgang;
+  fortsatt utenfor kuratert-kun-regelen.
+- **Mistral:** de to kuraterte id-ene (`mistral-large-4`, `ministral-14b-2512`)
+  uendret, ingen Large 4.1 eller nyere generasjon observert (siden lister
+  Large 4 v26.10 som nyeste). Medium 3.5 og Large 3 fortsatt deprecated,
+  ingen av dem kuratert. Nytt sett på siden, uten kodekonsekvens: Z.ai GLM 5.3/
+  5.3 Flash og DeepSeek V4.1 Flash 1017 er nå også hostet i Mistrals katalog
+  (tredjeparts open-weight, som GLM 5.2 forrige runde) — utenfor
+  kuratert-kun-regelen, ingen av dem Mistrals eget flaggskip-spor.
+- **Groq:** `console.groq.com/docs/models` uendret for
+  `openai/gpt-oss-120b`/`-20b` (Production-tier, 131 072 kontekst, ingen
+  deprecation-merknad). Preview-seksjonen har samme tre ikke-produksjonsklare
+  modeller som forrige runde (Qwen3.8-27B, MiniMax M2.7, Muse Spark Open).
+  Ingen endring.
+- `npm run check:models` (keyless): ingen statisk drift før Neon-tillegget;
+  OpenRouter-probe 477 modeller, alle fire felt
+  (`input_modalities`/`output_modalities`/`created`/`pricing.completion`)
+  intakte.
 
 ## Standardmodeller og fallback (Emil, 27.9.2026)
 
