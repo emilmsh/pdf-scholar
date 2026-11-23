@@ -5278,6 +5278,25 @@ html.pen-near .draw-layer {
   letter-spacing: 0;
 }
 
+/* The name as a way to the setting: text until hovered, then underlined —
+   a quiet link, not a control competing with the colour row */
+.annot-popover-author.is-link {
+  font: inherit;
+  font-weight: 400;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-underline-offset: 2px;
+}
+
+.annot-popover-author.is-link:hover,
+.annot-popover-author.is-link:focus-visible {
+  color: var(--text);
+  text-decoration: underline;
+}
+
 .annot-popover-text {
   width: 100%;
   height: 72px;

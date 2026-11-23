@@ -2957,6 +2957,16 @@ export default function PdfViewer({
     arm()
   }, [])
 
+  /** The author's name in a comment popup opens the gear menu at «Navn på
+   *  merknader» (Toolbar's authorFieldAsk): the popup closes, a tucked
+   *  toolbar peeks and stays while the caret is in the field */
+  const [authorFieldAsk, setAuthorFieldAsk] = useState(0)
+  const openAuthorSetting = useCallback(() => {
+    setAnnotPopover(null)
+    revealToolbarKey()
+    setAuthorFieldAsk((n) => n + 1)
+  }, [revealToolbarKey])
+
   useEffect(() => {
     const el = containerRef.current
     if (!el || !active) return
@@ -7718,6 +7728,7 @@ export default function PdfViewer({
         onMouseLeave={() => !toolbarPinned && setToolbarPeek(false)}
       >
         <Toolbar
+          authorFieldAsk={authorFieldAsk}
           page={currentPage}
           pageCount={sizes.length}
           zoomPercent={scale > 0 ? Math.round(scale * 100) : 100}
@@ -8519,6 +8530,7 @@ export default function PdfViewer({
           if (!record) return null
           return (
             <AnnotPopover
+              onAuthorClick={openAuthorSetting}
               x={annotPopover.x}
               y={annotPopover.y}
               avoid={annotPopover.avoid}
