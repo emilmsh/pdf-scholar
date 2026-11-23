@@ -157,6 +157,22 @@ export const MODELS: Record<
     // reasoning parameter is sent for it (see ai-provider-profile.ts); open
     // question in modeller-api.md.
     { id: 'gemini-4-carbon', label: 'Gemini 4 Carbon', short: 'Gemini 4 Carbon', hint: 'ai.modelHintHeaviest' },
+    // Gemini 4 Neon added 2026-11-23, alongside Carbon/Hydrogen — Google's own
+    // page calls it "frontier-level intelligence with fast end-to-end task
+    // completion" (no "most capable" superlative, unlike Carbon's own page) and
+    // prices it between the two ($3/$15 flat vs Carbon's $2/$10 through
+    // 2026-11-30 then $4/$20, and Hydrogen's $1.50/$7.50 flat) — not dominated
+    // by either neighbour on price alone, same pattern as GPT-6.1 Terra earning
+    // its OpenAI seat. Same shared 1,048,576 input+output budget as
+    // Carbon/Argon/Hydrogen → same 900K floor. Text+image/video/audio/PDF in,
+    // text out (curated rule #2 met). `reasoning_effort` VERIFIED the same way
+    // Hydrogen was: aistudio.google.com/docs/openai's generic "Gemini 4" column
+    // names `gemini-4-neon` by id in its `xhigh` cell (alongside Hydrogen), so
+    // treated as covered by the whole low/medium/high/xhigh column — added to
+    // OPENAI_REASONING_RE/OPENAI_ALWAYS_REASONS_RE (ai-provider-profile.ts) as
+    // a literal id, no `none` (page: reasoning "cannot be turned off for ...
+    // Gemini 4 models"). See docs/agent-notes/modeller-api.md for the full note.
+    { id: 'gemini-4-neon', label: 'Gemini 4 Neon', short: 'Gemini 4 Neon', hint: 'ai.modelHintCapable' },
     // Gemini 4 Argon (curated 2026-10-19) left the menu 2026-11-17 (Emil):
     // it costs exactly what Carbon costs ($2/$10, $4/$20 from 2026-12-01) and
     // Carbon is the more capable of the two, so no axis is left on which
@@ -412,6 +428,10 @@ const MODEL_CONTEXT_TOKENS: Record<string, number> = {
   // reason (aistudio.google.com/docs/models/gemini-4-carbon,
   // /gemini-4-hydrogen, verified 2026-11-16)
   'gemini-4-carbon': 900_000,
+  // Gemini 4 Neon (added 2026-11-23): same shared 1,048,576 input+output
+  // budget as Carbon/Argon/Hydrogen, same 900K floor for the same reason
+  // (aistudio.google.com/docs/models/gemini-4-neon, verified 2026-11-23)
+  'gemini-4-neon': 900_000,
   'gemini-4-hydrogen': 900_000,
   // Verified against provider docs 2026-08-12/13; entries missing here on
   // purpose (Gemini Flash-Lite) fall back to the provider floor because no
