@@ -317,7 +317,11 @@ function setPolicy(patch: Partial<McpPolicy>): McpPolicy {
   return state.mcp
 }
 
-export function registerMcpIpc(windowFor: (e?: { sender: Electron.WebContents }) => BrowserWindow | null): void {
+export function registerMcpIpc(
+  windowFor: (e?: { sender: Electron.WebContents }) => BrowserWindow | null,
+  /** Told of every policy change made from the dialog */
+  onPolicyChanged?: (policy: McpPolicy) => void
+): void {
   ipcMain.handle('mcp:status', () => status())
   ipcMain.handle('mcp:policy', () => getState().mcp)
   ipcMain.handle('mcp:set-policy', (_e, patch: unknown) => {
@@ -325,10 +329,15 @@ export function registerMcpIpc(windowFor: (e?: { sender: Electron.WebContents })
     const p = patch as Record<string, unknown>
     // The switches are turned only through mcp:connect, which also writes or
     // takes back the tool's entry — never on their own from here
-    return setPolicy({
+    const next = setPolicy({
       ...(Array.isArray(p.excludedDocs) ? { excludedDocs: p.excludedDocs as string[] } : {}),
-      ...(Array.isArray(p.excludedFolders) ? { excludedFolders: p.excludedFolders as string[] } : {})
+      ...(Array.isArray(p.excludedFolders) ? { excludedFolders: p.excludedFolders as string[] } : {}),
+      // «Les sammen» is a switch of its own: it writes into no tool's config,
+      // and main starts or stops listening on it (tool-bridge.ts)
+      ...(typeof p.live === 'boolean' ? { live: p.live } : {})
     })
+    onPolicyChanged?.(next)
+    return next
   })
   ipcMain.handle('mcp:pick-folder', async (e): Promise<string | null> => {
     const parent = windowFor(e)
@@ -336,9 +345,12 @@ export function registerMcpIpc(windowFor: (e?: { sender: Electron.WebContents })
     const result = parent ? await dialog.showOpenDialog(parent, opts) : await dialog.showOpenDialog(opts)
     return result.canceled ? null : (result.filePaths[0] ?? null)
   })
-  ipcMain.handle('mcp:connect', (_e, target: unknown, on: unknown) =>
-    target === 'claude' || target === 'codex' || target === 'other'
-      ? connect(target, on !== false)
-      : { ok: false, code: 'mcp-client-missing', error: String(target) }
-  )
+  ipcMain.handle('mcp:connect', async (_e, target: unknown, on: unknown) => {
+    if (target !== 'claude' && target !== 'codex' && target !== 'other') {
+      return { ok: false, code: 'mcp-client-missing', error: String(target) }
+    }
+    const result = await connect(target, on !== false)
+    onPolicyChanged?.(getState().mcp)
+    return result
+  })
 }

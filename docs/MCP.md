@@ -17,6 +17,7 @@ writes that line for you when you turn a tool on.
 - [Other tools that support MCP](#other-tools)
 - [A tool that cannot connect: copy and paste](#a-tool-that-cannot-connect)
 - [Turning it off, and keeping things out](#turning-it-off-and-keeping-things-out)
+- [Reading together: the tool shows you where a paper says it](#reading-together)
 - [What a tool can read](#what-a-tool-can-read) · [Troubleshooting](#troubleshooting)
 
 ## Turning a tool on
@@ -118,6 +119,48 @@ the **Annotations** tab of the sidebar, under the export buttons. It copies
 the open document's highlights, comments and AI conversations as text, ready
 to paste into any chat. This also works in the browser extension.
 
+## Reading together
+
+An AI tool that tells you "the paper says so" should be able to show you
+where. With **Read together** turned on, it can: ask Claude Code about a PDF
+in your project, and PDF Scholar comes up on the page with the quoted words
+highlighted, while you keep typing where you were.
+
+1. In the same **AI tools** dialog, turn on the tool you use, then **Let the
+   tools point and read in PDF Scholar** under **Read together**. It is off
+   until you do.
+2. Ask the tool about a PDF on your computer. "Show me where it says that"
+   or "check that against the paper" helps it reach for PDF Scholar.
+
+What it adds, on top of the notes:
+
+| Tool | What it does |
+| --- | --- |
+| `show_passage` | PDF Scholar opens the PDF, goes to the page and highlights the quoted words. The tool is told whether the words really are in the document, so a quote that is not there comes back as unverified |
+| `read_document` | The document's text as PDF Scholar reads it, page by page. A quote taken from here is one `show_passage` finds |
+| `get_reading_context` | Which document you have in front of you, the page you are on, and the text you have selected. Say "look at what I have selected" |
+
+- **Every reference is kept.** The assistant panel's history has a **From AI
+  tools** heading with one list per session of the tool. Each reference is the
+  claim, the quoted words and the page as a chip: press it to go to the
+  passage again, in whatever order you like. A session spans documents, and a
+  reference into another document opens it there. References whose words were
+  not found are marked.
+- **What was read is listed too**: "Read the text on pp. 1–15", "Read your
+  selection". You see what left, not only what you were shown.
+- **The window comes up without taking the keyboard.** PDF Scholar appears
+  over the app you are in; your next keystroke still lands where you were
+  typing. (Measured on Windows. On macOS and Linux the system decides.)
+- **PDF Scholar is started if it is not running.**
+- **This shares more than the notes do, which is why it has its own switch.**
+  The document's own text, the full path of the document you have open, and
+  the text you have selected go to the AI provider your tool uses. A
+  password-protected document, and a document or folder you keep out, are
+  neither shown, read nor named.
+- A PDF that is not open in PDF Scholar is read without being opened. A
+  scanned one has no text until PDF Scholar has recognised it, which it does
+  when you open it, never on a tool's word.
+
 ## What a tool can read
 
 The server is read-only and offers four tools:
@@ -129,11 +172,12 @@ The server is read-only and offers four tools:
 | `get_document_notes` | Everything about one paper, by its id or words from its name: its annotations by page and its conversations in full |
 | `get_conversation` | One conversation, by the id the other tools give |
 
-- **Never the PDFs themselves.** What a tool gets is what you marked, wrote and
-  asked, plus the passages the answers cited.
+- **Never the PDFs themselves**, unless you turn on
+  [Read together](#reading-together). What a tool gets is what you marked,
+  wrote and asked, plus the passages the answers cited.
 - **Never images.** Pictures attached to a conversation are mentioned, not sent.
-- **Never where a file lives.** A document is named by its file name and a short
-  id. No path and no folder name is sent, since a folder can be named after a
+- **Never where a file lives**, with the same exception. A document is named
+  by its file name and a short id. No path and no folder name is sent, since a folder can be named after a
   client. A mark's author is not sent either.
 - **Nothing about a password-protected document or one you kept out**: neither
   notes nor conversations.
@@ -153,6 +197,8 @@ recent list come in the first time you open them again.
 - **The tool says the server failed to start.** Turn its switch off and on
   again in PDF Scholar. That puts the script back in place. For a tool set up
   by hand, check that both paths in the entry exist.
+- **"Read together is off".** Turn on **Let the tools point and read in PDF
+  Scholar** in the same dialog. The notes tools work without it.
 - **"PDF Scholar is not sharing with this tool".** Turn on its switch under
   **AI tools** in PDF Scholar's settings menu. A hand-made entry without
   `--client` answers to **Other tools**.

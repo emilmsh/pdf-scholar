@@ -514,7 +514,8 @@ that.)*
   the app copies for you ([`MCP.md`](MCP.md)). They can then search your
   highlights (with the words marked), comments and assistant conversations
   across every paper — never the PDFs, never images, never where a file
-  lives, nothing of a password-protected document. Every switch is off until
+  lives, nothing of a password-protected document (the PDFs' text and a
+  path leave only under «Read together», the next point). Every switch is off until
   you turn it on, the same switch takes it back, and a document or a whole
   folder can be kept out in the same place. «Copy for AI» in the
   Annotations tab puts one document's notes and conversations on the
@@ -530,6 +531,27 @@ that.)*
   (checked 2026-10-29 — re-check in the monthly audit; the README and
   MCP.md say so, the dialog's Codex line reads «Codex (ikke chat)»). The
   extension listing names no tool and claims only the copy.)*
+- Read together with the AI tool you work in *(2026-11-24, Emil: an AI that
+  says «the paper says so» should point at where — otherwise you end up
+  trusting it)*: with «Read together» on, Claude or Codex can show you the
+  passage a claim rests on. PDF Scholar opens the document, goes to the page
+  and highlights the quoted words, and tells the tool whether those words
+  really are in the document — a quote that is not there comes back as
+  unverified. Every reference is kept in a list in the assistant panel, per
+  session of the tool and across documents, each with its page as a chip
+  you can press again later. The tool can also read a document's text as
+  PDF Scholar reads it, and see which document, page and selection you have
+  in front of you. *(A switch of its own, off until turned on, in the same
+  «AI tools» dialog. This is the one place a document's own text and a file
+  path leave through an outside tool: say so wherever it is offered — the
+  dialog and PRIVACY.md do. Desktop only and not the Microsoft Store build,
+  PLATFORMS §37. Never «Claude inside PDF Scholar» or «sign in with Claude»:
+  the tool stays in its own app; Anthropic's terms bar offering a Claude
+  subscription sign-in in another app, checked 2026-11-24. The window comes
+  up over the app you are in WITHOUT taking the keyboard — measured on
+  Windows only, so claim «shows you the passage», never «switches to PDF
+  Scholar». Not in the README or any listing yet: when it is claimed is
+  Emil's call, with a release.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
@@ -605,7 +627,9 @@ app looks like.)*
   notes and conversations through a read-only server on your own machine, and
   what it reads goes to that tool's provider under its terms; nothing is
   shared until you turn a tool on, its switch takes it back at once, a
-  document or folder can be kept out, and no file path ever leaves
+  document or folder can be kept out, and no file path ever leaves —
+  unless you also turn on «Read together», which shares a document's text
+  and the path of what you have open, and lists what was read
   *(PRIVACY.md, «AI tools on your computer»; the switches are separate from
   AI access, which governs the app's own assistant — Emil, 2026-10-29)*
 - The key is stored in the platform's own key store; the exact mode differs per

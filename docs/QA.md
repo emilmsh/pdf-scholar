@@ -278,6 +278,37 @@ skjermens linjeskift = filens, skriftbredder = Standard 14), `test:engine` §
 Håndsjekk: følelsen med finger og penn, og at grepet ikke står i veien for
 teksten til venstre.
 
+## 15. Les sammen – Claude Code peker i PDF Scholar (2026-11-24)
+
+**Gjør:** Installer bygget (ikke `npm run dev` – serveren starter den
+INSTALLERTE appen). Tannhjulet → «KI-verktøy»: slå på Claude, og så «La
+verktøyene peke og lese i PDF Scholar». Start en NY Claude Code-sesjon i
+skrivebordsappen, i en mappe med en PDF. Legg PDF Scholar bak et annet vindu.
+Spør Claude om noe artikkelen sier, og be den vise hvor. Skriv videre i Claude
+mens passasjen kommer opp. Trykk på et par av henvisningene i listen i
+omvendt rekkefølge. Minimer PDF Scholar og be om en ny passasje. Lukk PDF
+Scholar helt og be om enda en. Marker en setning i PDF Scholar og skriv «se på
+det jeg har markert» i Claude. Be til slutt om en påstand du vet er feil.
+
+**Se:** PDF Scholar legger seg OVER vinduet du er i, på riktig side med
+sitatet markert – og det du skriver, havner fortsatt i Claude. Assistentpanelet
+åpner på listen «Fra KI-verktøy», med påstanden og siden som en knapp;
+knappene virker i hvilken som helst rekkefølge, også etter at du har bladd et
+annet sted. Fra minimert kommer vinduet tilbake uten å ta tastaturet (knappen på
+oppgavelinja kan flytte seg til enden hvis appen ikke er festet – det er
+prisen for at tastaturet blir stående). Med
+appen lukket starter den selv (noen sekunder). Markeringen din kommer fram i
+Claudes svar, og listen sier «Leste markeringen din». Den feile påstanden står
+i listen med «Ikke funnet i teksten», og Claude sier at den ikke er bekreftet.
+
+**Dekket av maskin:** `test:tool-bridge` (hvem som får svar, utelatte og
+låste dokumenter, lageret, de tre verktøyene over et ekte rør) og
+`test:bridge-desktop` (bryteren, passasjen som blinker, panelet på listen,
+ikke-funn, et uåpnet dokument lest uten fane). Håndsjekk: at vinduet faktisk
+kommer OVER et annet program uten å ta tastaturet (målt på Windows 11 –
+på macOS og Linux er det ikke prøvd), at appen startes når den er lukket, og
+at Claude faktisk griper til verktøyene uten å bli bedt om det.
+
 ## Står igjen fra RELEASE.md steg 1 (alltid)
 
 - Skriv ut én gang – bare når Electrons hovedversjon endres (se RELEASE.md).

@@ -109,6 +109,7 @@ import { rebindIdentity, validFingerprint } from '../shared/doc-identity'
 import { createNotesStore } from './notes-store'
 import { sanitizeDocNotes } from '../shared/research-notes'
 import { refreshMcpScriptAtStartup, registerMcpIpc } from './mcp-connect'
+import { registerToolBridgeIpc, syncToolBridge, type ToolBridgeContext } from './tool-bridge'
 import { isNativeHostChild } from '../shared/native-host'
 import { runNativeHost } from './native-host'
 import { registerNativeHostAtStartup } from './native-host-register'
@@ -1251,7 +1252,11 @@ function registerIpc(): void {
   ipcMain.handle('settings:get', () => getState().settings)
 
   registerFileIconIpc(windowFor)
-  registerMcpIpc(windowFor)
+  // «Les sammen» (tool-bridge.ts): listens only while its switch and some
+  // tool's are on — a change in the dialog starts or stops it at once
+  const toolBridge: ToolBridgeContext = { createWindow: () => createWindow() }
+  registerMcpIpc(windowFor, (policy) => void syncToolBridge(toolBridge, policy))
+  registerToolBridgeIpc(toolBridge)
 
   ipcMain.handle('app:version', () => app.getVersion())
 

@@ -114,7 +114,8 @@ but the fact that it is locked.** Nothing reads this record unless you turn a
 tool on under "AI tools" in the settings menu; **every tool's switch is off
 until you do**. A tool switched on starts PDF Scholar's own read-only server on
 your machine, which opens no network port. The tool can then read those records
-and your AI conversations (their text and the passages the answers cited). It
+and your AI conversations (their text and the passages the answers cited). Unless
+you also turn on Read together (the next paragraph), it
 never gets images, the PDFs themselves, or where a file lives: there is no path
 or folder name, and a document is named by its file name and a short id. It
 never gets who wrote a mark, or anything at all about a password-protected
@@ -131,6 +132,30 @@ switches are separate from the AI access switch above, which governs the app's
 own assistant. The Annotations tab's "Copy for AI"
 puts the same kind of text for the open document on your clipboard, for you to
 paste wherever you choose; nothing is sent by the copy itself.
+
+**Reading together with an AI tool (desktop app only, off until you turn it
+on).** "Read together", a switch of its own in the same dialog, lets the tools
+you have turned on work with the app while it is open. It is more than the
+above, and the difference is the point of having a separate switch: a tool can
+then (1) have PDF Scholar show you a passage — it names a PDF on your computer
+by its path, a page and the words it quotes, and PDF Scholar opens the
+document, goes there and tells the tool whether those words are in the
+document; (2) **read a document's text** as PDF Scholar reads it, page by page;
+and (3) ask what you have in front of you, and be told **the full path** of the
+open document, the page you are on and **the text you have selected**. All of
+that goes to whichever AI provider the tool uses, under that tool's terms. The
+app listens for such requests on a named pipe on your own machine (no network
+port), only while this switch and a tool's switch are both on, and only from a
+program that can read a token the app keeps in your own profile folder. A
+document you keep out and a password-protected one are neither shown, read nor
+named: a tool that asks what is open while one is in front learns only that
+something is. Everything a tool pointed at **and everything it read** is listed
+in the assistant panel's history under "From AI tools", per session of the
+tool, and kept on your device in the app's data folder until you delete the
+list; a list holds the quoted words, the claim the tool attached to them, and
+the document's path. A document that is not open is read without being opened,
+and without the app recognising text in a scan on a tool's word. Turning the
+switch off stops the app listening at once.
 
 How the key is protected where it is stored depends on what the platform offers,
 and the app uses the strongest option available on each. The assistant's key

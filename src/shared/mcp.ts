@@ -55,12 +55,19 @@ export interface McpPolicy {
   excludedDocs: string[]
   /** Folders kept out, with everything under them */
   excludedFolders: string[]
+  /** «Les sammen» (shared/tool-bridge.ts, Emil 2026-11-24): the tools that are
+   *  on may also work with the RUNNING app — show a passage, read a document's
+   *  text, see which document, page and selection the reader has. A switch of
+   *  its own and off until turned on: it is more than reading notes — the
+   *  document's own text leaves, and so does the path of what is open. */
+  live: boolean
 }
 
 export const DEFAULT_MCP_POLICY: McpPolicy = {
   clients: { claude: false, codex: false, other: false },
   excludedDocs: [],
-  excludedFolders: []
+  excludedFolders: [],
+  live: false
 }
 
 const MAX_EXCLUDED_DOCS = 5000
@@ -86,7 +93,8 @@ export function sanitizeMcpPolicy(input: unknown): McpPolicy {
       other: stored ? stored.other === true : legacy
     },
     excludedDocs: pathList(input.excludedDocs, MAX_EXCLUDED_DOCS),
-    excludedFolders: pathList(input.excludedFolders, MAX_EXCLUDED_FOLDERS)
+    excludedFolders: pathList(input.excludedFolders, MAX_EXCLUDED_FOLDERS),
+    live: input.live === true
   }
 }
 

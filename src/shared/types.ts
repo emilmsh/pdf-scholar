@@ -5,6 +5,7 @@ import type { ConversationHit, ConversationMeta, StoredConversation } from './ch
 import type { FileIconChoice, FileIconErrorCode, FileIconResult } from './file-icon'
 import type { DocNotes } from './research-notes'
 import type { McpDocument, McpErrorCode, McpPolicy, McpResult, McpStatus, McpTarget } from './mcp'
+import type { ToolSession, ToolSessionMeta, ToolSessionsChange, ViewReply, ViewRequest } from './tool-bridge'
 
 /** 'night' is the softer dark mode; 'nightHc' is the high-contrast one;
  *  'custom' is the user-toned light mode (paper tone from `customTone`) */
@@ -1128,12 +1129,24 @@ export interface PdfxApi {
    *  connected */
   mcpPolicy(): Promise<McpPolicy | null>
   /** Desktop: what is kept out (the switches turn only through mcpConnect) */
-  mcpSetPolicy(patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders'>>): Promise<McpPolicy | null>
+  mcpSetPolicy(patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders' | 'live'>>): Promise<McpPolicy | null>
   /** Desktop: every document with notes or conversations, as the panel lists
    *  them; [] elsewhere */
   mcpDocuments(): Promise<McpDocument[]>
   /** Desktop: a folder to keep out, from the system's folder picker */
   mcpPickFolder(): Promise<string | null>
+  // ---------- Reading together with an AI tool (shared/tool-bridge.ts) ----------
+  /** Desktop: answer what an AI tool asks of this window's documents — show a
+   *  passage, read a document's text, say what is open. Registering is what
+   *  tells main this window can; nothing ever arrives unless «Les sammen» and
+   *  a tool's switch are on. A no-op elsewhere. */
+  onToolRequest(cb: (req: ViewRequest) => Promise<ViewReply>): () => void
+  /** Desktop: the sessions of AI tools that pointed at or read something,
+   *  the one last added to first; [] elsewhere */
+  toolSessions(): Promise<ToolSessionMeta[]>
+  toolSession(id: string): Promise<ToolSession | null>
+  removeToolSession(id: string): Promise<void>
+  onToolSessionsChanged(cb: (change: ToolSessionsChange) => void): () => void
   setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
    *  goes through src/main/incremental-appender.ts instead) */
