@@ -270,14 +270,16 @@ export const register: Register = on => {
         {answer}
         <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
           {mine.map(reference => (
+            // The text as ONE label, never as children: a Button with several
+            // children takes a press only where it lands on their glyphs, and
+            // the padding around «[3] s. 7» — most of so small a button — was
+            // dead (Emil, 2026-11-24: «finicky to hit»)
             <Button
               key={`reference-${reference.n}`}
+              label={`[${reference.n}] ${reference.isFound ? '' : '✗ '}${pageLabel(reference.page)}`}
               dimColor={!reference.isFound}
               onPress={() => show($, reference)}
-            >
-              [{reference.n}] {reference.isFound ? '' : '✗ '}
-              {pageLabel(reference.page)}
-            </Button>
+            />
           ))}
         </Box>
       </Box>
