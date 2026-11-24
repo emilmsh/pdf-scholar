@@ -140,10 +140,13 @@ What it adds, on top of the notes:
 | `read_document` | The document's text as PDF Scholar reads it, page by page. A quote taken from here is one `show_passage` finds |
 | `get_reading_context` | Which document you have in front of you, the page you are on, and the text you have selected. Say "look at what I have selected" |
 
-- **Every reference is kept.** The assistant panel's history has a **From AI
-  tools** heading with one list per session of the tool. Each reference is the
+- **Every reference is numbered and kept.** The tool writes the reference's
+  number after its claim, like `[3]`, and the same number is on the card in
+  PDF Scholar. The assistant panel's history has a **From AI tools** heading
+  with one list per session of the tool. Each reference is its number, the
   claim, the quoted words and the page as a chip: press it to go to the
-  passage again, in whatever order you like. A session spans documents, and a
+  passage again, in whatever order you like. Showing the same passage again
+  keeps its number. A session spans documents, and a
   reference into another document opens it there. References whose words were
   not found are marked.
 - **What was read is listed too**: "Read the text on pp. 1–15", "Read your
@@ -160,6 +163,26 @@ What it adds, on top of the notes:
 - A PDF that is not open in PDF Scholar is read without being opened. A
   scanned one has no text until PDF Scholar has recognised it, which it does
   when you open it, never on a tool's word.
+
+### Buttons in Claude Code
+
+With PDF Scholar's plugin for Claude Code, every `[3]` in an answer gets a
+button under the answer: `[3] p. 7`. Press it and PDF Scholar shows that
+passage. The buttons stay under the answer, so the claim and its source are in
+the window the discussion is in.
+
+In a Claude Code terminal session:
+
+```
+/plugin install pdf-scholar --marketplace emilmsh/pdf-scholar
+```
+
+In the desktop app: **+** next to the prompt box, then **Plugins**, **Add
+marketplace** with `emilmsh/pdf-scholar`, then **Add plugin**. It is optional:
+without it Claude still writes the numbers, and you find the card in PDF
+Scholar's list yourself. What it does and keeps is in
+[its own README](../claude-plugin/README.md). Codex has no such plugin; the
+numbers and the list work there all the same.
 
 ## What a tool can read
 

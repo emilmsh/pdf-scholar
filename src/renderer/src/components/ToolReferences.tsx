@@ -163,6 +163,9 @@ export function ToolSessionView({
             shown.map((e) =>
               e.kind === 'reference' ? (
                 <div key={e.id} className={`tool-ref${e.found ? '' : ' is-missing'}`}>
+                  {/* The number the tool wrote beside its claim («… [3]»):
+                      what tells the reader which sentence this card backs */}
+                  <span className="tool-ref-n">[{e.n}]</span>
                   {e.claim && <p className="tool-ref-claim">{e.claim}</p>}
                   <p className="tool-ref-quote">
                     «{e.quote.length > 260 ? `${e.quote.slice(0, 259)}…` : e.quote}»

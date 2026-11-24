@@ -1,0 +1,10 @@
+{
+  "name": "pdf-scholar",
+  "version": "0.1.0",
+  "description": "Buttons under Claude's answer that show each cited passage in PDF Scholar",
+  "author": { "name": "Emil Mathias Strøm Halseth" },
+  "homepage": "https://github.com/emilmsh/pdf-scholar/blob/master/docs/MCP.md",
+  "repository": "https://github.com/emilmsh/pdf-scholar",
+  "license": "MIT",
+  "types": "./types/index.d.ts"
+}

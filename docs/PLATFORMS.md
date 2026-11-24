@@ -816,6 +816,12 @@ regressions are treated as bugs, not as acceptable platform lag.
     own userData gives it its own pipe. Covered by `npm run
     test:tool-bridge` (the rules, the store, the three tools over a real
     pipe, every OS) and `test:bridge-desktop` (the real app; Windows run).
+    The buttons under an answer are a **Claude Code plugin** (`claude-plugin/`,
+    installed from this repository's marketplace file): Claude Code only, in
+    its terminal and in the desktop app's Code tab alike — the plugin draws
+    through the surface's own element table and is tested on both. Codex and
+    any other tool get the numbers in the answer and the list in the app,
+    which is the whole feature without the shortcut.
 
 ## Maintenance rules
 

@@ -537,9 +537,11 @@ that.)*
   passage a claim rests on. PDF Scholar opens the document, goes to the page
   and highlights the quoted words, and tells the tool whether those words
   really are in the document — a quote that is not there comes back as
-  unverified. Every reference is kept in a list in the assistant panel, per
+  unverified. Every reference is numbered and kept in a list in the assistant panel, per
   session of the tool and across documents, each with its page as a chip
-  you can press again later. The tool can also read a document's text as
+  you can press again later; the tool writes the same number beside its
+  claim («… [3]»), and with PDF Scholar's plugin for Claude Code that number
+  gets a button under the answer that shows the passage. The tool can also read a document's text as
   PDF Scholar reads it, and see which document, page and selection you have
   in front of you. *(A switch of its own, off until turned on, in the same
   «AI tools» dialog. This is the one place a document's own text and a file
@@ -550,8 +552,12 @@ that.)*
   subscription sign-in in another app, checked 2026-11-24. The window comes
   up over the app you are in WITHOUT taking the keyboard — measured on
   Windows only, so claim «shows you the passage», never «switches to PDF
-  Scholar». Not in the README or any listing yet: when it is claimed is
-  Emil's call, with a release.)*
+  Scholar». The plugin is Claude Code only — Codex has none, and gets the numbers and
+  the list — and it installs from this repository
+  (`/plugin install pdf-scholar --marketplace emilmsh/pdf-scholar`), so it
+  ships WITH the app: name it wherever the feature is (Emil, 2026-11-24).
+  Not in the README or any listing yet: when it is claimed is Emil's call,
+  with a release.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only

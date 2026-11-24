@@ -178,20 +178,20 @@ async function main() {
     console.log('\n5. a passage shown, and kept')
     const QUOTE = 'Navigasjonshistorikk med en tydelig tilbake-knapp er derfor en sentral del av planen.'
     const shown = await server.call('show_passage', { path: DOC, page: 4, quote: QUOTE, claim: 'Dokumentet lover en tilbake-knapp', topic: 'Navigasjon i appen' })
-    check('found word for word on its page', !shown.isError && /Found word for word on page 4/.test(shown.text), shown.text)
+    check('found word for word on its page, as reference 1', !shown.isError && /^\[1\] Found word for word on page 4/.test(shown.text), shown.text)
     const view = await waitFor(
       () => run(send, `return { page: page(), flash: !!document.querySelector('.search-hit.cite-flash'), panel: !!document.querySelector('.tool-session'),
-                              refs: [...document.querySelectorAll('.tool-ref')].map((r) => ({ claim: r.querySelector('.tool-ref-claim')?.textContent, chip: r.querySelector('.ai-chip')?.textContent, missing: r.classList.contains('is-missing') })),
+                              refs: [...document.querySelectorAll('.tool-ref')].map((r) => ({ n: r.querySelector('.tool-ref-n')?.textContent, claim: r.querySelector('.tool-ref-claim')?.textContent, chip: r.querySelector('.ai-chip')?.textContent, missing: r.classList.contains('is-missing') })),
                               title: document.querySelector('.tool-session-title')?.textContent }`),
       (v) => v.page === '4' && v.flash && v.refs.length === 1,
       'the passage to be shown'
     )
     check('the viewer went to the page and the passage flashes', view.page === '4' && view.flash)
     check('the assistant panel opened on the list, headed by the topic', view.panel && view.title === 'Navigasjon i appen', view.title)
-    check('the reference: the claim, and the page as a chip', view.refs[0].claim === 'Dokumentet lover en tilbake-knapp' && /4/.test(view.refs[0].chip) && !view.refs[0].missing, JSON.stringify(view.refs[0]))
+    check('the reference: its number as the tool was given it, the claim, and the page as a chip', view.refs[0].n === '[1]' && view.refs[0].claim === 'Dokumentet lover en tilbake-knapp' && /4/.test(view.refs[0].chip) && !view.refs[0].missing, JSON.stringify(view.refs[0]))
 
     const wrong = await server.call('show_passage', { path: DOC, page: 2, quote: 'Appen ble lansert i 1987 og har ti millioner brukere.', claim: 'En påstand uten dekning' })
-    check('words that are not in the document: NOT FOUND', /^NOT FOUND/.test(wrong.text) && /unverified/.test(wrong.text), wrong.text)
+    check('words that are not in the document: NOT FOUND, as reference 2', /^\[2\] NOT FOUND/.test(wrong.text) && /unverified/.test(wrong.text), wrong.text)
     const missing = await waitFor(
       () => run(send, `return { page: page(), refs: [...document.querySelectorAll('.tool-ref')].map((r) => ({ missing: r.classList.contains('is-missing'), flag: r.querySelector('.tool-ref-flag')?.textContent ?? '' })) }`),
       (v) => v.refs.length === 2,
@@ -211,6 +211,10 @@ async function main() {
        return { page: page(), flash: !!document.querySelector('.search-hit.cite-flash'), had: !!field };`
     )
     check('pressing the first reference’s chip goes back to its passage', back.page === '4' && back.flash, JSON.stringify(back))
+
+    const again = await server.call('show_passage', { path: DOC, page: 4, quote: QUOTE })
+    const count = await run(send, `await settle(500); return document.querySelectorAll('.tool-ref').length`)
+    check('the same passage shown again keeps its number and adds no card', /^\[1\] /.test(again.text) && count === 2, `${again.text.slice(0, 40)} · ${count} cards`)
 
     console.log('\n7. a document no tab holds')
     const tabsBefore = await run(send, `return document.querySelectorAll('.tab').length`)

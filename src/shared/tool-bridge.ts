@@ -189,6 +189,9 @@ export type BridgeReply =
   | {
       ok: true
       op: 'cite'
+      /** The reference's number in this session — what the tool writes as
+       *  «[3]» beside its claim, and what the reader sees on the card */
+      n: number
       /** The quote occurs in the document's text */
       found: boolean
       /** Every character of it, not only an anchor of it */
@@ -235,6 +238,11 @@ export type ToolEntry =
       kind: 'reference'
       id: string
       at: number
+      /** Its number in the session, from 1. What ties a claim in the tool's
+       *  own answer («… [3]») to this card: a list of page chips alone says
+       *  nothing about which claim each belongs to (Emil's first real test,
+       *  2026-11-24). Never reused, so a number already read stays true. */
+      n: number
       docPath: string
       docName: string
       /** Where the passage is — the cited page when it was not found */
@@ -296,6 +304,8 @@ function entryOf(v: unknown): ToolEntry | null {
       kind: 'reference',
       id,
       at,
+      // 0 = none stored: sanitizeToolSession numbers it
+      n: typeof v.n === 'number' && Number.isInteger(v.n) && v.n >= 1 && v.n <= 1_000_000 ? v.n : 0,
       docPath,
       docName,
       page,
@@ -323,6 +333,15 @@ export function sanitizeToolSession(v: unknown): ToolSession | null {
     entries.push(e)
   }
   if (entries.length === 0) return null
+  // Every reference has a number, and no two the same: one without, or one
+  // whose number is already taken, gets the next free one
+  const taken = new Set<number>()
+  let top = Math.max(0, ...entries.map((e) => (e.kind === 'reference' ? e.n : 0)))
+  for (const e of entries) {
+    if (e.kind !== 'reference') continue
+    if (e.n === 0 || taken.has(e.n)) e.n = ++top
+    taken.add(e.n)
+  }
   const kept = entries.slice(-MAX_SESSION_ENTRIES)
   return {
     ...info,
@@ -341,6 +360,11 @@ export function withToolEntry(
   topic?: string
 ): ToolSession {
   const base: ToolSession = session ?? { ...info, title: '', updatedAt: entry.at, entries: [] }
+  // The next number after the highest ever given here — not the count, which
+  // would hand an old number out again once the list has dropped its oldest
+  if (entry.kind === 'reference' && !(entry.n >= 1)) {
+    entry = { ...entry, n: Math.max(0, ...base.entries.map((e) => (e.kind === 'reference' ? e.n : 0))) + 1 }
+  }
   return {
     ...base,
     title: base.title || tidy(topic, MAX_TOPIC),
@@ -381,6 +405,24 @@ export function toolSessionMeta(s: ToolSession): ToolSessionMeta {
     references: refs.length,
     documents: [...new Set(refs.map((e) => e.docPath))]
   }
+}
+
+/** The reference a session already holds for these words in this document:
+ *  a tool that shows a passage again («vis meg [3]») gets the SAME number
+ *  back instead of a second card. Paths compare with either slash and any
+ *  case; the quote must be the same words. */
+export function sameReference(
+  session: ToolSession | null,
+  docPath: string,
+  quote: string
+): Extract<ToolEntry, { kind: 'reference' }> | null {
+  const key = (p: string): string => p.replace(/[\\/]+/g, '/').toLowerCase()
+  const words = (q: string): string => q.replace(/\s+/g, ' ').trim()
+  const want = words(quote)
+  for (const e of session?.entries ?? []) {
+    if (e.kind === 'reference' && key(e.docPath) === key(docPath) && words(e.quote) === want) return e
+  }
+  return null
 }
 
 /** The references of one session, newest last, optionally of one document */

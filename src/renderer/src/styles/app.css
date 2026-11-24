@@ -7168,6 +7168,18 @@ button.bookmark-fold:hover {
   margin-bottom: 8px;
 }
 
+/* The reference's number, as the tool writes it in its own answer: set off
+   to the right of the card's first line, in the mono face a bracketed number
+   reads best in */
+.tool-ref-n {
+  float: right;
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--ai-scale, 1));
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
 .tool-ref-claim {
   font-size: calc(12.5px * var(--ai-scale, 1));
   line-height: 1.45;

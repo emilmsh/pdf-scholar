@@ -284,15 +284,19 @@ teksten til venstre.
 INSTALLERTE appen). Tannhjulet → «KI-verktøy»: slå på Claude, og så «La
 verktøyene peke og lese i PDF Scholar». Start en NY Claude Code-sesjon i
 skrivebordsappen, i en mappe med en PDF. Legg PDF Scholar bak et annet vindu.
-Spør Claude om noe artikkelen sier, og be den vise hvor. Skriv videre i Claude
-mens passasjen kommer opp. Trykk på et par av henvisningene i listen i
+Installer også pluginen (+ ved skrivefeltet → Plugins → Add marketplace
+`emilmsh/pdf-scholar` → Add plugin). Spør Claude om noe artikkelen sier, og be
+den vise hvor. Skriv videre i Claude mens passasjen kommer opp. Trykk på
+knappene under svaret, også etter at du har stilt et nytt spørsmål. Trykk på et par av henvisningene i listen i
 omvendt rekkefølge. Minimer PDF Scholar og be om en ny passasje. Lukk PDF
 Scholar helt og be om enda en. Marker en setning i PDF Scholar og skriv «se på
 det jeg har markert» i Claude. Be til slutt om en påstand du vet er feil.
 
 **Se:** PDF Scholar legger seg OVER vinduet du er i, på riktig side med
 sitatet markert – og det du skriver, havner fortsatt i Claude. Assistentpanelet
-åpner på listen «Fra KI-verktøy», med påstanden og siden som en knapp;
+åpner på listen «Fra KI-verktøy», med nummeret, påstanden og siden som en
+knapp. Claude skriver samme nummer ved påstanden («… [3]»), og under svaret
+står det en knapp per nummer («[3] p. 7») som viser passasjen og blir stående;
 knappene virker i hvilken som helst rekkefølge, også etter at du har bladd et
 annet sted. Fra minimert kommer vinduet tilbake uten å ta tastaturet (knappen på
 oppgavelinja kan flytte seg til enden hvis appen ikke er festet – det er
@@ -306,8 +310,10 @@ låste dokumenter, lageret, de tre verktøyene over et ekte rør) og
 `test:bridge-desktop` (bryteren, passasjen som blinker, panelet på listen,
 ikke-funn, et uåpnet dokument lest uten fane). Håndsjekk: at vinduet faktisk
 kommer OVER et annet program uten å ta tastaturet (målt på Windows 11 –
-på macOS og Linux er det ikke prøvd), at appen startes når den er lukket, og
-at Claude faktisk griper til verktøyene uten å bli bedt om det.
+på macOS og Linux er det ikke prøvd), at appen startes når den er lukket,
+at Claude faktisk skriver numrene ved påstandene, og at knappene under svaret
+tegnes i skrivebordsappen (pluginens egne tester, `claude plugin test
+claude-plugin`, dekker tegningen og trykket, ikke en ekte sesjon).
 
 ## Står igjen fra RELEASE.md steg 1 (alltid)
 

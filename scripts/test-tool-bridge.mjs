@@ -114,6 +114,17 @@ console.log('\n3. a stored session is untrusted input')
   grown = T.withToolEntry(grown, SESSION, ref('new2', { at: 20 }), 'A later topic')
   check('the first topic names the session; a later one does not rename it', grown.title === 'First topic' && grown.entries.length === 2 && grown.updatedAt === 20)
   check('no topic at first, one later: the later one names it', T.withToolEntry(T.withToolEntry(null, SESSION, ref('new1')), SESSION, ref('new2'), 'Named late').title === 'Named late')
+  // Numbers: what ties «… [3]» in the tool's answer to a card in the list
+  const numbered = T.sanitizeToolSession({ ...SESSION, entries: [ref('num1'), ref('num2', { n: 7 }), ref('num3', { n: 7 }), ref('num4', { n: 'x' }), { kind: 'read', id: 'num5', at: 11, docPath: '/p/a.pdf', docName: 'a.pdf', from: 1, to: 2 }] })
+  const ns = numbered.entries.filter((e) => e.kind === 'reference').map((e) => e.n)
+  check('every stored reference has a number, no two the same; one without, or taken, gets the next free', new Set(ns).size === 4 && ns.includes(7) && ns.every((n) => Number.isInteger(n) && n >= 1), ns.join())
+  check('a read has no number', !('n' in numbered.entries.at(-1)))
+  let counted = T.withToolEntry(null, SESSION, ref('cnt1', { n: 0 }))
+  counted = T.withToolEntry(counted, SESSION, ref('cnt2', { n: 0 }))
+  check('a new reference gets the next number, from 1', counted.entries.map((e) => e.n).join() === '1,2')
+  const dropped = { ...counted, entries: counted.entries.slice(1) }
+  check('…the next after the HIGHEST ever given, never one a dropped card had', T.withToolEntry(dropped, SESSION, ref('cnt3', { n: 0 })).entries.at(-1).n === 3)
+  check('the same words in the same document are the same reference — either slash, any case, any spacing', T.sameReference(counted, '\\p\\A.PDF', ' words ') !== null && T.sameReference(counted, '/p/a.pdf', 'wo  rds') === null && T.sameReference(counted, '/p/b.pdf', 'words') === null && T.sameReference(null, '/p/a.pdf', 'words') === null)
   const meta = T.toolSessionMeta(T.sanitizeToolSession({ ...SESSION, entries: [ref('ent1'), ref('ent2', { docPath: '/p/b.pdf', docName: 'b.pdf' }), { kind: 'read', id: 'ent3', at: 11, docPath: '/p/c.pdf', docName: 'c.pdf', from: 1, to: 2 }] }))
   check('a row counts references, and the documents they point into (a read is not one)', meta.references === 2 && meta.documents.join() === '/p/a.pdf,/p/b.pdf' && !('entries' in meta))
 }
@@ -220,7 +231,7 @@ console.log('\n6. a passage: shown, kept, and told whether it is there')
 {
   const w = world()
   const r = await w.ask({ op: 'cite', path: W('C:\\papers\\card.pdf'), page: 2, quote: 'We find no such effect in fast food.', claim: 'The paper finds no employment effect', topic: 'Minimum wages', show: true })
-  check('found word for word, on its page, and shown', r.ok && r.found && r.whole && r.page === 2 && r.citedPage === 2 && r.shown === true)
+  check('found word for word, on its page, and shown — as reference 1', r.ok && r.found && r.whole && r.page === 2 && r.citedPage === 2 && r.shown === true && r.n === 1)
   check('the window was asked with the path the app knows the document by', w.calls[0].op === 'cite' && w.calls[0].path === W('C:/papers/card.pdf') && w.calls[0].bytes === undefined)
   check('…and brought up once', w.raised() === 1)
   const kept = await w.store.get(SESSION.id)
@@ -228,13 +239,27 @@ console.log('\n6. a passage: shown, kept, and told whether it is there')
   check('…and the windows are told, with «shown»', w.changes.length === 1 && w.changes[0].kind === 'reference' && w.changes[0].shown === true)
 
   const wrongPage = await w.ask({ op: 'cite', path: W('C:/papers/card.pdf'), page: 1, quote: 'The result survives every specification we tried.', show: false })
-  check('cited on the wrong page: found where it is, and both pages told', wrongPage.found && wrongPage.page === 3 && wrongPage.citedPage === 1)
+  check('cited on the wrong page: found where it is, and both pages told — reference 2', wrongPage.found && wrongPage.page === 3 && wrongPage.citedPage === 1 && wrongPage.n === 2)
   check('show: false keeps the reference and leaves the window where it is', wrongPage.shown === false && w.raised() === 1 && (await w.store.get(SESSION.id)).entries.length === 2)
 
   const part = await w.ask({ op: 'cite', path: W('C:/papers/card.pdf'), page: 2, quote: 'The dominant view holds that wages are too low.', show: false })
   check('only its first words are there: found, but NOT whole', part.found && !part.whole)
   const none = await w.ask({ op: 'cite', path: W('C:/papers/card.pdf'), page: 2, quote: 'Unemployment tripled within a year.', show: true })
   check('not in the document: not found — and still shown (the page) and kept, marked', none.ok && !none.found && !none.whole && none.shown && (await w.store.get(SESSION.id)).entries.at(-1).found === false)
+}
+
+console.log('\n6b. the same passage again')
+{
+  const w = world()
+  const QUOTE = 'We find no such effect in fast food.'
+  const first = await w.ask({ op: 'cite', path: W('C:/papers/card.pdf'), page: 2, quote: QUOTE, claim: 'No effect', show: false })
+  const other = await w.ask({ op: 'cite', path: W('C:/papers/card.pdf'), page: 3, quote: 'The result survives every specification we tried.', show: false })
+  const changesBefore = w.changes.length
+  const again = await w.ask({ op: 'cite', path: W('C:\\papers\\CARD.pdf'), page: 2, quote: `  ${QUOTE} `, show: false })
+  check('cited again: the SAME number, and no second card', first.n === 1 && other.n === 2 && again.n === 1 && (await w.store.get(SESSION.id)).entries.length === 2)
+  check('…and nothing to tell the windows, since nothing changed', w.changes.length === changesBefore && w.raised() === 0)
+  const shown = await w.ask({ op: 'cite', path: W('C:/papers/card.pdf'), page: 2, quote: QUOTE, show: true })
+  check('shown again («vis meg [1]»): its number, the window brought up, the panel told — still two cards', shown.n === 1 && shown.shown && w.raised() === 1 && w.changes.at(-1).shown === true && (await w.store.get(SESSION.id)).entries.length === 2)
 }
 
 console.log('\n7. a document no tab holds')
@@ -326,15 +351,15 @@ console.log('\n10. the server’s tools, over the pipe')
   }
 
   const shown = await call('show_passage', { path: W('C:\\papers\\card.pdf'), page: 2, quote: 'We find no such effect in fast food.', claim: 'No effect', topic: 'Minimum wages' })
-  check('show_passage: found word for word, and says the user sees it', !shown.isError && /Found word for word on page 2/.test(shown.text) && /showing it/.test(shown.text), shown.text)
+  check('show_passage: found word for word, and says the user sees it', !shown.isError && /^\[1\] Found word for word on page 2/.test(shown.text) && /showing it/.test(shown.text), shown.text)
   const session = (await w.store.all())[0]
   check('…kept under the server’s own session, named by the topic', session.client === 'claude' && /^[0-9a-f]{16}$/.test(session.id) && session.title === 'Minimum wages' && session.entries[0].claim === 'No effect')
   const off = await call('show_passage', { path: W('C:/papers/card.pdf'), page: 1, quote: 'The result survives every specification we tried.', show: false })
-  check('the wrong page is said, and a listed one says so', /page 3 \(not page 1, as cited\)/.test(off.text) && /list of references/.test(off.text), off.text)
+  check('the wrong page is said, and a listed one says so', /^\[2\] /.test(off.text) && /page 3 \(not page 1, as cited\)/.test(off.text) && /list of references/.test(off.text), off.text)
   const part = await call('show_passage', { path: W('C:/papers/card.pdf'), page: 2, quote: 'The dominant view holds that wages are too low.' })
   check('found in part is not reported as found', /Only part of the quote/.test(part.text) && !/word for word/.test(part.text))
   const none = await call('show_passage', { path: W('C:/papers/card.pdf'), page: 2, quote: 'Unemployment tripled within a year.' })
-  check('not found: NOT FOUND, and «unverified»', /^NOT FOUND/.test(none.text) && /unverified/.test(none.text))
+  check('not found: NOT FOUND, and «unverified»', /^\[4\] NOT FOUND/.test(none.text) && /unverified/.test(none.text), none.text)
   check('every answer came from the same session id', (await w.store.all()).length === 1 && (await w.store.all())[0].entries.length === 4)
 
   const text = await call('read_document', { path: W('C:/papers/card.pdf') })

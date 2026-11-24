@@ -35,6 +35,7 @@ import { docNameFromPath } from '../shared/chat-history'
 import { excludedBy, type McpPolicy } from '../shared/mcp'
 import {
   MAX_SELECTION,
+  sameReference,
   sanitizeBridgeEnvelope,
   type BridgeEnvelope,
   type BridgeErrorCode,
@@ -213,24 +214,39 @@ export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise
     const answer = await deps.view({ op: 'cite', path, page: req.page, quote: req.quote, show: req.show, ...(bytes ? { bytes } : {}) })
     if (!answer.ok) return fail(answer.error)
     if (answer.op !== 'cite') return fail('no-window')
-    const entry: ToolEntry = {
-      kind: 'reference',
-      id: deps.newId(),
-      at: deps.now(),
-      docPath: path,
-      docName: docNameFromPath(path),
-      page: answer.page,
-      quote: req.quote,
-      ...(req.claim ? { claim: req.claim } : {}),
-      found: answer.found,
-      whole: answer.found && answer.whole
+    // The same words in the same document again — the reader asked to see a
+    // reference once more, or the tool repeated itself: the card it has, and
+    // its number, not a second one
+    const have = sameReference(await deps.store.get(env.session.id), path, req.quote)
+    let entry: Extract<ToolEntry, { kind: 'reference' }>
+    let session: ToolSession
+    if (have) {
+      entry = have
+      session = (await deps.store.get(env.session.id)) as ToolSession
+    } else {
+      const made: ToolEntry = {
+        kind: 'reference',
+        id: deps.newId(),
+        at: deps.now(),
+        n: 0,
+        docPath: path,
+        docName: docNameFromPath(path),
+        page: answer.page,
+        quote: req.quote,
+        ...(req.claim ? { claim: req.claim } : {}),
+        found: answer.found,
+        whole: answer.found && answer.whole
+      }
+      session = await deps.store.append(env.session, made, req.topic)
+      // The store numbered it; read the number back from what it kept
+      entry = (session.entries.find((e) => e.id === made.id) ?? made) as Extract<ToolEntry, { kind: 'reference' }>
     }
-    const session = await deps.store.append(env.session, entry, req.topic)
     if (req.show) deps.raise()
-    deps.changed(session, entry, req.show)
+    if (!have || req.show) deps.changed(session, entry, req.show)
     return {
       ok: true,
       op: 'cite',
+      n: entry.n,
       found: answer.found,
       whole: answer.found && answer.whole,
       page: answer.page,
