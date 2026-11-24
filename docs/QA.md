@@ -285,7 +285,7 @@ INSTALLERTE appen). Tannhjulet → «KI-verktøy»: slå på Claude, og så «La
 verktøyene peke og lese i PDF Scholar». Start en NY Claude Code-sesjon i
 skrivebordsappen, i en mappe med en PDF. Legg PDF Scholar bak et annet vindu.
 Installer også pluginen (+ ved skrivefeltet → Plugins → Add marketplace
-`emilmsh/pdf-scholar` → Add plugin). Spør Claude om noe artikkelen sier, og be
+`emilmsh/pdf-scholar` → Add plugin `pdf-scholar-buttons`). Spør Claude om noe artikkelen sier, og be
 den vise hvor. Skriv videre i Claude mens passasjen kommer opp. Trykk på
 knappene under svaret, også etter at du har stilt et nytt spørsmål. Trykk på et par av henvisningene i listen i
 omvendt rekkefølge. Minimer PDF Scholar og be om en ny passasje. Lukk PDF
@@ -294,9 +294,9 @@ det jeg har markert» i Claude. Be til slutt om en påstand du vet er feil.
 
 **Se:** PDF Scholar legger seg OVER vinduet du er i, på riktig side med
 sitatet markert – og det du skriver, havner fortsatt i Claude. Assistentpanelet
-åpner på listen «Fra KI-verktøy», med nummeret, påstanden og siden som en
+åpner på listen «Henvisninger fra KI-verktøy», med nummeret, påstanden og siden som en
 knapp. Claude skriver samme nummer ved påstanden («… [3]»), og under svaret
-står det en knapp per nummer («[3] p. 7») som viser passasjen og blir stående;
+står det en knapp per nummer («[3] s. 7») som viser passasjen og blir stående;
 knappene virker i hvilken som helst rekkefølge, også etter at du har bladd et
 annet sted. Fra minimert kommer vinduet tilbake uten å ta tastaturet (knappen på
 oppgavelinja kan flytte seg til enden hvis appen ikke er festet – det er

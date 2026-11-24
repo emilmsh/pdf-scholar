@@ -150,7 +150,7 @@ program that can read a token the app keeps in your own profile folder. A
 document you keep out and a password-protected one are neither shown, read nor
 named: a tool that asks what is open while one is in front learns only that
 something is. Everything a tool pointed at **and everything it read** is listed
-in the assistant panel's history under "From AI tools", per session of the
+in the assistant panel's history under "References from AI tools", per session of the
 tool, and kept on your device in the app's data folder until you delete the
 list; a list holds the quoted words, the claim the tool attached to them, and
 the document's path. A document that is not open is read without being opened,

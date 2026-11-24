@@ -791,7 +791,7 @@ regressions are treated as bugs, not as acceptable platform lag.
     `src/main/tool-bridge.ts`.) It rides on the MCP server of §33, so it
     exists exactly where that does: not in the extension or dev:web
     (`onToolRequest` is a no-op there, `toolSessions` answers [], and the
-    assistant's history draws no «Fra KI-verktøy» heading), and not in the
+    assistant's history draws no «Henvisninger fra KI-verktøy» heading), and not in the
     **Microsoft Store build**, which no program can start a server for — main
     never listens there. The app listens on a named pipe on Windows
     (`\\.\pipe\pdf-scholar-bridge-<hash of userData>`) and on a socket
