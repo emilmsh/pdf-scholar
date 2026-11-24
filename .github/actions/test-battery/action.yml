@@ -231,6 +231,11 @@ runs:
     # script spoken to over stdio, by Node and by Electron in Node mode
     - run: npm run test:research-notes
       shell: bash
+    # «Les sammen»: an AI tool pointing at a passage in the RUNNING app —
+    # who is answered (the token, both switches), what is kept out or locked,
+    # the store of what was pointed at, and the three tools over a real pipe
+    - run: npm run test:tool-bridge
+      shell: bash
     # A moved/renamed file's records follow it (issue #46): /ID[0] read from
     # the bytes, a copy never steals its original's history, and /ID[0]
     # survives both of our save paths (the real engine, both bundles)

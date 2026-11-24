@@ -297,7 +297,17 @@ console.log('\n8. the protocol')
   check('a notification gets no answer', (await server.handle({ jsonrpc: '2.0', method: 'notifications/initialized' })) === null)
   check('ping', !!(await rpc('ping')).result)
   const list = await rpc('tools/list')
-  check('four tools, all read-only', list.result.tools.length === 4 && list.result.tools.every((t) => t.annotations.readOnlyHint === true))
+  // The three «read together» tools (scripts/test-tool-bridge.mjs) are listed
+  // beside the four that read notes; only show_passage is not read-only
+  const NOTE_TOOLS = ['search_notes', 'list_documents', 'get_document_notes', 'get_conversation']
+  const byName = new Map(list.result.tools.map((t) => [t.name, t]))
+  check('the four notes tools, all read-only', NOTE_TOOLS.every((n) => byName.get(n)?.annotations.readOnlyHint === true))
+  check(
+    'seven tools in all, and only show_passage acts on the app',
+    list.result.tools.length === 7 &&
+      list.result.tools.filter((t) => t.annotations.readOnlyHint !== true).map((t) => t.name).join() === 'show_passage' &&
+      list.result.tools.every((t) => !('acts' in t))
+  )
   check('an unknown method is -32601', (await rpc('resources/list')).error?.code === -32601)
   check('an unknown tool is -32602', (await rpc('tools/call', { name: 'delete_everything' })).error?.code === -32602)
   check('not JSON-RPC at all → Invalid request', (await server.handle({ id: 7, method: 'x' })).error?.code === -32600)
@@ -374,7 +384,7 @@ console.log('\n10. one switch per tool')
   setState({ mcp: { clients: { ...ON, claude: false } } })
   const off = await call('list_documents', {})
   check('a tool whose switch is off has every call refused', off.isError && /not sharing with this tool/.test(off.text) && !off.text.includes('Card'))
-  check('…tools/list still answers (nothing in it is the reader’s)', (await rpc('tools/list')).result.tools.length === 4)
+  check('…tools/list still answers (nothing in it is the reader’s)', (await rpc('tools/list')).result.tools.length === 7)
   setState({ mcp: { clients: { claude: false, codex: true, other: true } } })
   check('another tool’s switch does not let this one in', (await call('list_documents', {})).isError)
   const codex = createMcpServer({ dataDir, version: '9.9.9', client: 'codex', foldCase: true })

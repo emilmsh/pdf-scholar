@@ -176,31 +176,7 @@ export function resolveCitation(
   // Web citations point outside the document — opened externally, never resolved;
   // a conversation chip points at another conversation, not into this text
   if (citation.kind === 'web' || citation.kind === 'conversation') return null
-  if (citation.kind === 'quote') {
-    const pageIndex = citation.pageNumber - 1
-    if (pageIndex < 0 || pageIndex >= pages.length) return null
-    // Models are usually right about the page but "verbatim" quotes get
-    // normalized (curly quotes, collapsed breaks, expanded ligatures),
-    // truncated with an ellipsis, or land one page off (the page-marker
-    // offset, or a passage straddling a page break). Try progressively
-    // looser anchors — cited page first, then neighbours — and give up
-    // rather than guess: every fallback match must be UNIQUE on its page,
-    // so a miss degrades to the page jump, never to a wrong highlight.
-    const candidates = [pageIndex, pageIndex - 1, pageIndex + 1].filter(
-      (i) => i >= 0 && i < pages.length
-    )
-    for (const pi of candidates) {
-      const hit = locateQuote(citation.quote, pages[pi].text, pi !== pageIndex)
-      if (hit) return { pageNumber: pi + 1, ...hit }
-    }
-    for (const needle of fallbackNeedles(citation.quote)) {
-      for (const pi of candidates) {
-        const hit = locateQuote(needle, pages[pi].text, true)
-        if (hit) return { pageNumber: pi + 1, ...hit }
-      }
-    }
-    return null
-  }
+  if (citation.kind === 'quote') return resolveQuote(citation.pageNumber, citation.quote, pages)
   // char kind: find the slot whose range contains the citation start (offsets
   // inside the leading "[Side 1]" marker clamp to the first slot), then map
   // slot → real page (identity on full documents, pageNumbers on excerpts —
@@ -213,6 +189,36 @@ export function resolveCitation(
   const end = Math.min(citation.end - doc.pageStarts[slot], pageLen)
   if (start >= pageLen || end <= 0 || end <= start) return null
   return { pageNumber: pageIndex + 1, start: Math.max(0, start), end }
+}
+
+/** A quote said to be on a page → where it is in that page's text, or null.
+ *  The quote half of resolveCitation, on its own for the callers that hold a
+ *  page and a quote and no AiDocument (a passage an outside tool cites,
+ *  tool-bridge.ts). */
+export function resolveQuote(pageNumber: number, quote: string, pages: PageText[]): ResolvedCitation | null {
+  const pageIndex = pageNumber - 1
+  if (pageIndex < 0 || pageIndex >= pages.length) return null
+  // Models are usually right about the page but "verbatim" quotes get
+  // normalized (curly quotes, collapsed breaks, expanded ligatures),
+  // truncated with an ellipsis, or land one page off (the page-marker
+  // offset, or a passage straddling a page break). Try progressively
+  // looser anchors — cited page first, then neighbours — and give up
+  // rather than guess: every fallback match must be UNIQUE on its page,
+  // so a miss degrades to the page jump, never to a wrong highlight.
+  const candidates = [pageIndex, pageIndex - 1, pageIndex + 1].filter(
+    (i) => i >= 0 && i < pages.length
+  )
+  for (const pi of candidates) {
+    const hit = locateQuote(quote, pages[pi].text, pi !== pageIndex)
+    if (hit) return { pageNumber: pi + 1, ...hit }
+  }
+  for (const needle of fallbackNeedles(quote)) {
+    for (const pi of candidates) {
+      const hit = locateQuote(needle, pages[pi].text, true)
+      if (hit) return { pageNumber: pi + 1, ...hit }
+    }
+  }
+  return null
 }
 
 /** Locate `quote` in `pageText`: exact case-insensitive first, then on the

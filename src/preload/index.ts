@@ -22,6 +22,7 @@ import type {
 import type { StoredConversation } from '../shared/chat-history'
 import type { DocNotes } from '../shared/research-notes'
 import type { McpPolicy, McpTarget } from '../shared/mcp'
+import type { ToolSessionsChange, ViewReply, ViewRequest } from '../shared/tool-bridge'
 
 const api: PdfxApi = {
   openFileDialog: () => ipcRenderer.invoke('dialog:open'),
@@ -58,9 +59,32 @@ const api: PdfxApi = {
   mcpStatus: () => ipcRenderer.invoke('mcp:status'),
   mcpConnect: (target: McpTarget, on: boolean) => ipcRenderer.invoke('mcp:connect', target, on),
   mcpPolicy: () => ipcRenderer.invoke('mcp:policy'),
-  mcpSetPolicy: (patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders'>>) =>
+  mcpSetPolicy: (patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders' | 'live'>>) =>
     ipcRenderer.invoke('mcp:set-policy', patch),
   mcpPickFolder: () => ipcRenderer.invoke('mcp:pick-folder'),
+  onToolRequest: (cb: (req: ViewRequest) => Promise<ViewReply>) => {
+    const listener = (_e: unknown, id: number, req: ViewRequest): void => {
+      void cb(req)
+        .catch((): ViewReply => ({ ok: false, error: 'unreadable' }))
+        .then((reply) => ipcRenderer.send('tool-bridge:reply', id, reply))
+    }
+    ipcRenderer.on('tool-bridge:request', listener)
+    // Main asks only windows that said they answer
+    ipcRenderer.send('tool-bridge:ready')
+    return () => {
+      ipcRenderer.removeListener('tool-bridge:request', listener)
+    }
+  },
+  toolSessions: () => ipcRenderer.invoke('tool-sessions:list'),
+  toolSession: (id: string) => ipcRenderer.invoke('tool-sessions:get', id),
+  removeToolSession: (id: string) => ipcRenderer.invoke('tool-sessions:remove', id),
+  onToolSessionsChanged: (cb: (change: ToolSessionsChange) => void) => {
+    const listener = (_e: unknown, change: ToolSessionsChange): void => cb(change)
+    ipcRenderer.on('tool-sessions:changed', listener)
+    return () => {
+      ipcRenderer.removeListener('tool-sessions:changed', listener)
+    }
+  },
   mcpDocuments: () => ipcRenderer.invoke('mcp:documents'),
   notesBackfillTargets: () => ipcRenderer.invoke('notes:backfill-targets'),
   onConversationsChanged: (cb: (path: string | null) => void) => {

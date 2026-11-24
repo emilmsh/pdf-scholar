@@ -25,6 +25,14 @@ import type {
   ViewRotation
 } from '../../../shared/types'
 import { bridge, isElectron, isExtension } from '../bridge'
+import {
+  hasPendingPassage,
+  locatePassage,
+  onPassageRequest,
+  pathKey,
+  registerToolViewer,
+  takePendingPassage
+} from '../tool-bridge'
 import { CONVERSATION_HANDOFF_EVENT, pendingConversationFor } from '../chat-store'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { useDropTarget } from './useDropTarget'
@@ -7098,6 +7106,74 @@ export default function PdfViewer({
 
   const consumeAiSeed = useCallback(() => setAiSeed(null), [])
 
+  // «Les sammen» (tool-bridge.ts): what an AI tool outside the app may ask of
+  // this document — where a quoted passage is, its text, what is selected.
+  // Registered always and asked only while the reader's switches are on.
+  const toolPageRef = useRef({ page: currentPage, pages: sizes.length, asking: false })
+  toolPageRef.current = { page: currentPage, pages: sizes.length, asking: passwordAsk !== null }
+  useEffect(
+    () =>
+      registerToolViewer({
+        path: payload.path,
+        locked: () => docPasswordRef.current !== undefined || toolPageRef.current.asking,
+        page: () => toolPageRef.current.page,
+        pageCount: () => toolPageRef.current.pages,
+        texts: async () => {
+          const ensured = await ensureAiDocument()
+          return ensured ? { pages: ensured.pages, hasText: ensured.hasText } : null
+        },
+        jump: (target) => void jumpToAiCitation(target),
+        selection: () => {
+          const sel = window.getSelection()
+          if (!sel || sel.isCollapsed) return ''
+          // Only what is selected in THIS document's pages
+          return containerRef.current?.contains(sel.anchorNode) ? sel.toString() : ''
+        }
+      }),
+    [payload.path, ensureAiDocument, jumpToAiCitation]
+  )
+
+  // A tool just brought a passage up in this document: the assistant panel
+  // opens on that session's list, so the claim and its passage are seen
+  // together (and can be come back to once the reader has looked elsewhere)
+  const [toolSessionAsk, setToolSessionAsk] = useState<{ id: number; sessionId: string } | null>(null)
+  useEffect(
+    () =>
+      bridge.onToolSessionsChanged((change) => {
+        if (!change.shownHere || !change.docPath || pathKey(change.docPath) !== pathKey(payload.path)) return
+        setToolSessionAsk((ask) => ({ id: (ask?.id ?? 0) + 1, sessionId: change.sessionId }))
+        setAiPinned(true)
+      }),
+    [payload.path]
+  )
+
+  // A reference pressed in another document's list names a passage HERE: go
+  // to it once this document's text is there to look it up in (a tab opened
+  // for it is still loading — ensureAiDocument changes identity when it has)
+  useEffect(() => {
+    let cancelled = false
+    const take = (): void => {
+      if (!hasPendingPassage(payload.path)) return
+      void ensureAiDocument().then((ensured) => {
+        if (cancelled || !ensured) return
+        const passage = takePendingPassage(payload.path)
+        if (!passage) return
+        const hit = locatePassage(ensured.pages, passage.page, passage.quote)
+        void jumpToAiCitation(hit?.target ?? { pageNumber: passage.page, start: 0, end: 0 })
+        if (passage.sessionId) {
+          setToolSessionAsk((ask) => ({ id: (ask?.id ?? 0) + 1, sessionId: passage.sessionId }))
+          setAiPinned(true)
+        }
+      })
+    }
+    take()
+    const off = onPassageRequest(take)
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [payload.path, ensureAiDocument, jumpToAiCitation])
+
   // A DETACHED assistant clicked a citation in this document: show it here.
   // ensureAiDocument first — a viewer that never opened its own panel has no
   // page texts yet, and the jump needs them to resolve rects. Returning true
@@ -8297,6 +8373,7 @@ export default function PdfViewer({
                 currentPage={currentPage}
                 pageCount={sizes.length}
                 conversationAskId={conversationAskId}
+                toolSessionAsk={toolSessionAsk}
                 isLocked={() => docPasswordRef.current !== undefined}
                 onOpenElsewhere={(path) => {
                   // The host opens the document (a tab, focused or created),

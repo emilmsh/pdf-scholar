@@ -205,7 +205,14 @@ export async function buildPageText(pdf: PDFDocumentProxy, pageNumber: number): 
  */
 export async function buildPageTexts(
   pdf: PDFDocumentProxy,
-  opts: { onProgress?(pages: PageText[]): void; signal?: AbortSignal; images?: ImageText } = {}
+  opts: {
+    onProgress?(pages: PageText[]): void
+    signal?: AbortSignal
+    images?: ImageText
+    /** The pages' OWN text only: nothing is recognised. For a document read
+     *  without being opened (tool-bridge.ts) — OCR is the reader's to start. */
+    ownOnly?: boolean
+  } = {}
 ): Promise<PageText[]> {
   const pages: PageText[] = []
   const owns: TextContent[] = []
@@ -218,7 +225,7 @@ export async function buildPageTexts(
     owns.push(content)
     pages.push(toPageText(content, pdf.isPureXfa))
   }
-  if (!textFallback || pdf.isPureXfa) return pages
+  if (!textFallback || pdf.isPureXfa || opts.ownOnly) return pages
   const fallback = textFallback
   // The own text is searchable now; what OCR adds follows page by page
   if (scanned || opts.images === 'wait') opts.onProgress?.(pages.slice())

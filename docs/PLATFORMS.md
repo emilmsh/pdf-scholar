@@ -785,6 +785,44 @@ regressions are treated as bugs, not as acceptable platform lag.
     neither, so there the field starts empty as before. Typing a name works
     identically everywhere.
 
+37. **«Les sammen» — an AI tool pointing at a passage in the running app —
+    is desktop-only, and how the window comes up is measured on Windows
+    alone.** (2026-11-24; `src/shared/tool-bridge.ts`,
+    `src/main/tool-bridge.ts`.) It rides on the MCP server of §33, so it
+    exists exactly where that does: not in the extension or dev:web
+    (`onToolRequest` is a no-op there, `toolSessions` answers [], and the
+    assistant's history draws no «Fra KI-verktøy» heading), and not in the
+    **Microsoft Store build**, which no program can start a server for — main
+    never listens there. The app listens on a named pipe on Windows
+    (`\\.\pipe\pdf-scholar-bridge-<hash of userData>`) and on a socket
+    file inside userData on macOS and Linux (`tool-bridge.sock`; a stale one
+    is unlinked before the bind, which the single-instance lock makes safe).
+    Bringing the window up: on **Windows** it is made topmost for an instant
+    (`setAlwaysOnTop` on, `moveTop`, off), which puts it above the app in
+    front without taking the keyboard — measured on Windows 11 against
+    Claude's app in the foreground, where `moveTop` + `focus` did nothing
+    at all and `isFocused()` still answered true; a minimized window is
+    brought back with `showInactive` while it is made unfocusable for that
+    moment (`setFocusable(false)` … `true`), since `restore` took the
+    foreground and so did a plain `showInactive` in two runs of three — at
+    the price of Electron taking the window out of the taskbar and putting
+    it back, which can move an unpinned app's button to the end.
+    On **macOS and Linux** it is `showInactive` + `moveTop`, which is what
+    the APIs promise and has NOT been measured — whether a window manager
+    honours it is a hand check on those platforms before the feature is
+    claimed there. The MCP server starts the app when it is not running: the
+    executable it was itself started with, minus the Node-mode variable (the
+    AppImage by `APPIMAGE`); never from a developer run. The portable zip's
+    own userData gives it its own pipe. Covered by `npm run
+    test:tool-bridge` (the rules, the store, the three tools over a real
+    pipe, every OS) and `test:bridge-desktop` (the real app; Windows run).
+    The buttons under an answer are a **Claude Code plugin** (`claude-plugin/`,
+    installed from this repository's marketplace file): Claude Code only, in
+    its terminal and in the desktop app's Code tab alike — the plugin draws
+    through the surface's own element table and is tested on both. Codex and
+    any other tool get the numbers in the answer and the list in the app,
+    which is the whole feature without the shortcut.
+
 ## Maintenance rules
 
 - **CI is the parity backbone**: `.github/workflows/ci.yml` builds, typechecks,

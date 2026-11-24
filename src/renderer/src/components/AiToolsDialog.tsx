@@ -16,6 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FileError } from '../../../shared/types'
 import type { McpDocument, McpPolicy, McpStatus, McpTarget } from '../../../shared/mcp'
+import { sharesWithAny } from '../../../shared/mcp'
 import { docNameFromPath } from '../../../shared/chat-history'
 import { bridge } from '../bridge'
 import { errorText, t, useLang } from '../i18n'
@@ -118,7 +119,7 @@ export default function AiToolsDialog({
     if (on) void runNotesBackfill().then(reloadDocs)
   }
 
-  const update = async (patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders'>>): Promise<void> => {
+  const update = async (patch: Partial<Pick<McpPolicy, 'excludedDocs' | 'excludedFolders' | 'live'>>): Promise<void> => {
     const next = await bridge.mcpSetPolicy(patch)
     if (next) setPolicy(next)
     reloadDocs()
@@ -289,6 +290,29 @@ export default function AiToolsDialog({
                     {error.code === 'mcp-client-failed' && error.error ? ` (${error.error})` : ''}
                   </p>
                 )}
+              </section>
+              {/* «Les sammen» (shared/tool-bridge.ts): more than reading
+                  notes — the document's own text and the path of what is open
+                  leave too — so a switch of its own, off until turned on, with
+                  what it shares said in full rather than behind a hover */}
+              <section className="keys-group">
+                <h3 className="keys-group-title">{t('mcp.live')}</h3>
+                <label className="theme-menu-toggle ai-tools-row">
+                  <span className="ai-tools-text">
+                    <span className="ai-tools-name">{t('mcp.liveName')}</span>
+                    <span className="ai-tools-sub">
+                      {policy && (policy.live || sharesWithAny(policy)) ? t('mcp.liveSub') : t('mcp.liveNeedsTool')}
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={policy?.live === true}
+                    // Off can always be chosen; on needs a tool to be on
+                    disabled={!policy || busy !== null || (!policy.live && !sharesWithAny(policy))}
+                    onChange={(e) => void update({ live: e.target.checked })}
+                  />
+                </label>
+                <p className="ai-tools-note">{t('mcp.liveNote')}</p>
               </section>
               <section className="keys-group">
                 <h3 className="keys-group-title">{t('mcp.docs')}</h3>

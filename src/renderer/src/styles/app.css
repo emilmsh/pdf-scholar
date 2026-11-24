@@ -7127,6 +7127,118 @@ button.bookmark-fold:hover {
   color: var(--text);
 }
 
+/* ---------- What an AI tool outside the app pointed at (ToolReferences.tsx) ----------
+   The sessions sit above the assistant's own conversations in the history
+   view, on the same rows; one session's list takes the conversation's place.
+   A reference is a claim with its passage: the claim in the interface face,
+   the quoted words in the reading face (docs/TYPOGRAPHY.md), and the page as
+   the same pill a source in an answer wears. */
+.tool-sessions {
+  margin-bottom: 14px;
+}
+
+.tool-session-back {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 0;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.tool-session-back:hover {
+  color: var(--text);
+}
+
+.tool-session-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tool-session-meta {
+  margin: 2px 0 10px;
+}
+
+.tool-ref {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+
+/* The reference's number, as the tool writes it in its own answer: set off
+   to the right of the card's first line, in the mono face a bracketed number
+   reads best in */
+.tool-ref-n {
+  float: right;
+  margin-left: 8px;
+  font-family: var(--font-mono);
+  font-size: calc(10.5px * var(--ai-scale, 1));
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+
+.tool-ref-claim {
+  font-size: calc(12.5px * var(--ai-scale, 1));
+  line-height: 1.45;
+  margin: 0 0 4px;
+}
+
+.tool-ref-quote {
+  font-family: var(--font-reading);
+  font-size-adjust: var(--font-reading-adjust, none);
+  font-size: calc(11.5px * var(--ai-scale, 1));
+  line-height: 1.45;
+  color: var(--text-secondary);
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}
+
+.tool-ref-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tool-ref-foot .ai-chip {
+  flex: none;
+  margin: 0;
+  vertical-align: baseline;
+}
+
+.tool-ref-foot .ai-history-doc {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The quote is not in the document's text — the one thing in the list that
+   must not be missed, so it takes the error colour; found only in part is a
+   quieter word in the secondary one */
+.tool-ref-flag {
+  flex: none;
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--danger);
+}
+
+.tool-ref-flag.is-part {
+  color: var(--text-secondary);
+}
+
+.tool-ref.is-missing {
+  border-style: dashed;
+}
+
+/* What the tool read, between the references: a line, not a card */
+.tool-ref-quiet {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  margin: 0 2px 8px;
+}
+
 /* Settings */
 
 .ai-settings {

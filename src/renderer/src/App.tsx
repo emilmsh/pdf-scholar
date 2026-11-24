@@ -29,6 +29,7 @@ import {
 } from '../../shared/tab-groups'
 import { BREW_UPGRADE_COMMAND, RELEASES_PAGE_URL } from '../../shared/update-channel'
 import { bridge, isElectron } from './bridge'
+import { answerToolRequest, pathKey, registerToolShell } from './tool-bridge'
 import { movedFromLabel, positionFor, reportIdentity } from './doc-identity'
 import { errorText, setLanguage, t, useLang } from './i18n'
 import { commandForEvent, isKeyboardCaptured, setKeymapOverrides } from './keymap'
@@ -1310,6 +1311,30 @@ export default function App(): React.JSX.Element {
       }),
     [goToTab, tabsOn]
   )
+
+  // «Les sammen» (tool-bridge.ts): this window answers what an AI tool asks
+  // of its documents. Registering is what tells main it can — a detached
+  // assistant window never mounts this.
+  useEffect(() => {
+    const offShell = registerToolShell({
+      front: (path) => {
+        const tab = tabsRef.current.find((t) => pathKey(t.payload.path) === pathKey(path))
+        if (tab) goToTab(tab.id)
+        return !!tab
+      },
+      open: async (path) => {
+        await openPath(path)
+      },
+      // The library in front is no document in front
+      activePath: () =>
+        atLibraryRef.current ? null : (tabsRef.current.find((t) => t.id === activeIdRef.current)?.payload.path ?? null)
+    })
+    const offRequests = bridge.onToolRequest(answerToolRequest)
+    return () => {
+      offRequests()
+      offShell()
+    }
+  }, [goToTab, openPath])
 
   // Refresh recents whenever the library comes into view — the last tab
   // closing, or simply walking back to it. Reading a document is exactly what
