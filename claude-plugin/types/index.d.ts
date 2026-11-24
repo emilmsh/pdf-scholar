@@ -13,6 +13,6 @@ export type Reference = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'pdf-scholar': { references: Shaped<Reference[]> }
+    'pdf-scholar-buttons': { references: Shaped<Reference[]> }
   }
 }
