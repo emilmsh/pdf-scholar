@@ -190,15 +190,29 @@ function pageLabel(page: number): string {
   return `${word[language] ?? 'p.'} ${page}`
 }
 
-/** Show the passage in PDF Scholar again; a refusal is said, not swallowed
- *  (the switch was turned off, the document is kept out, the app is closed) */
+/** Show the passage in PDF Scholar again. A press never just does nothing:
+ *  a refusal is said (the switch was turned off, the document is kept out),
+ *  and so is a server that is not there — `$.mcp.call` REJECTS for a tool or
+ *  a server the session does not have, and the first version let that
+ *  rejection fall silent (Emil pressed a button whose server was gone, and
+ *  nothing happened; measured 2026-11-24). */
 async function show($: Caller, reference: Reference): Promise<void> {
-  const result = await $.mcp.call(reference.server, 'show_passage', {
-    path: reference.path,
-    page: reference.page,
-    quote: reference.quote,
-    show: true,
-  })
+  let result: { content: unknown[]; isError: boolean }
+
+  try {
+    result = await $.mcp.call(reference.server, 'show_passage', {
+      path: reference.path,
+      page: reference.page,
+      quote: reference.quote,
+      show: true,
+    })
+  } catch {
+    $.ui.toast(
+      'PDF Scholar is not connected in this session. Start a new session with PDF Scholar’s «Read together» turned on.',
+    )
+
+    return
+  }
 
   if (!result.isError) {
     return
@@ -270,14 +284,16 @@ export const register: Register = on => {
         {answer}
         <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
           {mine.map(reference => (
+            // The text as ONE label, never as children: a Button with several
+            // children takes a press only where it lands on their glyphs, and
+            // the padding around «[3] s. 7» — most of so small a button — was
+            // dead (Emil, 2026-11-24: «finicky to hit»)
             <Button
               key={`reference-${reference.n}`}
+              label={`[${reference.n}] ${reference.isFound ? '' : '✗ '}${pageLabel(reference.page)}`}
               dimColor={!reference.isFound}
               onPress={() => show($, reference)}
-            >
-              [{reference.n}] {reference.isFound ? '' : '✗ '}
-              {pageLabel(reference.page)}
-            </Button>
+            />
           ))}
         </Box>
       </Box>
