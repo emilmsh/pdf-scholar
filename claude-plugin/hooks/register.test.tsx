@@ -223,6 +223,54 @@ test('a transcript the session will not hand over costs only the fallback', asyn
   await ui.unmount()
 })
 
+test('a press that cannot reach PDF Scholar says so', async ($, on) => {
+  // What $.mcp.call does for a tool or a server the session does not have:
+  // it rejects. And what PDF Scholar answers when it refuses: an error result.
+  const said: string[] = []
+  let answer: 'reject' | 'refuse' = 'reject'
+
+  on('tool.call', () => {
+    const text = '[1] Found word for word on page 6. PDF Scholar is showing it to the user.'
+
+    return { result: text, text }
+  })
+  on('session.messages', () => ({ value: [] }))
+  on('mcp.call', () => {
+    if (answer === 'reject') {
+      throw new Error('no connected MCP tool "show_passage" on a server named "pdf-scholar"')
+    }
+
+    return {
+      value: {
+        content: [{ type: 'text', text: 'The user keeps this document out of AI tools.' }],
+        isError: true,
+      },
+    }
+  })
+  on('ui.toast', (_, e) => {
+    said.push(e.text)
+
+    return { value: undefined }
+  })
+
+  await $.tool.call({ tool: TOOL, path: PATH, page: 6, quote: 'we use sine and cosine functions' })
+
+  const ui = await $.ui.mount({
+    ...ANSWER,
+    surface: 'desktop',
+    props: { text: 'Sinusoids [1].', isFirstOfReply: true },
+  })
+
+  await ui.press({ key: 'reference-1' })
+  answer = 'refuse'
+  await ui.press({ key: 'reference-1' })
+  await ui.unmount()
+
+  expect(said.length).toBe(2)
+  expect(said[0]).toMatch(/not connected in this session/)
+  expect(said[1]).toBe('The user keeps this document out of AI tools.')
+})
+
 test('a server set up under another name is called by that name', async ($, on) => {
   const shown = scholar(on)
 

@@ -190,15 +190,29 @@ function pageLabel(page: number): string {
   return `${word[language] ?? 'p.'} ${page}`
 }
 
-/** Show the passage in PDF Scholar again; a refusal is said, not swallowed
- *  (the switch was turned off, the document is kept out, the app is closed) */
+/** Show the passage in PDF Scholar again. A press never just does nothing:
+ *  a refusal is said (the switch was turned off, the document is kept out),
+ *  and so is a server that is not there — `$.mcp.call` REJECTS for a tool or
+ *  a server the session does not have, and the first version let that
+ *  rejection fall silent (Emil pressed a button whose server was gone, and
+ *  nothing happened; measured 2026-11-24). */
 async function show($: Caller, reference: Reference): Promise<void> {
-  const result = await $.mcp.call(reference.server, 'show_passage', {
-    path: reference.path,
-    page: reference.page,
-    quote: reference.quote,
-    show: true,
-  })
+  let result: { content: unknown[]; isError: boolean }
+
+  try {
+    result = await $.mcp.call(reference.server, 'show_passage', {
+      path: reference.path,
+      page: reference.page,
+      quote: reference.quote,
+      show: true,
+    })
+  } catch {
+    $.ui.toast(
+      'PDF Scholar is not connected in this session. Start a new session with PDF Scholar’s «Read together» turned on.',
+    )
+
+    return
+  }
 
   if (!result.isError) {
     return
