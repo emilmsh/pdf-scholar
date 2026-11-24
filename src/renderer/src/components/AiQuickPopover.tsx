@@ -25,6 +25,7 @@ import type {
 } from '../../../shared/types'
 import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { appendDelta } from '../../../shared/ai-stream'
+import { answerComment } from '../../../shared/answer-comment'
 import { bridge } from '../bridge'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { prettyModelName, providerLabels } from './ai-models'
@@ -103,12 +104,23 @@ const quickTitle = (mode: AiQuickState['mode']): string =>
 interface QuickProps {
   state: AiQuickState
   onSendToChat(seed: AiSeed): void
+  /** Keep the answer as a comment on what was asked about (issue #137). Absent
+   *  when the viewer has nowhere to put it; the text is already plain. */
+  onSaveComment?: ((text: string) => void) | undefined
   onCitation?(citation: AiCitation): void
   onClose(): void
 }
 
-export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: QuickProps): React.JSX.Element {
+export function AiQuickPopover({
+  state,
+  onSendToChat,
+  onSaveComment,
+  onCitation,
+  onClose
+}: QuickProps): React.JSX.Element {
   useLang()
+  /** One answer is one comment: the button says «Lagret» and stays down */
+  const [commentSaved, setCommentSaved] = useState(false)
   const [text, setText] = useState('')
   /** Seconds waited for the first word — see WAIT_HINT_S */
   const [waited, setWaited] = useState(0)
@@ -489,6 +501,19 @@ export function AiQuickPopover({ state, onSendToChat, onCitation, onClose }: Qui
         )}
         {fallbackModel && <FallbackChip model={fallbackModel} className="ai-meta" />}
         {meta && <span className="ai-meta">{meta}</span>}
+        {onSaveComment && (
+          <button
+            className="btn-secondary"
+            title={t(isFigure ? 'ai.saveAsNoteTip' : 'ai.saveAsCommentTip')}
+            disabled={!done || !!error || commentSaved}
+            onClick={() => {
+              onSaveComment(answerComment(finalRef.current, isAsk ? asked : null))
+              setCommentSaved(true)
+            }}
+          >
+            {t(commentSaved ? 'ai.commentSaved' : 'ai.saveAsComment')}
+          </button>
+        )}
         <button
           className="btn-secondary"
           disabled={!done || !!error}

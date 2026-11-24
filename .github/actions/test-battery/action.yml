@@ -165,6 +165,10 @@ runs:
     # untrusted input that must read as a list every time
     - run: npm run test:custom-colors
       shell: bash
+    # An AI answer kept as a comment (issue #137): the Markdown marks go, the
+    # words stay, and what the rule does not recognise is left as written
+    - run: npm run test:answer-comment
+      shell: bash
     # «Navn på merknader» filled from the system once: the system's name is
     # cleaned before it is stored, a cleared field is never re-signed, and the
     # real lookup answers on every OS without hanging
