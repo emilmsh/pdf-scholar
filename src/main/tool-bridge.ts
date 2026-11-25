@@ -36,6 +36,7 @@ import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import {
   BRIDGE_TOKEN_FILE,
   bridgePipePath,
+  isReplyShaped,
   toolSessionMeta,
   type ToolSession,
   type ToolSessionMeta,
@@ -64,8 +65,12 @@ const ready = new Set<number>()
 let lastFocused: number | null = null
 /** The window the last request went to: the one raise() means */
 let lastTarget: BrowserWindow | null = null
-/** Where holds() just found a path, for the request that follows it */
-let heldBy: { path: string; win: BrowserWindow } | null = null
+/** Where holds() just found each path, for the request that follows it.
+ *  Keyed by path: requests overlap (a tool cites several passages at once,
+ *  each in a process of its own), and one global let the second request's
+ *  holds() clear the first's answer — which then went to the reader's
+ *  window, possibly not the one holding the document. */
+const heldBy = new Map<string, BrowserWindow>()
 
 const pending = new Map<number, (reply: ViewReply) => void>()
 let askSeq = 0
@@ -98,11 +103,11 @@ function ask(win: BrowserWindow, req: ViewRequest, timeoutMs: number): Promise<V
 }
 
 async function holds(path: string): Promise<boolean> {
-  heldBy = null
+  heldBy.delete(path)
   for (const win of readyWindows()) {
     const reply = await ask(win, { op: 'holds', path }, 3000)
     if (reply.ok && reply.op === 'holds' && reply.holds) {
-      heldBy = { path, win }
+      heldBy.set(path, win)
       return true
     }
   }
@@ -131,8 +136,8 @@ async function view(ctx: ToolBridgeContext, req: ViewRequest): Promise<ViewReply
     return ask(win, req, 5000)
   }
   if (req.op === 'holds') return { ok: true, op: 'holds', holds: await holds(req.path) }
-  const held = heldBy && heldBy.path === req.path && live(heldBy.win) ? heldBy.win : null
-  heldBy = null
+  const found = heldBy.get(req.path)
+  const held = found && live(found) ? found : null
   const win = held ?? (await someWindow(ctx))
   if (!win) return { ok: false, error: 'no-window' }
   lastTarget = win
@@ -140,6 +145,12 @@ async function view(ctx: ToolBridgeContext, req: ViewRequest): Promise<ViewReply
   // a long document, is what these wait for
   return ask(win, req, req.op === 'read' ? 120_000 : 60_000)
 }
+
+/** Whether these first bytes of a file are a PDF's: the header may sit a
+ *  little into the file, never far */
+const PDF_HEAD_BYTES = 1024
+const hasPdfHeader = (head: Uint8Array): boolean =>
+  Buffer.from(head.subarray(0, PDF_HEAD_BYTES)).toString('latin1').includes('%PDF-')
 
 /** The file as opening it would show it (its draft, when it has unsaved
  *  marks), for a document no tab holds — never past what the app reads
@@ -154,9 +165,7 @@ async function readBytes(path: string): Promise<Uint8Array | 'unreadable' | 'too
     try {
       const bytes = new Uint8Array(info.size)
       await handle.read(bytes, 0, info.size, 0)
-      // The header may sit a little into the file, never far
-      const head = Buffer.from(bytes.subarray(0, 1024)).toString('latin1')
-      return head.includes('%PDF-') ? bytes : 'unreadable'
+      return hasPdfHeader(bytes) ? bytes : 'unreadable'
     } finally {
       await handle.close()
     }
@@ -172,9 +181,9 @@ async function isPdf(path: string): Promise<boolean> {
   try {
     const handle = await open(readPathFor(path), 'r')
     try {
-      const head = Buffer.alloc(1024)
+      const head = Buffer.alloc(PDF_HEAD_BYTES)
       const { bytesRead } = await handle.read(head, 0, head.length, 0)
-      return head.subarray(0, bytesRead).toString('latin1').includes('%PDF-')
+      return hasPdfHeader(head.subarray(0, bytesRead))
     } finally {
       await handle.close()
     }
@@ -208,15 +217,10 @@ function raise(): void {
   }
 }
 
-function broadcast(session: ToolSession, shown: boolean, docPath?: string): void {
+/** Tell every window a session's list changed; `change` says what for each */
+function broadcast(change: (w: BrowserWindow) => ToolSessionsChange): void {
   for (const w of BrowserWindow.getAllWindows()) {
-    if (!live(w)) continue
-    const change: ToolSessionsChange = {
-      sessionId: session.id,
-      shownHere: shown && w === lastTarget,
-      ...(docPath ? { docPath } : {})
-    }
-    w.webContents.send('tool-sessions:changed', change)
+    if (live(w)) w.webContents.send('tool-sessions:changed', change(w))
   }
 }
 
@@ -245,7 +249,12 @@ async function start(ctx: ToolBridgeContext): Promise<void> {
     isPdf,
     view: (req) => view(ctx, req),
     raise,
-    changed: (session, entry, shown) => broadcast(session, shown, 'docPath' in entry ? entry.docPath : undefined),
+    changed: (session, entry, shown) =>
+      broadcast((w) => ({
+        sessionId: session.id,
+        shownHere: shown && w === lastTarget,
+        ...(entry.docPath ? { docPath: entry.docPath } : {})
+      })),
     now: () => Date.now(),
     newId: () => randomUUID().replace(/-/g, '').slice(0, 16)
   })
@@ -293,11 +302,7 @@ export function registerToolBridgeIpc(ctx: ToolBridgeContext): void {
     const settle = pending.get(id)
     if (!settle) return
     pending.delete(id)
-    settle(
-      reply && typeof reply === 'object' && typeof (reply as { ok?: unknown }).ok === 'boolean'
-        ? (reply as ViewReply)
-        : { ok: false, error: 'no-window' }
-    )
+    settle(isReplyShaped(reply) ? (reply as ViewReply) : { ok: false, error: 'no-window' })
   })
   app.on('browser-window-focus', (_e, win) => {
     if (live(win) && ready.has(win.webContents.id)) lastFocused = win.webContents.id
@@ -313,9 +318,7 @@ export function registerToolBridgeIpc(ctx: ToolBridgeContext): void {
   ipcMain.handle('tool-sessions:remove', async (_e, id: unknown): Promise<void> => {
     if (typeof id !== 'string') return
     await sessions().remove(id)
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (live(w)) w.webContents.send('tool-sessions:changed', { sessionId: id, shownHere: false } satisfies ToolSessionsChange)
-    }
+    broadcast(() => ({ sessionId: id, shownHere: false }))
   })
 
   void syncToolBridge(ctx)

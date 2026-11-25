@@ -24,7 +24,7 @@
 // see what left, not only what was shown.
 import { useCallback, useEffect, useState } from 'react'
 import type { McpClient } from '../../../shared/mcp'
-import type { ToolEntry, ToolSession, ToolSessionMeta } from '../../../shared/tool-bridge'
+import type { ToolEntry, ToolReference, ToolSession, ToolSessionMeta } from '../../../shared/tool-bridge'
 import { bridge } from '../bridge'
 import { locale, t, useLang } from '../i18n'
 import { pathKey } from '../tool-bridge'
@@ -39,7 +39,7 @@ const day = (ms: number): string => new Date(ms).toLocaleDateString(locale())
 /** The history view's ONE row for everything AI tools have pointed at. Draws
  *  nothing while there is nothing — a reader who never turned «Les sammen» on
  *  never sees a word about it. */
-export function ToolSessionRows({ onOpen }: { onOpen(): void }): React.JSX.Element | null {
+export function ToolReferencesRow({ onOpen }: { onOpen(): void }): React.JSX.Element | null {
   useLang()
   const [sessions, setSessions] = useState<ToolSessionMeta[]>([])
 
@@ -85,8 +85,6 @@ function quietLine(e: Exclude<ToolEntry, { kind: 'reference' }>): string {
   return t(e.selection ? 'tool.sawSelection' : 'tool.sawOpen')
 }
 
-type Reference = Extract<ToolEntry, { kind: 'reference' }>
-
 /** What is shown, how it is grouped, how it is sorted */
 const SHOWS = ['here', 'all', 'missing'] as const
 const GROUPS = ['none', 'session', 'doc'] as const
@@ -106,7 +104,7 @@ const sessionName = (s: ToolSession): string =>
   `${s.title ? `${s.title} · ` : ''}${clientName(s.client)} · ${day(s.startedAt || s.updatedAt)}`
 
 /** Every reference AI tools have left, as one list in place of the conversation */
-export function ToolSessionView({
+export function ToolReferencesView({
   docPath,
   onBack,
   onShow
@@ -114,7 +112,7 @@ export function ToolSessionView({
   docPath: string
   onBack(): void
   /** Go to a reference: here when it is in this document, else in its own */
-  onShow(entry: Reference): void
+  onShow(entry: ToolReference): void
 }): React.JSX.Element {
   useLang()
   /** undefined = loading */

@@ -38,17 +38,20 @@ export function clientFromArgv(argv: readonly string[]): McpClient {
   return named === 'claude' || named === 'codex' ? named : 'other'
 }
 
+/** The one form a «Les sammen» session id takes (shared/tool-bridge.ts): on
+ *  the command line, off the pipe, and as a file name in userData/tool-sessions */
+export const isSessionId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8,64}$/.test(v)
+
 /** The session a server started with these arguments belongs to. A tool
  *  starts the script once per session of its own and names none: the process
  *  IS the session. A caller that starts it once per CALL — a plugin that
  *  speaks to the app without the tool's own connection — names the session
  *  (`--session <hex>`), or every call would be a list of its own in the app.
- *  The form is the one the app accepts off the pipe (sessionOf in
- *  tool-bridge.ts); anything else is no name at all. */
+ *  Anything but a session id (isSessionId) is no name at all. */
 export function sessionFromArgv(argv: readonly string[]): string | undefined {
   const at = argv.indexOf('--session')
   const named = at > -1 ? argv[at + 1] : undefined
-  return typeof named === 'string' && /^[0-9a-f]{8,64}$/.test(named) ? named : undefined
+  return isSessionId(named) ? named : undefined
 }
 
 // ---------- What may be shared (Emil, 2026-10-29) ----------

@@ -17,7 +17,13 @@
 // every reader of it is a sanitizer: a request from the pipe, a session from
 // its file. Pure and renderer-safe (no Node imports); tested by
 // scripts/test-tool-bridge.mjs.
-import type { McpClient } from './mcp'
+import { isSessionId, MCP_CLIENTS, type McpClient } from './mcp'
+
+/** A path as two spellings of it compare: either slash, any case. (Linux
+ *  keeps case apart on disk; this only decides which document — a tab, a
+ *  stored reference — a path means, and main has already made the path
+ *  canonical.) */
+export const pathKey = (path: string): string => path.replace(/[\\/]+/g, '/').toLowerCase()
 
 // ---------- Where the app listens ----------
 
@@ -111,14 +117,12 @@ const pageOf = (v: unknown): number | null =>
 const numberOf = (v: unknown): number =>
   typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 1_000_000 ? v : 0
 
-const CLIENTS: ReadonlySet<string> = new Set(['claude', 'codex', 'other'])
+/** A moment in time; anything else is 0 = none */
+const timeOf = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
 
 function sessionOf(v: unknown): BridgeSessionInfo | null {
-  if (!isObj(v)) return null
-  const id = typeof v.id === 'string' && /^[0-9a-f]{8,64}$/.test(v.id) ? v.id : null
-  if (!id || typeof v.client !== 'string' || !CLIENTS.has(v.client)) return null
-  const startedAt = typeof v.startedAt === 'number' && Number.isFinite(v.startedAt) && v.startedAt > 0 ? v.startedAt : 0
-  return { id, client: v.client as McpClient, startedAt }
+  if (!isObj(v) || !isSessionId(v.id) || !MCP_CLIENTS.includes(v.client as McpClient)) return null
+  return { id: v.id, client: v.client as McpClient, startedAt: timeOf(v.startedAt) }
 }
 
 export function sanitizeBridgeRequest(v: unknown): BridgeRequest | null {
@@ -202,6 +206,20 @@ export type OpenDocument =
 
 export const MAX_SELECTION = 8000
 
+/** A document's text, the pages asked for — the same answer from the window
+ *  to main and from main to the tool */
+export interface ReadReply {
+  ok: true
+  op: 'read'
+  pageCount: number
+  hasText: boolean
+  pages: { page: number; text: string }[]
+}
+
+/** Whether a line that came back is shaped like an answer at all (the pipe's
+ *  and the window's alike); what is in it is the sender's to vouch for */
+export const isReplyShaped = (v: unknown): v is { ok: boolean } => isObj(v) && typeof v.ok === 'boolean'
+
 export type BridgeReply =
   | { ok: false; error: BridgeErrorCode }
   | { ok: true; op: 'ping'; version: string }
@@ -224,7 +242,7 @@ export type BridgeReply =
       /** The window was brought up on the passage */
       shown: boolean
     }
-  | { ok: true; op: 'read'; pageCount: number; hasText: boolean; pages: { page: number; text: string }[] }
+  | ReadReply
   | { ok: true; op: 'context'; open: OpenDocument | null }
 
 // ---------- Main ↔ the window that holds the document ----------
@@ -243,7 +261,7 @@ export type ViewReply =
   | { ok: false; error: 'locked' | 'unreadable' | 'no-window' }
   | { ok: true; op: 'holds'; holds: boolean }
   | { ok: true; op: 'cite'; found: boolean; whole: boolean; page: number; pageCount: number; hasText: boolean }
-  | { ok: true; op: 'read'; pageCount: number; hasText: boolean; pages: { page: number; text: string }[] }
+  | ReadReply
   | {
       ok: true
       op: 'context'
@@ -277,6 +295,8 @@ export type ToolEntry =
   /** The tool asked what was open; `selection` = it got selected text */
   | { kind: 'context'; id: string; at: number; docPath?: string; docName?: string; selection: boolean }
 
+export type ToolReference = Extract<ToolEntry, { kind: 'reference' }>
+
 export interface ToolSession {
   id: string
   client: McpClient
@@ -293,21 +313,22 @@ export const MAX_SESSION_ENTRIES = 1000
 /** The most sessions kept; the least recently used go first */
 export const MAX_SESSIONS = 300
 
+/** The highest number any reference among these carries (0 = none) */
+const topNumber = (entries: readonly ToolEntry[]): number =>
+  Math.max(0, ...entries.map((e) => (e.kind === 'reference' ? e.n : 0)))
+
 const idOf = (v: unknown): string | null => (typeof v === 'string' && /^[0-9a-z-]{4,64}$/i.test(v) ? v : null)
-const timeOf = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
 
 function entryOf(v: unknown): ToolEntry | null {
   if (!isObj(v)) return null
   const id = idOf(v.id)
   const at = timeOf(v.at)
   if (!id || !at) return null
-  if (v.kind === 'context') {
-    const docPath = pathOf(v.docPath)
-    const docName = tidy(v.docName, 300)
-    return { kind: 'context', id, at, ...(docPath && docName ? { docPath, docName } : {}), selection: v.selection === true }
-  }
   const docPath = pathOf(v.docPath)
   const docName = tidy(v.docName, 300)
+  if (v.kind === 'context') {
+    return { kind: 'context', id, at, ...(docPath && docName ? { docPath, docName } : {}), selection: v.selection === true }
+  }
   if (!docPath || !docName) return null
   if (v.kind === 'read') {
     const from = pageOf(v.from)
@@ -355,7 +376,7 @@ export function sanitizeToolSession(v: unknown): ToolSession | null {
   // Every reference has a number, and no two the same: one without, or one
   // whose number is already taken, gets the next free one
   const taken = new Set<number>()
-  let top = Math.max(0, ...entries.map((e) => (e.kind === 'reference' ? e.n : 0)))
+  let top = topNumber(entries)
   for (const e of entries) {
     if (e.kind !== 'reference') continue
     if (e.n === 0 || taken.has(e.n)) e.n = ++top
@@ -379,10 +400,15 @@ export function withToolEntry(
   topic?: string
 ): ToolSession {
   const base: ToolSession = session ?? { ...info, title: '', updatedAt: entry.at, entries: [] }
-  // The next number after the highest ever given here — not the count, which
-  // would hand an old number out again once the list has dropped its oldest
-  if (entry.kind === 'reference' && !(entry.n >= 1)) {
-    entry = { ...entry, n: Math.max(0, ...base.entries.map((e) => (e.kind === 'reference' ? e.n : 0))) + 1 }
+  // A number the entry brings (a caller that numbers its citations itself)
+  // stands unless a reference here already carries it. Otherwise the next
+  // number after the highest ever given here — not the count, which would
+  // hand an old number out again once the list has dropped its oldest.
+  // Decided here, inside the store's queue, so two at once cannot both keep
+  // the same number.
+  const taken = (n: number): boolean => base.entries.some((e) => e.kind === 'reference' && e.n === n)
+  if (entry.kind === 'reference' && (!(entry.n >= 1) || taken(entry.n))) {
+    entry = { ...entry, n: topNumber(base.entries) + 1 }
   }
   return {
     ...base,
@@ -409,7 +435,7 @@ export interface ToolSessionMeta {
   startedAt: number
   updatedAt: number
   references: number
-  /** How many references name this document (the row's count when filtered) */
+  /** The documents its references point into, each once */
   documents: string[]
 }
 
@@ -430,23 +456,12 @@ export function toolSessionMeta(s: ToolSession): ToolSessionMeta {
  *  a tool that shows a passage again («vis meg [3]») gets the SAME number
  *  back instead of a second card. Paths compare with either slash and any
  *  case; the quote must be the same words. */
-export function sameReference(
-  session: ToolSession | null,
-  docPath: string,
-  quote: string
-): Extract<ToolEntry, { kind: 'reference' }> | null {
-  const key = (p: string): string => p.replace(/[\\/]+/g, '/').toLowerCase()
+export function sameReference(session: ToolSession | null, docPath: string, quote: string): ToolReference | null {
   const words = (q: string): string => q.replace(/\s+/g, ' ').trim()
   const want = words(quote)
+  const doc = pathKey(docPath)
   for (const e of session?.entries ?? []) {
-    if (e.kind === 'reference' && key(e.docPath) === key(docPath) && words(e.quote) === want) return e
+    if (e.kind === 'reference' && pathKey(e.docPath) === doc && words(e.quote) === want) return e
   }
   return null
-}
-
-/** The references of one session, newest last, optionally of one document */
-export function referencesOf(s: ToolSession, docPath?: string): Extract<ToolEntry, { kind: 'reference' }>[] {
-  return s.entries.filter(
-    (e): e is Extract<ToolEntry, { kind: 'reference' }> => e.kind === 'reference' && (docPath === undefined || e.docPath === docPath)
-  )
 }

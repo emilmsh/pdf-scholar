@@ -12,6 +12,7 @@
 // reader still has — nothing in it exists nowhere else.
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { isSessionId } from '../shared/mcp'
 import type { BridgeSessionInfo, ToolEntry, ToolSession } from '../shared/tool-bridge'
 import { MAX_SESSIONS, sanitizeToolSession, withToolEntry } from '../shared/tool-bridge'
 
@@ -24,9 +25,33 @@ export interface ToolSessionStore {
   remove(id: string): Promise<void>
 }
 
-const SESSION_FILE = /^[0-9a-f]{8,64}\.json$/
+/** A session's file: its id (isSessionId) and `.json` */
+const isSessionFile = (name: string): boolean => name.endsWith('.json') && isSessionId(name.slice(0, -5))
 
 let tmpSeq = 0
+
+/** A rename onto the session's file, tried again for a moment while Windows
+ *  refuses it. Writes of one session are queued, but the file the last one
+ *  renamed into place can still be held for a moment after (Defender scans a
+ *  new file; a reader of all() may have it open), and the rename onto it is
+ *  then EPERM — measured 2026-11-25 as one run in three of test:tool-bridge
+ *  failing on three appends at once. A tool citing several passages at once
+ *  meets the same. */
+async function renameOnto(from: string, to: string): Promise<void> {
+  for (let tried = 0; ; tried++) {
+    try {
+      await rename(from, to)
+      return
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (tried >= 20 || (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY')) {
+        await unlink(from).catch(() => {})
+        throw err
+      }
+      await new Promise((r) => setTimeout(r, 25 * (tried + 1)))
+    }
+  }
+}
 
 export function createToolSessionStore(dir: string): ToolSessionStore {
   const fileOf = (id: string): string => join(dir, `${id}.json`)
@@ -56,7 +81,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
   async function prune(): Promise<void> {
     let names: string[]
     try {
-      names = (await readdir(dir)).filter((n) => SESSION_FILE.test(n))
+      names = (await readdir(dir)).filter(isSessionFile)
     } catch {
       return
     }
@@ -70,7 +95,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
 
   return {
     get: async (id) => {
-      if (!SESSION_FILE.test(`${id}.json`)) return null
+      if (!isSessionId(id)) return null
       await writing.get(id)?.catch(() => {})
       const session = await read(fileOf(id))
       // Named by its id: the id inside must agree
@@ -84,14 +109,14 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
         await mkdir(dir, { recursive: true })
         const tmp = `${file}.${process.pid}.${++tmpSeq}.tmp`
         await writeFile(tmp, JSON.stringify(next))
-        await rename(tmp, file)
+        await renameOnto(tmp, file)
         if (!have) await prune()
         return next
       }),
     all: async () => {
       let names: string[]
       try {
-        names = (await readdir(dir)).filter((n) => SESSION_FILE.test(n))
+        names = (await readdir(dir)).filter(isSessionFile)
       } catch {
         return []
       }
@@ -99,7 +124,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
       return sessions.filter((s): s is ToolSession => s !== null).sort((a, b) => b.updatedAt - a.updatedAt)
     },
     remove: (id) =>
-      SESSION_FILE.test(`${id}.json`)
+      isSessionId(id)
         ? queue(id, () => unlink(fileOf(id)).catch(() => {}))
         : Promise.resolve()
   }

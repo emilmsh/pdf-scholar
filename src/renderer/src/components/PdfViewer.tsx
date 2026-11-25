@@ -27,8 +27,8 @@ import type {
 import { bridge, isElectron, isExtension } from '../bridge'
 import {
   hasPendingPassage,
-  locatePassage,
   onPassageRequest,
+  passageTarget,
   pathKey,
   registerToolViewer,
   takePendingPassage
@@ -5621,10 +5621,11 @@ export default function PdfViewer({
     setMenu((m) => (m ? null : m))
     setAnnotPopover((p) => (p ? null : p))
     // A lingering citation highlight releases on the next interaction with
-    // the document (while searching, the search UI owns the highlight)
-    // A passage a tool pointed at survives the click that only brings this
-    // window to the front: the reader arrives from another program, and that
-    // first click is how they get here, not a word about the mark.
+    // the document (while searching, the search UI owns the highlight) —
+    // except that a passage a tool pointed at survives the click that only
+    // brings this window to the front: the reader arrives from another
+    // program, and that first click is how they get here, not a word about
+    // the mark.
     const arriving = performance.now() - windowFocusedAtRef.current < 300
     if (!searchOpenRef.current) setSearchHits((h) => (h && !(h.stays && arriving) ? null : h))
     // Mousedown on a note bubble arms a drag (movement threshold decides
@@ -7214,17 +7215,19 @@ export default function PdfViewer({
   )
 
   // A tool just brought a passage up in this document: the assistant panel
-  // opens on that session's list, so the claim and its passage are seen
+  // opens on the list of references, so the claim and its passage are seen
   // together (and can be come back to once the reader has looked elsewhere)
-  const [toolSessionAsk, setToolSessionAsk] = useState<{ id: number; sessionId: string } | null>(null)
+  const [toolRefsAskId, setToolRefsAskId] = useState(0)
+  const openToolRefs = useCallback(() => {
+    setToolRefsAskId((n) => n + 1)
+    setAiPinned(true)
+  }, [])
   useEffect(
     () =>
       bridge.onToolSessionsChanged((change) => {
-        if (!change.shownHere || !change.docPath || pathKey(change.docPath) !== pathKey(payload.path)) return
-        setToolSessionAsk((ask) => ({ id: (ask?.id ?? 0) + 1, sessionId: change.sessionId }))
-        setAiPinned(true)
+        if (change.shownHere && change.docPath && pathKey(change.docPath) === pathKey(payload.path)) openToolRefs()
       }),
-    [payload.path]
+    [payload.path, openToolRefs]
   )
 
   // A reference pressed in another document's list names a passage HERE: go
@@ -7238,12 +7241,8 @@ export default function PdfViewer({
         if (cancelled || !ensured) return
         const passage = takePendingPassage(payload.path)
         if (!passage) return
-        const hit = locatePassage(ensured.pages, passage.page, passage.quote)
-        void jumpToAiCitation(hit?.target ?? { pageNumber: passage.page, start: 0, end: 0 }, true)
-        if (passage.sessionId) {
-          setToolSessionAsk((ask) => ({ id: (ask?.id ?? 0) + 1, sessionId: passage.sessionId }))
-          setAiPinned(true)
-        }
+        void jumpToAiCitation(passageTarget(ensured.pages, passage.page, passage.quote), true)
+        openToolRefs()
       })
     }
     take()
@@ -7252,7 +7251,7 @@ export default function PdfViewer({
       cancelled = true
       off()
     }
-  }, [payload.path, ensureAiDocument, jumpToAiCitation])
+  }, [payload.path, ensureAiDocument, jumpToAiCitation, openToolRefs])
 
   // A DETACHED assistant clicked a citation in this document: show it here.
   // ensureAiDocument first — a viewer that never opened its own panel has no
@@ -8453,7 +8452,7 @@ export default function PdfViewer({
                 currentPage={currentPage}
                 pageCount={sizes.length}
                 conversationAskId={conversationAskId}
-                toolSessionAsk={toolSessionAsk}
+                toolRefsAskId={toolRefsAskId}
                 isLocked={() => docPasswordRef.current !== undefined}
                 onOpenElsewhere={(path) => {
                   // The host opens the document (a tab, focused or created),
