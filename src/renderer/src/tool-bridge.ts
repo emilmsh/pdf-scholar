@@ -41,7 +41,9 @@ export interface ToolViewer {
   /** The document's text as the reader's search and assistant read it; null
    *  while it is not loaded yet */
   texts(): Promise<DocumentText | null>
-  /** Go to the passage and flash it — start === end is «just the page» */
+  /** Go to the passage and mark it — start === end is «just the page». The
+   *  mark stays until the reader clicks in the document: they come to it
+   *  from another program, in their own time. */
   jump(target: ResolvedCitation): void
   /** What the reader has selected in this document ('' = nothing) */
   selection(): string

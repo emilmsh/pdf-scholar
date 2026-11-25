@@ -136,7 +136,7 @@ What it adds, on top of the notes:
 
 | Tool | What it does |
 | --- | --- |
-| `show_passage` | PDF Scholar opens the PDF, goes to the page and highlights the quoted words. The tool is told whether the words really are in the document, so a quote that is not there comes back as unverified |
+| `show_passage` | PDF Scholar opens the PDF, goes to the page and marks the quoted words. They stay marked until you click in the document. The tool is told whether the words really are in the document, so a quote that is not there comes back as unverified |
 | `read_document` | The document's text as PDF Scholar reads it, page by page. A quote taken from here is one `show_passage` finds |
 | `get_reading_context` | Which document you have in front of you, the page you are on, and the text you have selected. Say "look at what I have selected" |
 

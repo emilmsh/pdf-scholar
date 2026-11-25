@@ -1,7 +1,7 @@
 // «Les sammen» in the REAL app (Emil, 2026-11-24): the shipped MCP script,
 // started the way a tool starts it, asking the running app to show a passage,
 // read a document and say what is open — and the app's own side of it: the
-// passage flashing on its page, the reference kept in the assistant panel's
+// passage marked on its page (and staying marked), the reference kept in the assistant panel's
 // list and pressable again after the reader has gone elsewhere, a document no
 // tab holds read WITHOUT a tab opening, and the switch that turns it all off.
 //
@@ -180,13 +180,17 @@ async function main() {
     const shown = await server.call('show_passage', { path: DOC, page: 4, quote: QUOTE, claim: 'Dokumentet lover en tilbake-knapp', topic: 'Navigasjon i appen' })
     check('found word for word on its page, as reference 1', !shown.isError && /^\[1\] Found word for word on page 4/.test(shown.text), shown.text)
     const view = await waitFor(
-      () => run(send, `return { page: page(), flash: !!document.querySelector('.search-hit.cite-flash'), panel: !!document.querySelector('.tool-session'),
+      () => run(send, `return { page: page(), mark: !!document.querySelector('.search-hit:not(.cite-flash)'), panel: !!document.querySelector('.tool-session'),
                               refs: [...document.querySelectorAll('.tool-ref')].map((r) => ({ n: r.querySelector('.tool-ref-n')?.textContent, claim: r.querySelector('.tool-ref-claim')?.textContent, chip: r.querySelector('.ai-chip')?.textContent, missing: r.classList.contains('is-missing') })),
                               title: document.querySelector('.tool-session-title')?.textContent }`),
-      (v) => v.page === '4' && v.flash && v.refs.length === 1,
+      (v) => v.page === '4' && v.mark && v.refs.length === 1,
       'the passage to be shown'
     )
-    check('the viewer went to the page and the passage flashes', view.page === '4' && view.flash)
+    check('the viewer went to the page and the passage is marked', view.page === '4' && view.mark)
+    // The assistant's own citation chips flash for 7 s and fade. A passage a
+    // tool pointed at does not: the reader comes to it from another program
+    const later = await run(send, `await settle(7600); return { mark: !!document.querySelector('.search-hit:not(.cite-flash)') }`)
+    check('…and stays marked past the seven seconds a flash lasts', later.mark)
     check('the assistant panel opened on the list, headed by the topic', view.panel && view.title === 'Navigasjon i appen', view.title)
     check('the reference: its number as the tool was given it, the claim, and the page as a chip', view.refs[0].n === '[1]' && view.refs[0].claim === 'Dokumentet lover en tilbake-knapp' && /4/.test(view.refs[0].chip) && !view.refs[0].missing, JSON.stringify(view.refs[0]))
 
@@ -207,10 +211,10 @@ async function main() {
        const first = [...document.querySelectorAll('.tool-ref .ai-chip')][0];
        click(first);
        let waited = 0;
-       while (waited < 8000 && !(page() === '4' && document.querySelector('.search-hit.cite-flash'))) { await settle(200); waited += 200; }
-       return { page: page(), flash: !!document.querySelector('.search-hit.cite-flash'), had: !!field };`
+       while (waited < 8000 && !(page() === '4' && document.querySelector('.search-hit:not(.cite-flash)'))) { await settle(200); waited += 200; }
+       return { page: page(), mark: !!document.querySelector('.search-hit:not(.cite-flash)'), had: !!field };`
     )
-    check('pressing the first reference’s chip goes back to its passage', back.page === '4' && back.flash, JSON.stringify(back))
+    check('pressing the first reference’s chip goes back to its passage', back.page === '4' && back.mark, JSON.stringify(back))
 
     const again = await server.call('show_passage', { path: DOC, page: 4, quote: QUOTE })
     const count = await run(send, `await settle(500); return document.querySelectorAll('.tool-ref').length`)
