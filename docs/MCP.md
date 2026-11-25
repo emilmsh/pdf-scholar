@@ -142,13 +142,16 @@ What it adds, on top of the notes:
 
 - **Every reference is numbered and kept.** The tool writes the reference's
   number after its claim, like `[3]`, and the same number is on the card in
-  PDF Scholar. The assistant panel's history has a **References from AI tools** heading
-  with one list per session of the tool. Each reference is its number, the
+  PDF Scholar. The assistant panel's history has one row, **References from AI
+  tools**, which opens one list of everything the tools have pointed at. It
+  opens on the document you are in, newest first. Each reference is the
   claim, the quoted words and the page as a chip: press it to go to the
-  passage again, in whatever order you like. Showing the same passage again
-  keeps its number. A session spans documents, and a
-  reference into another document opens it there. References whose words were
-  not found are marked.
+  passage again, in whatever order you like. **Show** this document, all
+  documents or only what was not found; **Group** by session or by document;
+  **Sort** by newest or by page. Grouped by session, each card carries the
+  number the tool wrote, and a session can be deleted from its heading.
+  Showing the same passage again keeps its number. A reference into another
+  document opens it there. References whose words were not found are marked.
 - **What was read is listed too**: "Read the text on pp. 1–15", "Read your
   selection". You see what left, not only what you were shown.
 - **The window comes up without taking the keyboard.** PDF Scholar appears

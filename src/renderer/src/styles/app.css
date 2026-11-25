@@ -7011,22 +7011,33 @@ button.bookmark-fold:hover {
   padding: 10px 12px;
 }
 
-/* «Show all 23» under the newest tool lists: a quiet text button, so the
-   reader's own conversations start right below */
-.tool-sessions-more {
-  align-self: flex-start;
-  margin: 2px 0 6px;
-  padding: 2px 4px;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
+/* The one list of what AI tools pointed at (ToolReferences.tsx): what is
+   shown, how it is grouped and how it is sorted, on one wrapping row */
+.tool-refs-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 2px 0 10px;
 }
 
-.tool-sessions-more:hover {
-  text-decoration: underline;
+.tool-refs-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.tool-refs-heading .ai-history-delete {
+  position: static;
+  opacity: 0.6;
+}
+
+.tool-refs-heading .ai-history-delete:hover {
+  opacity: 1;
 }
 
 .ai-history-heading {
