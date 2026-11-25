@@ -30,6 +30,29 @@ const isSessionFile = (name: string): boolean => name.endsWith('.json') && isSes
 
 let tmpSeq = 0
 
+/** A rename onto the session's file, tried again for a moment while Windows
+ *  refuses it. Writes of one session are queued, but the file the last one
+ *  renamed into place can still be held for a moment after (Defender scans a
+ *  new file; a reader of all() may have it open), and the rename onto it is
+ *  then EPERM — measured 2026-11-25 as one run in three of test:tool-bridge
+ *  failing on three appends at once. A tool citing several passages at once
+ *  meets the same. */
+async function renameOnto(from: string, to: string): Promise<void> {
+  for (let tried = 0; ; tried++) {
+    try {
+      await rename(from, to)
+      return
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code
+      if (tried >= 20 || (code !== 'EPERM' && code !== 'EACCES' && code !== 'EBUSY')) {
+        await unlink(from).catch(() => {})
+        throw err
+      }
+      await new Promise((r) => setTimeout(r, 25 * (tried + 1)))
+    }
+  }
+}
+
 export function createToolSessionStore(dir: string): ToolSessionStore {
   const fileOf = (id: string): string => join(dir, `${id}.json`)
   const writing = new Map<string, Promise<unknown>>()
@@ -86,7 +109,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
         await mkdir(dir, { recursive: true })
         const tmp = `${file}.${process.pid}.${++tmpSeq}.tmp`
         await writeFile(tmp, JSON.stringify(next))
-        await rename(tmp, file)
+        await renameOnto(tmp, file)
         if (!have) await prune()
         return next
       }),
