@@ -540,8 +540,8 @@ that.)*
   unverified. Every reference is numbered and kept in a list in the assistant panel, per
   session of the tool and across documents, each with its page as a chip
   you can press again later; the tool writes the same number beside its
-  claim («… [3]»), and with PDF Scholar's plugin for Claude Code that number
-  gets a button under the answer that shows the passage. The tool can also read a document's text as
+  claim («… [3]»), and with «Show your work», a separate plugin for Claude
+  Code, the citation is a link in the answer that shows the passage. The tool can also read a document's text as
   PDF Scholar reads it, and see which document, page and selection you have
   in front of you. *(A switch of its own, off until turned on, in the same
   «AI tools» dialog. This is the one place a document's own text and a file
@@ -559,8 +559,9 @@ that.)*
   only for now. It replaced `pdf-scholar-buttons`, which shipped in this
   repository with 0.87.0. Name it wherever the feature is, as a separate
   thing to install, and never without «Windows only for now» (Emil, 2026-11-25).
-  Not in the README or any listing yet: when it is claimed is Emil's call,
-  with a release.)*
+  In the README and on the landing page since 0.88.0 (Emil, 2026-11-25), as
+  one point under «Your notes in Claude, Codex and other AI tools», with the
+  plugin as a hint beside it. Not in the store listings yet.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
