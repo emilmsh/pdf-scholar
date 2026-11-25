@@ -184,6 +184,24 @@ Scholar's list yourself. What it does and keeps is in
 [its own README](../claude-plugin/README.md). Codex has no such plugin; the
 numbers and the list work there all the same.
 
+### For a program that keeps its own list of sources
+
+A program other than the AI tool itself can speak to the server too: a plugin
+that lists sources from several programs, say, with a Word file as `[1]` and a
+PDF as `[7]`. Two things let its list and PDF Scholar's read the same:
+
+- **`number` on `show_passage`**: the number the program has given the
+  citation. The card in PDF Scholar gets that number, unless another reference
+  in the session already has it. The answer always opens with the number the
+  card got. An AI tool calling the server directly leaves it out.
+- **`--session <id>` when starting the server**: a program that starts the
+  script once per call would otherwise make a new list in PDF Scholar for
+  every call. With the same id, 8 to 64 lowercase hex characters, its calls
+  are one session there.
+
+Nothing else changes: the same switches decide, and the program is answered
+as the tool its `--client` names.
+
 ## What a tool can read
 
 The server is read-only and offers four tools:

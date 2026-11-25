@@ -5,9 +5,11 @@
 // with ELECTRON_RUN_AS_NODE=1 (src/main/mcp-connect.ts). userData is
 // therefore the folder above the script's own; `--data <dir>` names another
 // (tests). `--client` is the switch this process answers to; none = 'other'.
+// `--session <hex>` makes this process part of a session its starter names
+// (a caller that starts the script once per call); none = a session of its own.
 import { spawn } from 'node:child_process'
 import { basename, dirname, resolve } from 'node:path'
-import { clientFromArgv } from '../shared/mcp'
+import { clientFromArgv, sessionFromArgv } from '../shared/mcp'
 import { createMcpServer, serveStdio } from './mcp-server'
 
 declare const __APP_VERSION__: string
@@ -43,6 +45,7 @@ const server = createMcpServer({
   dataDir,
   version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '0.0.0',
   client: clientFromArgv(process.argv),
+  session: sessionFromArgv(process.argv),
   startApp
 })
 void serveStdio(server, process.stdin, process.stdout).then(() => process.exit(0))
