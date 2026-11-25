@@ -7011,6 +7011,24 @@ button.bookmark-fold:hover {
   padding: 10px 12px;
 }
 
+/* «Show all 23» under the newest tool lists: a quiet text button, so the
+   reader's own conversations start right below */
+.tool-sessions-more {
+  align-self: flex-start;
+  margin: 2px 0 6px;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tool-sessions-more:hover {
+  text-decoration: underline;
+}
+
 .ai-history-heading {
   font-size: 12px;
   font-weight: 600;

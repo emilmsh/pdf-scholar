@@ -31,6 +31,9 @@ const day = (ms: number): string => new Date(ms).toLocaleDateString(locale())
 /** The sessions of AI tools, as rows for the history view. Draws nothing
  *  while there are none — a reader who never turned «Les sammen» on never
  *  sees a heading about it. */
+/** How many lists the history view shows before «Show all» */
+const TOOL_SESSIONS_SHOWN = 3
+
 export function ToolSessionRows({
   docPath,
   onOpen
@@ -40,6 +43,7 @@ export function ToolSessionRows({
 }): React.JSX.Element | null {
   useLang()
   const [sessions, setSessions] = useState<ToolSessionMeta[]>([])
+  const [all, setAll] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -57,10 +61,16 @@ export function ToolSessionRows({
   // The ones that pointed into this document first; a session that only read
   // has nothing to come back to and is not listed
   const here = pathKey(docPath)
+  const isHere = (s: ToolSessionMeta): number => Number(s.documents.some((d) => pathKey(d) === here))
   const listed = sessions
     .filter((s) => s.references > 0)
-    .sort((a, b) => Number(b.documents.some((d) => pathKey(d) === here)) - Number(a.documents.some((d) => pathKey(d) === here)))
+    .sort((a, b) => isHere(b) - isHere(a) || b.updatedAt - a.updatedAt)
   if (listed.length === 0) return null
+  // These lists stand ABOVE the reader's own conversations, and a tool makes
+  // one per session of its own: twenty of them pushed the conversations off
+  // the screen in a day (Emil, 2026-11-25). The newest few, the rest on ask.
+  const shown = all ? listed : listed.slice(0, TOOL_SESSIONS_SHOWN)
+  const fileName = (path: string): string => path.split(/[\\/]/).pop() ?? path
 
   return (
     <div className="tool-sessions">
@@ -69,9 +79,12 @@ export function ToolSessionRows({
       <div className="ai-history-heading" title={t('tool.sessionsTip')}>
         {t('tool.sessionsHeading')}
       </div>
-      {listed.map((s) => (
+      {shown.map((s) => (
         <div key={s.id} className="ai-history-item" title={t('tool.sessionsTip')} onClick={() => onOpen(s.id)}>
-          <span className="ai-history-title">{s.title || t('tool.sessionUntitled')}</span>
+          {/* A list its tool never named is told apart by its document */}
+          <span className="ai-history-title">
+            {s.title || (s.documents[0] ? fileName(s.documents[0]) : t('tool.sessionUntitled'))}
+          </span>
           <span className="ai-history-meta">
             {clientName(s.client)} · {day(s.updatedAt)} · {refCount(s.references)}
             {s.documents.length > 1 ? ` · ${t('tool.docsMany', { count: String(s.documents.length) })}` : ''}
@@ -88,6 +101,11 @@ export function ToolSessionRows({
           </button>
         </div>
       ))}
+      {listed.length > TOOL_SESSIONS_SHOWN && (
+        <button className="tool-sessions-more" onClick={() => setAll((v) => !v)}>
+          {all ? t('tool.sessionsFewer') : t('tool.sessionsAll', { count: String(listed.length) })}
+        </button>
+      )}
     </div>
   )
 }
