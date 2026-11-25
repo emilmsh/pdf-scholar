@@ -164,25 +164,32 @@ What it adds, on top of the notes:
   scanned one has no text until PDF Scholar has recognised it, which it does
   when you open it, never on a tool's word.
 
-### Buttons in Claude Code
+### Links in Claude Code: Show your work
 
-With PDF Scholar's plugin for Claude Code, every `[3]` in an answer gets a
-button under the answer: `[3] p. 7` (`[3] s. 7` on a Norwegian machine). Press it and PDF Scholar shows that
-passage. The buttons stay under the answer, so the claim and its source are in
-the window the discussion is in.
+[Show your work](https://github.com/emilmsh/show-your-work) is a separate
+plugin for Claude Code. With it, every source Claude cites becomes a link in
+its answer, reading as the place: `p. 7` (`s. 7` on a Norwegian machine).
+Press it and PDF Scholar shows that passage. The same goes for Word, Excel and
+PowerPoint files, text and code files and web pages, each opened in its own
+program at the cited words, and a pane lists every source of the session.
+Windows only for now.
 
 In a Claude Code terminal session:
 
 ```
-/plugin install pdf-scholar-buttons --marketplace emilmsh/pdf-scholar
+/plugin install show-your-work --marketplace emilmsh/show-your-work
 ```
 
 In the desktop app: **+** next to the prompt box, then **Plugins**, **Add
-marketplace** with `emilmsh/pdf-scholar`, then **Add plugin** for `pdf-scholar-buttons`. It is optional:
-without it Claude still writes the numbers, and you find the card in PDF
-Scholar's list yourself. What it does and keeps is in
-[its own README](../claude-plugin/README.md). Codex has no such plugin; the
-numbers and the list work there all the same.
+marketplace** with `emilmsh/show-your-work`, then **Add plugin**. It is
+optional: without it Claude still writes the numbers, and you find the card in
+PDF Scholar's list yourself. For PDFs it runs PDF Scholar's own server, so the
+switches above decide what is shared there too, and its numbers are the ones on
+the cards in PDF Scholar's list. Codex has no such plugin; the numbers and the
+list work there all the same.
+
+It replaces `pdf-scholar-buttons`, the plugin that shipped in this
+repository with 0.87.0 and drew a button per reference under the answer.
 
 ### For a program that keeps its own list of sources
 
