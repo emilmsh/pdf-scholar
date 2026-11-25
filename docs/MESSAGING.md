@@ -561,8 +561,13 @@ that.)*
   repository with 0.87.0. Name it wherever the feature is, as a separate
   thing to install, and never without «Windows only for now» (Emil, 2026-11-25).
   In the README and on the landing page since 0.88.0 (Emil, 2026-11-25), as
-  one point under «Your notes in Claude, Codex and other AI tools», with the
-  plugin as a hint beside it. Not in the store listings yet.)*
+  one point under «Your notes in Claude, Codex and other AI tools». On the
+  landing page the plugin has a card of its own beside those points, «Goes
+  well with PDF Scholar», in the plugin's plum and with a frame — a look
+  apart from the app's own sections on purpose, since it is a companion and
+  not a feature of the app (Emil, 2026-11-25); the card says «Not part of
+  PDF Scholar» and «Windows only for now» in so many words. The README
+  names it in the point itself. Not in the store listings yet.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only

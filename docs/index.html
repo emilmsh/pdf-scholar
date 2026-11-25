@@ -354,6 +354,53 @@
   footer p { margin: 0 0 10px; max-width: 760px; }
   footer p:last-child { margin-bottom: 0; }
 
+  /* A companion: something that goes well with the app and is NOT part of it
+     (the Claude Code plugin Show your work). Its own colour — the plugin's
+     plum, where everything of the app's is the accent — and a frame, where the
+     app's own sections have none, say so before a word is read. */
+  .companion {
+    --plum: #4a3b73;
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 4px 14px;
+    align-items: start;
+    margin-top: 26px;
+    padding: 18px 20px 20px;
+    border: 1px solid color-mix(in srgb, var(--plum) 30%, transparent);
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--plum) 6%, var(--bg-elevated));
+    font-size: 15px;
+  }
+  .companion img { grid-row: 1 / span 2; width: 44px; height: 44px; border-radius: 10px; }
+  .companion .eyebrow {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--plum);
+  }
+  .companion h3 { margin: 0; font-size: 20px; line-height: 1.25; }
+  .companion p.what { grid-column: 1 / -1; margin: 10px 0 0; }
+  .companion p.terms { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13.5px; color: var(--text-secondary); }
+  .companion a.get {
+    grid-column: 1 / -1;
+    justify-self: start;
+    margin-top: 14px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    background: var(--plum);
+    color: #ffffff;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .companion a.get:hover { background: color-mix(in srgb, var(--plum) 86%, black); }
+  @media (prefers-color-scheme: dark) {
+    .companion { --plum: #b3a3e0; }
+    .companion a.get { color: #1d1830; }
+    .companion a.get:hover { background: color-mix(in srgb, var(--plum) 88%, white); }
+  }
+
   /* ---------- narrower screens ---------- */
 
   @media (max-width: 900px) {
@@ -675,11 +722,19 @@
         across every paper: highlights with the words they mark, comments, and your
         assistant conversations.
       </p>
+      <aside class="companion" aria-label="Companion plugin">
+        <img src="show-your-work.svg" alt="" width="44" height="44">
+        <p class="eyebrow">Goes well with PDF Scholar</p>
+        <h3>Show your work</h3>
+        <p class="what">A separate plugin for Claude Code. Every source Claude cites becomes a link in its answer: press it, and PDF Scholar opens on the passage. It does the same for Word, Excel and PowerPoint files.</p>
+        <p class="terms">Not part of PDF Scholar. Free and open source, for Windows only for now, and it needs “Read together” turned on.</p>
+        <a class="get" href="https://github.com/emilmsh/show-your-work">Get the plugin</a>
+      </aside>
     </div>
     <ul class="points">
       <li>The MCP server is part of the app. Claude and Codex each have a switch under “AI tools” in the settings menu; other tools that support MCP take one config entry, which the app copies for you. <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/MCP.md">How to set it up</a>.</li>
       <li>Every switch is off until you turn it on. A document or a whole folder can be kept out, and a tool never sees the PDFs, images, file paths or anything from a password-protected document.</li>
-      <li>The one exception is “Read together”, a switch of its own: with it on, Claude or Codex can show you the passage a claim rests on. PDF Scholar opens the document, goes to the page and marks the quoted words, and tells the tool whether those words really are there. A document's own text and its file path then go to the tool. In Claude Code, the separate plugin <a href="https://github.com/emilmsh/show-your-work">Show your work</a> makes each source Claude cites a link in its answer that opens the passage (Windows only for now).</li>
+      <li>The one exception is “Read together”, a switch of its own: with it on, Claude or Codex can show you the passage a claim rests on. PDF Scholar opens the document, goes to the page and marks the quoted words, and tells the tool whether those words really are there. A document's own text and its file path then go to the tool.</li>
       <li>For a tool that cannot connect, “Copy for AI” copies one document's notes and conversations as text to paste. This also works in the browser extension.</li>
     </ul>
   </section>
