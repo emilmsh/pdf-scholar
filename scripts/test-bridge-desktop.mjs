@@ -90,6 +90,15 @@ const PRELUDE = `
 const settle = (ms = 300) => new Promise((r) => setTimeout(r, ms));
 const click = (el) => el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 const page = () => document.querySelector('.page-indicator input')?.value ?? null;
+// A <select> React controls: its value is set past React's own setter, then told
+const pick = async (key, value) => {
+  const el = document.querySelector('.tool-session select[data-pick="' + key + '"]');
+  if (!el) return false;
+  Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(el, value);
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  await settle(400);
+  return true;
+};
 `
 
 async function main() {
@@ -182,7 +191,8 @@ async function main() {
     const view = await waitFor(
       () => run(send, `return { page: page(), mark: !!document.querySelector('.search-hit:not(.cite-flash)'), panel: !!document.querySelector('.tool-session'),
                               refs: [...document.querySelectorAll('.tool-ref')].map((r) => ({ n: r.querySelector('.tool-ref-n')?.textContent, claim: r.querySelector('.tool-ref-claim')?.textContent, chip: r.querySelector('.ai-chip')?.textContent, missing: r.classList.contains('is-missing') })),
-                              title: document.querySelector('.tool-session-title')?.textContent }`),
+                              title: document.querySelector('.tool-session-title')?.textContent,
+                              picks: [...document.querySelectorAll('.tool-session select')].map((s) => s.dataset.pick + '=' + s.value) }`),
       (v) => v.page === '4' && v.mark && v.refs.length === 1,
       'the passage to be shown'
     )
@@ -191,8 +201,21 @@ async function main() {
     // tool pointed at does not: the reader comes to it from another program
     const later = await run(send, `await settle(7600); return { mark: !!document.querySelector('.search-hit:not(.cite-flash)') }`)
     check('…and stays marked past the seven seconds a flash lasts', later.mark)
-    check('the assistant panel opened on the list, headed by the topic', view.panel && view.title === 'Navigasjon i appen', view.title)
-    check('the reference: its number as the tool was given it, the claim, and the page as a chip', view.refs[0].n === '[1]' && view.refs[0].claim === 'Dokumentet lover en tilbake-knapp' && /4/.test(view.refs[0].chip) && !view.refs[0].missing, JSON.stringify(view.refs[0]))
+    // ONE list of references across sessions (Emil, 2026-11-25): it opens on
+    // this document's, newest first, with what is shown, how it is grouped
+    // and how it is sorted to choose
+    check('the assistant panel opened on the one list of references', view.panel && view.title === 'Henvisninger fra KI-verktøy' && view.picks.join() === 'show=here,group=none,sort=newest', `${view.title} · ${view.picks.join()}`)
+    check('the reference: the claim and the page as a chip — and no number, which is a session’s own', view.refs[0].n === undefined && view.refs[0].claim === 'Dokumentet lover en tilbake-knapp' && /4/.test(view.refs[0].chip) && !view.refs[0].missing, JSON.stringify(view.refs[0]))
+    const bySession = await run(
+      send,
+      `await pick('group', 'session');
+       const out = { headings: [...document.querySelectorAll('.tool-refs-heading-name')].map((h) => h.textContent),
+                     n: document.querySelector('.tool-ref .tool-ref-n')?.textContent,
+                     canDelete: !!document.querySelector('.tool-refs-heading .ai-history-delete') };
+       await pick('group', 'none');
+       return out;`
+    )
+    check('grouped by session: under the topic the tool gave, with the number it wrote and a way to delete the session', bySession.headings.length === 1 && /^Navigasjon i appen · [^·]+ · /.test(bySession.headings[0]) && / \(1\)$/.test(bySession.headings[0]) && bySession.n === '[1]' && bySession.canDelete, JSON.stringify(bySession))
 
     const wrong = await server.call('show_passage', { path: DOC, page: 2, quote: 'Appen ble lansert i 1987 og har ti millioner brukere.', claim: 'En påstand uten dekning' })
     check('words that are not in the document: NOT FOUND, as reference 2', /^\[2\] NOT FOUND/.test(wrong.text) && /unverified/.test(wrong.text), wrong.text)
@@ -201,14 +224,22 @@ async function main() {
       (v) => v.refs.length === 2,
       'the second reference'
     )
-    check('…listed, and marked as not found', missing.refs[1].missing && missing.refs[1].flag.length > 0 && !missing.refs[0].missing, JSON.stringify(missing.refs))
+    check('…listed first, as the newest, and marked as not found', missing.refs[0].missing && missing.refs[0].flag.length > 0 && !missing.refs[1].missing, JSON.stringify(missing.refs))
+    const lost = await run(
+      send,
+      `await pick('show', 'missing');
+       const only = [...document.querySelectorAll('.tool-ref')].map((r) => r.classList.contains('is-missing'));
+       await pick('show', 'here');
+       return only;`
+    )
+    check('«Ikke funnet» shows that one alone', lost.length === 1 && lost[0] === true, JSON.stringify(lost))
     check('…with the viewer on the cited page', missing.page === '2')
 
     console.log('\n6. a reference is come back to')
     const back = await run(
       send,
       `const field = document.querySelector('.page-indicator input');
-       const first = [...document.querySelectorAll('.tool-ref .ai-chip')][0];
+       const first = [...document.querySelectorAll('.tool-ref:not(.is-missing) .ai-chip')][0];
        click(first);
        let waited = 0;
        while (waited < 8000 && !(page() === '4' && document.querySelector('.search-hit:not(.cite-flash)'))) { await settle(200); waited += 200; }
@@ -233,14 +264,21 @@ async function main() {
     check('…and without filing it as just opened', !recents.some((r) => r.path === OTHER))
     const all = await run(
       send,
-      `const toggle = document.querySelector('.tool-session .ai-history-scope input');
-       const onlyHere = document.querySelectorAll('.tool-ref').length;
-       if (toggle) click(toggle);
-       await settle(500);
-       return { hadToggle: !!toggle, onlyHere, all: document.querySelectorAll('.tool-ref').length,
-                docs: [...document.querySelectorAll('.tool-ref .ai-history-doc')].map((d) => d.textContent) };`
+      `const onlyHere = document.querySelectorAll('.tool-ref').length;
+       const hadPick = await pick('show', 'all');
+       const out = { hadPick, onlyHere, all: document.querySelectorAll('.tool-ref').length,
+                     docs: [...document.querySelectorAll('.tool-ref .ai-history-doc')].map((d) => d.textContent) };
+       await pick('group', 'doc');
+       out.headings = [...document.querySelectorAll('.tool-refs-heading-name')].map((h) => h.textContent);
+       out.docsUnderHeadings = document.querySelectorAll('.tool-ref .ai-history-doc').length;
+       await pick('sort', 'page');
+       out.byPage = [...document.querySelectorAll('.tool-ref .ai-chip')].map((c) => c.textContent.replace(/\\D+/g, ''));
+       await pick('group', 'none'); await pick('sort', 'newest');
+       return out;`
     )
-    check('the list shows this document’s references, and every document’s on its switch', all.hadToggle && all.onlyHere === 2 && all.all === 3 && all.docs.includes('Unopened paper.pdf'), JSON.stringify(all))
+    check('the list shows this document’s references, and every document’s on «Alle dokumenter»', all.hadPick && all.onlyHere === 2 && all.all === 3 && all.docs.includes('Unopened paper.pdf'), JSON.stringify(all))
+    check('grouped by document: a heading per document with its count, and no file name on the cards', all.headings.length === 2 && all.headings.some((h) => /^Unopened paper\.pdf \(1\)$/.test(h)) && all.docsUnderHeadings === 0, JSON.stringify(all.headings))
+    check('sorted by page within each document', all.byPage.length === 3, all.byPage.join())
     const sessions = readdirSync(join(app.profile, 'tool-sessions')).filter((n) => n.endsWith('.json'))
     const stored = JSON.parse(readFileSync(join(app.profile, 'tool-sessions', sessions[0]), 'utf-8'))
     check('one session on disk, holding what was shown AND what was read', sessions.length === 1 && stored.entries.filter((e) => e.kind === 'reference').length === 3 && stored.entries.some((e) => e.kind === 'read') && stored.entries.some((e) => e.kind === 'context' && e.selection === true))

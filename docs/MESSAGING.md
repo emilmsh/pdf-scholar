@@ -537,8 +537,9 @@ that.)*
   passage a claim rests on. PDF Scholar opens the document, goes to the page
   and highlights the quoted words, and tells the tool whether those words
   really are in the document — a quote that is not there comes back as
-  unverified. Every reference is numbered and kept in a list in the assistant panel, per
-  session of the tool and across documents, each with its page as a chip
+  unverified. Every reference is numbered and kept in ONE list in the assistant panel,
+  across sessions of the tool and across documents (to show, group and sort
+  as in the plugin's Sources pane; Emil, 2026-11-25), each with its page as a chip
   you can press again later; the tool writes the same number beside its
   claim («… [3]»), and with «Show your work», a separate plugin for Claude
   Code, the citation is a link in the answer that shows the passage. The tool can also read a document's text as

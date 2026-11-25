@@ -270,8 +270,10 @@ export default function AiPanel({
   const [showSettings, setShowSettings] = useState(false)
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  /** The session of an outside AI tool whose references are shown in place of
-   *  the conversation (ToolReferences.tsx); null = the assistant's own views */
+  /** Set while the references outside AI tools have left are shown in place
+   *  of the conversation (ToolReferences.tsx): the session that asked for
+   *  the view, or 'all' from the history. The view itself is ONE list across
+   *  sessions; null = the assistant's own views */
   const [toolSession, setToolSession] = useState<string | null>(null)
   useEffect(() => {
     if (!toolSessionAsk) return
@@ -1731,7 +1733,6 @@ export default function AiPanel({
           only an outside tool would otherwise meet a key form in its place */}
       {toolSession ? (
         <ToolSessionView
-          sessionId={toolSession}
           docPath={docPath}
           onBack={() => setToolSession(null)}
           onShow={showToolReference}
@@ -1748,9 +1749,8 @@ export default function AiPanel({
       ) : showHistory ? (
         <div className="ai-history">
           <ToolSessionRows
-            docPath={docPath}
-            onOpen={(id) => {
-              setToolSession(id)
+            onOpen={() => {
+              setToolSession('all')
               setShowHistory(false)
             }}
           />
