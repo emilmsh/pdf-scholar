@@ -65,8 +65,12 @@ const ready = new Set<number>()
 let lastFocused: number | null = null
 /** The window the last request went to: the one raise() means */
 let lastTarget: BrowserWindow | null = null
-/** Where holds() just found a path, for the request that follows it */
-let heldBy: { path: string; win: BrowserWindow } | null = null
+/** Where holds() just found each path, for the request that follows it.
+ *  Keyed by path: requests overlap (a tool cites several passages at once,
+ *  each in a process of its own), and one global let the second request's
+ *  holds() clear the first's answer — which then went to the reader's
+ *  window, possibly not the one holding the document. */
+const heldBy = new Map<string, BrowserWindow>()
 
 const pending = new Map<number, (reply: ViewReply) => void>()
 let askSeq = 0
@@ -99,11 +103,11 @@ function ask(win: BrowserWindow, req: ViewRequest, timeoutMs: number): Promise<V
 }
 
 async function holds(path: string): Promise<boolean> {
-  heldBy = null
+  heldBy.delete(path)
   for (const win of readyWindows()) {
     const reply = await ask(win, { op: 'holds', path }, 3000)
     if (reply.ok && reply.op === 'holds' && reply.holds) {
-      heldBy = { path, win }
+      heldBy.set(path, win)
       return true
     }
   }
@@ -132,8 +136,8 @@ async function view(ctx: ToolBridgeContext, req: ViewRequest): Promise<ViewReply
     return ask(win, req, 5000)
   }
   if (req.op === 'holds') return { ok: true, op: 'holds', holds: await holds(req.path) }
-  const held = heldBy && heldBy.path === req.path && live(heldBy.win) ? heldBy.win : null
-  heldBy = null
+  const found = heldBy.get(req.path)
+  const held = found && live(found) ? found : null
   const win = held ?? (await someWindow(ctx))
   if (!win) return { ok: false, error: 'no-window' }
   lastTarget = win
