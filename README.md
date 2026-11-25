@@ -305,6 +305,12 @@ paper: highlights with the words they mark, comments, and your assistant convers
 - Read-only: search, list papers, one paper's notes, one conversation. Every switch is off
   until you turn it on. A document or a whole folder can be kept out, and a tool never
   sees the PDFs, images, file paths or anything from a password-protected document
+- The one exception is "Read together", a switch of its own: with it on, Claude or Codex
+  can show you the passage a claim rests on. PDF Scholar opens the document, goes to the
+  page and marks the quoted words, and tells the tool whether those words really are
+  there. A document's own text and its file path then go to the tool. In Claude Code, the
+  separate plugin [Show your work](https://github.com/emilmsh/show-your-work) makes each
+  source Claude cites a link in its answer that opens the passage (Windows only for now)
 - For a tool that cannot connect, "Copy for AI" in the Annotations tab copies one
   document's notes and conversations as text to paste. This also works in the browser
   extension
