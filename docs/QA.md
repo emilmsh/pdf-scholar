@@ -284,10 +284,10 @@ teksten til venstre.
 INSTALLERTE appen). Tannhjulet → «KI-verktøy»: slå på Claude, og så «La
 verktøyene peke og lese i PDF Scholar». Start en NY Claude Code-sesjon i
 skrivebordsappen, i en mappe med en PDF. Legg PDF Scholar bak et annet vindu.
-Installer også pluginen (+ ved skrivefeltet → Plugins → Add marketplace
-`emilmsh/pdf-scholar` → Add plugin `pdf-scholar-buttons`). Spør Claude om noe artikkelen sier, og be
+Installer også pluginen «Show your work» (+ ved skrivefeltet → Plugins → Add marketplace
+`emilmsh/show-your-work` → Add plugin). Spør Claude om noe artikkelen sier, og be
 den vise hvor. Skriv videre i Claude mens passasjen kommer opp. Trykk på
-knappene under svaret, også etter at du har stilt et nytt spørsmål. Trykk på et par av henvisningene i listen i
+lenkene i svaret, også etter at du har stilt et nytt spørsmål. Trykk på et par av henvisningene i listen i
 omvendt rekkefølge. Minimer PDF Scholar og be om en ny passasje. Lukk PDF
 Scholar helt og be om enda en. Marker en setning i PDF Scholar og skriv «se på
 det jeg har markert» i Claude. Be til slutt om en påstand du vet er feil.
@@ -311,9 +311,11 @@ låste dokumenter, lageret, de tre verktøyene over et ekte rør) og
 ikke-funn, et uåpnet dokument lest uten fane). Håndsjekk: at vinduet faktisk
 kommer OVER et annet program uten å ta tastaturet (målt på Windows 11 –
 på macOS og Linux er det ikke prøvd), at appen startes når den er lukket,
-at Claude faktisk skriver numrene ved påstandene, og at knappene under svaret
-tegnes i skrivebordsappen (pluginens egne tester, `claude plugin test
-claude-plugin`, dekker tegningen og trykket, ikke en ekte sesjon).
+at Claude faktisk viser til kildene ved påstandene, at lenkene i svaret
+tegnes i skrivebordsappen, at passasjen blir STÅENDE markert til du klikker i
+dokumentet, og at kortene i PDF Scholars liste har samme nummer og ligger i
+én liste (pluginens egne tester, `claude plugin test .` i
+show-your-work-repoet, dekker tegningen og trykket, ikke en ekte sesjon).
 
 ## Står igjen fra RELEASE.md steg 1 (alltid)
 

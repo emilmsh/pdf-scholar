@@ -553,9 +553,12 @@ that.)*
   up over the app you are in WITHOUT taking the keyboard — measured on
   Windows only, so claim «shows you the passage», never «switches to PDF
   Scholar». The plugin is Claude Code only — Codex has none, and gets the numbers and
-  the list — and it installs from this repository
-  (`/plugin install pdf-scholar-buttons --marketplace emilmsh/pdf-scholar`), so it
-  ships WITH the app: name it wherever the feature is (Emil, 2026-11-24).
+  the list — and since 2026-11-25 it is a project of its own, «Show your work»
+  (`/plugin install show-your-work --marketplace emilmsh/show-your-work`): the
+  same link for Word, Excel, PowerPoint, text, code and web sources, Windows
+  only for now. It replaced `pdf-scholar-buttons`, which shipped in this
+  repository with 0.87.0. Name it wherever the feature is, as a separate
+  thing to install, and never without «Windows only for now» (Emil, 2026-11-25).
   Not in the README or any listing yet: when it is claimed is Emil's call,
   with a release.)*
 - The assistant can open in its own window, so the document keeps the whole
