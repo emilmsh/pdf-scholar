@@ -44,9 +44,9 @@ import { charCitationsToQuotes } from '../ai-retrieval'
 import type { OcrProgress } from '../ocr'
 import { rememberRequestTokenLimit } from '../ai-token-limits'
 import { errorDetail, errorText, t, useLang, locale } from '../i18n'
-import type { ToolEntry } from '../../../shared/tool-bridge'
-import { locatePassage, pathKey, requestPassageOpen } from '../tool-bridge'
-import { ToolSessionRows, ToolSessionView } from './ToolReferences'
+import type { ToolReference } from '../../../shared/tool-bridge'
+import { passageTarget, pathKey, requestPassageOpen } from '../tool-bridge'
+import { ToolReferencesRow, ToolReferencesView } from './ToolReferences'
 import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-scale'
 import { bubblesWhileTyping } from '../keymap'
 import type { AiDocument, ResolvedCitation, StreamCiting } from '../ai'
@@ -220,9 +220,10 @@ interface PanelProps {
    *  function, not a flag: the host learns it from a ref set mid-load. */
   isLocked?(): boolean
   /** Bumped by the host when an AI tool outside the app just showed a passage
-   *  in this document (shared/tool-bridge.ts): the panel shows that session's
-   *  list of references */
-  toolSessionAsk?: { id: number; sessionId: string } | null
+   *  in this document (shared/tool-bridge.ts), or the reader pressed one of
+   *  its references in another document's list: the panel shows the list of
+   *  references */
+  toolRefsAskId?: number
 }
 
 const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
@@ -263,24 +264,22 @@ export default function AiPanel({
   onOpenElsewhere,
   conversationAskId = 0,
   isLocked,
-  toolSessionAsk = null
+  toolRefsAskId = 0
 }: PanelProps): React.JSX.Element | null {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  /** Set while the references outside AI tools have left are shown in place
-   *  of the conversation (ToolReferences.tsx): the session that asked for
-   *  the view, or 'all' from the history. The view itself is ONE list across
-   *  sessions; null = the assistant's own views */
-  const [toolSession, setToolSession] = useState<string | null>(null)
+  /** True while the references outside AI tools have left are shown in place
+   *  of the conversation (ToolReferences.tsx: ONE list across sessions) */
+  const [showToolRefs, setShowToolRefs] = useState(false)
   useEffect(() => {
-    if (!toolSessionAsk) return
-    setToolSession(toolSessionAsk.sessionId)
+    if (!toolRefsAskId) return
+    setShowToolRefs(true)
     setShowHistory(false)
     setShowSettings(false)
-  }, [toolSessionAsk])
+  }, [toolRefsAskId])
   // The store is async (issue #46): the list arrives in the load effect below,
   // which also picks the newest conversation up as the panel's first view
   const [conversations, setConversations] = useState<StoredConversation[]>([])
@@ -839,7 +838,7 @@ export default function AiPanel({
   useEffect(() => {
     if (!open || openSettingsAskId === lastSettingsAskRef.current) return
     lastSettingsAskRef.current = openSettingsAskId
-    setToolSession(null)
+    setShowToolRefs(false)
     setShowSettings(true)
     setShowHistory(false)
     setShowModelMenu(false)
@@ -951,7 +950,7 @@ export default function AiPanel({
     setMessages([])
     setAttached([])
     setShowHistory(false)
-    setToolSession(null)
+    setShowToolRefs(false)
     pinnedRef.current = true
     setPinned(true)
     inputRef.current?.focus()
@@ -990,8 +989,8 @@ export default function AiPanel({
     if (busy) return
     // From a tool's list the button goes BACK to the history it was opened
     // from, never past it to the conversation
-    const fromTool = toolSession !== null
-    setToolSession(null)
+    const fromTool = showToolRefs
+    setShowToolRefs(false)
     setShowHistory((s) => {
       const next = fromTool ? true : !s
       if (next && !s) {
@@ -1001,25 +1000,23 @@ export default function AiPanel({
       return next
     })
     setShowSettings(false)
-  }, [busy, docPath, refreshAll, toolSession])
+  }, [busy, docPath, refreshAll, showToolRefs])
 
   /** A reference an outside tool left: its passage here, or its document
    *  opened on it (the viewer that ends up showing it takes the handoff) */
   const showToolReference = useCallback(
-    (entry: Extract<ToolEntry, { kind: 'reference' }>): void => {
+    (entry: ToolReference): void => {
       if (pathKey(entry.docPath) !== pathKey(docPath)) {
         if (!onOpenElsewhere) return
-        requestPassageOpen(entry.docPath, { page: entry.page, quote: entry.quote, sessionId: toolSession ?? '' })
+        requestPassageOpen(entry.docPath, { page: entry.page, quote: entry.quote })
         onOpenElsewhere(entry.docPath)
         return
       }
       void ensureDocument().then((ensured) => {
-        if (!ensured) return
-        const hit = locatePassage(ensured.pages, entry.page, entry.quote)
-        onCitationClick(hit?.target ?? { pageNumber: entry.page, start: 0, end: 0 }, true)
+        if (ensured) onCitationClick(passageTarget(ensured.pages, entry.page, entry.quote), true)
       })
     },
-    [docPath, ensureDocument, onCitationClick, onOpenElsewhere, toolSession]
+    [docPath, ensureDocument, onCitationClick, onOpenElsewhere]
   )
 
   // The history view (issue #46): this document's conversations, or every
@@ -1683,7 +1680,7 @@ export default function AiPanel({
               onClose={() => setShowModelMenu(false)}
               onOpenSettings={() => {
                 setShowModelMenu(false)
-                setToolSession(null)
+                setShowToolRefs(false)
                 setShowSettings(true)
                 setShowHistory(false)
               }}
@@ -1699,7 +1696,7 @@ export default function AiPanel({
           <IconPlus size={15} />
         </button>
         <button
-          className={`tb-btn${showHistory || toolSession ? ' is-active' : ''}`}
+          className={`tb-btn${showHistory || showToolRefs ? ' is-active' : ''}`}
           title={t('ai.historyTip')}
           disabled={busy}
           onClick={toggleHistory}
@@ -1731,10 +1728,10 @@ export default function AiPanel({
       {/* A tool's list before everything else, the first-run key settings
           included: it needs no key of the app's own, and a reader who uses
           only an outside tool would otherwise meet a key form in its place */}
-      {toolSession ? (
-        <ToolSessionView
+      {showToolRefs ? (
+        <ToolReferencesView
           docPath={docPath}
-          onBack={() => setToolSession(null)}
+          onBack={() => setShowToolRefs(false)}
           onShow={showToolReference}
         />
       ) : showSettings && config ? (
@@ -1748,9 +1745,9 @@ export default function AiPanel({
         />
       ) : showHistory ? (
         <div className="ai-history">
-          <ToolSessionRows
+          <ToolReferencesRow
             onOpen={() => {
-              setToolSession('all')
+              setShowToolRefs(true)
               setShowHistory(false)
             }}
           />

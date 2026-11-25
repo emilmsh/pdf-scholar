@@ -20,7 +20,7 @@
 // request, and main sends none unless the switches are on.
 import { docNameFromPath } from '../../shared/chat-history'
 import type { ViewReply, ViewRequest } from '../../shared/tool-bridge'
-import { MAX_SELECTION } from '../../shared/tool-bridge'
+import { MAX_SELECTION, pathKey } from '../../shared/tool-bridge'
 import type { ResolvedCitation } from './ai'
 import { resolveQuote } from './ai'
 import { isPasswordException, openDocument } from './pdf-doc'
@@ -56,10 +56,8 @@ export interface ToolShell {
   activePath(): string | null
 }
 
-/** A path as two spellings of it compare: either slash, any case. (Linux
- *  keeps case apart on disk; here it only decides which tab a path means,
- *  and main has already made the path canonical.) */
-export const pathKey = (path: string): string => path.replace(/[\\/]+/g, '/').toLowerCase()
+// The renderer's components take the path rule from here, with the rest
+export { pathKey }
 
 const viewers = new Map<string, ToolViewer>()
 let shell: ToolShell | null = null
@@ -86,11 +84,12 @@ export function registerToolShell(s: ToolShell): () => void {
 // the passage from here — the same handoff a conversation's source chip makes
 // (chat-store.ts requestConversationOpen), kept in the window's own memory.
 
+/** A passage to go to once its document is in front. The viewer that takes
+ *  it also opens its assistant panel on the list of references, where the
+ *  reader pressed it. */
 export interface PendingPassage {
   page: number
   quote: string
-  /** The session whose list the reader was in, so the panel there shows it */
-  sessionId: string
 }
 
 const pendingPassages = new Map<string, PendingPassage>()
@@ -171,12 +170,7 @@ async function documentText(
   path: string,
   bytes: Uint8Array | undefined
 ): Promise<{ viewer: ToolViewer | null; text: DocumentText } | 'locked' | 'unreadable'> {
-  if (viewers.has(pathKey(path))) {
-    const tab = await tabText(path, 45_000)
-    if (tab === 'locked') return 'locked'
-    if (tab) return tab
-    return 'unreadable'
-  }
+  if (viewers.has(pathKey(path))) return (await tabText(path, 45_000)) ?? 'unreadable'
   const kept = quietText(path)
   if (kept) return { viewer: null, text: kept }
   if (!bytes) return 'unreadable'
@@ -184,13 +178,16 @@ async function documentText(
   return typeof read === 'string' ? read : { viewer: null, text: read }
 }
 
+/** A cited page, held inside the document */
+const citedPage = (pages: PageText[], page: number): number => Math.min(Math.max(1, page), Math.max(1, pages.length))
+
 /** Where a cited quote is: its page and neighbours first, then anywhere */
-export function locatePassage(
+function locatePassage(
   pages: PageText[],
   page: number,
   quote: string
 ): { target: ResolvedCitation; whole: boolean } | null {
-  const cited = Math.min(Math.max(1, page), Math.max(1, pages.length))
+  const cited = citedPage(pages, page)
   let target = resolveQuote(cited, quote, pages)
   for (let p = 1; p <= pages.length && !target; p++) {
     // resolveQuote looks at a page and its two neighbours
@@ -201,6 +198,11 @@ export function locatePassage(
   // the rest) — the tool is told which
   return { target, whole: target.end - target.start >= quote.length * 0.9 }
 }
+
+/** Where a reference the reader pressed goes: its passage, else its page
+ *  alone (start === end) */
+export const passageTarget = (pages: PageText[], page: number, quote: string): ResolvedCitation =>
+  locatePassage(pages, page, quote)?.target ?? { pageNumber: page, start: 0, end: 0 }
 
 async function cite(req: Extract<ViewRequest, { op: 'cite' }>): Promise<ViewReply> {
   // Shown = in a tab. One that is not open is opened, like any file
@@ -214,7 +216,7 @@ async function cite(req: Extract<ViewRequest, { op: 'cite' }>): Promise<ViewRepl
   const doc = await documentText(req.path, req.bytes)
   if (typeof doc === 'string') return { ok: false, error: doc }
   const { pages, hasText } = doc.text
-  const cited = Math.min(Math.max(1, req.page), Math.max(1, pages.length))
+  const cited = citedPage(pages, req.page)
   const hit = locatePassage(pages, req.page, req.quote)
   if (req.show && doc.viewer) {
     shell?.front(req.path)
