@@ -34,6 +34,7 @@ import { isAbsolute } from 'node:path'
 import { docNameFromPath } from '../shared/chat-history'
 import { excludedBy, type McpPolicy } from '../shared/mcp'
 import {
+  isReplyShaped,
   MAX_SELECTION,
   sameReference,
   sanitizeBridgeEnvelope,
@@ -42,6 +43,7 @@ import {
   type BridgeReply,
   type BridgeRequest,
   type ToolEntry,
+  type ToolReference,
   type ToolSession,
   type ViewReply,
   type ViewRequest
@@ -131,11 +133,7 @@ export function bridgeCall(
       if (nl === -1) return
       try {
         const parsed = JSON.parse(buf.slice(0, nl)) as unknown
-        finish(
-          parsed && typeof parsed === 'object' && typeof (parsed as { ok?: unknown }).ok === 'boolean'
-            ? (parsed as BridgeReply)
-            : { ok: false, failure: 'bad-reply' }
-        )
+        finish(isReplyShaped(parsed) ? (parsed as BridgeReply) : { ok: false, failure: 'bad-reply' })
       } catch {
         finish({ ok: false, failure: 'bad-reply' })
       }
@@ -190,36 +188,44 @@ function tokenMatches(given: string, want: string): boolean {
 
 export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise<BridgeReply> {
   /** A document a tool named: the path the app knows it by, or why not */
-  function allowed(path: string, policy: McpPolicy): string | BridgeErrorCode {
+  function allowed(path: string, policy: McpPolicy): { path: string } | { error: BridgeErrorCode } {
     // Relative to WHAT is not something the app could know
-    if (!isAbsolute(path)) return 'unreadable'
+    if (!isAbsolute(path)) return { error: 'unreadable' }
     const canonical = deps.canonical(path)
-    if (excludedBy(canonical, policy, deps.foldCase)) return 'kept-out'
-    if (deps.isLocked(canonical)) return 'locked'
-    return canonical
+    if (excludedBy(canonical, policy, deps.foldCase)) return { error: 'kept-out' }
+    if (deps.isLocked(canonical)) return { error: 'locked' }
+    return { path: canonical }
+  }
+
+  /** Where the window takes the document's text from: the tab that holds it
+   *  (no bytes), the file opened as a tab for a passage to SHOW (no bytes —
+   *  the window opens it itself), or else the file's bytes — or why none.
+   *  holds() is asked first, always: it is also what routes the request to
+   *  the window that holds the document. */
+  async function source(path: string, show: boolean): Promise<{ bytes?: Uint8Array } | { error: BridgeErrorCode }> {
+    if (await deps.holds(path)) return {}
+    if (isRemotePath(path)) return { error: 'not-local' }
+    if (show) return (await deps.isPdf(path)) ? {} : { error: 'unreadable' }
+    const bytes = await deps.readBytes(path)
+    return typeof bytes === 'string' ? { error: bytes } : { bytes }
   }
 
   async function cite(env: BridgeEnvelope, req: Extract<BridgeRequest, { op: 'cite' }>, policy: McpPolicy): Promise<BridgeReply> {
-    const path = allowed(req.path, policy)
-    if (path === 'kept-out' || path === 'locked' || path === 'unreadable') return fail(path)
-    // Asked first, always: it is also what routes the request to the window
-    // that holds the document. Shown = opened as a tab by the window itself;
-    // only a passage that is merely LISTED, of a document no tab holds, is
-    // resolved from the file's bytes without a tab.
-    const held = await deps.holds(path)
-    if (!held && isRemotePath(path)) return fail('not-local')
-    if (!held && req.show && !(await deps.isPdf(path))) return fail('unreadable')
-    const bytes = held || req.show ? undefined : await deps.readBytes(path)
-    if (typeof bytes === 'string') return fail(bytes)
-    const answer = await deps.view({ op: 'cite', path, page: req.page, quote: req.quote, show: req.show, ...(bytes ? { bytes } : {}) })
+    const doc = allowed(req.path, policy)
+    if ('error' in doc) return fail(doc.error)
+    const { path } = doc
+    const via = await source(path, req.show)
+    if ('error' in via) return fail(via.error)
+    const answer = await deps.view({ op: 'cite', path, page: req.page, quote: req.quote, show: req.show, ...via })
     if (!answer.ok) return fail(answer.error)
     if (answer.op !== 'cite') return fail('no-window')
+    const whole = answer.found && answer.whole
     // The same words in the same document again — the reader asked to see a
     // reference once more, or the tool repeated itself: the card it has, and
     // its number, not a second one
     const stored = await deps.store.get(env.session.id)
     const have = sameReference(stored, path, req.quote)
-    let entry: Extract<ToolEntry, { kind: 'reference' }>
+    let entry: ToolReference
     let session: ToolSession
     if (have) {
       entry = have
@@ -230,7 +236,7 @@ export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise
       // reference here already carries it: then the store gives the next
       // one, and the answer tells the caller which it became
       const isFree = !stored?.entries.some((e) => e.kind === 'reference' && e.n === req.n)
-      const made: ToolEntry = {
+      const made: ToolReference = {
         kind: 'reference',
         id: deps.newId(),
         at: deps.now(),
@@ -241,11 +247,11 @@ export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise
         quote: req.quote,
         ...(req.claim ? { claim: req.claim } : {}),
         found: answer.found,
-        whole: answer.found && answer.whole
+        whole
       }
       session = await deps.store.append(env.session, made, req.topic)
       // The store numbered it; read the number back from what it kept
-      entry = (session.entries.find((e) => e.id === made.id) ?? made) as Extract<ToolEntry, { kind: 'reference' }>
+      entry = (session.entries.find((e) => e.id === made.id) ?? made) as ToolReference
     }
     if (req.show) deps.raise()
     if (!have || req.show) deps.changed(session, entry, req.show)
@@ -254,7 +260,7 @@ export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise
       op: 'cite',
       n: entry.n,
       found: answer.found,
-      whole: answer.found && answer.whole,
+      whole,
       page: answer.page,
       citedPage: req.page,
       pageCount: answer.pageCount,
@@ -264,13 +270,12 @@ export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise
   }
 
   async function read(env: BridgeEnvelope, req: Extract<BridgeRequest, { op: 'read' }>, policy: McpPolicy): Promise<BridgeReply> {
-    const path = allowed(req.path, policy)
-    if (path === 'kept-out' || path === 'locked' || path === 'unreadable') return fail(path)
-    const held = await deps.holds(path)
-    if (!held && isRemotePath(path)) return fail('not-local')
-    const bytes = held ? undefined : await deps.readBytes(path)
-    if (typeof bytes === 'string') return fail(bytes)
-    const answer = await deps.view({ op: 'read', path, from: req.from, to: req.to, ...(bytes ? { bytes } : {}) })
+    const doc = allowed(req.path, policy)
+    if ('error' in doc) return fail(doc.error)
+    const { path } = doc
+    const via = await source(path, false)
+    if ('error' in via) return fail(via.error)
+    const answer = await deps.view({ op: 'read', path, from: req.from, to: req.to, ...via })
     if (!answer.ok) return fail(answer.error)
     if (answer.op !== 'read') return fail('no-window')
     if (answer.pages.length > 0) {

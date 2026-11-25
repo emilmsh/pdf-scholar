@@ -12,6 +12,7 @@
 // reader still has — nothing in it exists nowhere else.
 import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { isSessionId } from '../shared/mcp'
 import type { BridgeSessionInfo, ToolEntry, ToolSession } from '../shared/tool-bridge'
 import { MAX_SESSIONS, sanitizeToolSession, withToolEntry } from '../shared/tool-bridge'
 
@@ -24,7 +25,8 @@ export interface ToolSessionStore {
   remove(id: string): Promise<void>
 }
 
-const SESSION_FILE = /^[0-9a-f]{8,64}\.json$/
+/** A session's file: its id (isSessionId) and `.json` */
+const isSessionFile = (name: string): boolean => name.endsWith('.json') && isSessionId(name.slice(0, -5))
 
 let tmpSeq = 0
 
@@ -56,7 +58,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
   async function prune(): Promise<void> {
     let names: string[]
     try {
-      names = (await readdir(dir)).filter((n) => SESSION_FILE.test(n))
+      names = (await readdir(dir)).filter(isSessionFile)
     } catch {
       return
     }
@@ -70,7 +72,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
 
   return {
     get: async (id) => {
-      if (!SESSION_FILE.test(`${id}.json`)) return null
+      if (!isSessionId(id)) return null
       await writing.get(id)?.catch(() => {})
       const session = await read(fileOf(id))
       // Named by its id: the id inside must agree
@@ -91,7 +93,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
     all: async () => {
       let names: string[]
       try {
-        names = (await readdir(dir)).filter((n) => SESSION_FILE.test(n))
+        names = (await readdir(dir)).filter(isSessionFile)
       } catch {
         return []
       }
@@ -99,7 +101,7 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
       return sessions.filter((s): s is ToolSession => s !== null).sort((a, b) => b.updatedAt - a.updatedAt)
     },
     remove: (id) =>
-      SESSION_FILE.test(`${id}.json`)
+      isSessionId(id)
         ? queue(id, () => unlink(fileOf(id)).catch(() => {}))
         : Promise.resolve()
   }
