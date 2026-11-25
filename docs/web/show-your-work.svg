@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Show your work">
+  <rect width="512" height="512" rx="112" fill="#3B2F5C"/>
+  <!-- The source: a page, with the cited words marked -->
+  <rect x="176" y="84" width="252" height="328" rx="36" fill="#F7F4EC"/>
+  <rect x="216" y="136" width="172" height="26" rx="13" fill="#A9A2BD"/>
+  <rect x="204" y="196" width="196" height="60" rx="15" fill="#F2B84B"/>
+  <rect x="216" y="290" width="172" height="26" rx="13" fill="#A9A2BD"/>
+  <rect x="216" y="342" width="104" height="26" rx="13" fill="#A9A2BD"/>
+  <!-- The way there: an arrow from the claim to the words. Drawn twice, the
+       wider one in the background colour, so it stands clear of the page. -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96 418 L160 328" stroke="#3B2F5C" stroke-width="70"/>
+    <path d="M214 252 L205 351 L123 293 Z" stroke="#3B2F5C" stroke-width="40" fill="#3B2F5C"/>
+    <path d="M96 418 L160 328" stroke="#F7F4EC" stroke-width="38"/>
+    <path d="M214 252 L205 351 L123 293 Z" stroke="#F7F4EC" stroke-width="10" fill="#F7F4EC"/>
+  </g>
+</svg>
