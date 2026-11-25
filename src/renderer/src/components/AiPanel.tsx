@@ -181,7 +181,9 @@ interface PanelProps {
   getAnnotationsText(): Promise<string | null>
   /** Bumped from outside (gear menu, search) to open the key settings view */
   openSettingsAskId: number
-  onCitationClick(resolved: ResolvedCitation): void
+  /** `stays`: the passage is one an outside tool pointed at, and is marked
+   *  until the reader clicks it away instead of flashing (PdfViewer) */
+  onCitationClick(resolved: ResolvedCitation, stays?: boolean): void
   onClose(): void
   /** A page region snipped for the chat — staged as a composer attachment */
   chatSnip: { id: number; image: AiImage } | null
@@ -1012,7 +1014,7 @@ export default function AiPanel({
       void ensureDocument().then((ensured) => {
         if (!ensured) return
         const hit = locatePassage(ensured.pages, entry.page, entry.quote)
-        onCitationClick(hit?.target ?? { pageNumber: entry.page, start: 0, end: 0 })
+        onCitationClick(hit?.target ?? { pageNumber: entry.page, start: 0, end: 0 }, true)
       })
     },
     [docPath, ensureDocument, onCitationClick, onOpenElsewhere, toolSession]

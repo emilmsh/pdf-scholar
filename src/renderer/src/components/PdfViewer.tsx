@@ -1566,6 +1566,12 @@ export default function PdfViewer({
     /** Bumped each citation jump so the flash rects remount and the CSS fade
      *  animation replays even when a repeat/same-page click reuses the nodes */
     flashId?: number
+    /** A passage an AI tool outside the app pointed at (tool-bridge.ts): it
+     *  stays marked until the reader clicks in the document or presses Esc —
+     *  no timer. The reader comes to it from another program, and how long
+     *  that takes is not ours to guess: a window started for the occasion
+     *  was not even drawn before a timed flash was over (Emil, 2026-11-25). */
+    stays?: boolean
   } | null>(null)
   /** Highlight-all: every match on the pages that are currently mounted.
    *
@@ -1866,6 +1872,16 @@ export default function PdfViewer({
       .catch(() => {})
   }, [pdf])
   const aiHitTimerRef = useRef<number | null>(null)
+  /** When this window last took the focus — tells the click that brought the
+   *  reader here from the one that follows it (onMouseDown) */
+  const windowFocusedAtRef = useRef(-Infinity)
+  useEffect(() => {
+    const focused = (): void => {
+      windowFocusedAtRef.current = performance.now()
+    }
+    window.addEventListener('focus', focused)
+    return () => window.removeEventListener('focus', focused)
+  }, [])
   const searchSeqRef = useRef(0)
   const gotoSeqRef = useRef(0)
   /** Generation guard for the highlight-all resolve pass, which awaits text
@@ -5606,7 +5622,11 @@ export default function PdfViewer({
     setAnnotPopover((p) => (p ? null : p))
     // A lingering citation highlight releases on the next interaction with
     // the document (while searching, the search UI owns the highlight)
-    if (!searchOpenRef.current) setSearchHits((h) => (h ? null : h))
+    // A passage a tool pointed at survives the click that only brings this
+    // window to the front: the reader arrives from another program, and that
+    // first click is how they get here, not a word about the mark.
+    const arriving = performance.now() - windowFocusedAtRef.current < 300
+    if (!searchOpenRef.current) setSearchHits((h) => (h && !(h.stays && arriving) ? null : h))
     // Mousedown on a note bubble arms a drag (movement threshold decides
     // between drag and the plain click that opens the popover)
     if (handToolRef.current) {
@@ -7111,9 +7131,11 @@ export default function PdfViewer({
   }, [pdf])
 
   /** Citation chip clicked: jump to the cited passage and highlight it,
-   *  reusing the search-hit overlay and the text-layer rect machinery */
+   *  reusing the search-hit overlay and the text-layer rect machinery.
+   *  `stays`: a passage a tool outside the app pointed at — marked until the
+   *  reader clicks it away, where the assistant's own chips flash and fade. */
   const jumpToAiCitation = useCallback(
-    async (resolved: ResolvedCitation) => {
+    async (resolved: ResolvedCitation, stays = false) => {
       const texts = pageTextsRef.current
       if (!texts) return
       // Like search: the cited passage opens in the column being worked in
@@ -7142,13 +7164,20 @@ export default function PdfViewer({
         handle.scale()
       )
       if (!rects || rects.length === 0) return
-      setSearchHits({ pageNumber: resolved.pageNumber, rects, flash: true, flashId: seq })
+      setSearchHits(
+        stays
+          ? { pageNumber: resolved.pageNumber, rects, flashId: seq, stays: true }
+          : { pageNumber: resolved.pageNumber, rects, flash: true, flashId: seq }
+      )
       // The citation highlight releases by itself after a moment (or on the
-      // next click in the document) — it's a pointer, not a selection
+      // next click in the document) — it's a pointer, not a selection. One
+      // that stays has no timer, and an earlier flash's must not take it.
       if (aiHitTimerRef.current) window.clearTimeout(aiHitTimerRef.current)
-      aiHitTimerRef.current = window.setTimeout(() => {
-        if (!searchOpenRef.current) setSearchHits(null)
-      }, 7000)
+      aiHitTimerRef.current = stays
+        ? null
+        : window.setTimeout(() => {
+            if (!searchOpenRef.current) setSearchHits(null)
+          }, 7000)
       handle.scrollToPageY(resolved.pageNumber, rects[0].y, el.clientHeight * 0.35)
       if (pane === 'a') schedulePositionSave()
     },
@@ -7173,7 +7202,7 @@ export default function PdfViewer({
           const ensured = await ensureAiDocument()
           return ensured ? { pages: ensured.pages, hasText: ensured.hasText } : null
         },
-        jump: (target) => void jumpToAiCitation(target),
+        jump: (target) => void jumpToAiCitation(target, true),
         selection: () => {
           const sel = window.getSelection()
           if (!sel || sel.isCollapsed) return ''
@@ -7210,7 +7239,7 @@ export default function PdfViewer({
         const passage = takePendingPassage(payload.path)
         if (!passage) return
         const hit = locatePassage(ensured.pages, passage.page, passage.quote)
-        void jumpToAiCitation(hit?.target ?? { pageNumber: passage.page, start: 0, end: 0 })
+        void jumpToAiCitation(hit?.target ?? { pageNumber: passage.page, start: 0, end: 0 }, true)
         if (passage.sessionId) {
           setToolSessionAsk((ask) => ({ id: (ask?.id ?? 0) + 1, sessionId: passage.sessionId }))
           setAiPinned(true)
@@ -8401,7 +8430,7 @@ export default function PdfViewer({
                 annotsAskId={annotsAskId}
                 getAnnotationsText={getAnnotationsText}
                 openSettingsAskId={aiSettingsAskId}
-                onCitationClick={(resolved) => void jumpToAiCitation(resolved)}
+                onCitationClick={(resolved, stays) => void jumpToAiCitation(resolved, stays)}
                 onClose={() => {
                   setAiPeek(false)
                   setAiPinned(false)
