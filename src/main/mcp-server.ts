@@ -244,6 +244,8 @@ export interface McpServerOptions {
 /** One call to the running app: its answer, or why none came */
 type Bridged = BridgeReply | { ok: false; failure: BridgeCallFailure | 'no-token' }
 
+const NO_ANSWER_IN_TIME = 'PDF Scholar did not answer in time. It may still be opening the document — try once more.'
+
 const BRIDGE_ERRORS: Record<BridgeErrorCode, string> = {
   'bridge-off':
     'PDF Scholar is not reading together with AI tools: «Read together» is off (settings menu → AI tools). The user can turn it on there.',
@@ -258,8 +260,8 @@ const BRIDGE_ERRORS: Record<BridgeErrorCode, string> = {
     'The file is on a network share. PDF Scholar follows a network path only to a document the user has open themselves — ask them to open it in PDF Scholar, then try again.',
   'too-large':
     'The file is larger than PDF Scholar reads without the user opening it. Ask the user to open it in PDF Scholar, then try again.',
-  'no-window': 'PDF Scholar did not answer in time. It may still be opening the document — try once more.',
-  timeout: 'PDF Scholar did not answer in time. It may still be opening the document — try once more.'
+  'no-window': NO_ANSWER_IN_TIME,
+  timeout: NO_ANSWER_IN_TIME
 }
 
 const NOT_RUNNING =
@@ -331,13 +333,20 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
     return first
   }
 
-  /** The words for an answer that is not one: a named refusal, or no app */
-  function unanswered(r: Bridged): string | null {
-    if (r.ok) return null
-    if ('failure' in r) {
-      return r.failure === 'timeout' || r.failure === 'bad-reply' ? BRIDGE_ERRORS.timeout : NOT_RUNNING
+  /** The app's answer to one request, of the request's own kind — or the
+   *  words for why there is none (a named refusal, or no app), thrown as the
+   *  tool's refusal */
+  async function answer<O extends BridgeRequest['op']>(
+    request: Extract<BridgeRequest, { op: O }>,
+    timeoutMs: number
+  ): Promise<Extract<BridgeReply, { ok: true; op: O }>> {
+    const r = await ask(request, timeoutMs)
+    if (!r.ok) {
+      if (!('failure' in r)) throw new Error(BRIDGE_ERRORS[r.error] ?? BRIDGE_ERRORS['bad-request'])
+      throw new Error(r.failure === 'timeout' || r.failure === 'bad-reply' ? NO_ANSWER_IN_TIME : NOT_RUNNING)
     }
-    return BRIDGE_ERRORS[r.error] ?? BRIDGE_ERRORS['bad-request']
+    if (r.op !== request.op) throw new Error(BRIDGE_ERRORS['bad-request'])
+    return r as Extract<BridgeReply, { ok: true; op: O }>
   }
 
   const pathArg = (args: Record<string, unknown>): string => {
@@ -347,10 +356,9 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
   }
 
   /** Refused here already, without the app being asked (it checks again) */
-  function refusedHere(policy: McpPolicy, path?: string): string | null {
-    if (!policy.live) return BRIDGE_ERRORS['bridge-off']
-    if (path && excludedBy(path, policy, foldCase)) return BRIDGE_ERRORS['kept-out']
-    return null
+  function refuseHere(policy: McpPolicy, path?: string): void {
+    if (!policy.live) throw new Error(BRIDGE_ERRORS['bridge-off'])
+    if (path && excludedBy(path, policy, foldCase)) throw new Error(BRIDGE_ERRORS['kept-out'])
   }
 
   async function showTool(args: Record<string, unknown>, policy: McpPolicy): Promise<string> {
@@ -359,10 +367,9 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
     const quote = typeof args.quote === 'string' ? args.quote.trim() : ''
     if (!page) throw new Error('page is required: the page the passage is on, counted from 1')
     if (!quote) throw new Error('quote is required: the passage, word for word')
-    const refused = refusedHere(policy, path)
-    if (refused) throw new Error(refused)
+    refuseHere(policy, path)
     const show = args.show !== false
-    const r = await ask(
+    const r = await answer(
       {
         op: 'cite',
         path,
@@ -377,9 +384,6 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
       },
       75_000
     )
-    const none = unanswered(r)
-    if (none) throw new Error(none)
-    if (!r.ok || r.op !== 'cite') throw new Error(BRIDGE_ERRORS['bad-request'])
     const where = r.page === r.citedPage ? `page ${r.page}` : `page ${r.page} (not page ${r.citedPage}, as cited)`
     const seen = r.shown ? 'PDF Scholar is showing it to the user.' : 'It is in the user’s list of references in PDF Scholar.'
     // The number first, in the form the model is asked to write it in
@@ -396,14 +400,10 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
 
   async function readTool(args: Record<string, unknown>, policy: McpPolicy): Promise<string> {
     const path = pathArg(args)
-    const refused = refusedHere(policy, path)
-    if (refused) throw new Error(refused)
+    refuseHere(policy, path)
     const from = typeof args.from === 'number' && args.from >= 1 ? Math.floor(args.from) : 1
     const to = typeof args.to === 'number' && args.to >= from ? Math.floor(args.to) : from + MAX_READ_PAGES - 1
-    const r = await ask({ op: 'read', path, from, to }, 130_000)
-    const none = unanswered(r)
-    if (none) throw new Error(none)
-    if (!r.ok || r.op !== 'read') throw new Error(BRIDGE_ERRORS['bad-request'])
+    const r = await answer({ op: 'read', path, from, to }, 130_000)
     const name = docNameFromPath(path)
     if (r.pages.length === 0) return `«${name}» has ${r.pageCount} page${r.pageCount === 1 ? '' : 's'}; none in that range.`
     // Whole pages until the answer is full: a page cut in two is a quote
@@ -430,12 +430,8 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
   }
 
   async function contextTool(_args: Record<string, unknown>, policy: McpPolicy): Promise<string> {
-    const refused = refusedHere(policy)
-    if (refused) throw new Error(refused)
-    const r = await ask({ op: 'context' }, 8000)
-    const none = unanswered(r)
-    if (none) throw new Error(none)
-    if (!r.ok || r.op !== 'context') throw new Error(BRIDGE_ERRORS['bad-request'])
+    refuseHere(policy)
+    const r = await answer({ op: 'context' }, 8000)
     if (!r.open) return 'PDF Scholar has no document in front right now.'
     if (r.open.withheld) {
       return 'The document the user has in front is one PDF Scholar does not share (kept out of AI tools, or password-protected). Nothing about it is given.'
@@ -690,12 +686,7 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
           const run = toolsByName[name]
           if (!run) return failure(id, -32602, `Unknown tool: ${name}`)
           const policy = await policyNow()
-          if (!policy.clients[opts.client]) {
-            return refusal(
-              id,
-              'PDF Scholar is not sharing with this tool: its switch is off in PDF Scholar (Settings → AI tools on this computer). The user can turn it on there.'
-            )
-          }
+          if (!policy.clients[opts.client]) return refusal(id, BRIDGE_ERRORS['client-off'])
           try {
             const text = await run(isObj(params.arguments) ? params.arguments : {}, policy)
             return reply(id, { content: [{ type: 'text', text }] })
