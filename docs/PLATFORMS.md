@@ -846,5 +846,24 @@ regressions are treated as bugs, not as acceptable platform lag.
   Windows fonts exist (Segoe → `system-ui`, Consolas → `monospace`, …).
 - Dev scripts may be Windows-only (e.g. `scripts/pack-extension.mjs`); anything
   CI or users depend on must be portable.
+- **Nothing in the app may build on what only one system has** (Emil,
+  2026-11-25). The first thing that exists on Windows alone is outside the
+  app: «Show your work», the Claude Code plugin that opens Word, Excel and
+  PowerPoint at a cited passage (github.com/emilmsh/show-your-work). The
+  rules that follow from it:
+  - The app works the same with and without the plugin, on every system. A
+    feature of the app never requires it, and no screen, string or setting in
+    the app assumes it is there.
+  - What the plugin asks of the app goes through the app's public MCP tools
+    (`show_passage` with a caller's `number`, the script's `--session`).
+    Those are built and tested for every system, like any other tool — never
+    a Windows-only entry point added for the plugin's sake.
+  - A capability that can only be built for one system is built OUTSIDE the
+    app, or behind one seam with a listed divergence here, and is named as
+    that system's wherever it is offered. It is never a silent default the
+    other systems fall short of.
+  - Before work starts on something that leans on another program (Office, a
+    browser, a system service), ask first which systems it can exist on. If
+    the answer is «one», it belongs in the plugin, not in the app.
 - Review-time check: run the `platform-parity` skill over a diff that touches
   keyboard handling, window chrome, paths, packaging or dependencies.
