@@ -424,8 +424,9 @@ export const zh: Dict = {
   'mcp.liveSub': '显示段落、阅读文档文本、查看你打开的内容',
   'mcp.liveNeedsTool': '请先开启一个工具',
   'mcp.liveNote':
-    '你已开启的工具随后可以在 PDF Scholar 中显示某个段落、阅读文档的文本，并查看你面前的文档、页码和所选内容。文本和完整的文件路径会发送给该工具的 AI 提供商。它们显示和阅读的内容列在助手历史记录的“来自 AI 工具”下。受密码保护的文档和被排除的文档除外。',
-  'tool.sessionsHeading': '来自 AI 工具',
+    '你已开启的工具随后可以在 PDF Scholar 中显示某个段落、阅读文档的文本，并查看你面前的文档、页码和所选内容。文本和完整的文件路径会发送给该工具的 AI 提供商。它们显示和阅读的内容列在助手历史记录的“来自 AI 工具的引用”下。受密码保护的文档和被排除的文档除外。',
+  'tool.sessionsHeading': '来自 AI 工具的引用',
+  'tool.sessionsTip': 'Claude Code、Codex 或其他 AI 工具在开启“共同阅读”后在你的文档中指出的段落。这些不是与 PDF Scholar 自带助手的对话。',
   'tool.sessionUntitled': '引用',
   'tool.clientOther': '其他工具',
   'tool.refsOne': '1 条引用',

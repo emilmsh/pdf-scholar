@@ -17,11 +17,24 @@
 // pdf-scholar 7 times»), and anything drawn on a call's row is gone with the
 // row. An answer's text stays, and its «[n]» say which references it uses.
 //
-// What it keeps: per session, the references PDF Scholar numbered — the
-// document's path, the page and the quoted words, exactly what the model
-// already sent. Nothing is read from PDF Scholar and nothing leaves; a press
-// calls the same tool on the same server, which is the same session there,
-// so the passage keeps its number and no second card is made.
+// Where a reference comes from — two ways, since the first one failed in the
+// first real session and nothing in the session said why (2026-11-24: the
+// plugin, then named like the server, drew no button against the real tool
+// while it drew them against a stand-in):
+// - as the call is made: a `tool.call` hook notes the reference PDF Scholar
+//   numbered, in the session's state;
+// - from the transcript itself, when an answer cites a number that was never
+//   noted: the session's own record of the call and its answer. This one
+//   needs no hook to have run, and holds for a session resumed later.
+// Either way it is what the model already sent — the document's path, the
+// page and the quoted words. Nothing is read from PDF Scholar and nothing
+// leaves; a press calls the same tool on the same server, which is the same
+// session there, so the passage keeps its number and no second card is made.
+//
+// The plugin is NOT named like the server (`pdf-scholar`): a plugin's own
+// tools live under `mcp__<plugin>__…`, the very names the server's tools
+// have, and the first release under the shared name is the one that drew
+// nothing.
 import { atom, read, update } from 'claude-code'
 import type { Register } from 'claude-code'
 
@@ -40,13 +53,16 @@ const CITED = /\[(\d{1,6})\]/g
 
 // Change the tag when a reference's fields change: it declines what an
 // earlier version stored, which outlives a reload
-const references = atom({ plugin: 'pdf-scholar', key: 'references' } as const, [], {
+const references = atom({ plugin: 'pdf-scholar-buttons', key: 'references' } as const, [], {
   shape: 'references-1',
 })
 
 /** The most kept: a session that cites more than this has long since
  *  scrolled its first answers away */
 const KEEP = 500
+
+/** How far back the transcript is read for a number that was never noted */
+const LOOK_BACK = 400
 
 type Caller = {
   mcp: {
@@ -57,6 +73,17 @@ type Caller = {
     ) => Promise<{ content: unknown[]; isError: boolean }>
   }
   ui: { toast: (text: string) => unknown }
+}
+
+type Transcript = {
+  session: {
+    messages: (range: { last: number }) => Promise<
+      | { deny: string }
+      | readonly {
+          toolUses?: readonly { tool: string; input: Record<string, unknown>; text?: string }[]
+        }[]
+    >
+  }
 }
 
 /** The reference a finished `show_passage` call made, or undefined: the tool
@@ -89,6 +116,30 @@ function referenceOf(
   }
 }
 
+/** The references the session's own record holds: every answered
+ *  `show_passage` call in its last messages, the newest of a number last */
+async function referencesIn($: Transcript): Promise<Reference[]> {
+  const messages = await $.session.messages({ last: LOOK_BACK })
+
+  if ('deny' in messages) {
+    return []
+  }
+
+  const found: Reference[] = []
+
+  for (const message of messages) {
+    for (const use of message.toolUses ?? []) {
+      const made = referenceOf(use.tool, use.input, use.text)
+
+      if (made !== undefined) {
+        found.push(made)
+      }
+    }
+  }
+
+  return found
+}
+
 /** The numbers an answer cites, each once, in the order they first appear */
 function citedIn(text: string): number[] {
   const seen: number[] = []
@@ -104,15 +155,64 @@ function citedIn(text: string): number[] {
   return seen
 }
 
-/** Show the passage in PDF Scholar again; a refusal is said, not swallowed
- *  (the switch was turned off, the document is kept out, the app is closed) */
+/** «s. 6», as PDF Scholar's own source chips read — in the language the
+ *  machine is set to, which is as close as a plugin gets to the reader's.
+ *  English where the language has no entry here, or cannot be asked. */
+function pageLabel(page: number): string {
+  let language = 'en'
+
+  try {
+    language = new Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase().split('-')[0] ?? 'en'
+  } catch {
+    // No Intl here: English
+  }
+
+  if (language === 'zh') {
+    return `第 ${page} 页`
+  }
+
+  const word: Record<string, string> = {
+    nb: 's.',
+    nn: 's.',
+    no: 's.',
+    da: 's.',
+    sv: 's.',
+    fi: 's.',
+    de: 'S.',
+    nl: 'p.',
+    fr: 'p.',
+    es: 'p.',
+    it: 'p.',
+    pt: 'p.',
+    pl: 's.',
+  }
+
+  return `${word[language] ?? 'p.'} ${page}`
+}
+
+/** Show the passage in PDF Scholar again. A press never just does nothing:
+ *  a refusal is said (the switch was turned off, the document is kept out),
+ *  and so is a server that is not there — `$.mcp.call` REJECTS for a tool or
+ *  a server the session does not have, and the first version let that
+ *  rejection fall silent (Emil pressed a button whose server was gone, and
+ *  nothing happened; measured 2026-11-24). */
 async function show($: Caller, reference: Reference): Promise<void> {
-  const result = await $.mcp.call(reference.server, 'show_passage', {
-    path: reference.path,
-    page: reference.page,
-    quote: reference.quote,
-    show: true,
-  })
+  let result: { content: unknown[]; isError: boolean }
+
+  try {
+    result = await $.mcp.call(reference.server, 'show_passage', {
+      path: reference.path,
+      page: reference.page,
+      quote: reference.quote,
+      show: true,
+    })
+  } catch {
+    $.ui.toast(
+      'PDF Scholar is not connected in this session. Start a new session with PDF Scholar’s «Read together» turned on.',
+    )
+
+    return
+  }
 
   if (!result.isError) {
     return
@@ -143,7 +243,7 @@ export const register: Register = on => {
         )
       }
     } catch {
-      // A reference not noted costs a button, never the tool's answer
+      // A reference not noted costs nothing: the transcript still has it
     }
 
     return ran
@@ -157,7 +257,17 @@ export const register: Register = on => {
       return next(e)
     }
 
-    const known = await read($, references)
+    let known: readonly Reference[] = await read($, references)
+
+    // A number nobody noted: the session's own record of the calls
+    if (cited.some(n => !known.some(one => one.n === n))) {
+      try {
+        known = [...(await referencesIn($)), ...known]
+      } catch {
+        // Then only what was noted
+      }
+    }
+
     const mine = cited
       .map(n => known.findLast(one => one.n === n))
       .filter((one): one is Reference => one !== undefined)
@@ -174,13 +284,16 @@ export const register: Register = on => {
         {answer}
         <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
           {mine.map(reference => (
+            // The text as ONE label, never as children: a Button with several
+            // children takes a press only where it lands on their glyphs, and
+            // the padding around «[3] s. 7» — most of so small a button — was
+            // dead (Emil, 2026-11-24: «finicky to hit»)
             <Button
               key={`reference-${reference.n}`}
+              label={`[${reference.n}] ${reference.isFound ? '' : '✗ '}${pageLabel(reference.page)}`}
               dimColor={!reference.isFound}
               onPress={() => show($, reference)}
-            >
-              [{reference.n}] {reference.isFound ? '' : '✗ '}p. {reference.page}
-            </Button>
+            />
           ))}
         </Box>
       </Box>

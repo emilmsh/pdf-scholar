@@ -4,7 +4,7 @@
   "owner": { "name": "Emil Mathias Strøm Halseth" },
   "plugins": [
     {
-      "name": "pdf-scholar",
+      "name": "pdf-scholar-buttons",
       "source": "./claude-plugin",
       "description": "Buttons under Claude's answer that show each cited passage in PDF Scholar"
     }

@@ -187,7 +187,12 @@ const TOOLS: ToolDef[] = [
         quote: { type: 'string', description: 'The passage, word for word as the document has it — one or two sentences' },
         claim: { type: 'string', description: 'What you told the user that this passage supports, in their language — shown beside the page in their list' },
         topic: { type: 'string', description: 'A few words naming what this conversation is about — heads the list in PDF Scholar' },
-        show: { type: 'boolean', description: 'true (default): bring the passage up now. false: only add it to the list.' }
+        show: { type: 'boolean', description: 'true (default): bring the passage up now. false: only add it to the list.' },
+        number: {
+          type: 'number',
+          description:
+            'Leave out. Only for a program that numbers the citations itself, across several sources: the number it has given this one, which PDF Scholar then uses too.'
+        }
       },
       required: ['path', 'page', 'quote']
     }
@@ -219,6 +224,10 @@ export interface McpServerOptions {
   version: string
   /** The tool this process serves — the switch it answers to */
   client: McpClient
+  /** The session this process is part of, when its starter names one
+   *  (sessionFromArgv in shared/mcp.ts); absent, the process is a session
+   *  of its own */
+  session?: string | undefined
   /** Whether paths compare without case (Windows and macOS); the platform's
    *  by default — injected so a test can check both */
   foldCase?: boolean
@@ -277,8 +286,13 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
   // ---------- «Les sammen»: the running app (shared/tool-bridge.ts) ----------
 
   /** This process is one session of the tool: what it points at is kept
-   *  under this id in the app */
-  const session: BridgeSessionInfo = { id: randomBytes(8).toString('hex'), client: opts.client, startedAt: Date.now() }
+   *  under this id in the app. A starter that runs the script once per call
+   *  names the session instead, and its calls are one list there. */
+  const session: BridgeSessionInfo = {
+    id: opts.session ?? randomBytes(8).toString('hex'),
+    client: opts.client,
+    startedAt: Date.now()
+  }
   const pipe = bridgePipePath(opts.dataDir, opts.platform ?? process.platform)
   let started = false
 
@@ -356,6 +370,9 @@ export function createMcpServer(opts: McpServerOptions): McpServer {
         quote,
         ...(typeof args.claim === 'string' && args.claim.trim() ? { claim: args.claim } : {}),
         ...(typeof args.topic === 'string' && args.topic.trim() ? { topic: args.topic } : {}),
+        // The caller's own number for this citation; the app decides
+        // whether it can stand (sanitizeBridgeRequest, cite)
+        ...(typeof args.number === 'number' ? { n: args.number } : {}),
         show
       },
       75_000

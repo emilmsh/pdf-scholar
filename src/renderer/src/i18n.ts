@@ -487,8 +487,10 @@ const nb = {
   'mcp.liveSub': 'Vis passasjer, les dokumentets tekst, se hva du har åpent',
   'mcp.liveNeedsTool': 'Slå på et verktøy først',
   'mcp.liveNote':
-    'Verktøyene du har slått på, kan da vise en passasje i PDF Scholar, lese teksten i et dokument og se hvilket dokument, hvilken side og hvilken markering du har foran deg. Teksten og hele filstien går da til verktøyets KI-leverandør. Det de viser og leser, står under «Fra KI-verktøy» i assistentens historikk. Passordbeskyttede og utelatte dokumenter er unntatt.',
-  'tool.sessionsHeading': 'Fra KI-verktøy',
+    'Verktøyene du har slått på, kan da vise en passasje i PDF Scholar, lese teksten i et dokument og se hvilket dokument, hvilken side og hvilken markering du har foran deg. Teksten og hele filstien går da til verktøyets KI-leverandør. Det de viser og leser, står under «Henvisninger fra KI-verktøy» i assistentens historikk. Passordbeskyttede og utelatte dokumenter er unntatt.',
+  'tool.sessionsHeading': 'Henvisninger fra KI-verktøy',
+  'tool.sessionsTip':
+    'Passasjer som Claude Code, Codex eller et annet KI-verktøy har pekt på i dokumentene dine, med «Les sammen» slått på. Dette er ikke samtaler med PDF Scholars egen assistent.',
   'tool.sessionUntitled': 'Henvisninger',
   'tool.clientOther': 'Annet verktøy',
   'tool.refsOne': '1 henvisning',
@@ -1826,8 +1828,10 @@ const en: Dict = {
   'mcp.liveSub': 'Show passages, read a document’s text, see what you have open',
   'mcp.liveNeedsTool': 'Turn a tool on first',
   'mcp.liveNote':
-    'The tools you have turned on can then show a passage in PDF Scholar, read a document’s text, and see which document, page and selection you have in front of you. The text and the full file path then go to that tool’s AI provider. What they show and read is listed under “From AI tools” in the assistant’s history. Password-protected documents and ones kept out are excepted.',
-  'tool.sessionsHeading': 'From AI tools',
+    'The tools you have turned on can then show a passage in PDF Scholar, read a document’s text, and see which document, page and selection you have in front of you. The text and the full file path then go to that tool’s AI provider. What they show and read is listed under “References from AI tools” in the assistant’s history. Password-protected documents and ones kept out are excepted.',
+  'tool.sessionsHeading': 'References from AI tools',
+  'tool.sessionsTip':
+    'Passages that Claude Code, Codex or another AI tool has pointed at in your documents, with “Read together” on. These are not conversations with PDF Scholar’s own assistant.',
   'tool.sessionUntitled': 'References',
   'tool.clientOther': 'Another tool',
   'tool.refsOne': '1 reference',

@@ -554,7 +554,7 @@ that.)*
   Windows only, so claim «shows you the passage», never «switches to PDF
   Scholar». The plugin is Claude Code only — Codex has none, and gets the numbers and
   the list — and it installs from this repository
-  (`/plugin install pdf-scholar --marketplace emilmsh/pdf-scholar`), so it
+  (`/plugin install pdf-scholar-buttons --marketplace emilmsh/pdf-scholar`), so it
   ships WITH the app: name it wherever the feature is (Emil, 2026-11-24).
   Not in the README or any listing yet: when it is claimed is Emil's call,
   with a release.)*

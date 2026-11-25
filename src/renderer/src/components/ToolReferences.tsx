@@ -64,9 +64,13 @@ export function ToolSessionRows({
 
   return (
     <div className="tool-sessions">
-      <div className="ai-history-heading">{t('tool.sessionsHeading')}</div>
+      {/* Says what it is, and on hover what it is NOT: a reader looking for
+          their own conversations should not have to wonder (Emil, 2026-11-24) */}
+      <div className="ai-history-heading" title={t('tool.sessionsTip')}>
+        {t('tool.sessionsHeading')}
+      </div>
       {listed.map((s) => (
-        <div key={s.id} className="ai-history-item" onClick={() => onOpen(s.id)}>
+        <div key={s.id} className="ai-history-item" title={t('tool.sessionsTip')} onClick={() => onOpen(s.id)}>
           <span className="ai-history-title">{s.title || t('tool.sessionUntitled')}</span>
           <span className="ai-history-meta">
             {clientName(s.client)} · {day(s.updatedAt)} · {refCount(s.references)}

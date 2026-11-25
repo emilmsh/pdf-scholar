@@ -142,7 +142,7 @@ What it adds, on top of the notes:
 
 - **Every reference is numbered and kept.** The tool writes the reference's
   number after its claim, like `[3]`, and the same number is on the card in
-  PDF Scholar. The assistant panel's history has a **From AI tools** heading
+  PDF Scholar. The assistant panel's history has a **References from AI tools** heading
   with one list per session of the tool. Each reference is its number, the
   claim, the quoted words and the page as a chip: press it to go to the
   passage again, in whatever order you like. Showing the same passage again
@@ -167,22 +167,40 @@ What it adds, on top of the notes:
 ### Buttons in Claude Code
 
 With PDF Scholar's plugin for Claude Code, every `[3]` in an answer gets a
-button under the answer: `[3] p. 7`. Press it and PDF Scholar shows that
+button under the answer: `[3] p. 7` (`[3] s. 7` on a Norwegian machine). Press it and PDF Scholar shows that
 passage. The buttons stay under the answer, so the claim and its source are in
 the window the discussion is in.
 
 In a Claude Code terminal session:
 
 ```
-/plugin install pdf-scholar --marketplace emilmsh/pdf-scholar
+/plugin install pdf-scholar-buttons --marketplace emilmsh/pdf-scholar
 ```
 
 In the desktop app: **+** next to the prompt box, then **Plugins**, **Add
-marketplace** with `emilmsh/pdf-scholar`, then **Add plugin**. It is optional:
+marketplace** with `emilmsh/pdf-scholar`, then **Add plugin** for `pdf-scholar-buttons`. It is optional:
 without it Claude still writes the numbers, and you find the card in PDF
 Scholar's list yourself. What it does and keeps is in
 [its own README](../claude-plugin/README.md). Codex has no such plugin; the
 numbers and the list work there all the same.
+
+### For a program that keeps its own list of sources
+
+A program other than the AI tool itself can speak to the server too: a plugin
+that lists sources from several programs, say, with a Word file as `[1]` and a
+PDF as `[7]`. Two things let its list and PDF Scholar's read the same:
+
+- **`number` on `show_passage`**: the number the program has given the
+  citation. The card in PDF Scholar gets that number, unless another reference
+  in the session already has it. The answer always opens with the number the
+  card got. An AI tool calling the server directly leaves it out.
+- **`--session <id>` when starting the server**: a program that starts the
+  script once per call would otherwise make a new list in PDF Scholar for
+  every call. With the same id, 8 to 64 lowercase hex characters, its calls
+  are one session there.
+
+Nothing else changes: the same switches decide, and the program is answered
+as the tool its `--client` names.
 
 ## What a tool can read
 
