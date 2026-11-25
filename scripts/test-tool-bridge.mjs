@@ -69,6 +69,9 @@ console.log('\n2. a request off the pipe is untrusted input')
   const ok = T.sanitizeBridgeEnvelope(envelope({ op: 'cite', path: ' C:\\p\\a.pdf ', page: 6.9, quote: '  some words  ', claim: 'x', topic: 't', show: 'yes' }))
   check('a citation: path trimmed, page whole, show on unless exactly false', ok?.request.path === 'C:\\p\\a.pdf' && ok.request.page === 6 && ok.request.quote === 'some words' && ok.request.show === true)
   check('show: false is only listed', T.sanitizeBridgeRequest({ op: 'cite', path: '/a.pdf', page: 1, quote: 'q', show: false }).show === false)
+  const numbered = (n) => T.sanitizeBridgeRequest({ op: 'cite', path: '/a.pdf', page: 1, quote: 'q', n })
+  check('a caller’s own number: a whole one from 1 is kept, anything else is no number at all', numbered(7).n === 7 && [0, -3, 2.5, '7', 2_000_000, null, undefined].every((n) => !('n' in numbered(n))))
+  check('a session named by the server’s starter: the pipe’s own form of id, anything else no name', M.sessionFromArgv(['node', 'x.cjs', '--client', 'claude', '--session', 'abcdef0123456789']) === 'abcdef0123456789' && [['--session'], ['--session', 'ABCDEF0123456789'], ['--session', 'abc'], ['--session', '../../state'], ['--session', 'a'.repeat(65)], []].every((argv) => M.sessionFromArgv(argv) === undefined))
   check('no quote, no page, no path → not a request', [{ op: 'cite', path: '/a.pdf', page: 1, quote: ' ' }, { op: 'cite', path: '/a.pdf', page: 0, quote: 'q' }, { op: 'cite', path: '', page: 1, quote: 'q' }, { op: 'cite', path: 7, page: 1, quote: 'q' }].every((r) => T.sanitizeBridgeRequest(r) === null))
   const long = T.sanitizeBridgeRequest({ op: 'cite', path: '/a.pdf', page: 1, quote: 'q'.repeat(9000), claim: 'c'.repeat(9000), topic: 't'.repeat(900) })
   check('a runaway quote, claim and topic are cut to their caps', long.quote.length === T.MAX_QUOTE && long.claim.length === T.MAX_CLAIM && long.topic.length === T.MAX_TOPIC)
@@ -261,6 +264,22 @@ console.log('\n6b. the same passage again')
   const shown = await w.ask({ op: 'cite', path: W('C:/papers/card.pdf'), page: 2, quote: QUOTE, show: true })
   check('shown again («vis meg [1]»): its number, the window brought up, the panel told — still two cards', shown.n === 1 && shown.shown && w.raised() === 1 && w.changes.at(-1).shown === true && (await w.store.get(SESSION.id)).entries.length === 2)
 }
+{
+  // A caller that numbers its citations itself, across several programs of
+  // which this app is one: a Word file is its [1]–[6], this PDF its [7]
+  const w = world()
+  const card = W('C:/papers/card.pdf')
+  const seven = await w.ask({ op: 'cite', path: card, page: 2, quote: 'We find no such effect in fast food.', n: 7, show: false })
+  check('the caller’s own number is the card’s number', seven.n === 7 && (await w.store.get(SESSION.id)).entries[0].n === 7)
+  const again = await w.ask({ op: 'cite', path: card, page: 2, quote: 'We find no such effect in fast food.', n: 9, show: false })
+  check('the same words again keep the number they have, whatever the caller now says', again.n === 7 && (await w.store.get(SESSION.id)).entries.length === 1)
+  const taken = await w.ask({ op: 'cite', path: card, page: 3, quote: 'The result survives every specification we tried.', n: 7, show: false })
+  check('a number another reference has is not given twice: the next one, and the answer says which', taken.n === 8)
+  const own = await w.ask({ op: 'cite', path: card, page: 2, quote: 'The dominant view holds that employment falls.', show: false })
+  check('…and one cited with no number goes on after the highest', own.n === 9)
+  const low = await w.ask({ op: 'cite', path: card, page: 1, quote: 'We study the effect of a rise in the minimum wage.', n: 2, show: false })
+  check('a free number below the highest is the caller’s to give', low.n === 2 && new Set((await w.store.get(SESSION.id)).entries.map((e) => e.n)).size === 4)
+}
 
 console.log('\n7. a document no tab holds')
 {
@@ -426,6 +445,22 @@ console.log('\n10. the server’s tools, over the pipe')
   })
   const res = await server2.handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_reading_context', arguments: {} } })
   check('an app that was not running is started, waited for, and then asked', res.result.isError !== true && /card\.pdf/.test(res.result.content[0].text))
+
+  // A caller that starts the script once per CALL (a plugin speaking to the
+  // app without the tool's own connection): two processes, one named session
+  const NAMED = 'feedfacefeedface'
+  const one = (name, args) =>
+    createMcpServer({ dataDir: serverData, version: '9.9.9', client: 'claude', session: NAMED, foldCase: true, startApp: () => false, startWaitMs: 800 }).handle({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: { name, arguments: args }
+    })
+  const p1 = await one('show_passage', { path: W('C:/papers/card.pdf'), page: 2, quote: 'We find no such effect in fast food.', number: 3, show: false })
+  const p2 = await one('show_passage', { path: W('C:/papers/card.pdf'), page: 3, quote: 'The result survives every specification we tried.', number: 5, show: false })
+  const named = await w.store.get(NAMED)
+  check('two server processes started for one named session keep ONE list', named?.entries.length === 2 && (await w.store.all()).filter((s) => s.id === NAMED).length === 1)
+  check('…and each answer opens with the number the caller gave', /^\[3\] Found word for word/.test(p1.result.content[0].text) && /^\[5\] Found word for word/.test(p2.result.content[0].text), `${p1.result.content[0].text.slice(0, 12)} / ${p2.result.content[0].text.slice(0, 12)}`)
   if (listening3) await new Promise((done) => listening3.close(done))
 }
 

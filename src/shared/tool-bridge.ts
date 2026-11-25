@@ -73,8 +73,13 @@ export interface BridgeSessionInfo {
 
 export type BridgeRequest =
   | { op: 'ping' }
-  /** A claim's passage: kept in the session's list, and shown now when asked */
-  | { op: 'cite'; path: string; page: number; quote: string; claim?: string; topic?: string; show: boolean }
+  /** A claim's passage: kept in the session's list, and shown now when asked.
+   *  `n` is the number the CALLER has given the citation — a program that
+   *  numbers its citations itself, across several sources of which this app
+   *  holds some (a plugin with a Word file as [1] and a PDF as [2]): the
+   *  card then carries that number, so it reads the same in both places.
+   *  Absent, the app numbers it. */
+  | { op: 'cite'; path: string; page: number; quote: string; claim?: string; topic?: string; n?: number; show: boolean }
   /** A document's text as the app sees it, page by page */
   | { op: 'read'; path: string; from: number; to: number }
   /** What the reader has in front of them */
@@ -102,6 +107,10 @@ const pathOf = (v: unknown): string | null =>
 const pageOf = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= MAX_PAGE ? Math.floor(v) : null
 
+/** A reference's number: a whole one from 1, bounded; anything else is 0 = none */
+const numberOf = (v: unknown): number =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 1_000_000 ? v : 0
+
 const CLIENTS: ReadonlySet<string> = new Set(['claude', 'codex', 'other'])
 
 function sessionOf(v: unknown): BridgeSessionInfo | null {
@@ -123,7 +132,17 @@ export function sanitizeBridgeRequest(v: unknown): BridgeRequest | null {
     if (!page || !quote) return null
     const claim = tidy(v.claim, MAX_CLAIM)
     const topic = tidy(v.topic, MAX_TOPIC)
-    return { op: 'cite', path, page, quote, ...(claim ? { claim } : {}), ...(topic ? { topic } : {}), show: v.show !== false }
+    const n = numberOf(v.n)
+    return {
+      op: 'cite',
+      path,
+      page,
+      quote,
+      ...(claim ? { claim } : {}),
+      ...(topic ? { topic } : {}),
+      ...(n ? { n } : {}),
+      show: v.show !== false
+    }
   }
   if (v.op === 'read') {
     const from = pageOf(v.from) ?? 1
@@ -305,7 +324,7 @@ function entryOf(v: unknown): ToolEntry | null {
       id,
       at,
       // 0 = none stored: sanitizeToolSession numbers it
-      n: typeof v.n === 'number' && Number.isInteger(v.n) && v.n >= 1 && v.n <= 1_000_000 ? v.n : 0,
+      n: numberOf(v.n),
       docPath,
       docName,
       page,

@@ -217,18 +217,24 @@ export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise
     // The same words in the same document again — the reader asked to see a
     // reference once more, or the tool repeated itself: the card it has, and
     // its number, not a second one
-    const have = sameReference(await deps.store.get(env.session.id), path, req.quote)
+    const stored = await deps.store.get(env.session.id)
+    const have = sameReference(stored, path, req.quote)
     let entry: Extract<ToolEntry, { kind: 'reference' }>
     let session: ToolSession
     if (have) {
       entry = have
-      session = (await deps.store.get(env.session.id)) as ToolSession
+      session = stored as ToolSession
     } else {
+      // A caller that numbers its citations itself has its number kept, so
+      // the card reads as the caller's own list does — unless another
+      // reference here already carries it: then the store gives the next
+      // one, and the answer tells the caller which it became
+      const isFree = !stored?.entries.some((e) => e.kind === 'reference' && e.n === req.n)
       const made: ToolEntry = {
         kind: 'reference',
         id: deps.newId(),
         at: deps.now(),
-        n: 0,
+        n: req.n && isFree ? req.n : 0,
         docPath: path,
         docName: docNameFromPath(path),
         page: answer.page,
