@@ -1644,6 +1644,15 @@ export default function PdfViewer({
   }, [])
   const [aiSeed, setAiSeed] = useState<AiSeed | null>(null)
   const [aiQuick, setAiQuick] = useState<AiQuickState | null>(null)
+  /** Where the open bubble's answer goes if it is kept as a comment (issue
+   *  #137): the selection it was asked about, captured before the selection was
+   *  cleared, or a note's place beside a snipped figure. Set with every
+   *  setAiQuick that opens a bubble. */
+  const aiQuickTargetRef = useRef<
+    | { kind: 'marks'; perPage: { pageNumber: number; rects: PageRect[]; doc: DocId }[] }
+    | { kind: 'note'; pageNumber: number; anchor: PageRect; doc: DocId }
+    | null
+  >(null)
   /** Snip-to-explain: armed from toolbar/menu ('quick' → popover) or from
    *  the chat composer ('chat' → the region lands as a chat attachment) */
   const [snip, setSnip] = useState<null | { target: 'quick' | 'chat' }>(null)
@@ -4785,6 +4794,7 @@ export default function PdfViewer({
           }
           const { x, y, pageNumber } = menu
           const mode = action.mode
+          const perPage = collectSelectionRects()
           setMenu(null)
           window.getSelection()?.removeAllRanges()
           // Fetch the page text (context) before opening the popover
@@ -4801,6 +4811,7 @@ export default function PdfViewer({
             } catch {
               /* context is best-effort */
             }
+            aiQuickTargetRef.current = perPage.length ? { kind: 'marks', perPage } : null
             setAiQuick({ x, y, mode, selection: selText, pageNumber, pageContext, docPath: payload.path })
           })()
           break
@@ -4822,6 +4833,7 @@ export default function PdfViewer({
           }
           const { x, y, pageNumber } = menu
           const mode = action.kind
+          const perPage = collectSelectionRects()
           setMenu(null)
           window.getSelection()?.removeAllRanges()
           // Attach the whole document so the model can draw on the full paper
@@ -4846,6 +4858,7 @@ export default function PdfViewer({
             } catch {
               /* context is best-effort */
             }
+            aiQuickTargetRef.current = perPage.length ? { kind: 'marks', perPage } : null
             setAiQuick({
               x,
               y,
@@ -4935,6 +4948,23 @@ export default function PdfViewer({
           } catch {
             /* context is best-effort */
           }
+          // A note's place if the answer is kept: the snip's top right corner,
+          // in PAGE space (the box was drawn in the column's rotated frame)
+          const noteDoc = docOf(paneOfEl(pageEl))
+          const noteSize = (noteDoc === 'split' ? sessionBRef.current?.sizes : sizesRef.current)?.[
+            pageNumber - 1
+          ]
+          const noteRot = rotationOfPageElRef.current(pageEl)
+          const noteView = { x: Math.max(0, (cx + cw) / cur - 20), y: cy / cur, w: 20, h: 20 }
+          aiQuickTargetRef.current = {
+            kind: 'note',
+            pageNumber,
+            doc: noteDoc,
+            anchor:
+              noteSize && noteRot !== 0
+                ? viewRectToPage(noteView, noteSize.w, noteSize.h, noteRot)
+                : noteView
+          }
           setAiQuick({
             x: snipRect.x,
             y: snipRect.y + snipRect.h,
@@ -4950,7 +4980,28 @@ export default function PdfViewer({
         }
       })()
     },
-    [pdf, snip]
+    [pdf, snip, docOf]
+  )
+
+  /** «Lagre som kommentar» in the selection bubble (issue #137): the passage
+   *  the question was about becomes a highlight carrying the answer (the same
+   *  mark «Kommenter» makes, comment on the last page's), and a snipped
+   *  figure's answer a note beside it. One undo step each, like any mark. */
+  const saveAiComment = useCallback(
+    (text: string) => {
+      const target = aiQuickTargetRef.current
+      if (!target || !text) return
+      if (target.kind === 'note') {
+        void persistAnnotation(target.pageNumber, 'note', [target.anchor], NOTE_COLOR, 1, text, undefined, target.doc)
+        return
+      }
+      const { color, opacity } = prefsRef.current.markup.highlight
+      target.perPage.forEach(({ pageNumber, rects, doc }, i) => {
+        const last = i === target.perPage.length - 1
+        void persistAnnotation(pageNumber, 'highlight', rects, color, opacity, last ? text : undefined, undefined, doc)
+      })
+    },
+    [persistAnnotation]
   )
 
   /** Whole pages as images for the assistant to READ (scanned documents) —
@@ -8597,6 +8648,7 @@ export default function PdfViewer({
             setAiQuick(null)
             setAiPinned(true)
           }}
+          onSaveComment={aiQuickTargetRef.current ? saveAiComment : undefined}
           onCitation={(c) => {
             const pages = pageTextsRef.current
             if (!pages) return

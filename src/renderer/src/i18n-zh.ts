@@ -976,6 +976,10 @@ export const zh: Dict = {
   'ai.keyStorePlain':
     ' 密钥正以未加密形式存放在磁盘上（由旧版本存储）。请重新输入以将其移入安全存储。',
   'ai.sendToChat': '发送到对话',
+  'ai.saveAsComment': '保存为批注',
+  'ai.saveAsCommentTip': '高亮所选文字，并把回答写入其批注',
+  'ai.saveAsNoteTip': '把回答写入截图旁的便签',
+  'ai.commentSaved': '已保存',
   'ai.summaryBtn': '结构化摘要',
   'ai.summaryTip': '带来源引用的结构化文章摘要',
   'ai.annotsBtn': '总结我的批注',

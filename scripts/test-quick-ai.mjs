@@ -154,6 +154,52 @@ try {
   ok(!answered.note && !answered.thinking, 'counter and note disappear once the answer is there')
   ok(!answered.leaked, 'and the reasoning never appeared, start to finish')
 
+  // «Lagre som kommentar» (issue #137): the bubble is gone at the first Esc or
+  // click outside, so the answer can be kept ON the passage it was asked about —
+  // a highlight over the selection with the answer as its comment. The button
+  // is the first in the action row (asserted by position, like the chip).
+  const saved = await evaluate(
+    send,
+    `
+    const marks = () => document.querySelectorAll('.annot-highlights > *').length
+    const before = marks()
+    const btn = bubble().querySelector('.ai-quick-actions button')
+    const label = btn.textContent.trim()
+    for (let i = 0; i < 100 && btn.disabled; i++) await sleep(100)
+    const enabled = !btn.disabled
+    btn.click()
+    for (let i = 0; i < 40 && marks() === before; i++) await sleep(100)
+    const again = bubble().querySelector('.ai-quick-actions button')
+    const r = [...document.querySelectorAll('.annot-highlights > *')].at(-1)?.getBoundingClientRect()
+    return {
+      label, enabled, before, after: marks(),
+      spent: again.disabled, bubbleOpen: !!bubble(),
+      at: r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null
+    }
+  `,
+    PRELUDE
+  )
+  ok(saved.enabled, `the finished answer can be kept ("${saved.label}")`)
+  ok(saved.after === saved.before + 1, `the selection is highlighted (${saved.before} → ${saved.after} marks)`)
+  ok(saved.spent && saved.bubbleOpen, 'the bubble stays open and the button cannot make a second comment')
+
+  // The comment is the answer: close the bubble and open the mark with a real click
+  await evaluate(send, `Array.from(bubble().querySelectorAll('.ai-quick-actions button')).at(-1).click(); await sleep(200)`, PRELUDE)
+  if (saved.at) {
+    for (const type of ['mousePressed', 'mouseReleased'])
+      await send('Input.dispatchMouseEvent', { type, x: saved.at.x, y: saved.at.y, button: 'left', clickCount: 1 })
+  }
+  const comment = await evaluate(
+    send,
+    `
+    for (let i = 0; i < 40 && !document.querySelector('.annot-popover-text'); i++) await sleep(100)
+    return document.querySelector('.annot-popover-text')?.value ?? null
+  `,
+    PRELUDE
+  )
+  ok(comment !== null && /Kort svar til slutt/.test(comment), `the mark carries the answer as its comment (got "${comment}")`)
+  ok(comment !== null && !/INTERNAL-THOUGHT/.test(comment), 'and none of the reasoning')
+
   console.log(failures === 0 ? '\ntest-quick-ai: all checks passed' : `\ntest-quick-ai: ${failures} check(s) FAILED`)
   process.exitCode = failures === 0 ? 0 : 1
 } catch (err) {

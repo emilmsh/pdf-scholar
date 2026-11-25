@@ -1094,6 +1094,10 @@ const nb = {
   'ai.keyStorePlain':
     ' Nøkkelen ligger ukryptert på disken (lagret av en eldre versjon). Legg den inn på nytt for å flytte den til trygg lagring.',
   'ai.sendToChat': 'Send til chat',
+  'ai.saveAsComment': 'Lagre som kommentar',
+  'ai.saveAsCommentTip': 'Markerer utvalget og legger svaret i kommentaren',
+  'ai.saveAsNoteTip': 'Legger svaret i et notat ved utsnittet',
+  'ai.commentSaved': 'Lagret',
   'ai.summaryBtn': 'Strukturert sammendrag',
   'ai.summaryTip': 'Strukturert artikkelsammendrag med kildehenvisninger',
   'ai.annotsBtn': 'Oppsummer merknadene mine',
@@ -2392,6 +2396,10 @@ const en: Dict = {
   'ai.keyStorePlain':
     ' The key is sitting unencrypted on disk (stored by an older version). Enter it again to move it into safe storage.',
   'ai.sendToChat': 'Send to chat',
+  'ai.saveAsComment': 'Save as comment',
+  'ai.saveAsCommentTip': 'Highlights the selection and puts the answer in its comment',
+  'ai.saveAsNoteTip': 'Puts the answer in a note beside the snip',
+  'ai.commentSaved': 'Saved',
   'ai.summaryBtn': 'Structured summary',
   'ai.summaryTip': 'Structured article summary with source references',
   'ai.annotsBtn': 'Summarize my annotations',

@@ -7769,6 +7769,9 @@ button.bookmark-fold:hover {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  /* three buttons and the token count do not fit one 360 px row in every
+     language: the count takes a row of its own before a button is cut */
+  flex-wrap: wrap;
   flex-shrink: 0;
   gap: 8px;
   padding: 9px 13px;
