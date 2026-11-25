@@ -400,9 +400,14 @@ export function withToolEntry(
   topic?: string
 ): ToolSession {
   const base: ToolSession = session ?? { ...info, title: '', updatedAt: entry.at, entries: [] }
-  // The next number after the highest ever given here — not the count, which
-  // would hand an old number out again once the list has dropped its oldest
-  if (entry.kind === 'reference' && !(entry.n >= 1)) {
+  // A number the entry brings (a caller that numbers its citations itself)
+  // stands unless a reference here already carries it. Otherwise the next
+  // number after the highest ever given here — not the count, which would
+  // hand an old number out again once the list has dropped its oldest.
+  // Decided here, inside the store's queue, so two at once cannot both keep
+  // the same number.
+  const taken = (n: number): boolean => base.entries.some((e) => e.kind === 'reference' && e.n === n)
+  if (entry.kind === 'reference' && (!(entry.n >= 1) || taken(entry.n))) {
     entry = { ...entry, n: topNumber(base.entries) + 1 }
   }
   return {

@@ -234,13 +234,12 @@ export function createBridgeHandler(deps: BridgeDeps): (line: string) => Promise
       // A caller that numbers its citations itself has its number kept, so
       // the card reads as the caller's own list does — unless another
       // reference here already carries it: then the store gives the next
-      // one, and the answer tells the caller which it became
-      const isFree = !stored?.entries.some((e) => e.kind === 'reference' && e.n === req.n)
+      // one (withToolEntry), and the answer tells the caller which it became
       const made: ToolReference = {
         kind: 'reference',
         id: deps.newId(),
         at: deps.now(),
-        n: req.n && isFree ? req.n : 0,
+        n: req.n ?? 0,
         docPath: path,
         docName: docNameFromPath(path),
         page: answer.page,
