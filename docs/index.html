@@ -330,6 +330,18 @@
     background: var(--accent);
   }
 
+  /* A neighbouring project named beside a section's text: a tile with the
+     project's own icon, under the section's paragraph. One so far — the
+     «Show your work» plugin under the AI tools. */
+  section.feature .body a.plugin { display: flex; gap: 16px; align-items: flex-start; margin-top: 26px; }
+  .plugin img { width: 44px; height: 44px; flex: none; margin-top: 2px; }
+  .plugin .kicker { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 1px; }
+  .plugin h3 { margin-bottom: 4px; }
+  section.feature .body .plugin p { margin-bottom: 0; }
+  /* How a citation reads in Claude's answer: the place in the source, as a link. */
+  .plugin .cite { color: var(--accent); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 2px; }
+  section.feature .body .plugin p.fine { margin-top: 7px; font-size: 13.5px; }
+
   /* ---------- privacy and downloads ---------- */
 
   section.cards { margin-top: 72px; padding: 44px 0 0; border-top: 1px solid var(--border); }
@@ -675,11 +687,23 @@
         across every paper: highlights with the words they mark, comments, and your
         assistant conversations.
       </p>
+      <!-- A project of its own, so it gets a box of its own rather than a
+           clause in a point (Emil, 2026-11-25). Never without «Windows only
+           for now» (MESSAGING.md). -->
+      <a class="tile plugin" href="https://github.com/emilmsh/show-your-work">
+        <img src="web/show-your-work.svg" alt="" width="44" height="44">
+        <span>
+          <span class="kicker">A separate plugin for Claude Code</span>
+          <h3>Show your work</h3>
+          <p>Every source Claude cites becomes a link in its answer, like <span class="cite">p. 6</span>. Press it and PDF Scholar opens the paper at the cited words. Word, Excel and PowerPoint files open the same way, in their own programs.</p>
+          <p class="fine">Needs “Read together” for PDFs. Windows only for now.</p>
+        </span>
+      </a>
     </div>
     <ul class="points">
       <li>The MCP server is part of the app. Claude and Codex each have a switch under “AI tools” in the settings menu; other tools that support MCP take one config entry, which the app copies for you. <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/MCP.md">How to set it up</a>.</li>
       <li>Every switch is off until you turn it on. A document or a whole folder can be kept out, and a tool never sees the PDFs, images, file paths or anything from a password-protected document.</li>
-      <li>The one exception is “Read together”, a switch of its own: with it on, Claude or Codex can show you the passage a claim rests on. PDF Scholar opens the document, goes to the page and marks the quoted words, and tells the tool whether those words really are there. A document's own text and its file path then go to the tool. In Claude Code, the separate plugin <a href="https://github.com/emilmsh/show-your-work">Show your work</a> makes each source Claude cites a link in its answer that opens the passage (Windows only for now).</li>
+      <li>The one exception is “Read together”, a switch of its own: with it on, Claude or Codex can show you the passage a claim rests on. PDF Scholar opens the document, goes to the page and marks the quoted words, and tells the tool whether those words really are there. A document's own text and its file path then go to the tool.</li>
       <li>For a tool that cannot connect, “Copy for AI” copies one document's notes and conversations as text to paste. This also works in the browser extension.</li>
     </ul>
   </section>

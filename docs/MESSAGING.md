@@ -562,7 +562,11 @@ that.)*
   thing to install, and never without «Windows only for now» (Emil, 2026-11-25).
   In the README and on the landing page since 0.88.0 (Emil, 2026-11-25), as
   one point under «Your notes in Claude, Codex and other AI tools», with the
-  plugin as a hint beside it. Not in the store listings yet.)*
+  plugin as a hint beside it. On the landing page the plugin has a box of its
+  own under that section's paragraph (its icon, «A separate plugin for Claude
+  Code», two sentences, «Windows only for now»), linking to its repository,
+  and the point no longer names it (Emil, 2026-11-25). Not in the store
+  listings yet.)*
 - The assistant can open in its own window, so the document keeps the whole
   screen; a citation click still goes to the passage in the window showing the
   document. *(The extension opens a separate tab instead — say "window" only
