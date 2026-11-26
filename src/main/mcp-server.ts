@@ -250,7 +250,7 @@ const BRIDGE_ERRORS: Record<BridgeErrorCode, string> = {
   'bridge-off':
     'PDF Scholar is not reading together with AI tools: «Read together» is off (settings menu → AI tools). The user can turn it on there.',
   'client-off':
-    'PDF Scholar is not sharing with this tool: its switch is off in PDF Scholar (Settings → AI tools on this computer). The user can turn it on there.',
+    'PDF Scholar is not sharing with this tool: its switch is off in PDF Scholar (settings menu → AI tools). The user can turn it on there.',
   'bad-request': 'PDF Scholar could not read the request.',
   'bad-token': 'PDF Scholar refused the request. Restarting PDF Scholar puts it right.',
   'kept-out': 'The user keeps this document out of AI tools.',

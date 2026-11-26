@@ -456,10 +456,10 @@ const nb = {
   'iconerr.file-icon-registry': 'Windows avviste endringen av filikonet.',
   // AI tools on this machine (MCP, shared/mcp.ts) — the settings menu's own
   // dialog (AiToolsDialog.tsx), and the Merknader tab's line and «Kopier for KI»
-  'mcp.title': 'KI-verktøy på maskinen',
+  'mcp.title': 'Kompatible KI-verktøy',
   'mcp.menu': 'KI-verktøy (Claude, Codex …)',
   'mcp.intro':
-    'Slå på et verktøy, så kan det søke i markeringene, kommentarene og KI-samtalene dine når du spør det om noe. Det leser ikke selve PDF-ene, med mindre du slår på «Les sammen» under. Det verktøyet leser, går til leverandøren det bruker.',
+    'KI-programmer du bruker ved siden av PDF Scholar, som Claude og Codex, kan kobles hit over MCP. Slå på et verktøy, så kan det søke i markeringene, kommentarene og KI-samtalene dine når du spør det om noe. Det leser ikke selve PDF-ene, med mindre du slår på «Les sammen» under. Det verktøyet leser, går til leverandøren det bruker. Assistenten i PDF Scholar stilles ikke inn her.',
   'mcp.tools': 'Verktøy',
   'mcp.claudeBoth': 'Claude Code og Claude Desktop',
   'mcp.codexSub': 'Codex-CLI-en, og Codex (ikke chat) i ChatGPT-appen',
@@ -1806,10 +1806,10 @@ const en: Dict = {
   'iconerr.file-icon-not-square': 'The image must be square — as wide as it is tall.',
   'iconerr.file-icon-too-small': 'The image must be at least 48 × 48 px; 256 × 256 is recommended.',
   'iconerr.file-icon-registry': 'Windows refused the file icon change.',
-  'mcp.title': 'AI tools on this computer',
+  'mcp.title': 'Compatible AI tools',
   'mcp.menu': 'AI tools (Claude, Codex …)',
   'mcp.intro':
-    'Turn a tool on and it can search your highlights, comments and AI conversations when you ask it something. It does not read the PDFs themselves unless you turn on “Read together” below. What the tool reads goes to the provider it uses.',
+    'AI programs you use alongside PDF Scholar, such as Claude and Codex, can connect here over MCP. Turn a tool on and it can search your highlights, comments and AI conversations when you ask it something. It does not read the PDFs themselves unless you turn on “Read together” below. What the tool reads goes to the provider it uses. PDF Scholar’s own assistant is not set up here.',
   'mcp.tools': 'Tools',
   'mcp.claudeBoth': 'Claude Code and Claude Desktop',
   'mcp.codexSub': 'The Codex CLI, and Codex (not chat) in the ChatGPT app',

@@ -121,7 +121,7 @@ interface Props {
    *  mcp.ts): by itself, by its folder, or not. undefined = no line — not
    *  the desktop, or no tool may read. */
   aiToolsKeptOut?: 'doc' | 'folder' | null | undefined
-  /** Open «KI-verktøy på maskinen» on this document */
+  /** Open «Kompatible KI-verktøy» on this document */
   onChangeAiTools?: (() => void) | undefined
   /** Open the AI panel with the "summarize my annotations" question */
   onAskAi(): void
@@ -682,7 +682,7 @@ function AnnotationList({
   onExport(format: ExportFormat): void
   onCopyForAi(): void
   aiToolsKeptOut?: 'doc' | 'folder' | null | undefined
-  /** Open «KI-verktøy på maskinen» on this document */
+  /** Open «Kompatible KI-verktøy» on this document */
   onChangeAiTools?: (() => void) | undefined
   onAskAi(): void
   selectedAnnotId: string | null

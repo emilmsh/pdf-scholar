@@ -1536,7 +1536,7 @@ export default function App(): React.JSX.Element {
     [openPath, openPayload]
   )
 
-  // «KI-verktøy på maskinen» — one dialog per window, opened from any tab's
+  // «Kompatible KI-verktøy» — one dialog per window, opened from any tab's
   // gear menu or Merknader tab (AiToolsDialog.tsx)
   const [aiTools, setAiTools] = useState<{ path: string | undefined } | null>(null)
   useEffect(() => onOpenAiTools((path) => setAiTools({ path })), [])

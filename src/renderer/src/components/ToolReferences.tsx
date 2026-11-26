@@ -182,9 +182,13 @@ export function ToolReferencesView({
     set: (v: T) => void,
     key: string
   ): React.JSX.Element => (
-    <label className="convs-sort tool-refs-pick">
-      {label}{' '}
-      <select data-pick={key} value={value} onChange={(e) => set(oneOf(all, e.target.value, value))}>
+    <label className="convs-sort tool-refs-pick" title={label}>
+      <select
+        data-pick={key}
+        aria-label={label}
+        value={value}
+        onChange={(e) => set(oneOf(all, e.target.value, value))}
+      >
         {all.map((v) => (
           <option key={v} value={v}>
             {name(v)}

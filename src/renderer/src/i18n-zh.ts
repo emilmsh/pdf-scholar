@@ -393,10 +393,10 @@ export const zh: Dict = {
   'iconerr.file-icon-not-square': '图片必须是正方形——宽度与高度相等。',
   'iconerr.file-icon-too-small': '图片至少需要 48 × 48 px，建议使用 256 × 256。',
   'iconerr.file-icon-registry': 'Windows 拒绝了文件图标的更改。',
-  'mcp.title': '本机上的 AI 工具',
+  'mcp.title': '兼容的 AI 工具',
   'mcp.menu': 'AI 工具（Claude、Codex…）',
   'mcp.intro':
-    '开启某个工具后，当您向它提问时，它可以搜索您的高亮、评论和 AI 对话。除非您在下方开启“共同阅读”，否则它不会读取 PDF 本身。工具读取的内容会发送给它所使用的服务商。',
+    '您在 PDF Scholar 之外使用的 AI 程序（如 Claude 和 Codex）可以通过 MCP 连接到这里。开启某个工具后，当您向它提问时，它可以搜索您的高亮、评论和 AI 对话。除非您在下方开启“共同阅读”，否则它不会读取 PDF 本身。工具读取的内容会发送给它所使用的服务商。PDF Scholar 自带的助手不在此处设置。',
   'mcp.tools': '工具',
   'mcp.claudeBoth': 'Claude Code 和 Claude Desktop',
   'mcp.codexSub': 'Codex CLI，以及 ChatGPT 应用中的 Codex（非聊天）',
