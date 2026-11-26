@@ -1266,6 +1266,43 @@ async function chatMock(req: AiChatRequest, emit: Emit, signal: AbortSignal): Pr
   }
 }
 
+// ---------- OpenCode (issue #154) ----------
+
+/** What identifies us to a service that asks its clients to say who they are */
+export const DEFAULT_USER_AGENT = 'PDF-Scholar'
+
+const SESSION_ID_RE = /^[A-Za-z0-9_-]{8,64}$/
+
+/** The two headers OpenCode asks of a client using a subscription key
+ *  (opencode.ai/docs/console/go § «Where can I use it?», read 2026-11-26): a
+ *  stable id per conversation in `x-opencode-session`, which they route and
+ *  cache prompts by, and a User-Agent naming the client rather than an HTTP
+ *  library. Sent ONLY when the custom endpoint is theirs — any other server
+ *  gets the request it always got. The session id comes from the renderer and
+ *  is untrusted input: anything but a short plain token is replaced by a fresh
+ *  one, which costs the cache and nothing else. A browser may ignore the
+ *  User-Agent (the extension); it is not an error there. */
+export function opencodeHeaders(
+  baseUrl: string,
+  sessionId: unknown,
+  userAgent?: string
+): Record<string, string> {
+  let host: string
+  try {
+    host = new URL(baseUrl).hostname.toLowerCase()
+  } catch {
+    return {}
+  }
+  if (host !== 'opencode.ai' && !host.endsWith('.opencode.ai')) return {}
+  return {
+    'x-opencode-session':
+      typeof sessionId === 'string' && SESSION_ID_RE.test(sessionId)
+        ? sessionId
+        : globalThis.crypto.randomUUID(),
+    'user-agent': userAgent?.trim() || DEFAULT_USER_AGENT
+  }
+}
+
 // ---------- Dispatcher ----------
 
 export interface ProviderChatParams {
@@ -1279,6 +1316,9 @@ export interface ProviderChatParams {
   /** provider 'chatgpt' only: `key` is then the Codex ACCESS token (fresh —
    *  refreshing is the caller's job) and this the account it belongs to */
   chatgptAccountId?: string | undefined
+  /** How we name ourselves where a service asks (`opencodeHeaders`); the
+   *  platform adds its version. Absent = DEFAULT_USER_AGENT. */
+  userAgent?: string | undefined
   thinking: ThinkingLevel
   /** Live model catalog (capability data for request shaping); absent or empty
    *  falls back to the per-family heuristics */
@@ -1368,7 +1408,10 @@ export async function runProviderChat(params: ProviderChatParams): Promise<AiCha
         if (!baseUrl || !model) return AI_ERRORS.compatUnconfigured
         return await chatOpenAiCompatible(
           `${baseUrl}/chat/completions`,
-          key ? { authorization: `Bearer ${key}` } : {},
+          {
+            ...(key ? { authorization: `Bearer ${key}` } : {}),
+            ...opencodeHeaders(baseUrl, req.sessionId, params.userAgent)
+          },
           model,
           thinking,
           req,
