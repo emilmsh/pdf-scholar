@@ -40,6 +40,8 @@ import {
   claudeCodeAddArgs,
   claudeCodeCommand,
   claudeCodeRemoveArgs,
+  COMMAND_FILE,
+  commandFileText,
   configSnippet,
   hasCodexServer,
   hasServer,
@@ -65,17 +67,36 @@ const SCRIPT_NAME = 'pdf-scholar-mcp.cjs'
 const bundledScript = (): string => join(__dirname, '..', 'mcp', SCRIPT_NAME)
 const installedScript = (): string => join(app.getPath('userData'), 'mcp', SCRIPT_NAME)
 
+/** Beside the script: which program runs it (`COMMAND_FILE` in shared/mcp.ts).
+ *  Rewritten whenever it differs — an AppImage that was moved names its new
+ *  place at its next start. Failing to write it fails nothing: every tool
+ *  that was given an entry has the path there. */
+async function noteCommand(): Promise<void> {
+  const to = join(dirname(installedScript()), COMMAND_FILE)
+  const want = commandFileText(appCommand())
+  try {
+    if ((await readFile(to, 'utf8').catch(() => null)) === want) return
+    const tmp = `${to}.${process.pid}.tmp`
+    await writeFile(tmp, want, 'utf8')
+    await rename(tmp, to)
+  } catch {
+    // Left as it was
+  }
+}
+
 /** Copy the script into userData/mcp when it differs from the one there */
 async function installScript(): Promise<boolean> {
   const from = bundledScript()
   const to = installedScript()
   try {
     const [want, have] = await Promise.all([readFile(from), readFile(to).catch(() => null)])
-    if (have && have.equals(want)) return true
-    await mkdir(dirname(to), { recursive: true })
-    const tmp = `${to}.${process.pid}.tmp`
-    await copyFile(from, tmp)
-    await rename(tmp, to)
+    if (!have || !have.equals(want)) {
+      await mkdir(dirname(to), { recursive: true })
+      const tmp = `${to}.${process.pid}.tmp`
+      await copyFile(from, tmp)
+      await rename(tmp, to)
+    }
+    await noteCommand()
     return true
   } catch {
     return false

@@ -31,6 +31,16 @@ export function serverEntry(command: string, script: string, client: McpClient):
   return { command, args: [script, '--client', client], env: { ELECTRON_RUN_AS_NODE: '1' } }
 }
 
+/** `command.json`, beside the server script in userData/mcp: the program that
+ *  runs the script. A tool that was given an entry has the path in it; one
+ *  that starts the server on its own («Show your work», which runs one call
+ *  per process) has only the script's folder to go by, and an app that was
+ *  not installed to the usual place — a Linux AppImage, a portable build —
+ *  is found by nothing else. */
+export const COMMAND_FILE = 'command.json'
+
+export const commandFileText = (command: string): string => `${JSON.stringify({ command }, null, 2)}\n`
+
 /** The switch a server started with these arguments answers to */
 export function clientFromArgv(argv: readonly string[]): McpClient {
   const at = argv.indexOf('--client')
