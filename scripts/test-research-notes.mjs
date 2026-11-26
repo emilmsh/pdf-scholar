@@ -427,6 +427,10 @@ console.log('\n11. connecting a tool: the config merge')
   check('the entry runs the app in Node mode, naming its tool', e.env.ELECTRON_RUN_AS_NODE === '1' && e.args.join(' ').endsWith('--client claude'))
   check('the tool named in the arguments', M.clientFromArgv(['node', 's.cjs', '--client', 'codex']) === 'codex' && M.clientFromArgv(e.args) === 'claude')
   check('…none, or one we do not know, is «other»', M.clientFromArgv(['node', 's.cjs']) === 'other' && M.clientFromArgv(['--client', 'evil']) === 'other' && M.clientFromArgv(['--client']) === 'other')
+  // Beside the script: the program that runs it, for a tool that starts the
+  // server on its own and has only the script's folder to go by
+  const appImage = '/home/ø/Apps/PDF Scholar "new".AppImage'
+  check('command.json names the program, whatever is in its path', M.COMMAND_FILE === 'command.json' && JSON.parse(M.commandFileText(appImage)).command === appImage)
   const theirs = JSON.stringify({ mcpServers: { github: { command: 'gh-mcp' } }, globalShortcut: 'Ctrl+Space' })
   const merged = JSON.parse(M.mergeServerInto(theirs, e))
   check('merge keeps the other servers and settings', merged.mcpServers.github.command === 'gh-mcp' && merged.globalShortcut === 'Ctrl+Space')
