@@ -32,47 +32,63 @@ import { pathKey } from '../tool-bridge'
 const clientName = (client: McpClient): string =>
   client === 'claude' ? 'Claude' : client === 'codex' ? 'Codex' : t('tool.clientOther')
 
-const refCount = (n: number): string => t(n === 1 ? 'tool.refsOne' : 'tool.refsMany', { count: String(n) })
-
 const day = (ms: number): string => new Date(ms).toLocaleDateString(locale())
 
-/** The history view's ONE row for everything AI tools have pointed at. Draws
- *  nothing while there is nothing — a reader who never turned «Les sammen» on
- *  never sees a word about it. */
-export function ToolReferencesRow({ onOpen }: { onOpen(): void }): React.JSX.Element | null {
-  useLang()
-  const [sessions, setSessions] = useState<ToolSessionMeta[]>([])
+/** How many references outside AI tools have left, and how many of them the
+ *  reader has not had the list open for since (the tab's badge). «Seen» is a
+ *  count, not a set: deleting a session lowers the total and the badge is
+ *  clamped at zero, which is all a badge needs. */
+const SEEN_KEY = 'pdfx.toolRefsSeen'
+const readSeen = (): number => {
+  try {
+    const n = Number(localStorage.getItem(SEEN_KEY))
+    return Number.isFinite(n) && n >= 0 ? n : 0
+  } catch {
+    return 0
+  }
+}
+
+/** Whether the right panel should carry the «Henvisninger» tab at all, and
+ *  what its badge says. The tab is there while «Les sammen» is on OR any
+ *  reference is kept — a reader who never turned it on never sees a word
+ *  about it, and one who turned it off can still go back to what was left. */
+export function useToolReferences(): { references: number; live: boolean; unread: number; markSeen(): void } {
+  const [references, setReferences] = useState(0)
+  const [live, setLive] = useState(false)
+  const [seen, setSeen] = useState(readSeen)
 
   useEffect(() => {
-    let live = true
+    let on = true
     const load = (): void => {
-      void bridge.toolSessions().then((list) => live && setSessions(list))
+      // A session that only read has nothing to come back to
+      void bridge.toolSessions().then((list: ToolSessionMeta[]) => {
+        if (on) setReferences(list.reduce((sum, s) => sum + s.references, 0))
+      })
+      void bridge.mcpPolicy().then((p) => on && setLive(p?.live === true))
+      setSeen(readSeen())
     }
     load()
     const off = bridge.onToolSessionsChanged(load)
+    // The switch lives in a dialog of its own; it is turned on there and
+    // then the reader comes back to the window
+    window.addEventListener('focus', load)
     return () => {
-      live = false
+      on = false
       off()
+      window.removeEventListener('focus', load)
     }
   }, [])
 
-  // A session that only read has nothing to come back to
-  const references = sessions.reduce((sum, s) => sum + s.references, 0)
-  if (references === 0) return null
-  const latest = Math.max(...sessions.map((s) => s.updatedAt))
+  const markSeen = useCallback(() => {
+    try {
+      localStorage.setItem(SEEN_KEY, String(references))
+    } catch {
+      /* a badge that comes back is no harm */
+    }
+    setSeen(references)
+  }, [references])
 
-  return (
-    <div className="tool-sessions">
-      {/* Says what it is, and on hover what it is NOT: a reader looking for
-          their own conversations should not have to wonder (Emil, 2026-11-24) */}
-      <div className="ai-history-item tool-sessions-row" title={t('tool.sessionsTip')} onClick={onOpen}>
-        <span className="ai-history-title">{t('tool.sessionsHeading')}</span>
-        <span className="ai-history-meta">
-          {refCount(references)} · {day(latest)}
-        </span>
-      </div>
-    </div>
-  )
+  return { references, live, unread: Math.max(0, references - seen), markSeen }
 }
 
 function quietLine(e: Exclude<ToolEntry, { kind: 'reference' }>): string {
@@ -103,14 +119,15 @@ type Row = { entry: ToolEntry; session: ToolSession }
 const sessionName = (s: ToolSession): string =>
   `${s.title ? `${s.title} · ` : ''}${clientName(s.client)} · ${day(s.startedAt || s.updatedAt)}`
 
-/** Every reference AI tools have left, as one list in place of the conversation */
+/** Every reference AI tools have left, as one list: the right panel's
+ *  «Henvisninger» tab, beside the assistant rather than inside its history
+ *  (Emil, 2026-11-26 — what a tool outside the app pointed at is not one of
+ *  the reader's conversations with the app's own assistant) */
 export function ToolReferencesView({
   docPath,
-  onBack,
   onShow
 }: {
   docPath: string
-  onBack(): void
   /** Go to a reference: here when it is in this document, else in its own */
   onShow(entry: ToolReference): void
 }): React.JSX.Element {
@@ -200,10 +217,6 @@ export function ToolReferencesView({
 
   return (
     <div className="ai-history tool-session">
-      <button className="tool-session-back" onClick={onBack}>
-        ‹ {t('tool.back')}
-      </button>
-      <div className="tool-session-title">{t('tool.sessionsHeading')}</div>
       {sessions === undefined ? null : references === 0 ? (
         <p className="ai-history-empty">{t('tool.emptyShown')}</p>
       ) : (
