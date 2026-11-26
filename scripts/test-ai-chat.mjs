@@ -44,6 +44,7 @@ await build({
 })
 const {
   runProviderChat,
+  opencodeHeaders,
   PROVIDER_PROFILES,
   COMPAT_SERVICES,
   fetchCompatModels,
@@ -794,6 +795,48 @@ section('compat: config gate + keyless request + URL join')
     models: { anthropic: '', openai: '', azure: '', compat: 'gpt-5.6-terra', mock: '' }
   })
   ok(calls[0]?.body?.reasoning_effort === 'medium', 'reasoning_effort for an OpenAI-style reasoning id')
+}
+
+section('compat: OpenCode gets its session header and our name, nobody else does (issue #154)')
+{
+  const UUID = /^[0-9a-f-]{36}$/
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'compat' })
+  ok(calls[0]?.headers.get('x-opencode-session') === null, 'another endpoint gets no session header')
+  ok(calls[0]?.headers.get('user-agent') === null, '… and no User-Agent of ours')
+
+  const oc = { baseUrl: 'https://opencode.ai/inference/go/openai/v1' }
+  const withReq = (extra) => ({ ...baseParams().req, ...extra })
+  await run({
+    provider: 'compat',
+    compat: oc,
+    userAgent: 'PDF-Scholar/9.9.9',
+    req: withReq({ sessionId: 'conv-1234-abcd' })
+  })
+  ok(calls[0]?.headers.get('x-opencode-session') === 'conv-1234-abcd', 'the session id travels as x-opencode-session')
+  ok(calls[0]?.headers.get('user-agent') === 'PDF-Scholar/9.9.9', 'the platform names itself with its version')
+  ok(calls[0]?.headers.get('authorization') === 'Bearer sk-test', 'the key still travels as Bearer')
+
+  await run({ provider: 'compat', compat: oc })
+  ok(UUID.test(calls[0]?.headers.get('x-opencode-session') ?? ''), 'no id from the caller → a fresh one, never an empty header')
+  ok(calls[0]?.headers.get('user-agent') === 'PDF-Scholar', 'no version given → the bare name')
+
+  for (const bad of ['x\r\ny: 1', '', 'a b', 'z'.repeat(200), 42, null]) {
+    await run({ provider: 'compat', compat: oc, req: withReq({ sessionId: bad }) })
+    ok(
+      UUID.test(calls[0]?.headers.get('x-opencode-session') ?? ''),
+      `a junk session id (${JSON.stringify(bad).slice(0, 12)}) is replaced, not sent`
+    )
+  }
+
+  ok(Object.keys(opencodeHeaders('https://api.opencode.ai/v1', 'conv-1234-abcd')).length === 2, 'a subdomain is theirs too')
+  for (const other of [
+    'https://notopencode.ai/v1',
+    'https://opencode.ai.example.com/v1',
+    'https://example.com/opencode.ai/v1',
+    'not a url'
+  ])
+    ok(Object.keys(opencodeHeaders(other, 'conv-1234-abcd')).length === 0, `${other} is not OpenCode`)
 }
 
 section('compat: transport failures get their names')

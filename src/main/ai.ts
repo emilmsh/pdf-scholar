@@ -388,6 +388,7 @@ export function registerAiIpc(): void {
         azure: ai.azure,
         compat: ai.compat,
         chatgptAccountId,
+        userAgent: `PDF-Scholar/${app.getVersion()}`,
         thinking: ai.thinking,
         catalog: getState().modelCatalog,
         req,
