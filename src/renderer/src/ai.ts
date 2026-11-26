@@ -205,18 +205,61 @@ export function resolveQuote(pageNumber: number, quote: string, pages: PageText[
   // looser anchors — cited page first, then neighbours — and give up
   // rather than guess: every fallback match must be UNIQUE on its page,
   // so a miss degrades to the page jump, never to a wrong highlight.
-  const candidates = [pageIndex, pageIndex - 1, pageIndex + 1].filter(
-    (i) => i >= 0 && i < pages.length
-  )
-  for (const pi of candidates) {
+  return wholeNear(pageIndex, quote, pages) ?? anchorNear(pageIndex, quote, pages)
+}
+
+/** A page and its two neighbours, the page itself first */
+const near = (pageIndex: number, pages: PageText[]): number[] =>
+  [pageIndex, pageIndex - 1, pageIndex + 1].filter((i) => i >= 0 && i < pages.length)
+
+/** The WHOLE quote, on the page or a neighbour */
+function wholeNear(pageIndex: number, quote: string, pages: PageText[]): ResolvedCitation | null {
+  for (const pi of near(pageIndex, pages)) {
     const hit = locateQuote(quote, pages[pi].text, pi !== pageIndex)
     if (hit) return { pageNumber: pi + 1, ...hit }
   }
+  return null
+}
+
+/** Only an ANCHOR of the quote: a part of it a page holds exactly once */
+function anchorNear(pageIndex: number, quote: string, pages: PageText[]): ResolvedCitation | null {
   for (const needle of fallbackNeedles(quote)) {
-    for (const pi of candidates) {
+    for (const pi of near(pageIndex, pages)) {
       const hit = locateQuote(needle, pages[pi].text, true)
       if (hit) return { pageNumber: pi + 1, ...hit }
     }
+  }
+  return null
+}
+
+/** A cited page, held inside the document */
+export const citedPage = (pages: PageText[], page: number): number =>
+  Math.min(Math.max(1, page), Math.max(1, pages.length))
+
+/** Where a quote cited by a tool OUTSIDE the app is («Les sammen»), which
+ *  may have the page wrong altogether: the whole quote near the cited page,
+ *  then the whole quote anywhere, and only then an anchor of it — near the
+ *  page, then anywhere. `whole` says which, and it is what the tool is told:
+ *  true only when the quote itself was found, never for an anchor, however
+ *  much of the quote the anchor covers. (It was once judged by length —
+ *  marked ≥ 90 % of the quote — and a sentence with only its LAST word
+ *  wrong, «… i året 2024» for the page's «2023», came back as found word
+ *  for word: the anchor is the quote less its last word. And an anchor near
+ *  the cited page used to win over the whole quote on another page.
+ *  2026-11-26, `test:passage`.) */
+export function locatePassage(
+  pages: PageText[],
+  page: number,
+  quote: string
+): { target: ResolvedCitation; whole: boolean } | null {
+  const cited = citedPage(pages, page) - 1
+  // A page's neighbours are looked at with it: the rest of the document
+  const rest = pages.map((_, i) => i).filter((i) => Math.abs(i - cited) > 1)
+  for (const whole of [true, false]) {
+    const find = whole ? wholeNear : anchorNear
+    let target = find(cited, quote, pages)
+    for (const i of rest) target ??= find(i, quote, pages)
+    if (target) return { target, whole }
   }
   return null
 }
@@ -241,9 +284,36 @@ function locateQuote(
   const needle = normalizeNeedle(quote)
   if (needle.length < 3) return null
   const at = norm.indexOf(needle)
-  if (at === -1) return null
+  if (at === -1) return acrossMarkers(needle, norm, map)
   if (requireUnique && norm.indexOf(needle, at + 1) !== -1) return null
   return { start: map[at], end: map[at + needle.length - 1] + 1 }
+}
+
+/** A sentence with a FOOTNOTE MARKER set inside it: the page's text reads
+ *  «alle mottakere 12 av ytelsen», and whoever quotes the sentence leaves the
+ *  raised «12» out — so the quote was nowhere on the page, in any report
+ *  with footnotes (2026-11-26). A number of up to three digits may stand
+ *  between two of the quote's words, but never beside a word that itself
+ *  begins or ends with a digit: «paid 500 kroner» must not be found in «paid
+ *  12 500 kroner». Loose, so the match must be the only one on the page. */
+function acrossMarkers(
+  needle: string,
+  norm: string,
+  map: number[]
+): { start: number; end: number } | null {
+  const words = needle.split(' ')
+  if (words.length < 4) return null
+  let source = ''
+  for (let i = 0; i < words.length; i++) {
+    source += words[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    if (i === words.length - 1) break
+    const isBesideDigit = /\d$/.test(words[i]) || /^\d/.test(words[i + 1])
+    source += isBesideDigit ? ' ' : '(?: ?\\d{1,3})? '
+  }
+  const found = [...norm.matchAll(new RegExp(source, 'g'))]
+  if (found.length !== 1) return null
+  const at = found[0].index
+  return { start: map[at], end: map[at + found[0][0].length - 1] + 1 }
 }
 
 /** Looser anchors for a quote that failed as a whole, strongest first: the

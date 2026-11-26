@@ -22,7 +22,7 @@ import { docNameFromPath } from '../../shared/chat-history'
 import type { ViewReply, ViewRequest } from '../../shared/tool-bridge'
 import { MAX_SELECTION, pathKey } from '../../shared/tool-bridge'
 import type { ResolvedCitation } from './ai'
-import { resolveQuote } from './ai'
+import { citedPage, locatePassage } from './ai'
 import { isPasswordException, openDocument } from './pdf-doc'
 import { buildPageTexts, hasExtractableText, type PageText } from './search'
 
@@ -176,27 +176,6 @@ async function documentText(
   if (!bytes) return 'unreadable'
   const read = await textFromBytes(path, bytes)
   return typeof read === 'string' ? read : { viewer: null, text: read }
-}
-
-/** A cited page, held inside the document */
-const citedPage = (pages: PageText[], page: number): number => Math.min(Math.max(1, page), Math.max(1, pages.length))
-
-/** Where a cited quote is: its page and neighbours first, then anywhere */
-function locatePassage(
-  pages: PageText[],
-  page: number,
-  quote: string
-): { target: ResolvedCitation; whole: boolean } | null {
-  const cited = citedPage(pages, page)
-  let target = resolveQuote(cited, quote, pages)
-  for (let p = 1; p <= pages.length && !target; p++) {
-    // resolveQuote looks at a page and its two neighbours
-    if (Math.abs(p - cited) > 1) target = resolveQuote(p, quote, pages)
-  }
-  if (!target) return null
-  // Marked whole, or only an anchor of it (the model shortened or reworded
-  // the rest) — the tool is told which
-  return { target, whole: target.end - target.start >= quote.length * 0.9 }
 }
 
 /** Where a reference the reader pressed goes: its passage, else its page

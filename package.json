@@ -44,6 +44,7 @@
     "test:chat-history": "node scripts/test-chat-history.mjs",
     "test:research-notes": "node scripts/test-research-notes.mjs",
     "test:tool-bridge": "node scripts/test-tool-bridge.mjs",
+    "test:passage": "node scripts/test-passage.mjs",
     "test:bridge-desktop": "node scripts/test-bridge-desktop.mjs",
     "test:notes-desktop": "node scripts/test-notes-desktop.mjs",
     "test:doc-identity": "node scripts/test-doc-identity.mjs",
