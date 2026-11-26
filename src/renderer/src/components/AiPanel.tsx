@@ -428,6 +428,10 @@ export default function AiPanel({
   conversationsRef.current = conversations
   const activeChatIdRef = useRef(activeChatId)
   activeChatIdRef.current = activeChatId
+  // One random id per conversation SHOWN, for a service that routes and
+  // caches by it (AiChatRequest.sessionId, issue #154). Renewed wherever the
+  // panel changes conversation; never the stored conversation's own id.
+  const sessionIdRef = useRef(crypto.randomUUID())
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -776,7 +780,8 @@ export default function AiPanel({
         messages: history,
         document: imagesOnly || !prep ? null : { title: docTitle, text: prep.doc.text },
         webSearch: webSearchRef.current,
-        languageRule: chatLanguageRule()
+        languageRule: chatLanguageRule(),
+        sessionId: sessionIdRef.current
       })
       currentIdRef.current = null
       setStreamParts([])
@@ -894,6 +899,7 @@ export default function AiPanel({
         pinnedRef.current = true
         setPinned(true)
         setActiveChatId(target.id)
+        sessionIdRef.current = crypto.randomUUID()
         setMessages(target.messages)
         setAttached(target.attached ?? [])
         // A conversation asked for by name is what the reader came to see:
@@ -964,6 +970,7 @@ export default function AiPanel({
   const startNewChat = useCallback((): void => {
     if (busy) return
     setActiveChatId(null)
+    sessionIdRef.current = crypto.randomUUID()
     setMessages([])
     setAttached([])
     setShowHistory(false)
@@ -981,6 +988,7 @@ export default function AiPanel({
       pinnedRef.current = true
       setPinned(true)
       setActiveChatId(id)
+      sessionIdRef.current = crypto.randomUUID()
       setMessages(chat.messages)
       setAttached(chat.attached ?? [])
       setShowHistory(false)
@@ -996,6 +1004,7 @@ export default function AiPanel({
       })
       if (activeChatIdRef.current === id) {
         setActiveChatId(null)
+        sessionIdRef.current = crypto.randomUUID()
         setMessages([]) // stay in the history view
       }
     },

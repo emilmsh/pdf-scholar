@@ -916,6 +916,11 @@ export interface AiChatRequest {
    *  can tell a semantic-search request from a chat question; the two are
    *  otherwise the same shape (text-only, one user message). */
   purpose?: 'search'
+  /** A random id that stays the same through one conversation and names
+   *  nothing stored (never the conversation's own id). Only a service that
+   *  asks for one ever sees it — OpenCode's `x-opencode-session`, issue #154;
+   *  absent = a fresh one per request. */
+  sessionId?: string
 }
 
 /** Normalized citation. 'char' = offsets into the document text we sent
