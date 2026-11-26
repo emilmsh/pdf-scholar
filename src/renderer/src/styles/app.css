@@ -7165,37 +7165,41 @@ button.bookmark-fold:hover {
 }
 
 /* ---------- What an AI tool outside the app pointed at (ToolReferences.tsx) ----------
-   The sessions sit above the assistant's own conversations in the history
-   view, on the same rows; one session's list takes the conversation's place.
+   The list is the right panel's «Henvisninger» tab, beside the assistant
+   (2026-11-26; before, it sat above the conversations in the history view).
    A reference is a claim with its passage: the claim in the interface face,
    the quoted words in the reading face (docs/TYPOGRAPHY.md), and the page as
    the same pill a source in an answer wears. */
-.tool-sessions {
-  margin-bottom: 14px;
+
+/* The right panel's tabs: the left panel's own (.sidebar-tabs), with the
+   close cross at the end of the row since it closes both pages */
+.ai-tabs {
+  align-items: center;
+  padding: 8px 8px 4px;
 }
 
-.tool-session-back {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: 12px;
-  padding: 2px 0;
-  margin-bottom: 8px;
-  cursor: pointer;
+.ai-tabs button[role='tab'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
-.tool-session-back:hover {
-  color: var(--text);
+.sidebar-tabs.ai-tabs .ai-tabs-close {
+  flex: none;
+  margin-left: 4px;
 }
 
-.tool-session-title {
-  font-size: 13px;
+/* What has landed since the list was last open */
+.ai-tab-badge {
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
   font-weight: 600;
-}
-
-.tool-session-meta {
-  margin: 2px 0 10px;
+  line-height: 16px;
 }
 
 .tool-ref {

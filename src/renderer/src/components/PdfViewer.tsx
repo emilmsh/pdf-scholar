@@ -7214,8 +7214,8 @@ export default function PdfViewer({
     [payload.path, ensureAiDocument, jumpToAiCitation]
   )
 
-  // A tool just brought a passage up in this document: the assistant panel
-  // opens on the list of references, so the claim and its passage are seen
+  // A tool just brought a passage up in this document: the right panel opens
+  // on its «Henvisninger» tab, so the claim and its passage are seen
   // together (and can be come back to once the reader has looked elsewhere)
   const [toolRefsAskId, setToolRefsAskId] = useState(0)
   const openToolRefs = useCallback(() => {
@@ -8453,6 +8453,7 @@ export default function PdfViewer({
                 pageCount={sizes.length}
                 conversationAskId={conversationAskId}
                 toolRefsAskId={toolRefsAskId}
+                toolTab
                 isLocked={() => docPasswordRef.current !== undefined}
                 onOpenElsewhere={(path) => {
                   // The host opens the document (a tab, focused or created),

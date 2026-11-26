@@ -191,7 +191,7 @@ async function main() {
     const view = await waitFor(
       () => run(send, `return { page: page(), mark: !!document.querySelector('.search-hit:not(.cite-flash)'), panel: !!document.querySelector('.tool-session'),
                               refs: [...document.querySelectorAll('.tool-ref')].map((r) => ({ n: r.querySelector('.tool-ref-n')?.textContent, claim: r.querySelector('.tool-ref-claim')?.textContent, chip: r.querySelector('.ai-chip')?.textContent, missing: r.classList.contains('is-missing') })),
-                              title: document.querySelector('.tool-session-title')?.textContent,
+                              tab: document.querySelector('.ai-tabs [role=tab][aria-selected=true]')?.textContent,
                               picks: [...document.querySelectorAll('.tool-session select')].map((s) => s.dataset.pick + '=' + s.value) }`),
       (v) => v.page === '4' && v.mark && v.refs.length === 1,
       'the passage to be shown'
@@ -204,7 +204,17 @@ async function main() {
     // ONE list of references across sessions (Emil, 2026-11-25): it opens on
     // this document's, newest first, with what is shown, how it is grouped
     // and how it is sorted to choose
-    check('the assistant panel opened on the one list of references', view.panel && view.title === 'Henvisninger fra KI-verktøy' && view.picks.join() === 'show=here,group=none,sort=newest', `${view.title} · ${view.picks.join()}`)
+    check('the right panel opened on its «Henvisninger» tab, beside the assistant', view.panel && view.tab === 'Henvisninger' && view.picks.join() === 'show=here,group=none,sort=newest', `${view.tab} · ${view.picks.join()}`)
+    const tabs = await run(
+      send,
+      `const [assistant, refs] = document.querySelectorAll('.ai-tabs [role=tab]');
+       click(assistant); await settle(200);
+       const out = { header: getComputedStyle(document.querySelector('.ai-header')).display !== 'none', list: !!document.querySelector('.tool-session') };
+       click(refs); await settle(200);
+       out.back = !!document.querySelector('.tool-session');
+       return out;`
+    )
+    check('…and «Assistent» beside it brings the assistant back, the list one click away', tabs.header && !tabs.list && tabs.back, JSON.stringify(tabs))
     check('the reference: the claim and the page as a chip — and no number, which is a session’s own', view.refs[0].n === undefined && view.refs[0].claim === 'Dokumentet lover en tilbake-knapp' && /4/.test(view.refs[0].chip) && !view.refs[0].missing, JSON.stringify(view.refs[0]))
     const bySession = await run(
       send,

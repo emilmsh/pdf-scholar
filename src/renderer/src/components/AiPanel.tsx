@@ -46,7 +46,7 @@ import { rememberRequestTokenLimit } from '../ai-token-limits'
 import { errorDetail, errorText, t, useLang, locale } from '../i18n'
 import type { ToolReference } from '../../../shared/tool-bridge'
 import { passageTarget, pathKey, requestPassageOpen } from '../tool-bridge'
-import { ToolReferencesRow, ToolReferencesView } from './ToolReferences'
+import { ToolReferencesView, useToolReferences } from './ToolReferences'
 import { loadAiTextScale, saveAiTextScale, stepAiTextScale } from '../ai-text-scale'
 import { bubblesWhileTyping } from '../keymap'
 import type { AiDocument, ResolvedCitation, StreamCiting } from '../ai'
@@ -224,6 +224,10 @@ interface PanelProps {
    *  its references in another document's list: the panel shows the list of
    *  references */
   toolRefsAskId?: number
+  /** Whether this panel may carry the «Henvisninger» tab: the docked panel
+   *  does, the detached assistant window does not (the references point into
+   *  the document, which that window does not show) */
+  toolTab?: boolean
 }
 
 const suggestions = (): string[] => [t('ai.suggestion1'), t('ai.suggestion2'), t('ai.suggestion3')]
@@ -264,22 +268,30 @@ export default function AiPanel({
   onOpenElsewhere,
   conversationAskId = 0,
   isLocked,
-  toolRefsAskId = 0
+  toolRefsAskId = 0,
+  toolTab = false
 }: PanelProps): React.JSX.Element | null {
   useLang()
   const [config, setConfig] = useState<AiConfigView | null>(null)
   const [showSettings, setShowSettings] = useState(false)
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
-  /** True while the references outside AI tools have left are shown in place
-   *  of the conversation (ToolReferences.tsx: ONE list across sessions) */
+  /** True on the «Henvisninger» tab: what AI tools OUTSIDE the app pointed
+   *  at (ToolReferences.tsx), a page of the panel beside the assistant and not
+   *  inside its history (Emil, 2026-11-26) */
   const [showToolRefs, setShowToolRefs] = useState(false)
+  const toolRefs = useToolReferences()
+  const hasToolTab = toolTab && (toolRefs.references > 0 || toolRefs.live || showToolRefs)
   useEffect(() => {
-    if (!toolRefsAskId) return
+    if (!toolRefsAskId || !toolTab) return
     setShowToolRefs(true)
-    setShowHistory(false)
-    setShowSettings(false)
-  }, [toolRefsAskId])
+    setShowModelMenu(false)
+  }, [toolRefsAskId, toolTab])
+  // The list open = everything in it seen, also what lands while it is open
+  const { markSeen } = toolRefs
+  useEffect(() => {
+    if (showToolRefs && open) markSeen()
+  }, [showToolRefs, open, toolRefs.references, markSeen])
   // The store is async (issue #46): the list arrives in the load effect below,
   // which also picks the newest conversation up as the panel's first view
   const [conversations, setConversations] = useState<StoredConversation[]>([])
@@ -598,6 +610,7 @@ export default function AiPanel({
       { role: 'user', text: seed.question },
       { role: 'assistant', parts: [{ text: seed.answer, citations: [] }] }
     ])
+    setShowToolRefs(false)
     onSeedConsumed()
   }, [open, seed, onSeedConsumed])
 
@@ -631,6 +644,7 @@ export default function AiPanel({
   useEffect(() => {
     if (!open || !chatSnip) return
     setPendingImages((l) => (l.length >= MAX_IMAGES ? l : [...l, chatSnip.image]))
+    setShowToolRefs(false)
     onChatSnipConsumed()
     inputRef.current?.focus()
   }, [open, chatSnip, onChatSnipConsumed])
@@ -643,6 +657,7 @@ export default function AiPanel({
     setPendingImages(chatPages.images.slice(0, MAX_IMAGES))
     setStagedPages(chatPages.pages.slice(0, MAX_IMAGES))
     setInput((i) => (i.trim() === '' ? t('ai.readPagesQuestion') : i))
+    setShowToolRefs(false)
     onChatPagesConsumed()
     inputRef.current?.focus()
   }, [open, chatPages, onChatPagesConsumed])
@@ -833,6 +848,7 @@ export default function AiPanel({
     if (!open || annotsAskId === lastAnnotsAskRef.current) return
     lastAnnotsAskRef.current = annotsAskId
     setAnnotsStaged(true)
+    setShowToolRefs(false)
     setInput((current) => current.trim() ? current : annotationsDefaultQuestion())
     // The panel may be opening in this same commit — focus after layout
     requestAnimationFrame(() => inputRef.current?.focus())
@@ -889,6 +905,7 @@ export default function AiPanel({
         // A conversation asked for by name is what the reader came to see:
         // it wins over the history list and over the first-run key settings
         if (wanted) {
+          setShowToolRefs(false)
           setShowHistory(false)
           setShowSettings(false)
         }
@@ -996,20 +1013,16 @@ export default function AiPanel({
 
   const toggleHistory = useCallback((): void => {
     if (busy) return
-    // From a tool's list the button goes BACK to the history it was opened
-    // from, never past it to the conversation
-    const fromTool = showToolRefs
-    setShowToolRefs(false)
     setShowHistory((s) => {
-      const next = fromTool ? true : !s
-      if (next && !s) {
+      const next = !s
+      if (next) {
         void loadConversations(docPath).then(setConversations) // fresh across windows
         if (historyAllRef.current) refreshAll()
       }
       return next
     })
     setShowSettings(false)
-  }, [busy, docPath, refreshAll, showToolRefs])
+  }, [busy, docPath, refreshAll])
 
   /** A reference an outside tool left: its passage here, or its document
    *  opened on it (the viewer that ends up showing it takes the handoff) */
@@ -1654,7 +1667,46 @@ export default function AiPanel({
       ref={panelRef}
       style={{ '--ai-scale': textScale } as React.CSSProperties}
     >
-      <header className="ai-header">
+      {/* Two pages, as the left panel has its tabs: the app's own assistant,
+          and what AI tools OUTSIDE the app pointed at (Emil, 2026-11-26 —
+          that list lived in the assistant's history and read as one of the
+          reader's conversations). Only while there is something to it: a
+          reader who never turned «Les sammen» on sees the panel as before. */}
+      {hasToolTab && (
+        <div className="sidebar-tabs ai-tabs" role="tablist">
+          <button
+            role="tab"
+            aria-selected={!showToolRefs}
+            className={showToolRefs ? '' : 'active'}
+            onClick={() => setShowToolRefs(false)}
+          >
+            {t('ai.assistant')}
+          </button>
+          <button
+            role="tab"
+            aria-selected={showToolRefs}
+            className={showToolRefs ? 'active' : ''}
+            title={t('tool.sessionsTip')}
+            aria-label={t('tool.sessionsHeading')}
+            onClick={() => {
+              setShowToolRefs(true)
+              setShowModelMenu(false)
+            }}
+          >
+            {t('tool.tab')}
+            {toolRefs.unread > 0 && !showToolRefs && (
+              <span className="ai-tab-badge" title={t('tool.unread', { count: String(toolRefs.unread) })}>
+                {toolRefs.unread}
+              </span>
+            )}
+          </button>
+          <button className="tb-btn ai-tabs-close" title={t('ai.closeTip')} onClick={onClose}>
+            ✕
+          </button>
+        </div>
+      )}
+      {/* The assistant's own controls; out of view on the other tab */}
+      <header className="ai-header" style={showToolRefs ? { display: 'none' } : undefined}>
         {/* No "Assistent" caption and (since v0.41) no sparkle either: both
             cost width the model chip was paying for — "GPT-5.6 …" hides
             exactly the part that separates Sol from Terra from Luna. Nothing
@@ -1705,7 +1757,7 @@ export default function AiPanel({
           <IconPlus size={15} />
         </button>
         <button
-          className={`tb-btn${showHistory || showToolRefs ? ' is-active' : ''}`}
+          className={`tb-btn${showHistory ? ' is-active' : ''}`}
           title={t('ai.historyTip')}
           disabled={busy}
           onClick={toggleHistory}
@@ -1729,20 +1781,19 @@ export default function AiPanel({
             <IconDetach size={15} />
           </button>
         )}
-        <button className="tb-btn" title={t('ai.closeTip')} onClick={onClose}>
-          ✕
-        </button>
+        {/* With the tabs, the close cross sits on their row, where it is
+            for both pages */}
+        {!hasToolTab && (
+          <button className="tb-btn" title={t('ai.closeTip')} onClick={onClose}>
+            ✕
+          </button>
+        )}
       </header>
 
-      {/* A tool's list before everything else, the first-run key settings
-          included: it needs no key of the app's own, and a reader who uses
-          only an outside tool would otherwise meet a key form in its place */}
+      {/* The tool's list before everything else, the first-run key settings
+          included: it needs no key of the app's own */}
       {showToolRefs ? (
-        <ToolReferencesView
-          docPath={docPath}
-          onBack={() => setShowToolRefs(false)}
-          onShow={showToolReference}
-        />
+        <ToolReferencesView docPath={docPath} onShow={showToolReference} />
       ) : showSettings && config ? (
         <AiSettings
           config={config}
@@ -1754,12 +1805,6 @@ export default function AiPanel({
         />
       ) : showHistory ? (
         <div className="ai-history">
-          <ToolReferencesRow
-            onOpen={() => {
-              setShowToolRefs(true)
-              setShowHistory(false)
-            }}
-          />
           <div className="ai-history-heading">{t('ai.historyTitle')}</div>
           <input
             className="ai-history-search"
