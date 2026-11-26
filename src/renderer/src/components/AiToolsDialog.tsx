@@ -1,4 +1,4 @@
-// «KI-verktøy på maskinen»: which AI tools on this computer may read the
+// «Kompatible KI-verktøy»: which AI tools on this computer may read the
 // reader's notes and conversations (src/main/mcp-server.ts), and about which
 // documents. Its own dialog from the settings menu — not part of the API-key
 // settings, which are about the app's own assistant and have nothing to do

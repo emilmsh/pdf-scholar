@@ -7012,12 +7012,20 @@ button.bookmark-fold:hover {
 }
 
 /* The one list of what AI tools pointed at (ToolReferences.tsx): what is
-   shown, how it is grouped and how it is sorted, on one wrapping row */
+   shown, how it is grouped and how it is sorted. Three bare selects on one
+   row: each value says what it does («Dette dokumentet», «Én liste»,
+   «Nyeste først»), so the labels ride as tooltip and aria-label instead of
+   costing the panel a row apiece */
 .tool-refs-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 12px;
+  gap: 6px;
   margin: 2px 0 10px;
+}
+
+.tool-refs-pick select {
+  font-size: 12px;
+  padding: 2px 2px 2px 4px;
 }
 
 .tool-refs-heading {
@@ -7407,7 +7415,7 @@ button.bookmark-fold:hover {
   cursor: pointer;
 }
 
-/* «KI-verktøy på maskinen» (AiToolsDialog.tsx): the keyboard map's plate,
+/* «Kompatible KI-verktøy» (AiToolsDialog.tsx): the keyboard map's plate,
    narrowed to one column — a switch per tool and per document, each a name
    with a quiet line under it and the switch at the row's end. Giving and
    taking back are the same switch. Doubled class: the plate's own rules come
