@@ -22,7 +22,7 @@
 // What a tool READ is listed too, quietly, among the references: «Leste
 // teksten, s. 1–15», «Leste markeringen din». The reader should be able to
 // see what left, not only what was shown.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { McpClient } from '../../../shared/mcp'
 import type { ToolEntry, ToolReference, ToolSession, ToolSessionMeta } from '../../../shared/tool-bridge'
 import { bridge } from '../bridge'
@@ -112,6 +112,35 @@ type Sort = (typeof SORTS)[number]
 const oneOf = <T extends string>(all: readonly T[], value: string, otherwise: T): T =>
   (all as readonly string[]).includes(value) ? (value as T) : otherwise
 
+/** How the list is read is the WINDOW's, not a tab's (Emil, 2026-11-27). The
+ *  references span documents, and pressing one in another document brings
+ *  that document's tab up with a panel of its own: with the choices kept per
+ *  panel the reader landed in a list reset to «this document», ungrouped, at
+ *  its top — the thread they were following gone. Every tab's list reads and
+ *  writes this one view instead, the place it is scrolled to included. */
+interface ListView {
+  /** null = not chosen yet: this document's when it has any, else every one */
+  show: Show | null
+  group: Group
+  sort: Sort
+  /** The groups folded away, by their key (session ids, document paths) */
+  folded: ReadonlySet<string>
+}
+let listView: ListView = { show: null, group: 'none', sort: 'newest', folded: new Set() }
+let listScroll = 0
+const viewListeners = new Set<() => void>()
+const setListView = (patch: Partial<ListView>): void => {
+  listView = { ...listView, ...patch }
+  for (const listener of [...viewListeners]) listener()
+}
+const subscribeView = (cb: () => void): (() => void) => {
+  viewListeners.add(cb)
+  return () => {
+    viewListeners.delete(cb)
+  }
+}
+const readView = (): ListView => listView
+
 /** An entry with the session it is kept in */
 type Row = { entry: ToolEntry; session: ToolSession }
 
@@ -134,19 +163,19 @@ export function ToolReferencesView({
   useLang()
   /** undefined = loading */
   const [sessions, setSessions] = useState<ToolSession[] | undefined>(undefined)
-  /** null = not chosen yet: this document's when it has any, else every one */
-  const [show, setShow] = useState<Show | null>(null)
-  const [group, setGroup] = useState<Group>('none')
-  const [sort, setSort] = useState<Sort>('newest')
-  /** The groups folded away, by their key. A grouping's keys are its own
-   *  (session ids, document paths), so changing the grouping starts open */
-  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set())
-  const fold = (key: string): void =>
-    setFolded((was) => {
-      const next = new Set(was)
-      if (!next.delete(key)) next.add(key)
-      return next
-    })
+  const { show, group, sort, folded } = useSyncExternalStore(subscribeView, readView)
+  const setShow = (v: Show): void => setListView({ show: v })
+  const setGroup = (v: Group): void => setListView({ group: v })
+  const setSort = (v: Sort): void => setListView({ sort: v })
+  const fold = (key: string): void => {
+    const next = new Set(folded)
+    if (!next.delete(key)) next.add(key)
+    setListView({ folded: next })
+  }
+  // The list comes up where the window's list was last scrolled to — once,
+  // when its rows are there to scroll among
+  const listRef = useRef<HTMLDivElement>(null)
+  const scrolledRef = useRef(false)
 
   const load = useCallback(() => {
     void bridge
@@ -165,6 +194,18 @@ export function ToolReferencesView({
   const rows: Row[] = (sessions ?? []).flatMap((session) => session.entries.map((entry) => ({ entry, session })))
   const hasHere = rows.some((r) => r.entry.kind === 'reference' && mine(r.entry))
   const showing: Show = show ?? (hasHere ? 'here' : 'all')
+  useLayoutEffect(() => {
+    if (scrolledRef.current || sessions === undefined || !listRef.current) return
+    scrolledRef.current = true
+    listRef.current.scrollTop = listScroll
+  }, [sessions])
+  /** A reference in ANOTHER document: what is shown now is what the list
+   *  there must show too, so a choice never made («every document's», since
+   *  this one has none) is made before the tabs change */
+  const go = (entry: ToolReference): void => {
+    if (!mine(entry) && show === null) setListView({ show: showing })
+    onShow(entry)
+  }
 
   // What a tool read is listed where the list is told in time; a list by
   // page, and one of what was not found, is of references alone
@@ -225,7 +266,13 @@ export function ToolReferencesView({
   )
 
   return (
-    <div className="ai-history tool-session">
+    <div
+      className="ai-history tool-session"
+      ref={listRef}
+      onScroll={(e) => {
+        if (scrolledRef.current) listScroll = e.currentTarget.scrollTop
+      }}
+    >
       {sessions === undefined ? null : references === 0 ? (
         <p className="ai-history-empty">{t('tool.emptyShown')}</p>
       ) : (
@@ -285,7 +332,7 @@ export function ToolReferencesView({
                         <button
                           className="ai-chip"
                           title={t(mine(e) ? 'ai.chipTip' : 'tool.openElsewhereTip')}
-                          onClick={() => onShow(e)}
+                          onClick={() => go(e)}
                         >
                           {t('app.pageAbbrev')} {e.page}
                         </button>
