@@ -39,6 +39,13 @@ export const NATIVE_HOST_NAME = 'no.emil.pdfscholar'
 /** Bumped when a message shape changes incompatibly; the host refuses a
  *  request for another version by name instead of misreading it. */
 export const NATIVE_HOST_PROTOCOL = 1
+// Only an extended-effort request needs v2. Older hosts can still serve every
+// v1 request and return the existing update-desktop error when sent v2.
+export const EXTENDED_EFFORT_PROTOCOL = 2
+
+export function chatHostProtocol(level: ThinkingLevel): number {
+  return level === 'xhigh' || level === 'max' ? EXTENDED_EFFORT_PROTOCOL : NATIVE_HOST_PROTOCOL
+}
 
 /** What the relay starts the app with: the switch into host mode. A reader
  *  launching the app with it gets a process waiting on stdin, nothing more. */

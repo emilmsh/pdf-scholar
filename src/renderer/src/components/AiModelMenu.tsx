@@ -9,8 +9,8 @@
 // and this menu can never disagree about the active model.
 import { useEffect, useRef, useState } from 'react'
 import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/types'
-import { OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
-import { compareVendors } from '../../../shared/ai-model-catalog'
+import { effectiveThinking, thinkingLevels } from '../../../shared/ai-provider-profile'
+import { compareVendors, remoteModel } from '../../../shared/ai-model-catalog'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
 import {
@@ -21,7 +21,7 @@ import {
   stepAiTextScale
 } from '../ai-text-scale'
 import { useDismissable } from '../useDismissable'
-import { keyProviders, MODELS, modelOptions, THINKING_LEVELS } from './ai-models'
+import { keyProviders, MODELS, modelOptions, THINKING_LABELS } from './ai-models'
 import { typedModelOffers, type TypedModelOffer } from '../../../shared/typed-model'
 
 /** Show the filter field once the combined list gets this big (an OpenRouter
@@ -133,19 +133,15 @@ export function ModelQuickMenu({
   const provider = config.provider
   const model = config.models[provider] ?? ''
   const anyKey = keyProviders().some((p) => config.hasKey[p.id])
-  // The provider profile decides whether a reasoning control exists at all;
-  // within that, model-level exceptions keep the selector honest: Haiku
-  // ignores effort, and every effort-style provider only shows the selector
-  // for ids the request actually sends the parameter to (same regex request
-  // shaping uses — a visible selector wired to nothing is a lie). Azure is
-  // the one exemption: deployment names are opaque, so the selector shows
-  // and a misfire is caught by the degrade-on-400 net.
-  const thinkingApplies =
-    PROVIDER_PROFILES[provider].thinking !== 'none' &&
-    !/haiku/i.test(model) &&
-    (PROVIDER_PROFILES[provider].thinking !== 'effort' ||
-      provider === 'azure' ||
-      OPENAI_REASONING_RE.test(model))
+  // The efforts THIS model takes (thinkingLevels, the rule request shaping
+  // uses too): the selector offers those and no others, and is not shown for
+  // a model the request sends no reasoning control to — a visible selector
+  // wired to nothing is a lie. Azure is the one exemption: deployment names
+  // are opaque, so the selector shows and a misfire is caught by the
+  // degrade-on-400 net.
+  const caps = provider === 'anthropic' ? remoteModel(config.catalog, 'anthropic', model)?.caps : undefined
+  const levels = thinkingLevels(provider, model, caps)
+  const thinkingApplies = levels.length > 0
   const [filter, setFilter] = useState('')
   const [view, setView] = useState<MenuView>({ level: 'root' })
   const listRef = useRef<HTMLDivElement>(null)
@@ -548,12 +544,12 @@ export function ModelQuickMenu({
         <label className="ai-field">
           <span>{t('ai.reasoning')}</span>
           <select
-            value={config.thinking}
+            value={effectiveThinking(provider, model, config.thinking, caps)}
             onChange={(e) => patch({ thinking: e.target.value as ThinkingLevel })}
           >
-            {THINKING_LEVELS.map((l) => (
-              <option key={l.id} value={l.id}>
-                {t(l.key)}
+            {levels.map((level) => (
+              <option key={level} value={level}>
+                {t(THINKING_LABELS[level])}
               </option>
             ))}
           </select>

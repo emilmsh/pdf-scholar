@@ -17,7 +17,99 @@
 // `npm run test:ai-chat` holds each provider's request path to its row here —
 // a profile that disagrees with what the path actually sends is a test failure,
 // not a latent UI lie.
-import type { AiProviderId } from './types'
+import {
+  STANDARD_THINKING_LEVELS,
+  THINKING_LEVELS,
+  type AiModelCaps,
+  type AiProviderId,
+  type ThinkingLevel
+} from './types'
+
+/** Anthropic models whose thinking cannot be configured at all: the Fable
+ *  family and Opus from 5.5 on. Shared with request shaping (anthropicTraits
+ *  in ai-chat.ts), where the sources are. */
+export const ANTHROPIC_ALWAYS_THINKS_RE = /fable|mythos|opus-5-5/i
+
+/** Haiku 4.5 and older: no effort parameter and no adaptive thinking, so the
+ *  request carries no reasoning control at all (Haiku 5.5 has both). */
+export function isLegacyHaiku(model: string): boolean {
+  return /haiku/i.test(model) && !/haiku-[5-9]/i.test(model)
+}
+
+/** OpenAI's own models that take `xhigh` and `max`, by exact id, on the
+ *  OpenAI API and the ChatGPT plan: the model overview's «Reasoning» row
+ *  reads low to max for GPT-6.2 Astra and Sol, none to max for GPT-6.1 Terra
+ *  and GPT-6 Luna, and GPT-6.1 Sol's own page says «`reasoning.effort`
+ *  supports `low`, `medium` (default), `high`, `xhigh`, and `max`»
+ *  (developers.openai.com/api/docs/models, read 2026-11-27). Exact ids and
+ *  the two first-party providers only: the same id behind a custom endpoint,
+ *  OpenRouter or an Azure deployment is somebody else's server. */
+const OPENAI_XHIGH_MAX_RE = /^gpt-6\.2-(astra|sol)$|^gpt-6\.1-(sol|terra)$|^gpt-6-luna$/i
+
+/** `xhigh` with no `max` above it, at the provider that documents it: xAI for
+ *  grok-4.3 and 4.5 to 4.7, Google for gemini-4-hydrogen and gemini-4-neon
+ *  (the sources are at OPENAI_REASONING_RE below). */
+const XHIGH_AT: Partial<Record<AiProviderId, RegExp>> = {
+  xai: /grok-4\.[3567]/i,
+  gemini: /gemini-4-(hydrogen|neon)/i
+}
+
+/** The reasoning efforts THIS model takes, lowest first: what the menu offers
+ *  and what a request may carry. Empty = the request carries no reasoning
+ *  control for this model, and the menu shows none.
+ *
+ *  «Off» is listed only where the model can stop reasoning; a model that
+ *  cannot (Fable, GPT-6.2 Astra, Grok 4.7 ...) starts at Low. The levels
+ *  above High are listed only where the provider documents them for the
+ *  model by name. Mistral's reasoning models know two values, off and on.
+ *  An Azure deployment's name says nothing about its model, so it gets the
+ *  four everybody has and the degrade-on-400 net.
+ *
+ *  `caps` is the live capability data for an Anthropic model, when a
+ *  snapshot exists: the API's own list of efforts wins over the family rule. */
+export function thinkingLevels(provider: AiProviderId, model: string, caps?: AiModelCaps): readonly ThinkingLevel[] {
+  const profile = PROVIDER_PROFILES[provider].thinking
+
+  if (profile === 'none') return []
+  if (profile === 'per-model') {
+    const efforts = caps ? caps.effort : isLegacyHaiku(model) ? [] : ['low', 'medium', 'high']
+    const on = THINKING_LEVELS.filter((level) => level !== 'off' && efforts.includes(level))
+
+    if (on.length === 0) return []
+    return ANTHROPIC_ALWAYS_THINKS_RE.test(model) ? on : ['off', ...on]
+  }
+  if (provider === 'azure') return STANDARD_THINKING_LEVELS
+  if (MISTRAL_REASONING_RE.test(model)) return ['off', 'high']
+  if (!OPENAI_REASONING_RE.test(model)) return []
+
+  const firstParty = provider === 'openai' || provider === 'chatgpt'
+  const above: ThinkingLevel[] =
+    firstParty && OPENAI_XHIGH_MAX_RE.test(model) ? ['xhigh', 'max'] : XHIGH_AT[provider]?.test(model) ? ['xhigh'] : []
+  const off: ThinkingLevel[] = OPENAI_ALWAYS_REASONS_RE.test(model) ? [] : ['off']
+
+  return [...off, 'low', 'medium', 'high', ...above]
+}
+
+/** The level a saved preference comes to on this model: itself when the model
+ *  takes it, else the nearest level above it that the model does take, else
+ *  the model's highest. So «Maximum» chosen on one model is «High» on a model
+ *  that stops there and Maximum again on going back, and «Off» on a model
+ *  that cannot stop reasoning is its lowest effort. The preference itself is
+ *  never rewritten. The menu shows this level and the request sends it. */
+export function effectiveThinking(
+  provider: AiProviderId,
+  model: string,
+  level: ThinkingLevel,
+  caps?: AiModelCaps
+): ThinkingLevel {
+  const levels = thinkingLevels(provider, model, caps)
+
+  if (levels.length === 0 || levels.includes(level)) return level
+
+  const rank = THINKING_LEVELS.indexOf(level)
+
+  return levels.find((one) => THINKING_LEVELS.indexOf(one) > rank) ?? levels[levels.length - 1]
+}
 
 export interface AiProviderProfile {
   /** How grounded citations travel: 'native' = the provider emits citation

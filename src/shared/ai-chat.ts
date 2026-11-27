@@ -29,7 +29,10 @@ import type {
 } from './types'
 import { isCatalogProvider, remoteModel } from './ai-model-catalog'
 import {
+  ANTHROPIC_ALWAYS_THINKS_RE,
   COMPAT_SERVICES,
+  effectiveThinking,
+  isLegacyHaiku,
   isCompatService,
   MISTRAL_BLIND_WHEN_REASONING_RE,
   MISTRAL_REASONING_RE,
@@ -43,12 +46,7 @@ import { AI_ERRORS } from './engine-errors'
 
 // ---------- Reasoning-effort mapping (verified 2026-07, see docs/MODEL-UPDATE.md) ----------
 
-type Effort = 'low' | 'medium' | 'high'
-const EFFORT: Record<Exclude<ThinkingLevel, 'off'>, Effort> = {
-  low: 'low',
-  medium: 'medium',
-  high: 'high'
-}
+type Effort = Exclude<ThinkingLevel, 'off'>
 
 /** What request shaping needs to know about an Anthropic model. Resolved from
  *  the live capability catalog when a snapshot exists (fetched via
@@ -80,7 +78,7 @@ function anthropicTraits(model: string, caps?: AiModelCaps): AnthropicTraits {
   // from 5.5 on (thinking: disabled → 400, platform.claude.com, 2026-09-26).
   // Sonnet 5.5 is NOT in this set — its thinking is adaptive, not always-on
   // (platform.claude.com/docs/en/models/sonnet-5-5/overview, 2026-10-05).
-  const alwaysThinks = /fable|mythos|opus-5-5/i.test(model)
+  const alwaysThinks = ANTHROPIC_ALWAYS_THINKS_RE.test(model)
   const betweenToolsOff = /sonnet-5-5/i.test(model)
   if (caps) {
     return {
@@ -100,10 +98,10 @@ function anthropicTraits(model: string, caps?: AiModelCaps): AnthropicTraits {
   // lineup, manual budget_tokens now a 400, and «Av» is an explicit
   // {type:'disabled'} (not impossible like Fable/Opus 5.5, not between_tools
   // like Sonnet 5.5). Haiku 4.5 and earlier keep the old shape.
-  const isLegacyHaiku = /haiku/i.test(model) && !/haiku-[5-9]/i.test(model)
+  const legacy = isLegacyHaiku(model)
   return {
-    effort: isLegacyHaiku ? [] : ['low', 'medium', 'high'],
-    adaptive: !isLegacyHaiku,
+    effort: legacy ? [] : ['low', 'medium', 'high'],
+    adaptive: !legacy,
     alwaysThinks,
     betweenToolsOff,
     // Opus 5 thinks by default too ("thinking is on by default and
@@ -144,8 +142,7 @@ function anthropicThinking(
     }
     return { maxTokens: 4096 }
   }
-  const effort = EFFORT[level]
-  const outputConfig = traits.effort.includes(effort) ? { effort } : undefined
+  const outputConfig = traits.effort.includes(level) ? { effort: level } : undefined
   if (traits.alwaysThinks) return { ...(outputConfig && { outputConfig }), maxTokens: 16000 }
   // No adaptive support (Haiku, pre-4.6 ids): send no thinking at all; effort
   // still goes through when the model accepts it (e.g. Opus 4.5).
@@ -1333,7 +1330,19 @@ export interface ProviderChatParams {
  *  missing-key case in its own words); this only validates provider-specific
  *  extras (Azure endpoint/deployment). Aborts surface as AI_ERRORS.aborted. */
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
-  const { provider, key, models, azure, compat, thinking, catalog, req, emit, signal } = params
+  const { provider, key, models, azure, compat, catalog, req, emit, signal } = params
+  // The level this model takes (thinkingLevels): a preference saved on another
+  // model is brought to the nearest one. «Off» goes through as it is - each
+  // path already says it the way its model takes it, or as its lowest effort.
+  const thinking =
+    params.thinking === 'off'
+      ? 'off'
+      : effectiveThinking(
+          provider,
+          models[provider],
+          params.thinking,
+          provider === 'anthropic' ? remoteModel(catalog, 'anthropic', models.anthropic)?.caps : undefined
+        )
   const openAiTarget: ResponsesTarget = {
     url: 'https://api.openai.com/v1/responses',
     headers: { authorization: `Bearer ${key}` },
