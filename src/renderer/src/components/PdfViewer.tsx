@@ -7237,12 +7237,16 @@ export default function PdfViewer({
     let cancelled = false
     const take = (): void => {
       if (!hasPendingPassage(payload.path)) return
+      // The list first, at once: the reader pressed it in another tab's panel
+      // and must find it standing when this tab comes up — not a closed panel
+      // until the document's text is read (seconds for a long or scanned one,
+      // and never if it cannot be read at all). Emil, 2026-11-27.
+      openToolRefs()
       void ensureAiDocument().then((ensured) => {
         if (cancelled || !ensured) return
         const passage = takePendingPassage(payload.path)
         if (!passage) return
         void jumpToAiCitation(passageTarget(ensured.pages, passage.page, passage.quote), true)
-        openToolRefs()
       })
     }
     take()

@@ -304,6 +304,43 @@ async function main() {
     const stored = JSON.parse(readFileSync(join(app.profile, 'tool-sessions', sessions[0]), 'utf-8'))
     check('one session on disk, holding what was shown AND what was read', sessions.length === 1 && stored.entries.filter((e) => e.kind === 'reference').length === 3 && stored.entries.some((e) => e.kind === 'read') && stored.entries.some((e) => e.kind === 'context' && e.selection === true))
 
+    // The list spans documents, and following it into another one must not
+    // lose it (Emil, 2026-11-27): the other document's tab has a panel of its
+    // own, which used to stay closed until the text was read and then show a
+    // list set back to «this document», ungrouped
+    console.log('\n7b. a reference in another document: the list comes along')
+    const hop = await run(
+      send,
+      `await pick('show', 'all'); await pick('group', 'session');
+       const chip = [...document.querySelectorAll('.tab-view.active .tool-ref')]
+         .find((r) => r.querySelector('.ai-history-doc')?.textContent === 'Unopened paper.pdf')?.querySelector('.ai-chip');
+       if (!chip) return { pressed: false };
+       click(chip);
+       const view = () => document.querySelector('.tab-view.active');
+       const state = () => ({
+         tabs: document.querySelectorAll('.tab').length,
+         open: !!view()?.querySelector('.right-panel.open .tool-session'),
+         tab: view()?.querySelector('.ai-tabs [role=tab][aria-selected=true]')?.textContent,
+         picks: [...(view()?.querySelectorAll('.tool-session select') ?? [])].map((s) => s.dataset.pick + '=' + s.value).join(),
+         cards: view()?.querySelectorAll('.tool-ref').length ?? 0,
+         page: view()?.querySelector('.page-indicator input')?.value ?? null,
+         mark: !!view()?.querySelector('.search-hit:not(.cite-flash)')
+       });
+       let waited = 0;
+       while (waited < 10000 && !(state().tabs === 2 && state().page === '4' && state().mark && state().cards === 3)) { await settle(200); waited += 200; }
+       const out = { pressed: true, ...state() };
+       // Back to the first document, the list as the sections below expect it
+       click(document.querySelectorAll('.tab .tab-label')[0]); await settle(500);
+       await pick('group', 'none'); await pick('show', 'here');
+       out.backPage = view()?.querySelector('.page-indicator input')?.value ?? null;
+       out.backList = !!view()?.querySelector('.right-panel.open .tool-session');
+       return out;`
+    )
+    check('pressing it opens its document on the passage', hop.pressed && hop.tabs === 2 && hop.page === '4' && hop.mark, JSON.stringify(hop))
+    check('…with the panel open on «Henvisninger» there too', hop.open && hop.tab === 'Henvisninger', JSON.stringify(hop))
+    check('…and the list as it was read: every document’s, grouped by session', hop.picks === 'show=all,group=session,sort=newest' && hop.cards === 3, hop.picks)
+    check('back in the first tab the list still stands', hop.backList, JSON.stringify(hop))
+
     console.log('\n8. kept out, and switched off')
     await run(send, `await window.api.mcpSetPolicy({ excludedDocs: [${JSON.stringify(DOC)}] }); return true;`)
     const kept = await server.call('show_passage', { path: DOC, page: 4, quote: QUOTE })
