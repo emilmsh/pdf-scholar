@@ -4026,6 +4026,10 @@ export default function PdfViewer({
         imageUrl: extras?.imageUrl
       }
       pushUndo({ kind: 'create', handle, snapshot })
+      // A mark that was just made is shown: with the annotations hidden (H) it
+      // would exist in the Merknader tab and nowhere on the page, neither seen
+      // nor reachable by a click — nobody makes a mark to not see it
+      if (annotsHiddenRef.current) setAnnotsHidden(false)
       // engineCreate puts the record in state synchronously and persists in
       // the background — returning the handle lets callers reference the new
       // annotation (e.g. open its popover) without waiting for the write.

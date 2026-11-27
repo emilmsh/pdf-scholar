@@ -346,6 +346,19 @@ export function AiQuickPopover({
     })
   }, [state.x, state.y, text, parts, asked, error, sizeBump, access, confirmed])
 
+  // «Spør …» opens on its question field, ready to be typed in. `autoFocus`
+  // cannot do it: the bubble mounts hidden until it is measured (above), and
+  // focusing inside a hidden box is a no-op — so the focus stayed on the pages,
+  // and what the reader typed ran the viewer's one-key shortcuts instead. A
+  // question that opens «Hva …» hid every annotation (H), and the answer then
+  // kept as a comment was a mark nobody could see (2026-11-27).
+  const askRef = useRef<HTMLInputElement>(null)
+  const placed = pos !== null
+  const awaitingQuestion = isAsk && asked === null && access !== null && access !== 'off'
+  useEffect(() => {
+    if (placed && awaitingQuestion) askRef.current?.focus()
+  }, [placed, awaitingQuestion])
+
   // Esc and clicks outside dismiss the popover — the Lukk button must never
   // be the only way out (it once sat offscreen and trapped the bubble open)
   useDismissable(popRef, true, onClose)
@@ -420,8 +433,8 @@ export function AiQuickPopover({
         ) : isAsk && asked === null ? (
           <div className="ai-quick-ask">
             <input
+              ref={askRef}
               type="text"
-              autoFocus
               value={question}
               placeholder={t('ai.askPlaceholder')}
               spellCheck={false}

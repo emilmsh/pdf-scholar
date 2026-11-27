@@ -206,7 +206,7 @@ try {
   // again and follows it. «Spør …» attaches the document, and the `answer`
   // scenario cites page 1; asked from page 2, so the jump can be seen.
   await evaluate(send, `await window.api.aiSetConfig({ models: { compat: 'self/answer' } })`, PRELUDE)
-  const asked = await evaluate(
+  const chipAt = await evaluate(
     send,
     `
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -228,17 +228,49 @@ try {
       target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: r.right, clientY: r.bottom }))
     document.dispatchEvent(new Event('selectionchange'))
     for (let i = 0; i < 40 && !document.querySelector('.menu-ai-chip-wide'); i++) await sleep(100)
-    // «Spør …» is the wide chip; its bubble first asks for the question
-    document.querySelector('.menu-ai-chip-wide').click()
+    const c = document.querySelector('.menu-ai-chip-wide').getBoundingClientRect()
+    return { x: c.left + c.width / 2, y: c.top + c.height / 2 }
+  `,
+    PRELUDE
+  )
+  // «Spør …» is the wide chip; its bubble first asks for the question. Chosen
+  // and typed with REAL input events, because that is where it broke
+  // (2026-11-27): the menu keeps the focus on the pages, the bubble mounts
+  // hidden until measured, so `autoFocus` on its field was a no-op — and a
+  // question typed straight away ran the viewer's one-key shortcuts instead.
+  // «Hva …» hid every annotation (H), and the answer then kept as a comment
+  // was a mark nobody could see. Dispatched clicks and a value set from script
+  // never notice any of it.
+  for (const type of ['mousePressed', 'mouseReleased'])
+    await send('Input.dispatchMouseEvent', { type, x: chipAt.x, y: chipAt.y, button: 'left', clickCount: 1 })
+  const focused = await evaluate(
+    send,
+    `
     for (let i = 0; i < 50 && !document.querySelector('.ai-quick-ask input'); i++) await sleep(100)
-    const input = document.querySelector('.ai-quick-ask input')
-    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Hva sier innledningen?')
-    input.dispatchEvent(new Event('input', { bubbles: true }))
-    await sleep(100)
+    await sleep(200)
+    return document.activeElement === document.querySelector('.ai-quick-ask input')
+  `,
+    PRELUDE
+  )
+  ok(focused, 'the question field has the keyboard as soon as «Spør …» opens')
+  for (const ch of 'Hva sier innledningen?') {
+    if (/[a-z]/i.test(ch)) {
+      const code = `Key${ch.toUpperCase()}`
+      const vk = ch.toUpperCase().charCodeAt(0)
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: ch, code, text: ch, unmodifiedText: ch, windowsVirtualKeyCode: vk })
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: ch, code, windowsVirtualKeyCode: vk })
+    } else await send('Input.insertText', { text: ch })
+  }
+  const asked = await evaluate(
+    send,
+    `
+    const typed = document.querySelector('.ai-quick-ask input')?.value ?? null
+    const marksShown = document.querySelectorAll('.annot-highlights > *').length
     document.querySelector('.ai-quick-ask .ai-send').click()
     const save = () => bubble()?.querySelector('.ai-quick-actions button.btn-secondary')
     for (let i = 0; i < 300 && (!save() || save().disabled); i++) await sleep(100)
     return {
+      typed, marksShown,
       chips: [...bubble().querySelectorAll('.ai-quick-body .ai-chip')].map((c) => c.textContent.trim()),
       error: bubble().querySelector('.ai-error')?.textContent ?? null,
       page: document.querySelector('.toolbar input').value
@@ -246,25 +278,38 @@ try {
   `,
     PRELUDE
   )
+  ok(asked.typed === 'Hva sier innledningen?', `what is typed lands in the field (got "${asked.typed}")`)
+  ok(asked.marksShown > 0, `and ran no shortcut: the marks are still shown (${asked.marksShown})`)
   ok(asked.error === null, `«Spør …» is answered (${asked.error ?? 'no error'})`)
   ok(asked.chips.length === 1 && /1/.test(asked.chips[0]), `the answer carries its source chip (${asked.chips.join(', ')})`)
   ok(asked.page === '2', `asked from page 2 (page field says ${asked.page})`)
 
+  // A mark that was just made is SHOWN, also with the annotations hidden (H):
+  // hidden, it existed in the Merknader tab and nowhere on the page.
+  await evaluate(send, `document.querySelector('.pages').focus()`, PRELUDE)
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'h', code: 'KeyH', text: 'h', unmodifiedText: 'h', windowsVirtualKeyCode: 72 })
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'h', code: 'KeyH', windowsVirtualKeyCode: 72 })
   const kept = await evaluate(
     send,
     `
     const marks = () => document.querySelectorAll('.annot-highlights > *').length
-    const before = marks()
+    await sleep(300)
+    const hidden = marks() === 0
+    // The new mark is page 2's first; the pages come back from hidden a
+    // render later, so wait for it rather than read at once
+    const here = () => [...document.querySelectorAll('.pdf-page[data-page="2"] .annot-highlights > *')]
     bubble().querySelector('.ai-quick-actions button.btn-secondary').click()
-    for (let i = 0; i < 40 && marks() === before; i++) await sleep(100)
-    const r = [...document.querySelectorAll('.pdf-page[data-page="2"] .annot-highlights > *')].at(-1)?.getBoundingClientRect()
+    for (let i = 0; i < 60 && here().length === 0; i++) await sleep(100)
+    const r = here().at(-1)?.getBoundingClientRect()
     Array.from(bubble().querySelectorAll('.ai-quick-actions button')).at(-1).click()
     await sleep(200)
-    return { made: marks() === before + 1, at: r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null }
+    return { hidden, made: here().length === 1, shownAgain: marks() >= ${asked.marksShown} + 1, at: r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null }
   `,
     PRELUDE
   )
-  ok(kept.made && kept.at !== null, 'the cited answer is kept as a comment on the selection')
+  ok(kept.hidden, 'H hides the marks')
+  ok(kept.made && kept.at !== null, 'the cited answer is kept as a comment on the selection — and shown, though the marks were hidden')
+  ok(kept.shownAgain, 'with the marks that were there before')
   if (kept.at) {
     for (const type of ['mousePressed', 'mouseReleased'])
       await send('Input.dispatchMouseEvent', { type, x: kept.at.x, y: kept.at.y, button: 'left', clickCount: 1 })
