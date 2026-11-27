@@ -111,8 +111,21 @@ try {
     // By the Ollama row in its service menu: the URL field's placeholder is an
     // example endpoint and changed once already (v0.61.0 — this locator went
     // red with it, unnoticed until 2026-10-13)
-    const compatGroup = () => [...document.querySelectorAll('.ai-field-group')]
-      .find((g) => g.querySelector('select option[value="http://localhost:11434/v1"]'))
+    // A provider is a row that folds out (2026-11-27): its fields exist only
+    // while it is open, so reaching them starts with opening the row
+    const openRow = async (id) => {
+      const row = document.querySelector('.ai-provider[data-provider="' + id + '"]')
+      const head = row?.querySelector('.ai-provider-head')
+      if (head && head.getAttribute('aria-expanded') !== 'true') {
+        head.click()
+        await sleep(100)
+      }
+      return row
+    }
+    const compatGroup = async () => {
+      const row = await openRow('compat')
+      return row?.querySelector('select option[value="http://localhost:11434/v1"]') ? row : undefined
+    }
   `
 
   // Keyless factory profile: opening the assistant lands in the settings
@@ -123,10 +136,30 @@ try {
   `, PRELUDE)
 
   const settings = await evaluate(send, `
-    const g = compatGroup()
-    const groupNames = [...document.querySelectorAll('.ai-field-group > .ai-field > span')]
+    // Before anything is opened: what the folded list shows. The local
+    // endpoint's row is left out of the count — it opens by itself on a
+    // machine where Ollama answers.
+    const rows = [...document.querySelectorAll('.ai-provider:not([data-provider="compat"])')]
+    const folded = {
+      rows: rows.length,
+      open: rows.filter((r) => r.querySelector('.ai-provider-head')?.getAttribute('aria-expanded') === 'true').length,
+      fields: rows.reduce((n, r) => n + r.querySelectorAll('input, select').length, 0),
+      kinds: [...document.querySelectorAll('.ai-provider-kind')].map((k) =>
+        [...k.querySelectorAll('.ai-provider-name')].map((n) => n.textContent).join(',')
+      ),
+      kindHeads: document.querySelectorAll('.ai-provider-kind-head').length
+    }
+    const openai = await openRow('openai')
+    folded.opened = openai.querySelectorAll('input[type="password"]').length
+    openai.querySelector('.ai-provider-head').click()
+    await sleep(100)
+    folded.closedAgain = openai.querySelectorAll('input').length
+    const g = await compatGroup()
+    const groupNames = [...document.querySelectorAll('.ai-field-group > .ai-field > span, .ai-provider-name')]
       .map((s) => s.textContent)
+    await openRow('chatgpt')
     return {
+      folded,
       settingsShown: !!document.querySelector('.ai-settings'),
       groups: document.querySelectorAll('.ai-field-group').length,
       groupNames,
@@ -137,11 +170,9 @@ try {
       presets: g ? [...g.querySelectorAll('select option')].map((o) => o.textContent) : [],
       keyPlaceholder: g?.querySelector('input[type="password"]')?.placeholder ?? '',
       chatgpt: (() => {
-        const row = [...document.querySelectorAll('.ai-field-group')].find((el) =>
-          /ChatGPT/.test(el.querySelector('.ai-field > span')?.textContent ?? '')
-        )
+        const row = document.querySelector('.ai-provider[data-provider="chatgpt"]')
         return {
-          button: row?.querySelector('button')?.textContent ?? '',
+          button: row?.querySelector('.ai-provider-body button')?.textContent ?? '',
           hasKeyField: !!row?.querySelector('input'),
           hint: row?.querySelector('p.ai-field-hint')?.textContent ?? ''
         }
@@ -149,16 +180,29 @@ try {
     }
   `, PRELUDE)
   ok(settings.settingsShown, 'keyless start lands in the AI settings')
-  // KI-tilgang (the access switch) sits first, then the ten provider groups —
-  // the ChatGPT-plan sign-in right under the OpenAI key it is the keyless twin of
+  // KI-tilgang (the access switch) sits first, then the ten providers, each a
+  // folded row under a heading for what it needs: a key, a sign-in, or an
+  // address and a model name on top (Emil, 2026-11-27 — with every field
+  // stacked it was not clear which field belonged to which provider)
   ok(settings.groups === 11, `access group + ten provider groups render (got ${settings.groups})`)
+  const folded = settings.folded
+  ok(folded.rows === 9 && folded.open === 0 && folded.fields === 0, `the providers start folded, no field showing (${folded.open} open, ${folded.fields} fields)`)
+  ok(folded.kindHeads === 3, `three headings divide them (got ${folded.kindHeads})`)
+  ok(
+    /^OpenAI,/.test(folded.kinds[0] ?? '') && /Groq$/.test(folded.kinds[0] ?? '') &&
+      /^ChatGPT[^,]*$/.test(folded.kinds[1] ?? '') &&
+      /^Azure OpenAI,/.test(folded.kinds[2] ?? ''),
+    `by key, by subscription, by own setup (got ${folded.kinds.join(' | ')})`
+  )
+  ok(folded.opened === 1, `a row opens to its key field (got ${folded.opened})`)
+  ok(folded.closedAgain === 0, 'and folds away again')
   ok(!settings.mcpHere, '«AI tools on this computer» is not among the keys and providers (its own dialog)')
   ok(
     /KI-tilgang|AI access/.test(settings.groupNames[0] ?? '') &&
       settings.groupNames[1] === 'OpenAI' &&
-      /ChatGPT/.test(settings.groupNames[2] ?? '') &&
-      /Gemini/.test(settings.groupNames[4] ?? ''),
-    `ranked order: access, OpenAI, ChatGPT plan, Claude, Gemini (got ${settings.groupNames.slice(0, 5).join(' | ')})`
+      /Claude/.test(settings.groupNames[2] ?? '') &&
+      /Gemini/.test(settings.groupNames[3] ?? ''),
+    `ranked order: access, OpenAI, Claude, Gemini (got ${settings.groupNames.slice(0, 4).join(' | ')})`
   )
   // Signed out on the desktop: a sign-in BUTTON where the others have a key
   // field, and the one-line disclosure under it (unofficial route, whose terms)
@@ -179,7 +223,7 @@ try {
 
   // Pick the Ollama preset, type a model id, save
   await evaluate(send, `
-    const g = compatGroup()
+    const g = await compatGroup()
     const preset = g.querySelector('select')
     preset.value = 'http://localhost:11434/v1'
     preset.dispatchEvent(new Event('change', { bubbles: true }))
@@ -458,7 +502,7 @@ try {
       for (let i = 0; i < 30 && !document.querySelector('.ai-model-menu'); i++) await sleep(100)
       document.querySelector('.ai-model-more').click()
       for (let i = 0; i < 50 && !document.querySelector('.ai-settings'); i++) await sleep(100)
-      const g = compatGroup()
+      const g = await compatGroup()
       const inputs = [...g.querySelectorAll('.ai-field input:not([type="password"])')]
       setVal(inputs[0], ${JSON.stringify(quota.baseUrl)})
       setVal(inputs[1], 'self/quota')
