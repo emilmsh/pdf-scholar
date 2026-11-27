@@ -69,6 +69,10 @@ export async function runLiveSuite({ keys = {}, args = [], chatgptAccountId = ''
   /** A reasoning model can legitimately think for a long time before its first
    *  token; this is the point past which the app would be reported as hung. */
   const DEADLINE_MS = Number(value('deadline') ?? 120_000)
+  /** The reasoning effort every request carries. `--thinking=max` is how a
+   *  level above High is tried against the provider: the no-degrade-retry
+   *  check then says whether the model took it. */
+  const THINKING = value('thinking') ?? 'medium'
 
   const { runProviderChat, PROVIDER_PROFILES } = await loadAiCore()
   const keyFor = (provider) => keys[provider] ?? ''
@@ -149,7 +153,7 @@ export async function runLiveSuite({ keys = {}, args = [], chatgptAccountId = ''
       azure: { endpoint: '', deployment: '', apiVersion: '' },
       compat: { baseUrl: compatBaseUrl ?? '' },
       chatgptAccountId,
-      thinking: 'medium',
+      thinking: THINKING,
       catalog: {},
       req,
       emit,
