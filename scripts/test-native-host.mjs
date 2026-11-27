@@ -55,6 +55,8 @@ const throws = (fn, msg) => {
 // ---------- 1. Framing ----------
 console.log('1. stdio framing')
 {
+  eq(['off', 'low', 'medium', 'high', 'xhigh', 'max'].map(shared.chatHostProtocol),
+    [1, 1, 1, 1, 2, 2], 'only extended efforts require the newer desktop host')
   const { encodeFrame, FrameReader } = shared
   const msgs = [{ type: 'status', protocol: 1 }, { type: 'delta', text: 'æøå — 中文 😀' }, { a: [1, 2, 3], s: '\u0000\n"' }]
   const frames = msgs.map(encodeFrame)

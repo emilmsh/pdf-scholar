@@ -1395,7 +1395,12 @@ samme dag; `npm run check:models` keyless):
   **Et ekte avslag er ikke fremprovosert** — det krever et innhold
   klassifikatoren slår ut på.
 
-## Anbefalt mapping «Tenkeinnsats» (Av/Lav/Middels/Høy)
+## Anbefalt mapping «Tenkeinnsats»
+
+GPT-6.2 Astra hos OpenAI og med ChatGPT-abonnement har også **Ekstra høy**
+(`xhigh`) og **Maksimal** (`max`). Velger leseren en annen modell, viser menyen
+Høy og bruker den modellens vanlige mapping for Høy. Valget for Astra er lagret
+til leseren endrer tenkeinnsatsen. [OpenAIs modelloversikt](https://developers.openai.com/api/docs/models)
 
 | Valg | Opus 5 / Sonnet 5 / Haiku 5.5 | Fable 5 / 5.1 / 5.2, Opus 5.5 | Sonnet 5.5 | Haiku 4.5 (legacy) | gpt-5.6, GPT-6 Sol/Luna | GPT-6 Astra, GPT-6.1 Sol, grok 4.5–4.7, gpt-oss, gemini-4-argon/hydrogen | Mistral Medium 3.5 / Small 4 |
 |---|---|---|---|---|---|---|---|

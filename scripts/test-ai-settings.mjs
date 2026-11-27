@@ -259,7 +259,7 @@ try {
     const input = document.querySelector('.ai-model-menu input')
     if (!input) return { field: false }
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
-    set.call(input, 'gpt-6.2-sol')
+    set.call(input, 'gpt-6-ui-test')
     input.dispatchEvent(new Event('input', { bubbles: true }))
     await sleep(200)
     const rows = [...document.querySelectorAll('.ai-model-menu [data-menuitem]')]
@@ -269,33 +269,55 @@ try {
     const phraseRows = (() => { set.call(input, 'gpt 6'); input.dispatchEvent(new Event('input', { bubbles: true })); return null })()
     await sleep(200)
     const phraseTyped = document.querySelectorAll('.ai-model-menu .is-typed').length
-    set.call(input, 'gpt-6.2-sol'); input.dispatchEvent(new Event('input', { bubbles: true }))
+    set.call(input, 'gpt-6-ui-test'); input.dispatchEvent(new Event('input', { bubbles: true }))
     await sleep(200)
     return { field: true, typedRows, phraseTyped, placeholder: input.placeholder }
   `, PRELUDE)
   ok(typed.field, 'the search field shows once a curated provider is keyed')
   ok(/modell-id|model id/.test(typed.placeholder ?? ''), `the placeholder invites a typed id (got «${typed.placeholder}»)`)
   ok(
-    typed.typedRows?.length === 1 && typed.typedRows[0].value === 'openai:gpt-6.2-sol',
+    typed.typedRows?.length === 1 && typed.typedRows[0].value === 'openai:gpt-6-ui-test',
     `exactly one typed row, at the keyed curated provider (got ${JSON.stringify(typed.typedRows)})`
   )
-  ok(/gpt-6\.2-sol/.test(typed.typedRows?.[0]?.label ?? ''), 'the row names the id as typed')
+  ok(/gpt-6-ui-test/.test(typed.typedRows?.[0]?.label ?? ''), 'the row names the id as typed')
   ok(/OpenAI/.test(typed.typedRows?.[0]?.detail ?? '') && /ikke utprøvd|untested/.test(typed.typedRows?.[0]?.detail ?? ''), 'the row names the provider and says it is unverified')
   ok(typed.phraseTyped === 0, `a search phrase with a space offers no typed row (got ${typed.phraseTyped})`)
   const picked = await evaluate(send, `
     document.querySelector('.ai-model-menu .is-typed').click()
-    for (let i = 0; i < 30 && !document.querySelector('.ai-model-menu [data-value="openai:gpt-6.2-sol"][aria-checked="true"]'); i++) await sleep(100)
+    for (let i = 0; i < 30 && !document.querySelector('.ai-model-menu [data-value="openai:gpt-6-ui-test"][aria-checked="true"]'); i++) await sleep(100)
     const menu = document.querySelector('.ai-model-menu')
     return {
-      picked: menu?.querySelector('[data-value="openai:gpt-6.2-sol"]')?.getAttribute('aria-checked') === 'true',
-      listedUnderOpenAI: !!menu?.querySelector('[data-value="openai:gpt-6.2-sol"]'),
+      picked: menu?.querySelector('[data-value="openai:gpt-6-ui-test"]')?.getAttribute('aria-checked') === 'true',
+      listedUnderOpenAI: !!menu?.querySelector('[data-value="openai:gpt-6-ui-test"]'),
       filterCleared: (menu?.querySelector('input')?.value ?? '') === '',
       chip: document.querySelector('.ai-model-name')?.textContent ?? ''
     }
   `, PRELUDE)
   ok(picked.picked && picked.listedUnderOpenAI, 'picking the row stores the id and keeps it listed under its provider')
   ok(picked.filterCleared, 'the pick clears the search')
-  ok(/GPT-6\.2 Sol/.test(picked.chip), `the header chip names the typed model (got «${picked.chip}»)`)
+  ok(/GPT-6 Ui Test/.test(picked.chip), `the header chip names the typed model (got «${picked.chip}»)`)
+  const effortMenu = await evaluate(send, `
+    const menu = document.querySelector('.ai-model-menu')
+    const select = () => menu.querySelector('select')
+    const pickModel = async (id) => {
+      const row = menu.querySelector('[data-value="openai:' + id + '"]')
+      row.click()
+      for (let i = 0; i < 30 && row.getAttribute('aria-checked') !== 'true'; i++) await sleep(100)
+    }
+    await pickModel('gpt-6.2-astra')
+    const levels = [...select().options].map((o) => o.value)
+    select().value = 'max'
+    select().dispatchEvent(new Event('change', { bubbles: true }))
+    for (let i = 0; i < 30 && (await window.api.aiGetConfig()).thinking !== 'max'; i++) await sleep(100)
+    await pickModel('gpt-6.2-sol')
+    const limited = select().value === 'high' && !select().querySelector('option[value="xhigh"], option[value="max"]')
+    await pickModel('gpt-6.2-astra')
+    return { levels, limited, restored: select().value }
+  `, PRELUDE)
+  ok(effortMenu.levels.join(',') === 'off,low,medium,high,xhigh,max', 'Astra offers Extra high and Maximum')
+  ok(effortMenu.limited, 'switching away from Astra displays High and hides both extra options')
+  ok(effortMenu.restored === 'max', 'switching back to Astra restores Maximum')
+
   // Back to the compat state the rest of the run expects — and the throwaway
   // key out of the profile
   await evaluate(send, `

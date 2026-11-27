@@ -9,7 +9,7 @@
 // and this menu can never disagree about the active model.
 import { useEffect, useRef, useState } from 'react'
 import type { AiConfigView, AiProviderId, ThinkingLevel } from '../../../shared/types'
-import { OPENAI_REASONING_RE, PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
+import { effectiveThinking, OPENAI_REASONING_RE, PROVIDER_PROFILES, thinkingLevels } from '../../../shared/ai-provider-profile'
 import { compareVendors } from '../../../shared/ai-model-catalog'
 import { bridge } from '../bridge'
 import { t, useLang } from '../i18n'
@@ -21,7 +21,7 @@ import {
   stepAiTextScale
 } from '../ai-text-scale'
 import { useDismissable } from '../useDismissable'
-import { keyProviders, MODELS, modelOptions, THINKING_LEVELS } from './ai-models'
+import { keyProviders, MODELS, modelOptions, THINKING_LABELS } from './ai-models'
 import { typedModelOffers, type TypedModelOffer } from '../../../shared/typed-model'
 
 /** Show the filter field once the combined list gets this big (an OpenRouter
@@ -548,12 +548,12 @@ export function ModelQuickMenu({
         <label className="ai-field">
           <span>{t('ai.reasoning')}</span>
           <select
-            value={config.thinking}
+            value={effectiveThinking(provider, model, config.thinking)}
             onChange={(e) => patch({ thinking: e.target.value as ThinkingLevel })}
           >
-            {THINKING_LEVELS.map((l) => (
-              <option key={l.id} value={l.id}>
-                {t(l.key)}
+            {thinkingLevels(provider, model).map((level) => (
+              <option key={level} value={level}>
+                {t(THINKING_LABELS[level])}
               </option>
             ))}
           </select>

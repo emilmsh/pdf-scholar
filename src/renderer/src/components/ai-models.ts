@@ -566,12 +566,14 @@ export const SPEND_CAP_LABELS: Partial<Record<AiProviderId, string>> = {
   groq: 'Groq'
 }
 
-export const THINKING_LEVELS: { id: ThinkingLevel; key: MsgKey }[] = [
-  { id: 'off', key: 'ai.thinkOff' },
-  { id: 'low', key: 'ai.thinkLow' },
-  { id: 'medium', key: 'ai.thinkMedium' },
-  { id: 'high', key: 'ai.thinkHigh' }
-]
+export const THINKING_LABELS: Record<ThinkingLevel, MsgKey> = {
+  off: 'ai.thinkOff',
+  low: 'ai.thinkLow',
+  medium: 'ai.thinkMedium',
+  high: 'ai.thinkHigh',
+  xhigh: 'ai.thinkExtraHigh',
+  max: 'ai.thinkMax'
+}
 
 /** Configurable providers for the key manager and the model menu (mock is
  *  not listed — it needs no setup). Same RANKED order as providerLabels; a

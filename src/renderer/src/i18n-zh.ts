@@ -960,6 +960,8 @@ export const zh: Dict = {
   'ai.thinkLow': '低',
   'ai.thinkMedium': '中',
   'ai.thinkHigh': '高',
+  'ai.thinkExtraHigh': '超高',
+  'ai.thinkMax': '最高',
   'ai.textSize': '文字大小',
   'ai.textSizeWheelTip': '在面板上按住 Ctrl 并滚动也可以更改大小',
   'ai.textSmallerTip': '缩小文字',

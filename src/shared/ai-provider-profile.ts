@@ -17,7 +17,20 @@
 // `npm run test:ai-chat` holds each provider's request path to its row here —
 // a profile that disagrees with what the path actually sends is a test failure,
 // not a latent UI lie.
-import type { AiProviderId } from './types'
+import { STANDARD_THINKING_LEVELS, THINKING_LEVELS, type AiProviderId, type ThinkingLevel } from './types'
+
+/** The OpenAI API and ChatGPT plan both offer the higher efforts for this model. */
+export function thinkingLevels(provider: AiProviderId, model: string): readonly ThinkingLevel[] {
+  return (provider === 'openai' || provider === 'chatgpt') && model === 'gpt-6.2-astra'
+    ? THINKING_LEVELS
+    : STANDARD_THINKING_LEVELS
+}
+
+/** Keep the saved preference when switching models. The menu and the request
+ *  both use the effective level for the current model. */
+export function effectiveThinking(provider: AiProviderId, model: string, level: ThinkingLevel): ThinkingLevel {
+  return thinkingLevels(provider, model).includes(level) ? level : 'high'
+}
 
 export interface AiProviderProfile {
   /** How grounded citations travel: 'native' = the provider emits citation

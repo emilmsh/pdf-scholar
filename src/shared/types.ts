@@ -718,7 +718,9 @@ export type AiProviderId =
   | 'mock'
 
 /** How hard the model should reason; mapped per provider/model in main */
-export type ThinkingLevel = 'off' | 'low' | 'medium' | 'high'
+export const STANDARD_THINKING_LEVELS = ['off', 'low', 'medium', 'high'] as const
+export const THINKING_LEVELS = [...STANDARD_THINKING_LEVELS, 'xhigh', 'max'] as const
+export type ThinkingLevel = (typeof THINKING_LEVELS)[number]
 
 /** The dead-man switch over every AI request. Enforced where the request
  *  actually leaves (main's ai:chat handler, the extension's aiChat, the web

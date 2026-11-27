@@ -553,6 +553,29 @@ section('openai: gpt-6 (Astra curated 2026-09-05, Sol/Luna 2026-09-26)')
   }
 }
 
+section('saved Astra effort follows the active model and provider')
+{
+  const astra = 'gpt-6.2-astra'
+  responder = () => openAiSse({ deltas: ['ok'], response: { model: astra, output: [] } })
+  for (const provider of ['openai', 'chatgpt']) {
+    for (const thinking of ['xhigh', 'max']) {
+      await run({ provider, models: { [provider]: astra }, thinking })
+      ok(calls.length === 1 && calls[0].body.reasoning?.effort === thinking, `${provider} sends Astra ${thinking}`)
+
+      await run({ provider, models: { [provider]: 'gpt-6.2-sol' }, thinking })
+      ok(calls[0]?.body?.reasoning?.effort === 'high', `${provider} sends high after switching to Sol`)
+    }
+  }
+
+  responder = () => anthropicSse({ deltas: ['ok'] })
+  await run({ provider: 'anthropic', thinking: 'max' })
+  ok(calls[0]?.body?.output_config?.effort === 'high', 'switching to Claude uses its normal high request')
+
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'compat', models: { compat: astra }, thinking: 'max' })
+  ok(calls[0]?.body?.reasoning_effort === 'high', 'an identical id on a custom endpoint stays at high')
+}
+
 section('openai: degrade-on-400 + response.failed')
 {
   responder = (call) =>

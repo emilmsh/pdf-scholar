@@ -30,6 +30,7 @@ import type {
 import { isCatalogProvider, remoteModel } from './ai-model-catalog'
 import {
   COMPAT_SERVICES,
+  effectiveThinking,
   isCompatService,
   MISTRAL_BLIND_WHEN_REASONING_RE,
   MISTRAL_REASONING_RE,
@@ -43,12 +44,7 @@ import { AI_ERRORS } from './engine-errors'
 
 // ---------- Reasoning-effort mapping (verified 2026-07, see docs/MODEL-UPDATE.md) ----------
 
-type Effort = 'low' | 'medium' | 'high'
-const EFFORT: Record<Exclude<ThinkingLevel, 'off'>, Effort> = {
-  low: 'low',
-  medium: 'medium',
-  high: 'high'
-}
+type Effort = Exclude<ThinkingLevel, 'off'>
 
 /** What request shaping needs to know about an Anthropic model. Resolved from
  *  the live capability catalog when a snapshot exists (fetched via
@@ -144,8 +140,7 @@ function anthropicThinking(
     }
     return { maxTokens: 4096 }
   }
-  const effort = EFFORT[level]
-  const outputConfig = traits.effort.includes(effort) ? { effort } : undefined
+  const outputConfig = traits.effort.includes(level) ? { effort: level } : undefined
   if (traits.alwaysThinks) return { ...(outputConfig && { outputConfig }), maxTokens: 16000 }
   // No adaptive support (Haiku, pre-4.6 ids): send no thinking at all; effort
   // still goes through when the model accepts it (e.g. Opus 4.5).
@@ -1333,7 +1328,8 @@ export interface ProviderChatParams {
  *  missing-key case in its own words); this only validates provider-specific
  *  extras (Azure endpoint/deployment). Aborts surface as AI_ERRORS.aborted. */
 export async function runProviderChat(params: ProviderChatParams): Promise<AiChatResult> {
-  const { provider, key, models, azure, compat, thinking, catalog, req, emit, signal } = params
+  const { provider, key, models, azure, compat, catalog, req, emit, signal } = params
+  const thinking = effectiveThinking(provider, models[provider], params.thinking)
   const openAiTarget: ResponsesTarget = {
     url: 'https://api.openai.com/v1/responses',
     headers: { authorization: `Bearer ${key}` },

@@ -36,7 +36,7 @@ import type {
   PdfxApi
 } from '../../shared/types'
 import { runProviderChat } from '../../shared/ai-chat'
-import { PROVIDER_PROFILES } from '../../shared/ai-provider-profile'
+import { effectiveThinking, PROVIDER_PROFILES } from '../../shared/ai-provider-profile'
 import { AI_ERRORS } from '../../shared/engine-errors'
 import { CATALOG_PROVIDERS, refreshCatalog } from '../../shared/ai-model-catalog'
 import { store } from './extension-store'
@@ -45,6 +45,7 @@ import { DEFAULT_AI_MODELS } from '../../shared/defaults'
 import {
   NATIVE_HOST_NAME,
   NATIVE_HOST_PROTOCOL,
+  chatHostProtocol,
   nativePortFailure,
   type HostMessage,
   type HostRequest
@@ -248,9 +249,11 @@ async function chatThroughHost(
   emit: (text: string, kind?: AiDeltaKind, citation?: AiCitation) => void,
   signal: AbortSignal
 ): Promise<AiChatResult> {
+  const model = config.models.chatgpt
+  const thinking = effectiveThinking('chatgpt', model, config.thinking)
   const pieces: string[] = []
   const result = await hostExchange<AiChatResult>(
-    { type: 'chat', protocol: NATIVE_HOST_PROTOCOL, model: config.models.chatgpt, thinking: config.thinking, request },
+    { type: 'chat', protocol: chatHostProtocol(thinking), model, thinking, request },
     (m) => {
       if (m.type === 'delta') emit(m.text, m.kind, m.citation)
       else if (m.type === 'result-part') pieces.push(m.data)

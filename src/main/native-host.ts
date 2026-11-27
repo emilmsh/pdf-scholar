@@ -21,10 +21,12 @@
 import { app } from 'electron'
 import { createReadStream, writeSync } from 'node:fs'
 import type { AiChatResult, AiCitation, AiDeltaKind, FileError } from '../shared/types'
+import { THINKING_LEVELS } from '../shared/types'
 import { runProviderChat } from '../shared/ai-chat'
 import { AI_ERRORS } from '../shared/engine-errors'
 import { DEFAULT_AI_MODELS } from '../shared/defaults'
 import {
+  EXTENDED_EFFORT_PROTOCOL,
   FrameReader,
   HOST_READY,
   NATIVE_HOST_PROTOCOL,
@@ -36,8 +38,6 @@ import {
 import { refreshChatgpt } from './chatgpt-auth'
 import { freshChatgptTokens } from './chatgpt-renew'
 import { chatgptIo, chatgptLockPath, loadChatgpt } from './chatgpt-store'
-
-const THINKING = new Set(['off', 'low', 'medium', 'high'])
 
 function send(message: HostMessage): void {
   const frame = encodeFrame(message)
@@ -56,7 +56,7 @@ async function access(): Promise<{ access: string; accountId: string } | FileErr
 }
 
 async function handle(msg: HostRequest, signal: AbortSignal): Promise<void> {
-  if (msg.protocol !== NATIVE_HOST_PROTOCOL) {
+  if (msg.protocol !== NATIVE_HOST_PROTOCOL && msg.protocol !== EXTENDED_EFFORT_PROTOCOL) {
     send({ type: 'error', error: AI_ERRORS.chatgptHostOutdated })
     return
   }
@@ -66,7 +66,7 @@ async function handle(msg: HostRequest, signal: AbortSignal): Promise<void> {
     else send({ type: 'status', account: t.email || t.accountId })
     return
   }
-  if (typeof msg.model !== 'string' || !THINKING.has(msg.thinking) || !msg.request) {
+  if (typeof msg.model !== 'string' || !THINKING_LEVELS.includes(msg.thinking) || !msg.request) {
     send({ type: 'error', error: AI_ERRORS.chatgptHostFailed('malformed request') })
     return
   }
