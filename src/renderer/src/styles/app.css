@@ -7333,6 +7333,26 @@ button.bookmark-fold:hover {
   min-width: 0;
 }
 
+/* One entry off the list: a quiet cross at the end of its line, always there
+   (nothing here is hover-only — a finger gets the same row a mouse does) */
+.tool-ref-remove {
+  position: static;
+  flex: none;
+  margin-left: auto;
+  opacity: 0.45;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tool-ref-remove:hover,
+.tool-ref-remove:focus-visible {
+  opacity: 1;
+}
+
+.tool-ref-quiet .tool-ref-remove {
+  float: right;
+}
+
 /* The quote is not in the document's text — the one thing in the list that
    must not be missed, so it takes the error colour; found only in part is a
    quieter word in the secondary one */

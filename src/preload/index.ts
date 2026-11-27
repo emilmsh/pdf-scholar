@@ -78,6 +78,8 @@ const api: PdfxApi = {
   toolSessions: () => ipcRenderer.invoke('tool-sessions:list'),
   toolSession: (id: string) => ipcRenderer.invoke('tool-sessions:get', id),
   removeToolSession: (id: string) => ipcRenderer.invoke('tool-sessions:remove', id),
+  removeToolEntries: (id: string, entryIds: string[]) =>
+    ipcRenderer.invoke('tool-sessions:remove-entries', id, entryIds),
   onToolSessionsChanged: (cb: (change: ToolSessionsChange) => void) => {
     const listener = (_e: unknown, change: ToolSessionsChange): void => cb(change)
     ipcRenderer.on('tool-sessions:changed', listener)

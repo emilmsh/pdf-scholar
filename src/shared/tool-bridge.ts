@@ -305,6 +305,10 @@ export interface ToolSession {
   startedAt: number
   updatedAt: number
   entries: ToolEntry[]
+  /** The highest number a reference here has ever carried, kept once the
+   *  reader has taken entries off the list — so a number the tool wrote beside
+   *  a claim is not handed to another passage. Absent = the entries' own. */
+  top?: number
 }
 
 /** The most one session keeps; the oldest go first. A list this long is a log
@@ -383,11 +387,13 @@ export function sanitizeToolSession(v: unknown): ToolSession | null {
     taken.add(e.n)
   }
   const kept = entries.slice(-MAX_SESSION_ENTRIES)
+  const stored = typeof v.top === 'number' && Number.isInteger(v.top) && v.top > top && v.top < 1e9 ? v.top : 0
   return {
     ...info,
     title: tidy(v.title, MAX_TOPIC),
     updatedAt: Math.max(timeOf(v.updatedAt), kept[kept.length - 1].at),
-    entries: kept
+    entries: kept,
+    ...(stored ? { top: stored } : {})
   }
 }
 
@@ -408,7 +414,7 @@ export function withToolEntry(
   // the same number.
   const taken = (n: number): boolean => base.entries.some((e) => e.kind === 'reference' && e.n === n)
   if (entry.kind === 'reference' && (!(entry.n >= 1) || taken(entry.n))) {
-    entry = { ...entry, n: topNumber(base.entries) + 1 }
+    entry = { ...entry, n: Math.max(topNumber(base.entries), base.top ?? 0) + 1 }
   }
   return {
     ...base,
@@ -416,6 +422,21 @@ export function withToolEntry(
     updatedAt: Math.max(base.updatedAt, entry.at),
     entries: [...base.entries, entry].slice(-MAX_SESSION_ENTRIES)
   }
+}
+
+/** The session without these entries: the reader took them off the list
+ *  («Henvisninger», Emil 2026-11-27 — until then only a whole session could
+ *  go). Null when nothing is left, and the session goes with its last entry.
+ *  The numbers of the references that stay are theirs, and the highest ever
+ *  given is remembered, so the next reference does not take a number the tool
+ *  has already written beside another claim. An id the session does not hold
+ *  changes nothing (the same session back). */
+export function withoutToolEntries(session: ToolSession, ids: readonly string[]): ToolSession | null {
+  const gone = new Set(ids)
+  const entries = session.entries.filter((e) => !gone.has(e.id))
+  if (entries.length === session.entries.length) return session
+  if (entries.length === 0) return null
+  return { ...session, entries, top: Math.max(topNumber(session.entries), session.top ?? 0) }
 }
 
 /** What a window is told when a session's list changes */

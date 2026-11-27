@@ -445,6 +445,8 @@ export const zh: Dict = {
   'tool.noDocument': '无文档',
   'tool.clientOther': '其他工具',
   'tool.deleteTip': '删除此会话的引用',
+  'tool.deleteDocTip': '删除此文档的引用',
+  'tool.removeTip': '从列表中移除',
   'tool.emptyHere': '没有指向此文档的引用。',
   'tool.openElsewhereTip': '在该段落处打开文档',
   'tool.notFound': '未在文本中找到',

@@ -35,6 +35,7 @@ import { sharesWithAny, type McpPolicy } from '../shared/mcp'
 import { RECENT_THUMB_READ_MAX_BYTES } from '../shared/recent-thumbs'
 import {
   BRIDGE_TOKEN_FILE,
+  MAX_SESSION_ENTRIES,
   bridgePipePath,
   isReplyShaped,
   toolSessionMeta,
@@ -318,6 +319,15 @@ export function registerToolBridgeIpc(ctx: ToolBridgeContext): void {
   ipcMain.handle('tool-sessions:remove', async (_e, id: unknown): Promise<void> => {
     if (typeof id !== 'string') return
     await sessions().remove(id)
+    broadcast(() => ({ sessionId: id, shownHere: false }))
+  })
+  ipcMain.handle('tool-sessions:remove-entries', async (_e, id: unknown, entryIds: unknown): Promise<void> => {
+    if (typeof id !== 'string' || !Array.isArray(entryIds)) return
+    // Untrusted like the rest that comes off a window: ids only, and no more
+    // than a session can hold
+    const ids = entryIds.filter((v): v is string => typeof v === 'string' && v.length <= 64).slice(0, MAX_SESSION_ENTRIES)
+    if (ids.length === 0) return
+    await sessions().removeEntries(id, ids)
     broadcast(() => ({ sessionId: id, shownHere: false }))
   })
 

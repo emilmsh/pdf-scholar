@@ -201,6 +201,7 @@ export const webApi: PdfxApi = {
   toolSessions: async () => [],
   toolSession: async () => null,
   removeToolSession: async () => {},
+  removeToolEntries: async () => {},
   onToolSessionsChanged: () => () => {},
   mcpPickFolder: async () => null,
   mcpDocuments: async () => [],

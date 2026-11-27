@@ -1153,6 +1153,9 @@ export interface PdfxApi {
   toolSessions(): Promise<ToolSessionMeta[]>
   toolSession(id: string): Promise<ToolSession | null>
   removeToolSession(id: string): Promise<void>
+  /** Take single entries off a session's list (the «Henvisninger» tab's ✕ on
+   *  a reference, or on a document's heading); the session goes with its last */
+  removeToolEntries(id: string, entryIds: string[]): Promise<void>
   onToolSessionsChanged(cb: (change: ToolSessionsChange) => void): () => void
   setSettings(patch: Partial<Settings>): void
   /** Write an annotation into the PDF file (EmbedPDF/PDFium; the >150 MB path
