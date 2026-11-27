@@ -150,6 +150,9 @@ What it adds, on top of the notes:
   documents or only what was not found; **Group** by session or by document;
   **Sort** by newest or by page. Grouped by session, each card carries the
   number the tool wrote, and a session can be deleted from its heading.
+  A single reference goes with the ✕ on its card, and a document's from its
+  heading when grouped by document; the numbers of the ones that stay are
+  theirs, and a removed one's is not given to another passage.
   Showing the same passage again keeps its number. A reference into another
   document opens it there. References whose words were not found are marked.
 - **What was read is listed too**: "Read the text on pp. 1–15", "Read your

@@ -18,6 +18,9 @@
 // On disk nothing changed: references are still kept per session
 // (main/tool-sessions.ts), which is what gives each its number and lets a
 // whole session be deleted — from its heading, when grouped by session.
+// Since 2026-11-27 (Emil) a single reference goes too, from a ✕ on its card,
+// and a document's from its heading when grouped by document: until then a
+// passage pointed at by mistake stayed until its whole session was thrown out.
 //
 // What a tool READ is listed too, quietly, among the references: «Leste
 // teksten, s. 1–15», «Leste markeringen din». The reader should be able to
@@ -221,6 +224,23 @@ export function ToolReferencesView({
     sort === 'page' ? byName(a, b) || pageOf(a.entry) - pageOf(b.entry) || a.entry.at - b.entry.at : b.entry.at - a.entry.at
   )
 
+  /** Take entries off the list, each out of the session that keeps it */
+  const remove = (gone: Row[]): void => {
+    const bySession = new Map<string, string[]>()
+    for (const { entry, session } of gone) bySession.set(session.id, [...(bySession.get(session.id) ?? []), entry.id])
+    for (const [id, ids] of bySession) void bridge.removeToolEntries(id, ids)
+  }
+  const removeButton = (row: Row): React.JSX.Element => (
+    <button
+      className="ai-history-delete tool-ref-remove"
+      title={t('tool.removeTip')}
+      aria-label={t('tool.removeTip')}
+      onClick={() => remove([row])}
+    >
+      ✕
+    </button>
+  )
+
   type Section = { key: string; title: string; session?: ToolSession; rows: Row[] }
   const sections: Section[] = []
   if (group === 'none') sections.push({ key: 'all', title: '', rows: sorted })
@@ -307,7 +327,7 @@ export function ToolReferencesView({
                         {section.title} ({section.rows.filter((r) => r.entry.kind === 'reference').length})
                       </span>
                     </button>
-                    {section.session && (
+                    {section.session ? (
                       <button
                         className="ai-history-delete"
                         title={t('tool.deleteTip')}
@@ -315,12 +335,24 @@ export function ToolReferencesView({
                       >
                         ✕
                       </button>
+                    ) : (
+                      // A document's heading takes everything kept about that
+                      // document, in every session — what a tool read there
+                      // too, also when the list is showing only a part of it
+                      <button
+                        className="ai-history-delete"
+                        title={t('tool.deleteDocTip')}
+                        onClick={() => remove(rows.filter((r) => pathKey(r.entry.docPath ?? '') === section.key))}
+                      >
+                        ✕
+                      </button>
                     )}
                   </div>
                 )}
-                {(section.title && folded.has(section.key) ? [] : section.rows).map(({ entry: e }) =>
-                  e.kind === 'reference' ? (
-                    <div key={e.id} className={`tool-ref${e.found ? '' : ' is-missing'}`}>
+                {(section.title && folded.has(section.key) ? [] : section.rows).map((row) => {
+                  const e = row.entry
+                  return e.kind === 'reference' ? (
+                    <div key={e.id} className={`tool-ref${e.found ? '' : ' is-missing'}`} data-ref={e.id}>
                       {/* The number the tool wrote beside its claim («… [3]»)
                           is the session's own, so it stands only where the
                           session does: under its heading. In one list across
@@ -342,15 +374,17 @@ export function ToolReferencesView({
                         ) : !e.whole ? (
                           <span className="tool-ref-flag is-part">{t('tool.partly')}</span>
                         ) : null}
+                        {removeButton(row)}
                       </div>
                     </div>
                   ) : (
                     <p key={e.id} className="tool-ref-quiet">
                       {quietLine(e)}
                       {showsDoc && e.docName ? ` · ${e.docName}` : ''}
+                      {removeButton(row)}
                     </p>
                   )
-                )}
+                })}
               </div>
             ))
           )}

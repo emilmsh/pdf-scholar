@@ -14,7 +14,7 @@ import { mkdir, readFile, readdir, rename, stat, unlink, writeFile } from 'node:
 import { join } from 'node:path'
 import { isSessionId } from '../shared/mcp'
 import type { BridgeSessionInfo, ToolEntry, ToolSession } from '../shared/tool-bridge'
-import { MAX_SESSIONS, sanitizeToolSession, withToolEntry } from '../shared/tool-bridge'
+import { MAX_SESSIONS, sanitizeToolSession, withToolEntry, withoutToolEntries } from '../shared/tool-bridge'
 
 export interface ToolSessionStore {
   get(id: string): Promise<ToolSession | null>
@@ -23,6 +23,8 @@ export interface ToolSessionStore {
   /** Every session, the one last added to first */
   all(): Promise<ToolSession[]>
   remove(id: string): Promise<void>
+  /** Take entries off a session's list; the session goes with its last one */
+  removeEntries(id: string, entryIds: readonly string[]): Promise<void>
 }
 
 /** A session's file: its id (isSessionId) and `.json` */
@@ -126,6 +128,23 @@ export function createToolSessionStore(dir: string): ToolSessionStore {
     remove: (id) =>
       isSessionId(id)
         ? queue(id, () => unlink(fileOf(id)).catch(() => {}))
+        : Promise.resolve(),
+    removeEntries: (id, entryIds) =>
+      isSessionId(id)
+        ? queue(id, async () => {
+            const file = fileOf(id)
+            const have = await read(file)
+            if (!have || have.id !== id) return
+            const next = withoutToolEntries(have, entryIds)
+            if (next === have) return
+            if (!next) {
+              await unlink(file).catch(() => {})
+              return
+            }
+            const tmp = `${file}.${process.pid}.${++tmpSeq}.tmp`
+            await writeFile(tmp, JSON.stringify(next))
+            await renameOnto(tmp, file)
+          })
         : Promise.resolve()
   }
 }

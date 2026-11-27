@@ -367,6 +367,7 @@ export function createExtensionApi(base: PdfxApi): PdfxApi {
     toolSessions: async () => [],
     toolSession: async () => null,
     removeToolSession: async () => {},
+    removeToolEntries: async () => {},
     onToolSessionsChanged: () => () => {},
     mcpPickFolder: async () => null,
     mcpDocuments: async () => [],

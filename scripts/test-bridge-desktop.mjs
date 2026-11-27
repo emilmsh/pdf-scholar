@@ -341,6 +341,46 @@ async function main() {
     check('…and the list as it was read: every document’s, grouped by session', hop.picks === 'show=all,group=session,sort=newest' && hop.cards === 3, hop.picks)
     check('back in the first tab the list still stands', hop.backList, JSON.stringify(hop))
 
+    // One reference can be taken off the list, and a document's from its
+    // heading (Emil, 2026-11-27): until then only a whole session could go
+    console.log('\n7c. a reference taken off the list')
+    const sessionFile = join(app.profile, 'tool-sessions', sessions[0])
+    const onDisk = () => JSON.parse(readFileSync(sessionFile, 'utf-8'))
+    const one = await run(
+      send,
+      `const cards = () => [...document.querySelectorAll('.tab-view.active .tool-ref')];
+       const before = cards().length;
+       const cross = cards().find((c) => c.classList.contains('is-missing'))?.querySelector('.tool-ref-remove');
+       if (!cross) return { before, cross: false };
+       const at = cross.getBoundingClientRect();
+       const reachable = document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2) === cross;
+       click(cross);
+       let waited = 0;
+       while (waited < 4000 && cards().length === before) { await settle(100); waited += 100; }
+       return { before, cross: true, reachable, after: cards().length, missingLeft: cards().filter((c) => c.classList.contains('is-missing')).length };`
+    )
+    check('the ✕ on a card is reachable by a pointer and takes exactly that reference off the list', one.cross && one.reachable && one.before === 2 && one.after === 1 && one.missingLeft === 0, JSON.stringify(one))
+    const afterOne = onDisk()
+    check('…and out of the session on disk, the others keeping their numbers', afterOne.entries.filter((e) => e.kind === 'reference').map((e) => e.n).join() === '1,3' && afterOne.entries.some((e) => e.kind === 'read'), JSON.stringify(afterOne.entries.map((e) => [e.kind, e.n])))
+    const byDoc = await run(
+      send,
+      `await pick('show', 'all'); await pick('group', 'doc');
+       const heading = [...document.querySelectorAll('.tab-view.active .tool-refs-heading-name')].find((h) => /^Unopened paper\\.pdf/.test(h.textContent))?.closest('.tool-refs-heading');
+       const cross = heading?.querySelector('.ai-history-delete');
+       if (!cross) return { cross: false };
+       click(cross);
+       const names = () => [...document.querySelectorAll('.tab-view.active .tool-refs-heading-name')].map((h) => h.textContent);
+       let waited = 0;
+       while (waited < 4000 && names().some((n) => /^Unopened paper/.test(n))) { await settle(100); waited += 100; }
+       const out = { cross: true, headings: names(), cards: document.querySelectorAll('.tab-view.active .tool-ref').length };
+       await pick('group', 'none'); await pick('show', 'here');
+       return out;`
+    )
+    const afterDoc = onDisk()
+    check('a document’s heading takes everything kept about that document — what was read there too', byDoc.cross && byDoc.cards === 1 && !byDoc.headings.some((h) => /^Unopened paper/.test(h)) && !afterDoc.entries.some((e) => e.docPath === OTHER), JSON.stringify({ byDoc, left: afterDoc.entries.map((e) => [e.kind, e.docName]) }))
+    const renumbered = await server.call('show_passage', { path: DOC, page: 2, quote: 'Appen ble lansert i 1987 og har ti millioner brukere.', claim: 'En påstand uten dekning' })
+    check('the next reference does not take a number a removed one had', /^\[4\] NOT FOUND/.test(renumbered.text), renumbered.text)
+
     console.log('\n8. kept out, and switched off')
     await run(send, `await window.api.mcpSetPolicy({ excludedDocs: [${JSON.stringify(DOC)}] }); return true;`)
     const kept = await server.call('show_passage', { path: DOC, page: 4, quote: QUOTE })
