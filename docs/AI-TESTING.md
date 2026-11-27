@@ -29,6 +29,7 @@ npm run test:live -- --dry-run         # unlock the keys and stop: proves the pl
 npm run test:live -- --self-check      # no keys at all: the harness against a local fake endpoint
 npm run test:live -- --record          # …and save each stream into the replay library
 npm run test:live -- --provider=openrouter --model=moonshotai/kimi-k2.5
+npm run test:live -- --provider=chatgpt --model=gpt-6.2-astra --thinking=max   # a level above the default medium
 npm run test:live -- --env-keys        # force ANTHROPIC_API_KEY etc. instead
 ```
 

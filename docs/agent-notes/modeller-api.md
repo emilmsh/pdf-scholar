@@ -1418,10 +1418,24 @@ bruker, holdt av `test:ai-chat`):
 `xhigh`/`max` for OpenAI er lest i [OpenAIs modelloversikt](https://developers.openai.com/api/docs/models)
 2026-11-27 («Reasoning»-raden per modell, og GPT-6.1 Sols egen side) og
 gjelder bare de eksakte id-ene hos OpenAI og på abonnementet – samme id bak
-OpenRouter, et eget endepunkt eller Azure stopper på Høy. **Ikke kjørt mot
-leverandøren ennå**: første `test:live` etter dette må sende `max` til Astra
-på API-et og på abonnementet og se at nettet for avviste parametre ikke slår
-inn. `xhigh` for Grok og Gemini bygger på kildene ved `OPENAI_REASONING_RE`.
+OpenRouter, et eget endepunkt eller Azure stopper på Høy. `xhigh` for Grok og
+Gemini bygger på kildene ved `OPENAI_REASONING_RE`.
+
+**Kjørt mot leverandørene 2026-11-27** (`npm run test:live -- --provider=…
+--model=… --thinking=max`, flagget kom samme dag; før det sendte live-testen
+alltid `medium`):
+
+- ChatGPT-abonnementet, `max`: GPT-6.2 Astra, GPT-6.2 Sol, GPT-6.1 Sol,
+  GPT-6.1 Terra og GPT-6 Luna, 9/9 hver, én forespørsel (nettet for avviste
+  parametre slo ikke inn).
+- Gemini, `xhigh`: `gemini-4-hydrogen` svarte i én forespørsel (bildespørsmålet
+  fikk 503 fra Google, uten sammenheng med nivået). `gemini-4-neon` ble ikke
+  prøvd (429, kvoten brukt opp).
+- **Ikke prøvd:** OpenAI-API-et (`ai-no-credit`) og xAI (`ai-no-credit`). `max`
+  på API-nøkkelen hviler på dokumentasjonen alene.
+
+Én forespørsel viser at nivået ikke avvises, ikke at modellen tenker mer enn
+på Høy.
 
 Lagret valg skrives aldri om ved modellbytte: en modell som ikke tar nivået
 får nærmeste nivå over, ellers sitt høyeste (`effectiveThinking`) – Maksimal
