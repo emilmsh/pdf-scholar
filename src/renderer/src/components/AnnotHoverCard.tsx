@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { useEdgeFade } from '../edge-fade'
+import { CommentBody, useCommentSources } from './CommentSources'
 
 /** The card's width: ~50 characters of the reading face at 12 px, enough to
  *  read a paragraph without the lines breaking every few words */
@@ -32,6 +33,9 @@ interface Props {
 export default function AnnotHoverCard({ text, anchor, onPointerEnter, onPointerLeave }: Props): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null)
   useEdgeFade(scrollRef, [text])
+  // An AI answer kept as a comment names its sources in the text: here they
+  // are the chips they were in the chat (issue #168)
+  const sources = useCommentSources(text)
 
   const winW = window.innerWidth
   const winH = window.innerHeight
@@ -55,7 +59,7 @@ export default function AnnotHoverCard({ text, anchor, onPointerEnter, onPointer
       onPointerLeave={onPointerLeave}
     >
       <div className="annot-hover-text" ref={scrollRef}>
-        {text}
+        {sources ? <CommentBody parsed={sources} /> : text}
       </div>
     </div>
   )

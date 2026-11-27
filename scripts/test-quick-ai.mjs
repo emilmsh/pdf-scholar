@@ -200,6 +200,108 @@ try {
   ok(comment !== null && /Kort svar til slutt/.test(comment), `the mark carries the answer as its comment (got "${comment}")`)
   ok(comment !== null && !/INTERNAL-THOUGHT/.test(comment), 'and none of the reasoning')
 
+  // The answer's SOURCES go into the comment too (issue #168). A comment is
+  // plain text in the file, so a chip is kept as a «[s. 1]» with the cited
+  // passage listed under the answer — and the app draws the marker as a chip
+  // again and follows it. «Spør …» attaches the document, and the `answer`
+  // scenario cites page 1; asked from page 2, so the jump can be seen.
+  await evaluate(send, `await window.api.aiSetConfig({ models: { compat: 'self/answer' } })`, PRELUDE)
+  const asked = await evaluate(
+    send,
+    `
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    document.querySelector('.annot-popover-text')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    for (let i = 0; i < 20 && document.querySelector('.annot-popover'); i++) await sleep(100)
+    const page2 = () => document.querySelector('.pdf-page[data-page="2"]')
+    page2().scrollIntoView()
+    document.querySelector('.pages').dispatchEvent(new Event('scroll'))
+    const spans = () => [...page2().querySelectorAll('.textLayer span')].filter((s) => s.textContent.trim().length > 12)
+    for (let i = 0; i < 100 && spans().length < 4; i++) await sleep(200)
+    const target = spans()[3]
+    const range = document.createRange()
+    range.selectNodeContents(target)
+    const sel = getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+    const r = target.getBoundingClientRect()
+    for (const type of ['pointerup', 'mouseup'])
+      target.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: r.right, clientY: r.bottom }))
+    document.dispatchEvent(new Event('selectionchange'))
+    for (let i = 0; i < 40 && !document.querySelector('.menu-ai-chip-wide'); i++) await sleep(100)
+    // «Spør …» is the wide chip; its bubble first asks for the question
+    document.querySelector('.menu-ai-chip-wide').click()
+    for (let i = 0; i < 50 && !document.querySelector('.ai-quick-ask input'); i++) await sleep(100)
+    const input = document.querySelector('.ai-quick-ask input')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'Hva sier innledningen?')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await sleep(100)
+    document.querySelector('.ai-quick-ask .ai-send').click()
+    const save = () => bubble()?.querySelector('.ai-quick-actions button.btn-secondary')
+    for (let i = 0; i < 300 && (!save() || save().disabled); i++) await sleep(100)
+    return {
+      chips: [...bubble().querySelectorAll('.ai-quick-body .ai-chip')].map((c) => c.textContent.trim()),
+      error: bubble().querySelector('.ai-error')?.textContent ?? null,
+      page: document.querySelector('.toolbar input').value
+    }
+  `,
+    PRELUDE
+  )
+  ok(asked.error === null, `«Spør …» is answered (${asked.error ?? 'no error'})`)
+  ok(asked.chips.length === 1 && /1/.test(asked.chips[0]), `the answer carries its source chip (${asked.chips.join(', ')})`)
+  ok(asked.page === '2', `asked from page 2 (page field says ${asked.page})`)
+
+  const kept = await evaluate(
+    send,
+    `
+    const marks = () => document.querySelectorAll('.annot-highlights > *').length
+    const before = marks()
+    bubble().querySelector('.ai-quick-actions button.btn-secondary').click()
+    for (let i = 0; i < 40 && marks() === before; i++) await sleep(100)
+    const r = [...document.querySelectorAll('.pdf-page[data-page="2"] .annot-highlights > *')].at(-1)?.getBoundingClientRect()
+    Array.from(bubble().querySelectorAll('.ai-quick-actions button')).at(-1).click()
+    await sleep(200)
+    return { made: marks() === before + 1, at: r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : null }
+  `,
+    PRELUDE
+  )
+  ok(kept.made && kept.at !== null, 'the cited answer is kept as a comment on the selection')
+  if (kept.at) {
+    for (const type of ['mousePressed', 'mouseReleased'])
+      await send('Input.dispatchMouseEvent', { type, x: kept.at.x, y: kept.at.y, button: 'left', clickCount: 1 })
+  }
+  const sourced = await evaluate(
+    send,
+    `
+    for (let i = 0; i < 40 && !document.querySelector('.annot-popover-text'); i++) await sleep(100)
+    const text = document.querySelector('.annot-popover-text')?.value ?? null
+    const chip = document.querySelector('.annot-popover .comment-source')
+    const label = chip?.textContent.trim() ?? null
+    const tip = chip?.title ?? ''
+    // A real pointer must reach the chip: it sits in the bubble's last row
+    const c = chip?.getBoundingClientRect()
+    const reachable = !!c && document.elementFromPoint(c.left + c.width / 2, c.top + c.height / 2) === chip
+    chip?.click()
+    for (let i = 0; i < 50 && document.querySelector('.toolbar input').value !== '1'; i++) await sleep(100)
+    return {
+      text, label, tip, reachable,
+      page: document.querySelector('.toolbar input').value,
+      bubbleGone: !document.querySelector('.annot-popover')
+    }
+  `,
+    PRELUDE
+  )
+  ok(
+    sourced.text !== null && sourced.text.startsWith('Hva sier innledningen?') && /Dokumentet slår an tonen tidlig\. \[s\. 1\]/.test(sourced.text),
+    `the comment reads question, answer and «[s. 1]» where the chip stood (got "${sourced.text}")`
+  )
+  ok(
+    sourced.text !== null && /\n\[s\. 1\] «Innledningen setter rammen»$/.test(sourced.text),
+    'and lists the cited passage under the answer, word for word'
+  )
+  ok(sourced.label !== null && /1/.test(sourced.label) && sourced.reachable, `the comment bubble draws the marker as a chip a pointer reaches (${sourced.label})`)
+  ok(/Innledningen setter rammen/.test(sourced.tip), 'whose hover shows the passage')
+  ok(sourced.page === '1' && sourced.bubbleGone, `pressing it goes to the cited page and puts the bubble away (page ${sourced.page})`)
+
   console.log(failures === 0 ? '\ntest-quick-ai: all checks passed' : `\ntest-quick-ai: ${failures} check(s) FAILED`)
   process.exitCode = failures === 0 ? 0 : 1
 } catch (err) {

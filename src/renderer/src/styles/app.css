@@ -2545,6 +2545,45 @@ html.touch-ui .convs-row {
   color: var(--text-secondary);
 }
 
+/* A comment that names its sources (an AI answer kept as one, issue #168) is
+   READ here — the field's own text metrics, so the words stand where the
+   field will put them when a press on them swaps it in — with each «[s. 4]»
+   drawn as the assistant's chip (CommentSources.tsx). */
+.margin-card-text {
+  min-height: 19px;
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  cursor: text;
+  outline: none;
+}
+
+.margin-card-text:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 3px;
+}
+
+/* The chip itself is the chat's .ai-chip; outside the assistant it needs the
+   interface face (a card and the hover card are set in the reading one) */
+.comment-source {
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+
+/* …and beside a field that is being typed in — the comment bubble — the
+   chips stand in a row of their own, left of «Slett» */
+.comment-source-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 2px;
+  margin-right: 8px;
+}
+
 /* Delete: hidden until the card is hovered OR focused — focus-within is the
    touch path (tap the card, the control appears), per the touch-parity rule. */
 .margin-note-delete {
