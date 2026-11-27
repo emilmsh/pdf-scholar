@@ -138,6 +138,15 @@ export function ToolReferencesView({
   const [show, setShow] = useState<Show | null>(null)
   const [group, setGroup] = useState<Group>('none')
   const [sort, setSort] = useState<Sort>('newest')
+  /** The groups folded away, by their key. A grouping's keys are its own
+   *  (session ids, document paths), so changing the grouping starts open */
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set())
+  const fold = (key: string): void =>
+    setFolded((was) => {
+      const next = new Set(was)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
 
   const load = useCallback(() => {
     void bridge
@@ -233,9 +242,24 @@ export function ToolReferencesView({
               <div key={section.key} className="tool-refs-section">
                 {section.title && (
                   <div className="tool-refs-heading">
-                    <span className="tool-refs-heading-name">
-                      {section.title} ({section.rows.filter((r) => r.entry.kind === 'reference').length})
-                    </span>
+                    {/* A group folds like one in a file manager: the whole
+                        heading is the handle, the chevron says which way */}
+                    <button
+                      type="button"
+                      className="tool-refs-fold"
+                      aria-expanded={!folded.has(section.key)}
+                      onClick={() => fold(section.key)}
+                    >
+                      <span
+                        className={`outline-chevron${folded.has(section.key) ? '' : ' expanded'}`}
+                        aria-hidden="true"
+                      >
+                        ›
+                      </span>
+                      <span className="tool-refs-heading-name">
+                        {section.title} ({section.rows.filter((r) => r.entry.kind === 'reference').length})
+                      </span>
+                    </button>
                     {section.session && (
                       <button
                         className="ai-history-delete"
@@ -247,7 +271,7 @@ export function ToolReferencesView({
                     )}
                   </div>
                 )}
-                {section.rows.map(({ entry: e }) =>
+                {(section.title && folded.has(section.key) ? [] : section.rows).map(({ entry: e }) =>
                   e.kind === 'reference' ? (
                     <div key={e.id} className={`tool-ref${e.found ? '' : ' is-missing'}`}>
                       {/* The number the tool wrote beside its claim («… [3]»)

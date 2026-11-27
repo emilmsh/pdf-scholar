@@ -31,9 +31,20 @@ interface SettingsProps {
   onClose(): void
 }
 
-/** Key manager: one view with every provider's key field stacked — fill in
- *  the keys you have, leave the rest empty. Model and reasoning effort are
- *  NOT here: they are picked from the header chip's menu in the chat. */
+/** What a provider asks of the reader before it can be used: one pasted key,
+ *  a sign-in and no key at all, or an address and a model name on top of the
+ *  key. The list is divided by it (Emil, 2026-11-27: with every field stacked
+ *  in one column it was not clear why some providers had one field and others
+ *  four, or which field belonged to which). */
+const KINDS = ['key', 'plan', 'custom'] as const
+type Kind = (typeof KINDS)[number]
+const kindOf = (id: AiProviderId): Kind => (id === 'chatgpt' ? 'plan' : id === 'azure' || id === 'compat' ? 'custom' : 'key')
+
+/** Key manager: every provider as a row that folds out, under a heading for
+ *  what it needs. Folded, the list is a scan of what exists and what is set
+ *  up; opened, a row holds what that provider takes. Model and reasoning
+ *  effort are NOT here: they are picked from the header chip's menu in the
+ *  chat. */
 export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.JSX.Element {
   useLang()
   const [keys, setKeys] = useState<Record<AiProviderId, string>>({
@@ -67,6 +78,15 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
   const [chatgptAccount, setChatgptAccount] = useState(config.chatgpt.account)
   const [chatgptWaiting, setChatgptWaiting] = useState(false)
   const [chatgptError, setChatgptError] = useState<FileError | null>(null)
+  /** The rows folded out. All start folded: the fields live in this
+   *  component's state, so folding a row loses nothing typed in it */
+  const [open, setOpen] = useState<ReadonlySet<AiProviderId>>(new Set())
+  const toggle = (id: AiProviderId): void =>
+    setOpen((was) => {
+      const next = new Set(was)
+      if (!next.delete(id)) next.add(id)
+      return next
+    })
 
   // Auto-detection: when nothing is configured yet, one quiet probe of
   // Ollama's default port. no-cors on purpose — we only need "is something
@@ -78,7 +98,11 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 1500)
     fetch('http://localhost:11434/api/version', { mode: 'no-cors', signal: controller.signal })
-      .then(() => setOllamaFound(true))
+      .then(() => {
+        setOllamaFound(true)
+        // The offer to use it is inside the row, so the row opens with it
+        setOpen((was) => new Set(was).add('compat'))
+      })
       .catch(() => {})
       .finally(() => clearTimeout(timer))
     return () => {
@@ -153,6 +177,21 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
     window.dispatchEvent(new CustomEvent('pdfx:ai-config'))
   }
 
+  /** What a folded row says about itself: set up, or typed in and not saved */
+  const statusOf = (id: AiProviderId): { text: string; pending?: boolean } | null => {
+    const typed =
+      keys[id].trim() !== '' ||
+      (id === 'azure' &&
+        (endpoint.trim() !== config.azure.endpoint ||
+          deployment.trim() !== config.azure.deployment ||
+          apiVersion.trim() !== config.azure.apiVersion)) ||
+      (id === 'compat' && (compatUrl.trim() !== config.compat.baseUrl || compatModel.trim() !== config.models.compat))
+    if (typed) return { text: t('ai.rowUnsaved'), pending: true }
+    if (id === 'chatgpt') return chatgptAccount ? { text: t('ai.rowSignedIn') } : null
+    if (!config.hasKey[id]) return null
+    return { text: t(id === 'compat' || id === 'azure' ? 'ai.rowReady' : 'ai.rowKeySaved') }
+  }
+
   // The plain-web preview cannot store keys at all — just say so
   if (!config.keysSupported) {
     return (
@@ -203,13 +242,39 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
             </span>
           ))}
       </p>
-      {keyProviders().map(({ id, name }) =>
-        id === 'chatgpt' ? (
+      {KINDS.map((kind) => (
+        <div className="ai-provider-kind" key={kind}>
+          <div className="ai-provider-kind-head">
+            <span>{t(`ai.kind_${kind}` as const)}</span>
+            <span className="ai-provider-kind-needs">{t(`ai.kindNeeds_${kind}` as const)}</span>
+          </div>
+      {keyProviders().filter(({ id }) => kindOf(id) === kind).map(({ id, name }) => {
+        const isOpen = open.has(id)
+        const status = statusOf(id)
+        const head = (
+          <button
+            type="button"
+            className="ai-provider-head"
+            aria-expanded={isOpen}
+            onClick={() => toggle(id)}
+          >
+            <span className={`outline-chevron${isOpen ? ' expanded' : ''}`} aria-hidden="true">
+              ›
+            </span>
+            <span className="ai-provider-name">{name}</span>
+            {status && (
+              <span className={`ai-provider-status${status.pending ? ' is-pending' : ''}`}>{status.text}</span>
+            )}
+          </button>
+        )
+        return id === 'chatgpt' ? (
           // Not a key: a sign-in. The explanation that matters (unofficial
           // route, ChatGPT's terms) is one short line; the rest is on hover.
-          <div className="ai-field-group" key={id}>
+          <div className="ai-field-group ai-provider" key={id} data-provider={id}>
+            {head}
+            {isOpen && (
+            <div className="ai-provider-body">
             <div className="ai-field">
-              <span>{name}</span>
               {!config.chatgpt.supported ? (
                 <span className="ai-field-hint">{t('ai.chatgptDesktopOnly')}</span>
               ) : chatgptAccount ? (
@@ -247,11 +312,16 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
               </p>
             )}
             {chatgptError && <p className="ai-field-hint ai-field-error">{errorText(chatgptError)}</p>}
+            </div>
+            )}
           </div>
         ) : (
-        <div className="ai-field-group" key={id}>
+        <div className="ai-field-group ai-provider" key={id} data-provider={id}>
+          {head}
+          {isOpen && (
+          <div className="ai-provider-body">
           <label className="ai-field">
-            <span>{name}</span>
+            <span>{t('ai.keyLabel')}</span>
             <input
               type="password"
               value={keys[id]}
@@ -410,9 +480,13 @@ export function AiSettings({ config, onSaved, onClose }: SettingsProps): React.J
               </label>
             </>
           )}
+          </div>
+          )}
         </div>
         )
-      )}
+      })}
+        </div>
+      ))}
       <p className="ai-settings-note">
         {t('ai.settingsNote')}
         {/* One sentence per storage mode, saying what actually protects the key

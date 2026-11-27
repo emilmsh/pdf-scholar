@@ -222,9 +222,20 @@ async function main() {
        const out = { headings: [...document.querySelectorAll('.tool-refs-heading-name')].map((h) => h.textContent),
                      n: document.querySelector('.tool-ref .tool-ref-n')?.textContent,
                      canDelete: !!document.querySelector('.tool-refs-heading .ai-history-delete') };
+       // A group folds on its heading, as in a file manager
+       const fold = document.querySelector('.tool-refs-fold');
+       const at = fold.getBoundingClientRect();
+       out.reachable = document.elementFromPoint(at.left + 8, at.top + at.height / 2)?.closest('.tool-refs-fold') === fold;
+       out.openFirst = fold.getAttribute('aria-expanded') === 'true' && document.querySelectorAll('.tool-ref').length;
+       click(fold); await settle(150);
+       out.folded = fold.getAttribute('aria-expanded') === 'false' && document.querySelectorAll('.tool-ref').length === 0;
+       out.headingStays = document.querySelectorAll('.tool-refs-heading-name').length;
+       click(fold); await settle(150);
+       out.openAgain = document.querySelectorAll('.tool-ref').length;
        await pick('group', 'none');
        return out;`
     )
+    check('a group folds on its heading and opens again, the heading and its count staying', bySession.reachable && bySession.openFirst === 1 && bySession.folded && bySession.headingStays === 1 && bySession.openAgain === 1, JSON.stringify(bySession))
     check('grouped by session: under the topic the tool gave, with the number it wrote and a way to delete the session', bySession.headings.length === 1 && /^Navigasjon i appen · [^·]+ · /.test(bySession.headings[0]) && / \(1\)$/.test(bySession.headings[0]) && bySession.n === '[1]' && bySession.canDelete, JSON.stringify(bySession))
 
     const wrong = await server.call('show_passage', { path: DOC, page: 2, quote: 'Appen ble lansert i 1987 og har ti millioner brukere.', claim: 'En påstand uten dekning' })

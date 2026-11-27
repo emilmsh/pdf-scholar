@@ -7048,6 +7048,45 @@ button.bookmark-fold:hover {
   opacity: 1;
 }
 
+/* A group's heading folds it, as in a file manager: the whole heading is the
+   handle and the chevron turns (the outline's own, .outline-chevron) */
+.tool-refs-fold {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  margin-left: -4px;
+  padding: 1px 4px 1px 0;
+  border-radius: 6px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.tool-refs-fold:hover {
+  background: var(--hover);
+}
+
+.tool-refs-fold .outline-chevron,
+.ai-provider-head .outline-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-refs-fold .outline-chevron:hover,
+.ai-provider-head .outline-chevron:hover {
+  background: none;
+}
+
+.tool-refs-heading-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ai-history-heading {
   font-size: 12px;
   font-weight: 600;
@@ -7399,6 +7438,79 @@ button.bookmark-fold:hover {
 
 .ai-field-hint.ai-field-error {
   color: var(--danger);
+}
+
+/* The providers, divided by what each asks for (AiSettings.tsx): a heading
+   per kind, then one row per provider that folds out to its fields. Folded,
+   the list is a scan of what exists and what is already set up. */
+.ai-provider-kind {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-provider-kind-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  margin-bottom: 4px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.ai-provider-kind-needs {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.ai-provider {
+  gap: 0;
+}
+
+.ai-provider-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  margin-left: -4px;
+  padding: 4px 6px 4px 0;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+}
+
+.ai-provider-head:hover {
+  background: var(--hover);
+}
+
+.ai-provider-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-provider-status {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.ai-provider-status.is-pending {
+  color: var(--accent);
+}
+
+/* The fields sit under the name, past the chevron's column */
+.ai-provider-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0 10px 14px;
 }
 
 /* The ChatGPT sign-in row: a button where the other rows have a key field.
