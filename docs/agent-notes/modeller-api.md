@@ -1397,10 +1397,36 @@ samme dag; `npm run check:models` keyless):
 
 ## Anbefalt mapping «Tenkeinnsats»
 
-GPT-6.2 Astra hos OpenAI og med ChatGPT-abonnement har også **Ekstra høy**
-(`xhigh`) og **Maksimal** (`max`). Velger leseren en annen modell, viser menyen
-Høy og bruker den modellens vanlige mapping for Høy. Valget for Astra er lagret
-til leseren endrer tenkeinnsatsen. [OpenAIs modelloversikt](https://developers.openai.com/api/docs/models)
+**Menyen tilbyr de nivåene modellen tar, og ingen andre** (Emil, 2026-11-27;
+`thinkingLevels` i `src/shared/ai-provider-profile.ts`, som forespørselen også
+bruker, holdt av `test:ai-chat`):
+
+| Modell | Nivåer i menyen |
+|---|---|
+| GPT-6.2 Astra, GPT-6.2 Sol, GPT-6.1 Sol (OpenAI og ChatGPT-abonnement) | Lav – Maksimal (`low` … `xhigh`, `max`); ingen «Av» |
+| GPT-6.1 Terra, GPT-6 Luna (samme to) | Av – Maksimal |
+| Grok 4.5–4.7 (xAI) | Lav – Ekstra høy |
+| Grok 4.3 (xAI) | Av – Ekstra høy |
+| Gemini 4 Hydrogen, Neon (Google) | Lav – Ekstra høy |
+| Gemini 4 Argon, gpt-oss (Groq) | Lav – Høy |
+| Mistral Medium 3.5 / Small 4 | Av, Høy |
+| Claude | Det API-ets egen kapabilitetsliste sier når den finnes, ellers Lav – Høy; «Av» unntatt for Fable-familien og Opus 5.5; Haiku 4.5 og eldre ingen |
+| Azure-deployment | Av – Høy (navnet sier ikke hvilken modell det er) |
+| Alt annet som får `reasoning_effort` | Av – Høy, uten «Av» for modellene i `OPENAI_ALWAYS_REASONS_RE` |
+| Modeller forespørselen ikke sender noe til (Gemini 4 Carbon, Mistral Large 4 …) | Feltet vises ikke |
+
+`xhigh`/`max` for OpenAI er lest i [OpenAIs modelloversikt](https://developers.openai.com/api/docs/models)
+2026-11-27 («Reasoning»-raden per modell, og GPT-6.1 Sols egen side) og
+gjelder bare de eksakte id-ene hos OpenAI og på abonnementet – samme id bak
+OpenRouter, et eget endepunkt eller Azure stopper på Høy. **Ikke kjørt mot
+leverandøren ennå**: første `test:live` etter dette må sende `max` til Astra
+på API-et og på abonnementet og se at nettet for avviste parametre ikke slår
+inn. `xhigh` for Grok og Gemini bygger på kildene ved `OPENAI_REASONING_RE`.
+
+Lagret valg skrives aldri om ved modellbytte: en modell som ikke tar nivået
+får nærmeste nivå over, ellers sitt høyeste (`effectiveThinking`) – Maksimal
+på Astra er Høy på en modell som stopper der og Maksimal igjen ved retur, og
+«Av» på en modell som ikke kan slutte å resonnere er dens laveste.
 
 | Valg | Opus 5 / Sonnet 5 / Haiku 5.5 | Fable 5 / 5.1 / 5.2, Opus 5.5 | Sonnet 5.5 | Haiku 4.5 (legacy) | gpt-5.6, GPT-6 Sol/Luna | GPT-6 Astra, GPT-6.1 Sol, grok 4.5–4.7, gpt-oss, gemini-4-argon/hydrogen | Mistral Medium 3.5 / Small 4 |
 |---|---|---|---|---|---|---|---|

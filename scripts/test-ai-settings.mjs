@@ -310,12 +310,21 @@ try {
     select().dispatchEvent(new Event('change', { bubbles: true }))
     for (let i = 0; i < 30 && (await window.api.aiGetConfig()).thinking !== 'max'; i++) await sleep(100)
     await pickModel('gpt-6.2-sol')
+    const kept = select().value
+    // A typed id is listed only while it is the stored one: typed again
+    const input = menu.querySelector('input')
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, 'gpt-6-ui-test')
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    for (let i = 0; i < 30 && !menu.querySelector('.is-typed'); i++) await sleep(100)
+    menu.querySelector('.is-typed').click()
+    for (let i = 0; i < 30 && menu.querySelector('[data-value="openai:gpt-6-ui-test"]')?.getAttribute('aria-checked') !== 'true'; i++) await sleep(100)
     const limited = select().value === 'high' && !select().querySelector('option[value="xhigh"], option[value="max"]')
     await pickModel('gpt-6.2-astra')
-    return { levels, limited, restored: select().value }
+    return { levels, kept, limited, restored: select().value }
   `, PRELUDE)
-  ok(effortMenu.levels.join(',') === 'off,low,medium,high,xhigh,max', 'Astra offers Extra high and Maximum')
-  ok(effortMenu.limited, 'switching away from Astra displays High and hides both extra options')
+  ok(effortMenu.levels.join(',') === 'low,medium,high,xhigh,max', `Astra offers Low to Maximum, and no Off it cannot honour (got ${effortMenu.levels})`)
+  ok(effortMenu.kept === 'max', 'GPT-6.2 Sol takes Maximum too, and shows it')
+  ok(effortMenu.limited, 'a model with the four displays High and hides both extra options')
   ok(effortMenu.restored === 'max', 'switching back to Astra restores Maximum')
 
   // Back to the compat state the rest of the run expects — and the throwaway

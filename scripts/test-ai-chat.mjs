@@ -46,6 +46,8 @@ const {
   runProviderChat,
   opencodeHeaders,
   PROVIDER_PROFILES,
+  thinkingLevels,
+  effectiveThinking,
   COMPAT_SERVICES,
   fetchCompatModels,
   refreshCatalog,
@@ -553,7 +555,63 @@ section('openai: gpt-6 (Astra curated 2026-09-05, Sol/Luna 2026-09-26)')
   }
 }
 
-section('saved Astra effort follows the active model and provider')
+section('the efforts offered are the ones each model takes (thinkingLevels)')
+{
+  const levels = (provider, model, caps) => thinkingLevels(provider, model, caps).join(' ')
+  const four = 'off low medium high'
+
+  // OpenAI's own models, on the API and on the plan: no «off» where the model
+  // cannot stop reasoning, xhigh and max where OpenAI lists them
+  for (const provider of ['openai', 'chatgpt']) {
+    ok(levels(provider, 'gpt-6.2-astra') === 'low medium high xhigh max', `${provider}: GPT-6.2 Astra is low to max, no off`)
+    ok(levels(provider, 'gpt-6.2-sol') === 'low medium high xhigh max', `${provider}: GPT-6.2 Sol the same`)
+    ok(levels(provider, 'gpt-6.1-sol') === 'low medium high xhigh max', `${provider}: GPT-6.1 Sol the same`)
+    ok(levels(provider, 'gpt-6.1-terra') === 'off low medium high xhigh max', `${provider}: GPT-6.1 Terra is off to max`)
+    ok(levels(provider, 'gpt-6-luna') === 'off low medium high xhigh max', `${provider}: GPT-6 Luna is off to max`)
+    ok(levels(provider, 'gpt-6-ui-test') === four, `${provider}: an id nobody has documented gets the four`)
+  }
+  // The same id on somebody else's server is not OpenAI's promise
+  ok(levels('compat', 'gpt-6.2-astra') === 'low medium high', 'a custom endpoint: Astra stops at high')
+  ok(levels('openrouter', 'openai/gpt-6.1-terra') === four, 'OpenRouter: Terra stops at high')
+  ok(levels('azure', 'whatever-we-called-it') === four, 'an Azure deployment: the four, whatever its name')
+  // xhigh without max, where the provider documents it
+  ok(levels('xai', 'grok-4.7') === 'low medium high xhigh', 'Grok 4.7: low to xhigh, no off')
+  ok(levels('xai', 'grok-4.3') === 'off low medium high xhigh', 'Grok 4.3: off to xhigh')
+  ok(levels('gemini', 'gemini-4-hydrogen') === 'low medium high xhigh', 'Gemini 4 Hydrogen: low to xhigh')
+  ok(levels('gemini', 'gemini-4-argon') === 'low medium high', 'Gemini 4 Argon: low to high')
+  ok(levels('gemini', 'gemini-4-carbon') === '', 'Gemini 4 Carbon: no control is sent, so none is offered')
+  ok(levels('groq', 'openai/gpt-oss-120b') === 'low medium high', 'gpt-oss on Groq: low to high')
+  // Mistral: off and on
+  ok(levels('mistral', 'mistral-medium-2604') === 'off high', 'Mistral Medium 3.5: off or high')
+  ok(levels('mistral', 'mistral-large-4') === '', 'Mistral Large 4: none')
+  // Anthropic: the family rule, and the API's own list when there is one
+  ok(levels('anthropic', 'claude-sonnet-5') === four, 'Sonnet 5: the four')
+  ok(levels('anthropic', 'claude-haiku-5-5') === four, 'Haiku 5.5 takes effort, and is offered it')
+  ok(levels('anthropic', 'claude-haiku-4-5') === '', 'Haiku 4.5 takes none')
+  ok(levels('anthropic', 'claude-fable-5-2') === 'low medium high', 'Fable cannot stop thinking: no off')
+  const caps = { adaptiveThinking: true, budgetThinking: false, effort: ['low', 'medium', 'high', 'xhigh', 'max'] }
+  ok(levels('anthropic', 'claude-fable-5-2', caps) === 'low medium high xhigh max', 'the live capability list wins')
+  ok(levels('anthropic', 'claude-sonnet-5', { ...caps, effort: [] }) === '', 'a model whose list is empty is offered nothing')
+  ok(levels('mock', 'mock-1') === '', 'the mock has no control')
+
+  // A saved preference on a model that does not take it
+  ok(effectiveThinking('openai', 'gpt-6.2-astra', 'off') === 'low', '«Off» on a model that cannot stop is its lowest')
+  ok(effectiveThinking('xai', 'grok-4.7', 'max') === 'xhigh', '«Maximum» where xhigh is the top is xhigh')
+  ok(effectiveThinking('mistral', 'mistral-medium-2604', 'low') === 'high', '«Low» on Mistral is on')
+  ok(effectiveThinking('openai', 'gpt-6-ui-test', 'max') === 'high', '«Maximum» on a model with the four is high')
+  ok(effectiveThinking('gemini', 'gemini-4-carbon', 'max') === 'max', 'with no control the preference is left alone')
+  for (const provider of Object.keys(PROVIDER_PROFILES)) {
+    for (const model of ['gpt-6.2-astra', 'claude-fable-5-2', 'grok-4.3', 'mistral-medium-2604', 'x']) {
+      const offered = thinkingLevels(provider, model)
+      for (const level of ['off', 'low', 'medium', 'high', 'xhigh', 'max']) {
+        const landed = effectiveThinking(provider, model, level)
+        if (offered.length > 0 && !offered.includes(landed)) ok(false, `${provider}/${model}: ${level} lands outside the list`)
+      }
+    }
+  }
+}
+
+section('a saved effort follows the active model and provider')
 {
   const astra = 'gpt-6.2-astra'
   responder = () => openAiSse({ deltas: ['ok'], response: { model: astra, output: [] } })
@@ -562,10 +620,19 @@ section('saved Astra effort follows the active model and provider')
       await run({ provider, models: { [provider]: astra }, thinking })
       ok(calls.length === 1 && calls[0].body.reasoning?.effort === thinking, `${provider} sends Astra ${thinking}`)
 
-      await run({ provider, models: { [provider]: 'gpt-6.2-sol' }, thinking })
-      ok(calls[0]?.body?.reasoning?.effort === 'high', `${provider} sends high after switching to Sol`)
+      await run({ provider, models: { [provider]: 'gpt-6.1-terra' }, thinking })
+      ok(calls[0]?.body?.reasoning?.effort === thinking, `${provider} sends Terra ${thinking} too`)
+
+      await run({ provider, models: { [provider]: 'gpt-6-ui-test' }, thinking })
+      ok(calls[0]?.body?.reasoning?.effort === 'high', `${provider} sends high to a model with the four`)
     }
   }
+
+  responder = () => chatCompletionsSse({ deltas: ['ok'] })
+  await run({ provider: 'xai', models: { xai: 'grok-4.7' }, thinking: 'max' })
+  ok(calls[0]?.body?.reasoning_effort === 'xhigh', 'Grok 4.7 is sent xhigh for «Maximum»')
+  await run({ provider: 'xai', models: { xai: 'grok-4.7' }, thinking: 'off' })
+  ok(calls[0]?.body?.reasoning_effort === 'low', '... and low for «Off», as before')
 
   responder = () => anthropicSse({ deltas: ['ok'] })
   await run({ provider: 'anthropic', thinking: 'max' })
