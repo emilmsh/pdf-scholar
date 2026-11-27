@@ -142,12 +142,15 @@ import {
   nextAiRequestId,
   prepareDocumentForRequest,
   resolveCitation,
+  resolveQuote,
   semanticSearchPrompt
 } from '../ai'
 import type { AiDocument, ResolvedCitation } from '../ai'
 import { charCitationsToQuotes } from '../ai-retrieval'
 import { rememberRequestTokenLimit } from '../ai-token-limits'
 import AnnotHoverCard from './AnnotHoverCard'
+import { CommentSourceContext } from './CommentSources'
+import type { CommentSourceHandler } from './CommentSources'
 import AnnotPopover from './AnnotPopover'
 import LinkPreview from './LinkPreview'
 import AbstractBubble from './AbstractBubble'
@@ -761,6 +764,8 @@ export default function PdfViewer({
     /** Land keyboard focus in the comment field on open (comment action) */
     focusText?: boolean
   } | null>(null)
+  const annotPopoverRef = useRef(annotPopover)
+  annotPopoverRef.current = annotPopover
   /** Drag-resized size of a specific annotation's comment bubble, keyed by its
    *  local id. Per document session and deliberately NOT persisted: a brand-new
    *  note or text bubble must always open at the default shape (so the default
@@ -5677,6 +5682,8 @@ export default function PdfViewer({
     text: string
     /** The mark's box in viewport coordinates — the card hangs off it */
     anchor: { left: number; top: number; right: number; bottom: number }
+    /** Which document the mark is in — a source chip in the card goes there */
+    doc: DocId
   } | null>(null)
   const hoverTipRef = useRef(hoverTip)
   hoverTipRef.current = hoverTip
@@ -5759,12 +5766,12 @@ export default function PdfViewer({
       const open = hoverTipRef.current
       if (open && open.id === hit.id && open.text === text) return
       const anchor = annotClientRect(pageEl, pageNumber, hit)
-      if (anchor) setHoverTip({ id: hit.id, text, anchor })
+      if (anchor) setHoverTip({ id: hit.id, text, anchor, doc: docOf(paneOfEl(pageEl)) })
     } else {
       // Off the mark: the grace lets the pointer reach the card
       scheduleHoverClose()
     }
-  }, [pagePointFromClient, annotsFor, annotClientRect, clearHoverClose, scheduleHoverClose, closeHoverTip])
+  }, [pagePointFromClient, annotsFor, annotClientRect, clearHoverClose, scheduleHoverClose, closeHoverTip, docOf])
 
   // ---------- Annotation dragging (note bubbles + geometric shapes) ----------
 
@@ -7185,6 +7192,38 @@ export default function PdfViewer({
     [pushBack, waitForTextLayer, schedulePositionSave]
   )
 
+  /** A source chip in a COMMENT was pressed (issue #168, CommentSources.tsx):
+   *  an AI answer kept as a comment names its sources in its text, and they
+   *  are followed like the chat's own — to the page, the passage flashing when
+   *  the comment lists it and the page still holds it. The split view's other
+   *  file has no text read in here: its chips turn that column to the page. */
+  const onCommentSource = useCallback<CommentSourceHandler>(
+    ({ page, quote }, from) => {
+      // Which document the comment is in: read off where the chip sits — a
+      // margin card in the other file's column, or the bubble or hover card of
+      // a mark there (paneOfEl answers 'a' for anything outside the columns)
+      const other =
+        !!sessionBRef.current &&
+        (paneOfEl(from) === 'b' ||
+          (from.closest('.annot-popover') !== null && annotPopoverRef.current?.doc === 'split') ||
+          (from.closest('.annot-hover-tip') !== null && hoverTipRef.current?.doc === 'split'))
+      // The bubble and the card hang off a mark that is about to scroll away
+      // (closing the bubble saves what was typed in it)
+      setAnnotPopover(null)
+      closeHoverTip()
+      if (other) {
+        goToPaneBPageRef.current(page)
+        return
+      }
+      void ensureAiDocument().then((ensured) => {
+        if (!ensured || page > ensured.pages.length) return
+        const passage = quote ? resolveQuote(page, quote, ensured.pages) : null
+        void jumpToAiCitation(passage ?? { pageNumber: page, start: 0, end: 0 })
+      })
+    },
+    [closeHoverTip, ensureAiDocument, jumpToAiCitation]
+  )
+
   const consumeAiSeed = useCallback(() => setAiSeed(null), [])
 
   // «Les sammen» (tool-bridge.ts): what an AI tool outside the app may ask of
@@ -7877,6 +7916,9 @@ export default function PdfViewer({
   // The native web view only ever shows for the active tab (a background tab's
   // placeholder rect would float it over another document)
   return (
+    // Source chips in comments (CommentSources.tsx) reach onCommentSource
+    // through this — the tree under it is left at its own indentation
+    <CommentSourceContext.Provider value={onCommentSource}>
     <div
       ref={viewerRootRef}
       className={`viewer${immersive ? ' toolbar-unpinned' : ''}${immersive && hudFaded ? ' hud-faded' : ''}`}
@@ -8829,5 +8871,6 @@ export default function PdfViewer({
         />
       )}
     </div>
+    </CommentSourceContext.Provider>
   )
 }

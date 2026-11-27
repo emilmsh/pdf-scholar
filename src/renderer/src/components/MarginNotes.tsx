@@ -27,6 +27,7 @@ import { IconChevronDown } from './icons'
 import { bubblesWhileTyping } from '../keymap'
 import { t, useLang } from '../i18n'
 import { inTextField } from './TextContextMenu'
+import { CommentBody, useCommentSources } from './CommentSources'
 
 /** Vertical gap between stacked cards, CSS px */
 const CARD_GAP = 8
@@ -167,7 +168,8 @@ export function MarginCard({
   selected,
   onCommit,
   onSelect,
-  onDelete
+  onDelete,
+  onHeight
 }: {
   a: PageAnnotation
   pageNumber: number
@@ -181,7 +183,34 @@ export function MarginCard({
   onCommit(pageNumber: number, localId: string, text: string): void
   onSelect(pageNumber: number, localId: string): void
   onDelete(pageNumber: number, localId: string): void
+  /** The card changed height on its own (read ⇄ write, below): a host that
+   *  stacks the cards by their heights lays them out again */
+  onHeight?: (() => void) | undefined
 }): React.JSX.Element {
+  // A comment that names its sources — an AI answer kept as one, «[s. 4]» in
+  // the text and the passages listed under it (issue #168) — is READ with the
+  // markers as chips and the list folded into them, and WRITTEN as the plain
+  // text it is in the file: a press on the words swaps the one for the other.
+  // Every other comment has no such state and is the bare field it always was.
+  const sources = useCommentSources(a.contents)
+  const [editing, setEditing] = useState(false)
+  const reading = sources !== null && !editing
+  const fieldRef = useRef<HTMLTextAreaElement>(null)
+  const swapped = useRef(false)
+  useLayoutEffect(() => {
+    // Only on the swap itself: a card that mounts is laid out by its host
+    if (!swapped.current) {
+      swapped.current = true
+      return
+    }
+    const ta = fieldRef.current
+    if (ta) {
+      autosize(ta)
+      ta.focus()
+    }
+    onHeight?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing])
   return (
     <div
       // Contents in the key (set by the callers): an external text change
@@ -197,29 +226,50 @@ export function MarginCard({
       style={{ borderLeftColor: rgbCss(a.color, 1), ...extraProps?.style }}
     >
       {context && <div className="margin-card-context">{context}</div>}
-      <textarea
-        defaultValue={a.contents ?? ''}
-        placeholder={t(a.type === 'note' ? 'menu.notePlaceholder' : 'popover.commentPlaceholder')}
-        spellCheck={false}
-        rows={1}
-        onFocus={() => onSelect(pageNumber, a.id)}
-        onKeyDown={(e) => {
-          // Keep viewer shortcuts (H, W, Delete …) out of typed text; Esc and
-          // Ctrl/Cmd+Enter both commit via the blur below. App shortcuts still
-          // bubble to the window handler, same as the comment popover — and
-          // asking the keymap means a REBOUND find gets through too, not just
-          // Ctrl+F.
-          if (bubblesWhileTyping(e)) return
-          e.stopPropagation()
-          if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
-            ;(e.target as HTMLTextAreaElement).blur()
-          }
-        }}
-        onBlur={(e) => {
-          const text = e.target.value.trim()
-          if (text !== (a.contents ?? '').trim()) onCommit(pageNumber, a.id, text)
-        }}
-      />
+      {reading ? (
+        <div
+          className="margin-card-text"
+          tabIndex={0}
+          title={t('margin.editSourcedTip')}
+          onClick={() => setEditing(true)}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return // a chip's own Enter
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              e.stopPropagation()
+              setEditing(true)
+            }
+          }}
+        >
+          <CommentBody parsed={sources} />
+        </div>
+      ) : (
+        <textarea
+          ref={fieldRef}
+          defaultValue={a.contents ?? ''}
+          placeholder={t(a.type === 'note' ? 'menu.notePlaceholder' : 'popover.commentPlaceholder')}
+          spellCheck={false}
+          rows={1}
+          onFocus={() => onSelect(pageNumber, a.id)}
+          onKeyDown={(e) => {
+            // Keep viewer shortcuts (H, W, Delete …) out of typed text; Esc and
+            // Ctrl/Cmd+Enter both commit via the blur below. App shortcuts still
+            // bubble to the window handler, same as the comment popover — and
+            // asking the keymap means a REBOUND find gets through too, not just
+            // Ctrl+F.
+            if (bubblesWhileTyping(e)) return
+            e.stopPropagation()
+            if (e.key === 'Escape' || (e.key === 'Enter' && (e.ctrlKey || e.metaKey))) {
+              ;(e.target as HTMLTextAreaElement).blur()
+            }
+          }}
+          onBlur={(e) => {
+            const text = e.target.value.trim()
+            if (text !== (a.contents ?? '').trim()) onCommit(pageNumber, a.id, text)
+            setEditing(false)
+          }}
+        />
+      )}
       <button
         className="margin-note-delete"
         title={t('app.delete')}
@@ -567,6 +617,7 @@ export default function MarginNotes({
           onCommit={onCommit}
           onSelect={onSelect}
           onDelete={onDelete}
+          onHeight={() => restackRef.current()}
           extraProps={{
             'data-anchor': anchor.y,
             style: { top: anchor.y - strip.top },

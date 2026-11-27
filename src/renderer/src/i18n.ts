@@ -427,6 +427,7 @@ const nb = {
   'margin.sideRight': 'Høyre',
   'margin.prevComment': 'Forrige kommentar',
   'margin.nextComment': 'Neste kommentar',
+  'margin.editSourcedTip': 'Klikk i teksten for å redigere – brikkene går til kilden',
   'settings.reading': 'Lesing',
   'settings.selectionMenuAuto': 'Meny ved tekstmarkering',
   'settings.selectionMenuAutoTip':
@@ -1791,6 +1792,7 @@ const en: Dict = {
   'margin.sideRight': 'Right',
   'margin.prevComment': 'Previous comment',
   'margin.nextComment': 'Next comment',
+  'margin.editSourcedTip': 'Click the text to edit — the chips go to the source',
   'settings.reading': 'Reading',
   'settings.selectionMenuAuto': 'Menu on text selection',
   'settings.selectionMenuAutoTip':

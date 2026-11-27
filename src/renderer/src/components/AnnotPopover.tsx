@@ -22,6 +22,7 @@ import { useResizable } from '../useResizable'
 import type { BoxSize } from '../useResizable'
 import { MarkupColorRow } from './SelectionMenu'
 import { inTextField } from './TextContextMenu'
+import { CommentSourceRow, useCommentSources } from './CommentSources'
 
 /** Marks made by a DRAWING tool (the pen and the shapes), as opposed to marks
  *  anchored to text. They share the pen case; text markup keeps its own
@@ -103,6 +104,7 @@ export default function AnnotPopover({
   useLang()
   const [text, setText] = useState(annotation.contents ?? '')
   const textRef = useRef<HTMLTextAreaElement>(null)
+  const sources = useCommentSources(annotation.type !== 'freetext' ? text : undefined)
 
   // The default shape, when no dragged size overrides it: the field at the
   // text's height (fitH), the whole text after a double-click (showAll), the
@@ -346,6 +348,10 @@ export default function AnnotPopover({
       )}
 
       <div className="annot-popover-actions">
+        {/* The sources the comment names (an AI answer kept as one, issue
+            #168), as chips beside the field: in it the markers stay the text
+            they are in the file */}
+        {sources && <CommentSourceRow parsed={sources} />}
         <button className="annot-delete" onClick={onDelete}>
           {t('app.delete')}
         </button>

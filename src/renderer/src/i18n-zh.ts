@@ -366,6 +366,7 @@ export const zh: Dict = {
   'margin.sideRight': '右',
   'margin.prevComment': '上一条评论',
   'margin.nextComment': '下一条评论',
+  'margin.editSourcedTip': '点击文字即可编辑 — 页码标签可跳转到来源',
   'settings.reading': '阅读',
   'settings.selectionMenuAuto': '选中文本时显示菜单',
   'settings.selectionMenuAutoTip':

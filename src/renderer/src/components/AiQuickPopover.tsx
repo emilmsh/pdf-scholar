@@ -25,7 +25,7 @@ import type {
 } from '../../../shared/types'
 import { PROVIDER_PROFILES } from '../../../shared/ai-provider-profile'
 import { appendDelta } from '../../../shared/ai-stream'
-import { answerComment } from '../../../shared/answer-comment'
+import { answerCommentWithSources } from '../../../shared/answer-comment'
 import { bridge } from '../bridge'
 import { isSharedWith, markSharedWith } from '../ai-sharing'
 import { prettyModelName, providerLabels } from './ai-models'
@@ -33,6 +33,7 @@ import { FallbackChip } from './FallbackChip'
 import {
   askSystem,
   askUserMessage,
+  citationPage,
   critiqueSystem,
   excerptSystemNote,
   formatTokens,
@@ -507,7 +508,17 @@ export function AiQuickPopover({
             title={t(isFigure ? 'ai.saveAsNoteTip' : 'ai.saveAsCommentTip')}
             disabled={!done || !!error || commentSaved}
             onClick={() => {
-              onSaveComment(answerComment(finalRef.current, isAsk ? asked : null))
+              // The answer's source chips go along as text — «[s. 4]» and the
+              // passage under the answer — which the viewer draws as chips
+              // again wherever it shows the comment (issue #168)
+              onSaveComment(
+                answerCommentWithSources(
+                  parts ?? [{ text: finalRef.current, citations: [] }],
+                  isAsk ? asked : null,
+                  { pageAbbrev: t('app.pageAbbrev'), heading: t('ai.exportPassages') },
+                  (c) => citationPage(c, state.document?.doc ?? null)
+                )
+              )
               setCommentSaved(true)
             }}
           >
