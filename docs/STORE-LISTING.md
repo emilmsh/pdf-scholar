@@ -73,7 +73,7 @@ Selecting text opens the annotation menu at the selection; every mark is listed 
 
 AI ASSISTANT (optional, bring your own key)
 • Answers cite their sources: each claim links to the passage it came from
-• Structured article summaries; explain, simplify, critique or define selected text
+• Structured article summaries; explain, simplify, critique or ask a question about selected text
 • A figure or region can be cropped into the chat and asked about
 • A scanned document is read the same way: the assistant gets the text recognised on your computer, with clickable citations, instead of only pages attached as images
 • Conversations are kept with their document and listed across documents in the library, searchable; an earlier conversation, about this paper or another, can be attached to a new question as context
@@ -124,7 +124,7 @@ ANNOTERING
 
 AI-ASSISTENT (valgfri, egen nøkkel)
 • Svarene viser kildene sine: hver påstand lenker til avsnittet den kom fra
-• Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller definer merket tekst
+• Strukturerte artikkelsammendrag; forklar, forenkle, kritiser eller still et spørsmål om merket tekst
 • En figur eller et område kan klippes inn i samtalen og spørres om
 • Et skannet dokument leses på samme måte: assistenten får teksten som er gjenkjent på maskinen din, med klikkbare kildehenvisninger, i stedet for bare sider lagt ved som bilder
 • Samtaler beholdes sammen med dokumentet og listes på tvers av dokumenter i biblioteket, søkbare; en tidligere samtale, om denne artikkelen eller en annen, kan legges ved et nytt spørsmål som kontekst
