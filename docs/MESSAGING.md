@@ -484,6 +484,15 @@ that.)*
   cropping in general; PRIVACY.md states the sending rules and copy must not
   exceed it.)*
 - Questions about your own annotations ("summarize what I've highlighted")
+- An answer from the selection menu can be saved as a comment on the passage
+  it was asked about, its sources along: a page marker («[p. 4]») where each
+  source stood and the cited words listed under the answer. In other readers
+  that is plain text; in PDF Scholar each marker is a link to the passage
+  *(issue #137, sources since #168, v0.90.0. Say «plain text in other
+  readers» wherever the link is claimed — a PDF comment holds no button, and
+  Emil's bar is that other viewers see clean text, not an address they
+  cannot read (2026-11-27). README and the Microsoft Store's «What's new»;
+  the landing page and the store descriptions leave it out at their length)*
 - A scanned document is read the same way *(v0.69)*: the assistant gets the
   recognised text of the whole document, with clickable citations like any
   other PDF, instead of only the pages you attach as images — and the panel

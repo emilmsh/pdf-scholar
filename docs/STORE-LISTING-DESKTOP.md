@@ -156,28 +156,25 @@ Kildekode: https://github.com/emilmsh/pdf-scholar
 
 ---
 
-## What's new in this version (≤ 1 500 chars) — v0.89.1
+## What's new in this version (≤ 1 500 chars) — v0.90.1
 
-*(The Store last carried v0.85.0's notes, so this covers v0.85.1–v0.89.1.
-«Les sammen» and the AI tools outside the app are left out — the Store build
-cannot connect to them.)*
+*(The Store was sent v0.89.1's notes on 2026-11-27, so this covers
+v0.89.2–v0.90.1. The changes to «Les sammen»'s reference list are left out —
+the Store build cannot connect to the AI tools outside the app. The next full
+release restamps the heading with its own version and adds what came after.)*
 
 **EN:**
 ```
-• AI settings: the providers are rows under three headings for what each needs – a key, a sign-in, or an address and a model name on top – and each opens to its own fields
-• Reasoning effort: the menu offers the levels the chosen model takes, with «Extra high» and «Maximum» where the provider has them
-• Your name on annotations is filled in from the system the first time, and can be changed or cleared
-• A custom endpoint on OpenCode gets the two headers OpenCode asks of a client
-• A tighter gear menu
+• An answer from the selection menu saved as a comment brings its sources along: «[p. 4]» where each source stood and the cited words under the answer – plain text in any PDF reader, a link to the passage in PDF Scholar
+• «Ask …» in the selection menu puts the cursor in the question field, so what you type no longer runs a keyboard shortcut
+• A mark made while annotations are hidden shows them again
 ```
 
 **NO:**
 ```
-• KI-innstillinger: leverandørene er rader under tre overskrifter for hva hver trenger – en nøkkel, en innlogging, eller adresse og modellnavn i tillegg – og hver åpnes til sine egne felt
-• Tenkeinnsats: menyen viser nivåene den valgte modellen tar, med «Ekstra høy» og «Maksimal» der leverandøren har dem
-• Navnet ditt på merknader fylles inn fra systemet første gang, og kan endres eller fjernes
-• Et eget endepunkt hos OpenCode får de to hodene OpenCode ber en klient om
-• En strammere tannhjulmeny
+• Et svar fra markeringsmenyen som lagres som kommentar, tar med kildene: «[s. 4]» der hver kilde sto og de siterte ordene under svaret – ren tekst i alle PDF-lesere, en lenke til stedet i PDF Scholar
+• «Spør …» i markeringsmenyen setter markøren i spørsmålsfeltet, så det du skriver ikke lenger utløser en hurtigtast
+• Et merke du lager mens merknadene er skjult, viser dem igjen
 ```
 
 ---

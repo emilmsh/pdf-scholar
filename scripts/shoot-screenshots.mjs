@@ -440,7 +440,11 @@ const SHOTS = [
       await ui.expectTabs(2)
       await ui.fitWidth()
       await ui.openScanSearch('attention')
-      await ui.settle(3400)
+      // Until every page is read: the hit count and the list grow while the
+      // pass runs, and a fixed wait photographed «2 of 18» under «Reading
+      // scanned pages … 2 of 4» on 2026-11-28 (the shipped frame says 2 of 49)
+      await ui.waitForScanRead()
+      await ui.settle(900)
     `,
     cleanup: `await ui.closeActiveTab(); await ui.expectTabs(1)`
   },
@@ -1145,6 +1149,14 @@ const ui = {
    *  of blank margin — fine when the frame is about the app, wrong when the
    *  frame is about the page filling the window. Anchored on the text rather
    *  than a pixel offset, so it survives a zoom or a margin change. */
+  /** The search bar's «Reading scanned pages … N of M» note is there while
+   *  the OCR pass runs and gone when the last page is read */
+  async waitForScanRead() {
+    const note = () => document.querySelector('.search-bar .search-ai-note, .search-ai-note');
+    for (let i = 0; i < 4; i++) { if (note()) break; await settle(250) }
+    for (let i = 0; i < 240 && note(); i++) await settle(250);
+    if (note()) throw new Error('the scan was still being read after a minute: ' + (note().textContent || '').trim());
+  },
   async scrollTextToTop(phrase, pad = 40) {
     const host = document.querySelector('.pages');
     const span = [...host.querySelectorAll('.textLayer span')]
@@ -1823,6 +1835,21 @@ const ui = {
     // (PRELUDE is a template literal: the backslash must be doubled to reach the regex)
     const spans = [...page.querySelectorAll('.textLayer > span')].filter((s) =>
       /\\[2,/.test(s.textContent || ''));
+    // Bring the bracket up near the top (where the 2026-10-29 frame had it, a
+    // sixth of the way down): the card opens beside
+    // it and the abstract falls out under it, so it needs the room below. Where
+    // «go to page 2» leaves the bracket is the layout's business, not this
+    // frame's — on 2026-11-28 it stood at 638 px of 810 and the shot failed.
+    if (spans[0]) {
+      const want = box.top + box.height * 0.17;
+      const dy = spans[0].getBoundingClientRect().top - want;
+      if (Math.abs(dy) > 20) {
+        const scroller = document.querySelector('.pages[data-pane="a"]');
+        scroller.scrollTop += dy;
+        scroller.dispatchEvent(new Event('scroll'));
+        await settle(600);
+      }
+    }
     const over = (r, q) => r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top;
     const links = [...page.querySelectorAll('a.pdf-link.internal')].filter((a) => {
       const r = a.getBoundingClientRect();
