@@ -93,6 +93,9 @@ runs:
     # matches its capability-profile row (no keys, no network)
     - run: npm run test:ai-chat
       shell: bash
+    # Inline math in the assistant's Markdown, including emphasized prose
+    - run: npm run test:ai-markdown
+      shell: bash
     # Which language an AI answer is in (issue #75): the reader's own words
     # where they typed, else the interface language — or the system's when
     # the interface is English only for want of a dictionary — and the real
