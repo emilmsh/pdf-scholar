@@ -563,6 +563,25 @@ const SHOTS = [
       await ui.setTheme('nightHc')
       await ui.cover()
     `
+  },
+  {
+    // «Read together» (Emil, 2026-11-28: a frame of its own for it and the
+    // References tab). An AI tool outside the app — here the shipped MCP
+    // script, run the way a tool runs it — cites four passages: three the
+    // document holds, one it does not. The window shows the last on its page,
+    // marked, and the References tab lists all four, newest first, the one
+    // whose words are not there flagged. LAST in the run on purpose: it turns
+    // a tool's switch and «Read together» on, and the tab row beside
+    // «Assistant» shows while either is on or a reference is kept — every
+    // assistant frame after it would gain a row. Its cleanup takes it all back.
+    name: 'read_together',
+    caption: 'Read together: an AI tool outside the app shows where the paper says it, and every reference is kept in a list',
+    before: readTogether,
+    setup: `
+      await ui.expectReadTogether(4)
+      await ui.settle(3400)   // outlast the nav pills' idle fade («Back to p. 1»)
+    `,
+    cleanup: `await ui.endReadTogether()`
   }
 ]
 
@@ -1156,6 +1175,31 @@ const ui = {
     for (let i = 0; i < 4; i++) { if (note()) break; await settle(250) }
     for (let i = 0; i < 240 && note(); i++) await settle(250);
     if (note()) throw new Error('the scan was still being read after a minute: ' + (note().textContent || '').trim());
+  },
+  /** read_together: the passage the tool showed is marked on its page and
+   *  the References tab lists every reference it cited */
+  async expectReadTogether(count) {
+    let refs = 0, mark = null, tab = '';
+    for (let i = 0; i < 80; i++) {
+      refs = document.querySelectorAll('.tool-session .tool-ref').length;
+      mark = document.querySelector('.search-hit:not(.cite-flash)');
+      tab = document.querySelector('.ai-tabs [role=tab][aria-selected=true]')?.textContent || '';
+      if (refs === count && mark && /References/.test(tab)) break;
+      await settle(250);
+    }
+    if (refs !== count) throw new Error('the References tab lists ' + refs + ' of ' + count + ' references');
+    if (!mark) throw new Error('the shown passage is not marked on its page');
+    if (!/References/.test(tab)) throw new Error('the right panel is not on References (' + tab + ')');
+    this.expectInFrame(mark, 'the marked passage');
+    await settle(800);
+  },
+  /** …and everything it turned on, off again: the references, «Read
+   *  together», the tool's switch */
+  async endReadTogether() {
+    for (const m of await window.api.toolSessions()) await window.api.removeToolSession(m.id);
+    await window.api.mcpSetPolicy({ live: false });
+    await window.api.mcpConnect('other', false);
+    await settle(400);
   },
   async scrollTextToTop(phrase, pad = 40) {
     const host = document.querySelector('.pages');
@@ -2556,6 +2600,104 @@ async function openScan() {
   })
   child.unref()
 }
+/** read_together's preparation: turn on the one tool switch that writes into
+ *  no tool's config («other») and «Read together», wait for main to listen,
+ *  then run the SHIPPED server script as one session of a tool and cite four
+ *  passages — the last shown, the others only listed (`show: false` moves
+ *  nothing). Every quote that should be in the paper is checked against the
+ *  text the app itself reads, so a quote that drifted fails the frame by name
+ *  instead of photographing a «not found» nobody meant. */
+async function readTogether(send) {
+  const page = async (expression) => {
+    const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true })
+    if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description ?? 'page script failed')
+    return r.result?.value
+  }
+  // Fit to width like the other frames; the fit holds when the panel the
+  // passage opens takes its share of the window
+  await runSetup(send, `await ui.closePanels(); await ui.goToPage(1); await ui.fitWidth()`)
+  await page(`(async () => { await window.api.mcpConnect('other', true); await window.api.mcpSetPolicy({ live: true }); return true })()`)
+  const tokenFile = join(app.profile, 'tool-bridge.json')
+  for (let i = 0; i < 80 && !existsSync(tokenFile); i++) await sleep(250)
+  if (!existsSync(tokenFile)) throw new Error('main never started listening for «Read together»')
+  const script = join(ROOT, 'out', 'mcp', 'pdf-scholar-mcp.cjs')
+  if (!existsSync(script)) throw new Error('out/mcp/pdf-scholar-mcp.cjs is missing — run npm run build')
+  const child = spawn(process.execPath, [script, '--data', app.profile, '--client', 'other'], { stdio: ['pipe', 'pipe', 'pipe'] })
+  let buf = ''
+  let id = 1
+  const waiting = new Map()
+  child.stdout.on('data', (d) => {
+    buf += d
+    for (let nl = buf.indexOf('\n'); nl !== -1; nl = buf.indexOf('\n')) {
+      const line = buf.slice(0, nl)
+      buf = buf.slice(nl + 1)
+      if (!line.trim()) continue
+      const msg = JSON.parse(line)
+      waiting.get(msg.id)?.(msg)
+      waiting.delete(msg.id)
+    }
+  })
+  const rpc = (method, params) =>
+    new Promise((done, fail) => {
+      const mine = ++id
+      const timer = setTimeout(() => fail(new Error(`the MCP script did not answer ${method}`)), 60_000)
+      waiting.set(mine, (msg) => {
+        clearTimeout(timer)
+        done(msg)
+      })
+      child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: mine, method, params })}\n`)
+    })
+  const call = async (name, args) => {
+    const res = await rpc('tools/call', { name, arguments: args })
+    const text = res.result?.content?.[0]?.text ?? ''
+    if (res.result?.isError) throw new Error(`${name} was refused: ${text.slice(0, 200)}`)
+    return text
+  }
+  try {
+    await rpc('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'shoot', version: '1' } })
+    const topic = 'Positional encoding'
+    // Oldest first: the list shows the newest on top, and the last is the one
+    // the window goes to
+    const cites = [
+      {
+        page: 2,
+        claim: 'The Transformer drops recurrence and convolution entirely',
+        // Stops before «sequence-aligned», which the paper breaks over a line
+        quote: 'the Transformer is the first transduction model relying entirely on self-attention to compute representations of its input and output'
+      },
+      {
+        page: 7,
+        claim: 'The base model trained in about half a day',
+        quote: 'We trained the base models for a total of 100,000 steps or 12 hours.'
+      },
+      {
+        // NOT in the paper, on purpose: it reports nearly identical results
+        // for learned embeddings, and the card says the words are not there
+        page: 9,
+        claim: 'Learned positional embeddings did worse than the sinusoids',
+        quote: 'learned positional embeddings performed noticeably worse than the sinusoidal version',
+        missing: true
+      },
+      {
+        page: 6,
+        claim: 'Without recurrence, the order of the tokens has to be added to the input',
+        quote: 'Since our model contains no recurrence and no convolution, in order for the model to make use of the order of the sequence, we must inject some information about the relative or absolute position of the tokens in the sequence.'
+      }
+    ]
+    for (const [i, c] of cites.entries()) {
+      const last = i === cites.length - 1
+      const answer = await call('show_passage', { path: pdf, page: c.page, quote: c.quote, claim: c.claim, topic, show: last })
+      const found = /Found word for word/.test(answer)
+      if (c.missing ? !/NOT FOUND/.test(answer) : !found) {
+        throw new Error(`«${c.quote.slice(0, 50)}…» came back «${answer.slice(0, 120)}»`)
+      }
+      if (!last) await sleep(300)
+    }
+  } finally {
+    child.stdin.end()
+  }
+}
+
 try {
   const [target] = await waitForPageTargets(PORT, 1)
   const ws = await openSocket(target.webSocketDebuggerUrl)
@@ -2584,7 +2726,7 @@ try {
     process.stdout.write(`  ${shot.name} … `)
     try {
       // Node-side preparation a page script cannot do (open a second file)
-      if (shot.before) await shot.before()
+      if (shot.before) await shot.before(send)
       await runSetup(send, shot.setup)
       await sleep(500)
       const { data } = await send('Page.captureScreenshot', {

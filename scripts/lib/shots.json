@@ -46,6 +46,12 @@
     "page that is only a picture is the frame that carries the claim. README",
     "and landing page; the stores keep their five slots.",
     "",
+    "`read_together` joined on 2026-11-28 (Emil): «Read together» and the",
+    "References tab had shipped since 0.87 with no picture. README and landing",
+    "page, under «Your notes in Claude, Codex and other AI tools»; not the",
+    "stores, whose listings do not carry the feature (the Microsoft Store build",
+    "cannot connect, the extension has no MCP).",
+    "",
     "Read by scale-store-shots.cjs (what to downscale) and check-screenshots.mjs",
     "(what must exist where)."
   ],
@@ -70,7 +76,8 @@
     "assistant_figure": { "ships": ["readme", "store"] },
     "parchment": { "ships": [] },
     "night": { "ships": [] },
-    "night+": { "ships": [] }
+    "night+": { "ships": [] },
+    "read_together": { "ships": ["readme", "landing"] }
   },
   "storeOrder": ["tricolor", "annotations", "assistant", "assistant_figure", "dual-pane"]
 }

@@ -106,6 +106,7 @@ surface missing one it needs.
 | `margin` | ✓ | — | — |
 | `reading`, `parchment`, `night` | — | — | — (tricolor's sources) |
 | `shortcuts` | ✓ | ✓ | — (its own section after the assistant, never an opening frame) |
+| `read_together` | ✓ | ✓ | — (the stores do not carry «Read together»; shot last in the run, since it turns a tool's switch on) |
 | `night+`, `annotations_edit`, `reading_tabs`, `page_only`, `feedback`, `signature`, `search` | — | — | — (shot as smoke tests) |
 
 **Why tricolor opens everything, and why it keeps its toolbar** (Emil, 2026-08-08).
