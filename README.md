@@ -268,6 +268,9 @@ the claim came from.
 - Ask about the document, a passage, your own highlights ("summarize what I've
   highlighted"), or a structured summary: research question, method, data, findings,
   limitations. The selection menu adds explain, simplify, critique and a free question
+- An answer from the selection menu can be saved as a comment on the passage, with its
+  sources: a page marker where each one stood and the cited words under the answer. Other
+  PDF readers show that as plain text; in PDF Scholar each marker opens the passage
 - Drag a box around a figure or table and it lands in the chat, staged until you send.
   Images can be pasted the same way. A scanned document is read from its recognised text,
   with the same clickable citations

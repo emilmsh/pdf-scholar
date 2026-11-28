@@ -54,10 +54,17 @@ the only reason it was caught is that `signature` failed outright — the featur
 had not existed when that build was made. Every other frame in that run was
 wrong in ways nothing would have flagged.
 
-**What ships is Emil's call.** Framing, what is on screen, which answer is worth
-showing and which page tells the story are judgement calls, so `npm run shoot`
-writes to the gitignored `docs/screenshots/_auto/` and cannot touch the shipped
-set without `--out`. Review the frames, then copy over the ones that are right.
+**A refresh is mechanical; a new scene is Emil's call.** `npm run shoot` writes
+to the gitignored `docs/screenshots/_auto/` and cannot touch the shipped set
+without `--out`. Which frames exist and where each ships is settled in
+`scripts/lib/shots.json`, and the scenes are scripted, so bringing the shipped
+set up to date needs no choosing: look at every shipped frame in the new run,
+copy over the ones whose picture changed, and say in the commit which moved and
+why the rest did not (Emil, 2026-11-28: «Det med å velge hvilke rammer har jeg
+aldri skjønt. I alle fall der hvor vi bare oppdaterer det som allerede ligger
+ute»). He sees the result in the PR. What stays his: a frame added or taken out,
+or a scene that shows something else — framing, which answer is worth showing
+and which page tells the story are the judgement calls.
 
 The run needs no API key: it takes every shot, including the assistant ones,
 replaying recorded answers from `docs/ai-fixtures/`. Re-record with
