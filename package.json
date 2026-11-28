@@ -60,6 +60,7 @@
     "test:bookmarks": "node scripts/test-bookmarks.mjs",
     "test:retrieval": "node scripts/test-ai-retrieval.mjs",
     "test:ai-chat": "node scripts/test-ai-chat.mjs",
+    "test:ai-markdown": "node scripts/test-ai-markdown.mjs",
     "test:answer-language": "node scripts/test-answer-language.mjs",
     "test:model-curation": "node scripts/test-model-curation.mjs",
     "test:typed-model": "node scripts/test-typed-model.mjs",

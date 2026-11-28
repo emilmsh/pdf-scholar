@@ -44,24 +44,37 @@ function mathNode(tex: string, display: boolean, key: string): React.ReactNode {
   )
 }
 
-function renderInline(text: string, keyBase: string, ctx?: ChipContext): React.ReactNode[] {
+const CODE_OR_TEX = /`[^`\n]+`|\\\(.+?\\\)/g
+const EMPHASIS = /(\*{1,3})[^*\n]+\1/
+const INLINE_TOKEN = new RegExp(
+  [EMPHASIS.source, CODE_OR_TEX.source, /\uE000\d+\uE001|\$\$[^$\n]+\$\$/.source].join('|'),
+  'g'
+)
+
+function renderInline(
+  text: string,
+  keyBase: string,
+  ctx?: ChipContext,
+  tokens = INLINE_TOKEN
+): React.ReactNode[] {
   const out: React.ReactNode[] = []
-  const regex =
-    /(\*\*\*[^*\n]+\*\*\*|\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\uE000\d+\uE001|\\\(.+?\\\)|\$\$[^$\n]+\$\$)/g
+  // A star in TeX or code cannot close emphasis. Mask just those stars so
+  // match offsets still point into the untouched source passed to KaTeX.
+  const scan = tokens === INLINE_TOKEN && text.includes('*')
+    ? text.replace(CODE_OR_TEX, (span) => span.replace(/\*/g, ' '))
+    : text
   let last = 0
-  let match: RegExpExecArray | null
   let i = 0
-  while ((match = regex.exec(text)) !== null) {
+  for (const match of scan.matchAll(tokens)) {
     if (match.index > last) out.push(text.slice(last, match.index))
-    const token = match[0]
+    last = match.index + match[0].length
+    const token = text.slice(match.index, last)
     if (token.startsWith('\\(')) {
       out.push(mathNode(token.slice(2, -2), false, `${keyBase}-${i++}`))
-      last = regex.lastIndex
       continue
     }
     if (token.startsWith('$$')) {
       out.push(mathNode(token.slice(2, -2), false, `${keyBase}-${i++}`))
-      last = regex.lastIndex
       continue
     }
     if (token.startsWith('\uE000')) {
@@ -116,20 +129,15 @@ ${t('ai.conversationChipTip')}`}
           </button>
         )
       }
-    } else if (token.startsWith('***')) {
-      out.push(
-        <strong key={`${keyBase}-${i++}`}>
-          <em>{token.slice(3, -3)}</em>
-        </strong>
-      )
-    } else if (token.startsWith('**')) {
-      out.push(<strong key={`${keyBase}-${i++}`}>{token.slice(2, -2)}</strong>)
     } else if (token.startsWith('`')) {
       out.push(<code key={`${keyBase}-${i++}`}>{token.slice(1, -1)}</code>)
     } else {
-      out.push(<em key={`${keyBase}-${i++}`}>{token.slice(1, -1)}</em>)
+      const width = match[1].length
+      const key = `${keyBase}-${i++}`
+      const body = renderInline(token.slice(width, -width), key, ctx, CODE_OR_TEX)
+      if (width === 1) out.push(<em key={key}>{body}</em>)
+      else out.push(<strong key={key}>{width === 3 ? <em>{body}</em> : body}</strong>)
     }
-    last = regex.lastIndex
   }
   if (last < text.length) out.push(text.slice(last))
   return out
