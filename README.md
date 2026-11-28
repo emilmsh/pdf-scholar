@@ -314,6 +314,9 @@ paper: highlights with the words they mark, comments, and your assistant convers
   there. A document's own text and its file path then go to the tool. In Claude Code, the
   separate plugin [Show your work](https://github.com/emilmsh/show-your-work) makes each
   source Claude cites a link in its answer that opens the passage (Windows only for now)
+
+  ![Read together: the passage an AI tool cited, marked on its page, and the References tab listing every reference, one flagged as not found in the text](docs/screenshots/read_together.png)
+
 - For a tool that cannot connect, "Copy for AI" in the Annotations tab copies one
   document's notes and conversations as text to paste. This also works in the browser
   extension

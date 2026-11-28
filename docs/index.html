@@ -307,6 +307,8 @@
   /* No frame of its own: the heading stands left, the points right. */
   section.feature.text { align-items: start; }
   section.feature.text ul.points { margin-top: 6px; }
+  /* …except where the points carry a frame under them (Read together) */
+  section.feature.text .aside a.shot-link { margin-top: 26px; }
 
   section h2 {
     font-size: 30px;
@@ -700,12 +702,17 @@
         </span>
       </a>
     </div>
+    <div class="aside">
     <ul class="points">
       <li>The MCP server is part of the app. Claude and Codex each have a switch under “AI tools” in the settings menu; other tools that support MCP take one config entry, which the app copies for you. <a href="https://github.com/emilmsh/pdf-scholar/blob/master/docs/MCP.md">How to set it up</a>.</li>
       <li>Every switch is off until you turn it on. A document or a whole folder can be kept out, and a tool never sees the PDFs, images, file paths or anything from a password-protected document.</li>
       <li>The one exception is “Read together”, a switch of its own: with it on, Claude or Codex can show you the passage a claim rests on. PDF Scholar opens the document, goes to the page and marks the quoted words, and tells the tool whether those words really are there. A document's own text and its file path then go to the tool.</li>
       <li>For a tool that cannot connect, “Copy for AI” copies one document's notes and conversations as text to paste. This also works in the browser extension.</li>
     </ul>
+    <a class="shot-link" href="screenshots/read_together.png">
+      <img class="shot" loading="lazy" src="screenshots/read_together.png" alt="Read together: the passage an AI tool cited, marked on page 6, and the References tab beside it listing four references, newest first, one flagged as not found in the text.">
+    </a>
+    </div>
   </section>
 
   <section class="feature" id="shortcuts">
